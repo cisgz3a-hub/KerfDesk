@@ -53,7 +53,11 @@ function validateOwnership(document: DesignStudioDocument): string | null {
     )
   )
     return 'output ownership';
-  if (document.appliedOperationsByLayer.some(([layer]) => !layerIds.has(layer)))
+  const operationTargets = new Set(document.appliedOperationsByLayer.map(([, id]) => id));
+  if (
+    operationTargets.size !== document.appliedOperationsByLayer.length ||
+    document.appliedOperationsByLayer.some(([layer]) => !layerIds.has(layer))
+  )
     return 'operation ownership';
   return null;
 }

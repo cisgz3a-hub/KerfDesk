@@ -117,6 +117,7 @@ function StudioNavigation({
         type="button"
         className="lf-btn"
         aria-pressed={mode === 'vectors'}
+        title="Draw vector shapes and compose them with project photos"
         onClick={() => onChange('vectors')}
       >
         Vectors
@@ -125,6 +126,7 @@ function StudioNavigation({
         type="button"
         className="lf-btn"
         aria-pressed={mode === 'photos'}
+        title="Import photos or edit the photos saved in this project"
         onClick={() => onChange('photos')}
       >
         Photos
@@ -135,12 +137,22 @@ function StudioNavigation({
           : 'Design Studio · Edit project photos'}
       </span>
       {mode === 'photos' ? (
-        <button type="button" className="lf-btn" onClick={() => onChange('vectors')}>
+        <button
+          type="button"
+          className="lf-btn"
+          title="Return to the photo and vector composition canvas"
+          onClick={() => onChange('vectors')}
+        >
           Back to canvas
         </button>
       ) : null}
       {mode === 'photos' ? (
-        <button type="button" className="lf-btn design-workspace-close" onClick={onClose}>
+        <button
+          type="button"
+          className="lf-btn design-workspace-close"
+          title="Close Design Studio and return to the project workspace"
+          onClick={onClose}
+        >
           Close studio
         </button>
       ) : null}

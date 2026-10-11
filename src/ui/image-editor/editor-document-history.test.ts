@@ -80,12 +80,42 @@ describe('dimension-changing image history', () => {
     current = undoScoped(current);
     expect(pixels(current)).toEqual(original);
     expect(current.baseLayers?.every((layer) => layer.buffer.width === 4)).toBe(true);
-    expect(current.baseLayers?.[1]?.buffer).not.toBe(baseLayers[1]?.buffer);
+    expect(current.baseLayers).toBe(baseLayers);
     current = removeActiveLayer(current);
     current = revertSession(current);
     expect(current.layers.map((layer) => layer.id)).toEqual(['background', 'ink']);
     expect(current.activeLayerId).toBe('ink');
     expect(pixels(current).layers).toEqual(original.layers);
+  });
+
+  it('shares immutable Revert sources through metadata Undo/Redo while isolating paint pixels', () => {
+    let current = paint(addLayerAboveActive(session(), 'ink'));
+    const base = current.base;
+    const baseLayers = current.layers.map((layer) => ({
+      ...layer,
+      buffer: cloneRgbaBuffer(layer.buffer),
+    }));
+    current = { ...current, baseLayers, baseActiveLayerId: 'ink', history: createEditHistory() };
+    const original = pixels(current);
+    current = setActiveLayerProps(current, { name: 'Paint' });
+    current = setActiveLayerProps(current, { opacity: 0.5 });
+    current = setActiveLayerProps(current, { isVisible: false });
+    for (let index = 0; index < 3; index += 1) {
+      current = undoScoped(current);
+      expect(current.base).toBe(base);
+      expect(current.baseLayers).toBe(baseLayers);
+      expect(current.doc).not.toBe(baseLayers[1]?.buffer);
+    }
+    for (let index = 0; index < 3; index += 1) {
+      current = redoScoped(current);
+      expect(current.base).toBe(base);
+      expect(current.baseLayers).toBe(baseLayers);
+    }
+    current = paint(current, 3, 3);
+    current = revertSession(current);
+    expect(pixels(current).layers).toEqual(original.layers);
+    current = paint(current, 2, 2);
+    expect(pixels(revertSession(current)).layers).toEqual(original.layers);
   });
 
   it('undoes and redoes strokes across resize, crop and canvas size with exact physical geometry', () => {

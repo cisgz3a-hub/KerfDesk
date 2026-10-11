@@ -27,15 +27,16 @@ export function captureDocumentHistory(session: EditorSession, label: string): H
     ...layer,
     buffer: cloneRgbaBuffer(layer.buffer),
   }));
-  const base = cloneRgbaBuffer(session.base);
-  const baseLayers = session.baseLayers?.map((layer) => ({
-    ...layer,
-    buffer: cloneRgbaBuffer(layer.buffer),
-  }));
+  // Revert sources are immutable: Revert clones them into working layers and
+  // Image Size replaces them with resampled buffers. Share these potentially
+  // large sources across metadata snapshots instead of copying them each time.
+  const { base, baseLayers } = session;
   const selection =
     session.selection === null
       ? null
       : { ...session.selection, alpha: session.selection.alpha.slice() };
+  // Conservatively charge retained sources per entry. In particular, resizing
+  // must not leave an old, otherwise unreferenced baseline outside the budget.
   const byteSize =
     layers.reduce((bytes, layer) => bytes + layer.buffer.data.byteLength, base.data.byteLength) +
     (selection?.alpha.byteLength ?? 0) +
@@ -85,14 +86,11 @@ export function stepDocumentHistory(
     layers,
     activeLayerId: active.id,
     doc: active.buffer,
-    base: cloneRgbaBuffer(snapshot.base),
+    base: snapshot.base,
     ...(snapshot.baseLayers === undefined
       ? {}
       : {
-          baseLayers: snapshot.baseLayers.map((layer) => ({
-            ...layer,
-            buffer: cloneRgbaBuffer(layer.buffer),
-          })),
+          baseLayers: snapshot.baseLayers,
         }),
     ...(snapshot.baseActiveLayerId === undefined
       ? {}

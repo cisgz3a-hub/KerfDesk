@@ -26,6 +26,7 @@ export function DesignPhotoWorkspace(): JSX.Element {
         <button
           className="lf-btn lf-btn--primary"
           type="button"
+          title="Import a photo into this project and open its editing tools"
           onClick={importPhoto}
           disabled={importing || !available}
         >
@@ -48,6 +49,7 @@ export function DesignPhotoWorkspace(): JSX.Element {
               key={photo.id}
               onClick={() => openEditor(photo)}
               aria-label={`Edit photo ${photo.source}`}
+              title={`Open ${photo.source} and its editable photo layers`}
               disabled={importing}
             >
               {photo.dataUrl ? <img src={photo.dataUrl} alt="" /> : <span>Photo</span>}

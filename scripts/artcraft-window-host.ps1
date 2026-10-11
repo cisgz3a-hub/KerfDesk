@@ -139,7 +139,19 @@ public static class KerfDeskWindowHost {
                 x=left,y=top,width=w,height=h,parentWidth=client.Right,parentHeight=client.Bottom,dpi=GetDpiForWindow(entry.Window),visible=IsWindowVisible(entry.Window) };
         } finally { if(oldContext!=IntPtr.Zero) SetThreadDpiAwarenessContext(oldContext); }
     }
-    public static void Hide(string id) { ShowWindow(Owned(id).Window,0); }
+    public static void Hide(string id) {
+        Entry entry;
+        if (!entries.TryGetValue(id,out entry)) return;
+        uint pid;
+        if (!IsWindow(entry.Window) || GetWindowThreadProcessId(entry.Window,out pid)==0 || pid!=entry.Pid) {
+            entries.Remove(id); return;
+        }
+        // A live handle still needs its process identity checked before use.
+        // Never hide a recycled HWND or a different process.
+        try { CheckIdentity(entry.Pid,entry.Start,entry.Executable); }
+        catch { entries.Remove(id); return; }
+        ShowWindow(entry.Window,0);
+    }
     public static void Focus(string id) {
         CheckHost(); var entry=Owned(id);
         uint ignored; uint target=GetWindowThreadProcessId(entry.Window,out ignored);

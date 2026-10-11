@@ -3,11 +3,31 @@ import type { AdjustmentId } from './editor-adjustments';
 import { useImageEditorStore } from './image-editor-store';
 import { useResizeDialogStore } from './resize-dialog-store';
 
-const ADJUSTMENTS: readonly { readonly id: AdjustmentId; readonly label: string }[] = [
-  { id: 'remove-white-background', label: 'Clean up white paper' },
-  { id: 'brightness-contrast', label: 'Brightness & contrast' },
-  { id: 'levels', label: 'Levels' },
-  { id: 'threshold', label: 'Black & white' },
+const ADJUSTMENTS: readonly {
+  readonly id: AdjustmentId;
+  readonly label: string;
+  readonly help: string;
+}[] = [
+  {
+    id: 'remove-white-background',
+    label: 'Clean up white paper',
+    help: 'Make white paper transparent on the active layer',
+  },
+  {
+    id: 'brightness-contrast',
+    label: 'Brightness & contrast',
+    help: 'Adjust the brightness and contrast of the active layer',
+  },
+  {
+    id: 'levels',
+    label: 'Levels',
+    help: 'Adjust shadows, midtones and highlights on the active layer',
+  },
+  {
+    id: 'threshold',
+    label: 'Black & white',
+    help: 'Convert the active layer to black and white using a threshold',
+  },
 ];
 
 /** Common photo preparation tasks share the full editor's preview and Undo path. */
@@ -31,6 +51,7 @@ export function PhotoQuickActions(): JSX.Element {
           className="lf-btn"
           disabled={disabled}
           onClick={() => setTool({ kind: 'crop' })}
+          title="Choose the area of the photo to keep"
         >
           Crop photo
         </button>
@@ -39,12 +60,14 @@ export function PhotoQuickActions(): JSX.Element {
           className="lf-btn"
           disabled={disabled}
           onClick={() => openResize('image-size')}
+          title="Change the photo's pixel dimensions"
         >
           Resize pixels
         </button>
         {ADJUSTMENTS.map((action) => (
           <button
             key={action.id}
+            title={action.help}
             type="button"
             className="lf-btn"
             disabled={disabled}

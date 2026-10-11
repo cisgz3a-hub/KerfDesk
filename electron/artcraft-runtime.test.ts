@@ -165,6 +165,36 @@ it('rejects corrupt native bytes before starting an editor', async () => {
   );
   expect(launchArtcraftProcess).not.toHaveBeenCalled();
 });
+it('reuses identical restored documents concurrently and after restarting the runtime', async () => {
+  const original = createArtcraftRuntime(root, 'editors');
+  const source = await original.open({ editor: 'photo' });
+  const document = await original.capture!(source.id);
+  const profile = path.join(root, 'restored-profile');
+  const restored = createArtcraftRuntime(profile, 'editors');
+  const [first, concurrent] = await Promise.all([
+    restored.restore!(document),
+    restored.restore!(document),
+  ]);
+  expect(concurrent.id).toBe(first.id);
+  expect((await restored.restore!(document)).id).toBe(first.id);
+  const restarted = createArtcraftRuntime(profile, 'editors');
+  expect((await restarted.restore!(document)).id).toBe(first.id);
+  expect((await restarted.status()).sessions).toHaveLength(1);
+});
+it('keeps newer working bytes when restoring an older embedded revision', async () => {
+  const original = createArtcraftRuntime(root, 'editors');
+  const source = await original.open({ editor: 'photo' });
+  const document = await original.capture!(source.id);
+  const working = path.join(root, 'artcraft-studio', source.id, 'working.pcraft');
+  await writeFile(working, 'newer local document');
+  const restarted = createArtcraftRuntime(root, 'editors');
+  const restored = await restarted.restore!(document);
+  expect(restored.id).not.toBe(source.id);
+  expect(await readFile(working, 'utf8')).toBe('newer local document');
+  expect((await restarted.capture!(restored.id)).nativeSha256).toBe(document.nativeSha256);
+  expect((await restarted.restore!(document)).id).toBe(restored.id);
+  expect((await restarted.status()).sessions).toHaveLength(2);
+});
 it('refuses to checkpoint a document changed while saving', async () => {
   const runtime = createArtcraftRuntime(root, 'editors');
   const session = await runtime.open({ editor: 'photo' });

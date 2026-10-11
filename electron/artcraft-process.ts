@@ -14,10 +14,36 @@ export type ArtcraftProcess = {
   running(): boolean;
 };
 
+// Also retain ownership when a disk/identity failure prevents a durable lease.
+// Never launch another editor against the same working file while this child lives.
+const ownedDirectories = new Map<string, ChildProcess | null>();
+
 export async function launchArtcraftProcess(
   executable: string,
   editor: ArtcraftEditor,
   directory: string,
+): Promise<ArtcraftProcess> {
+  const key =
+    process.platform === 'win32' ? path.resolve(directory).toLowerCase() : path.resolve(directory);
+  if (ownedDirectories.has(key)) {
+    throw new Error(
+      'The previous editor for this session is still running. Close its window before retrying.',
+    );
+  }
+  ownedDirectories.set(key, null);
+  try {
+    return await launchOwnedProcess(executable, editor, directory, key);
+  } catch (error) {
+    if (ownedDirectories.get(key) === null) ownedDirectories.delete(key);
+    throw error;
+  }
+}
+
+async function launchOwnedProcess(
+  executable: string,
+  editor: ArtcraftEditor,
+  directory: string,
+  key: string,
 ): Promise<ArtcraftProcess> {
   await checkEditorLease(directory);
   const port = await reservePort();
@@ -45,30 +71,45 @@ export async function launchArtcraftProcess(
     windowsHide: true,
     stdio: 'ignore',
   });
+  ownedDirectories.set(key, child);
+  const release = () => {
+    if (ownedDirectories.get(key) === child) ownedDirectories.delete(key);
+  };
+  child.once('exit', release);
   let launchError: Error | null = null;
   child.on('error', (error) => {
     launchError = error;
+    if (child.pid === undefined) release();
   });
+  // Every post-spawn failure leaves the visible editor independent of KerfDesk.
+  // The handshake's sockets/timers keep its awaited work alive while connecting.
+  child.unref();
   const handle: ArtcraftProcess = {
     child,
     request: (method, params = {}) => artcraftRequest(options, method, params),
     running: () => launchError === null && child.exitCode === null && child.signalCode === null,
   };
-  await saveEditorLease(directory, child.pid, executable);
+  try {
+    await saveEditorLease(directory, child.pid, executable);
+  } catch (error) {
+    if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) release();
+    throw new Error(
+      'Could not record the editor process. Close its native window before retrying or restarting KerfDesk.',
+      { cause: error },
+    );
+  }
   const deadline = Date.now() + 45_000;
   while (Date.now() < deadline) {
     if (launchError !== null) throw launchError;
     if (!handle.running()) throw new Error('The editor exited before it was ready.');
     try {
       await artcraftRequest({ ...options, timeoutMs: 1500 }, 'ui.inspect', {});
-      child.unref();
       return handle;
     } catch {
       await delay(200);
     }
   }
   // Do not kill a visible editor: the operator may already have started drawing.
-  child.unref();
   throw new Error(
     'The full editor opened but its connection is not ready. Close that editor and retry.',
   );

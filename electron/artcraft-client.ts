@@ -127,7 +127,9 @@ function validateEndpoint(endpoint: ArtcraftEndpoint): number {
   if (!Number.isInteger(endpoint.port) || endpoint.port < 1 || endpoint.port > 65535) {
     throw new Error('Invalid ArtCraft control port');
   }
-  const timeoutMs = endpoint.timeoutMs ?? 30_000;
+  // PhotoCraft 0.7.0 and VectorCraft 0.9.0 allow 60 seconds for replies.
+  // Leave time for authentication/transport rather than abandoning a save early.
+  const timeoutMs = endpoint.timeoutMs ?? 65_000;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new Error('Invalid ArtCraft request timeout');
   }

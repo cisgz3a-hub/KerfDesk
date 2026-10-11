@@ -7,7 +7,8 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 10_000 });
   await page.getByRole('button', { name: 'Open Design Studio', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Design Studio' })).toBeVisible();
-  await page.getByRole('button', { name: '3D', exact: true }).click();
+  const threeD = page.getByRole('button', { name: '3D', exact: true });
+  if ((await threeD.getAttribute('aria-pressed')) === 'true') await threeD.click();
   await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute(
     'aria-pressed',
     'false',

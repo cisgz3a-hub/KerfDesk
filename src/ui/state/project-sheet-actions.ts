@@ -5,6 +5,7 @@ import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 import { projectWithCurrentJobSetup } from './project-job-setup';
 import { visitWorkflowArchives } from '../../io/project/project-workflow-archives';
+import { validateProjectStudioDocuments } from '../../io/project/project-studio-document-validator';
 import { useToastStore } from './toast-store';
 
 type Set = (patch: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
@@ -87,7 +88,7 @@ export function projectSheetActions(set: Set, get: () => AppState): ProjectSheet
 }
 
 function replaceSheetProject(set: Set, get: () => AppState, project: Project): boolean {
-  const error = visitWorkflowArchives(project);
+  const error = visitWorkflowArchives(project) ?? validateProjectStudioDocuments(project);
   if (error !== null) {
     useToastStore.getState().pushToast(error, 'warning');
     return false;

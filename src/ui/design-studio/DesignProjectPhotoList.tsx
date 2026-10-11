@@ -26,6 +26,7 @@ export function DesignProjectPhotoList(actions: DesignPhotoActions): JSX.Element
               type="button"
               key={photo.id}
               aria-label={`Select photo ${photo.source}`}
+              title={`Select ${photo.source} on the composition canvas`}
               aria-pressed={photo.id === selected?.id}
               disabled={!visible || photo.locked === true}
               onClick={() => {
@@ -53,6 +54,7 @@ export function DesignProjectPhotoList(actions: DesignPhotoActions): JSX.Element
         <button
           type="button"
           className="lf-btn"
+          title="Open the selected photo and its editable layers"
           disabled={selected.locked === true || !sceneObjectHasVisibleLayer(scene, selected)}
           onClick={() => actions.onEditPhoto?.(selected.id)}
         >

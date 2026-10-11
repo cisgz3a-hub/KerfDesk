@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { createServer, type Server, type Socket } from 'node:net';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { artcraftRequest } from './artcraft-client';
 
 const servers: Server[] = [];
@@ -31,6 +31,8 @@ async function endpoint(handle: (request: Request, socket: Socket) => void) {
 }
 
 afterEach(async () => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   for (const socket of sockets) socket.destroy();
   await Promise.all(
     servers
@@ -40,6 +42,34 @@ afterEach(async () => {
 });
 
 describe('ArtCraft native control transport', () => {
+  it('allows the upstream 60-second reply deadline when no timeout is overridden', async () => {
+    let received!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      received = resolve;
+    });
+    let reply!: () => void;
+    const target = await endpoint((request, socket) => {
+      reply = () =>
+        socket.end(JSON.stringify({ id: request.id, ok: true, result: 'saved' }) + '\n');
+      received();
+    });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const saving = artcraftRequest({ port: target.port }, 'app.save');
+    let settled = false;
+    void saving.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      },
+    );
+    await ready;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(settled).toBe(false);
+    reply();
+    await expect(saving).resolves.toBe('saved');
+  });
   it('authenticates PhotoCraft before sending the command and handles split UTF-8 replies', async () => {
     const methods: string[] = [];
     const target = await endpoint((request, socket) => {

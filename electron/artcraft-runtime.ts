@@ -44,6 +44,7 @@ class DesktopStudio implements ArtcraftRuntime {
   private readonly busy = new Set<string>();
   private readonly ready = new Set<string>();
   private readonly captured = new Map<string, { identity: string; document: ArtcraftDocument }>();
+  private readonly restoring = new Map<string, Promise<ArtcraftSession>>();
   private loaded: Promise<void> | undefined;
   constructor(
     private readonly root: string,
@@ -179,6 +180,23 @@ class DesktopStudio implements ArtcraftRuntime {
   async restore(value: unknown): Promise<ArtcraftSession> {
     const { document, bytes } = readArtcraftDocument(value);
     await this.load();
+    const key = `${document.id}:${document.editor}:${document.nativeSha256}`;
+    const pending = this.restoring.get(key);
+    if (pending !== undefined) return pending;
+    const restore = this.restoreDocument(document, bytes);
+    this.restoring.set(key, restore);
+    try {
+      return await restore;
+    } finally {
+      this.restoring.delete(key);
+    }
+  }
+  private async restoreDocument(
+    document: ArtcraftDocument,
+    bytes: Buffer,
+  ): Promise<ArtcraftSession> {
+    const existing = await this.matchingSession(document);
+    if (existing !== undefined) return this.resume(existing.id);
     const id = randomUUID();
     const directory = studioDirectory(this.root, id);
     const nativeFile = workingFile(document.editor);
@@ -194,6 +212,26 @@ class DesktopStudio implements ArtcraftRuntime {
     await saveStudioSession(this.root, session);
     this.sessions.set(id, session);
     return this.resume(id);
+  }
+  private async matchingSession(
+    document: ArtcraftDocument,
+  ): Promise<StoredArtcraftSession | undefined> {
+    for (const session of this.sessions.values()) {
+      if ((session.documentId ?? session.id) !== document.id || session.editor !== document.editor)
+        continue;
+      if (this.processes.get(session.id)?.running() === true) {
+        // Capture live edits first: a previously matching revision must not reuse changed work.
+        if ((await this.capture(session.id)).nativeSha256 === document.nativeSha256) return session;
+        continue;
+      }
+      const directory = studioDirectory(this.root, session.id);
+      const recovered = await prepareRecoveredSession(session, directory);
+      if (recovered.nativeFile === undefined) continue;
+      const bytes = await boundedStudioRead(await studioFile(directory, recovered.nativeFile));
+      if (createHash('sha256').update(bytes).digest('hex') === document.nativeSha256)
+        return session;
+    }
+    return undefined;
   }
   async capture(id: string): Promise<ArtcraftDocument> {
     await this.load();

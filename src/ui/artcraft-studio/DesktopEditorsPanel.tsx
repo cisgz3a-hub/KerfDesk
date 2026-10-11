@@ -54,6 +54,7 @@ export function DesktopEditorsPanel({ onClose }: { readonly onClose: () => void 
               <button
                 type="button"
                 key={document.id}
+                title={`Resume editing ${document.title}`}
                 disabled={bridge.busy}
                 aria-pressed={document.id === (bridge.session?.documentId ?? bridge.session?.id)}
                 onClick={() => void bridge.resume(document.id)}
@@ -95,6 +96,7 @@ function NewDocument({ bridge }: { readonly bridge: EditorBridge }): JSX.Element
           type="button"
           disabled={bridge.busy}
           aria-pressed={bridge.editor === 'vector'}
+          title="Create a document with VectorCraft's vector drawing tools"
           onClick={() => bridge.chooseEditor('vector')}
         >
           VectorCraft
@@ -103,6 +105,7 @@ function NewDocument({ bridge }: { readonly bridge: EditorBridge }): JSX.Element
           type="button"
           disabled={bridge.busy}
           aria-pressed={bridge.editor === 'photo'}
+          title="Create a document with PhotoCraft's photo editing tools"
           onClick={() => bridge.chooseEditor('photo')}
         >
           PhotoCraft
@@ -113,6 +116,7 @@ function NewDocument({ bridge }: { readonly bridge: EditorBridge }): JSX.Element
         <input
           key={bridge.editor}
           type="file"
+          title="Choose an SVG for VectorCraft or a PNG or JPEG for PhotoCraft"
           accept={bridge.editor === 'vector' ? '.svg' : '.png,.jpg,.jpeg'}
           disabled={bridge.busy}
           onChange={(event) => bridge.setFile(event.target.files?.[0] ?? null)}
@@ -126,6 +130,7 @@ function NewDocument({ bridge }: { readonly bridge: EditorBridge }): JSX.Element
             min="0.01"
             step="any"
             value={bridge.width}
+            title="Set the artwork width in millimetres"
             disabled={bridge.busy}
             onChange={(event) => bridge.setWidth(event.target.value)}
           />
@@ -137,6 +142,7 @@ function NewDocument({ bridge }: { readonly bridge: EditorBridge }): JSX.Element
             min="0.01"
             step="any"
             value={bridge.height}
+            title="Set the artwork height in millimetres"
             disabled={bridge.busy}
             onChange={(event) => bridge.setHeight(event.target.value)}
           />

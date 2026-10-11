@@ -143,6 +143,48 @@ describe('project-owned vector source', () => {
     expect(sessionSketch(restoreProjectDesignSession(restored.project))).toEqual(guides);
   });
 
+  it('rejects two design layers claiming the same operation when reopening a project', () => {
+    const secondLayer = {
+      ...DEFAULT_DESIGN_LAYER,
+      id: 'second-layer',
+      name: 'Deeper cut',
+      depthMm: 3,
+    };
+    const layeredSketch: Sketch = {
+      layers: [DEFAULT_DESIGN_LAYER, secondLayer],
+      entities: sketch.entities.map((entity) =>
+        entity.id === 'rect' ? { ...entity, layerId: secondLayer.id } : entity,
+      ),
+    };
+    const applied = applyDesignSketch({ project: createProject(), undoStack: [] }, layeredSketch, [
+      'arc-output',
+      'guide-unused',
+      'rect-output',
+    ]);
+    if (applied === null || applied.project.designStudioDocument === undefined)
+      throw new Error('layered apply failed');
+    const document = applied.project.designStudioDocument;
+    expect(document.appliedOperationsByLayer).toHaveLength(2);
+    expect(new Set(document.appliedOperationsByLayer.map(([, id]) => id)).size).toBe(2);
+    expect(deserializeProject(serializeProject(applied.project)).kind).toBe('ok');
+
+    const operationId = document.appliedOperationsByLayer[0]![1];
+    const malformed = {
+      ...applied.project,
+      designStudioDocument: {
+        ...document,
+        appliedOperationsByLayer: [
+          [DEFAULT_DESIGN_LAYER.id, operationId],
+          [secondLayer.id, operationId],
+        ],
+      },
+    };
+    expect(deserializeProject(JSON.stringify(malformed))).toMatchObject({
+      kind: 'invalid',
+      reason: expect.stringContaining('operation ownership'),
+    });
+  });
+
   it.each([
     { sketch: { entities: [{ ...sketch.entities[0], sweepDeg: 1e308 }] } },
     { appliedEntityObjectIds: [] },

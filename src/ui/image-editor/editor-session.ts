@@ -109,9 +109,9 @@ export type EditorSession = {
   /** Bottom-up layer stack; index 0 is the Background (ADR-245). */
   readonly layers: readonly EditorLayer[];
   readonly activeLayerId: string;
-  /** As-opened pixels, for the explicit Revert action (F-L4). */
+  /** Immutable Revert pixels. Resize replaces these; never mutate in place. */
   readonly base: RgbaBuffer;
-  /** Layered source restored from the project, for lossless Revert. */
+  /** Immutable layered Revert source; clone before making it editable. */
   readonly baseLayers?: readonly EditorLayer[];
   readonly baseActiveLayerId?: string;
   /** Where the doc sits inside the as-opened image (crop accumulates). */
