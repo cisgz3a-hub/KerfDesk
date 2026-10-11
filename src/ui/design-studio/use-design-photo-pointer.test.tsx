@@ -7,6 +7,7 @@ import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { createDesignSession } from './design-session';
 import { useDesignStudioStore } from './design-studio-store';
+import type { DesignSurface } from './design-surface';
 import { useDesignPointer } from './use-design-pointer';
 import { useDesignPhotoPointer } from './use-design-photo-pointer';
 
@@ -15,8 +16,9 @@ import { useDesignPhotoPointer } from './use-design-photo-pointer';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 const onSelectPhoto = vi.fn();
-const surface = {
+const surface: DesignSurface = {
   toMm: (event: React.PointerEvent<HTMLCanvasElement>) => ({ x: event.clientX, y: event.clientY }),
+  toClient: (point) => point,
   pxPerMm: () => 2,
 };
 
