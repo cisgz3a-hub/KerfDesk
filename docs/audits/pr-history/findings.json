@@ -9,7 +9,7 @@
     "attribution": null,
     "group": "svg-paint-opacity",
     "localEvidence": "docs/audits/2026-10-11-pr-history/foundation.md",
-    "repairReport": "docs/audits/2026-10-11-pr-history/publication/svg-math-followup.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-repair-report.md",
     "followUps": [
       {
         "title": "Invalid winning CSS and duplicate inline declarations discard a valid lower opacity",
@@ -53,12 +53,22 @@
         "evidence": "docs/audits/2026-10-11-pr-history/publication/svg-math-limits.json",
         "publishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
         "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md"
+      },
+      {
+        "title": "Valid variable-containing opacity declaration is discarded before the cascade winner is resolved",
+        "result": "Confirmed valid variable winner was discarded before cascade resolution. The published repair preserves syntactically valid variable-containing winners as unresolved, imports them with opacity 1 and explicitly warns that CSS variables or layout-dependent values may hide source artwork that is included. Invalid syntax retains valid lower candidates. Full custom-property substitution remains outside scope. Source review, 1259 isolated tests and 12 real production-worker cases passed; latest-head hosted CI is pending.",
+        "status": "published-awaiting-ci",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240505326",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-reproduction.md",
+        "publishedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md"
       }
     ],
-    "followUpAttribution": "The first four follow-ups were corrected in the earlier audit repair. The later rollback, typed math and replacement-warning defects are repaired and published at the recorded follow-up head; required CI is still pending. These audit-repair regressions and older cascade limitations are not attributed wholesale to historical PR #10.",
+    "followUpAttribution": "Cascade, rollback, typed-math, replacement-warning and variable-winner follow-ups are published at the recorded review heads. The variable defect was found while reviewing the audit repair; its historical introduction was not established and is not assigned to PR #10. The separate intermediate Infinity/NaN claim did not reproduce and is rejected candidate DISP-042, not a repaired defect.",
     "followUpEvidence": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
     "previousRepairReports": [
-      "docs/audits/2026-10-11-pr-history/publication/svg-opacity-follow-up.md"
+      "docs/audits/2026-10-11-pr-history/publication/svg-opacity-follow-up.md",
+      "docs/audits/2026-10-11-pr-history/publication/svg-math-followup.md"
     ]
   },
   {

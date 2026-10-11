@@ -20,10 +20,11 @@ Review follow-ups:
 - Comments and malformed numeric tokens change imported visibility: Confirmed comment rejection in the first candidate. Accept surrounding comments without joining number, percent, sign or keyword tokens; reject trailing-dot numbers and clamp large numeric values consistently. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305771).
 - Valid revert-layer incorrectly exposes lower opacity from the same cascade layer: Confirmed in the earlier audit repair. Inline revert-layer now reveals stylesheet opacity, and stylesheet rollback reveals the presentation attribute with importance order preserved. Independently reviewed and published; latest-head hosted CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364150).
 - Valid CSS math opacity is rejected before cascade resolution: Context-free CSS math now retains valid winning opacity, including typed absolute-unit cancellation and scalar functions; invalid numeric types preserve valid lower declarations. Layout-dependent winners retain an explicitly warned opaque approximation because exact visibility requires layout. Fresh imports and replacements both display the warning. Independently reviewed and published; latest-head hosted CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364155).
+- Valid variable-containing opacity declaration is discarded before the cascade winner is resolved: Confirmed valid variable winner was discarded before cascade resolution. The published repair preserves syntactically valid variable-containing winners as unresolved, imports them with opacity 1 and explicitly warns that CSS variables or layout-dependent values may hide source artwork that is included. Invalid syntax retains valid lower candidates. Full custom-property substitution remains outside scope. Source review, 1259 isolated tests and 12 real production-worker cases passed; latest-head hosted CI is pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240505326).
 
-The first four follow-ups were corrected in the earlier audit repair. The later rollback, typed math and replacement-warning defects are repaired and published at the recorded follow-up head; required CI is still pending. These audit-repair regressions and older cascade limitations are not attributed wholesale to historical PR #10.
+Cascade, rollback, typed-math, replacement-warning and variable-winner follow-ups are published at the recorded review heads. The variable defect was found while reviewing the audit repair; its historical introduction was not established and is not assigned to PR #10. The separate intermediate Infinity/NaN claim did not reproduce and is rejected candidate DISP-042, not a repaired defect.
 
-Local evidence: docs/audits/2026-10-11-pr-history/foundation.md. Repair evidence: docs/audits/2026-10-11-pr-history/publication/svg-math-followup.md.
+Local evidence: docs/audits/2026-10-11-pr-history/foundation.md. Repair evidence: docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-repair-report.md.
 
 ## BITMAP-01: Retain boundary outlines after pixel-coordinate rounding
 
@@ -75,7 +76,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/early-ui-materials.md. Repair 
 
 ## CCA-001: Append camera preview cache busting outside the proxied camera URL
 
-Repair: [#1142](https://github.com/cisgz3a-hub/KerfDesk/pull/1142). State: pr-open-ci-pending.
+Repair: [#1142](https://github.com/cisgz3a-hub/KerfDesk/pull/1142). State: pr-open-ci-verified.
 
 Trigger: Detect a machine snapshot camera whose successful frame response takes longer than the 1500 ms preview poll (2.2 s in reproduction, below the bridge 10 s timeout).
 
@@ -87,7 +88,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-02/camera-canvas-arcs.js
 
 ## CCA-002: Use the grabbed selected node as the drag reference
 
-Repair: [#1143](https://github.com/cisgz3a-hub/KerfDesk/pull/1143). State: pr-open-ci-pending.
+Repair: [#1143](https://github.com/cisgz3a-hub/KerfDesk/pull/1143). State: pr-open-ci-verified.
 
 Trigger: Select node A, Shift-add B so B is primary, then plain-drag already-selected A.
 
@@ -111,7 +112,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-02/board-rotary-planner.
 
 ## B02-TRACE-001: Close the final fairing span at its actual corner
 
-Repair: [#1144](https://github.com/cisgz3a-hub/KerfDesk/pull/1144). State: pr-open-ci-pending.
+Repair: [#1144](https://github.com/cisgz3a-hub/KerfDesk/pull/1144). State: pr-open-ci-verified.
 
 Trigger: A closed measured organic contour with one or more pinned corners reaches fairChainSegments; cyclically shift the equivalent ring to a different first corner or reverse traversal.
 
@@ -141,7 +142,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-03/cnc-geometry.json. Re
 
 ## B03-CNC-002: Look up manual tab anchors using the source path color
 
-Repair: [#1147](https://github.com/cisgz3a-hub/KerfDesk/pull/1147). State: pr-open-ci-pending.
+Repair: [#1147](https://github.com/cisgz3a-hub/KerfDesk/pull/1147). State: pr-open-ci-verified.
 
 Trigger: An imported red 40 x 40 mm square is explicitly bound to a green named profile operation. Place two anchors at path fractions 0.05 and 0.55, with automatic tabs-per-shape still four; use a 6 mm cut with 3 mm depth steps and 2 mm high, 6 mm wide tabs.
 
@@ -153,7 +154,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-03/cnc-geometry.json. Re
 
 ## MTX-001: Bind Zero Z acknowledgement to the tool that initiated it
 
-Repair: [#1148](https://github.com/cisgz3a-hub/KerfDesk/pull/1148). State: pr-open-ci-pending.
+Repair: [#1148](https://github.com/cisgz3a-hub/KerfDesk/pull/1148). State: pr-open-ci-verified.
 
 Trigger: Select the 3.175 mm bit after the 6.35 mm bit, begin Zero Z, and use Ctrl+Z before the controller acknowledges G54 G92 Z0. Undo restores the 6.35 mm bit while the original write is pending.
 

@@ -1,6 +1,6 @@
 # Historical findings and dispositions
 
-These 41 records were reconciled from the first three historical audit batches. They are separate from newly confirmed current defects. Counts: 1 closed-unmerged proposal; 24 resolved before audit; 9 rejected candidate; 7 documented limitation.
+These 42 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 1 closed-unmerged proposal; 24 resolved before audit; 10 rejected candidate; 7 documented limitation.
 
 A rejected candidate means the stated investigation did not establish an actionable current defect. It is not a proof of general correctness. Evidence paths are relative to the local archive docs/audits/2026-10-11-pr-history/.
 
@@ -331,3 +331,11 @@ Disposition: **resolved before audit**. Historical PRs: [#88](https://github.com
 Baseline runOriginTransaction binds controller session, write epoch and operation identity, applying only owned success/failure patches. The origin suite passed. This prior session-ownership repair is distinct from later #110 tool ownership defect MTX-001 found in this audit.
 
 Local audit evidence: batch-03/machine-transactions.md, batch-03/machine-transactions.json.
+
+## DISP-042: Current SVG repair prematurely censors intermediate Infinity and NaN
+
+Disposition: **rejected candidate**. Historical PRs: [#1139](https://github.com/cisgz3a-hub/KerfDesk/pull/1139).
+
+Review comment r4240505330 did not reproduce at published head 282b60d3c71320ad7884299d7d40924ab59c73f8. All 25 independent Chrome/math controls passed through both parser routes and exact state, including infinity / infinity becoming NaN and outer opacity zero. Six direct @csstools/css-calc 2.1.4 controls using the exact current options preserve numeric Infinity, -Infinity, NaN and signed zero. No math production change is justified by this claim. This is bounded evidence for the reported expressions, not general CSS conformance.
+
+Local audit evidence: publication/heartbeat-0621-svg-reproduction.md, publication/heartbeat-0621-svg-ieee-library.json.

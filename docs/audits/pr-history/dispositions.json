@@ -340,5 +340,18 @@
     "disposition": "resolved before audit",
     "currentSourceReason": "Baseline runOriginTransaction binds controller session, write epoch and operation identity, applying only owned success/failure patches. The origin suite passed. This prior session-ownership repair is distinct from later #110 tool ownership defect MTX-001 found in this audit.",
     "evidenceReports": ["batch-03/machine-transactions.md", "batch-03/machine-transactions.json"]
+  },
+  {
+    "id": "DISP-042",
+    "title": "Current SVG repair prematurely censors intermediate Infinity and NaN",
+    "historicalPrs": [1139],
+    "scope": "repair review follow-up",
+    "disposition": "rejected candidate",
+    "currentSourceReason": "Review comment r4240505330 did not reproduce at published head 282b60d3c71320ad7884299d7d40924ab59c73f8. All 25 independent Chrome/math controls passed through both parser routes and exact state, including infinity / infinity becoming NaN and outer opacity zero. Six direct @csstools/css-calc 2.1.4 controls using the exact current options preserve numeric Infinity, -Infinity, NaN and signed zero. No math production change is justified by this claim. This is bounded evidence for the reported expressions, not general CSS conformance.",
+    "evidenceReports": [
+      "publication/heartbeat-0621-svg-reproduction.md",
+      "publication/heartbeat-0621-svg-ieee-library.json"
+    ],
+    "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240505330"
   }
 ]

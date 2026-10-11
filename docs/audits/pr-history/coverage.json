@@ -1,6 +1,6 @@
 {
   "repository": "cisgz3a-hub/KerfDesk",
-  "inventoryRefreshedAt": "2026-10-11T05:51:30.188Z",
+  "inventoryRefreshedAt": "2026-10-11T06:19:22.457Z",
   "snapshot": "Live GitHub paginated pull-request inventory, all authors and states",
   "definitions": {
     "full-diff": "Changed diff inspected within stated scope; not whole-feature, upstream-dependency, hosted or hardware qualification",
@@ -9,8 +9,8 @@
   },
   "counts": {
     "partial": 57,
-    "full-diff": 45,
-    "not-started": 1043
+    "full-diff": 46,
+    "not-started": 1042
   },
   "prs": [
     {
@@ -24479,18 +24479,18 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T04:44:30Z",
-      "updated_at": "2026-10-11T05:21:57Z",
+      "updated_at": "2026-10-11T06:17:44Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "32cb8477965866e9f23be099a369dca64f447147",
-      "head": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+      "merge_commit_sha": "1d77af2810ac958607f10b82a53896006ad92be8",
+      "head": "a4c1968b50ab735953b064ec65f8055aa74ced28",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "review": {
         "coverage": "full-diff",
         "scope": "Complete focused repair diff and permanent tests independently reviewed; publication and CI completion are tracked separately in repairs.json",
-        "report": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md",
         "reviewer": "foundation_prs",
-        "reviewedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+        "reviewedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
         "reviewedFiles": [
           "THIRD_PARTY_NOTICES.md",
           "package.json",
@@ -24498,10 +24498,12 @@
           "public/third-party-notices.txt",
           "src/io/svg/parse-svg-opacity-math.test.ts",
           "src/io/svg/parse-svg-opacity-unresolved.test.ts",
+          "src/io/svg/parse-svg-opacity-variables.test.ts",
           "src/io/svg/parse-svg-paint-opacity.test.ts",
           "src/io/svg/parse-svg.ts",
           "src/io/svg/svg-import-notes.ts",
           "src/io/svg/svg-opacity-math.ts",
+          "src/io/svg/svg-opacity-variables.ts",
           "src/io/svg/svg-paint-opacity.ts",
           "src/io/svg/svg-presentation.ts",
           "src/io/svg/svg-stylesheet.ts",
@@ -24513,8 +24515,8 @@
         "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
         "repairGroup": "svg-paint-opacity"
       },
-      "previousInventoriedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
-      "headRefreshedAt": "2026-10-11T06:12:10.466Z",
+      "previousInventoriedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+      "headRefreshedAt": "2026-10-11T06:39:54.734Z",
       "headEvidence": "Publication verified the live GitHub PR head; source attestation checked the complete diff manifest and reviewed files"
     },
     {
@@ -24880,15 +24882,32 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T05:20:35Z",
-      "updated_at": "2026-10-11T05:26:45Z",
+      "updated_at": "2026-10-11T06:18:33Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "389b201d3b788cc033582765d5eb89c83befab9b",
-      "head": "a0ace701f12c880bc897a8c5d48ec20ba548c045",
+      "merge_commit_sha": "2edf4b2bb2acf771f68712de780ab0d3dc78b2ff",
+      "head": "073af6f4cb4618d5db95f9fbbfac4c213dbae04e",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "review": {
-        "coverage": "not-started",
-        "report": null
+        "coverage": "full-diff",
+        "scope": "Complete nine-file tracking snapshot independently reviewed and committed source matched at publication; required hosted CI remains separate in state.json",
+        "report": "docs/audits/2026-10-11-pr-history/publication/ledger-followup-peer-review.md",
+        "reviewer": "foundation_prs",
+        "reviewedHead": "073af6f4cb4618d5db95f9fbbfac4c213dbae04e",
+        "reviewedFiles": [
+          "docs/audits/pr-history/README.md",
+          "docs/audits/pr-history/STATUS.md",
+          "docs/audits/pr-history/FINDINGS.md",
+          "docs/audits/pr-history/DISPOSITIONS.md",
+          "docs/audits/pr-history/state.json",
+          "docs/audits/pr-history/findings.json",
+          "docs/audits/pr-history/repairs.json",
+          "docs/audits/pr-history/coverage.json",
+          "docs/audits/pr-history/dispositions.json"
+        ],
+        "remaining": [],
+        "limitations": "Audit tracking consistency and publication controls only; no additional historical product scope or successful CI is implied",
+        "trackingPr": true
       }
     }
   ]
