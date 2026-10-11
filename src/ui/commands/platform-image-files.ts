@@ -3,8 +3,11 @@ import { BATCH_PNM_EXTENSIONS, BATCH_TIFF_EXTENSIONS } from './batch-raster-deco
 
 const IMAGE_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.bmp', '.gif'] as const;
 
-export async function pickPlatformImageFile(platform: PlatformAdapter): Promise<File | null> {
-  const files = await pickPlatformImageFiles(platform, false, true);
+export async function pickPlatformImageFile(
+  platform: PlatformAdapter,
+  includeTiff = true,
+): Promise<File | null> {
+  const files = await pickPlatformImageFiles(platform, false, includeTiff);
   return files[0] ?? null;
 }
 

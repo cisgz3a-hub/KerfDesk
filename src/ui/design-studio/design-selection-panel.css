@@ -1,0 +1,143 @@
+.design-selection {
+  font-size: 12px;
+  color: var(--lf-text);
+}
+.design-selection__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+}
+.design-selection h3,
+.design-selection h4 {
+  margin: 0;
+  font-size: 12px;
+}
+.design-selection h3 {
+  font-size: 14px;
+}
+.design-selection__heading > span,
+.design-selection h4 span,
+.design-selection small {
+  color: var(--lf-text-muted);
+  font-weight: normal;
+}
+.design-selection__hint {
+  margin: 0;
+  padding: 0 12px 16px;
+  color: var(--lf-text-muted);
+  line-height: 1.6;
+}
+.design-selection button {
+  border: 1px solid var(--lf-border);
+  border-radius: 5px;
+  background: var(--lf-bg-1);
+  color: var(--lf-text);
+  padding: 7px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+.design-selection button:hover:not(:disabled) {
+  background: var(--lf-bg-2);
+  border-color: var(--lf-accent);
+}
+.design-selection button:focus-visible {
+  outline: 2px solid var(--lf-accent);
+  outline-offset: 2px;
+}
+.design-selection button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.design-selection__arrange {
+  padding: 12px;
+  border-top: 1px solid var(--lf-border);
+}
+.design-selection__transform {
+  padding: 12px;
+  border-top: 1px solid var(--lf-border);
+}
+.design-selection__transform-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 8px;
+}
+.design-selection__align,
+.design-selection__distribute {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 14px;
+}
+.design-selection__align {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.design-selection__distribute {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.design-selection__actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+.design-selection__bounds {
+  margin: 0;
+  display: flex;
+  gap: 24px;
+  padding: 0 12px 12px;
+}
+.design-selection__bounds dt {
+  color: var(--lf-text-muted);
+}
+.design-selection__bounds dd {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.design-selection__objects {
+  border-top: 1px solid var(--lf-border);
+}
+.design-selection__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 0 12px 12px;
+}
+.design-selection__list button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+.design-selection__list button[aria-pressed='true'] {
+  background: var(--lf-bg-2);
+  border-color: var(--lf-accent);
+}
+.design-selection__cut-settings {
+  border-top: 1px solid var(--lf-border);
+}
+.design-selection__cut-settings > summary {
+  cursor: pointer;
+  padding: 14px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.design-composition-photos img {
+  object-fit: contain;
+  flex-shrink: 0;
+  background: white;
+}
+.design-composition-photos .design-selection__list button {
+  align-items: center;
+}
+.design-composition-photos .design-selection__list span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.design-composition-photos > .lf-btn {
+  margin-top: 8px;
+  width: 100%;
+}

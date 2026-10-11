@@ -2,10 +2,7 @@ import type { ConstrainedSketch2d } from '../sketch-constraints/constrained-sket
 import type { PartGeneratorSource } from '../parts/part-generator';
 import type { RegistrationJigIdentity } from './registration-jig-identity';
 // SceneObject â€” the discriminated union the rest of the pipeline pattern-matches
-// against. Phase A ships one variant (ImportedSvg); ADR-014 commits to adding
-// 'text' (Phase D) and 'traced-image' (Phase E) without touching code outside
-// this module's switch arms. `assertNever` enforces exhaustiveness at compile
-// time so the missing arm is the only compile error when a new variant lands.
+// against. `assertNever` makes an unhandled variant a compile-time error.
 
 import type { ColoredPath } from './colored-path';
 import type { TextBoxSettings } from './text-box';
@@ -17,6 +14,7 @@ import type { ReliefHeightfield } from './relief/relief-heightfield';
 import type { ReliefAuthoringDocument } from './relief/relief-authoring';
 import type { LayerPowerMode, TabLayoutMode } from './layer';
 import type { LaserTabAnchor } from './laser-tab-anchor';
+import type { PhotoEditorDocument } from './photo-editor-document';
 
 export type { LaserTabAnchor } from './laser-tab-anchor';
 
@@ -383,6 +381,9 @@ export type RasterImage = ObjectPowerScale & {
   readonly imageAsset?: PagedRasterImageAsset; // Qualified PNG source + luma page references.
   readonly pixelWidth: number;
   readonly pixelHeight: number;
+  // Optional and additive: old projects open as a single flattened photo layer.
+  // Applied display/output pixels remain dataUrl/lumaBase64; this is editable source.
+  readonly editorDocument?: PhotoEditorDocument;
   readonly bounds: Bounds;
   readonly transform: Transform;
   // The Layer this image binds to, by color key. Lets a single

@@ -9,6 +9,7 @@ import { lazy, Suspense } from 'react';
 import { rejectAsLoadFailure } from '../common/lazy-load-failure';
 import { LazyOverlayBoundary } from '../common/LazyOverlayBoundary';
 import { useImageEditorStore } from './image-editor-store';
+import { useDesignStudioStore } from '../design-studio/design-studio-store';
 
 const LazyOverlay = lazy(() =>
   import('./ImageEditorOverlay')
@@ -16,23 +17,40 @@ const LazyOverlay = lazy(() =>
     .catch(rejectAsLoadFailure),
 );
 
-export function ImageEditorHost(): JSX.Element | null {
+export function ImageEditorHost(props: { readonly embedded?: boolean } = {}): JSX.Element | null {
   const hasSession = useImageEditorStore((s) => s.session !== null);
   const loadState = useImageEditorStore((s) => s.loadState);
   const closeEditor = useImageEditorStore((s) => s.closeEditor);
+  const designIsOpen = useDesignStudioStore((s) => s.session !== null);
+  if (designIsOpen && !props.embedded) return null;
   if (!hasSession && loadState.kind !== 'loading') return null;
   return (
-    <LazyOverlayBoundary toolName="Image Studio" onClose={closeEditor}>
-      <Suspense fallback={<LoadingCard />}>
-        {hasSession ? <LazyOverlay /> : <LoadingCard />}
+    <LazyOverlayBoundary
+      toolName="Image Studio"
+      onClose={closeEditor}
+      presentation={props.embedded ? 'inline' : 'dialog'}
+    >
+      <Suspense fallback={<LoadingCard embedded={props.embedded === true} />}>
+        {hasSession ? (
+          <LazyOverlay embedded={props.embedded === true} />
+        ) : (
+          <LoadingCard embedded={props.embedded === true} />
+        )}
       </Suspense>
     </LazyOverlayBoundary>
   );
 }
 
-function LoadingCard(): JSX.Element {
+function LoadingCard(props: { readonly embedded?: boolean }): JSX.Element {
   return (
-    <div style={loadingBackdropStyle} role="status" aria-label="Opening image">
+    <div
+      style={{
+        ...loadingBackdropStyle,
+        ...(props.embedded ? { position: 'relative', flex: 1 } : {}),
+      }}
+      role="status"
+      aria-label="Opening image"
+    >
       <div style={loadingCardStyle}>Opening image…</div>
     </div>
   );

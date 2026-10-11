@@ -12,48 +12,70 @@ import { useImageEditorStore } from './image-editor-store';
 
 type ToolEntry = {
   readonly tool: EditorTool;
+  readonly shortLabel: string;
   readonly label: string;
   readonly shortcut: string;
 };
 
 const TOOLS: readonly ToolEntry[] = [
-  { tool: { kind: 'brush' }, label: 'Brush', shortcut: 'B' },
-  { tool: { kind: 'pencil' }, label: 'Pencil (hard edge)', shortcut: 'P' },
+  { tool: { kind: 'brush' }, shortLabel: 'Brush', label: 'Brush', shortcut: 'B' },
+  { tool: { kind: 'pencil' }, shortLabel: 'Pencil', label: 'Pencil (hard edge)', shortcut: 'P' },
   {
     tool: { kind: 'eraser' },
+    shortLabel: 'Eraser',
     label: 'Eraser (clears upper layers; paints the Background color)',
     shortcut: 'E',
   },
-  { tool: { kind: 'line' }, label: 'Line (Shift = 45°)', shortcut: 'L' },
+  { tool: { kind: 'line' }, shortLabel: 'Line', label: 'Line (Shift = 45°)', shortcut: 'L' },
   {
     tool: { kind: 'marquee', shape: 'rect' },
+    shortLabel: 'Select area',
     label: 'Marquee — M cycles rect/ellipse; Shift adds, Alt subtracts',
     shortcut: 'M',
   },
-  { tool: { kind: 'lasso' }, label: 'Lasso — Shift adds, Alt subtracts', shortcut: 'S' },
-  { tool: { kind: 'wand' }, label: 'Magic wand — Shift adds, Alt subtracts', shortcut: 'W' },
+  {
+    tool: { kind: 'lasso' },
+    shortLabel: 'Lasso',
+    label: 'Lasso — Shift adds, Alt subtracts',
+    shortcut: 'S',
+  },
+  {
+    tool: { kind: 'wand' },
+    shortLabel: 'Wand',
+    label: 'Magic wand — Shift adds, Alt subtracts',
+    shortcut: 'W',
+  },
   {
     tool: { kind: 'bucket' },
+    shortLabel: 'Fill',
     label: 'Paint bucket — fills the clicked region of what you see',
     shortcut: 'G',
   },
   {
     tool: { kind: 'gradient', shape: 'linear' },
+    shortLabel: 'Gradient',
     label: 'Gradient — drag foreground→background; G cycles bucket/linear/radial',
     shortcut: 'G',
   },
   {
     tool: { kind: 'clone', source: null, offset: null },
+    shortLabel: 'Clone',
     label: 'Clone stamp — Alt-click sets the source, then paint the copy',
     shortcut: 'K',
   },
   {
     tool: { kind: 'heal' },
+    shortLabel: 'Heal',
     label: 'Spot heal — click a blemish; the surround patches it',
     shortcut: 'J',
   },
-  { tool: { kind: 'crop' }, label: 'Crop — drag a box, Enter commits, Esc cancels', shortcut: 'C' },
-  { tool: { kind: 'move' }, label: 'Move selected pixels', shortcut: 'V' },
+  {
+    tool: { kind: 'crop' },
+    shortLabel: 'Crop',
+    label: 'Crop — drag a box, Enter commits, Esc cancels',
+    shortcut: 'C',
+  },
+  { tool: { kind: 'move' }, shortLabel: 'Move', label: 'Move selected pixels', shortcut: 'V' },
 ];
 
 export function EditorToolStrip(): JSX.Element {
@@ -79,6 +101,7 @@ export function EditorToolStrip(): JSX.Element {
             style={{ ...buttonStyle, ...(isActive ? activeStyle : null) }}
           >
             <EditorToolIcon kind={entry.tool.kind} />
+            <span>{entry.shortLabel}</span>
           </button>
         );
       })}
@@ -158,13 +181,18 @@ const railStyle: React.CSSProperties = {
   padding: 6,
   borderRight: '1px solid var(--lf-border)',
   background: 'var(--lf-bg-1)',
+  flexShrink: 0,
 };
 
 const buttonStyle: React.CSSProperties = {
-  width: 34,
-  height: 34,
-  display: 'grid',
-  placeItems: 'center',
+  width: 108,
+  minHeight: 38,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  textAlign: 'left',
+  fontSize: 12,
+  padding: '6px 8px',
   border: '1px solid transparent',
   borderRadius: 6,
   background: 'transparent',

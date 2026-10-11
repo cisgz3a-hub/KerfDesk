@@ -1,6 +1,7 @@
 import type { EditorSession } from './editor-session';
 import { EditorAdjustMenus } from './EditorAdjustMenus';
 import { TutorialButton } from '../tutorials/TutorialButton';
+import { useImageEditorStore } from './image-editor-store';
 
 export type ImageEditorTopBarActions = {
   readonly undo: () => void;
@@ -18,17 +19,19 @@ export function ImageEditorTopBar(props: {
   readonly isHistoryOpen: boolean;
   readonly onToggleHistory: () => void;
   readonly actions: ImageEditorTopBarActions;
+  readonly embedded?: boolean;
 }): JSX.Element {
   const canUndo = props.session.history.undoStack.length > 0;
   const canRedo = props.session.history.redoStack.length > 0;
   return (
     <header style={topBarStyle} aria-label="Image Studio actions">
       <strong style={titleStyle}>
-        Image Studio — {props.session.sourceName} ({props.session.doc.width}×
-        {props.session.doc.height} px)
+        {props.embedded ? 'Photo' : 'Image Studio'} — {props.session.sourceName} (
+        {props.session.doc.width}×{props.session.doc.height} px)
       </strong>
       <EditorAdjustMenus />
       <span style={topActionsStyle}>
+        <PhotoViewButtons />
         <TutorialButton tutorialId="image-studio" />
         <button
           type="button"
@@ -45,9 +48,35 @@ export function ImageEditorTopBar(props: {
           canUndo={canUndo}
           canRedo={canRedo}
           actions={props.actions}
+          embedded={props.embedded === true}
         />
       </span>
     </header>
+  );
+}
+
+function PhotoViewButtons(): JSX.Element {
+  const setView = useImageEditorStore((s) => s.setView);
+  const zoomTo100 = useImageEditorStore((s) => s.zoomTo100);
+  return (
+    <>
+      <button
+        type="button"
+        className="lf-btn"
+        title="Fit the whole photo in the canvas (Ctrl+0)"
+        onClick={() => setView(null)}
+      >
+        Fit photo
+      </button>
+      <button
+        type="button"
+        className="lf-btn"
+        title="Show one image pixel per screen pixel (Ctrl+1)"
+        onClick={zoomTo100}
+      >
+        100%
+      </button>
+    </>
   );
 }
 
@@ -57,6 +86,7 @@ function ActionButtons(props: {
   readonly canUndo: boolean;
   readonly canRedo: boolean;
   readonly actions: ImageEditorTopBarActions;
+  readonly embedded?: boolean;
 }): JSX.Element {
   const applyDisabled = !props.session.dirtySinceApply || props.isApplying;
   return (
@@ -111,8 +141,9 @@ function ActionButtons(props: {
         className="lf-btn lf-btn--ghost"
         onClick={props.actions.close}
         title="Close — the editing session is kept and resumes on reopen"
+        aria-label={props.embedded ? 'Back to photos' : 'Close Image Studio'}
       >
-        ✕
+        {props.embedded ? 'Back to photos' : '✕'}
       </button>
     </>
   );

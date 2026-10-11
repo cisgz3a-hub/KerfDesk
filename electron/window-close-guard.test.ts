@@ -23,6 +23,7 @@ function harness(updateClose = false) {
     decideUnsaved: vi.fn((): 'leave' | 'stay' => 'leave'),
     decideUnavailable: vi.fn((): 'leave' | 'stay' => 'stay'),
     forceClose: vi.fn(() => events.emit('closed')),
+    beforeClose: vi.fn(async () => undefined),
     isQuitRequested: () => quitting,
     isUpdateCloseRequested: () => updateClose,
     cancelQuit: vi.fn(() => (quitting = false)),
@@ -197,7 +198,7 @@ describe('ordinary desktop close and quit', () => {
     h.options.decideUnavailable.mockReturnValueOnce('leave');
     h.window.close();
     expect(h.options.decideUnavailable).toHaveBeenCalledTimes(2);
-    expect(h.options.forceClose).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(h.options.forceClose).toHaveBeenCalledTimes(1));
   });
 
   it('only bypasses unload for an explicit unavailable-renderer Close decision', async () => {
@@ -223,5 +224,52 @@ describe('close state for crash recovery (ADR-482)', () => {
     finish({ status: 'cancelled', dirty: false });
     await vi.waitFor(() => expect(h.options.cancelQuit).toHaveBeenCalled());
     expect(h.guard.isClosing()).toBe(false);
+  });
+});
+
+describe('native editor detachment before parent destruction', () => {
+  it('waits after renderer approval, then permits the existing close path', async () => {
+    const h = harness();
+    let finish = (): void => undefined;
+    h.options.beforeClose.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    h.window.close();
+    await vi.waitFor(() => expect(h.options.beforeClose).toHaveBeenCalledOnce());
+    expect(h.options.request.mock.calls.map(([op]) => op)).toEqual(['prepare', 'approve']);
+    expect(h.allowed).not.toHaveBeenCalled();
+    finish();
+    await vi.waitFor(() => expect(h.allowed).toHaveBeenCalledOnce());
+  });
+  it('never detaches on a cancelled renderer handoff', async () => {
+    const h = harness();
+    h.options.request.mockResolvedValueOnce({ status: 'cancelled' });
+    h.window.close();
+    await vi.waitFor(() => expect(h.options.cancelQuit).toHaveBeenCalledOnce());
+    expect(h.options.beforeClose).not.toHaveBeenCalled();
+  });
+  it('keeps the parent open when detachment cannot be confirmed', async () => {
+    const h = harness();
+    h.options.beforeClose.mockRejectedValue(new Error('detach failed'));
+    h.window.close();
+    await vi.waitFor(() => expect(h.options.cancelQuit).toHaveBeenCalledOnce());
+    expect(h.allowed).not.toHaveBeenCalled();
+    expect(h.options.decideUnavailable).not.toHaveBeenCalled();
+    expect(h.options.reportFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'detach failed' }),
+    );
+  });
+  it('also detaches before explicitly approved renderer-unavailable force close', async () => {
+    const h = harness();
+    h.options.request.mockResolvedValue({ status: 'unavailable' });
+    h.options.decideUnavailable.mockReturnValue('leave');
+    h.options.beforeClose.mockRejectedValue(new Error('detach failed'));
+    h.window.close();
+    await vi.waitFor(() => expect(h.options.beforeClose).toHaveBeenCalledOnce());
+    expect(h.options.forceClose).not.toHaveBeenCalled();
+    expect(h.options.cancelQuit).toHaveBeenCalledOnce();
   });
 });

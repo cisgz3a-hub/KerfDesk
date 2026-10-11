@@ -3,7 +3,11 @@ import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
 import { rectSelection } from '../../core/image-select/marquee';
 import { commitAdjustment, computeAdjustPreview } from './editor-adjust-session';
 import { createSession, undoSession, withSelection } from './editor-session';
-import { compositeSession, setActiveLayerProps } from './editor-session-layers';
+import {
+  addLayerAboveActive,
+  compositeSession,
+  setActiveLayerProps,
+} from './editor-session-layers';
 
 const BOUNDS = { minX: 0, minY: 0, maxX: 10, maxY: 10 };
 
@@ -12,6 +16,30 @@ function newSession() {
 }
 
 describe('commitAdjustment', () => {
+  it('reveals artwork below a paper layer with smooth ink edges in the preview and Apply composite', () => {
+    const bottom = newSession();
+    bottom.doc.data.set([0, 80, 160, 255, 0, 80, 160, 255]);
+    const session = addLayerAboveActive(bottom, 'paper');
+    session.doc.data.set([255, 255, 255, 255, 153, 153, 153, 255]);
+    const preview = computeAdjustPreview(session, 'remove-white-background', { cleanup: 0 });
+    expect([...preview.data.slice(0, 8)]).toEqual([0, 80, 160, 255, 0, 48, 96, 255]);
+    const committed = commitAdjustment(session, 'remove-white-background', { cleanup: 0 });
+    expect(compositeSession(committed)).toEqual(preview);
+  });
+
+  it('previews white removal without mutation, commits one edit, and restores alpha on Undo', () => {
+    const session = newSession();
+    session.doc.data.set([153, 153, 153, 128]);
+    const original = new Uint8ClampedArray(session.doc.data);
+    const preview = computeAdjustPreview(session, 'remove-white-background', { cleanup: 0 });
+    expect(session.doc.data).toEqual(original);
+    const committed = commitAdjustment(session, 'remove-white-background', { cleanup: 0 });
+    expect([...committed.doc.data.slice(0, 4)]).toEqual([0, 0, 0, 51]);
+    expect(committed.history.undoStack).toHaveLength(1);
+    expect(preview).toEqual(compositeSession(committed));
+    expect(undoSession(committed).doc.data).toEqual(original);
+  });
+
   it('applies as exactly one undoable history entry', () => {
     const session = newSession();
     const committed = commitAdjustment(session, 'invert', {});

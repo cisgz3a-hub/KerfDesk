@@ -24,6 +24,19 @@ beforeEach(() => {
 });
 
 describe('Image Studio shortcut ownership', () => {
+  it('allows keyboard Undo after clicking a tool button while leaving text editing native', () => {
+    useImageEditorStore.getState().fillSelection();
+    expect(useImageEditorStore.getState().session?.history.undoStack).toHaveLength(1);
+    const nativeUndo = keyEvent(document.createElement('input'), 'z', { ctrlKey: true });
+    handleEditorKeyDown(nativeUndo.event);
+    expect(nativeUndo.preventDefault).not.toHaveBeenCalled();
+    expect(useImageEditorStore.getState().session?.history.undoStack).toHaveLength(1);
+    const editorUndo = keyEvent(document.createElement('button'), 'z', { ctrlKey: true });
+    handleEditorKeyDown(editorUndo.event);
+    expect(editorUndo.preventDefault).toHaveBeenCalledOnce();
+    expect(useImageEditorStore.getState().session?.history.undoStack).toHaveLength(0);
+    expect(useImageEditorStore.getState().session?.history.redoStack).toHaveLength(1);
+  });
   it('does not consume Space, arrows, Enter, or Ctrl+A from native controls', () => {
     const input = document.createElement('input');
     const button = document.createElement('button');

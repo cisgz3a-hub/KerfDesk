@@ -18,6 +18,7 @@ import type { SvgFragmentActions } from './svg-fragment-mutation';
 import { create } from 'zustand';
 import type { InsertBoxPanels } from './box-insert-mutation';
 import type { Sketch } from '../../core/design';
+import type { DesignStudioView } from '../../core/design/design-studio-document';
 import type { DesignApplyRecord } from './design-apply-record';
 import type { DeviceProfile } from '../../core/devices';
 import {
@@ -308,6 +309,7 @@ export type AppState = PartGeneratorActions &
       sketch: Sketch,
       ids: ReadonlyArray<string>,
       previous: DesignApplyRecord | null,
+      view?: DesignStudioView,
     ) => DesignApplyRecord | 'refused' | null;
     // ADR-057: add (or replace) the registration jig box on the reserved
     // registration layer. Width/height in mm; a new box centers on the bed, a

@@ -91,7 +91,7 @@ export function sha256Hex(parts: ReadonlyArray<Uint8Array>): string {
   return state.finishHex();
 }
 
-class Sha256State {
+export class Sha256State {
   private readonly hash = INITIAL_HASH.slice();
   private readonly schedule = new Uint32Array(64);
   private readonly pending = new Uint8Array(BLOCK_BYTES);

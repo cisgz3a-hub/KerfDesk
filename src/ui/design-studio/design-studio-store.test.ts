@@ -20,25 +20,25 @@ beforeEach(reset);
 
 describe('open and close', () => {
   it('opens a fresh session on Select', () => {
-    store().openStudio();
+    void store().openStudio();
     expect(session().tool).toBe('select');
     expect(session().history.present.entities).toHaveLength(0);
   });
 
   it('is idempotent — opening twice does not discard the session', () => {
-    store().openStudio();
+    void store().openStudio();
     store().setTool('circle');
-    store().openStudio();
+    void store().openStudio();
     expect(session().tool).toBe('circle');
   });
 
   it('stashes on close and resumes on reopen, asking nothing', () => {
-    store().openStudio();
+    void store().openStudio();
     store().setTool('rect');
     store().closeStudio();
     expect(store().session).toBeNull();
     expect(store().stash).not.toBeNull();
-    store().openStudio();
+    void store().openStudio();
     expect(session().tool).toBe('rect');
   });
 
@@ -50,7 +50,7 @@ describe('open and close', () => {
 
 describe('draw a rectangle end to end', () => {
   beforeEach(() => {
-    store().openStudio();
+    void store().openStudio();
     store().setTool('rect');
   });
 
@@ -113,7 +113,7 @@ describe('draw a rectangle end to end', () => {
 
 describe('marquee selection', () => {
   beforeEach(() => {
-    store().openStudio();
+    void store().openStudio();
     store().setTool('line');
     store().setDraft({
       tool: 'line',
@@ -155,7 +155,7 @@ describe('marquee selection', () => {
 
 describe('corner operations', () => {
   it('does not add an undo step when the same rectangle fillet is reapplied', () => {
-    store().openStudio();
+    void store().openStudio();
     store().setFilletRadiusMm(7);
     store().setSketch({
       entities: [

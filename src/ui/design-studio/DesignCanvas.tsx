@@ -20,17 +20,22 @@ import { subscribeCanvasColorScheme } from '../theme/canvas-color-scheme';
 import { entityFields, type EntityField } from './design-entity-fields';
 import type { DesignSession as DesignStudioSession } from './design-session';
 import { paintDesignCanvas } from './design-canvas-draw';
-import { createFrameScheduler, frameSchedulerHostFor } from './design-frame-scheduler';
+import {
+  createFrameScheduler,
+  frameSchedulerHostFor,
+  type FrameScheduler,
+} from './design-frame-scheduler';
 import { paintDesignOverlay } from './design-overlay-draw';
-import { ShapeInspector } from './ShapeInspector';
 import { useCanvas2dSurface } from './design-surface';
 import { useDesignStudioStore } from './design-studio-store';
 import { useDesignPointer } from './use-design-pointer';
 import { fitView, zoomAt } from './design-view';
+import type { DesignPhotoActions } from './design-project-photos';
+import { useDesignPhotoPointer } from './use-design-photo-pointer';
 
 const ZOOM_PER_WHEEL_NOTCH = 1.0015;
 
-export function DesignCanvas(): JSX.Element {
+export function DesignCanvas(photoActions: DesignPhotoActions = {}): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const staticRef = useRef<HTMLCanvasElement | null>(null);
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
@@ -41,9 +46,17 @@ export function DesignCanvas(): JSX.Element {
   const setView = useDesignStudioStore((state) => state.setView);
 
   useFrameOnOpen(hostRef, workspace.width, workspace.height);
-  useLayerPaint(staticRef, overlayRef, hostRef, workspace.width, workspace.height);
+  useLayerPaint(
+    staticRef,
+    overlayRef,
+    hostRef,
+    workspace.width,
+    workspace.height,
+    photoActions.selectedPhotoId ?? null,
+  );
   const surface = useCanvas2dSurface(overlayRef);
-  const pointer = useDesignPointer(surface, newEntityId);
+  const drawingPointer = useDesignPointer(surface, newEntityId);
+  const pointer = useDesignPhotoPointer(surface, drawingPointer, photoActions);
 
   const handleWheel = useCallback(
     (event: React.WheelEvent<HTMLCanvasElement>) => {
@@ -61,6 +74,7 @@ export function DesignCanvas(): JSX.Element {
       <canvas ref={staticRef} style={staticStyle} aria-hidden="true" />
       <canvas
         ref={overlayRef}
+        tabIndex={-1}
         style={overlayStyle}
         aria-label={`Design canvas, ${entityCount} entities`}
         onPointerDown={pointer.onPointerDown}
@@ -70,7 +84,6 @@ export function DesignCanvas(): JSX.Element {
         onDoubleClick={pointer.onDoubleClick}
         onWheel={handleWheel}
       />
-      <ShapeInspector />
     </div>
   );
 }
@@ -135,6 +148,7 @@ function useLayerPaint(
   hostRef: React.RefObject<HTMLDivElement | null>,
   bedWidthMm: number,
   bedHeightMm: number,
+  selectedPhotoId: string | null,
 ): void {
   useEffect(() => {
     const host = hostRef.current;
@@ -145,6 +159,10 @@ function useLayerPaint(
     // to DOM child order inside the host — adding any third child could break it.
     if (host === null || staticCanvas === null || overlayCanvas === null) return undefined;
 
+    let active = true;
+    const requestBitmapPaint = (): void => {
+      if (active) scheduler.request();
+    };
     const paint = (): void => {
       const session = useDesignStudioStore.getState().session;
       if (session?.view == null) return;
@@ -156,6 +174,10 @@ function useLayerPaint(
       const overlayCtx = sizedContext(overlayCanvas, widthPx, heightPx, ratio);
       if (staticCtx === null || overlayCtx === null) return;
       paintDesignCanvas(staticCtx, {
+        scene: useStore.getState().project.scene,
+        selectedPhotoId,
+        ...(session.applied === null ? {} : { draftObjectIds: session.applied.objectIds }),
+        onBitmapReady: requestBitmapPaint,
         view: session.view,
         sketch: session.history.present,
         selectedIds: session.selectedIds,
@@ -185,28 +207,45 @@ function useLayerPaint(
       paint,
       frameSchedulerHostFor(host.ownerDocument.defaultView),
     );
-    const unsubscribe = useDesignStudioStore.subscribe(scheduler.request);
-    const unsubscribeTheme = subscribeCanvasColorScheme(scheduler.request);
-    const observer = new ResizeObserver(scheduler.request);
-    observer.observe(host);
-    // The FIRST paint runs immediately rather than on a frame: a hidden or
-    // throttled page does not run frame callbacks at all, and the canvas must not
-    // be blank while that is true.
-    scheduler.flush();
-    // Coming back into view is the other moment a frame is owed but may never have
-    // arrived, so repaint outright rather than trusting the pending request.
-    const onVisible = (): void => {
-      if (!host.ownerDocument.hidden) scheduler.flush();
-    };
-    host.ownerDocument.addEventListener('visibilitychange', onVisible);
+    const stopPainting = subscribeLayerPaint(host, scheduler);
     return () => {
-      unsubscribe();
-      unsubscribeTheme();
-      observer.disconnect();
-      host.ownerDocument.removeEventListener('visibilitychange', onVisible);
-      scheduler.cancel();
+      active = false;
+      stopPainting();
     };
-  }, [staticRef, overlayRef, hostRef, bedWidthMm, bedHeightMm]);
+  }, [staticRef, overlayRef, hostRef, bedWidthMm, bedHeightMm, selectedPhotoId]);
+}
+
+function subscribeLayerPaint(host: HTMLDivElement, scheduler: FrameScheduler): () => void {
+  const unsubscribe = useDesignStudioStore.subscribe(scheduler.request);
+  const unsubscribeProject = subscribeProjectScene(scheduler.request);
+  const unsubscribeTheme = subscribeCanvasColorScheme(scheduler.request);
+  const observer = new ResizeObserver(scheduler.request);
+  observer.observe(host);
+  // The FIRST paint runs immediately rather than on a frame: a hidden or
+  // throttled page does not run frame callbacks at all, and the canvas must not
+  // be blank while that is true.
+  scheduler.flush();
+  // Coming back into view is the other moment a frame is owed but may never have
+  // arrived, so repaint outright rather than trusting the pending request.
+  const onVisible = (): void => {
+    if (!host.ownerDocument.hidden) scheduler.flush();
+  };
+  host.ownerDocument.addEventListener('visibilitychange', onVisible);
+  return () => {
+    unsubscribe();
+    unsubscribeProject();
+    unsubscribeTheme();
+    observer.disconnect();
+    host.ownerDocument.removeEventListener('visibilitychange', onVisible);
+    scheduler.cancel();
+  };
+}
+
+// Telemetry and unrelated selection changes do not alter the composition pixels.
+function subscribeProjectScene(onChange: () => void): () => void {
+  return useStore.subscribe((next, previous) => {
+    if (next.project.scene !== previous.project.scene) onChange();
+  });
 }
 
 function sizedContext(

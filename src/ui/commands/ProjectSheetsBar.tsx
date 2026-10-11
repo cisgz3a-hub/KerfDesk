@@ -4,6 +4,7 @@ import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { ProductionManifestButton } from './ProductionManifestButton';
 import { RetainedArraysButton } from './RetainedArraysButton';
+import { runProjectSheetChange } from './project-sheet-checkpoint';
 import './ProjectSheetsBar.css';
 
 type SheetTab = { readonly id: string; readonly name: string };
@@ -30,7 +31,11 @@ export function ProjectSheetsBar(): JSX.Element {
   const tabs = useSheetTabs(book);
   const openSheet = (id: string): void => {
     if (id === activeId) return;
-    setStatus(switchSheet(id) ? '' : 'This sheet could not be opened. The active sheet was kept.');
+    runProjectSheetChange(() =>
+      setStatus(
+        switchSheet(id) ? '' : 'This sheet could not be opened. The active sheet was kept.',
+      ),
+    );
   };
   return (
     <>
@@ -43,10 +48,12 @@ export function ProjectSheetsBar(): JSX.Element {
           title="Add and open a blank sheet"
           disabled={sheets.length >= 100}
           onClick={() =>
-            setStatus(
-              addSheet(nextSheetName(sheets), false) === null
-                ? 'This sheet could not be created. The active sheet was kept.'
-                : '',
+            runProjectSheetChange(() =>
+              setStatus(
+                addSheet(nextSheetName(sheets), false) === null
+                  ? 'This sheet could not be created. The active sheet was kept.'
+                  : '',
+              ),
             )
           }
         >
@@ -83,13 +90,15 @@ function ProjectSheetsDialog(props: { readonly onClose: () => void }): JSX.Eleme
   const sheets = currentSheets(book);
   const activeId = book?.activeId ?? 'current';
   const create = (duplicate: boolean | 'production-design'): void => {
-    const id = addSheet(name, duplicate);
-    setStatus(
-      id === null
-        ? 'The sheet could not be created. Use a name of up to 200 characters and no more than 100 sheets.'
-        : 'Opened the new sheet.',
-    );
-    if (id !== null) setName('');
+    runProjectSheetChange(() => {
+      const id = addSheet(name, duplicate);
+      setStatus(
+        id === null
+          ? 'The sheet could not be created. Use a name of up to 200 characters and no more than 100 sheets.'
+          : 'Opened the new sheet.',
+      );
+      if (id !== null) setName('');
+    });
   };
   return (
     <Dialog
@@ -182,7 +191,11 @@ function ProjectSheetRow(props: {
         <>
           <Button
             onClick={() =>
-              props.onStatus(switchSheet(props.sheet.id) ? '' : 'This sheet could not be opened.')
+              runProjectSheetChange(() =>
+                props.onStatus(
+                  switchSheet(props.sheet.id) ? '' : 'This sheet could not be opened.',
+                ),
+              )
             }
           >
             Open

@@ -1,0 +1,165 @@
+.artcraft-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  background: #171b21;
+  color: #edf1f7;
+  font: 13px var(--lf-font);
+}
+.artcraft-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #39414e;
+  background: #202630;
+}
+.artcraft-heading h2 {
+  margin: 3px 0 0;
+  font-size: 20px;
+}
+.artcraft-preview {
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  color: #adc4e3;
+}
+.artcraft-toolbar {
+  display: flex;
+  gap: 8px;
+}
+.artcraft-workspace {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.artcraft-sidebar {
+  overflow: auto;
+  padding: 18px 14px;
+  border-right: 1px solid #39414e;
+  background: #202630;
+}
+.artcraft-sidebar h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+.artcraft-hint {
+  color: #adb9ca;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.artcraft-documents {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0 24px;
+}
+.artcraft-documents button,
+.artcraft-editor-choices button {
+  text-align: left;
+  border: 1px solid #48576c;
+  background: #293240;
+  color: #edf1f7;
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+}
+.artcraft-documents strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.artcraft-documents small {
+  display: block;
+  margin-top: 4px;
+  color: #b4c5df;
+}
+.artcraft-backdrop button[aria-pressed='true'] {
+  background: #314c6c;
+  border-color: #82b7f4;
+}
+.artcraft-backdrop button:focus-visible,
+.artcraft-backdrop input:focus-visible {
+  outline: 2px solid #a6cfff;
+  outline-offset: 2px;
+}
+.artcraft-backdrop button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.artcraft-create {
+  border-top: 1px solid #39414e;
+  padding-top: 18px;
+}
+.artcraft-editor-choices {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.artcraft-create label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+.artcraft-create input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  background: #171b21;
+  color: #edf1f7;
+  border: 1px solid #48576c;
+  border-radius: 4px;
+  padding: 7px;
+}
+.artcraft-create input[type='file'] {
+  font-size: 10px;
+  padding: 5px;
+}
+.artcraft-dimensions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.artcraft-editor {
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  background: #15181e;
+}
+.artcraft-empty {
+  max-width: 440px;
+  margin: 18vh auto 0;
+  padding: 30px;
+  line-height: 1.6;
+  color: #adb9ca;
+}
+.artcraft-empty h2 {
+  color: #edf1f7;
+  font-size: 26px;
+}
+.artcraft-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 22px;
+  padding: 10px 16px;
+  border-top: 1px solid #39414e;
+  font-size: 11px;
+  color: #adb9ca;
+}
+.artcraft-error {
+  color: #ffb5b5;
+}
+@media (max-width: 900px) {
+  .artcraft-workspace {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+  .artcraft-heading {
+    padding: 10px;
+  }
+  .artcraft-footer > span:last-child {
+    display: none;
+  }
+}

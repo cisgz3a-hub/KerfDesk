@@ -3,7 +3,7 @@
 // closing (Esc / ×) keeps the session and never asks anything. Apply bakes
 // the working pixels into the scene object as one project undo entry.
 
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type HTMLAttributes } from 'react';
 import type { RgbaBuffer } from '../../core/image-edit';
 import { formatDuration } from '../../core/job';
 import type { RasterImage } from '../../core/scene';
@@ -27,8 +27,12 @@ import { handleEditorKeyDown, handleEditorKeyUp } from './editor-shortcuts';
 import { useImageEditorStore } from './image-editor-store';
 import { useCompositeDoc } from './use-composite-doc';
 import { useQuickMaskStore } from './quick-mask-store';
+import { useDesignStudioStore } from '../design-studio/design-studio-store';
+import { PhotoQuickActions } from './PhotoQuickActions';
 
-export function ImageEditorOverlay(): JSX.Element | null {
+export function ImageEditorOverlay(
+  props: { readonly embedded?: boolean } = {},
+): JSX.Element | null {
   const session = useImageEditorStore((s) => s.session);
   const isApplying = useImageEditorStore((s) => s.isApplying);
   const closeEditor = useImageEditorStore((s) => s.closeEditor);
@@ -38,12 +42,15 @@ export function ImageEditorOverlay(): JSX.Element | null {
   const apply = useImageEditorStore((s) => s.apply);
   const applyAndTrace = useImageEditorStore((s) => s.applyAndTrace);
   const openImageDialog = useUiStore((s) => s.openImageDialog);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
   const isQuickMask = useQuickMaskStore((s) => s.rubylith !== null);
   const composite = useCompositeDoc(session, session?.revision ?? -1);
-  useRegisterModal();
 
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const embeddedRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    if (props.embedded) embeddedRef.current?.focus();
+  }, [props.embedded]);
   useDialogA11y(rootRef, closeEditor, { closeOnEscape: false, initialFocus: 'surface' });
 
   if (session === null) return null;
@@ -51,20 +58,17 @@ export function ImageEditorOverlay(): JSX.Element | null {
 
   return (
     <div
-      ref={rootRef}
-      role="dialog"
-      aria-modal="true"
+      {...editorSurfaceProps(props.embedded, rootRef, embeddedRef)}
       aria-label={`Image Studio — ${session.sourceName}`}
       tabIndex={-1}
-      style={overlayStyle}
-      onKeyDown={handleEditorKeyDown}
-      onKeyUp={handleEditorKeyUp}
     >
+      {props.embedded ? null : <EditorModalRegistration />}
       <ImageEditorTopBar
         session={session}
         isApplying={isApplying}
         isHistoryOpen={isHistoryOpen}
         onToggleHistory={() => setIsHistoryOpen((open) => !open)}
+        embedded={props.embedded === true}
         actions={{
           undo,
           redo,
@@ -72,7 +76,11 @@ export function ImageEditorOverlay(): JSX.Element | null {
           apply,
           // Apply & Trace hands the updated scene raster to the existing
           // trace dialog (V2 plan F) via the toolbar's openImageDialog seam.
-          applyAndTrace: () => applyAndTrace((id) => traceUpdatedImage(id, openImageDialog)),
+          applyAndTrace: () =>
+            applyAndTrace((id) => {
+              if (props.embedded) useDesignStudioStore.getState().closeStudio();
+              traceUpdatedImage(id, openImageDialog);
+            }),
           close: closeEditor,
         }}
       />
@@ -93,6 +101,7 @@ export function ImageEditorOverlay(): JSX.Element | null {
         </div>
         {isHistoryOpen ? (
           <div style={dockStyle}>
+            <PhotoQuickActions />
             <LayersPanel />
             <HistoryPanel />
           </div>
@@ -100,6 +109,28 @@ export function ImageEditorOverlay(): JSX.Element | null {
       </div>
     </div>
   );
+}
+
+function editorSurfaceProps(
+  embedded: boolean | undefined,
+  ref: React.RefObject<HTMLDivElement>,
+  embeddedRef: React.RefObject<HTMLDivElement>,
+): HTMLAttributes<HTMLDivElement> & { readonly ref?: React.RefObject<HTMLDivElement> } {
+  return embedded
+    ? { ref: embeddedRef, role: 'region', style: embeddedStyle }
+    : {
+        ref,
+        role: 'dialog',
+        'aria-modal': true,
+        style: overlayStyle,
+        onKeyDown: handleEditorKeyDown,
+        onKeyUp: handleEditorKeyUp,
+      };
+}
+
+function EditorModalRegistration(): null {
+  useRegisterModal();
+  return null;
 }
 
 // Look the freshly-applied scene raster back up by id and hand it to the
@@ -114,11 +145,11 @@ function traceUpdatedImage(objectId: string, openImageDialog: (source: RasterIma
 const dockStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  width: 168,
-  minWidth: 168,
+  width: 252,
+  minWidth: 220,
   borderLeft: '1px solid var(--lf-border)',
   background: 'var(--lf-bg-1)',
-  overflow: 'hidden',
+  overflow: 'auto',
 };
 
 function StatusFooter(props: {
@@ -173,6 +204,14 @@ const overlayStyle: React.CSSProperties = {
 };
 
 const bodyStyle: React.CSSProperties = { display: 'flex', flex: 1, minHeight: 0 };
+const embeddedStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  flex: 1,
+  minHeight: 0,
+  minWidth: 0,
+  outline: 'none',
+};
 const mainColumnStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',

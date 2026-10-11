@@ -10,6 +10,7 @@ interface DesktopCloseOptions {
   isUpdateCloseRequested?(): boolean;
   cancelQuit(): void;
   quit(): void;
+  beforeClose?(): Promise<void>;
 }
 
 export function installDesktopWindowClose(

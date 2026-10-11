@@ -12,6 +12,8 @@ import { pickPlatformImageFile } from './platform-image-files';
 import { requestPagedArtwork } from '../import/request-paged-artwork';
 
 export type ImagePickActionContext = {
+  /** Nested studios cannot host the separate document-page import dialog. */
+  readonly allowPagedImport?: boolean;
   readonly platform: PlatformAdapter;
   readonly getProjectDocumentEpoch: () => number;
   readonly importSvgObject: (object: SceneObject, batchIndex?: number) => ImportOutcome;
@@ -25,13 +27,20 @@ export async function runImagePickAction(ctx: ImagePickActionContext): Promise<S
   const ownedActions = bindImportActionsToDocument(actions, owner);
   let file: File | null;
   try {
-    file = await pickPlatformImageFile(ctx.platform);
+    file = await pickPlatformImageFile(ctx.platform, ctx.allowPagedImport !== false);
   } catch (error) {
     ownedActions.pushToast(`Could not choose image: ${errorMessage(error)}`, 'error');
     return null;
   }
   if (file === null || !owner.isCurrent()) return null;
   if (/\.(tif|tiff)$/i.test(file.name) || file.type === 'image/tiff') {
+    if (ctx.allowPagedImport === false) {
+      ownedActions.pushToast(
+        'Import TIFF from the main workspace first, then select it in Studio Photos.',
+        'info',
+      );
+      return null;
+    }
     try {
       const imported = await requestPagedArtwork(
         file,

@@ -233,12 +233,16 @@ describe('Design Studio Extend interaction', () => {
       construction: true,
       layerId: 'default',
     });
-    expect(
-      applyDesignSketch({ project: createProject(), undoStack: [] }, session().history.present, [
-        'a',
-        'b',
-      ]),
-    ).toBeNull();
+    const constructionApplied = applyDesignSketch(
+      { project: createProject(), undoStack: [] },
+      session().history.present,
+      ['a', 'b'],
+    );
+    expect(constructionApplied?.project.scene.objects).toHaveLength(0);
+    expect(constructionApplied?.project.scene.layers).toHaveLength(0);
+    expect(constructionApplied?.project.designStudioDocument?.sketch).toEqual(
+      session().history.present,
+    );
   });
 
   it('explains a curved source without adding history', () => {

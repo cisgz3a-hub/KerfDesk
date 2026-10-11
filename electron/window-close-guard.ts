@@ -23,6 +23,8 @@ interface CloseOptions {
   decideUnsavedClose?(): UnsavedCloseDecision;
   decideUnavailable(): WindowUnloadDecision;
   forceClose(): void;
+  /** Preserve external child windows before the parent HWND is destroyed. */
+  beforeClose?(): Promise<void>;
   isQuitRequested(): boolean;
   isUpdateCloseRequested?(): boolean;
   cancelQuit(): void;
@@ -127,10 +129,7 @@ export class WindowCloseGuard {
         await this.cancel(id);
         return;
       }
-      this.preparing = false;
-      this.allowNextClose = true;
-      if (this.options.isQuitRequested()) this.options.quit();
-      else this.window.close();
+      await this.closeApproved(id);
     } catch (error) {
       if (!this.isCurrent(id)) return;
       await this.unavailable(id, error);
@@ -173,9 +172,30 @@ export class WindowCloseGuard {
     }
     // Only the explicit unavailable-renderer decision may bypass unload. It
     // makes no claim that Abort or saving ran in the unreachable renderer.
+    if (!(await this.prepareNativeClose(id))) return;
     const quitting = this.options.isQuitRequested();
     this.options.forceClose();
     if (quitting) this.options.quit();
+  }
+
+  private async closeApproved(id: number): Promise<void> {
+    if (!(await this.prepareNativeClose(id))) return;
+    this.preparing = false;
+    this.allowNextClose = true;
+    if (this.options.isQuitRequested()) this.options.quit();
+    else this.window.close();
+  }
+
+  private async prepareNativeClose(id: number): Promise<boolean> {
+    try {
+      await this.options.beforeClose?.();
+      return this.isCurrent(id);
+    } catch (error) {
+      if (!this.isCurrent(id)) return false;
+      this.options.reportFailure(error);
+      await this.cancel(id);
+      return false;
+    }
   }
 
   private isCurrent(id: number): boolean {

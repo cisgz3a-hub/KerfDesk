@@ -1,11 +1,12 @@
 // Image Size / Canvas Size session ops (ADR-242, PP-E). Both replace the
-// working document, so — like crop — the tile history cannot span them and
-// clears (surfaced in the status row); Revert still restores the as-opened
+// working document, recording a bounded document snapshot for Undo/Redo.
+// Revert still restores the as-opened
 // state (at the current resolution after an Image Size — documented delta).
 
-import { createEditHistory, RGBA_CHANNELS, type RgbaBuffer } from '../../core/image-edit';
+import { pushHistoryEntry, RGBA_CHANNELS, type RgbaBuffer } from '../../core/image-edit';
 import { resampleBuffer } from '../../core/image-resample';
 import type { EditorSession } from './editor-session';
+import { captureDocumentHistory } from './editor-document-history';
 
 /** Where existing pixels sit when the canvas grows or shrinks. */
 export type CanvasAnchor = {
@@ -42,12 +43,24 @@ export function commitImageSize(
     layers,
     activeLayerId: active.id,
     base: resampleBuffer(session.base, session.base.width * scaleX, session.base.height * scaleY),
+    ...(session.baseLayers === undefined
+      ? {}
+      : {
+          baseLayers: session.baseLayers.map((layer) => ({
+            ...layer,
+            buffer: resampleBuffer(
+              layer.buffer,
+              layer.buffer.width * scaleX,
+              layer.buffer.height * scaleY,
+            ),
+          })),
+        }),
     cropOffset: {
       x: session.cropOffset.x * scaleX,
       y: session.cropOffset.y * scaleY,
     },
     pixelSizeMm: { x: session.pixelSizeMm.x / scaleX, y: session.pixelSizeMm.y / scaleY },
-    history: createEditHistory(),
+    history: pushHistoryEntry(session.history, captureDocumentHistory(session, 'Image size')),
     selection: null,
     revision: session.revision + 1,
     dirtySinceApply: true,
@@ -86,7 +99,7 @@ export function commitCanvasSize(
     layers,
     activeLayerId: active.id,
     cropOffset: { x: session.cropOffset.x - offsetX, y: session.cropOffset.y - offsetY },
-    history: createEditHistory(),
+    history: pushHistoryEntry(session.history, captureDocumentHistory(session, 'Canvas size')),
     selection: null,
     revision: session.revision + 1,
     dirtySinceApply: true,

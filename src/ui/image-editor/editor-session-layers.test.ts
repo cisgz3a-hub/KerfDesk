@@ -5,9 +5,11 @@ import { commitAdjustment } from './editor-adjust-session';
 import {
   commitCrop,
   commitFillSelection,
+  commitStroke,
   createSession,
   withSelection,
   BLACK,
+  type EditorSession,
 } from './editor-session';
 import {
   addLayerAboveActive,
@@ -15,6 +17,8 @@ import {
   compositeSession,
   duplicateActiveLayer,
   mergeActiveLayerDown,
+  moveActiveLayer,
+  moveLayerToIndex,
   redoScoped,
   removeActiveLayer,
   setActiveLayer,
@@ -60,7 +64,7 @@ describe('layer session ops', () => {
     session = addLayerAboveActive(session, 'l1');
     session = setActiveLayer(session, 'background');
     expect(session.doc).toBe(session.layers[0]?.buffer);
-    expect(session.history.undoStack.length).toBe(1);
+    expect(session.history.undoStack.length).toBe(2);
     expect(session.history.undoStack[0]?.scope).toBe('background');
   });
 
@@ -126,14 +130,16 @@ describe('layer session ops', () => {
       BLACK,
       'Fill selection',
     );
-    expect(session.history.undoStack.length).toBe(2); // switch KEPT history
+    expect(session.history.undoStack.length).toBe(3);
 
     // First undo reverts the upper-layer fill (active already l1).
     session = undoScoped(session);
     expect(session.activeLayerId).toBe('l1');
     expect(session.doc.data[(4 * 8 + 4) * 4 + 3]).toBe(0); // transparent again
 
-    // Second undo follows the scope back to the Background.
+    // Undo the layer creation, then the earlier background fill.
+    session = undoScoped(session);
+    expect(session.layers.map((layer) => layer.id)).toEqual(['background']);
     session = undoScoped(session);
     expect(session.activeLayerId).toBe('background');
     expect(session.doc.data[0]).toBe(255); // background fill reverted
@@ -143,11 +149,13 @@ describe('layer session ops', () => {
     expect(session.activeLayerId).toBe('background');
     expect(session.doc.data[0]).toBe(0);
     session = redoScoped(session);
+    expect(session.doc.data[(4 * 8 + 4) * 4 + 3]).toBe(0);
+    session = redoScoped(session);
     expect(session.activeLayerId).toBe('l1');
     expect(session.doc.data[(4 * 8 + 4) * 4 + 3]).toBe(255);
   });
 
-  it('removing a layer purges exactly its history entries', () => {
+  it('undoes removal before following retained strokes on the restored layer', () => {
     let session = commitFillSelection(
       withSelection(newSession(), rectSelection(8, 8, { x: 0, y: 0, width: 2, height: 2 })),
       BLACK,
@@ -160,13 +168,19 @@ describe('layer session ops', () => {
       'Fill selection',
     );
     session = removeActiveLayer(session);
-    expect(session.history.undoStack.length).toBe(1);
+    expect(session.history.undoStack.length).toBe(4);
     expect(session.history.undoStack[0]?.scope).toBe('background');
+    session = undoScoped(session);
+    expect(session.activeLayerId).toBe('l1');
+    expect(session.doc.data[(4 * 8 + 4) * 4 + 3]).toBe(255);
+    session = undoScoped(session);
+    expect(session.doc.data[(4 * 8 + 4) * 4 + 3]).toBe(0);
+    session = undoScoped(session);
     session = undoScoped(session);
     expect(session.doc.data[0]).toBe(255);
   });
 
-  it('merge-down still clears history (buffer identities replaced)', () => {
+  it('undoes merging without dropping earlier history', () => {
     let session = commitFillSelection(
       withSelection(newSession(), rectSelection(8, 8, { x: 0, y: 0, width: 2, height: 2 })),
       BLACK,
@@ -174,7 +188,12 @@ describe('layer session ops', () => {
     );
     session = addLayerAboveActive(session, 'l1');
     session = mergeActiveLayerDown(session);
-    expect(session.history.undoStack.length).toBe(0);
+    expect(session.history.undoStack.length).toBe(3);
+    session = undoScoped(session);
+    expect(session.layers.map((layer) => layer.id)).toEqual(['background', 'l1']);
+    session = undoScoped(session);
+    session = undoScoped(session);
+    expect(session.doc.data[0]).toBe(255);
   });
 
   it('addTextLayer inserts a doc-sized buffer as the new active layer', () => {
@@ -207,5 +226,81 @@ describe('layer session ops', () => {
     session = commitImageSize(session, 8, 8);
     expect(session.layers.every((l) => l.buffer.width === 8)).toBe(true);
     expect(session.doc).toBe(session.layers[1]?.buffer);
+  });
+
+  it('round trips an interleaved editing workflow through every layer and dimension change', () => {
+    const snapshot = (session: EditorSession) => ({
+      layers: session.layers.map((layer) => ({
+        ...layer,
+        buffer: { ...layer.buffer, data: [...layer.buffer.data] },
+      })),
+      active: session.activeLayerId,
+      cropOffset: session.cropOffset,
+      pixelSizeMm: session.pixelSizeMm,
+      base: { ...session.base, data: [...session.base.data] },
+    });
+    const paint = (session: EditorSession) =>
+      commitStroke(
+        session,
+        { kind: 'pencil' },
+        { diameterPx: 1, hardness: 1, opacity: 1 },
+        BLACK,
+        [{ x: 3, y: 3 }],
+        'Pencil',
+      );
+    const steps: ((session: EditorSession) => EditorSession)[] = [
+      paint,
+      (session) => addLayerAboveActive(session, 'ink'),
+      paint,
+      (session) => setActiveLayerProps(session, { name: 'My ink' }),
+      (session) => setActiveLayerProps(session, { opacity: 0.5 }),
+      (session) => setActiveLayerProps(session, { blend: 'multiply' }),
+      (session) => setActiveLayerProps(session, { isVisible: false }),
+      (session) => duplicateActiveLayer(session, 'copy'),
+      (session) => moveActiveLayer(session, -1),
+      (session) => moveLayerToIndex(session, 'copy', 2),
+      (session) => commitCrop(session, { x: 1, y: 1, width: 6, height: 6 }),
+      (session) => commitImageSize(session, 10, 10),
+      (session) => addTextLayer(session, 'text', 'Text', createRgbaBuffer(10, 10)),
+      paint,
+      mergeActiveLayerDown,
+      removeActiveLayer,
+    ];
+    let current = newSession();
+    const checkpoints = [snapshot(current)];
+    for (const step of steps) {
+      current = step(current);
+      checkpoints.push(snapshot(current));
+    }
+    expect(current.history.undoStack).toHaveLength(steps.length);
+    for (const expected of checkpoints.slice(0, -1).reverse()) {
+      current = undoScoped(current);
+      expect(snapshot(current)).toEqual(expected);
+      expect(current.doc).toBe(
+        current.layers.find((layer) => layer.id === current.activeLayerId)?.buffer,
+      );
+    }
+    for (const expected of checkpoints.slice(1)) {
+      current = redoScoped(current);
+      expect(snapshot(current)).toEqual(expected);
+    }
+  });
+
+  it('does not record selection changes or no-ops and forks structural redo after a new edit', () => {
+    let session = addLayerAboveActive(newSession(), 'ink');
+    const history = session.history;
+    session = setActiveLayer(session, 'background');
+    expect(session.history).toBe(history);
+    expect(setActiveLayer(session, 'missing')).toBe(session);
+    expect(setActiveLayerProps(session, { name: 'Background', opacity: 1 })).toBe(session);
+    expect(moveActiveLayer(session, -1)).toBe(session);
+    expect(addLayerAboveActive(session, 'ink')).toBe(session);
+    expect(duplicateActiveLayer(session, 'ink')).toBe(session);
+    session = undoScoped(session);
+    expect(session.history.redoStack).toHaveLength(1);
+    session = addLayerAboveActive(session, 'replacement');
+    expect(session.history.redoStack).toHaveLength(0);
+    expect(redoScoped(session)).toBe(session);
+    expect(undoScoped(session).layers.map((layer) => layer.id)).toEqual(['background']);
   });
 });

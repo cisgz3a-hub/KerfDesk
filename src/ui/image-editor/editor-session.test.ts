@@ -158,7 +158,7 @@ describe('editor session ops', () => {
       240,
       PARTIAL_ALPHA,
     ]);
-    expect(session.history.undoStack).toHaveLength(1);
+    expect(session.history.undoStack).toHaveLength(2);
 
     session = undoScoped(session);
     expect(Array.from(session.doc.data)).toEqual(Array.from(original));
@@ -183,7 +183,7 @@ describe('editor session ops', () => {
 
     expect(moved).toBe(session);
     expect(Array.from(moved.doc.data)).toEqual(Array.from(original));
-    expect(moved.history.undoStack).toHaveLength(0);
+    expect(moved.history.undoStack).toHaveLength(1);
   });
 
   it('nudgeOutline moves only the selection, never the pixels', () => {
@@ -213,7 +213,7 @@ describe('editor session ops', () => {
     expect(session.doc.height).toBe(6);
     // The painted pixel travelled into crop space.
     expect(channelAt(session, 1, 1)).toBe(0);
-    expect(session.history.undoStack).toHaveLength(0);
+    expect(session.history.undoStack.map((entry) => entry.label)).toEqual(['Pencil', 'Crop']);
     // 24 px ↔ 24 mm source: 1 px = 1 mm (cropLocalBounds convention).
     expect(appliedBounds(session)).toEqual({ minX: 6, minY: 6, maxX: 18, maxY: 12 });
 

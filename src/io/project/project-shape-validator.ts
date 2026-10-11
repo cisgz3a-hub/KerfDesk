@@ -1,3 +1,5 @@
+import { validateProjectStudioDocuments } from './project-studio-document-validator';
+import { validateDesignStudioDocument } from './project-design-studio-validator';
 import { validateRetainedVectorSources } from './project-retained-vector-source-validator';
 import { validateCncMachiningSetup } from './project-cnc-setup-validator';
 import { validateProcessRecipeApplications } from './project-process-recipe-validator';
@@ -95,6 +97,8 @@ export function validateProjectShape(
     validateProjectVariables(raw['variables']),
     validatePrintAndCutTargets(raw['printAndCutTargets']),
     validateEmbeddedFonts(raw['embeddedFonts']),
+    validateProjectStudioDocuments(raw),
+    validateDesignStudioDocument(raw['designStudioDocument']),
     optionalString(raw, 'notes'),
     validateProjectSheets(raw['sheetBook'], validateProjectShape),
     validateProductionManifest(raw['productionManifest'], validateProjectShape),

@@ -27,6 +27,7 @@ const PERSISTED_VERSION = 1;
 const MAX_PERSISTED_CHARS = 2_000_000;
 
 export type PersistedDesignSession = {
+  readonly projectOwner?: string;
   readonly sketch: Sketch;
   readonly activeLayerId: string;
   readonly surface3d: boolean;
@@ -35,6 +36,7 @@ export type PersistedDesignSession = {
 };
 
 type StoredShape = {
+  readonly projectOwner?: string;
   readonly version: number;
   readonly sketch: Sketch;
   readonly activeLayerId: string;
@@ -50,6 +52,7 @@ export function writePersistedSession(session: PersistedDesignSession): void {
     if (typeof localStorage === 'undefined') return;
     const stored: StoredShape = {
       version: PERSISTED_VERSION,
+      ...(session.projectOwner === undefined ? {} : { projectOwner: session.projectOwner }),
       sketch: session.sketch,
       activeLayerId: session.activeLayerId,
       surface3d: session.surface3d,
@@ -103,6 +106,7 @@ function fromStored(value: unknown): PersistedDesignSession | null {
   if (typeof stored.activeLayerId !== 'string') return null;
   return {
     sketch,
+    ...(typeof stored.projectOwner === 'string' ? { projectOwner: stored.projectOwner } : {}),
     activeLayerId: stored.activeLayerId,
     surface3d: stored.surface3d !== false,
     applied: appliedFromStored(stored),
