@@ -10,15 +10,16 @@
   "ledgerPr": {
     "number": 1151,
     "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151",
-    "head": "a05bb69051de0e076fbcca96f7b42657628ea86e",
-    "integrationCommit": "3f6abf9cc505b3690e4ab4adc392d5c73f0b93d9",
+    "head": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
+    "integrationCommit": "64f5c66ac64c036cbbd87b51f9fa8b1637b3f1a8",
     "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "previousPublishedHeads": [
       "a0ace701f12c880bc897a8c5d48ec20ba548c045",
       "073af6f4cb4618d5db95f9fbbfac4c213dbae04e",
       "23455fc2987e0bf7673dda780a8bb68f34629daa",
       "69e97b7b6af333d20851af56c3a5e2ecf3d684e1",
-      "f7833a464df7307499c5aa3de4a28a4244dc8de2"
+      "f7833a464df7307499c5aa3de4a28a4244dc8de2",
+      "a05bb69051de0e076fbcca96f7b42657628ea86e"
     ]
   },
   "publisherWorktree": "C:/Users/Asus/.codex/worktrees/6fd9/pr-audit-publish",
@@ -37,10 +38,10 @@
       "pr": 1151,
       "owner": "root",
       "publicationOwner": "root",
-      "activity": "Stale CI narrative correction requires independent snapshot review, focused commit, publication and replacement-head CI",
-      "publishedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+      "activity": "Generated next-action correction requires independent review, publication and replacement-head CI",
+      "publishedHead": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
       "publicationInProgress": false,
-      "claimedAt": "2026-10-11T08:55:58.386Z"
+      "claimedAt": "2026-10-11T09:18:04.839Z"
     }
   ],
   "completionCriteria": [
@@ -80,12 +81,12 @@
   "finalSourceHead": "b87f289594735c5f1dc54f635a15078907f36619",
   "ledgerReview": {
     "status": "follow-up-review-pending",
-    "reviewer": "ledger_0812",
-    "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-review.md",
-    "verification": "All nine frozen files match independent approval, focused commit and complete published source tree. Priority type consistency and ledger associations passed independent checks. Replacement-head CI remains separate.",
+    "reviewer": "ledger_0900",
+    "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-peer-review.md",
+    "verification": "All nine frozen files match independent approval, focused commit and complete published source tree. CI narrative consistency and ledger associations passed independent checks. Replacement-head CI remains separate.",
     "followUpReview": {
       "status": "awaiting-independent-review",
-      "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-peer-review.md"
+      "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-ledger-peer-review.md"
     },
     "approvalScope": "Frozen nine-file snapshot independently approved, focused commit matched all reviewed files; local self-receipt is separate from that committed snapshot.",
     "reviewComments": [
@@ -144,33 +145,43 @@
         "id": 4240943303,
         "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240943303",
         "commentedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
-        "status": "fixed-awaiting-independent-review",
+        "status": "resolved-in-published-followup",
         "result": "Confirmed three SVG result descriptions contradicted successful CI receipts in the same snapshot. Replace transient pending wording with neutral behavior prose and render recorded CI status together with its observed commit from the repair ledger. Underlying repair CI was already successful.",
-        "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-review-report.md"
+        "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-review-report.md",
+        "resolvedByPublishedHead": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
+        "independentSnapshotReview": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-peer-review.md"
+      },
+      {
+        "id": 4241008264,
+        "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241008264",
+        "commentedHead": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
+        "status": "fixed-awaiting-independent-review",
+        "result": "The status page used a generic repair-publication instruction while the structured next action identified pending tracking review/publication/CI. Render state.nextAction directly so the visible continuation step follows the recorded phase. No machine-readable gate bypass or application defect is claimed.",
+        "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-review-report.md"
       }
     ],
-    "integrationCommit": "3f6abf9cc505b3690e4ab4adc392d5c73f0b93d9",
-    "previousReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-review.md",
-    "fileManifest": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-files.json",
-    "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-commit-attestation.json",
-    "verifiedPublishedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+    "integrationCommit": "64f5c66ac64c036cbbd87b51f9fa8b1637b3f1a8",
+    "previousReport": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-review.md",
+    "fileManifest": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-peer-files.json",
+    "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-commit-attestation.json",
+    "verifiedPublishedHead": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
     "sourceAttestation": {
-      "reviewedCommit": "3f6abf9cc505b3690e4ab4adc392d5c73f0b93d9",
-      "publishedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+      "reviewedCommit": "64f5c66ac64c036cbbd87b51f9fa8b1637b3f1a8",
+      "publishedHead": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
       "method": "Complete nine-file ledger manifest and every file match the reviewed Git tree",
-      "checkedAt": "2026-10-11T08:46:14.484Z"
+      "checkedAt": "2026-10-11T09:04:08.143Z"
     },
-    "publicationVerifiedAt": "2026-10-11T08:48:01.756Z",
+    "publicationVerifiedAt": "2026-10-11T09:06:30.276Z",
     "previousApproval": {
       "status": "approved",
-      "reviewer": "ledger_0812",
-      "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-review.md",
-      "verification": "All nine frozen files match independent approval, focused commit and complete published source tree. Priority type consistency and ledger associations passed independent checks. Replacement-head CI remains separate.",
+      "reviewer": "ledger_0900",
+      "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-peer-review.md",
+      "verification": "All nine frozen files match independent approval, focused commit and complete published source tree. CI narrative consistency and ledger associations passed independent checks. Replacement-head CI remains separate.",
       "followUpReview": {
         "status": "published-awaiting-ci",
-        "reviewer": "ledger_0812",
-        "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-review.md",
-        "fileManifest": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-files.json"
+        "reviewer": "ledger_0900",
+        "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-peer-review.md",
+        "fileManifest": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-peer-files.json"
       },
       "approvalScope": "Frozen nine-file snapshot independently approved, focused commit matched all reviewed files; local self-receipt is separate from that committed snapshot.",
       "reviewComments": [
@@ -224,30 +235,40 @@
           "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-priority-triage.md",
           "resolvedByPublishedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
           "independentSnapshotReview": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-review.md"
+        },
+        {
+          "id": 4240943303,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240943303",
+          "commentedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+          "status": "resolved-in-published-followup",
+          "result": "Confirmed three SVG result descriptions contradicted successful CI receipts in the same snapshot. Replace transient pending wording with neutral behavior prose and render recorded CI status together with its observed commit from the repair ledger. Underlying repair CI was already successful.",
+          "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-review-report.md",
+          "resolvedByPublishedHead": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
+          "independentSnapshotReview": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-peer-review.md"
         }
       ],
-      "integrationCommit": "3f6abf9cc505b3690e4ab4adc392d5c73f0b93d9",
-      "previousReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-review.md",
-      "fileManifest": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-files.json",
-      "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-commit-attestation.json",
-      "verifiedPublishedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+      "integrationCommit": "64f5c66ac64c036cbbd87b51f9fa8b1637b3f1a8",
+      "previousReport": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-review.md",
+      "fileManifest": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-peer-files.json",
+      "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-commit-attestation.json",
+      "verifiedPublishedHead": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
       "sourceAttestation": {
-        "reviewedCommit": "3f6abf9cc505b3690e4ab4adc392d5c73f0b93d9",
-        "publishedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+        "reviewedCommit": "64f5c66ac64c036cbbd87b51f9fa8b1637b3f1a8",
+        "publishedHead": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
         "method": "Complete nine-file ledger manifest and every file match the reviewed Git tree",
-        "checkedAt": "2026-10-11T08:46:14.484Z"
+        "checkedAt": "2026-10-11T09:04:08.143Z"
       },
-      "publicationVerifiedAt": "2026-10-11T08:48:01.756Z",
+      "publicationVerifiedAt": "2026-10-11T09:06:30.276Z",
       "previousApproval": {
         "status": "approved",
         "reviewer": "ledger_0812",
-        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-review.md",
-        "verification": "All nine frozen files matched independent review, focused commit and complete published source tree. Independent tracking helper controls and ledger consistency checks passed. Required replacement-head CI remains separate.",
+        "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-review.md",
+        "verification": "All nine frozen files match independent approval, focused commit and complete published source tree. Priority type consistency and ledger associations passed independent checks. Replacement-head CI remains separate.",
         "followUpReview": {
           "status": "published-awaiting-ci",
           "reviewer": "ledger_0812",
-          "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-review.md",
-          "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-files.json"
+          "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-review.md",
+          "fileManifest": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-files.json"
         },
         "approvalScope": "Frozen nine-file snapshot independently approved, focused commit matched all reviewed files; local self-receipt is separate from that committed snapshot.",
         "reviewComments": [
@@ -291,30 +312,40 @@
             "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-triage.md",
             "resolvedByPublishedHead": "f7833a464df7307499c5aa3de4a28a4244dc8de2",
             "independentSnapshotReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-review.md"
+          },
+          {
+            "id": 4240863024,
+            "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240863024",
+            "commentedHead": "f7833a464df7307499c5aa3de4a28a4244dc8de2",
+            "status": "resolved-in-published-followup",
+            "result": "Confirmed mixed JSON priority types: four P2 display strings differed from ten numeric values. Normalize the four records to numeric 2 and document the numeric 0-3 convention. A strict numeric selection omitted those four records; no existing production consumer failure is claimed.",
+            "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-priority-triage.md",
+            "resolvedByPublishedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+            "independentSnapshotReview": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-review.md"
           }
         ],
-        "integrationCommit": "0f86bcf9f37c53a9ca160bf83f220c605042f2da",
-        "previousReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-peer-review.md",
-        "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-files.json",
-        "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-commit-attestation.json",
-        "verifiedPublishedHead": "f7833a464df7307499c5aa3de4a28a4244dc8de2",
+        "integrationCommit": "3f6abf9cc505b3690e4ab4adc392d5c73f0b93d9",
+        "previousReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-review.md",
+        "fileManifest": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-files.json",
+        "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-commit-attestation.json",
+        "verifiedPublishedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
         "sourceAttestation": {
-          "reviewedCommit": "0f86bcf9f37c53a9ca160bf83f220c605042f2da",
-          "publishedHead": "f7833a464df7307499c5aa3de4a28a4244dc8de2",
+          "reviewedCommit": "3f6abf9cc505b3690e4ab4adc392d5c73f0b93d9",
+          "publishedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
           "method": "Complete nine-file ledger manifest and every file match the reviewed Git tree",
-          "checkedAt": "2026-10-11T08:17:43.024Z"
+          "checkedAt": "2026-10-11T08:46:14.484Z"
         },
-        "publicationVerifiedAt": "2026-10-11T08:18:28.736Z",
+        "publicationVerifiedAt": "2026-10-11T08:48:01.756Z",
         "previousApproval": {
           "status": "approved",
-          "reviewer": "foundation_prs",
-          "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-peer-review.md",
-          "verification": "All nine frozen hashes matched focused commit and published tree; 24 current offline composite scenarios, reciprocal associations, complete source manifests and category counts passed. Latest-head hosted CI tracked separately.",
+          "reviewer": "ledger_0812",
+          "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-review.md",
+          "verification": "All nine frozen files matched independent review, focused commit and complete published source tree. Independent tracking helper controls and ledger consistency checks passed. Required replacement-head CI remains separate.",
           "followUpReview": {
             "status": "published-awaiting-ci",
-            "reviewer": "foundation_prs",
-            "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-peer-review.md",
-            "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-peer-files.json"
+            "reviewer": "ledger_0812",
+            "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-review.md",
+            "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-files.json"
           },
           "approvalScope": "Frozen nine-file snapshot independently approved, focused commit matched all reviewed files; local self-receipt is separate from that committed snapshot.",
           "reviewComments": [
@@ -338,41 +369,50 @@
               "id": 6106651312,
               "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312",
               "commentedHead": "69e97b7b6af333d20851af56c3a5e2ecf3d684e1",
-              "status": "reported-needs-reconciliation",
+              "status": "resolved-in-published-followup",
               "claims": [
                 {
                   "key": "pending-ledger-review",
-                  "status": "reported-needs-reconciliation"
+                  "status": "resolved-in-published-followup",
+                  "result": "Confirmed queue inconsistency: the frozen snapshot awaited independent review but omitted its pending task. The next snapshot retains an explicit review token and sequences review before publication; only commit-bound approval and verified committed blobs clear the local token. Independent evidence shows the previous snapshot was reviewed; a publication bypass was not reproduced.",
+                  "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-triage.md",
+                  "resolvedByPublishedHead": "f7833a464df7307499c5aa3de4a28a4244dc8de2"
                 },
                 {
                   "key": "tracking-coverage-ci",
-                  "status": "reported-needs-reconciliation"
+                  "status": "resolved-in-published-followup",
+                  "result": "Confirmed same-head contradiction: coverage still called passed tracking CI pending. Coverage now has neutral source-review prose and a structured CI receipt synchronized to state, including its observed head and whether that head matches the inventory. A green result cannot silently advance source review or inventory identity.",
+                  "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-triage.md",
+                  "resolvedByPublishedHead": "f7833a464df7307499c5aa3de4a28a4244dc8de2"
                 }
-              ]
+              ],
+              "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-triage.md",
+              "resolvedByPublishedHead": "f7833a464df7307499c5aa3de4a28a4244dc8de2",
+              "independentSnapshotReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-review.md"
             }
           ],
-          "integrationCommit": "aa3e765de9547e771698e202f15179ed9b0b9ed5",
-          "previousReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-peer-review.md",
-          "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-peer-files.json",
-          "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-commit-attestation.json",
-          "verifiedPublishedHead": "69e97b7b6af333d20851af56c3a5e2ecf3d684e1",
+          "integrationCommit": "0f86bcf9f37c53a9ca160bf83f220c605042f2da",
+          "previousReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-peer-review.md",
+          "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-files.json",
+          "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-commit-attestation.json",
+          "verifiedPublishedHead": "f7833a464df7307499c5aa3de4a28a4244dc8de2",
           "sourceAttestation": {
-            "reviewedCommit": "aa3e765de9547e771698e202f15179ed9b0b9ed5",
-            "publishedHead": "69e97b7b6af333d20851af56c3a5e2ecf3d684e1",
+            "reviewedCommit": "0f86bcf9f37c53a9ca160bf83f220c605042f2da",
+            "publishedHead": "f7833a464df7307499c5aa3de4a28a4244dc8de2",
             "method": "Complete nine-file ledger manifest and every file match the reviewed Git tree",
-            "checkedAt": "2026-10-11T07:16:34.935Z"
+            "checkedAt": "2026-10-11T08:17:43.024Z"
           },
-          "publicationVerifiedAt": "2026-10-11T07:17:48.773Z",
+          "publicationVerifiedAt": "2026-10-11T08:18:28.736Z",
           "previousApproval": {
             "status": "approved",
             "reviewer": "foundation_prs",
-            "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-peer-review.md",
-            "verification": "21 offline control fixtures; source attestation, reciprocal associations and per-category counts validated",
+            "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-peer-review.md",
+            "verification": "All nine frozen hashes matched focused commit and published tree; 24 current offline composite scenarios, reciprocal associations, complete source manifests and category counts passed. Latest-head hosted CI tracked separately.",
             "followUpReview": {
               "status": "published-awaiting-ci",
               "reviewer": "foundation_prs",
-              "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-peer-review.md",
-              "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-peer-files.json"
+              "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-peer-review.md",
+              "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-peer-files.json"
             },
             "approvalScope": "Frozen nine-file snapshot independently approved, focused commit matched all reviewed files; local self-receipt is separate from that committed snapshot.",
             "reviewComments": [
@@ -391,31 +431,46 @@
                 "result": "Queued aggregates already kept cycleVerified false. absentRequired and unmetRequired now distinguish absence from all unsuccessful required checks.",
                 "report": "docs/audits/2026-10-11-pr-history/publication/tracker-comment-peer-review.md",
                 "resolvedByPublishedHead": "073af6f4cb4618d5db95f9fbbfac4c213dbae04e"
+              },
+              {
+                "id": 6106651312,
+                "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312",
+                "commentedHead": "69e97b7b6af333d20851af56c3a5e2ecf3d684e1",
+                "status": "reported-needs-reconciliation",
+                "claims": [
+                  {
+                    "key": "pending-ledger-review",
+                    "status": "reported-needs-reconciliation"
+                  },
+                  {
+                    "key": "tracking-coverage-ci",
+                    "status": "reported-needs-reconciliation"
+                  }
+                ]
               }
             ],
-            "integrationCommit": "485ac6ee97a192d792876d932853bc3986807f34",
-            "previousReport": "docs/audits/2026-10-11-pr-history/publication/ledger-followup-peer-review.md",
-            "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-peer-files.json",
-            "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-commit-attestation.json",
-            "verifiedPublishedHead": "23455fc2987e0bf7673dda780a8bb68f34629daa",
+            "integrationCommit": "aa3e765de9547e771698e202f15179ed9b0b9ed5",
+            "previousReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-peer-review.md",
+            "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-peer-files.json",
+            "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-commit-attestation.json",
+            "verifiedPublishedHead": "69e97b7b6af333d20851af56c3a5e2ecf3d684e1",
             "sourceAttestation": {
-              "reviewedCommit": "485ac6ee97a192d792876d932853bc3986807f34",
-              "publishedHead": "23455fc2987e0bf7673dda780a8bb68f34629daa",
+              "reviewedCommit": "aa3e765de9547e771698e202f15179ed9b0b9ed5",
+              "publishedHead": "69e97b7b6af333d20851af56c3a5e2ecf3d684e1",
               "method": "Complete nine-file ledger manifest and every file match the reviewed Git tree",
-              "checkedAt": "2026-10-11T06:44:12.541Z"
+              "checkedAt": "2026-10-11T07:16:34.935Z"
             },
-            "publicationVerifiedAt": "2026-10-11T06:47:16.666Z",
+            "publicationVerifiedAt": "2026-10-11T07:17:48.773Z",
             "previousApproval": {
               "status": "approved",
               "reviewer": "foundation_prs",
-              "report": "docs/audits/2026-10-11-pr-history/publication/ledger-followup-peer-review.md",
+              "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-peer-review.md",
               "verification": "21 offline control fixtures; source attestation, reciprocal associations and per-category counts validated",
               "followUpReview": {
                 "status": "published-awaiting-ci",
                 "reviewer": "foundation_prs",
-                "report": "docs/audits/2026-10-11-pr-history/publication/tracker-comment-peer-review.md",
-                "verification": "24 offline composite scenarios covering required CI, cycle blockers, evidence associations and null fallback",
-                "publisherGuards": "Independent reviewer confirmed commit-bound approval, complete nine-file manifest and reviewed source equality; dependency verification derives from relevant files, with package licence checks separate from exact notice bytes."
+                "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-peer-review.md",
+                "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-peer-files.json"
               },
               "approvalScope": "Frozen nine-file snapshot independently approved, focused commit matched all reviewed files; local self-receipt is separate from that committed snapshot.",
               "reviewComments": [
@@ -436,35 +491,92 @@
                   "resolvedByPublishedHead": "073af6f4cb4618d5db95f9fbbfac4c213dbae04e"
                 }
               ],
-              "integrationCommit": "8015c0761d9ed28278e835deead805eece8f6079",
-              "previousReport": "docs/audits/2026-10-11-pr-history/publication/ledger-peer-review.md",
-              "fileManifest": "docs/audits/2026-10-11-pr-history/publication/ledger-followup-peer-files.json",
-              "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/ledger-followup-commit-attestation.json",
-              "verifiedPublishedHead": "073af6f4cb4618d5db95f9fbbfac4c213dbae04e",
+              "integrationCommit": "485ac6ee97a192d792876d932853bc3986807f34",
+              "previousReport": "docs/audits/2026-10-11-pr-history/publication/ledger-followup-peer-review.md",
+              "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-peer-files.json",
+              "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-commit-attestation.json",
+              "verifiedPublishedHead": "23455fc2987e0bf7673dda780a8bb68f34629daa",
               "sourceAttestation": {
-                "reviewedCommit": "8015c0761d9ed28278e835deead805eece8f6079",
-                "publishedHead": "073af6f4cb4618d5db95f9fbbfac4c213dbae04e",
+                "reviewedCommit": "485ac6ee97a192d792876d932853bc3986807f34",
+                "publishedHead": "23455fc2987e0bf7673dda780a8bb68f34629daa",
                 "method": "Complete nine-file ledger manifest and every file match the reviewed Git tree",
-                "checkedAt": "2026-10-11T06:18:19.894Z"
+                "checkedAt": "2026-10-11T06:44:12.541Z"
               },
-              "publicationVerifiedAt": "2026-10-11T06:20:40.193Z"
+              "publicationVerifiedAt": "2026-10-11T06:47:16.666Z",
+              "previousApproval": {
+                "status": "approved",
+                "reviewer": "foundation_prs",
+                "report": "docs/audits/2026-10-11-pr-history/publication/ledger-followup-peer-review.md",
+                "verification": "21 offline control fixtures; source attestation, reciprocal associations and per-category counts validated",
+                "followUpReview": {
+                  "status": "published-awaiting-ci",
+                  "reviewer": "foundation_prs",
+                  "report": "docs/audits/2026-10-11-pr-history/publication/tracker-comment-peer-review.md",
+                  "verification": "24 offline composite scenarios covering required CI, cycle blockers, evidence associations and null fallback",
+                  "publisherGuards": "Independent reviewer confirmed commit-bound approval, complete nine-file manifest and reviewed source equality; dependency verification derives from relevant files, with package licence checks separate from exact notice bytes."
+                },
+                "approvalScope": "Frozen nine-file snapshot independently approved, focused commit matched all reviewed files; local self-receipt is separate from that committed snapshot.",
+                "reviewComments": [
+                  {
+                    "id": 4240384675,
+                    "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240384675",
+                    "status": "resolved-in-published-followup",
+                    "result": "Four null repair evidence references now use the canonical repair reports. Renderer has explicit fallback.",
+                    "report": "docs/audits/2026-10-11-pr-history/publication/tracker-comment-peer-review.md",
+                    "resolvedByPublishedHead": "073af6f4cb4618d5db95f9fbbfac4c213dbae04e"
+                  },
+                  {
+                    "id": 4240384677,
+                    "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240384677",
+                    "status": "resolved-in-published-followup",
+                    "result": "Queued aggregates already kept cycleVerified false. absentRequired and unmetRequired now distinguish absence from all unsuccessful required checks.",
+                    "report": "docs/audits/2026-10-11-pr-history/publication/tracker-comment-peer-review.md",
+                    "resolvedByPublishedHead": "073af6f4cb4618d5db95f9fbbfac4c213dbae04e"
+                  }
+                ],
+                "integrationCommit": "8015c0761d9ed28278e835deead805eece8f6079",
+                "previousReport": "docs/audits/2026-10-11-pr-history/publication/ledger-peer-review.md",
+                "fileManifest": "docs/audits/2026-10-11-pr-history/publication/ledger-followup-peer-files.json",
+                "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/ledger-followup-commit-attestation.json",
+                "verifiedPublishedHead": "073af6f4cb4618d5db95f9fbbfac4c213dbae04e",
+                "sourceAttestation": {
+                  "reviewedCommit": "8015c0761d9ed28278e835deead805eece8f6079",
+                  "publishedHead": "073af6f4cb4618d5db95f9fbbfac4c213dbae04e",
+                  "method": "Complete nine-file ledger manifest and every file match the reviewed Git tree",
+                  "checkedAt": "2026-10-11T06:18:19.894Z"
+                },
+                "publicationVerifiedAt": "2026-10-11T06:20:40.193Z"
+              },
+              "latestHostedReviewRefresh": {
+                "checkedAt": "2026-10-11T06:45:23.661Z",
+                "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-postpublish-review-complete.json",
+                "result": "No new actionable feedback; new usage-limit notice and a previous-head completed summary are not current-head review approval. Independent frozen-snapshot review is recorded separately."
+              }
             },
             "latestHostedReviewRefresh": {
-              "checkedAt": "2026-10-11T06:45:23.661Z",
-              "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-postpublish-review-complete.json",
-              "result": "No new actionable feedback; new usage-limit notice and a previous-head completed summary are not current-head review approval. Independent frozen-snapshot review is recorded separately."
+              "checkedAt": "2026-10-11T07:36:41.000Z",
+              "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-review-complete.json",
+              "result": "Two tracker consistency claims retained for independent reconciliation"
             }
           },
           "latestHostedReviewRefresh": {
-            "checkedAt": "2026-10-11T07:36:41.000Z",
-            "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-review-complete.json",
-            "result": "Two tracker consistency claims retained for independent reconciliation"
-          }
+            "checkedAt": "2026-10-11T08:20:33.433Z",
+            "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-final-review-complete.json",
+            "result": "No new substantive claims; known record corrections are published and independently attested. Hosted code/security review is running on the current tracking head; recheck its complete feedback before advancing."
+          },
+          "trackingHelperReview": {
+            "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-triage.md",
+            "independentCandidateCases": 23,
+            "baselineAndAttestationCases": 14,
+            "legacyCheckerAndRendererCases": 24,
+            "scope": "Local continuation helper and README review; independent approval of the frozen nine-file snapshot remains required"
+          },
+          "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-tracker-published-review.md"
         },
         "latestHostedReviewRefresh": {
-          "checkedAt": "2026-10-11T08:20:33.433Z",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-final-review-complete.json",
-          "result": "No new substantive claims; known record corrections are published and independently attested. Hosted code/security review is running on the current tracking head; recheck its complete feedback before advancing."
+          "checkedAt": "2026-10-11T08:48:53.731Z",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0846-review-complete.json",
+          "result": "No new IDs or substantive claims. Priority comment 4240863024 is resolved in the independently attested published tree. Hosted code/security reviews are running at the new tracking head and need complete feedback refresh before advancement."
         },
         "trackingHelperReview": {
           "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-triage.md",
@@ -473,12 +585,12 @@
           "legacyCheckerAndRendererCases": 24,
           "scope": "Local continuation helper and README review; independent approval of the frozen nine-file snapshot remains required"
         },
-        "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-tracker-published-review.md"
+        "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/continuation-0846-tracker-published-review.md"
       },
       "latestHostedReviewRefresh": {
-        "checkedAt": "2026-10-11T08:48:53.731Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0846-review-complete.json",
-        "result": "No new IDs or substantive claims. Priority comment 4240863024 is resolved in the independently attested published tree. Hosted code/security reviews are running at the new tracking head and need complete feedback refresh before advancement."
+        "checkedAt": "2026-10-11T09:06:52.534Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0904-review-complete.json",
+        "result": "No new IDs or substantive claims. Priority and stale-CI-prose comments are resolved in the independently attested published tree. Hosted code/security reviews are running at the new head and require complete feedback refresh before advancement."
       },
       "trackingHelperReview": {
         "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-triage.md",
@@ -487,12 +599,12 @@
         "legacyCheckerAndRendererCases": 24,
         "scope": "Local continuation helper and README review; independent approval of the frozen nine-file snapshot remains required"
       },
-      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/continuation-0846-tracker-published-review.md"
+      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/continuation-0904-tracker-published-review.md"
     },
     "latestHostedReviewRefresh": {
-      "checkedAt": "2026-10-11T08:54:07.698Z",
-      "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-review-complete.json",
-      "result": "Code and security review completed at a05bb690. One new stale-CI-prose claim is retained for independent review and publication; no other new substantive claims."
+      "checkedAt": "2026-10-11T09:16:28.453Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-review-complete.json",
+      "result": "Code and security review completed at 8f82dc68. One new navigation consistency claim retained for independent review and publication; no other new substantive claims."
     },
     "trackingHelperReview": {
       "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-triage.md",
@@ -501,44 +613,44 @@
       "legacyCheckerAndRendererCases": 24,
       "scope": "Local continuation helper and README review; independent approval of the frozen nine-file snapshot remains required"
     },
-    "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/continuation-0846-tracker-published-review.md"
+    "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/continuation-0904-tracker-published-review.md"
   },
   "ledgerCi": {
     "status": "pending",
-    "head": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+    "head": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
     "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-    "checkedAt": "2026-10-11T08:58:27.309Z",
-    "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+    "checkedAt": "2026-10-11T09:18:42.928Z",
+    "absentRequired": ["Chrome UX smoke"],
     "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
-    "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+    "missingRequired": ["Chrome UX smoke"],
     "checks": [
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T08:50:01Z",
+        "completedAt": "2026-10-11T09:09:45Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981181/job/114430313716",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043314/job/114433592417",
         "name": "Browser test checks and production-bundle smoke",
-        "startedAt": "2026-10-11T08:46:16Z",
+        "startedAt": "2026-10-11T09:04:52Z",
         "status": "COMPLETED",
         "workflowName": "Browser smoke"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T08:54:10Z",
+        "completedAt": "2026-10-11T09:10:54Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981199/job/114430314026",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043388/job/114433460158",
         "name": "Typecheck, lint and format",
-        "startedAt": "2026-10-11T08:46:16Z",
+        "startedAt": "2026-10-11T09:04:09Z",
         "status": "COMPLETED",
         "workflowName": "CI"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T08:49:36Z",
+        "completedAt": "2026-10-11T09:07:32Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981201/job/114430313921",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043326/job/114433459976",
         "name": "Package, check and launch the desktop app",
-        "startedAt": "2026-10-11T08:46:16Z",
+        "startedAt": "2026-10-11T09:04:09Z",
         "status": "COMPLETED",
         "workflowName": "Desktop package check"
       },
@@ -546,29 +658,29 @@
         "__typename": "CheckRun",
         "completedAt": "0001-01-01T00:00:00Z",
         "conclusion": "",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981181/job/114430313931",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043314/job/114433592544",
         "name": "Chrome UX smoke (1/4)",
-        "startedAt": "2026-10-11T08:46:16Z",
+        "startedAt": "2026-10-11T09:04:52Z",
         "status": "IN_PROGRESS",
         "workflowName": "Browser smoke"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T08:46:14Z",
+        "completedAt": "2026-10-11T09:04:07Z",
         "conclusion": "SKIPPED",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981201/job/114430314781",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043326/job/114433460778",
         "name": "Package, install and launch the Windows desktop app",
-        "startedAt": "2026-10-11T08:46:15Z",
+        "startedAt": "2026-10-11T09:04:07Z",
         "status": "COMPLETED",
         "workflowName": "Desktop package check"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T08:49:50Z",
+        "completedAt": "2026-10-11T09:07:28Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981199/job/114430314054",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043388/job/114433460100",
         "name": "Policy checks and builds",
-        "startedAt": "2026-10-11T08:46:16Z",
+        "startedAt": "2026-10-11T09:04:09Z",
         "status": "COMPLETED",
         "workflowName": "CI"
       },
@@ -576,9 +688,9 @@
         "__typename": "CheckRun",
         "completedAt": "0001-01-01T00:00:00Z",
         "conclusion": "",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981181/job/114430314036",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043314/job/114433592555",
         "name": "Chrome UX smoke (2/4)",
-        "startedAt": "2026-10-11T08:46:17Z",
+        "startedAt": "2026-10-11T09:04:52Z",
         "status": "IN_PROGRESS",
         "workflowName": "Browser smoke"
       },
@@ -586,9 +698,9 @@
         "__typename": "CheckRun",
         "completedAt": "0001-01-01T00:00:00Z",
         "conclusion": "",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981181/job/114430313912",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043314/job/114433592545",
         "name": "Chrome UX smoke (3/4)",
-        "startedAt": "2026-10-11T08:46:16Z",
+        "startedAt": "2026-10-11T09:04:52Z",
         "status": "IN_PROGRESS",
         "workflowName": "Browser smoke"
       },
@@ -596,49 +708,69 @@
         "__typename": "CheckRun",
         "completedAt": "0001-01-01T00:00:00Z",
         "conclusion": "",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981181/job/114430313919",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043314/job/114433592527",
         "name": "Chrome UX smoke (4/4)",
-        "startedAt": "2026-10-11T08:46:16Z",
+        "startedAt": "2026-10-11T09:04:52Z",
         "status": "IN_PROGRESS",
         "workflowName": "Browser smoke"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T08:46:14Z",
+        "completedAt": "2026-10-11T09:04:07Z",
         "conclusion": "SKIPPED",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981201/job/114430314768",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043326/job/114433460527",
         "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
-        "startedAt": "2026-10-11T08:46:15Z",
+        "startedAt": "2026-10-11T09:04:07Z",
         "status": "COMPLETED",
         "workflowName": "Desktop package check"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T08:55:24Z",
+        "completedAt": "2026-10-11T09:14:41Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981199/job/114430314122",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043388/job/114433460145",
         "name": "Unit tests (1/4)",
-        "startedAt": "2026-10-11T08:46:16Z",
+        "startedAt": "2026-10-11T09:04:09Z",
         "status": "COMPLETED",
         "workflowName": "CI"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "0001-01-01T00:00:00Z",
-        "conclusion": "",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981199/job/114430314112",
+        "completedAt": "2026-10-11T09:18:21Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043388/job/114433460182",
         "name": "Unit tests (2/4)",
-        "startedAt": "2026-10-11T08:46:16Z",
-        "status": "IN_PROGRESS",
+        "startedAt": "2026-10-11T09:04:09Z",
+        "status": "COMPLETED",
         "workflowName": "CI"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T08:56:42Z",
+        "completedAt": "2026-10-11T09:15:08Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981199/job/114430314251",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043388/job/114433460132",
         "name": "Unit tests (3/4)",
-        "startedAt": "2026-10-11T08:46:16Z",
+        "startedAt": "2026-10-11T09:04:09Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-11T09:13:26Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043388/job/114433460123",
+        "name": "Unit tests (4/4)",
+        "startedAt": "2026-10-11T09:04:08Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-11T09:07:48Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043388/job/114433460045",
+        "name": "Phone and MCP service",
+        "startedAt": "2026-10-11T09:04:09Z",
         "status": "COMPLETED",
         "workflowName": "CI"
       },
@@ -646,26 +778,16 @@
         "__typename": "CheckRun",
         "completedAt": "0001-01-01T00:00:00Z",
         "conclusion": "",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981199/job/114430314236",
-        "name": "Unit tests (4/4)",
-        "startedAt": "2026-10-11T08:46:17Z",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38127043388/job/114435964271",
+        "name": "Lint, typecheck, license, test, build",
+        "startedAt": "2026-10-11T09:18:24Z",
         "status": "IN_PROGRESS",
-        "workflowName": "CI"
-      },
-      {
-        "__typename": "CheckRun",
-        "completedAt": "2026-10-11T08:50:43Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38125981199/job/114430313841",
-        "name": "Phone and MCP service",
-        "startedAt": "2026-10-11T08:46:16Z",
-        "status": "COMPLETED",
         "workflowName": "CI"
       },
       {
         "__typename": "StatusContext",
         "context": "CodeRabbit",
-        "startedAt": "2026-10-11T08:46:19Z",
+        "startedAt": "2026-10-11T09:04:12Z",
         "state": "SUCCESS",
         "targetUrl": ""
       }
@@ -673,18 +795,18 @@
   },
   "pendingRepairPrs": [],
   "lastContinuationCheck": {
-    "checkedAt": "2026-10-11T08:55:58.386Z",
+    "checkedAt": "2026-10-11T09:18:04.839Z",
     "main": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "phase": "review-follow-up",
     "recordedAndLiveRepairHeadsMatch": true,
     "sourceVerification": [
       "docs/audits/2026-10-11-pr-history/publication/continuation-0822-source-review.md"
     ],
-    "reviewRefresh": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-review-report.md",
+    "reviewRefresh": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-review-report.md",
     "cycleVerified": 12,
     "pendingRepairs": [],
     "trackingCiStatus": "pending",
-    "trackingHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+    "trackingHead": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
     "publishedFollowups": [1151],
     "rejectedReviewClaims": [4240505330, 4240648361],
     "documentedReviewLimitations": [4240569210, 4240648358],
@@ -694,5 +816,5 @@
     "automation": "ACTIVE; unchanged continuation retained"
   },
   "reviewCommentProtocol": "Read all current-head comments and compare IDs with explicit dispositions; do not infer processing from posting-time cutoffs.",
-  "nextAction": "Independently review the frozen tracking snapshot and CI narrative correction, then commit and publish to PR #1151. Verify replacement-head required aggregates and complete review feedback before refreshing repair cycle gates and starting the prepared historical batch."
+  "nextAction": "Independently review the frozen tracking snapshot and generated next-action correction, then commit and publish it to PR #1151. Verify replacement-head required aggregate CI and complete review feedback before refreshing repair cycle gates and starting the prepared historical batch."
 }

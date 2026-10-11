@@ -11,6 +11,7 @@ The maintainer authorised continuing the audit through the complete PR history o
 - `repairs.json` maps findings to focused changes, local verification, commit, branch, PR and CI evidence. Three related material-preset defects share one coherent repair.
 - `coverage.json` retains the full PR inventory, review scopes and explicit gaps. Historical evidence paths refer to the local audit archive, which includes intentionally failing probes and is not shipped with repair PRs.
 - `state.json` records the continuation cursor, partial-review backlog, active ownership, authorisation and completion criteria.
+- The generated status page takes its next action directly from `state.json`; update that canonical action when the loop changes phase.
 - The initial local archive is `docs/audits/2026-10-11-pr-history/`. Preserve it while reconciling new evidence into this ledger.
 
 ## Repeatable procedure

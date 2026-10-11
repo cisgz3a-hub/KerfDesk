@@ -24892,14 +24892,14 @@
       "closed_at": null,
       "merged_at": null,
       "merge_commit_sha": "ecdfb6480e3338545b284996f0430bbe64672fa8",
-      "head": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+      "head": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "review": {
         "coverage": "full-diff",
         "scope": "Complete nine-file tracking diff independently reviewed at reviewedHead. Source-review coverage and per-head CI are separate; see ciSnapshot and state.json:ledgerCi.",
-        "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-ledger-peer-review.md",
-        "reviewer": "ledger_0812",
-        "reviewedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+        "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-peer-review.md",
+        "reviewer": "ledger_0900",
+        "reviewedHead": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
         "reviewedFiles": [
           "docs/audits/pr-history/README.md",
           "docs/audits/pr-history/STATUS.md",
@@ -24915,16 +24915,16 @@
         "limitations": "Documentation and workflow record. CI applies only to its recorded head and does not complete the historical audit or qualify product deployment/hardware."
       },
       "ciSnapshot": {
-        "head": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+        "head": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
         "status": "pending",
-        "checkedAt": "2026-10-11T08:58:27.309Z",
+        "checkedAt": "2026-10-11T09:18:42.928Z",
         "matchesInventoriedHead": true,
-        "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+        "absentRequired": ["Chrome UX smoke"],
         "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
         "source": "state.json:ledgerCi"
       },
-      "previousInventoriedHead": "f7833a464df7307499c5aa3de4a28a4244dc8de2",
-      "headRefreshedAt": "2026-10-11T08:46:43.525Z",
+      "previousInventoriedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
+      "headRefreshedAt": "2026-10-11T09:04:25.619Z",
       "headEvidence": "Live publisher confirmed the pushed head and every file matched the independently reviewed Git tree"
     }
   ]
