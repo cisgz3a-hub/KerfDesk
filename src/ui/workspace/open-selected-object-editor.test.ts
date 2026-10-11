@@ -6,6 +6,7 @@ import {
   type Project,
   type RasterImage,
   type TextObject,
+  type TracedImage,
 } from '../../core/scene';
 import { useStore } from '../state';
 import { useImageEditorStore } from '../image-editor/image-editor-store';
@@ -45,12 +46,35 @@ let openEditorSpy: ReturnType<
 beforeEach(() => {
   resetStore();
   useCanvasTextStore.getState().close();
-  useUiStore.setState({ textDialog: null, imageDialog: null, modalDepth: 0 });
+  useUiStore.setState({
+    textDialog: null,
+    imageDialog: null,
+    modalDepth: 0,
+    toolMode: { kind: 'select' },
+  });
   openEditorSpy = vi.fn();
   useImageEditorStore.setState({ openEditor: openEditorSpy });
 });
 
 describe('openEditorForSelectedObject (canvas double-click)', () => {
+  it('opens trace part editing without altering geometry or retaining whole-trace handles', () => {
+    const object: TracedImage = {
+      kind: 'traced-image',
+      id: 'trace',
+      source: 'image.png',
+      paths: [],
+      bounds: { minX: 0, minY: 0, maxX: 50, maxY: 50 },
+      transform: IDENTITY_TRANSFORM,
+    };
+    const project = { ...createProject(), scene: { objects: [object], layers: [] } };
+    useStore.setState({ project, selectedObjectId: object.id });
+    openEditorForSelectedObject();
+    expect(useUiStore.getState().toolMode.kind).toBe('trace-parts');
+    expect(useStore.getState().selectedObjectId).toBeNull();
+    expect(useStore.getState().project).toBe(project);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
   it('opens text on canvas without the Add Text dialog or a geometry mutation', () => {
     const object = text();
     const project = { ...createProject(), scene: { objects: [object], layers: [] } };

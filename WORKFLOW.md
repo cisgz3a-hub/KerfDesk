@@ -429,6 +429,29 @@ destination and cannot overwrite the template source.
 
 ---
 
+### Edit individual trace parts (ADR-587)
+
+1. After tracing, click **Edit trace parts** in the canvas hint or the left tool strip.
+   Double-clicking a trace with Select also opens this tool.
+2. Click or drag the line or filled shape you want to change. Only that part separates from the
+   rest of the trace. A filled shape keeps its holes; a Centerline stroke moves independently
+   unless a Fill operation uses its enclosed shapes. Right-click picks a part for its context menu.
+3. Shift-click to select several parts. Drag them together, use the transform handles to resize
+   or rotate, arrow keys to nudge, or Delete to remove them. Existing duplication and numeric
+   position controls work on the picked parts.
+4. Use **Edit part nodes** to reshape a connected contour. This allows changes to points within
+   one connected mark, rather than moving the whole mark.
+5. One Undo restores a separation and its drag. Escape during a drag restores the original trace;
+   Done or Escape outside a drag returns to Select. The retained source image can start a fresh trace.
+6. Large traces stay together except for the parts you pick. **Arrange → Break Apart** remains
+   available when you deliberately want every shape separated.
+
+Pick the visible edge of a line-only trace or a trace in wireframe view. Filled parts can also
+be picked through their interior. If a trace is used as an image mask, a text-path guide, or a
+linked relief boundary, mask or rail, release that dependency before separating its parts;
+the tool explains this without changing
+the linked artwork.
+
 ### F-A5a. Join curve endpoints
 
 #### Success — join two open subpaths
@@ -2587,7 +2610,12 @@ authorization, Frame proof, controller command, or safety boundary.
 5. Repeating **Auto-fit + copy artwork to all N** replaces the generated copies
    instead of layering another set on the canvas.
 6. Reopened projects retain per-jig output order and shared-size controls because
-   the existing generated copy ids already bind each copy to its source and outline.
+   generated artwork retains its source ancestry and physical outline. Existing
+   encoded copy IDs remain readable; edited parts also carry explicit jig metadata.
+   A part fitted into the first outline stays there after its generated copies are deleted.
+7. An explicitly selected layout can include both an original and an edited generated
+   copy. Both selected objects become artwork in the first outline; each gets a distinct
+   copy in the remaining outlines. Repeating the action replaces those copies once.
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 

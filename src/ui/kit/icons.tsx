@@ -28,6 +28,7 @@ export type IconName =
   | 'cursor'
   | 'text'
   | 'nodes'
+  | 'trace-parts'
   | 'square'
   | 'circle'
   | 'pentagon'
@@ -97,6 +98,12 @@ const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
   home: <path d="M2.5 8 8 2.5 13.5 8M4.5 7v6.5h7V7" />,
   trash: <path d="M2.5 4.5h11M6.5 4.5v-2h3v2M4 4.5l.7 9h6.6l.7-9M6.5 7v4M9.5 7v4" />,
   cursor: <path d="M4 3l8 4.5-3.3 1L11 13l-1.7.8-2.3-4.5L4 11.5V3Z" />,
+  'trace-parts': (
+    <>
+      <path d="M2 7V2h5M9 2h5v5M2 9v5h5" strokeDasharray="2 2" />
+      <path d="M9 8h5v5H9zM11.5 11.5 15 15" />
+    </>
+  ),
   text: <path d="M3 5V3h10v2M8 3v10M5 13h6" />,
   nodes: (
     <>

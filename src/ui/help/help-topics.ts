@@ -7,6 +7,7 @@ export type CommandHelpId = `command:${CommandId}`;
 export type MenuHelpId = `menu:${CommandFamily}`;
 export type ToolHelpKey =
   | 'select'
+  | 'trace-parts'
   | 'text'
   | 'node'
   | 'measure'
@@ -68,6 +69,11 @@ export type HelpTopic = {
 };
 
 export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
+  'trace-parts': {
+    label: 'Edit trace parts',
+    tooltip:
+      'Click and drag an individual traced shape or line. Only the part you pick is separated; holes stay with their outline. Shift-click selects more parts. Use Edit nodes to reshape a connected line.',
+  },
   'position-laser': {
     label: 'Move laser here',
     tooltip:

@@ -1,5 +1,6 @@
 import type { ConstrainedSketch2d } from '../sketch-constraints/constrained-sketch';
 import type { PartGeneratorSource } from '../parts/part-generator';
+import type { RegistrationJigIdentity } from './registration-jig-identity';
 // SceneObject â€” the discriminated union the rest of the pipeline pattern-matches
 // against. Phase A ships one variant (ImportedSvg); ADR-014 commits to adding
 // 'text' (Phase D) and 'traced-image' (Phase E) without touching code outside
@@ -144,6 +145,8 @@ export type ObjectOperationOverride = ObjectOperationSettingsOverride & {
 };
 
 export type ObjectPowerScale = {
+  /** Durable jig membership; the self ID prevents ordinary clones inheriting it. */
+  readonly registrationJig?: RegistrationJigIdentity;
   /** Operator-assigned artwork label, independent of manufacturing operations. */
   readonly name?: string;
   // Shared source fragment identity and authored placement for SVG re-import.

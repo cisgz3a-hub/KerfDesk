@@ -13,10 +13,13 @@ import {
 import { fitSelectionToRegion } from '../../core/scene/fit-selection-to-region';
 import {
   registrationJigArtworkInstances,
-  registrationJigCopyId,
-  registrationJigCopyPrefix,
+  createRegistrationJigCopyIdAllocator,
   registrationJigGroupCopyId,
   registrationJigGroupCopyPrefix,
+  registrationJigReplacedArtworkIds,
+  registrationJigIdentityBudgetIssue,
+  withRegistrationJigBox,
+  withRegistrationJigChild,
 } from '../../core/scene/registration-jig-artwork';
 import {
   buildSelectionTransformEdit,
@@ -24,6 +27,10 @@ import {
 } from '../../core/scene/selection-transform';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
+import { removeObjectIdsFromGroups } from './scene-group-actions';
+import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
+import { reliefAuthoringLinkIds } from '../../core/relief/relief-authoring-link-ids';
+import { useToastStore } from './toast-store';
 
 const REGISTRATION_JIG_ARTWORK_FIT_FRACTION = 0.9;
 
@@ -77,41 +84,35 @@ export function applyCenterArtworkInRegistrationJigSet(
   const selectionBounds = combinedBBox(fitted);
   if (selectionBounds === null) return state;
 
-  const sourceCenter = centerOf(selectionBounds);
-  const movedById = new Map<string, SceneObject>();
-  const copies: SceneObject[] = [];
-  const copiedGroups: SceneGroup[] = [];
-  const selectionIds: string[] = [];
-  for (const [boxIndex, box] of boxes.entries()) {
-    const targetCenter = centerOf(transformedBBox(box));
-    const delta = { x: targetCenter.x - sourceCenter.x, y: targetCenter.y - sourceCenter.y };
-    if (boxIndex === 0) {
-      for (const object of fitted) {
-        movedById.set(object.id, translatedObject(object, object.id, delta));
-        selectionIds.push(object.id);
-      }
-      continue;
-    }
-    const copiedIds = new Map<string, string>();
-    for (const object of fitted) {
-      const id = registrationJigCopyId(object.id, box.id);
-      copiedIds.set(object.id, id);
-      copies.push(translatedObject(object, id, delta));
-    }
-    copiedGroups.push(
-      ...cloneCompleteSelectedGroups(state.project.scene, selected, copiedIds, box.id),
-    );
-  }
+  const { movedById, copies, copiedGroups, selectionIds } = buildJigArtworkLayout(
+    state.project.scene,
+    selected,
+    fitted,
+    boxes,
+    centerOf(selectionBounds),
+  );
 
-  const copyPrefixes = selected.map((object) => registrationJigCopyPrefix(object.id));
+  const replacedIds = registrationJigReplacedArtworkIds(
+    state.project.scene,
+    new Set(selected.map((object) => object.id)),
+  );
+  const metadataIssue = registrationJigIdentityBudgetIssue(copies);
+  if (metadataIssue !== null) {
+    useToastStore.getState().pushToast(metadataIssue, 'warning');
+    return state;
+  }
+  if (!canReplaceJigArtwork(state.project.scene, replacedIds, copies)) return state;
   const copiedGroupPrefixes = completeSelectedGroups(state.project.scene, selected).map((group) =>
     registrationJigGroupCopyPrefix(group.id),
   );
   let scene: Scene = {
     ...state.project.scene,
     objects: state.project.scene.objects
-      .filter((object) => !copyPrefixes.some((prefix) => object.id.startsWith(prefix)))
+      .filter((object) => !replacedIds.has(object.id))
       .map((object) => movedById.get(object.id) ?? object),
+    ...(state.project.scene.artworkOrder === undefined
+      ? {}
+      : { artworkOrder: state.project.scene.artworkOrder.filter((id) => !replacedIds.has(id)) }),
     groups: [
       ...(state.project.scene.groups ?? []).filter(
         (group) => !copiedGroupPrefixes.some((prefix) => group.id.startsWith(prefix)),
@@ -120,6 +121,11 @@ export function applyCenterArtworkInRegistrationJigSet(
     ],
   };
   for (const copy of copies) scene = addObject(scene, copy);
+  const liveIds = new Set(scene.objects.map((object) => object.id));
+  const removedIds = new Set([...replacedIds].filter((id) => !liveIds.has(id)));
+  const repaired = repairDanglingObjectDependencies(removeObjectIdsFromGroups(scene, removedIds));
+  scene = repaired.scene;
+  reportDependencyRepairs(repaired);
   const [selectedObjectId, ...additionalSelectedIds] = selectionIds;
   return {
     project: { ...state.project, scene },
@@ -129,6 +135,73 @@ export function applyCenterArtworkInRegistrationJigSet(
     redoStack: [],
     dirty: true,
   };
+}
+
+function buildJigArtworkLayout(
+  scene: Scene,
+  selected: ReadonlyArray<SceneObject>,
+  fitted: ReadonlyArray<SceneObject>,
+  boxes: ReturnType<typeof findRegistrationBoxes>,
+  sourceCenter: { readonly x: number; readonly y: number },
+) {
+  const movedById = new Map<string, SceneObject>();
+  const copies: SceneObject[] = [];
+  const copiedGroups: SceneGroup[] = [];
+  const selectionIds: string[] = [];
+  const allocateCopyId = createRegistrationJigCopyIdAllocator(
+    scene,
+    new Set(selected.map((object) => object.id)),
+  );
+  for (const [boxIndex, box] of boxes.entries()) {
+    const targetCenter = centerOf(transformedBBox(box));
+    const delta = { x: targetCenter.x - sourceCenter.x, y: targetCenter.y - sourceCenter.y };
+    if (boxIndex === 0) {
+      for (const object of fitted) {
+        movedById.set(
+          object.id,
+          withRegistrationJigBox(translatedObject(object, object.id, delta), box.id),
+        );
+        selectionIds.push(object.id);
+      }
+      continue;
+    }
+    const copiedIds = new Map<string, string>();
+    for (const object of fitted) {
+      const id = allocateCopyId(object.id, box.id);
+      copiedIds.set(object.id, id);
+      copies.push(
+        withRegistrationJigChild(object, translatedObject(object, id, delta), box.id, 'copy'),
+      );
+    }
+    copiedGroups.push(...cloneCompleteSelectedGroups(scene, selected, copiedIds, box.id));
+  }
+
+  return { movedById, copies, copiedGroups, selectionIds };
+}
+
+function canReplaceJigArtwork(
+  scene: Scene,
+  replacedIds: ReadonlySet<string>,
+  copies: ReadonlyArray<SceneObject>,
+): boolean {
+  const recreatedIds = new Set(copies.map((object) => object.id));
+  const removedDescendants = new Set([...replacedIds].filter((id) => !recreatedIds.has(id)));
+  const removesReliefSource = scene.objects.some(
+    (object) =>
+      !removedDescendants.has(object.id) &&
+      object.kind === 'relief' &&
+      'reliefAuthoring' in object &&
+      object.reliefAuthoring !== undefined &&
+      reliefAuthoringLinkIds(object.reliefAuthoring).some((id) => removedDescendants.has(id)),
+  );
+  if (removesReliefSource)
+    useToastStore
+      .getState()
+      .pushToast(
+        'A jig part is used as a linked relief source. Remove its linked use in the relief editor before replacing the jig artwork, or duplicate the source artwork to create a new jig layout.',
+        'warning',
+      );
+  return !removesReliefSource;
 }
 
 export function applyRegistrationJigArtworkSize(
