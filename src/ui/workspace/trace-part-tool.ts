@@ -47,7 +47,7 @@ export function beginTracePartDrag(args: TracePartDragArgs): DragState | null {
   const handle = selectedPartHandle(args, selectedObjects, point, pxToMm);
   if (handle !== null) return handle;
   const scene = focusedScene(args.project.scene, state.projectDocumentEpoch);
-  const hit = hitTracePart(scene, point, pxToMm);
+  const hit = hitTracePart(scene, point, pxToMm, useUiStore.getState().wireframeView);
   if (hit === null) {
     if (!args.e.shiftKey) state.selectTracePart(null);
     return null;

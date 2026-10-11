@@ -42,6 +42,8 @@ export function tracePartActions(set: TracePartSet): TracePartActions {
             selectedId = objectId;
             return state;
           }
+          warning = dependencyWarning(state.project.scene, objectId);
+          if (warning !== null) return state;
           const scene = replaceWithPart(state.project.scene, split.remainder, split.part);
           warning = sceneLimitOverrun(
             state.project.scene,
@@ -79,6 +81,26 @@ function editableTrace(scene: Scene, id: string): TracedImage | null {
   return sceneLayerVisibility.hasObject(object, sceneLayerVisibility.lookup(scene.layers))
     ? object
     : null;
+}
+
+function dependencyWarning(scene: Scene, id: string): string | null {
+  const mask = scene.objects.some(
+    (object) => object.kind === 'raster-image' && object.imageMaskId === id,
+  );
+  const guide = scene.objects.some(
+    (object) => object.kind === 'text' && object.pathText?.guideObjectId === id,
+  );
+  if (!mask && !guide) return null;
+  // The retained ID would otherwise silently narrow a live mask or guide.
+  // Releasing those relationships must be an explicit edit, even when hidden.
+  const uses = [mask ? 'an image mask' : null, guide ? 'a text guide' : null].filter(Boolean);
+  const steps = [
+    mask
+      ? 'Apply Crop Image to each masked image to keep its appearance, or use Remove Image Mask.'
+      : null,
+    guide ? "Turn off Path text in each linked text object's editor." : null,
+  ].filter(Boolean);
+  return `This trace is used as ${uses.join(' and ')}. Before separating its parts: ${steps.join(' ')}`;
 }
 
 function replaceWithPart(scene: Scene, remainder: TracedImage, part: TracedImage): Scene {

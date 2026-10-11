@@ -11,7 +11,7 @@ import {
   type TracedImage,
   type Vec2,
 } from '../../core/scene';
-import { isHybridStrokePath } from '../../core/trace/hybrid/hybrid-paths';
+import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { tracePartGroups } from '../state/trace-part-geometry';
 import { displayCurveToleranceMm } from './display-polylines';
 
@@ -29,25 +29,36 @@ type IndexedLine = {
   readonly curve?: CurveSubpath;
 };
 type NearestHit = { readonly hit: TracePartHit; readonly distance: number };
+type PathHitPaint = 'hidden' | 'stroke' | 'fill';
 const pathIndexCache = new WeakMap<ColoredPath, ReadonlyArray<IndexedLine>>();
 const curveLineCache = new WeakMap<
   CurveSubpath,
   Array<{ readonly tolerance: number; readonly line: Polyline }>
 >();
 
-export function hitTracePart(scene: Scene, point: Vec2, pxToMm: number): TracePartHit | null {
+export function hitTracePart(
+  scene: Scene,
+  point: Vec2,
+  pxToMm: number,
+  wireframe = false,
+): TracePartHit | null {
   if (!Number.isFinite(pxToMm) || pxToMm <= 0) return null;
   const visibility = sceneLayerVisibility.lookup(scene.layers);
   for (let index = scene.objects.length - 1; index >= 0; index -= 1) {
     const object = scene.objects[index];
     if (object?.kind !== 'traced-image' || object.locked === true) continue;
     if (!sceneLayerVisibility.hasObject(object, visibility)) continue;
-    const hit = hitObjectPart(
-      object,
-      point,
-      HIT_RADIUS_PX * pxToMm,
-      (path) => sceneLayerVisibility.resolvePath(object, path, visibility).visible,
-    );
+    const hit = hitObjectPart(object, point, HIT_RADIUS_PX * pxToMm, (path) => {
+      const { visible, operation } = sceneLayerVisibility.resolvePath(object, path, visibility);
+      if (!visible) return 'hidden';
+      // Match object-display: only an effective Fill operation paints an
+      // interior. Orphan paths and wireframe artwork are visible strokes.
+      return !wireframe &&
+        operation !== undefined &&
+        effectiveOperationForObject(operation, object).mode === 'fill'
+        ? 'fill'
+        : 'stroke';
+    });
     if (hit !== null) return hit;
   }
   return null;
@@ -57,7 +68,7 @@ function hitObjectPart(
   object: TracedImage,
   point: Vec2,
   radius: number,
-  visible: (path: ColoredPath) => boolean,
+  resolvePaint: (path: ColoredPath) => PathHitPaint,
 ): TracePartHit | null {
   const local = localPoint(object, point);
   if (local === null) return null;
@@ -75,13 +86,14 @@ function hitObjectPart(
   for (let pathIndex = object.paths.length - 1; pathIndex >= 0; pathIndex -= 1) {
     const path = object.paths[pathIndex];
     if (path === undefined) continue;
-    if (!visible(path)) continue;
+    const paint = resolvePaint(path);
+    if (paint === 'hidden') continue;
     const lines = indexedLines(path);
     nearest = nearestEdge(
       { object, lines, local, point, padding, radius, pathIndex, tolerance },
       nearest,
     );
-    if (nearest === null && filled === null) {
+    if (paint === 'fill' && nearest === null && filled === null) {
       filled = filledPart(object, pathIndex, path, lines, local, tolerance);
     }
   }
@@ -122,12 +134,6 @@ function filledPart(
   point: Vec2,
   tolerance: number,
 ): TracePartHit | null {
-  if (
-    object.traceMode === 'centerline' ||
-    (object.traceMode === 'hybrid' && isHybridStrokePath(path))
-  ) {
-    return null;
-  }
   // Most clicks are on an edge. Only group the path for an interior hit; this
   // never constructs one scene object per contour of a large image.
   const windings = lines.map((entry) =>
@@ -135,7 +141,10 @@ function filledPart(
       ? windingNumber(visibleLine(entry, tolerance).points, point)
       : 0,
   );
-  if (windings.every((value) => value === 0)) return null;
+  // The canvas fills the entire compound path. Even separately editable
+  // strokes can cancel one another after their operation changes to Fill.
+  const total = windings.reduce((sum, winding) => sum + winding, 0);
+  if (path.fillRule === 'nonzero' ? total === 0 : Math.abs(total) % 2 === 0) return null;
   for (const group of tracePartGroups(object, pathIndex)) {
     const winding = group.reduce((sum, index) => sum + (windings[index] ?? 0), 0);
     const inside = path.fillRule === 'nonzero' ? winding !== 0 : Math.abs(winding) % 2 === 1;

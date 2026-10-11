@@ -438,6 +438,11 @@ destination and cannot overwrite the template source.
 6. Large traces stay together except for the parts you pick. **Arrange → Break Apart** remains
    available when you deliberately want every shape separated.
 
+Pick the visible edge of a line-only trace or a trace in wireframe view. Filled parts can also
+be picked through their interior. If a trace is used as an image mask or a text-path guide,
+release that dependency before separating its parts; the tool explains this without changing
+the linked artwork.
+
 ### F-A5a. Join curve endpoints
 
 #### Success — join two open subpaths

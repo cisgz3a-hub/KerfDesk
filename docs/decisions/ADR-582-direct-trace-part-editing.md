@@ -31,7 +31,9 @@ direct selection, isolation, node editing, and hole-preserving splitting in esta
   immutable path bounds and shape groups; reject bounding-box misses before examining segments.
   Pick canonical curves at the canvas zoom precision, flattening only candidate contours and
   caching their recent scale buckets so edited curves stay selectable at high zoom.
-  Filled interiors respect holes and the path fill rule. Locked and hidden paths cannot be picked.
+  Filled interiors respect holes and the path fill rule. Interior picking follows the effective
+  canvas paint: line operations, orphan paths and wireframe view require an edge hit. Locked and
+  hidden paths cannot be picked.
   Respect the current group-editing scope, but select a picked part directly rather than expanding
   its parent group.
 - Drag immediately to move the part; Shift-click toggles multiple parts. Reuse ordinary transform
@@ -40,6 +42,10 @@ direct selection, isolation, node editing, and hole-preserving splitting in esta
 - Snapshot before extraction so separation and movement commit as one undo step. Escape,
   pointer cancellation and lost capture restore the original unsplit project. A selection-only
   click can itself separate a part and is undoable. Respect existing project object limits.
+- Refuse a split while the trace is a live image mask or text-path guide, with guidance to release
+  the dependency first. Retaining its ID only on the remainder would silently narrow the mask or
+  guide. Keep the complete project and history unchanged in that case, including for hidden or
+  locked dependents. Selecting an already separate single part requires no split.
 
 ## Consequences and verification
 

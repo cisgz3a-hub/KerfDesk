@@ -1,6 +1,7 @@
 import { expect } from 'vitest';
 import {
   createProject,
+  createLayer,
   IDENTITY_TRANSFORM,
   polylineToCurveSubpath,
   type Polyline,
@@ -33,7 +34,12 @@ export function loadTrace(transform: Transform = IDENTITY_TRANSFORM, contours = 
     bounds: boundsFromColoredPaths(paths),
   };
   const project = createProject();
-  useStore.setState({ project: { ...project, scene: { ...project.scene, objects: [object] } } });
+  const layers = paths.map((path) =>
+    createLayer({ id: path.color, color: path.color, mode: 'fill' }),
+  );
+  useStore.setState({
+    project: { ...project, scene: { ...project.scene, objects: [object], layers } },
+  });
 }
 
 export function getTrace(id: string): TracedImage {

@@ -5,6 +5,7 @@ import {
   flattenCurveSubpath,
   IDENTITY_TRANSFORM,
   polylineToCurveSubpath,
+  sceneLayerVisibility,
   type ColoredPath,
   type CurveSubpath,
   type Polyline,
@@ -14,6 +15,7 @@ import {
 import { boundsFromColoredPaths } from '../../core/trace/trace-bounds';
 import { HYBRID_STROKE_COLOR } from '../../core/trace/hybrid/hybrid-paths';
 import { hitTracePart } from './trace-part-hit-test';
+import { resolveObjectDisplay } from './object-display';
 
 function square(x: number, y: number, size: number): Polyline {
   return {
@@ -51,6 +53,10 @@ function trace(paths: ReadonlyArray<ColoredPath>, options: Partial<TracedImage> 
 
 function scene(...objects: TracedImage[]): Scene {
   return { objects, layers: [] };
+}
+
+function filledScene(...objects: TracedImage[]): Scene {
+  return { objects, layers: [createLayer({ id: 'fill', color: '#000000', mode: 'fill' })] };
 }
 
 describe('picking an individual trace part', () => {
@@ -122,18 +128,18 @@ describe('picking an individual trace part', () => {
         polylines: [square(0, 0, 100), square(20, 20, 60), square(40, 40, 20)],
       },
     ]);
-    expect(hitTracePart(scene(object), { x: 10, y: 50 }, 0.1)).toEqual({
+    expect(hitTracePart(filledScene(object), { x: 10, y: 50 }, 0.1)).toEqual({
       objectId: 'trace',
       pathIndex: 0,
       subpathIndex: 0,
     });
-    expect(hitTracePart(scene(object), { x: 30, y: 50 }, 0.1)).toBeNull();
-    expect(hitTracePart(scene(object), { x: 20.3, y: 50 }, 0.1)).toEqual({
+    expect(hitTracePart(filledScene(object), { x: 30, y: 50 }, 0.1)).toBeNull();
+    expect(hitTracePart(filledScene(object), { x: 20.3, y: 50 }, 0.1)).toEqual({
       objectId: 'trace',
       pathIndex: 0,
       subpathIndex: 1,
     });
-    expect(hitTracePart(scene(object), { x: 50, y: 50 }, 0.1)).toEqual({
+    expect(hitTracePart(filledScene(object), { x: 50, y: 50 }, 0.1)).toEqual({
       objectId: 'trace',
       pathIndex: 0,
       subpathIndex: 2,
@@ -153,13 +159,100 @@ describe('picking an individual trace part', () => {
           ],
         },
       ]);
-    expect(hitTracePart(scene(object(false)), { x: 50, y: 50 }, 0.1)).toEqual({
+    expect(hitTracePart(filledScene(object(false)), { x: 50, y: 50 }, 0.1)).toEqual({
       objectId: 'trace',
       pathIndex: 0,
       subpathIndex: 0,
     });
-    expect(hitTracePart(scene(object(true)), { x: 50, y: 50 }, 0.1)).toBeNull();
+    expect(hitTracePart(filledScene(object(true)), { x: 50, y: 50 }, 0.1)).toBeNull();
   });
+
+  it.each([
+    ['filled-contours', 'line', undefined, 'stroke'],
+    ['filled-contours', 'fill', undefined, 'fill'],
+    ['edge', 'line', undefined, 'stroke'],
+    ['edge', 'fill', undefined, 'fill'],
+    ['edge', 'line', 'fill', 'fill'],
+    ['filled-contours', 'fill', 'line', 'stroke'],
+    ['centerline', 'fill', undefined, 'fill'],
+  ] as const)(
+    'matches rendered %s paint for operation %s and override %s',
+    (traceMode, mode, override, expected) => {
+      const object = trace([{ color: '#000000', polylines: [square(0, 0, 100)] }], {
+        traceMode,
+        ...(override === undefined ? {} : { operationOverride: { mode: override } }),
+      });
+      const layers = [createLayer({ id: 'operation', color: '#000000', mode })];
+      const display = resolveObjectDisplay(
+        object,
+        sceneLayerVisibility.lookup(layers),
+        { scale: 10, offsetX: 0, offsetY: 0 },
+        undefined,
+        'design',
+      );
+      expect(display.paths[0]?.paint.kind).toBe(expected);
+      expect(hitTracePart({ objects: [object], layers }, { x: 50, y: 50 }, 0.1) !== null).toBe(
+        expected === 'fill',
+      );
+      expect(hitTracePart({ objects: [object], layers }, { x: 0.3, y: 50 }, 0.1)?.objectId).toBe(
+        'trace',
+      );
+    },
+  );
+
+  it('does not pick an orphan path interior that the canvas only outlines', () => {
+    const object = trace([{ color: '#000000', polylines: [square(0, 0, 100)] }]);
+    expect(hitTracePart(scene(object), { x: 50, y: 50 }, 0.1)).toBeNull();
+  });
+
+  it('keeps a centerline hole unpickable after changing its operation to Fill', () => {
+    const object = trace(
+      [{ color: '#000000', polylines: [square(0, 0, 100), square(20, 20, 60)] }],
+      { traceMode: 'centerline' },
+    );
+    expect(hitTracePart(filledScene(object), { x: 10, y: 50 }, 0.1)?.objectId).toBe('trace');
+    expect(hitTracePart(filledScene(object), { x: 50, y: 50 }, 0.1)).toBeNull();
+  });
+
+  it.each(['evenodd', 'nonzero'] as const)(
+    'matches whole-path %s fill where independently grouped outlines overlap',
+    (fillRule) => {
+      const object = trace([
+        { color: '#000000', fillRule, polylines: [square(0, 0, 60), square(30, 0, 60)] },
+      ]);
+      expect(hitTracePart(filledScene(object), { x: 45, y: 30 }, 0.1) !== null).toBe(
+        fillRule === 'nonzero',
+      );
+      expect(hitTracePart(filledScene(object), { x: 15, y: 30 }, 0.1)?.objectId).toBe('trace');
+    },
+  );
+
+  it.each([false, true])(
+    'allows an underlying edge through an unpainted outline interior (wireframe=%s)',
+    (wireframe) => {
+      const bottom = trace([{ color: '#ff0000', polylines: [line(50)] }], {
+        id: 'bottom',
+        traceMode: 'centerline',
+      });
+      const top = trace(
+        [{ color: '#000000', polylines: [square(0, 0, 100), square(20, 20, 60)] }],
+        { id: 'top', traceMode: 'edge' },
+      );
+      const layers = [
+        createLayer({ id: 'top', color: '#000000', mode: wireframe ? 'fill' : 'line' }),
+        createLayer({ id: 'bottom', color: '#ff0000', mode: 'line' }),
+      ];
+      expect(
+        hitTracePart({ objects: [bottom, top], layers }, { x: 10, y: 50 }, 0.1, wireframe)
+          ?.objectId,
+      ).toBe('bottom');
+      expect(hitTracePart({ objects: [top], layers }, { x: 20.3, y: 50 }, 0.1, wireframe)).toEqual({
+        objectId: 'top',
+        pathIndex: 0,
+        subpathIndex: 1,
+      });
+    },
+  );
 
   it.each(['centerline', 'hybrid'] as const)(
     'does not fill a closed %s stroke for picking',
