@@ -248,6 +248,62 @@ Historical origin: See attribution. The two discovery helpers originated at orig
 
 Local evidence: docs/audits/2026-10-11-pr-history/batch-04/early-supporting-diffs.md. Repair evidence: docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-author.md.
 
+## B05-CONSOLE-001: Combined tool and XY mutations retain stale XY origin evidence
+
+Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
+
+Recorded CI: pending at commit ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b.
+
+Trigger: G92 X0 T2 or G92.1 G49
+
+Impact: Stale XY setup authority and misleading current origin state. Console already clears Frame trace/permit, so this does not demonstrate an old-permit Start bypass.
+
+Historical origin: #94. {"originalHistoricalHead":"46ec73a56ae405d344672597de4b8ada80e38276","rewrittenIntroduction":"e1c6d14e0","currentPersistence":"Tool-first ordering unchanged; later #187 adds accessory branches only."}
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-a.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/repair-console-author.json.
+
+## B05-CONSOLE-002: Firmware-equivalent GRBL numeric spellings preserve stale work Z
+
+Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
+
+Recorded CI: pending at commit ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b.
+
+Trigger: G092 Z0 or G 92 Z0
+
+Impact: After a fresh position, CNC Frame planning still considers the old stock-top reference current and builds an absolute safe-Z retract/return against a mutated Z0; Job Review work-Z advisory also sees stale proof. Current Frame permit is invalidated, so no claim of direct prior-permit reuse.
+
+Historical origin: #94. {"rewrittenIntroduction":"e1c6d14e0","currentPersistence":"Original command regex/comment replacement unchanged through #187."}
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-a.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/repair-console-author.json.
+
+## B05-C-REALTIME-COMMENTS: Saved G-code comments preserve GRBL realtime command bytes
+
+Repair: [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161). State: pr-open-ci-pending.
+
+Recorded CI: pending at commit 72dbd3b37bcd125f14dd221cbc51d5ebbe5edbca.
+
+Trigger: Profile name Shop!~ exported with ordinary build metadata; a sender transmits comments verbatim.
+
+Impact: Preflight succeeds and profile comment retains ! then ~; upstream GRBL RX interprets feed hold and cycle start before line/comment parsing. Unsupported Unicode becomes ?, triggering status requests. Saved files sent by an external sender preserving comment bytes. Own streamer filters full-line comments. No physical-machine qualification or hardware operation.
+
+Historical origin: #541. User-controlled profile comment exposure introduced in #541 (b813865131); unsupported Unicode fallback to '?' added in #898 (91c1adefa0). Discovered while tracing checkpoint #10 descendants, not introduced by that checkpoint.
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-c.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/repair-comment-author.json.
+
+## B05-CONSOLE-003: Console WCS spellings and comments leave a stale G54 selection
+
+Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
+
+Recorded CI: pending at commit ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b.
+
+Trigger: Known activeWcs G54, then Console selects G55 using G055, G 55, G55X0, G55 (G54), or G55 ; G54.
+
+Impact: The physical Frame can remain in G55 while canonical emitted execution expects G54. Existing coordinate evidence invalidation does not repair the stale activeWcs cache.
+
+Historical origin: #923. GitHub commit-to-pulls API associates rewritten introduction 5eb28354d1804f7159ef86cbe2fc7d33849d6c40 with PR923; title Controller audit 2026-09-25: fix every confirmed controller finding; merge_commit_sha eaf62efe283d036c0192e0ea009df912ece72cb9; head ab9954213b83988201a6d75ef2e2334b5841e777.
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/console-wcs-finding.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/repair-console-author.json.
+
 ## Tracking record corrections
 
 These concern the audit records and are separate from application defect counts.
@@ -259,4 +315,4 @@ These concern the audit records and are separate from application defect counts.
 - [4240863024](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240863024): Confirmed mixed JSON priority types: four P2 display strings differed from ten numeric values. Normalize the four records to numeric 2 and document the numeric 0-3 convention. A strict numeric selection omitted those four records; no existing production consumer failure is claimed. Status: resolved-in-published-followup.
 - [4240943303](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240943303): Confirmed three SVG result descriptions contradicted successful CI receipts in the same snapshot. Replace transient pending wording with neutral behavior prose and render recorded CI status together with its observed commit from the repair ledger. Underlying repair CI was already successful. Status: resolved-in-published-followup.
 - [4241008264](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241008264): The status page used a generic repair-publication instruction while the structured next action identified pending tracking review/publication/CI. Render state.nextAction directly so the visible continuation step follows the recorded phase. No machine-readable gate bypass or application defect is claimed. Status: resolved-in-published-followup.
-- [4241339123](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241339123): Confirmed ambiguous historical milestone. Preserve its exact timestamp under publicationHistory tied to tracker1151 headf7833a46; remove unscoped current-completion field. No consumer failure or gate bypass demonstrated. Independent snapshot review also scoped the superseded83bd verification timestamp, aligned the current b060 source receipt and refreshed the feedback pointer. Status: fixed-awaiting-independent-review-and-publication.
+- [4241339123](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241339123): Confirmed ambiguous historical milestone. Preserve its exact timestamp under publicationHistory tied to tracker1151 headf7833a46; remove unscoped current-completion field. No consumer failure or gate bypass demonstrated. Independent snapshot review also scoped the superseded83bd verification timestamp, aligned the current b060 source receipt and refreshed the feedback pointer. Status: resolved-in-published-followup.

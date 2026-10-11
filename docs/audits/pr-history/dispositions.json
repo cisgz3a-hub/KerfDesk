@@ -429,5 +429,69 @@
       "batch-04/early-dependencies.json",
       "batch-04/early-dependencies-checks.json"
     ]
+  },
+  {
+    "id": "DISP-049",
+    "title": "Original checkpoint test weak baseline superseded by baseline-relative current test and expanded recovery checks; software score remains historical.",
+    "historicalPrs": [91],
+    "disposition": "no-current-defect-confirmed",
+    "currentSourceReason": "Original checkpoint test weak baseline superseded by baseline-relative current test and expanded recovery checks; software score remains historical.",
+    "evidenceReports": ["batch-05/lane-a.json", "batch-05/lane-a.md"]
+  },
+  {
+    "id": "DISP-050",
+    "title": "Atomic commit arithmetic correct under declared geometry; current geometry/ownership/G92 fixes in 06e8678f3, bb6c54fe5 and 53e6568d1. No duplicate repair.",
+    "historicalPrs": [92],
+    "disposition": "historical-limitations-already-fixed",
+    "currentSourceReason": "Atomic commit arithmetic correct under declared geometry; current geometry/ownership/G92 fixes in 06e8678f3, bb6c54fe5 and 53e6568d1. No duplicate repair.",
+    "evidenceReports": ["batch-05/lane-a.json", "batch-05/lane-a.md"]
+  },
+  {
+    "id": "DISP-051",
+    "title": "Removed 700/1100px collapse defaults and active-job rail lock intentionally replaced by tabbed layout and separate Live Motion controls; do not restore obsolete restrictions.",
+    "historicalPrs": [93],
+    "disposition": "superseded-contract",
+    "currentSourceReason": "Removed 700/1100px collapse defaults and active-job rail lock intentionally replaced by tabbed layout and separate Live Motion controls; do not restore obsolete restrictions.",
+    "evidenceReports": ["batch-05/lane-b.json", "batch-05/lane-b.md"]
+  },
+  {
+    "id": "DISP-052",
+    "title": "Indexed backing-array semantics remain coherent in current consumers; no lost/duplicated/reordered line or queue-based stall regression found.",
+    "historicalPrs": [95],
+    "disposition": "not-reproduced",
+    "currentSourceReason": "Indexed backing-array semantics remain coherent in current consumers; no lost/duplicated/reordered line or queue-based stall regression found.",
+    "evidenceReports": ["batch-05/lane-b.json", "batch-05/lane-b.md"]
+  },
+  {
+    "id": "DISP-053",
+    "title": "Historical acceptance scores and tests are dated bounded evidence, not current browser/hardware or universal performance qualification. No browser run performed in this lane.",
+    "historicalPrs": [93, 95],
+    "disposition": "evidence-limit",
+    "currentSourceReason": "Historical acceptance scores and tests are dated bounded evidence, not current browser/hardware or universal performance qualification. No browser run performed in this lane.",
+    "evidenceReports": ["batch-05/lane-b.json", "batch-05/lane-b.md"]
+  },
+  {
+    "id": "DISP-054",
+    "title": "Historical raster budget/pass-through mismatch",
+    "historicalPrs": [10, 11],
+    "disposition": "superseded",
+    "currentSourceReason": "PR11 corrected source-grid sizing; 2be958797 removed budget refusal and current tests pass.",
+    "evidenceReports": ["batch-05/lane-c.json", "batch-05/lane-c.md"]
+  },
+  {
+    "id": "DISP-055",
+    "title": "Historical optional optimization toggle",
+    "historicalPrs": [10, 11],
+    "disposition": "retained-under-canonical-setting",
+    "currentSourceReason": "bfef38a93 added toggle; 9721cc783 introduced richer settings. Current action/deserializer synchronize reduceTravelMoves/travelPolicy; independent exact emission controls pass.",
+    "evidenceReports": ["batch-05/lane-c.json", "batch-05/lane-c.md"]
+  },
+  {
+    "id": "DISP-056",
+    "title": "Historical metadata newline injection",
+    "historicalPrs": [10, 11],
+    "disposition": "already-fixed",
+    "currentSourceReason": "b813865131 shared sanitizer; existing newline controls and independent body/preflight parity pass. Distinct ASCII realtime defect remains.",
+    "evidenceReports": ["batch-05/lane-c.json", "batch-05/lane-c.md"]
   }
 ]
