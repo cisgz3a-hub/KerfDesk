@@ -4,9 +4,11 @@ import type { LiveJobEstimate } from '../laser/live-job-estimate';
 export function PreviewEstimateBreakdown({
   estimate,
   includesPlunge = false,
+  programTiming = false,
 }: {
   readonly estimate: LiveJobEstimate;
   readonly includesPlunge?: boolean;
+  readonly programTiming?: boolean;
 }): JSX.Element | null {
   if (estimate.kind !== 'estimated') return null;
   const { breakdown } = estimate;
@@ -18,14 +20,11 @@ export function PreviewEstimateBreakdown({
       <strong>{formatDuration(breakdown.cutSeconds)}</strong>
       <span>Travel time</span>
       <strong>{formatDuration(breakdown.travelSeconds)}</strong>
-      {dwellSeconds > 0 ? (
-        <>
-          <span title="Included in total time. Route playback spreads waits across the displayed path.">
-            {includesPlunge ? 'Spindle dwell' : 'Dwell time'}
-          </span>
-          <strong>{formatDuration(dwellSeconds)}</strong>
-        </>
-      ) : null}
+      <DwellBreakdown
+        seconds={dwellSeconds}
+        includesPlunge={includesPlunge}
+        programTiming={programTiming}
+      />
       {transportSeconds >= 0.5 ? (
         <>
           <span>Streaming time</span>
@@ -34,10 +33,32 @@ export function PreviewEstimateBreakdown({
       ) : null}
       {(estimate.manualPauseCount ?? 0) > 0 ? (
         <>
-          <span>Tool changes</span>
+          <span>{programTiming ? 'Manual pauses' : 'Tool changes'}</span>
           <strong>Operator time excluded</strong>
         </>
       ) : null}
+    </>
+  );
+}
+
+function DwellBreakdown(props: {
+  readonly seconds: number;
+  readonly includesPlunge: boolean;
+  readonly programTiming: boolean;
+}): JSX.Element | null {
+  if (props.seconds <= 0) return null;
+  return (
+    <>
+      <span
+        title={
+          props.programTiming
+            ? 'Included in total time at its source line.'
+            : 'Included in total time. Route playback spreads waits across the displayed path.'
+        }
+      >
+        {props.includesPlunge && !props.programTiming ? 'Spindle dwell' : 'Dwell time'}
+      </span>
+      <strong>{formatDuration(props.seconds)}</strong>
     </>
   );
 }

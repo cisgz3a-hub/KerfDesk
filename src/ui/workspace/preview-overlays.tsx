@@ -12,6 +12,7 @@ import type { Project } from '../../core/scene';
 import type { RemovalGridResolution } from '../../core/sim/removal-grid';
 import type { LiveJobEstimate } from '../laser/live-job-estimate';
 import { useUiStore, type PreviewPlaybackSpeed } from '../state/ui-store';
+import { useStore } from '../state/store';
 import { PreviewEstimateBreakdown } from './preview-estimate-breakdown';
 import { PreviewResolutionBanner } from './preview-resolution';
 import type { PreviewIssue } from './preview-status';
@@ -101,6 +102,7 @@ export function PreviewStatsPanel(props: {
   readonly estimate: LiveJobEstimate;
   readonly routeLabel?: string;
 }): JSX.Element {
+  const external = useStore((state) => state.externalGcodePreview);
   const showPreviewTravel = useUiStore((s) => s.showPreviewTravel);
   const setShowPreviewTravel = useUiStore((s) => s.setShowPreviewTravel);
   const stats = useMemo(() => summarizeToolpathDistances(props.toolpath), [props.toolpath]);
@@ -132,8 +134,12 @@ export function PreviewStatsPanel(props: {
           Distances and time details
         </summary>
         <p>
-          Time uses the current motion and streaming settings. Preview shows planned geometry; it
-          does not measure machine movement or the material result.
+          {external === null
+            ? 'Time uses the current motion and streaming settings.'
+            : (external.timing?.description ??
+              'Imported timing unavailable. Playback shows geometry only.')}{' '}
+          Preview shows planned geometry; it does not measure machine movement or the material
+          result.
         </p>
         <div style={statsGridStyle} aria-label="Preview distance statistics">
           <span>Cut</span>
@@ -150,7 +156,11 @@ export function PreviewStatsPanel(props: {
           <strong>{formatMm(stats.totalMm)}</strong>
           <span>Time</span>
           <strong>{formatEstimate(props.estimate)}</strong>
-          <PreviewEstimateBreakdown estimate={props.estimate} includesPlunge={stats.plungeMm > 0} />
+          <PreviewEstimateBreakdown
+            estimate={props.estimate}
+            includesPlunge={stats.plungeMm > 0}
+            programTiming={external !== null}
+          />
         </div>
       </details>
     </div>

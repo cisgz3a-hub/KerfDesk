@@ -15,17 +15,19 @@ import {
   type PackedToolpath,
 } from '../../core/job/packed-toolpath';
 import type { ParseGcodeProgramResult } from '../../io/gcode';
+import type { GcodePreviewParseResult, ImportedGcodeTiming } from './gcode-preview-timing';
 
 type PackedGcodeOk = PackedToolpath & {
   readonly kind: 'ok';
   readonly totalLength: number;
   readonly summary: Extract<ParseGcodeProgramResult, { kind: 'ok' }>['summary'];
   readonly notes: ReadonlyArray<string>;
+  readonly timing?: ImportedGcodeTiming;
 };
 
 export type PackedGcodeResult = { readonly kind: 'error'; readonly reason: string } | PackedGcodeOk;
 
-export function packGcodeResult(result: ParseGcodeProgramResult): PackedGcodeResult {
+export function packGcodeResult(result: GcodePreviewParseResult): PackedGcodeResult {
   if (result.kind === 'error') return result;
   const steps = result.toolpath.steps;
   let pointCount = 0;
@@ -40,11 +42,12 @@ export function packGcodeResult(result: ParseGcodeProgramResult): PackedGcodeRes
     totalLength: result.toolpath.totalLength,
     summary: result.summary,
     notes: result.notes,
+    ...(result.timing === undefined ? {} : { timing: result.timing }),
     ...packToolpathUnchecked(steps, pointCount, hasRasterSource),
   };
 }
 
-export function unpackGcodeResult(result: PackedGcodeResult): ParseGcodeProgramResult {
+export function unpackGcodeResult(result: PackedGcodeResult): GcodePreviewParseResult {
   if (result.kind === 'error') return result;
   const steps = Array.from({ length: result.stepKinds.length }, (_, index) =>
     unpackToolpathStep(result, index),
@@ -54,6 +57,7 @@ export function unpackGcodeResult(result: PackedGcodeResult): ParseGcodeProgramR
     toolpath: { steps, totalLength: result.totalLength },
     summary: result.summary,
     notes: result.notes,
+    ...(result.timing === undefined ? {} : { timing: result.timing }),
   };
 }
 

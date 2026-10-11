@@ -64,9 +64,13 @@ async function parseRequest(request: ImportWorkerRequest): Promise<ImportWorkerR
       id: request.id,
       kind: 'gcode',
       result: packGcodeResult(
-        await parseGcodeBlob(request.blob, ({ bytesRead, totalBytes }) => {
-          postProgress(request.id, 'parsing', bytesRead, totalBytes);
-        }),
+        await parseGcodeBlob(
+          request.blob,
+          ({ bytesRead, totalBytes }) => {
+            postProgress(request.id, 'parsing', bytesRead, totalBytes);
+          },
+          request.timingContext,
+        ),
       ),
     };
   }

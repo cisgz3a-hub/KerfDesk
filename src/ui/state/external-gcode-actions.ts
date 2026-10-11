@@ -4,10 +4,12 @@
 
 import type { Toolpath } from '../../core/job';
 import type { AppState } from './store';
+import type { ImportedGcodeTiming } from '../import/gcode-preview-timing';
 
 export type ExternalGcodePreview = {
   readonly name: string;
   readonly toolpath: Toolpath;
+  readonly timing?: ImportedGcodeTiming;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -16,9 +18,9 @@ export function externalGcodeActions(
   set: Setter,
 ): Pick<AppState, 'openExternalGcodePreview' | 'closeExternalGcodePreview'> {
   return {
-    openExternalGcodePreview: (name, toolpath) =>
+    openExternalGcodePreview: (name, toolpath, timing) =>
       set(() => ({
-        externalGcodePreview: { name, toolpath },
+        externalGcodePreview: { name, toolpath, ...(timing === undefined ? {} : { timing }) },
         previewMode: true,
         selectedPathNode: null,
         selectedPathNodes: [],

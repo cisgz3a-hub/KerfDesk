@@ -138,7 +138,7 @@ export function buildProgramTimeline(
   };
 }
 
-function timingUnavailableReason(model: GcodeRenderModel): string | null {
+export function timingUnavailableReason(model: GcodeRenderModel): string | null {
   const skipped = model.skippedMotions[0];
   if (skipped !== undefined) {
     return `Skipped motion at raw line ${skipped.line + 1}: ${skipped.reason}.`;

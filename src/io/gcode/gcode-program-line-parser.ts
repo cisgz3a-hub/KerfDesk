@@ -64,7 +64,9 @@ export type GcodeProgramLineParser = {
   readonly finish: () => ParseGcodeProgramResult;
 };
 
-export function createGcodeProgramLineParser(): GcodeProgramLineParser {
+export function createGcodeProgramLineParser(
+  onMotion?: (rawLineIndex: number, step: ToolpathStep) => void,
+): GcodeProgramLineParser {
   // The former 500 000-line ceiling was a policy cap (rule 7 / ADR-228): a
   // larger program parses correctly, it merely takes longer. A 100 MB program is
   // roughly 3.3 M lines and is now simulated rather than refused.
@@ -98,7 +100,12 @@ export function createGcodeProgramLineParser(): GcodeProgramLineParser {
       return;
     }
     recognizedWords += words.size;
+    const firstStep = steps.length;
     const issue = executeLine(state, words, steps, unsupported, lineCount);
+    for (let index = firstStep; index < steps.length; index += 1) {
+      const step = steps[index];
+      if (step !== undefined) onMotion?.(lineCount - 1, step);
+    }
     if (issue !== null) terminalError = issue;
   };
 

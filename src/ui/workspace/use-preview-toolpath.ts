@@ -40,7 +40,10 @@ export function usePreviewToolpath(
   const positionEpoch = useLaserStore((s) => s.trustedPositionEpoch ?? 0);
   const firstRegistrationPoint = usePrintCutSessionStore((s) => s.first);
   const secondRegistrationPoint = usePrintCutSessionStore((s) => s.second);
-  const [toolpath, setToolpath] = useState<PreviewToolpath | null>(null);
+  const [preview, setPreview] = useState<{
+    readonly toolpath: PreviewToolpath | null;
+    readonly externalOwner: typeof externalGcodePreview;
+  }>({ toolpath: null, externalOwner: externalGcodePreview });
   const outputScope = useOutputScope();
 
   // Key the rebuild on the RESOLVED placement, not the raw statusReport — a
@@ -65,7 +68,7 @@ export function usePreviewToolpath(
 
   useEffect(() => {
     if (!previewMode) {
-      setToolpath(null);
+      setPreview({ toolpath: null, externalOwner: externalGcodePreview });
       return;
     }
     // NB: no setToolpath(null) here — keep the previous route painted until the
@@ -80,7 +83,9 @@ export function usePreviewToolpath(
         outputScope,
         initialPosition: headRef.current,
         isCancelled: () => cancelled,
-        setToolpath,
+        setToolpath: (next) => {
+          setPreview({ toolpath: next, externalOwner: externalGcodePreview });
+        },
       });
     });
     return () => {
@@ -100,7 +105,9 @@ export function usePreviewToolpath(
     secondRegistrationPoint,
   ]);
 
-  return toolpath;
+  // A scheduled replacement must not paint an old imported route with the
+  // new program's timing (or the project estimate after the import closes).
+  return previewMode && preview.externalOwner === externalGcodePreview ? preview.toolpath : null;
 }
 
 function runScheduledPreviewBuild(args: {
