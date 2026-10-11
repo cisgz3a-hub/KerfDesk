@@ -138,6 +138,9 @@ function RemotePanelHeader(): JSX.Element {
   const { status, connectionLost, busy, act } = useRemoteAccessStore();
   const summary = remoteToolbarSummary(status, connectionLost);
   const enabled = status?.enabled === true;
+  const toggleHelp = enabled
+    ? 'Turn off to disconnect clients now; their access is revoked when this computer next connects.'
+    : 'Enable pairing with connections you approve on this computer.';
   return (
     <div className="lf-remote-panel__header">
       <div>
@@ -147,18 +150,12 @@ function RemotePanelHeader(): JSX.Element {
           {summary.text}
         </p>
       </div>
-      <label
-        className="lf-remote-panel__switch"
-        title={
-          enabled
-            ? 'Turn off to disconnect clients now; their access is revoked when this computer next connects.'
-            : 'Enable pairing with connections you approve on this computer.'
-        }
-      >
+      <label className="lf-remote-panel__switch" title={toggleHelp}>
         <input
           type="checkbox"
           role="switch"
           aria-label="Allow approved remote connections"
+          title={toggleHelp}
           checked={enabled}
           disabled={busy || status?.available !== true}
           onChange={(event) => {
