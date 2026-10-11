@@ -44,6 +44,11 @@ async function handleRequest(request: ImportWorkerRequest): Promise<void> {
 async function parseRequest(request: ImportWorkerRequest): Promise<ImportWorkerResponse> {
   postProgress(request.id, 'reading');
   if (request.kind === 'hpgl') return parseHpglRequest(request);
+  if (request.kind === 'psd') {
+    const { preparePsdImport } = await import('./psd-import-preparation');
+    postProgress(request.id, 'parsing');
+    return { id: request.id, kind: 'psd', result: await preparePsdImport(request.blob) };
+  }
   if (request.kind === 'dxf') {
     return {
       id: request.id,

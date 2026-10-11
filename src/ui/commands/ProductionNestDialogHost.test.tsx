@@ -71,6 +71,29 @@ async function calculate(): Promise<ProductionWorker> {
 }
 
 describe('quantity production operator workflow', () => {
+  it('opts into advanced search without changing the saved production definition', async () => {
+    vi.stubGlobal('crossOriginIsolated', true);
+    const project = {
+      ...productionProjectFixture(),
+      productionNest: productionDefinitionFixture(),
+    };
+    useStore.setState({ project, selectedObjectId: 'source' });
+    await render();
+    const checkbox = Array.from(
+      host!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
+    ).find((input) => input.parentElement?.textContent?.includes('Advanced optimise'))!;
+    expect(checkbox.checked).toBe(false);
+    await act(async () => {
+      checkbox.checked = true;
+      Simulate.change(checkbox);
+    });
+    expect(host!.textContent).toContain('five-second local search');
+    const worker = await calculate();
+    expect(worker.input).toMatchObject({ kind: 'production-search', advanced: true });
+    expect(useStore.getState().project).toBe(project);
+    await click('Cancel');
+    expect(worker.terminate).toHaveBeenCalledOnce();
+  });
   it('opens from Quick Nest and reviews counts and named sheet previews before one atomic acceptance', async () => {
     const project = {
       ...productionProjectFixture(),

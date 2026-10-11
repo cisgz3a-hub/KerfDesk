@@ -31,12 +31,12 @@ function matches(path: string, destination: RequestDestination = 'image', sameOr
 }
 
 describe('tutorial picture delivery', () => {
-  it('excludes the entire picture directory without changing the existing offline app policy', () => {
+  it('excludes tutorial pictures while preserving offline application and engine assets', () => {
     const options = pwaOptions();
     expect(options.workbox?.globIgnores).toContain('**/tutorial-images/**');
     expect(options.workbox?.globIgnores).toContain('**/node_modules/**/*');
     expect(options.workbox?.globPatterns).toEqual([
-      '**/*.{js,mjs,css,html,svg,ico,png,json,ttf,woff,woff2,bcmap,pfb}',
+      '**/*.{js,mjs,css,html,svg,ico,png,json,ttf,woff,woff2,bcmap,pfb,wasm}',
       'pdf-resources/**/LICENSE*',
       'third-party-notices.txt',
     ]);
@@ -45,7 +45,8 @@ describe('tutorial picture delivery', () => {
     );
     expect(options.registerType).toBe('prompt');
     expect(options.injectRegister).toBe(false);
-    expect(options.workbox?.maximumFileSizeToCacheInBytes).toBe(6 * 1024 * 1024);
+    // ADR-582 includes the pinned 7.4 MB offline nesting engine.
+    expect(options.workbox?.maximumFileSizeToCacheInBytes).toBe(8 * 1024 * 1024);
   });
 
   it.each([

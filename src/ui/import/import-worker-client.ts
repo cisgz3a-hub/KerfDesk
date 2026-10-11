@@ -2,6 +2,7 @@ import type { ParseDxfResult } from '../../io/dxf';
 import type { ParseGcodeProgramResult } from '../../io/gcode';
 import type { ParseHpglResult } from '../../io/hpgl';
 import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
+import type { PreparedPsdImport } from './psd-import-preparation';
 import type {
   PreparedStlImportResult,
   StlImportPreparationOptions,
@@ -116,6 +117,14 @@ export function prepareReliefHeightfieldPngOffThread(
 
 export function resetImportWorkerForTests(): void {
   rejectAllPendingAndRetireWorker('import worker reset');
+}
+
+/** PSD has no main-thread decode fallback; the composite is prepared in the worker. */
+export function preparePsdOffThread(
+  blob: Blob,
+  options: ImportWorkerRequestOptions = {},
+): Promise<PreparedPsdImport> | null {
+  return request({ kind: 'psd', blob }, 'psd', options);
 }
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;

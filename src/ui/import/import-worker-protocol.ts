@@ -14,6 +14,7 @@
 import type { PackedDxfResult } from './packed-dxf-result';
 import type { PackedGcodeResult } from './packed-gcode-result';
 import type { PackedHpglResult } from './packed-hpgl-result';
+import type { PreparedPsdImport } from './psd-import-preparation';
 import type {
   PreparedStlImportResult,
   StlImportPreparationOptions,
@@ -40,6 +41,7 @@ export type ImportWorkerRequest =
     }
   | { readonly id: number; readonly kind: 'gcode'; readonly blob: Blob }
   | { readonly id: number; readonly kind: 'depth-map-png'; readonly blob: Blob }
+  | { readonly id: number; readonly kind: 'psd'; readonly blob: Blob }
   | {
       readonly id: number;
       readonly kind: 'relief-heightfield-png';
@@ -67,6 +69,7 @@ export type ImportWorkerResponse =
   | { readonly id: number; readonly kind: 'hpgl'; readonly result: PackedHpglResult }
   | { readonly id: number; readonly kind: 'gcode'; readonly result: PackedGcodeResult }
   | { readonly id: number; readonly kind: 'stl'; readonly result: PreparedStlImportResult }
+  | { readonly id: number; readonly kind: 'psd'; readonly result: PreparedPsdImport }
   | {
       readonly id: number;
       readonly kind: 'depth-map-png';

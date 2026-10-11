@@ -70,6 +70,7 @@ describe('CommandShell file boundaries', () => {
           '.tif',
           '.tiff',
           '.stl',
+          '.psd',
         ],
         multiple: true,
       });

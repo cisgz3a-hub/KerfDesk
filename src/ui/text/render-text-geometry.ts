@@ -2,6 +2,7 @@ import { findFontEntry, textToPolylines, type TextRenderResult } from '../../cor
 import type { EmbeddedFont, TextAlignment } from '../../core/scene';
 import type { TextBoxSettings } from '../../core/scene/text-box';
 import { loadFont } from './font-loader';
+import { prepareTextShaping } from '../../io/text/prepare-text-shaping';
 
 export type RenderTextGeometryInput = {
   readonly fontKey: string;
@@ -35,8 +36,11 @@ export async function renderTextGeometry(
       fontKey: input.fontKey,
     });
   }
+  const fontBuffer = await loadFont(input.fontKey, input.embeddedFonts);
+  const shaping = await prepareTextShaping(fontBuffer, input.content);
   return textToPolylines({
     ...shared,
-    fontBuffer: await loadFont(input.fontKey, input.embeddedFonts),
+    fontBuffer,
+    ...(shaping === undefined ? {} : { shaping }),
   });
 }

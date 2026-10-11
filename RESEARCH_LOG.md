@@ -29,6 +29,85 @@ Required fields:
 
 ## Adopted runtime dependencies
 
+### Offline design and import upgrades (ADR-582)
+
+- **Subject / versions:** `harfbuzzjs@1.6.3`, native HarfBuzz submodule
+  `c7a7457b7385f33178e8cf87615ca077a810bbe7`; `bidi-js@1.1.0`;
+  Unicode 17 Scripts/ScriptExtensions; `ag-psd@31.0.3` with pako 2.1.0;
+  PackingSolver `49bf6c7d9d2204f17d698ee4e5a54a4882ebabf4` official WASM.
+- **Licence:** MIT package wrappers; HarfBuzz Old MIT; Unicode-3.0 data;
+  pako `(MIT AND Zlib)` (both terms reviewed, attribution/no-misrepresentation,
+  no source-disclosure obligation). PackingSolver, all enabled solver libraries,
+  HiGHS 1.13.1 and nlohmann/json 3.11.3 are MIT. Retain Emscripten MIT/NCSA,
+  musl and mimalloc MIT, LLVM/libc++ Apache-with-exception and legacy notices.
+  Actual licence texts are committed in `scripts/license-texts/` and included in
+  `public/third-party-notices.txt`; npm metadata alone does not cover native WASM.
+- **Sources:** https://github.com/harfbuzz/harfbuzzjs/tree/v1.6.3;
+  https://github.com/lojjic/bidi-js;
+  https://www.unicode.org/Public/17.0.0/ucd/;
+  https://github.com/Agamnentzar/ag-psd;
+  https://github.com/nodeca/pako/blob/2.1.0/LICENSE;
+  https://github.com/fontanf/packingsolver/actions/runs/38124619297;
+  https://github.com/fontanf/packingsolver/blob/49bf6c7d9d2204f17d698ee4e5a54a4882ebabf4/extern/CMakeLists.txt;
+  https://github.com/emscripten-core/emscripten/tree/6.0.11.
+- **Decision affected:** ADR-582 and ADR-017 compound licence review;
+  `src/core/text/`, `src/io/text/`, `src/io/psd/`, `src/core/nesting/`.
+- **Evaluated:** 2026-10-11, Codex session, against current `origin/main` ef9f5435.
+- **Confidence:** high for pinned file provenance and bounded features; medium
+  for performance/generalisation beyond the tested corpus. Solver certification
+  remains independent of solver claims. No machine qualification is implied.
+- **Re-verify by:** 2027-04-11, and before changing any pinned engine payload.
+- **Maintenance:** registry version timestamps checked on evaluation date:
+  ag-psd 31.0.3 2026-10-07; harfbuzzjs 1.6.3 2026-10-06;
+  bidi-js 1.1.0 2026-09-06. The exact PackingSolver workflow completed successfully
+  on the pinned source; native-package results alone were not accepted as browser
+  integration evidence.
+- **Alternatives considered:** existing opentype-only layout remains suitable
+  for ordinary Latin but failed RTL/combining-mark examples; replacing geometry
+  wholesale would regress established Latin/path behavior. Handwritten PSD
+  decompression would duplicate a maintained decoder; complete layer editing,
+  CMYK and ZIP are outside the supported contract. Existing nesting stays the
+  default; native Python or a hosted optimiser would violate offline integration
+  goals. Maker.js was rejected because its tested primitives already exist.
+- **Measured research:** seven text cases/24 checks; independent browser masks
+  improved for Hebrew, mixed direction and Arabic marks, while one Latin control
+  had slightly lower raster overlap (not a universal visual-quality claim).
+  PSD decoder passed independent pixel/alpha/density checks on generated fixtures;
+  a 3.15 MP decoder sample took a 22.4 ms warm median, excluding full import UI.
+  Candidate minified PSD decoder contributed approximately 86.9 KB gzip.
+  Native nesting examples improved L-shapes from 2 to 1 and 4 to 2 sheets and
+  triangles from 2 to 1; simple rectangular/hole controls did not improve.
+  Those native timings are not a browser speed claim. The installed HarfBuzz
+  WASM is 441,359 bytes; the solver WASM is 7,446,905 bytes plus 114,322-byte adapted loader.
+  ADR-582 explicitly records the solver's offline bundle-budget exception.
+- **Security/known limits:** `pnpm audit --prod --json` on 2026-10-11 reported
+  zero advisories at every severity in the installed production npm closure.
+  That result does not audit native solver code or prove absence of undisclosed
+  flaws. Inputs have decoder/optimiser work limits and owned cancellable workers;
+  solver certificates are independently checked. Unsupported PSD depth/mode,
+  missing saved composites and unsupported advanced stock configurations produce
+  explicit feedback rather than silently reinterpreted content.
+- **Integration corrections:** the official solver JS used Embind's dynamic
+  invoker and failed under the production CSP. `prepare-packing-solver.mjs`
+  reproducibly substitutes the matching Emscripten 6.0.11 no-eval branch; the
+  WASM stays byte-identical. The original loader is retained and both original
+  and adapted hashes are checked. Electron worker isolation headers must be
+  present in the protocol response, not only added by a later webRequest hook.
+  Independent PSD review verified that ResolutionInfo fixed-point values always
+  store PPI; the centimetre selector changes display only. A 300-pixel/300-PPI
+  regression retains 25.4 mm for either display setting. Primary implementation:
+  https://github.com/ImageMagick/ImageMagick/blob/main/coders/psd.c.
+- **Implementation verification:** focused text, PSD, nesting and worker tests,
+  TypeScript, lint, formatting, licence closure and web/desktop builds passed.
+  Production-browser checks loaded the emitted HarfBuzz WASM and imported/saved
+  PSD artwork with correct density. Browser nesting placed 40 concave parts on
+  two sheets instead of four; the native Electron probe placed eight on one.
+  The full 3,854-file Vitest attempt exhausted memory and did not finish. Its
+  reproducible hover-help and old precache-expectation failures were corrected;
+  all 13 recovery suites (54 tests), including the reported/terminated suites,
+  then passed with one worker. This is not a complete full-suite or release pass;
+  a clean full CI run remains required before merge/release.
+
 Each entry here corresponds to a `package.json` dependency. New rows are added when a dependency is added; existing rows are updated when a version is bumped.
 
 ### DOMPurify

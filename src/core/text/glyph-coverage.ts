@@ -13,10 +13,14 @@ export function textForLayout(content: string): string {
 export function missingCharacters(
   text: string,
   hasGlyph: (character: string) => boolean,
+  ignoreLayoutControls = false,
 ): ReadonlyArray<string> {
   const checked = new Set<string>(['\n']);
   const missing: string[] = [];
   for (const character of text) {
+    // Bidi controls, joiners and variation selectors affect layout rather
+    // than owning visible glyphs. HarfBuzz consumes them before outlining.
+    if (ignoreLayoutControls && /\p{Default_Ignorable_Code_Point}/u.test(character)) continue;
     if (checked.has(character)) continue;
     checked.add(character);
     if (!hasGlyph(character)) missing.push(character);
