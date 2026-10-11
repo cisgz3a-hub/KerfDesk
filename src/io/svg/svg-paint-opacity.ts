@@ -1,4 +1,5 @@
 import { svgOpacityMath } from './svg-opacity-math';
+import { hasSvgOpacityVariables } from './svg-opacity-variables';
 
 // SVG paint opacity is an inherited CSS value. Keep validation shared by the
 // cascade and the final attribute lookup so invalid winners cannot hide a
@@ -28,7 +29,12 @@ export function parseSvgPaintOpacity(
     return 'inherit';
   if (normalized === 'initial') return 'initial';
   if (normalized === 'revert-layer') return 'revert-layer';
-  return numericOpacity(normalized) ?? svgOpacityMath(value);
+  const number = numericOpacity(normalized);
+  if (number !== null) return number;
+  // Valid var() values win before substitution, even if substitution later
+  // fails. Do not expose an older declaration when context is unavailable.
+  if (hasSvgOpacityVariables(value)) return 'unresolved';
+  return svgOpacityMath(value);
 }
 
 function numericOpacity(value: string): number | null {
