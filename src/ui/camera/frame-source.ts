@@ -138,6 +138,6 @@ async function fetchAndDecode(url: string, io: FrameCaptureIo): Promise<RgbaImag
   return io.decodeToRgba(blob);
 }
 
-export function withCacheBuster(url: string): string {
-  return `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`;
+export function withCacheBuster(url: string, value = Date.now()): string {
+  return `${url}${url.includes('?') ? '&' : '?'}t=${value}`;
 }
