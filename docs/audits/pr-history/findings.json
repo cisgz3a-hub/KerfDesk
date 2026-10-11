@@ -33,7 +33,7 @@
       },
       {
         "title": "Valid revert-layer incorrectly exposes lower opacity from the same cascade layer",
-        "result": "Confirmed in the earlier audit repair. Inline revert-layer now reveals stylesheet opacity, and stylesheet rollback reveals the presentation attribute with importance order preserved. Independently reviewed and published; latest-head hosted CI remains pending.",
+        "result": "Confirmed in the earlier audit repair. Inline revert-layer now reveals stylesheet opacity, and stylesheet rollback reveals the presentation attribute with importance order preserved. Independently reviewed and published. Required CI is tracked at the current repair head.",
         "status": "published",
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364150",
         "publishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
@@ -47,7 +47,7 @@
       },
       {
         "title": "Valid CSS math opacity is rejected before cascade resolution",
-        "result": "Context-free CSS math now retains valid winning opacity, including typed absolute-unit cancellation and scalar functions; invalid numeric types preserve valid lower declarations. Layout-dependent winners retain an explicitly warned opaque approximation because exact visibility requires layout. Fresh imports and replacements both display the warning. Independently reviewed and published; latest-head hosted CI remains pending.",
+        "result": "Context-free CSS math now retains valid winning opacity, including typed absolute-unit cancellation and scalar functions; invalid numeric types preserve valid lower declarations. Layout-dependent winners retain an explicitly warned opaque approximation because exact visibility requires layout. Fresh imports and replacements both display the warning. Independently reviewed and published. Required CI is tracked at the current repair head.",
         "status": "published",
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364155",
         "additionalCases": [
@@ -68,7 +68,7 @@
       },
       {
         "title": "Valid variable-containing opacity declaration is discarded before the cascade winner is resolved",
-        "result": "Confirmed valid variable winner was discarded before cascade resolution. The published repair preserves syntactically valid variable-containing winners as unresolved, imports them with opacity 1 and explicitly warns that CSS variables or layout-dependent values may hide source artwork that is included. Invalid syntax retains valid lower candidates. Full custom-property substitution remains outside scope. Source review, 1259 isolated tests and 12 real production-worker cases passed; latest-head hosted CI is pending.",
+        "result": "Confirmed valid variable winner was discarded before cascade resolution. The published repair preserves syntactically valid variable-containing winners as unresolved, imports them with opacity 1 and explicitly warns that CSS variables or layout-dependent values may hide source artwork that is included. Invalid syntax retains valid lower candidates. Full custom-property substitution remains outside scope. Source review, 1259 isolated tests and 12 real production-worker cases passed. Required CI is tracked at the current repair head.",
         "status": "published",
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240505326",
         "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-reproduction.md",

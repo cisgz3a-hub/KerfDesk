@@ -6,6 +6,8 @@ This list grows as the audit continues. Status is taken from the live repair led
 
 Repair: [#1139](https://github.com/cisgz3a-hub/KerfDesk/pull/1139). State: pr-open-ci-verified.
 
+Recorded CI: passed at commit 2f212738870ccdbea45e739acd05a5c0bfe389e8.
+
 Trigger: Import a group with fill-opacity=0 and child rectangle fill-opacity=1, or stroke-opacity equivalents.
 
 Impact: Browser and worker parsers both return null object, zero paths and SVG has no drawable geometry.
@@ -18,9 +20,9 @@ Review follow-ups:
 - Raw presentation attributes incorrectly accept declaration importance: Confirmed parent-zero / child 1 !important case. Keep attribute property-value syntax separate from CSS declaration priority. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305762).
 - Revert falls back to a same-element author attribute: Confirmed against Chrome. For supported author-only paint-opacity declarations, revert removes author candidates and inherits the parent value. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305766).
 - Comments and malformed numeric tokens change imported visibility: Confirmed comment rejection in the first candidate. Accept surrounding comments without joining number, percent, sign or keyword tokens; reject trailing-dot numbers and clamp large numeric values consistently. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305771).
-- Valid revert-layer incorrectly exposes lower opacity from the same cascade layer: Confirmed in the earlier audit repair. Inline revert-layer now reveals stylesheet opacity, and stylesheet rollback reveals the presentation attribute with importance order preserved. Independently reviewed and published; latest-head hosted CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364150).
-- Valid CSS math opacity is rejected before cascade resolution: Context-free CSS math now retains valid winning opacity, including typed absolute-unit cancellation and scalar functions; invalid numeric types preserve valid lower declarations. Layout-dependent winners retain an explicitly warned opaque approximation because exact visibility requires layout. Fresh imports and replacements both display the warning. Independently reviewed and published; latest-head hosted CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364155).
-- Valid variable-containing opacity declaration is discarded before the cascade winner is resolved: Confirmed valid variable winner was discarded before cascade resolution. The published repair preserves syntactically valid variable-containing winners as unresolved, imports them with opacity 1 and explicitly warns that CSS variables or layout-dependent values may hide source artwork that is included. Invalid syntax retains valid lower candidates. Full custom-property substitution remains outside scope. Source review, 1259 isolated tests and 12 real production-worker cases passed; latest-head hosted CI is pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240505326).
+- Valid revert-layer incorrectly exposes lower opacity from the same cascade layer: Confirmed in the earlier audit repair. Inline revert-layer now reveals stylesheet opacity, and stylesheet rollback reveals the presentation attribute with importance order preserved. Independently reviewed and published. Required CI is tracked at the current repair head. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364150).
+- Valid CSS math opacity is rejected before cascade resolution: Context-free CSS math now retains valid winning opacity, including typed absolute-unit cancellation and scalar functions; invalid numeric types preserve valid lower declarations. Layout-dependent winners retain an explicitly warned opaque approximation because exact visibility requires layout. Fresh imports and replacements both display the warning. Independently reviewed and published. Required CI is tracked at the current repair head. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364155).
+- Valid variable-containing opacity declaration is discarded before the cascade winner is resolved: Confirmed valid variable winner was discarded before cascade resolution. The published repair preserves syntactically valid variable-containing winners as unresolved, imports them with opacity 1 and explicitly warns that CSS variables or layout-dependent values may hide source artwork that is included. Invalid syntax retains valid lower candidates. Full custom-property substitution remains outside scope. Source review, 1259 isolated tests and 12 real production-worker cases passed. Required CI is tracked at the current repair head. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240505326).
 - Valid environment opacity winner is discarded and malformed nested environment syntax survives: Independently reproduced against published a4c1968. Retain syntactically valid env() winners as qualified unresolved opacity, validate nested var/env fallback syntax, and explicitly warn that custom or environment values can hide artwork imported fully opaque. Full substitution remains outside scope. Independently reviewed and published. Required CI is tracked at the current repair head. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240569209).
 - Unsupported dimension escapes validation through a scalar opacity function: Independent lower-zero sign(1fr) tests exposed geometry that Chrome hides. Reject failed typed arguments except legitimate round/clamp keyword slots; preserve supported typed cancellation and scalar functions. This separately reproduced defect is distinct from the original flex-ratio interoperability claim. Independently reviewed and published. Required CI is tracked at the current repair head.
 - Typed attribute opacity winners are discarded before computed-value substitution: Syntactically valid typed attr() winners now use the disclosed opaque approximation instead of exposing a lower zero. Invalid syntax preserves valid lower declarations. The related real worker entity mismatch is repaired by consuming already-decoded Attr.value once for paint-opacity CSS, without a second decoder or changes to sanitization. Full attribute lookup/substitution is not claimed. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648365).
@@ -34,6 +36,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/foundation.md. Repair evidence
 
 Repair: [#1140](https://github.com/cisgz3a-hub/KerfDesk/pull/1140). State: pr-open-ci-verified.
 
+Recorded CI: passed at commit 297d3f547217c338fec8d6c6b7d77847c32cf0fc.
+
 Trigger: Convert a 10.01 by 10 mm rectangle to Outlines at 254 DPI
 
 Impact: Bitmap artwork and derived engraving omit a boundary edge
@@ -45,6 +49,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/controller-raster.md. Repair e
 ## EUM-01: Preserve valid imported thicknesses when opening the material editor
 
 Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: pr-open-ci-verified.
+
+Recorded CI: passed at commit 0e0a5f2f8f0381cb46daf097151af17499e21e27.
 
 Trigger: Deserialize and import a valid preset with thicknessMm=3.175 (one-eighth-inch stock), open MaterialPresetWizard with that preset, then click native Next. The draft displays 3.17, the number input has step=0.1 and stepMismatch=true, the form is invalid, and clicking Next stays at Step 1 despite the button being enabled.
 
@@ -58,6 +64,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/early-ui-materials.md. Repair 
 
 Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: pr-open-ci-verified.
 
+Recorded CI: passed at commit 0e0a5f2f8f0381cb46daf097151af17499e21e27.
+
 Trigger: Import a valid line/cut preset with material='Birch', materialName='Birch plywood premium', thicknessMm=3. It initially matches job material Birch. Open Edit and click Next/Next/Next/Save without editing. The stored material is replaced with Birch plywood premium; bestRecipeForOperation for the existing Birch job returns undefined.
 
 Impact: An ordinary no-change or description-only edit silently removes the preset from the previous material group and automatic recipe selection. Direct manual Apply remains available.
@@ -69,6 +77,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/early-ui-materials.md. Repair 
 ## EUM-03: Update operation metadata when changing a preset's process mode
 
 Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: pr-open-ci-verified.
+
+Recorded CI: passed at commit 0e0a5f2f8f0381cb46daf097151af17499e21e27.
 
 Trigger: Edit a saved line/cut preset, choose Fill in Step 2 and finish the wizard. The stored recipe.mode is fill but operation remains cut. bestRecipeForOperation for the same material's Fill operation returns undefined.
 
@@ -82,6 +92,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/early-ui-materials.md. Repair 
 
 Repair: [#1142](https://github.com/cisgz3a-hub/KerfDesk/pull/1142). State: pr-open-ci-verified.
 
+Recorded CI: passed at commit 335b6e8438f2694b005c906bce761894cc479e98.
+
 Trigger: Detect a machine snapshot camera whose successful frame response takes longer than the 1500 ms preview poll (2.2 s in reproduction, below the bridge 10 s timeout).
 
 Impact: The discovered-machine preview never displays a frame despite successful camera responses. Each tick changes the upstream camera URL, queues a different request, and the browser has superseded that request before its response arrives. Opening the panel can also accumulate extra upstream work.
@@ -93,6 +105,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-02/camera-canvas-arcs.js
 ## CCA-002: Use the grabbed selected node as the drag reference
 
 Repair: [#1143](https://github.com/cisgz3a-hub/KerfDesk/pull/1143). State: pr-open-ci-verified.
+
+Recorded CI: passed at commit b8389a0f7f9318e6750a0d7482ffa127aa4f293e.
 
 Trigger: Select node A, Shift-add B so B is primary, then plain-drag already-selected A.
 
@@ -106,6 +120,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-02/camera-canvas-arcs.js
 
 Repair: [#1145](https://github.com/cisgz3a-hub/KerfDesk/pull/1145). State: pr-open-ci-verified.
 
+Recorded CI: passed at commit 27f118da6cca51f64ec7e69b6cdd1ee1926e2084.
+
 Trigger: Capture a 120 x 80 rectangle over an existing 40 x 40 captured board. Begin bottom-left physical-point correction, then invoke ordinary Undo while setOriginHere is pending. Resolve the origin operation.
 
 Impact: The 40 x 40 outline restored by Undo is silently resized to 120 x 80 by stale completion and the panel displays success. The pending operation has published old geometry into the restored scene instead of retaining the Undo result or reporting stale ownership.
@@ -118,6 +134,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-02/board-rotary-planner.
 
 Repair: [#1144](https://github.com/cisgz3a-hub/KerfDesk/pull/1144). State: pr-open-ci-verified.
 
+Recorded CI: passed at commit b0a45672e8846e58910c06db3fbf286d60ebe96e.
+
 Trigger: A closed measured organic contour with one or more pinned corners reaches fairChainSegments; cyclically shift the equivalent ring to a different first corner or reverse traversal.
 
 Impact: The final ordinary sample is pinned instead of smoothing the full span back to the corner, leaving traversal-dependent texture/kink near the seam. A 4800-point textured rectangle differs by 0.35840233726637066 source pixels under cyclic rotation.
@@ -129,6 +147,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-02/trace.json. Repair ev
 ## B03-CNC-001: Use a valid containment witness for concave helical pockets
 
 Repair: [#1146](https://github.com/cisgz3a-hub/KerfDesk/pull/1146). State: pr-open-ci-verified.
+
+Recorded CI: passed at commit 04545ed92f6bbf4366b99be9d22ec21a53dda4b2.
 
 Trigger: One C-shaped island-free polygon [(0,0),(30,0),(30,6),(6,6),(6,24),(30,24),(30,30),(0,30)]; 2 mm cutter, 40% stepover, helix diameters 1 to 2 mm at 5 degrees, depth -1 mm.
 
@@ -148,6 +168,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-03/cnc-geometry.json. Re
 
 Repair: [#1147](https://github.com/cisgz3a-hub/KerfDesk/pull/1147). State: pr-open-ci-verified.
 
+Recorded CI: passed at commit be8d56612aeb6c20131ff2c1ca8eeb00a2770307.
+
 Trigger: An imported red 40 x 40 mm square is explicitly bound to a green named profile operation. Place two anchors at path fractions 0.05 and 0.55, with automatic tabs-per-shape still four; use a 6 mm cut with 3 mm depth steps and 2 mm high, 6 mm wide tabs.
 
 Impact: The UI stores and displays anchors by the source red path color. Compilation passes the green operation color to objectTabPoints, so both anchors disappear from collected contours and four automatic tabs replace the two chosen positions. Exported holding-tab placement differs from the editor.
@@ -160,6 +182,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-03/cnc-geometry.json. Re
 
 Repair: [#1148](https://github.com/cisgz3a-hub/KerfDesk/pull/1148). State: pr-open-ci-verified.
 
+Recorded CI: passed at commit 4cecefc2f99271f2ec3d6a88781d659bcad2122f.
+
 Trigger: Select the 3.175 mm bit after the 6.35 mm bit, begin Zero Z, and use Ctrl+Z before the controller acknowledges G54 G92 Z0. Undo restores the 6.35 mm bit while the original write is pending.
 
 Impact: The old command records manual-zero evidence for the newly selected 6.35 mm bit. cncWorkZeroToolStartIssue then reports no mismatch for that bit, although it did not own the touch-off. This corrupts tool-specific setup evidence and suppresses the existing Job Review warning; no physical motion or crash was asserted by the probe.
@@ -171,6 +195,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-03/machine-transactions.
 ## WUX-001: Imported-program playback uses the background project timing
 
 Repair: [#1149](https://github.com/cisgz3a-hub/KerfDesk/pull/1149). State: pr-open-ci-verified.
+
+Recorded CI: passed at commit 4dc690605f80ef27dac35b95e0d0371856ad19f4.
 
 Trigger: Open a CNC project containing ordinary artwork, inspect a different external program and choose Open in 2D simulator. Same-geometry F60/F6000 programs both inherit the existing project estimate.
 
@@ -198,6 +224,8 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-03/workspace-ux.json. Re
 
 Repair: [#1150](https://github.com/cisgz3a-hub/KerfDesk/pull/1150). State: pr-open-ci-verified.
 
+Recorded CI: passed at commit 5db629ff40eb51254d39695cce9bee3fdb850109.
+
 Trigger: Enter 10000000000000000 in the current Variable serial input. HTML input validity succeeds and the ordinary React/store edit commits that value.
 
 Impact: Manual Save preparation and autosave preparation reject variables.serialValue until the operator changes or undoes it. The visible editor accepts state that cannot be persisted; existing files are not overwritten with corrupt data.
@@ -214,4 +242,5 @@ These concern the audit records and are separate from application defect counts.
 - [4240384677](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240384677): Queued aggregates already kept cycleVerified false. absentRequired and unmetRequired now distinguish absence from all unsuccessful required checks. Status: resolved-in-published-followup.
 - [pending-ledger-review](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312): Confirmed queue inconsistency: the frozen snapshot awaited independent review but omitted its pending task. The next snapshot retains an explicit review token and sequences review before publication; only commit-bound approval and verified committed blobs clear the local token. Independent evidence shows the previous snapshot was reviewed; a publication bypass was not reproduced. Status: resolved-in-published-followup.
 - [tracking-coverage-ci](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312): Confirmed same-head contradiction: coverage still called passed tracking CI pending. Coverage now has neutral source-review prose and a structured CI receipt synchronized to state, including its observed head and whether that head matches the inventory. A green result cannot silently advance source review or inventory identity. Status: resolved-in-published-followup.
-- [4240863024](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240863024): Confirmed mixed JSON priority types: four P2 display strings differed from ten numeric values. Normalize the four records to numeric 2 and document the numeric 0-3 convention. A strict numeric selection omitted those four records; no existing production consumer failure is claimed. Status: fixed-awaiting-independent-review.
+- [4240863024](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240863024): Confirmed mixed JSON priority types: four P2 display strings differed from ten numeric values. Normalize the four records to numeric 2 and document the numeric 0-3 convention. A strict numeric selection omitted those four records; no existing production consumer failure is claimed. Status: resolved-in-published-followup.
+- [4240943303](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240943303): Confirmed three SVG result descriptions contradicted successful CI receipts in the same snapshot. Replace transient pending wording with neutral behavior prose and render recorded CI status together with its observed commit from the repair ledger. Underlying repair CI was already successful. Status: fixed-awaiting-independent-review.
