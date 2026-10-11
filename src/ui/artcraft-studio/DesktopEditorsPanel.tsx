@@ -2,17 +2,28 @@ import { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../kit/Button';
 import { useDialogA11y } from '../common/use-dialog-a11y';
+import { useUiStore } from '../state/ui-store';
 import { useRegisterModal } from '../common/use-register-modal';
-import type { StudioEditor } from './artcraft-api';
 import { useDesktopEditors } from './use-desktop-editors';
-type EditorBridge = ReturnType<typeof useDesktopEditors>;
+import { useNativeEditorViewport } from './use-native-editor-viewport';
 import './artcraft-studio.css';
+
+type EditorBridge = ReturnType<typeof useDesktopEditors>;
 
 export function DesktopEditorsPanel({ onClose }: { readonly onClose: () => void }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
-  useRegisterModal();
-  useDialogA11y(ref, onClose);
   const bridge = useDesktopEditors();
+  const modalDepth = useUiStore((state) => state.modalDepth);
+  const viewport = useNativeEditorViewport(
+    bridge.session,
+    bridge.busy || modalDepth > 2,
+    bridge.report,
+  );
+  useRegisterModal();
+  const close = () => {
+    void bridge.close(onClose);
+  };
+  useDialogA11y(ref, close, { closeOnEscape: false });
   return createPortal(
     <div
       className="artcraft-backdrop"
@@ -21,105 +32,93 @@ export function DesktopEditorsPanel({ onClose }: { readonly onClose: () => void 
       aria-modal="true"
       aria-labelledby="artcraft-title"
       tabIndex={-1}
-      onKeyDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+          event.preventDefault();
+          void bridge.save();
+        }
+      }}
       onDrop={(event) => {
         event.preventDefault();
         event.stopPropagation();
       }}
     >
-      <div className="artcraft-panel">
-        <header className="artcraft-heading">
-          <div>
-            <span className="artcraft-preview">DESKTOP PREVIEW</span>
-            <h2 id="artcraft-title">A bigger studio, connected to KerfDesk</h2>
+      <StudioHeader bridge={bridge} close={close} />
+      <div className="artcraft-workspace">
+        <aside className="artcraft-sidebar">
+          <h3>Project documents</h3>
+          <p className="artcraft-hint">Full editable sources travel with your .lf2 project.</p>
+          <div className="artcraft-documents">
+            {bridge.documents.map((document) => (
+              <button
+                type="button"
+                key={document.id}
+                disabled={bridge.busy}
+                aria-pressed={document.id === (bridge.session?.documentId ?? bridge.session?.id)}
+                onClick={() => void bridge.resume(document.id)}
+              >
+                <strong>{document.title}</strong>
+                <small>{document.editor === 'photo' ? 'PhotoCraft' : 'VectorCraft'}</small>
+              </button>
+            ))}
+            {bridge.documents.length === 0 && <p>No studio documents yet.</p>}
           </div>
-          <Button onClick={onClose}>Close</Button>
-        </header>
-        <p>
-          Design in the full VectorCraft or PhotoCraft desktop editor. Each opens in its own window.
-          Your existing Design Studio remains available.
-        </p>
-        <EditorChoices bridge={bridge} />
-        <EditorInputs bridge={bridge} />
-        <EditorSessions bridge={bridge} />
-        <p
-          role={bridge.error ? 'alert' : 'status'}
-          className={bridge.error ? 'artcraft-error' : 'artcraft-hint'}
-        >
-          {bridge.message}
-        </p>
+          <NewDocument bridge={bridge} />
+        </aside>
+        <main className="artcraft-editor" ref={viewport} aria-label="Native artwork editor">
+          {bridge.session === null && (
+            <div className="artcraft-empty">
+              <h2>Your complete creative workspace</h2>
+              <p>Create a vector or photo document, or choose one saved in this project.</p>
+              <p>VectorCraft and PhotoCraft open here with their full editing tools.</p>
+            </div>
+          )}
+        </main>
       </div>
+      <footer className="artcraft-footer" role={bridge.error ? 'alert' : 'status'}>
+        <span className={bridge.error ? 'artcraft-error' : ''}>
+          {bridge.busy ? 'Working…' : bridge.message}
+        </span>
+        <span>Native source → project · Apply → machining artwork</span>
+      </footer>
     </div>,
     document.body,
   );
 }
-
-function EditorCard(props: {
-  readonly editor: StudioEditor;
-  readonly selected: boolean;
-  readonly installed: boolean;
-  readonly onChoose: (editor: StudioEditor) => void;
-}): JSX.Element {
-  const vector = props.editor === 'vector';
+function NewDocument({ bridge }: { readonly bridge: EditorBridge }): JSX.Element {
   return (
-    <button
-      className="artcraft-card"
-      type="button"
-      aria-pressed={props.selected}
-      onClick={() => props.onChoose(props.editor)}
-    >
-      <strong>{vector ? 'VectorCraft' : 'PhotoCraft'}</strong>
-      <span>
-        {vector
-          ? 'Shapes, text and editable vector artwork'
-          : 'Layers, masks, brushes and photo adjustments'}
-      </span>
-      <small>{props.installed ? 'Ready' : 'Not installed'}</small>
-    </button>
-  );
-}
-
-function EditorChoices({ bridge }: { readonly bridge: EditorBridge }): JSX.Element {
-  return (
-    <>
-      <div className="artcraft-cards">
-        <EditorCard
-          editor="vector"
-          selected={bridge.editor === 'vector'}
-          installed={bridge.status?.editors.vector.installed ?? false}
-          onChoose={bridge.chooseEditor}
-        />
-        <EditorCard
-          editor="photo"
-          selected={bridge.editor === 'photo'}
-          installed={bridge.status?.editors.photo.installed ?? false}
-          onChoose={bridge.chooseEditor}
-        />
+    <section className="artcraft-create" aria-label="Create studio document">
+      <h3>New document</h3>
+      <div className="artcraft-editor-choices">
+        <button
+          type="button"
+          disabled={bridge.busy}
+          aria-pressed={bridge.editor === 'vector'}
+          onClick={() => bridge.chooseEditor('vector')}
+        >
+          VectorCraft
+        </button>
+        <button
+          type="button"
+          disabled={bridge.busy}
+          aria-pressed={bridge.editor === 'photo'}
+          onClick={() => bridge.chooseEditor('photo')}
+        >
+          PhotoCraft
+        </button>
       </div>
-      {bridge.status !== null && !bridge.status.available && (
-        <p role="status">The desktop editor bridge is not available in this build.</p>
-      )}
-      {bridge.status !== null && !bridge.status.editors[bridge.editor].installed && (
-        <p role="status">This editor has not been prepared for this preview build yet.</p>
-      )}
-    </>
-  );
-}
-
-function EditorInputs({ bridge }: { readonly bridge: EditorBridge }): JSX.Element {
-  return (
-    <>
-      <div className="artcraft-fields">
-        <label>
-          Start with a file (optional)
-          <input
-            key={bridge.editor}
-            type="file"
-            accept={bridge.editor === 'vector' ? '.svg' : '.png,.jpg,.jpeg'}
-            disabled={bridge.busy}
-            onChange={(event) => bridge.setFile(event.target.files?.[0] ?? null)}
-          />
-        </label>
+      <label>
+        Start with a file (optional)
+        <input
+          key={bridge.editor}
+          type="file"
+          accept={bridge.editor === 'vector' ? '.svg' : '.png,.jpg,.jpeg'}
+          disabled={bridge.busy}
+          onChange={(event) => bridge.setFile(event.target.files?.[0] ?? null)}
+        />
+      </label>
+      <div className="artcraft-dimensions">
         <label>
           Width (mm)
           <input
@@ -143,69 +142,51 @@ function EditorInputs({ bridge }: { readonly bridge: EditorBridge }): JSX.Elemen
           />
         </label>
       </div>
-      <p className="artcraft-hint">
-        SVG for vectors; PNG or JPEG for photos. New documents use these dimensions. Applied artwork
-        uses the editor's measured physical dimensions. Native layers stay in the editor document;
-        photo output is flattened for engraving.
-      </p>
       <Button
         variant="primary"
-        disabled={
-          bridge.busy ||
-          bridge.status?.available !== true ||
-          bridge.status.editors[bridge.editor].installed !== true
-        }
+        disabled={bridge.busy || bridge.status?.editors[bridge.editor].installed !== true}
         onClick={() => void bridge.open()}
       >
         Open {bridge.editor === 'vector' ? 'VectorCraft' : 'PhotoCraft'}
       </Button>
-    </>
+      <p className="artcraft-hint">
+        Save project keeps native layers. Apply sends SVG or a flattened photo to the machining
+        workspace.
+      </p>
+    </section>
   );
 }
 
-function EditorSessions({ bridge }: { readonly bridge: EditorBridge }): JSX.Element {
+function StudioHeader({
+  bridge,
+  close,
+}: {
+  readonly bridge: EditorBridge;
+  readonly close: () => void;
+}): JSX.Element {
   return (
-    <>
-      <section className="artcraft-sessions" aria-labelledby="artcraft-sessions-title">
-        <div className="artcraft-heading">
-          <h3 id="artcraft-sessions-title">Editor sessions</h3>
-          <Button disabled={bridge.busy} onClick={() => void bridge.refresh()}>
-            Refresh
-          </Button>
-        </div>
-        <p>
-          Apply saves a native document revision in the editor, then exports artwork here to add or
-          update it in the current KerfDesk project. Review the import notices and dimensions before
-          machining.
-        </p>
-        {bridge.status?.sessions.length === 0 && (
-          <p className="artcraft-hint">Open an editor to start your first session.</p>
-        )}
-        {bridge.status?.sessions.map((session) => (
-          <div className="artcraft-session" key={session.id}>
-            <div>
-              <strong>{session.title}</strong>
-              <span>
-                {session.editor === 'vector' ? 'VectorCraft' : 'PhotoCraft'} ·{' '}
-                {session.running ? 'Open' : 'Closed'}
-              </span>
-            </div>
-            <div className="artcraft-heading">
-              {!session.running && (
-                <Button disabled={bridge.busy} onClick={() => void bridge.resume(session.id)}>
-                  Reopen editor
-                </Button>
-              )}
-              <Button
-                disabled={bridge.busy || !session.running}
-                onClick={() => void bridge.apply(session.id)}
-              >
-                Apply to KerfDesk
-              </Button>
-            </div>
-          </div>
-        ))}
-      </section>
-    </>
+    <header className="artcraft-heading">
+      <div>
+        <span className="artcraft-preview">KERFDESK · DESKTOP PREVIEW</span>
+        <h2 id="artcraft-title">Design Studio</h2>
+      </div>
+      <div className="artcraft-toolbar">
+        <Button disabled={bridge.busy} onClick={() => void bridge.save()}>
+          Save project
+        </Button>
+        <Button
+          variant="primary"
+          disabled={bridge.busy || bridge.session === null}
+          onClick={() => {
+            if (bridge.session) void bridge.apply(bridge.session.id);
+          }}
+        >
+          Apply to KerfDesk
+        </Button>
+        <Button disabled={bridge.busy} onClick={close}>
+          Back to old studio
+        </Button>
+      </div>
+    </header>
   );
 }

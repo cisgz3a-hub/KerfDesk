@@ -74,6 +74,12 @@ export async function buildArtcraftPreview() {
     if (previousEnvironment === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = previousEnvironment;
   }
+  const helperRoot = path.join(ARTCRAFT_PREVIEW_ROOT, 'scripts');
+  await mkdir(helperRoot, { recursive: true });
+  await copyFile(
+    path.join(ARTCRAFT_REPO_ROOT, 'scripts', 'artcraft-window-host.ps1'),
+    path.join(helperRoot, 'artcraft-window-host.ps1'),
+  );
   const publicRoot = path.join(ARTCRAFT_PREVIEW_ROOT, 'public');
   await mkdir(publicRoot, { recursive: true });
   for (const entry of await readdir(path.join(ARTCRAFT_REPO_ROOT, 'public'), {

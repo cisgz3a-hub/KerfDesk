@@ -1,9 +1,11 @@
+import type { StudioDocument } from '../../core/scene/studio-document';
 export type StudioEditor = 'photo' | 'vector';
 export type StudioSession = {
   readonly id: string;
   readonly editor: StudioEditor;
   readonly title: string;
   readonly running: boolean;
+  readonly documentId?: string;
 };
 export type StudioStatus = {
   readonly available: boolean;
@@ -18,6 +20,8 @@ export type StudioSnapshot = {
   readonly mime: string;
   readonly dataBase64: string;
   readonly nativeSaved: true;
+  readonly nativeDocument?: StudioDocument;
+  readonly documentId?: string;
   readonly widthMm?: number;
   readonly heightMm?: number;
 };
@@ -84,11 +88,12 @@ export function snapshotFile(snapshot: StudioSnapshot): File {
     throw new Error('Save the native editor document before Apply.');
   const extension = snapshot.editor === 'vector' ? 'svg' : 'png';
   const mime = snapshot.editor === 'vector' ? 'image/svg+xml' : 'image/png';
-  if (snapshot.mime !== mime || !/^[a-zA-Z0-9-]+$/.test(snapshot.id))
+  const documentId = snapshot.documentId ?? snapshot.id;
+  if (snapshot.mime !== mime || !/^[a-zA-Z0-9-]+$/.test(documentId))
     throw new Error('The editor returned an unsupported artwork snapshot.');
   const bytes = Uint8Array.from(atob(snapshot.dataBase64), (character) => character.charCodeAt(0));
   const content = snapshot.editor === 'vector' ? vectorSnapshotSource(bytes, snapshot) : bytes;
-  return new File([content], `kerfdesk-studio-${snapshot.id}.${extension}`, { type: mime });
+  return new File([content], `kerfdesk-studio-${documentId}.${extension}`, { type: mime });
 }
 
 export const resumeStudioEditor = (sessionId: string): Promise<StudioSession> =>
@@ -135,3 +140,20 @@ function hasValidViewBox(root: Element): boolean {
     (viewBox[3] ?? 0) > 0
   );
 }
+
+export const captureStudioDocument = (sessionId: string): Promise<StudioDocument> =>
+  request({ action: 'capture', sessionId });
+export const restoreStudioDocument = (document: StudioDocument): Promise<StudioSession> =>
+  request({ action: 'restore', document });
+export type StudioViewport = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  viewportWidth: number;
+  viewportHeight: number;
+};
+export const hostStudioEditor = (sessionId: string, rect: StudioViewport): Promise<unknown> =>
+  request({ action: 'host', sessionId, rect });
+export const hideStudioEditor = (sessionId: string): Promise<unknown> =>
+  request({ action: 'hide', sessionId });

@@ -11,6 +11,7 @@ export type ArtcraftSession = {
   editor: ArtcraftEditor;
   title: string;
   running: boolean;
+  documentId?: string;
 };
 export type ArtcraftSnapshot = {
   id: string;
@@ -20,6 +21,8 @@ export type ArtcraftSnapshot = {
   mime: string;
   dataBase64: string;
   nativeSaved: true;
+  nativeDocument?: ArtcraftDocument;
+  documentId?: string;
   widthMm?: number;
   heightMm?: number;
 };
@@ -28,7 +31,29 @@ export type ArtcraftStatus = {
   editors: Record<ArtcraftEditor, { installed: boolean; version: string }>;
   sessions: ArtcraftSession[];
 };
+export type ArtcraftDocument = {
+  id: string;
+  editor: ArtcraftEditor;
+  title: string;
+  editorVersion: string;
+  nativeFormat: 'pcraft' | 'vectorcraft';
+  nativeBase64: string;
+  nativeSha256: string;
+  revision: string;
+};
+export type ArtcraftRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  viewportWidth: number;
+  viewportHeight: number;
+};
 export interface ArtcraftRuntime {
+  capture?(id: string): Promise<ArtcraftDocument>;
+  restore?(document: unknown): Promise<ArtcraftSession>;
+  host?(id: string, rect: ArtcraftRect): Promise<unknown>;
+  hide?(id: string): Promise<void>;
   status(): Promise<ArtcraftStatus>;
   open(input: ArtcraftOpen): Promise<ArtcraftSession>;
   snapshot(id: string): Promise<ArtcraftSnapshot>;

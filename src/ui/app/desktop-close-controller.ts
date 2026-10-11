@@ -169,6 +169,17 @@ export class DesktopCloseController {
     return { status: 'approved' };
   }
 
+  /** Native editor capture can update the project while the original stop handshake settles. */
+  refreshPreparedDocument(id: number): DesktopCloseReply {
+    const attempt = this.attempt;
+    if (attempt?.id !== id || attempt.preparedDocument === null) return { status: 'cancelled' };
+    const snapshot = this.read();
+    attempt.preparedDirty = snapshot.dirty;
+    attempt.preparedDocument = snapshot.document;
+    // Machine ownership/epoch/warning retain the original prepared values. Approve rechecks them.
+    return { status: 'ready', dirty: snapshot.dirty };
+  }
+
   /** Both unload hooks see the same one-use decision for this DOM event. */
   handleBeforeUnload(event: BeforeUnloadEvent): boolean {
     if (this.handledEvents.has(event)) return true;

@@ -5,6 +5,7 @@ import { record, type ArtcraftEditor } from './artcraft-types.js';
 
 export type StoredArtcraftSession = {
   id: string;
+  documentId?: string;
   editor: ArtcraftEditor;
   title: string;
   sourceFile?: string;
@@ -74,6 +75,8 @@ async function loadSession(root: string, id: string): Promise<StoredArtcraftSess
     editor: value['editor'] as ArtcraftEditor,
     title: value['title'].slice(0, 240),
   };
+  if (typeof value['documentId'] === 'string' && UUID.test(value['documentId']))
+    candidate.documentId = value['documentId'];
   await recoverSessionFiles(root, id, value, candidate);
   for (const key of ['widthMm', 'heightMm'] as const) {
     if (typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] > 0) {

@@ -1,5 +1,8 @@
+import { readArtcraftDocument } from './artcraft-document.js';
+import { readEditorProcessIdentity } from './artcraft-process-identity.js';
+import type { ArtcraftWindowHost } from './artcraft-window-host.js';
 import { prepareRecoveredSession } from './artcraft-recovery.js';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ARTCRAFT_VERSIONS, readArtcraftInstallation } from './artcraft-installation.js';
@@ -9,6 +12,7 @@ import {
   initialiseEditor,
   inspectEditor,
   saveEditorRevision,
+  workingFile,
 } from './artcraft-operations.js';
 import {
   boundedStudioRead,
@@ -19,24 +23,32 @@ import {
   type StoredArtcraftSession,
 } from './artcraft-storage.js';
 import type {
+  ArtcraftDocument,
+  ArtcraftRect,
   ArtcraftOpen,
   ArtcraftRuntime,
   ArtcraftSession,
   ArtcraftSnapshot,
 } from './artcraft-types.js';
 
-export function createArtcraftRuntime(userDataPath: string, editorRoot?: string): ArtcraftRuntime {
-  return new DesktopStudio(path.join(userDataPath, 'artcraft-studio'), editorRoot);
+export function createArtcraftRuntime(
+  userDataPath: string,
+  editorRoot?: string,
+  hostProvider?: () => ArtcraftWindowHost,
+): ArtcraftRuntime {
+  return new DesktopStudio(path.join(userDataPath, 'artcraft-studio'), editorRoot, hostProvider);
 }
 class DesktopStudio implements ArtcraftRuntime {
   private readonly processes = new Map<string, ArtcraftProcess>();
   private readonly sessions = new Map<string, StoredArtcraftSession>();
   private readonly busy = new Set<string>();
   private readonly ready = new Set<string>();
+  private readonly captured = new Map<string, { identity: string; document: ArtcraftDocument }>();
   private loaded: Promise<void> | undefined;
   constructor(
     private readonly root: string,
     private readonly editorRoot: string | undefined,
+    private readonly hostProvider: (() => ArtcraftWindowHost) | undefined,
   ) {}
   private load(): Promise<void> {
     this.loaded ??= loadStudioSessions(this.root).then((sessions) => {
@@ -65,6 +77,7 @@ class DesktopStudio implements ArtcraftRuntime {
     const directory = studioDirectory(this.root, id);
     const session: StoredArtcraftSession = {
       id,
+      documentId: id,
       editor: input.editor,
       title: input.source?.name ?? (input.editor === 'photo' ? 'Photo artwork' : 'Vector artwork'),
       ...(input.widthMm === undefined ? {} : { widthMm: input.widthMm }),
@@ -95,6 +108,7 @@ class DesktopStudio implements ArtcraftRuntime {
         return this.describe(session);
       }
       this.ready.delete(id);
+      this.captured.delete(id);
       const installation = await readArtcraftInstallation(this.editorRoot, session.editor, true);
       if (installation === null)
         throw new Error('Full editor is not installed or verified. Run the studio setup.');
@@ -137,19 +151,109 @@ class DesktopStudio implements ArtcraftRuntime {
       if (bytes.byteLength === 0) throw new Error('The editor exported an empty artwork file.');
       session.nativeFile = frozenNative;
       await saveStudioSession(this.root, session);
+      const documentId = session.documentId ?? id;
       const photo = session.editor === 'photo';
+      const nativeDocument = this.nativeDocument(
+        session,
+        await boundedStudioRead(await studioFile(directory, frozenNative)),
+      );
+      this.captured.set(id, {
+        identity: JSON.stringify([before.active, before.revision, before.documentPath]),
+        document: nativeDocument,
+      });
       return {
         id,
+        documentId,
         editor: session.editor,
         revision,
-        filename: `kerfdesk-studio-${id}.${photo ? 'png' : 'svg'}`,
+        filename: `kerfdesk-studio-${documentId}.${photo ? 'png' : 'svg'}`,
         mime: photo ? 'image/png' : 'image/svg+xml',
         dataBase64: bytes.toString('base64'),
         nativeSaved: true,
+        nativeDocument,
         ...(positive(before.widthMm) ? { widthMm: before.widthMm } : {}),
         ...(positive(before.heightMm) ? { heightMm: before.heightMm } : {}),
       };
     });
+  }
+  async restore(value: unknown): Promise<ArtcraftSession> {
+    const { document, bytes } = readArtcraftDocument(value);
+    await this.load();
+    const id = randomUUID();
+    const directory = studioDirectory(this.root, id);
+    const nativeFile = workingFile(document.editor);
+    const session: StoredArtcraftSession = {
+      id,
+      documentId: document.id,
+      editor: document.editor,
+      title: document.title,
+      nativeFile,
+    };
+    await mkdir(directory, { recursive: true });
+    await writeFile(path.join(directory, nativeFile), bytes, { flag: 'wx' });
+    await saveStudioSession(this.root, session);
+    this.sessions.set(id, session);
+    return this.resume(id);
+  }
+  async capture(id: string): Promise<ArtcraftDocument> {
+    await this.load();
+    return this.exclusive(id, async () => {
+      const session = this.session(id);
+      const process = this.processes.get(id);
+      if (process?.running() !== true || !this.ready.has(id))
+        throw new Error('Reopen the editor before saving its current document.');
+      const directory = studioDirectory(this.root, id);
+      const before = await inspectEditor(process, session.editor, true);
+      assertManagedDocument(before, session.editor, directory);
+      const identity = JSON.stringify([before.active, before.revision, before.documentPath]);
+      const cached = this.captured.get(id);
+      if (cached?.identity === identity) return cached.document;
+      await process.request('app.save', {});
+      const bytes = await boundedStudioRead(
+        await studioFile(directory, workingFile(session.editor)),
+      );
+      const after = await inspectEditor(process, session.editor, true);
+      if (JSON.stringify(before) !== JSON.stringify(after))
+        throw new Error('The editor changed during Save. Finish editing and save again.');
+      if (bytes.length === 0) throw new Error('The editor saved an empty document.');
+      const document = this.nativeDocument(session, bytes);
+      this.captured.set(id, { identity, document });
+      return document;
+    });
+  }
+  private nativeDocument(session: StoredArtcraftSession, bytes: Buffer): ArtcraftDocument {
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    return {
+      id: session.documentId ?? session.id,
+      editor: session.editor,
+      title: session.title,
+      editorVersion: ARTCRAFT_VERSIONS[session.editor],
+      nativeFormat: session.editor === 'photo' ? 'pcraft' : 'vectorcraft',
+      nativeBase64: bytes.toString('base64'),
+      nativeSha256: hash,
+      revision: hash,
+    };
+  }
+  async host(id: string, rect: ArtcraftRect): Promise<unknown> {
+    const session = this.session(id);
+    const process = this.processes.get(id);
+    if (process?.running() !== true || !this.ready.has(id) || process.child.pid === undefined)
+      throw new Error('Reopen this editor before showing it.');
+    if (this.hostProvider === undefined) throw new Error('Window hosting is unavailable.');
+    const identity = await readEditorProcessIdentity(process.child.pid);
+    if (identity === null) throw new Error('Editor process has exited.');
+    const installation = await readArtcraftInstallation(this.editorRoot, session.editor);
+    if (
+      installation === null ||
+      path.resolve(identity.executable).toLowerCase() !==
+        path.resolve(installation.executable).toLowerCase()
+    )
+      throw new Error('Editor process identity changed.');
+    return this.hostProvider().attach(id, identity, rect);
+  }
+  async hide(id: string): Promise<void> {
+    this.session(id);
+    await this.hostProvider?.().hide(id);
   }
   private session(id: string): StoredArtcraftSession {
     const session = this.sessions.get(id);
@@ -159,6 +263,7 @@ class DesktopStudio implements ArtcraftRuntime {
   private describe(session: StoredArtcraftSession): ArtcraftSession {
     return {
       id: session.id,
+      documentId: session.documentId ?? session.id,
       editor: session.editor,
       title: session.title,
       running: this.ready.has(session.id) && (this.processes.get(session.id)?.running() ?? false),

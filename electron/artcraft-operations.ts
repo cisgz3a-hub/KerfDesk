@@ -56,11 +56,13 @@ export type EditorRevision = {
 export async function inspectEditor(
   process: ArtcraftProcess,
   editor: ArtcraftEditor,
+  nativeOnly = false,
 ): Promise<EditorRevision> {
   if (editor === 'photo') return inspectPhoto(process);
   const ui = record(await process.request('ui.inspect', {}));
   const doc = record(await process.request('document.inspect', { depth: 0 }));
   const artboards = doc['artboards'];
+  if (nativeOnly) return identity(ui['activeDocument'], doc);
   if (!Array.isArray(artboards) || artboards.length !== 1) {
     throw new Error('Apply currently requires exactly one VectorCraft artboard.');
   }

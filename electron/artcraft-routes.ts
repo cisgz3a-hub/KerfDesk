@@ -1,6 +1,11 @@
 import { trustedAppRequest } from './app-route-guard.js';
 import type { ProtocolHandler } from './licensing-routes.js';
-import { record, type ArtcraftOpen, type ArtcraftRuntime } from './artcraft-types.js';
+import {
+  record,
+  type ArtcraftRect,
+  type ArtcraftOpen,
+  type ArtcraftRuntime,
+} from './artcraft-types.js';
 
 export const ARTCRAFT_ROUTE = '/api/artcraft-studio';
 const MAX_BODY = 48 * 1024 * 1024;
@@ -61,6 +66,19 @@ async function dispatch(
   runtime: ArtcraftRuntime,
 ): Promise<unknown> {
   switch (input['action']) {
+    case 'capture':
+      return requireCapability(runtime.capture).call(runtime, sessionId(input['sessionId']));
+    case 'restore':
+      return requireCapability(runtime.restore).call(runtime, input['document']);
+    case 'host':
+      return requireCapability(runtime.host).call(
+        runtime,
+        sessionId(input['sessionId']),
+        viewportInput(input['rect']),
+      );
+    case 'hide':
+      await runtime.hide?.(sessionId(input['sessionId']));
+      return { hidden: true };
     case 'open':
       return runtime.open(openInput(input));
     case 'snapshot':
@@ -102,6 +120,7 @@ function sourceInput(value: unknown): NonNullable<ArtcraftOpen['source']> {
     mediaType = source['mediaType'];
   if (
     typeof name !== 'string' ||
+    name.trim().length === 0 ||
     name.length > 240 ||
     typeof dataBase64 !== 'string' ||
     typeof mediaType !== 'string' ||
@@ -109,4 +128,16 @@ function sourceInput(value: unknown): NonNullable<ArtcraftOpen['source']> {
   )
     throw new Error('Invalid artwork upload');
   return { name, dataBase64, mediaType };
+}
+
+function requireCapability<T>(method: T | undefined): T {
+  if (method === undefined) throw new Error('This studio operation is unavailable');
+  return method;
+}
+function viewportInput(value: unknown): ArtcraftRect {
+  const rect = record(value);
+  for (const key of ['x', 'y', 'width', 'height', 'viewportWidth', 'viewportHeight'])
+    if (typeof rect[key] !== 'number' || !Number.isFinite(rect[key]))
+      throw new Error('Invalid viewport');
+  return rect as unknown as ArtcraftRect;
 }

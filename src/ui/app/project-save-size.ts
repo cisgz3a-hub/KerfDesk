@@ -19,6 +19,7 @@ function largeProject(project: Project): boolean {
   let work = stringWork(project.notes);
   for (const font of Array.isArray(project.embeddedFonts) ? project.embeddedFonts : [])
     work += stringWork(font?.dataBase64);
+  work += studioDocumentWork(project);
   const objects = project.scene?.objects;
   if (!Array.isArray(objects)) return false;
   if (objects.length >= 250) return true;
@@ -27,6 +28,11 @@ function largeProject(project: Project): boolean {
     if (work >= 500_000) return true;
   }
   return work >= 500_000;
+}
+
+function studioDocumentWork(project: Project): number {
+  const documents = Array.isArray(project.studioDocuments) ? project.studioDocuments : [];
+  return documents.reduce((size, document) => size + stringWork(document?.nativeBase64), 0);
 }
 
 function hasExternalProjectAssets(project: Project): boolean {

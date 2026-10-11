@@ -142,3 +142,51 @@ describe('desktop session ownership and revision persistence', () => {
     expect(launchArtcraftProcess).not.toHaveBeenCalled();
   });
 });
+
+it('stores native bytes and restores them without the original session cache', async () => {
+  const runtime = createArtcraftRuntime(root, 'editors');
+  const session = await runtime.open({ editor: 'photo' });
+  const portable = await runtime.capture!(session.id);
+  expect(Buffer.from(portable.nativeBase64, 'base64').toString()).toBe('layered original');
+  const fresh = createArtcraftRuntime(path.join(root, 'fresh-profile'), 'editors');
+  const restored = await fresh.restore!(JSON.parse(JSON.stringify(portable)));
+  expect(restored.id).not.toBe(session.id);
+  expect(restored.documentId).toBe(session.id);
+  const exported = await fresh.snapshot(restored.id);
+  expect(exported.filename).toBe(`kerfdesk-studio-${session.id}.png`);
+});
+it('rejects corrupt native bytes before starting an editor', async () => {
+  const runtime = createArtcraftRuntime(root, 'editors');
+  const session = await runtime.open({ editor: 'photo' });
+  const portable = await runtime.capture!(session.id);
+  vi.mocked(launchArtcraftProcess).mockClear();
+  await expect(runtime.restore!({ ...portable, nativeBase64: 'Y29ycnVwdA==' })).rejects.toThrow(
+    'checksum',
+  );
+  expect(launchArtcraftProcess).not.toHaveBeenCalled();
+});
+it('refuses to checkpoint a document changed while saving', async () => {
+  const runtime = createArtcraftRuntime(root, 'editors');
+  const session = await runtime.open({ editor: 'photo' });
+  vi.mocked(inspectEditor)
+    .mockResolvedValueOnce({ active: 0, revision: 1, documentPath: 'working.pcraft' })
+    .mockResolvedValueOnce({ active: 0, revision: 2, documentPath: 'working.pcraft' });
+  await expect(runtime.capture!(session.id)).rejects.toThrow('changed during Save');
+});
+
+it('does not rewrite unchanged native files on periodic checkpoints', async () => {
+  const runtime = createArtcraftRuntime(root, 'editors');
+  const session = await runtime.open({ editor: 'photo' });
+  const original = await runtime.capture!(session.id);
+  await writeFile(
+    path.join(root, 'artcraft-studio', session.id, 'working.pcraft'),
+    'timestamp-only rewrite',
+  );
+  expect(await runtime.capture!(session.id)).toEqual(original);
+  vi.mocked(inspectEditor).mockResolvedValue({
+    active: 0,
+    revision: 2,
+    documentPath: 'working.pcraft',
+  });
+  expect((await runtime.capture!(session.id)).nativeSha256).not.toBe(original.nativeSha256);
+});

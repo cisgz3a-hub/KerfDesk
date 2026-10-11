@@ -1,3 +1,4 @@
+import { disposeStudioProjectBridge } from './studio-project-bridge';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -10,7 +11,8 @@ import {
   getStudioSnapshot,
   getStudioStatus,
   openStudioEditor,
-  resumeStudioEditor,
+  restoreStudioDocument,
+  captureStudioDocument,
   type StudioSnapshot,
   type StudioStatus,
 } from './artcraft-api';
@@ -19,6 +21,10 @@ vi.mock('./artcraft-api', () => ({
   getStudioSnapshot: vi.fn(),
   openStudioEditor: vi.fn(),
   resumeStudioEditor: vi.fn(),
+  restoreStudioDocument: vi.fn(),
+  captureStudioDocument: vi.fn(),
+  hostStudioEditor: vi.fn(async () => ({})),
+  hideStudioEditor: vi.fn(async () => ({})),
 }));
 vi.mock('./apply-studio-snapshot', () => ({ applyStudioSnapshot: vi.fn() }));
 (
@@ -27,13 +33,44 @@ vi.mock('./apply-studio-snapshot', () => ({ applyStudioSnapshot: vi.fn() }));
 let root: Root | undefined;
 let host: HTMLDivElement;
 const close = vi.fn();
+const documentId = '11111111-1111-4111-8111-111111111111';
+const nativeDocument = {
+  id: documentId,
+  editor: 'vector' as const,
+  title: 'Drawing',
+  editorVersion: '0.9.0',
+  nativeFormat: 'vectorcraft' as const,
+  nativeBase64: 'YQ==',
+  nativeSha256: 'a'.repeat(64),
+  revision: 'saved',
+};
 const status: StudioStatus = {
   available: true,
   editors: { vector: { installed: true, version: '1' }, photo: { installed: true, version: '1' } },
   sessions: [{ id: 'session-1', editor: 'vector', title: 'Drawing', running: true }],
 };
 beforeEach(() => {
+  disposeStudioProjectBridge();
   vi.clearAllMocks();
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {
+        /* no layout in jsdom */
+      }
+      disconnect() {
+        /* no layout in jsdom */
+      }
+    },
+  );
+  vi.mocked(openStudioEditor).mockResolvedValue({
+    id: documentId,
+    documentId,
+    editor: 'vector',
+    title: 'Drawing',
+    running: true,
+  });
+  vi.mocked(captureStudioDocument).mockResolvedValue(nativeDocument);
   resetStore();
   vi.mocked(getStudioStatus).mockResolvedValue(status);
   useUiStore.setState({ modalDepth: 0 });
@@ -44,6 +81,8 @@ afterEach(async () => {
   await act(async () => root?.unmount());
   root = undefined;
   host.remove();
+  disposeStudioProjectBridge();
+  vi.unstubAllGlobals();
 });
 async function render(): Promise<void> {
   await act(async () => {
@@ -58,20 +97,24 @@ function button(label: string): HTMLButtonElement {
   if (!result) throw new Error(`Button ${label} not found`);
   return result;
 }
-it('registers a modal, traps workspace shortcuts and closes with Escape', async () => {
+it('registers a modal, traps workspace shortcuts and checkpoints before returning to the old studio', async () => {
   await render();
   expect(useUiStore.getState().modalDepth).toBe(1);
   const key = vi.fn();
   window.addEventListener('keydown', key);
   await act(async () =>
-    button('Close').dispatchEvent(
+    button('Back to old studio').dispatchEvent(
       new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }),
     ),
   );
   expect(key).not.toHaveBeenCalled();
   await act(async () =>
-    button('Close').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+    button('Back to old studio').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    ),
   );
+  expect(close).not.toHaveBeenCalled();
+  await act(async () => button('Back to old studio').click());
   expect(close).toHaveBeenCalledOnce();
   window.removeEventListener('keydown', key);
   await act(async () => root?.unmount());
@@ -83,15 +126,25 @@ it('opens the full vector editor with explicit physical dimensions', async () =>
   await act(async () => button('Open VectorCraft').click());
   expect(openStudioEditor).toHaveBeenCalledWith('vector', null, { widthMm: 100, heightMm: 100 });
 });
-it('reopens closed sessions and cannot Apply a stale closed editor', async () => {
-  vi.mocked(getStudioStatus).mockResolvedValue({
-    ...status,
-    sessions: [{ ...status.sessions[0]!, running: false }],
+it('restores editable source from this project instead of showing another project sessions', async () => {
+  useStore.setState({
+    project: { ...useStore.getState().project, studioDocuments: [nativeDocument] },
+  });
+  vi.mocked(restoreStudioDocument).mockResolvedValue({
+    id: 'new-session',
+    documentId,
+    editor: 'vector',
+    title: 'Drawing',
+    running: true,
   });
   await render();
   expect(button('Apply to KerfDesk').disabled).toBe(true);
-  await act(async () => button('Reopen editor').click());
-  expect(resumeStudioEditor).toHaveBeenCalledWith('session-1');
+  const documentButton = [...document.querySelectorAll('button')].find(
+    (item) => item.textContent === 'DrawingVectorCraft',
+  )!;
+  await act(async () => documentButton.click());
+  expect(restoreStudioDocument).toHaveBeenCalledWith(nativeDocument);
+  expect(button('Apply to KerfDesk').disabled).toBe(false);
 });
 it('does not apply an asynchronously returned snapshot after closing', async () => {
   let resolve: (value: StudioSnapshot) => void = () => undefined;
@@ -102,19 +155,21 @@ it('does not apply an asynchronously returned snapshot after closing', async () 
       }),
   );
   await render();
+  await act(async () => button('Open VectorCraft').click());
   await act(async () => button('Apply to KerfDesk').click());
   await act(async () => root?.unmount());
   root = undefined;
-  await act(async () => resolve({ id: 'session-1' } as StudioSnapshot));
+  await act(async () => resolve({ id: documentId } as StudioSnapshot));
   expect(applyStudioSnapshot).not.toHaveBeenCalled();
 });
 it('captures project ownership before requesting a snapshot', async () => {
-  const snapshot = { id: 'session-1' } as StudioSnapshot;
+  const snapshot = { id: documentId } as StudioSnapshot;
   vi.mocked(getStudioSnapshot).mockImplementation(async () => {
     useStore.setState({ projectDocumentEpoch: 2 });
     return snapshot;
   });
   await render();
+  await act(async () => button('Open VectorCraft').click());
   await act(async () => button('Apply to KerfDesk').click());
-  expect(applyStudioSnapshot).toHaveBeenCalledWith(snapshot, 0, expect.any(Function));
+  expect(applyStudioSnapshot).not.toHaveBeenCalled();
 });

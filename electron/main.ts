@@ -45,6 +45,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import electronUpdater from 'electron-updater';
 import * as appMenu from './application-menu-policy.js';
+import { installDesktopArtcraftWindow, detachDesktopArtcraftWindows } from './desktop-artcraft.js';
 import { mainWindowWebPreferences } from './desktop-window-options.js';
 import {
   PACKAGED_RENDERER_URL,
@@ -368,10 +369,6 @@ function installNavigationPolicy(window: BrowserWindow): void {
   });
 }
 
-async function loadRenderer(window: BrowserWindow): Promise<void> {
-  await window.loadURL(RENDERER_RUNTIME.rendererUrl);
-}
-
 function installDevTools(window: BrowserWindow): void {
   if (LOCKED_DOWN) return;
   window.webContents.on('console-message', ({ level, message, lineNumber, sourceId }) => {
@@ -397,7 +394,9 @@ async function createWindow(): Promise<void> {
   nativeSmoke.installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
   installDesktopContextMenu(window);
+  installDesktopArtcraftWindow(window);
   const closeGuard = manualCloseApproval.install(window, {
+    beforeClose: detachDesktopArtcraftWindows,
     isTrustedRenderer: (url) => shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS),
     isQuitRequested: () => quitRequested,
     cancelQuit: () => {
@@ -493,7 +492,7 @@ async function createWindow(): Promise<void> {
   // routes navigator.wakeLock.request('screen') through these handlers as
   // 'screen-wake-lock'; without the allowlist entry the request rejects and
   // keep-awake silently dies on the desktop build only.
-  await loadRenderer(window);
+  await window.loadURL(RENDERER_RUNTIME.rendererUrl);
 
   // Surface renderer console output to the main process stdout so dev runs
   // can see errors without having to open DevTools manually. Skipped in

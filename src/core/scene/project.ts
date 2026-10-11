@@ -12,6 +12,7 @@ import type { ProductionManifest } from './production-manifest';
 import type { RetainedArrayLayout } from './retained-array';
 import type { CncMachiningSetup } from './cnc-machining-setup';
 import type { ProcessRecipeApplication } from '../material-library/process-recipe-application';
+import type { StudioDocument } from './studio-document';
 import type { ProductionNestDefinition } from '../nesting/production-nest';
 
 // v9 preserves owned image clips. Older readers would engrave the full source
@@ -25,7 +26,8 @@ import type { ProductionNestDefinition } from '../nesting/production-nest';
 // Older readers must not silently rebuild wrapped/fitted text without its frame.
 // v14 retains editable Boolean sources and independent design-tree ordering.
 // v15 retains editable relief composition and reviewed machining setup/template intent.
-export const PROJECT_SCHEMA_VERSION = 15 as const;
+// v16 embeds editable native studio documents; older readers must not drop them.
+export const PROJECT_SCHEMA_VERSION = 16 as const;
 
 export type EmbeddedFont = {
   readonly key: string;
@@ -159,6 +161,7 @@ export type Project = {
   readonly variables?: ProjectVariableData;
   readonly printAndCutTargets?: PrintAndCutDesignTargets;
   readonly embeddedFonts?: ReadonlyArray<EmbeddedFont>;
+  readonly studioDocuments?: ReadonlyArray<StudioDocument>;
   readonly notes: string;
   readonly sheetBook?: ProjectSheetBook;
   readonly fixtureTemplates?: ReadonlyArray<FixtureTemplate>;

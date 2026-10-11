@@ -21,6 +21,7 @@ import { prepareProjectSave } from './prepare-project-save';
 import { projectSaveNeedsWorker } from './project-save-size';
 import { exportLargeProjectRecovery } from './large-project-recovery';
 import { clearAutosaveAfterFileHandoff } from './autosave-file-cleanup';
+import { getProjectSaveCheckpoint } from './project-save-checkpoint';
 
 export type SaveProjectCtx = Omit<ProjectSaveOwner, 'projectSaveRequestEpoch'> & {
   readonly platform: PlatformAdapter;
@@ -36,12 +37,27 @@ export async function handleSaveProject(
   ctx: SaveProjectCtx,
   forceDialog = false,
 ): Promise<SaveProjectOutcome> {
-  const owner: ProjectSaveOwner = {
+  let owner: ProjectSaveOwner = {
     ...ctx,
     projectSaveRequestEpoch: ctx.claimProjectSaveRequest(),
   };
   const writeOwner = ctx.projectSaveWriteCoordinator.begin(owner.projectSaveRequestEpoch);
   try {
+    const checkpoint = getProjectSaveCheckpoint();
+    if (checkpoint !== null) {
+      const refreshed = await checkpoint({
+        project: ctx.project,
+        expectedProject: ctx.expectedProject,
+        projectDocumentEpoch: owner.projectDocumentEpoch,
+        isCurrent: () => staleProjectSaveOutcome(owner) === null,
+      });
+      const stale = staleProjectSaveOutcome(owner);
+      if (stale !== null) return stale;
+      if (refreshed !== undefined) {
+        ctx = { ...ctx, ...refreshed };
+        owner = { ...owner, expectedProject: refreshed.expectedProject };
+      }
+    }
     const prepared = await prepareProjectSave(ctx, owner, forceDialog);
     if (prepared.kind === 'stopped') return prepared.outcome;
     if (prepared.kind === 'invalid')
