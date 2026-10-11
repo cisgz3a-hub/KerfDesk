@@ -3,13 +3,15 @@ import {
   createLayer,
   createProject,
   IDENTITY_TRANSFORM,
+  type Project,
+  type RasterImage,
+} from '../../core/scene';
+import {
   MAX_PHOTO_EDITOR_DOCUMENT_BYTES,
   MAX_PHOTO_EDITOR_LAYERS,
   PHOTO_EDITOR_BLENDS,
   type PhotoEditorDocument,
-  type Project,
-  type RasterImage,
-} from '../../core/scene';
+} from '../../core/scene/photo-editor-document';
 import { deserializeProject } from './deserialize-project';
 import { prepareProjectForAutosave } from './prepare-project-autosave';
 import { prepareProjectForPersistence } from './prepare-project-persistence';

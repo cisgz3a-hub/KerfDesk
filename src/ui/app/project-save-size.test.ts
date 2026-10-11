@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   createProject,
   IDENTITY_TRANSFORM,
-  type PhotoEditorDocument,
   type Project,
   type RasterImage,
 } from '../../core/scene';
+import type { PhotoEditorDocument } from '../../core/scene/photo-editor-document';
 import type { SketchEntity } from '../../core/design/sketch-entity';
 import { projectSaveNeedsWorker } from './project-save-size';
 

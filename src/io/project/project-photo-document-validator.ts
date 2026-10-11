@@ -2,7 +2,7 @@ import {
   MAX_PHOTO_EDITOR_DOCUMENT_BYTES,
   MAX_PHOTO_EDITOR_LAYERS,
   PHOTO_EDITOR_BLENDS,
-} from '../../core/scene';
+} from '../../core/scene/photo-editor-document';
 import {
   firstError,
   isObject,
