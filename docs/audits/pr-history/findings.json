@@ -1,0 +1,462 @@
+[
+  {
+    "id": "FND-001",
+    "priority": 2,
+    "title": "SVG import drops visible children overriding inherited fill or stroke opacity",
+    "originPr": 10,
+    "trigger": "Import a group with fill-opacity=0 and child rectangle fill-opacity=1, or stroke-opacity equivalents.",
+    "impact": "Browser and worker parsers both return null object, zero paths and SVG has no drawable geometry.",
+    "attribution": null,
+    "group": "svg-paint-opacity",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/foundation.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-repair-report.md",
+    "followUps": [
+      {
+        "title": "Invalid winning CSS and duplicate inline declarations discard a valid lower opacity",
+        "result": "Confirmed against the first published candidate with Chrome and both importers. Validate declarations before collapsing cascade candidates; retain valid lower values and importance order.",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305758"
+      },
+      {
+        "title": "Raw presentation attributes incorrectly accept declaration importance",
+        "result": "Confirmed parent-zero / child 1 !important case. Keep attribute property-value syntax separate from CSS declaration priority.",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305762"
+      },
+      {
+        "title": "Revert falls back to a same-element author attribute",
+        "result": "Confirmed against Chrome. For supported author-only paint-opacity declarations, revert removes author candidates and inherits the parent value.",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305766"
+      },
+      {
+        "title": "Comments and malformed numeric tokens change imported visibility",
+        "result": "Confirmed comment rejection in the first candidate. Accept surrounding comments without joining number, percent, sign or keyword tokens; reject trailing-dot numbers and clamp large numeric values consistently.",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305771"
+      },
+      {
+        "title": "Valid revert-layer incorrectly exposes lower opacity from the same cascade layer",
+        "result": "Confirmed in the earlier audit repair. Inline revert-layer now reveals stylesheet opacity, and stylesheet rollback reveals the presentation attribute with importance order preserved. Independently reviewed and published. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364150",
+        "publishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
+        }
+      },
+      {
+        "title": "Valid CSS math opacity is rejected before cascade resolution",
+        "result": "Context-free CSS math now retains valid winning opacity, including typed absolute-unit cancellation and scalar functions; invalid numeric types preserve valid lower declarations. Layout-dependent winners retain an explicitly warned opaque approximation because exact visibility requires layout. Fresh imports and replacements both display the warning. Independently reviewed and published. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364155",
+        "additionalCases": [
+          "Compound absolute-unit products and quotients reduce without losing valid winning opacity.",
+          "CSS scalar functions reject invalid dimension powers; round strategies and clamp none retain reduced typed arguments.",
+          "Relative-unit division can depend on zero-font 0/0; recognized unresolved winners retain a qualified opaque approximation and warn that source-hidden artwork may be included.",
+          "Replacement and reimport now deliver presentation warnings after the replacement summary; actual visible-toast controls cover the three-toast window."
+        ],
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/svg-math-limits.json",
+        "publishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
+        }
+      },
+      {
+        "title": "Valid variable-containing opacity declaration is discarded before the cascade winner is resolved",
+        "result": "Confirmed valid variable winner was discarded before cascade resolution. The published repair preserves syntactically valid variable-containing winners as unresolved, imports them with opacity 1 and explicitly warns that CSS variables or layout-dependent values may hide source artwork that is included. Invalid syntax retains valid lower candidates. Full custom-property substitution remains outside scope. Source review, 1259 isolated tests and 12 real production-worker cases passed. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240505326",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-reproduction.md",
+        "publishedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
+        }
+      },
+      {
+        "title": "Valid environment opacity winner is discarded and malformed nested environment syntax survives",
+        "result": "Independently reproduced against published a4c1968. Retain syntactically valid env() winners as qualified unresolved opacity, validate nested var/env fallback syntax, and explicitly warn that custom or environment values can hide artwork imported fully opaque. Full substitution remains outside scope. Independently reviewed and published. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240569209",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-reproduction.md",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
+        "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
+        }
+      },
+      {
+        "key": "unsupported-scalar-argument",
+        "title": "Unsupported dimension escapes validation through a scalar opacity function",
+        "result": "Independent lower-zero sign(1fr) tests exposed geometry that Chrome hides. Reject failed typed arguments except legitimate round/clamp keyword slots; preserve supported typed cancellation and scalar functions. This separately reproduced defect is distinct from the original flex-ratio interoperability claim. Independently reviewed and published. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-fr-scalar-before.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
+        "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
+        }
+      },
+      {
+        "title": "Typed attribute opacity winners are discarded before computed-value substitution",
+        "result": "Syntactically valid typed attr() winners now use the disclosed opaque approximation instead of exposing a lower zero. Invalid syntax preserves valid lower declarations. The related real worker entity mismatch is repaired by consuming already-decoded Attr.value once for paint-opacity CSS, without a second decoder or changes to sanitization. Full attribute lookup/substitution is not claimed.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648365",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
+        "additionalCases": [
+          "Actual Chrome main and source-bundled worker agree for XML-encoded typed-attribute inline CSS after the bounded Attr.value repair.",
+          "Named/numeric entity controls and double-encoded negative controls prevent unintended second decoding.",
+          "Actual Chrome DOMPurify main path passes; the separate jsdom serializer artifact remains DISP-046."
+        ],
+        "publishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
+        }
+      },
+      {
+        "title": "Escaped important identifiers are not recognized as declaration priority",
+        "result": "Declaration importance is recognized from final decoded delimiter/identifier tokens, including escaped important spelling, with property-value and raw-attribute validation kept separate. Independent browser and parser controls pass.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648371",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
+        "publishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
+        }
+      }
+    ],
+    "followUpAttribution": "Cascade, rollback, typed-math, replacement-warning and variable-winner follow-ups are published at the recorded review heads. The variable defect was found while reviewing the audit repair; its historical introduction was not established and is not assigned to PR #10. The separate intermediate Infinity/NaN claim did not reproduce and is rejected candidate DISP-042, not a repaired defect. Environment substitution and unsupported scalar arguments were reproduced against the current repair, not attributed to PR #10. Flex-ratio compatibility is DISP-043. Typed attribute winners and escaped importance are confirmed follow-ups; their related worker XML entity mismatch is recorded with the attribute repair. The rollback report is rejected in DISP-045, relative sign precision is DISP-044, and the distinct jsdom sanitizer artifact is DISP-046.",
+    "followUpEvidence": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+    "previousRepairReports": [
+      "docs/audits/2026-10-11-pr-history/publication/svg-opacity-follow-up.md",
+      "docs/audits/2026-10-11-pr-history/publication/svg-math-followup.md",
+      "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-repair-report.md",
+      "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-repair-report.md"
+    ]
+  },
+  {
+    "id": "BITMAP-01",
+    "priority": 2,
+    "title": "Retain boundary outlines after pixel-coordinate rounding",
+    "originPr": 10,
+    "trigger": "Convert a 10.01 by 10 mm rectangle to Outlines at 254 DPI",
+    "impact": "Bitmap artwork and derived engraving omit a boundary edge",
+    "attribution": null,
+    "group": "raster-outline-boundaries",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/controller-raster.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/repair-summary.md"
+  },
+  {
+    "id": "EUM-01",
+    "priority": 2,
+    "title": "Preserve valid imported thicknesses when opening the material editor",
+    "originPr": 14,
+    "trigger": "Deserialize and import a valid preset with thicknessMm=3.175 (one-eighth-inch stock), open MaterialPresetWizard with that preset, then click native Next. The draft displays 3.17, the number input has step=0.1 and stepMismatch=true, the form is invalid, and clicking Next stays at Step 1 despite the button being enabled.",
+    "impact": "The editor cannot edit the valid preset unchanged; the operator must alter the material thickness to a representable tenth, changing the identity used for material matching. Original store value is not mutated merely by opening the wizard.",
+    "attribution": "Both formatting and step constraint blame directly to the new #14 wizard.",
+    "group": "material-preset-roundtrip",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/early-ui-materials.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/repair-summary.md"
+  },
+  {
+    "id": "EUM-02",
+    "priority": 2,
+    "title": "Keep the canonical material identity during an unchanged preset edit",
+    "originPr": 14,
+    "trigger": "Import a valid line/cut preset with material='Birch', materialName='Birch plywood premium', thicknessMm=3. It initially matches job material Birch. Open Edit and click Next/Next/Next/Save without editing. The stored material is replaced with Birch plywood premium; bestRecipeForOperation for the existing Birch job returns undefined.",
+    "impact": "An ordinary no-change or description-only edit silently removes the preset from the previous material group and automatic recipe selection. Direct manual Apply remains available.",
+    "attribution": "The metadata rewrite was introduced in #14. The demonstrated auto-recipe consequence is a later descendant behavior (ADR-496), not a claim that automatic assignment shipped in #14.",
+    "group": "material-preset-roundtrip",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/early-ui-materials.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/repair-summary.md"
+  },
+  {
+    "id": "EUM-03",
+    "priority": 2,
+    "title": "Update operation metadata when changing a preset's process mode",
+    "originPr": 14,
+    "trigger": "Edit a saved line/cut preset, choose Fill in Step 2 and finish the wizard. The stored recipe.mode is fill but operation remains cut. bestRecipeForOperation for the same material's Fill operation returns undefined.",
+    "impact": "The wizard creates an internally inconsistent preset that the current automatic material recipe selector cannot use for either its old or its chosen process. No operation field is offered to repair this in the wizard.",
+    "attribution": "Existing operation is unconditionally retained by the #14 new builder. Automatic selection manifestation depends on later ADR-496 code.",
+    "group": "material-preset-roundtrip",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/early-ui-materials.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/repair-summary.md"
+  },
+  {
+    "id": "CCA-001",
+    "priority": 2,
+    "title": "Append camera preview cache busting outside the proxied camera URL",
+    "originPr": 33,
+    "trigger": "Detect a machine snapshot camera whose successful frame response takes longer than the 1500 ms preview poll (2.2 s in reproduction, below the bridge 10 s timeout).",
+    "impact": "The discovered-machine preview never displays a frame despite successful camera responses. Each tick changes the upstream camera URL, queues a different request, and the browser has superseded that request before its response arrives. Opening the panel can also accumulate extra upstream work.",
+    "attribution": "PR #33 introduced the bridge URL input at MachineCameraSection while retaining NetworkCameraView's pre-existing ?t concatenation. #50 touched this component's click mapping but did not repair the URL composition. Current blame points at a later JSX rewrite; cached #33 patch establishes the integration regression, not initial authorship of the concatenation.",
+    "group": "camera-preview-url",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-02/camera-canvas-arcs.json",
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-02/camera-repair.md"
+  },
+  {
+    "id": "CCA-002",
+    "priority": 2,
+    "title": "Use the grabbed selected node as the drag reference",
+    "originPr": 32,
+    "trigger": "Select node A, Shift-add B so B is primary, then plain-drag already-selected A.",
+    "impact": "The entire selected node set jumps by the separation from B to A. A 1 mm drag of A at x=0 when B is x=10 instead moves A to -9 and B to 1, distorting the path relative to unselected nodes.",
+    "attribution": "The exact conditional and primary-target group translation are introduced in cached PR #32 patches and survive current main. Current blame is 5b226b9abb; historical GitHub head differs because repository history was rewritten.",
+    "group": "selected-node-drag",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-02/camera-canvas-arcs.json",
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-02/node-drag-repair.md"
+  },
+  {
+    "id": "BRP-01",
+    "priority": 2,
+    "title": "Reject a stale board correction after Undo replaces the captured outline",
+    "originPr": 304,
+    "trigger": "Capture a 120 x 80 rectangle over an existing 40 x 40 captured board. Begin bottom-left physical-point correction, then invoke ordinary Undo while setOriginHere is pending. Resolve the origin operation.",
+    "impact": "The 40 x 40 outline restored by Undo is silently resized to 120 x 80 by stale completion and the panel displays success. The pending operation has published old geometry into the restored scene instead of retaining the Undo result or reporting stale ownership.",
+    "attribution": "Mocked origin/jog promises only. No firmware state changed and no hardware ran. This lane found the later descendant bug while reviewing #43; #304 has not received a full PR audit.",
+    "group": "board-correction-ownership",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-02/board-rotary-planner.json",
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-02/board-repair.md"
+  },
+  {
+    "id": "B02-TRACE-001",
+    "priority": 2,
+    "title": "Close the final fairing span at its actual corner",
+    "originPr": 51,
+    "trigger": "A closed measured organic contour with one or more pinned corners reaches fairChainSegments; cyclically shift the equivalent ring to a different first corner or reverse traversal.",
+    "impact": "The final ordinary sample is pinned instead of smoothing the full span back to the corner, leaving traversal-dependent texture/kink near the seam. A 4800-point textured rectangle differs by 0.35840233726637066 source pixels under cyclic rotation.",
+    "attribution": null,
+    "group": "closed-contour-fairing",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-02/trace.json",
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-02/trace-repair.md"
+  },
+  {
+    "id": "B03-CNC-001",
+    "priority": 2,
+    "title": "Use a valid containment witness for concave helical pockets",
+    "originPr": 74,
+    "trigger": "One C-shaped island-free polygon [(0,0),(30,0),(30,6),(6,6),(6,24),(30,24),(30,30),(0,30)]; 2 mm cutter, 40% stepover, helix diameters 1 to 2 mm at 5 degrees, depth -1 mm.",
+    "impact": "The three generated nested C rings are all inside the legal outer boundary, but their area centroid falls in the open notch. The centroid check incorrectly classifies them as multiple/island geometry. The planner returns the island-free-pocket error and the actual source-region caller returns no passes, dropping a geometrically feasible operation.",
+    "attribution": null,
+    "group": "concave-helical-pockets",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-03/cnc-geometry.json",
+    "repairReport": "docs/audits/2026-10-11-pr-history/publication/helical-performance-repair.md",
+    "followUps": [
+      {
+        "title": "Repeated full-boundary scans add material dense-pocket planning cost",
+        "result": "Confirmed on the first repair: eight rings with 2,048 vertices each rose from roughly 1.15 s before repair to 2.38 s. Reusing the boundary index restores roughly 1.12 s while preserving complete plans and full checks for possible contact. A separate deterministic four-ring, 256-vertex regression reduces full predicates from 768 to 3.",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1146#discussion_r4240337078"
+      }
+    ],
+    "followUpAttribution": "The first audit repair added this measured cost. The planner already had quadratic entry-search work; the follow-up does not claim to eliminate that pre-existing worst case or qualify hardware latency."
+  },
+  {
+    "id": "B03-CNC-002",
+    "priority": 2,
+    "title": "Look up manual tab anchors using the source path color",
+    "originPr": 193,
+    "trigger": "An imported red 40 x 40 mm square is explicitly bound to a green named profile operation. Place two anchors at path fractions 0.05 and 0.55, with automatic tabs-per-shape still four; use a 6 mm cut with 3 mm depth steps and 2 mm high, 6 mm wide tabs.",
+    "impact": "The UI stores and displays anchors by the source red path color. Compilation passes the green operation color to objectTabPoints, so both anchors disappear from collected contours and four automatic tabs replace the two chosen positions. Exported holding-tab placement differs from the editor.",
+    "attribution": null,
+    "group": "manual-tabs-binding",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-03/cnc-geometry.json",
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-03/cnc-repairs.md"
+  },
+  {
+    "id": "MTX-001",
+    "priority": 2,
+    "title": "Bind Zero Z acknowledgement to the tool that initiated it",
+    "originPr": 110,
+    "trigger": "Select the 3.175 mm bit after the 6.35 mm bit, begin Zero Z, and use Ctrl+Z before the controller acknowledges G54 G92 Z0. Undo restores the 6.35 mm bit while the original write is pending.",
+    "impact": "The old command records manual-zero evidence for the newly selected 6.35 mm bit. cncWorkZeroToolStartIssue then reports no mismatch for that bit, although it did not own the touch-off. This corrupts tool-specific setup evidence and suppresses the existing Job Review warning; no physical motion or crash was asserted by the probe.",
+    "attribution": "PR #88 created the acknowledged origin transaction callback. The faulty live selectedCncToolId read was added by PR #110 (outside this assigned historical range), whose implementation is a current descendant; no claim that #110 received a complete audit.",
+    "group": "zero-z-owner",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-03/machine-transactions.json",
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-03/zero-z-repair.md"
+  },
+  {
+    "id": "WUX-001",
+    "priority": 2,
+    "title": "Imported-program playback uses the background project timing",
+    "originPr": 80,
+    "trigger": "Open a CNC project containing ordinary artwork, inspect a different external program and choose Open in 2D simulator. Same-geometry F60/F6000 programs both inherit the existing project estimate.",
+    "impact": "Playback and displayed timing describe unrelated project output, hiding external feed timing differences. No emitted program change is asserted.",
+    "attribution": "PR80 introduced estimate-dependent playback; the displayed project estimate mismatch predates PR80 (Workspace estimate call blame 8f24e8d2d5).",
+    "group": "external-program-timing",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-03/workspace-ux.json",
+    "repairReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-repair.md",
+    "followUps": [
+      {
+        "title": "Incremental arc-center declarations unnecessarily disable imported timing",
+        "result": "Explicit incremental arc centers preserve the already-supported route and timing; absolute centers remain unsupported. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361096",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
+        }
+      },
+      {
+        "title": "Pausing a trailing dwell makes Play restart the entire route",
+        "result": "Play resumes remaining trailing dwell and replays only after actual timeline completion. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361100",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
+        }
+      },
+      {
+        "title": "Supported exported dialect words unnecessarily disable imported timing",
+        "result": "Only represented G54, Marlin fan and Smoothieware power words pass the source-model validation and retain timing. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361105",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
+        }
+      },
+      {
+        "title": "Restart during a leading dwell retains elapsed wait time",
+        "result": "An explicit restart revision clears elapsed time even when the scrubber distance is already zero. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361108",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
+        }
+      },
+      {
+        "title": "Same-block dwell is scheduled after motion",
+        "result": "Ordinary G4 executes before same-block motion in both planning boundaries and preview timestamps; existing cycle dwell representation is preserved. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361112",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
+        }
+      },
+      {
+        "title": "Non-finite dwell publishes an infinite estimate and unfinishable playback",
+        "result": "Non-finite totals or segments retain geometry and report timing unavailable instead of publishing an unfinishable timeline. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361117",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
+        }
+      },
+      {
+        "key": "inactive-preview-render-loop",
+        "title": "Clearing inactive preview repeatedly updates state with an unstable scheduler",
+        "result": "Hosted CI exhausted a test worker. The exact unfinished test injects a fresh scheduler; independent capped probes reproduce all three modes. The repair returns the existing already-empty state for the same owner, preserving real owner changes, route clearing and cancellation. The default application scheduler is stable; this is not a claim that every ordinary mount exhausts memory. Independently reviewed and published. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-repair.md",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-review.md",
+        "publishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
+        }
+      },
+      {
+        "key": "same-block-dwell-live-progress",
+        "title": "Live ETA counts an already-completed same-block dwell",
+        "result": "A trusted midpoint after G4 P3 plus motion retained three extra seconds of remaining time. Current-line dwell progress removes the completed wait while preserving exact route boundaries, future and trailing dwells, calibration and serial time.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240671071",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-repair.md",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
+        "publishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
+        }
+      },
+      {
+        "key": "v1-dwell-event-projection",
+        "title": "Parser-only dwell metadata violates the closed executable-plan v1 schema",
+        "result": "Assembly now creates the declared kind/line/seconds dwell shape. Original render-model events retain ordering metadata for internal timing; the v1 schema and exact executable program bytes remain unchanged.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240671073",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-repair.md",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
+        "publishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
+        }
+      }
+    ],
+    "followUpAttribution": "These six cases were reproduced against the first published imported-program timing repair. Their repair remains in the same focused PR; they are not attributed wholesale to historical PR #80. Source and mock playback evidence do not qualify controller hardware. The inactive-clear object update was introduced by this audit repair, and is tracked as a CI follow-up rather than a new historical PR #80 defect. The same-block live-progress and v1 event-projection defects are descendants of this audit repair, not newly attributed historical PR #80 defects.",
+    "previousRepairReports": [
+      "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md",
+      "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-repair.md"
+    ]
+  },
+  {
+    "id": "B03-VAR-001",
+    "priority": 2,
+    "title": "Keep the editable current serial inside the persistence integer domain",
+    "originPr": 58,
+    "trigger": "Enter 10000000000000000 in the current Variable serial input. HTML input validity succeeds and the ordinary React/store edit commits that value.",
+    "impact": "Manual Save preparation and autosave preparation reject variables.serialValue until the operator changes or undoes it. The visible editor accepts state that cannot be persisted; existing files are not overwritten with corrupt data.",
+    "attribution": "The current-value Counter originated in PR #58 (e3fb1903c8); #72 preserved it while adding bounded controls; #1041 (2f3c83ab5a) moved the same lower-bound-only rule to DraftNumberInput. This is not newly introduced by #72.",
+    "group": "variable-counter-bounds",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-03/root-coverage.json",
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-03/variable-counter-repair.md"
+  },
+  {
+    "id": "B04-DIAGNOSTIC-001",
+    "priority": 3,
+    "title": "Opt-in Edge diagnostics use copied settings that differ from the app defaults they claim",
+    "originPr": null,
+    "discoveredDuringPr": 18,
+    "trigger": "Run the Edge smoothness or small-letter diagnostics with TRACE_AUDIT=1 and no operator override.",
+    "impact": "The diagnostic helpers force a 3-pixel minimum instead of the fresh app default of 12, retaining short closed contours that the app drops and undermining their claimed default-path comparisons. This is a developer diagnostic fidelity defect, not a demonstrated application tracing regression.",
+    "attribution": "The two discovery helpers originated at original-history 0f5668c6ff5795addf7bd41e2e27dee26d287d6e (rewritten history 871bb3acd5b9ca3106890603a1595dd1e206c51b), when the preset already used 12 and fresh UI overrides were empty. PR #18 changed only opt-in gating. Independent review identified the same false-current-default copy in _new-problems-audit.test.ts; the explicit historical region-enhancement scenario keeps its inputs.",
+    "group": "trace-diagnostic-defaults",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-04/early-supporting-diffs.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-author.md"
+  }
+]

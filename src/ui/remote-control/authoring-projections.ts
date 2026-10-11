@@ -20,10 +20,14 @@ export function workspaceReadProjection(state: AppState, options: RemoteControlO
       return { ...item, ...(transformBounds === undefined ? {} : { transformBounds }) };
     }),
     history: historyProjection(state),
+    // ADR-584: touch creation works in both modes; `saved` reveals only whether a file exists.
     capabilities: {
-      touchEditing: state.project.machine?.kind !== 'cnc',
+      touchEditing: true,
       groupTransformBounds: true,
+      scene: true,
+      designControl: true,
     },
+    saved: { hasFile: state.lastSaveTarget !== null },
     permissions: {
       canEdit: options.canWrite() && options.canEdit?.() !== false && state.pendingUndo === null,
       artworkSharingEnabled: options.canShareArtwork?.() === true,

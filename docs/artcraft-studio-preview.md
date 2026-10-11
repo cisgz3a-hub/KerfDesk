@@ -1,6 +1,6 @@
 # Desktop studio preview
 
-> Current direction (ADR-584): improve KerfDesk's own Design Studio. The hosted
+> Current direction (ADR-590): improve KerfDesk's own Design Studio. The hosted
 > editor replacement was rejected after the quality review. Open Design Studio
 > directly for labelled tools, docked properties, shape selection and alignment.
 > The launcher below now opens that preview without requiring native editor
@@ -111,7 +111,7 @@ normal KerfDesk installer or authorise a public bundled release. The upstream
 core has an MIT licence option, but dependencies, bundled fonts/assets, notices
 and branding still need a distribution review. KerfDesk retains its own licence.
 
-See [ADR-582](decisions/ADR-582-desktop-artcraft-studio-preview.md) for the
+See [ADR-588](decisions/ADR-588-desktop-artcraft-studio-preview.md) for the
 architecture and the pinned upstream protocol sources.
 
 

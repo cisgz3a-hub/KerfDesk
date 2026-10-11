@@ -142,10 +142,9 @@ export const DESIGN_TOOLS: ReadonlyArray<DesignToolDefinition> = [
     kind: 'extend',
     rail: 'modify',
     label: 'Extend',
-    hint: 'Click an open end to run it out to the next edge.',
+    hint: 'Hover an open straight end to preview, then click to extend to the first boundary. Undo restores it.',
     shortcut: 'e',
     needsSelection: false,
-    planned: true,
   },
   {
     kind: 'fillet',

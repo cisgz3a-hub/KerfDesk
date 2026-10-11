@@ -1,8 +1,8 @@
-# ADR-584: Improve KerfDesk's own studio and adapt selected upstream algorithms
+## ADR-590 - Improve KerfDesk's own studio and adapt selected upstream algorithms
 
 Date: 2026-10-11
 Status: Implemented locally; rendered and packaged qualification recorded separately
-Amends: ADR-582 and ADR-583 replacement direction
+Amends: ADR-588 and ADR-589 replacement direction
 
 The maintainer rejected the hosted full-editor experience and prioritised the
 layout and ease of use of KerfDesk's own studio. Development returns to the

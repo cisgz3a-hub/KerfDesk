@@ -1,4 +1,4 @@
-## ADR-582 - Connect full desktop editors through an explicit local studio preview
+## ADR-588 - Connect full desktop editors through an explicit local studio preview
 
 Date: 2026-10-11
 Status: Accepted for local desktop preview; distribution qualification pending

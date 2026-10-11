@@ -26,6 +26,18 @@ import {
 import { remoteDeliveryResult, releaseRemoteDelivery } from './renderer-delivery';
 import { createRendererMachineAuthorities } from './renderer-machine-authority';
 import type { MachineAuthority } from '../remote-control/machine-types';
+import type { PlatformAdapter } from '../../platform/types';
+import { createRemoteChangeObserver } from './remote-change-observer';
+
+const SHARED_ARTWORK_READS = new Set([
+  'get_workspace_preview',
+  'get_workspace_scene',
+  'get_camera_snapshot',
+  'get_text',
+]);
+/** Normal command polling; a held jog polls faster so heartbeats reach the dead-man promptly. */
+const POLL_MS = 350;
+const HOLD_POLL_MS = 80;
 
 type RequestEnvelope = {
   id: string;
@@ -58,18 +70,31 @@ function validRequest(value: unknown): value is RequestEnvelope {
     object(value.args)
   );
 }
-function validPoll(value: unknown): value is {
+type HoldBeat = { clientId: string; operationId: string };
+type PollResult = {
   requests: RequestEnvelope[];
   cancelled: string[];
   status: RemoteAccessStatus;
-} {
+  beats?: HoldBeat[];
+  releases?: string[];
+};
+const shortId = (id: unknown) => typeof id === 'string' && id.length <= 128;
+/** An optional list of at most 64 items that each pass `valid`. */
+function optionalList(value: unknown, valid: (item: unknown) => boolean): boolean {
+  return value === undefined || (Array.isArray(value) && value.length <= 64 && value.every(valid));
+}
+const validBeat = (beat: unknown) =>
+  object(beat) && shortId(beat.clientId) && shortId(beat.operationId);
+function validPoll(value: unknown): value is PollResult {
   if (!object(value) || !Array.isArray(value.requests) || !Array.isArray(value.cancelled))
     return false;
   return (
     value.requests.length <= 1 &&
     value.requests.every(validRequest) &&
     value.cancelled.length <= 64 &&
-    value.cancelled.every((id) => typeof id === 'string' && id.length <= 128) &&
+    value.cancelled.every(shortId) &&
+    optionalList(value.beats, validBeat) &&
+    optionalList(value.releases, shortId) &&
     isRemoteAccessStatus(value.status)
   );
 }
@@ -92,13 +117,15 @@ export class RemoteRendererSession {
   private readonly observeAuthorities = useRemoteAccessStore.subscribe(() =>
     this.authorities.observe(),
   );
-  constructor() {
+  private readonly changes: ReturnType<typeof createRemoteChangeObserver>;
+  constructor(platform: PlatformAdapter | null = null) {
     this.options = {
       canWrite: () => this.canWrite(),
       canEdit: () => useStore.getState().pendingUndo === null,
       getAppStatus: remoteAppStatus,
       canShareArtwork: () => !this.stopped && artworkSharingEnabled(),
       getReview: preparedJobReview,
+      getPlatform: () => platform,
       captureMachineAuthority: () => this.active?.machineAuthority ?? null,
       getRemoteCaller: () =>
         this.session === null || this.active === null
@@ -106,6 +133,7 @@ export class RemoteRendererSession {
           : { clientId: this.active.clientId, sessionId: this.session },
     };
     this.adapter = createRemoteControlAdapter(this.options);
+    this.changes = createRemoteChangeObserver(() => this.adapter.getRevision());
     window.addEventListener(REMOTE_REVOKE_EVENT, this.revoke);
     window.addEventListener(ARTWORK_SHARING_EVENT, this.sharingChanged);
     window.addEventListener('storage', this.sharingStorageChanged);
@@ -125,6 +153,7 @@ export class RemoteRendererSession {
   private revoke = (event: Event): void => {
     const detail: unknown = (event as CustomEvent<unknown>).detail;
     const clientId = object(detail) && typeof detail.clientId === 'string' ? detail.clientId : null;
+    this.adapter.holdRelease?.(clientId);
     this.authorities.revoke(clientId);
     for (const request of this.requests.values())
       if (clientId === null || request.clientId === clientId) request.controller.abort();
@@ -211,15 +240,18 @@ export class RemoteRendererSession {
       clientId: request.clientId,
       canWrite: request.canWrite,
       machineAuthority: this.authorities.capture(owner, request.clientId, request.canControl),
-      sharesArtwork: request.command === 'get_workspace_preview' || request.command === 'get_text',
+      sharesArtwork: SHARED_ARTWORK_READS.has(request.command),
       controller: new AbortController(),
     };
     this.requests.set(request.id, current);
-    if (request.command === 'abort_job') void this.run(request, owner, current, true);
+    // Abort and held-jog stops never wait behind an ordinary request.
+    if (request.command === 'abort_job' || request.command === 'jog_hold_stop')
+      void this.run(request, owner, current, true);
     else this.work = this.work.then(() => this.run(request, owner, current));
   }
   private lostConnection(owner: string): void {
     if (!this.owns(owner)) return;
+    this.adapter.holdRelease?.(null);
     for (const request of this.requests.values()) request.controller.abort();
     this.authorities.dispose();
     this.ui.disconnected(
@@ -231,20 +263,27 @@ export class RemoteRendererSession {
     const owner = this.session;
     if (this.stopped || owner === null) return;
     try {
-      const value = await remoteRequest('poll', {}, owner);
+      const value = await remoteRequest('poll', this.changes.take(), owner);
       if (!this.owns(owner)) return;
       if (!validPoll(value)) throw new Error('Invalid remote response.');
       this.ui.publish(value.status, owner);
+      this.applyHoldSignals(value);
       for (const id of value.cancelled) this.requests.get(id)?.controller.abort();
       for (const request of value.requests) this.schedule(request, owner);
     } catch {
       this.lostConnection(owner);
       return;
     }
-    if (!this.stopped)
-      this.timer = setTimeout(() => {
-        void this.poll();
-      }, 350);
+    if (!this.stopped) this.timer = setTimeout(() => void this.poll(), this.pollDelay());
+  }
+  /** Releases first, so a stale heartbeat cannot re-arm a hold its client just released. */
+  private applyHoldSignals(value: PollResult): void {
+    for (const clientId of value.releases ?? [])
+      this.adapter.holdRelease?.(clientId === '*' ? null : clientId);
+    for (const beat of value.beats ?? []) this.adapter.holdBeat?.(beat.clientId, beat.operationId);
+  }
+  private pollDelay(): number {
+    return this.adapter.holdActive?.() === true ? HOLD_POLL_MS : POLL_MS;
   }
   stop(): void {
     this.stopped = true;
@@ -252,6 +291,7 @@ export class RemoteRendererSession {
     for (const request of this.requests.values()) request.controller.abort();
     this.authorities.dispose();
     this.observeAuthorities();
+    this.changes.dispose();
     this.adapter.dispose();
     window.removeEventListener(REMOTE_REVOKE_EVENT, this.revoke);
     window.removeEventListener(ARTWORK_SHARING_EVENT, this.sharingChanged);

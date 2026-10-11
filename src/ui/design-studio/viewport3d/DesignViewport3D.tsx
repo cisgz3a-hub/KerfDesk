@@ -123,6 +123,12 @@ function useViewportSurface(scene: ReturnType<typeof useDesignViewportScene>): D
         return handle.pointerToSceneMm(event.clientX - rect.left, event.clientY - rect.top);
       },
       pxPerMm: () => scene.handleRef.current?.pxPerMmAtTarget() ?? 1,
+      toClient: (point) => {
+        const pixel = scene.handleRef.current?.sceneMmToViewport(point);
+        const rect = scene.canvasRef.current?.getBoundingClientRect();
+        if (pixel == null || rect === undefined) return null;
+        return { x: pixel.x + rect.left, y: pixel.y + rect.top };
+      },
     }),
     [scene.handleRef, scene.canvasRef],
   );
@@ -147,6 +153,7 @@ function useOverlaySync(
           draft: session.draft,
           pointSequence: session.pointSequence,
           snapMm: session.activeSnap?.atMm ?? null,
+          extendPreview: session.tool === 'extend' ? session.extendPreview : null,
           frame,
         }),
       );
@@ -174,6 +181,7 @@ function useOverlaySync(
         draft: session.draft,
         pointSequence: session.pointSequence,
         snapMm: session.activeSnap?.atMm ?? null,
+        extendPreview: session.tool === 'extend' ? session.extendPreview : null,
         frame,
       }),
     );

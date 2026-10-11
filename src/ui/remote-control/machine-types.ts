@@ -31,7 +31,28 @@ export type MachineCommand =
       readonly command: 'start_job';
       readonly args: MachineAdmission & { readonly reviewId: string };
     }
-  | { readonly command: 'abort_job'; readonly args: { readonly requestId: string } };
+  | { readonly command: 'abort_job'; readonly args: { readonly requestId: string } }
+  | {
+      readonly command: 'connect_machine' | 'disconnect_machine' | 'home_machine';
+      readonly args: MachineAdmission;
+    }
+  | {
+      readonly command: 'set_work_origin';
+      readonly args: MachineAdmission & { readonly axes: 'xy' | 'z' };
+    }
+  | { readonly command: 'pause_job' | 'resume_job'; readonly args: { readonly requestId: string } }
+  | {
+      readonly command: 'jog_hold_start';
+      readonly args: MachineAdmission & {
+        readonly axis: 'x' | 'y' | 'z';
+        readonly direction: -1 | 1;
+        readonly feedMmPerMin?: number;
+      };
+    }
+  | {
+      readonly command: 'jog_hold_stop';
+      readonly args: { readonly requestId: string; readonly operationId: string };
+    };
 export type MachineAdmission = { readonly expectedRevision: string; readonly requestId: string };
 export type MachineReviewPageRequest = { readonly reviewId: string; readonly offset: number };
 export type MachineOperationState =
@@ -71,9 +92,21 @@ export type MachineReview = {
   readonly acknowledgement: JobReviewModel['acknowledgement'];
   readonly frame: { readonly required: true; readonly complete: boolean };
 };
+export type MachineOperationKind =
+  | 'jog'
+  | 'frame'
+  | 'job'
+  | 'abort'
+  | 'connect'
+  | 'disconnect'
+  | 'home'
+  | 'origin'
+  | 'pause'
+  | 'resume'
+  | 'hold';
 export type MachineOperation = {
   readonly operationId: string;
-  readonly kind: 'jog' | 'frame' | 'job' | 'abort';
+  readonly kind: MachineOperationKind;
   readonly state: MachineOperationState;
   readonly revision: string;
   readonly committed: boolean | null;

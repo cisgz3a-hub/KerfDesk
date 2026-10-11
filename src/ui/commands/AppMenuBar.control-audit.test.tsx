@@ -110,6 +110,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.exclude': { callback: 'excludeSelection' },
   'tools.cut-shapes': { callback: 'cutShapes' },
   'tools.trim-shapes': { callback: 'trimShapes' },
+  'tools.extend-shapes': { callback: 'extendShapes' },
   'tools.convert-to-bitmap': { callback: 'convertToBitmap' },
   'tools.fill-selection': { callback: 'fillSelectionSeparately' },
   'tools.close-open-fill-contours': { callback: 'closeSelectedOpenFillContours' },

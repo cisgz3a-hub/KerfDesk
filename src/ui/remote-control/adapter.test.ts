@@ -233,23 +233,29 @@ describe('remote renderer uses the real authoring store', () => {
     ).toBe('not_editable');
   });
 
-  it('refuses CNC creation/settings without changing the workspace, but edits existing CNC art', async () => {
+  it('creates CNC artwork (ADR-584) but refuses Laser-only settings on a CNC operation', async () => {
     const id = await rectangle();
     useStore.setState({
       project: { ...useStore.getState().project, machine: DEFAULT_CNC_MACHINE_CONFIG },
     });
     const project = useStore.getState().project;
-    const writes = [
-      ['add_rectangle', { xMm: 1, yMm: 2, widthMm: 3, heightMm: 4 }],
-      ['add_text', { xMm: 1, yMm: 2, widthMm: 3, text: 'CNC', fontSizeMm: 5 }],
-      [
-        'update_operation',
-        { operationId: project.scene.layers[0]!.id, patch: { powerPercent: 7 } },
-      ],
-    ] as const;
-    for (const [command, value] of writes)
-      expect(code(await adapter.execute(command, args(value)))).toBe('unsupported_operation');
+    expect(
+      code(
+        await adapter.execute(
+          'update_operation',
+          args({ operationId: project.scene.layers[0]!.id, patch: { powerPercent: 7 } }),
+        ),
+      ),
+    ).toBe('unsupported_operation');
     expect(useStore.getState().project).toBe(project);
+    expect(
+      code(
+        await adapter.execute('add_rectangle', args({ xMm: 1, yMm: 2, widthMm: 3, heightMm: 4 })),
+      ),
+    ).toBe('ok');
+    expect(useStore.getState().project.scene.objects).toHaveLength(2);
+    expect(code(await adapter.execute('undo', args({})))).toBe('ok');
+    expect(useStore.getState().project.scene.objects).toHaveLength(1);
     expect(
       code(
         await adapter.execute(

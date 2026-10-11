@@ -23,6 +23,7 @@ import type { SnapTarget } from '../../core/design/snap';
 import type { MeasurementKey } from './design-entity-fields';
 import type { DesignToolKind } from './design-tool';
 import type { DesignPointSequence } from './design-point-sequence';
+import type { SketchExtension } from '../../core/design/ops/extend-sketch';
 
 export type DesignView = {
   readonly pxPerMm: number;
@@ -57,6 +58,7 @@ export type DesignSession = {
   // null until the canvas has measured itself and framed the bed.
   readonly view: DesignView | null;
   readonly cursorMm: Vec2 | null;
+  readonly extendPreview: SketchExtension | null;
   // In-progress gesture. Deliberately OUTSIDE history: a draft is not a state
   // worth undoing, only the entity it commits to is.
   readonly draft: DesignDraft | null;
@@ -112,6 +114,7 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
     selectedIds: new Set<string>(),
     view: null,
     cursorMm: null,
+    extendPreview: null,
     draft: null,
     pointSequence: null,
     marquee: null,
@@ -163,6 +166,7 @@ export function withSketch(session: DesignSession, next: Sketch): DesignSession 
   return withValidActiveLayer({
     ...session,
     history: commitSketch(session.history, next),
+    extendPreview: null,
     selectedIds: retainedSelection(session.selectedIds, next),
     dirtySinceApply: true,
   });
@@ -196,6 +200,7 @@ export function undoSession(session: DesignSession): DesignSession {
   return withValidActiveLayer({
     ...session,
     history,
+    extendPreview: null,
     selectedIds: retainedSelection(session.selectedIds, history.present),
     dirtySinceApply: true,
   });
@@ -207,6 +212,7 @@ export function redoSession(session: DesignSession): DesignSession {
   return withValidActiveLayer({
     ...session,
     history,
+    extendPreview: null,
     selectedIds: retainedSelection(session.selectedIds, history.present),
     dirtySinceApply: true,
   });

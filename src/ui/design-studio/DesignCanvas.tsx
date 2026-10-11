@@ -193,6 +193,7 @@ function useLayerPaint(
         measuredEntity: measured.entity,
         measuredField: measured.field,
         snap: session.activeSnap,
+        extendPreview: session.tool === 'extend' ? session.extendPreview : null,
         widthPx,
         heightPx,
       });

@@ -77,6 +77,8 @@ import {
   transformSelection,
   type DesignTransformKind,
 } from '../../core/design/ops/transform-selection';
+import { findSketchExtension } from '../../core/design/ops/extend-sketch';
+import { extendSessionAt } from './design-extend';
 
 type DesignStudioState = {
   readonly documentEpoch: number;
@@ -88,6 +90,16 @@ type DesignStudioState = {
   readonly setTool: (tool: DesignToolKind) => void;
   readonly setView: (view: DesignView) => void;
   readonly setCursorMm: (point: Vec2 | null) => void;
+  readonly previewExtension: (
+    point: Vec2,
+    tolerance: number,
+    distanceToEndpoint?: (endpoint: Vec2) => number,
+  ) => void;
+  readonly extendAt: (
+    point: Vec2,
+    tolerance: number,
+    distanceToEndpoint?: (endpoint: Vec2) => number,
+  ) => void;
   readonly setActiveSnap: (target: SnapTarget | null) => void;
   readonly setSelection: (ids: ReadonlyArray<string>) => void;
   readonly selectAll: () => void;
@@ -160,7 +172,7 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
 
   setTool: (tool) => set(mapSession((session) => setSessionTool(session, tool))),
   setView: (view) => set(mapSession((session) => ({ ...session, view }))),
-  setCursorMm: (cursorMm) => set(mapSession((session) => ({ ...session, cursorMm }))),
+  ...extendCursorActions(set),
   setActiveSnap: (activeSnap) => set(mapSession((session) => ({ ...session, activeSnap }))),
   ...selectionActions(set),
 
@@ -291,6 +303,35 @@ function selectionActions(
           ),
         ),
       ),
+  };
+}
+
+function extendCursorActions(
+  set: (change: (state: DesignStudioState) => Partial<DesignStudioState>) => void,
+): Pick<DesignStudioState, 'setCursorMm' | 'previewExtension' | 'extendAt'> {
+  return {
+    setCursorMm: (cursorMm) =>
+      set(
+        mapSession((session) => ({
+          ...session,
+          cursorMm,
+          ...(cursorMm === null ? { extendPreview: null } : {}),
+        })),
+      ),
+    previewExtension: (point, tolerance, distanceToEndpoint) =>
+      set(
+        mapSession((session) => ({
+          ...session,
+          extendPreview: findSketchExtension(
+            session.history.present,
+            point,
+            tolerance,
+            distanceToEndpoint,
+          ),
+        })),
+      ),
+    extendAt: (point, tolerance, distanceToEndpoint) =>
+      set(mapSession((session) => extendSessionAt(session, point, tolerance, distanceToEndpoint))),
   };
 }
 

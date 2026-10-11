@@ -1,8 +1,8 @@
-## ADR-583 - Host full native editors in one project-owned desktop studio
+## ADR-589 - Host full native editors in one project-owned desktop studio
 
 Date: 2026-10-11
 Status: Accepted for local Windows desktop preview
-Amends: ADR-582 companion-window and nonportable project boundaries
+Amends: ADR-588 companion-window and nonportable project boundaries
 
 ### Decision
 
@@ -61,11 +61,11 @@ are not implicitly bound; use project document controls. The full native documen
 is embedded, but external linked resources, installed fonts and broad feature
 fidelity still need qualification. Apply currently supports one vector artboard
 and flattened photo output. Native layer editing remains inside its respective
-editor, with separate undo histories. ADR-582's local control-protocol and
+editor, with separate undo histories. ADR-588's local control-protocol and
 redistribution/licence limitations still apply.
 
 ### Primary references
 
 - [Microsoft SetParent](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setparent)
 - [Electron BrowserWindow native handle](https://www.electronjs.org/docs/latest/api/browser-window)
-- [ADR-582](ADR-582-desktop-artcraft-studio-preview.md)
+- [ADR-588](ADR-588-desktop-artcraft-studio-preview.md)

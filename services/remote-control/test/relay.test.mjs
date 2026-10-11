@@ -27,6 +27,8 @@ const readTools = [
   'get_workspace_preview',
   'list_fonts',
   'get_text',
+  'get_workspace_scene',
+  'wait_for_change',
   'get_machine_status',
   'get_control_operation',
 ];
@@ -42,28 +44,62 @@ const editTools = [
   'arrange_artwork',
   'undo',
   'redo',
+  'create_operation',
+  'assign_artwork_to_operation',
+  'reorder_operation',
+  'delete_operation',
+  'apply_material_recipe',
+  'add_svg',
+  'import_file',
+  'save_project',
+  'apply_edits',
 ];
-const controlTools = ['jog_machine', 'frame_job', 'review_machine_job', 'start_job', 'abort_job'];
+const controlTools = [
+  'jog_machine',
+  'frame_job',
+  'review_machine_job',
+  'start_job',
+  'abort_job',
+  'connect_machine',
+  'disconnect_machine',
+  'home_machine',
+  'set_work_origin',
+  'pause_job',
+  'resume_job',
+];
+// ADR-585: control-approved but read-only (no ledger); held jogs are phone-only, never MCP tools.
+const controlReadTools = ['get_camera_snapshot'];
+const nonDestructiveEdits = [
+  'set_selection',
+  'add_text',
+  'add_rectangle',
+  'add_ellipse',
+  'add_polyline',
+  'add_svg',
+  'import_file',
+  'create_operation',
+  'save_project',
+];
 
 function assertToolCatalogue(tools) {
-  assert.equal(tools.length, 26);
-  assert.deepEqual(
-    tools.map((tool) => tool.name).sort(),
-    [...readTools, ...editTools, ...controlTools].sort(),
-  );
+  const expected = [...readTools, ...editTools, ...controlTools, ...controlReadTools];
+  assert.equal(tools.length, expected.length);
+  assert.deepEqual(tools.map((tool) => tool.name).sort(), expected.sort());
   for (const tool of tools) {
-    const readOnly = readTools.includes(tool.name);
+    const controlRead = controlReadTools.includes(tool.name);
+    const readOnly = readTools.includes(tool.name) || controlRead;
     const control = controlTools.includes(tool.name);
     assert.deepEqual(
       tool._meta?.securitySchemes,
       [
         {
           type: 'oauth2',
-          scopes: control
-            ? ['kerfdesk:read', 'kerfdesk:control']
-            : readOnly
-              ? ['kerfdesk:read']
-              : ['kerfdesk:read', 'kerfdesk:edit'],
+          scopes:
+            control || controlRead
+              ? ['kerfdesk:read', 'kerfdesk:control']
+              : readOnly
+                ? ['kerfdesk:read']
+                : ['kerfdesk:read', 'kerfdesk:edit'],
         },
       ],
       `${tool.name} OAuth scopes`,
@@ -72,12 +108,7 @@ function assertToolCatalogue(tools) {
       tool.annotations,
       {
         readOnlyHint: readOnly,
-        destructiveHint:
-          control ||
-          (!readOnly &&
-            !['set_selection', 'add_text', 'add_rectangle', 'add_ellipse', 'add_polyline'].includes(
-              tool.name,
-            )),
+        destructiveHint: control || (!readOnly && !nonDestructiveEdits.includes(tool.name)),
         idempotentHint: readOnly,
         openWorldHint: false,
       },
@@ -91,7 +122,7 @@ test('real workerd: fixed origin, small metadata, no bearer URLs, no machine rou
   try {
     const health = await worker.dispatchFetch(`${ORIGIN}/health`);
     assert.equal(health.status, 200);
-    assert.equal((await health.json()).protocol, 1);
+    assert.equal((await health.json()).protocol, 2);
     assert.equal(health.headers.get('Cache-Control'), 'no-store, no-transform');
     assert.match(health.headers.get('Content-Security-Policy'), /frame-ancestors 'none'/);
     assert.equal((await worker.dispatchFetch('https://foreign.example/health')).status, 403);

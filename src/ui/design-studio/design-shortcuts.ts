@@ -123,7 +123,8 @@ function handleViewToggle(
 }
 
 // Six rungs, smallest retreat first: discard the live click sequence, then the
-// live draft, marquee, selection, tool, and finally close. Esc
+// live draft, marquee, selection, tool, and finally close. Extend disarms before
+// clearing selection because its documented Escape action ends the click tool. Esc
 // never destroys more than the operator expected — and unlike the main
 // workspace's draw tool, an abandoned draft here is genuinely discarded rather
 // than committed on the following pointer-up.
@@ -141,6 +142,11 @@ function handleEscapeLadder(): void {
   }
   if (session.marquee !== null) {
     store.setMarquee(null);
+    return;
+  }
+  // Extend is a click tool: one Escape always disarms it, retaining the selection.
+  if (session.tool === 'extend') {
+    store.setTool('select');
     return;
   }
   if (session.selectedIds.size > 0) {
