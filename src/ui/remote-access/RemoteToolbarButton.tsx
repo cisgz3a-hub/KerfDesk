@@ -65,6 +65,17 @@ function RemoteToolbarControl(): JSX.Element {
         title={`Phone & MCP: ${summary.text}`}
         data-remote-state={summary.tone}
         onClick={() => setOpen((value) => !value)}
+        onBlur={(event) => {
+          const next = event.relatedTarget;
+          if (!(next instanceof Node) || !document.getElementById(panelId)?.contains(next)) close();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && open) {
+            event.preventDefault();
+            event.stopPropagation();
+            close();
+          }
+        }}
       >
         <span className="lf-remote-toolbar-icon">
           <ToolbarIcon icon="remote" />
@@ -79,6 +90,7 @@ function RemoteToolbarControl(): JSX.Element {
           role="dialog"
           anchorRef={triggerRef}
           className="lf-remote-panel"
+          initialFocus={'[role="switch"]:not(:disabled), button:not(:disabled)'}
           focusFallbackId={triggerId}
           closeOnTab={false}
           onClose={close}
