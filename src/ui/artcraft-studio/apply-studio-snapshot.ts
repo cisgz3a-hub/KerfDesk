@@ -4,6 +4,7 @@ import { useStore } from '../state';
 import type { AppState, ImportOutcome } from '../state/store';
 import { objectInsertActions } from '../state/object-insert-actions';
 import { imageImportActions } from '../state/import-actions';
+import { projectWithRefreshedReliefLinks } from '../state/relief-link-mutation';
 import { pushUndo } from '../state/undo-stack';
 import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 import { useToastStore } from '../state/toast-store';
@@ -80,7 +81,7 @@ function commitArtwork(
   if (useStore.getState().project !== state.project)
     throw new Error('The project changed while applying artwork.');
   useStore.setState({
-    project: staged.project,
+    project: projectWithRefreshedReliefLinks(staged.project),
     selectedObjectId: staged.selectedObjectId,
     additionalSelectedIds: staged.additionalSelectedIds,
     undoStack: pushUndo(state.project, state.undoStack, 'Apply studio artwork'),

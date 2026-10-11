@@ -2,11 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as studioValidator from '../../io/project/project-studio-document-validator';
 import { studioDocument } from '../../io/project/studio-document.test-fixture';
 import {
+  testAuthoringRelief,
+  testLinkedReliefDocument,
+  testMaterializedRelief,
+  testReliefBoundary,
+} from '../../__fixtures__/relief-authoring';
+import {
   bindStudioSession,
   disposeStudioProjectBridge,
   getStudioBinding,
 } from './studio-project-bridge';
-import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
+import { IDENTITY_TRANSFORM, type Project, type RasterImage } from '../../core/scene';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { dispatchImportFilesInOrder, type ImportDispatchActions } from '../app/import-dispatch';
@@ -26,6 +32,13 @@ const snapshot: StudioSnapshot = {
 let nextContent = '#000000';
 let beforeCommit: (() => void) | undefined;
 
+function retainedRelief(project: Project, id: string) {
+  const object = project.scene.objects.find((candidate) => candidate.id === id);
+  if (object?.kind !== 'relief' || object.reliefSource.kind !== 'heightfield-v1')
+    throw new Error('Missing retained relief');
+  return object;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
@@ -44,6 +57,74 @@ afterEach(() => {
 });
 
 describe('desktop editor artwork handoff', () => {
+  it('refreshes retained relief when native SVG reapply restores a component placement', async () => {
+    const native = studioDocument();
+    const source = snapshotFile(snapshot).name;
+    const svgImport = {
+      id: 'composition',
+      source,
+      transform: IDENTITY_TRANSFORM,
+      mode: 'line' as const,
+    };
+    const anchor = { ...testReliefBoundary('anchor', 1), source, svgImport };
+    const boundary = { ...testReliefBoundary(), source, svgImport };
+    const original = testAuthoringRelief();
+    const document = testLinkedReliefDocument(original);
+    const relief = {
+      ...original,
+      reliefAuthoring: document,
+      reliefSource: testMaterializedRelief(document),
+    };
+    const project = useStore.getState().project;
+    useStore.setState({
+      project: {
+        ...project,
+        studioDocuments: [native],
+        scene: {
+          ...project.scene,
+          objects: [anchor, boundary, testReliefBoundary('mask'), relief],
+        },
+      },
+    });
+    // A workspace edit narrows just this component. Reapplying unchanged source
+    // retains its ID and restores its placement relative to the first component.
+    useStore.getState().setObjectTransform(boundary.id, { ...IDENTITY_TRANSFORM, scaleX: 0.5 });
+    useStore.setState({ undoStack: [], redoStack: [] });
+    bindStudioSession(
+      {
+        id: snapshot.id,
+        documentId: native.id,
+        editor: snapshot.editor,
+        title: 'Artwork',
+        running: true,
+      },
+      0,
+    );
+    vi.mocked(dispatchImportFilesInOrder).mockImplementation(async (_files, actions) => {
+      const incoming = [testReliefBoundary('exported-anchor', 1), testReliefBoundary('exported')];
+      actions.importSvgFragment!({ source, bounds: boundary.bounds, objects: incoming });
+    });
+    const before = useStore.getState().project;
+    const prior = retainedRelief(before, relief.id);
+    await applyStudioSnapshot(
+      { ...snapshot, nativeDocument: { ...native, title: 'Reapplied composition' } },
+      0,
+    );
+    const after = useStore.getState().project;
+    const changed = retainedRelief(after, relief.id);
+    expect(after.scene.objects.find((object) => object.id === boundary.id)?.transform.scaleX).toBe(
+      1,
+    );
+    expect(changed.reliefAuthoring?.revision).toBe((prior.reliefAuthoring?.revision ?? 0) + 1);
+    expect(changed.reliefSource.revision).toBe(changed.reliefAuthoring?.revision);
+    expect(changed.reliefSource.samplesBase64).not.toBe(prior.reliefSource.samplesBase64);
+    expect(after.studioDocuments?.[0]?.title).toBe('Reapplied composition');
+    expect(useStore.getState().undoStack).toEqual([before]);
+    useStore.getState().undo();
+    expect(useStore.getState().project).toBe(before);
+    useStore.getState().redo();
+    expect(useStore.getState().project).toBe(after);
+  });
   it('commits frozen native source and artwork in one notification and one Undo step', async () => {
     const native = studioDocument();
     const session = {
