@@ -5,7 +5,10 @@ import {
   manualDownloadKey,
   verifyManualDownload,
 } from '../public/desktop-manual-download.mjs';
-import { verifyCommercialCatalog } from '../public/desktop-commercial-catalog.mjs';
+import {
+  compareCommercialVersions,
+  verifyCommercialCatalog,
+} from '../public/desktop-commercial-catalog.mjs';
 import { digest, verifyCommercialEnvelope } from './commercial-release-manifest.mjs';
 import { MANUAL_CATALOG_KEY, verifyManualCatalog } from '../public/desktop-manual-catalog.mjs';
 import { manualDownloadPayload, signManualDownload } from './manual-commercial-manifest.mjs';
@@ -108,13 +111,38 @@ function nextRelease(f, version) {
   };
 }
 
+function reviewedHistory(f, abandoned = []) {
+  const latest = JSON.parse(
+    Buffer.from(JSON.parse(f.objects.get(MANUAL_DOWNLOAD_LATEST_KEY)).payload, 'base64'),
+  );
+  return {
+    schemaVersion: 1,
+    expectedLatestSha256: digest(f.objects.get(MANUAL_DOWNLOAD_LATEST_KEY)),
+    entries: [...f.objects.entries()]
+      .filter(([key]) => key.endsWith('/download-manifest.json'))
+      .map(([, bytes]) => {
+        const { version } = JSON.parse(Buffer.from(JSON.parse(bytes).payload, 'base64'));
+        return {
+          version,
+          manifestSha256: digest(bytes),
+          status: abandoned.includes(version) ? 'abandoned' : 'published',
+          evidence: `Synthetic reviewed publication receipt for ${version}`,
+        };
+      })
+      .filter(({ version }) => compareCommercialVersions(version, latest.version) <= 0),
+  };
+}
+
 test('the first history publication backfills immutable releases and retains every covered installer', async () => {
   const f = fixture('1.2.3');
   await publishManualCommercialRelease(f);
   await publishManualCommercialRelease(nextRelease(f, '1.9.0'));
   // Model an existing deployment whose old publisher never wrote this index.
   f.objects.delete(MANUAL_CATALOG_KEY);
-  await publishManualCommercialRelease(nextRelease(f, '1.10.0'));
+  await publishManualCommercialRelease({
+    ...nextRelease(f, '1.10.0'),
+    reviewedHistory: reviewedHistory(f),
+  });
   assert.deepEqual(await historyVersions(f), ['1.10.0', '1.9.0', '1.2.3']);
   const archived = await verifyManualCatalog(
     f.objects.get(MANUAL_CATALOG_KEY).toString(),
@@ -143,12 +171,94 @@ test('a legacy latest can gain history on an identical retry without rewriting i
   await publishManualCommercialRelease(f);
   f.objects.delete(MANUAL_CATALOG_KEY);
   const count = f.writes.length;
-  assert.equal((await publishManualCommercialRelease(f)).status, 'already-published');
+  assert.equal(
+    (await publishManualCommercialRelease({ ...f, reviewedHistory: reviewedHistory(f) })).status,
+    'already-published',
+  );
   assert.deepEqual(
     f.writes.slice(count).map(({ key }) => key),
     [MANUAL_CATALOG_KEY],
   );
   assert.deepEqual(await historyVersions(f), ['1.2.3']);
+});
+
+test('legacy backfill requires reviewed promotion evidence and excludes an older abandoned upload', async () => {
+  const f = fixture('1.2.3');
+  await publishManualCommercialRelease(f);
+  const put = f.store.put;
+  f.store.put = async (key, bytes, metadata) => {
+    await put(key, bytes, metadata);
+    if (key === MANUAL_CATALOG_KEY) throw new Error('Interrupted before latest');
+  };
+  await assert.rejects(publishManualCommercialRelease(nextRelease(f, '1.2.4')), /Interrupted/u);
+  f.store.put = put;
+  await publishManualCommercialRelease(nextRelease(f, '1.2.5'));
+  // An abandoned legacy attempt may also have left only part of its upload plan.
+  f.objects.delete(manualDownloadKey('1.2.4', 'KerfDesk-1.2.4-windows-x64-setup.exe'));
+  f.objects.delete(MANUAL_CATALOG_KEY);
+  const next = nextRelease(f, '1.2.6');
+  const count = f.writes.length;
+  await assert.rejects(publishManualCommercialRelease(next), /reviewed history/u);
+  assert.equal(f.writes.length, count);
+  const evidence = reviewedHistory(f, ['1.2.4']);
+  assert.equal(
+    (await publishManualCommercialRelease({ ...next, reviewedHistory: evidence })).status,
+    'published',
+  );
+  assert.deepEqual(await historyVersions(f), ['1.2.6', '1.2.5', '1.2.3']);
+  assert.ok(f.objects.has(manualDownloadKey('1.2.4', 'download-manifest.json')));
+  assert.equal(
+    (await publishManualCommercialRelease({ ...next, reviewedHistory: evidence })).status,
+    'already-published',
+  );
+  await publishManualCommercialRelease(nextRelease(f, '1.2.7'));
+  assert.deepEqual(await historyVersions(f), ['1.2.7', '1.2.6', '1.2.5', '1.2.3']);
+});
+
+test('migration evidence must pin latest and explicitly cover every archived manifest without writes', async () => {
+  const f = fixture('1.2.3');
+  await publishManualCommercialRelease(f);
+  await publishManualCommercialRelease(nextRelease(f, '1.2.5'));
+  f.objects.delete(MANUAL_CATALOG_KEY);
+  const count = f.writes.length;
+  for (const change of [
+    (evidence) => {
+      evidence.expectedLatestSha256 = 'f'.repeat(64);
+    },
+    (evidence) => {
+      evidence.entries.shift();
+    },
+    (evidence) => {
+      evidence.entries.push(evidence.entries[0]);
+    },
+    (evidence) => {
+      evidence.entries[0].manifestSha256 = 'f'.repeat(64);
+    },
+    (evidence) => {
+      evidence.entries.at(-1).status = 'abandoned';
+    },
+    (evidence) => {
+      evidence.entries[0].evidence = '';
+    },
+    (evidence) => {
+      evidence.entries.push({ ...evidence.entries[0], version: '1.2.2' });
+    },
+  ]) {
+    const evidence = reviewedHistory(f);
+    change(evidence);
+    await assert.rejects(
+      publishManualCommercialRelease({ ...nextRelease(f, '1.2.6'), reviewedHistory: evidence }),
+      /(?:reviewed history|Historical)/u,
+    );
+    assert.equal(f.writes.length, count);
+  }
+  const evidence = reviewedHistory(f);
+  f.objects.delete(manualDownloadKey('1.2.3', 'KerfDesk-1.2.3-windows-x64-setup.exe'));
+  await assert.rejects(
+    publishManualCommercialRelease({ ...nextRelease(f, '1.2.6'), reviewedHistory: evidence }),
+    /installer is missing/u,
+  );
+  assert.equal(f.writes.length, count);
 });
 
 test('interruption after history publication retries without losing history or advancing latest early', async () => {
@@ -214,7 +324,7 @@ test('corrupt history and missing historical installers refuse publication befor
   ]) {
     const f = fixture();
     await publishManualCommercialRelease(f);
-    const next = nextRelease(f, '1.2.4');
+    const next = { ...nextRelease(f, '1.2.4'), reviewedHistory: reviewedHistory(f) };
     corrupt(f);
     const count = f.writes.length;
     await assert.rejects(publishManualCommercialRelease(next));

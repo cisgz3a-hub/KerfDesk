@@ -31,6 +31,7 @@ export async function publishManualCommercialRelease({
   verifyInstaller,
   expectedLatestSha256,
   reviewedNotes,
+  reviewedHistory,
 }) {
   if (typeof verifyInstaller !== 'function')
     refuse('Unsigned commercial package verification is mandatory.');
@@ -55,7 +56,7 @@ export async function publishManualCommercialRelease({
       refuse('The published manual version conflicts with this build.');
     if (!same(initial, manifest)) requireNotesBaseline(reviewedNotes, previous);
   } else requireNotesBaseline(reviewedNotes, null);
-  const history = await prepareManualHistory(store, initial, envelope, keySet);
+  const history = await prepareManualHistory(store, initial, envelope, keySet, reviewedHistory);
   const plan = [
     { key: manualDownloadKey(payload.version, payload.artifacts[0].name), bytes: installer },
     { key: manualDownloadKey(payload.version, 'download-manifest.json'), bytes: manifest },

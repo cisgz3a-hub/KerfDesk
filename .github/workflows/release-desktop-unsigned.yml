@@ -220,7 +220,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Cannot refresh publication ancestry.' }
           $identity = Join-Path $env:RUNNER_TEMP 'commercial-preparation/commercial-release-identity.json'
           $release = "release/commercial-unsigned/$env:RELEASE_VERSION"
-          node scripts/publish-manual-commercial-release.mjs `
+          $historyArguments = @()
+          $historyPath = 'docs/releases/manual-download-history.json'
+          if (Test-Path -LiteralPath $historyPath) {
+            $historyArguments = @('--reviewed-history', $historyPath)
+          }
+          node scripts/publish-manual-commercial-release.mjs @historyArguments `
             --expected-latest-sha256 $env:EXPECTED_LATEST_SHA256 $release $identity "$release/win-unpacked/resources"
           if ($LASTEXITCODE -ne 0) { throw 'Unsigned publication was not confirmed.' }
           "Published Windows $env:RELEASE_VERSION with verified download history. Installed apps check at startup and every 30 minutes; download and installation require user choices." >> $env:GITHUB_STEP_SUMMARY
