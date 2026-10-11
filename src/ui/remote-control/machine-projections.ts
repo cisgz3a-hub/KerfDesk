@@ -23,6 +23,7 @@ import { machineReviewPage } from './machine-review-pages';
 import { RemoteFault } from './fault';
 import { useCameraStore } from '../state/camera-store';
 import { describeLiveJobTiming } from '../state/live-job-timing';
+import { disconnectMachineBlockMessage } from './machine-actions';
 
 type Laser = ReturnType<typeof useLaserStore.getState>;
 type App = ReturnType<typeof useStore.getState>;
@@ -113,7 +114,7 @@ function extendedAvailability(laser: Laser, canControl: boolean) {
       gate.approval,
       gate.disconnected ? null : 'The machine is already connected.',
     ),
-    disconnect: firstReason(gate.approval, gate.offline, gate.busy),
+    disconnect: firstReason(gate.approval, gate.offline, disconnectMachineBlockMessage(laser)),
     home: firstReason(gate.general, gate.busy, homing),
     origin: firstReason(gate.general, gate.busy),
     pause: firstReason(

@@ -22,8 +22,8 @@ export async function saveProjectRemotely(
     };
   if (platform === null) throw new RemoteFault('unavailable');
   commit(() => ({}));
-  const current = store.getState();
-  await handleSaveProject(
+  const current = app;
+  const outcome = await handleSaveProject(
     {
       platform,
       project: projectWithCurrentJobSetup(current),
@@ -41,8 +41,12 @@ export async function saveProjectRemotely(
     },
     false,
   );
-  const saved = !store.getState().dirty;
-  return saved
+  if (outcome === 'saved-with-newer-edits')
+    return {
+      saved: true,
+      message: 'Saved the captured version on the PC. Newer edits remain unsaved.',
+    };
+  return outcome === 'saved'
     ? { saved: true, message: 'Saved on the PC.' }
     : { saved: false, message: 'The save did not finish. Check KerfDesk on the PC.' };
 }

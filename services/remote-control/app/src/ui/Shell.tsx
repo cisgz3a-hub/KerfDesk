@@ -60,12 +60,11 @@ export function Shell({ phone }: { phone: PhoneTransport | null }) {
 function TopBar() {
   const workspace = useApp((state) => state.workspace);
   const online = useApp((state) => state.pcOnline);
-  const socket = useApp((state) => state.socket);
-  const host = useApp((state) => state.host);
+  const liveUpdates = useApp((state) => state.liveUpdates);
   const pending = useApp((state) => state.pending > 0);
   const status = !online
     ? ['off', 'PC offline']
-    : host === 'mcp' || socket
+    : liveUpdates
       ? ['live', 'Live with your PC']
       : ['warn', 'Connected · checking for changes'];
   return (
