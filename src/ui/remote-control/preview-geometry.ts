@@ -153,6 +153,7 @@ export function previewViewport(view: ViewTransform, sizePx: number): RemoteBoun
   return { xMm, yMm, widthMm, heightMm };
 }
 
+export const strictPreviewCache = (): DisplayPolylineCache => strictCache();
 function strictCache(): DisplayPolylineCache {
   const flatten = (path: ColoredPath, toleranceMm: number): DisplayPolylines => {
     const flattened = flattenColoredPathCurves(path, {

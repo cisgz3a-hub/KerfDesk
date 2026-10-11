@@ -13,6 +13,8 @@ import { RemoteFault } from '../remote-control/fault';
 
 const READS = new Set([
   'get_workspace',
+  'get_workspace_scene',
+  'get_camera_snapshot',
   'get_workspace_preview',
   'list_fonts',
   'get_text',
@@ -50,7 +52,9 @@ export function remoteDeliveryResult(
 }
 function rawArtworkResult(command: string, data: Readonly<Record<string, unknown>>): boolean {
   return (
-    command === 'get_text' || (command === 'get_workspace_preview' && data['status'] !== 'disabled')
+    command === 'get_text' ||
+    (['get_workspace_preview', 'get_workspace_scene', 'get_camera_snapshot'].includes(command) &&
+      data['status'] !== 'disabled')
   );
 }
 function refused(revision: string, code: RemoteErrorCode): RemoteCommandResult {

@@ -50,7 +50,10 @@ const review = z.object({
   frame,
 });
 
-/** Bounded machine commands; no arbitrary console, G-code, homing or file exchange. */
+const axis = z.enum(['x', 'y', 'z']);
+const direction = z.union([z.literal(-1), z.literal(1)]);
+
+/** Bounded machine commands; no arbitrary console, G-code, laser firing or file exchange. */
 export const mcpMachineInputSchemas = {
   get_machine_status: z.strictObject({}),
   get_control_operation: z.strictObject({
@@ -59,8 +62,8 @@ export const mcpMachineInputSchemas = {
   }),
   jog_machine: z.strictObject({
     ...admission,
-    axis: z.enum(['x', 'y', 'z']),
-    direction: z.union([z.literal(-1), z.literal(1)]),
+    axis,
+    direction,
     distanceMm: z.number().min(0.01).max(100),
     feedMmPerMin: z.number().min(1).max(100_000).optional(),
   }),
@@ -68,11 +71,39 @@ export const mcpMachineInputSchemas = {
   review_machine_job: z.strictObject(admission),
   start_job: z.strictObject({ ...admission, reviewId: z.uuid() }),
   abort_job: z.strictObject({ requestId: z.uuid() }),
+  connect_machine: z.strictObject(admission),
+  disconnect_machine: z.strictObject(admission),
+  home_machine: z.strictObject(admission),
+  set_work_origin: z.strictObject({ ...admission, axes: z.enum(['xy', 'z']) }),
+  pause_job: z.strictObject({ requestId: z.uuid() }),
+  resume_job: z.strictObject({ requestId: z.uuid() }),
+  jog_hold_start: z.strictObject({
+    ...admission,
+    axis,
+    direction,
+    feedMmPerMin: z.number().min(1).max(100_000).optional(),
+  }),
+  jog_hold_stop: z.strictObject({ requestId: z.uuid(), operationId: z.uuid() }),
+  get_camera_snapshot: z.strictObject({}),
 } as const;
+
+export const MCP_CONTROL_OPERATION_KINDS = [
+  'jog',
+  'frame',
+  'job',
+  'abort',
+  'connect',
+  'disconnect',
+  'home',
+  'origin',
+  'pause',
+  'resume',
+  'hold',
+] as const;
 
 export const mcpControlOperationSchema = z.object({
   operationId: z.uuid(),
-  kind: z.enum(['jog', 'frame', 'job', 'abort']),
+  kind: z.enum(MCP_CONTROL_OPERATION_KINDS),
   state: z.enum([
     'accepted',
     'preparing',
@@ -116,18 +147,31 @@ export const mcpMachineOutputSchemas = {
       review: availability,
       start: availability,
       abort: availability,
+      connect: availability.optional(),
+      disconnect: availability.optional(),
+      home: availability.optional(),
+      origin: availability.optional(),
+      pause: availability.optional(),
+      resume: availability.optional(),
+      hold: availability.optional(),
     }),
     jog: z.object({
       xySupported: z.boolean(),
       zSupported: z.boolean(),
       maxFeedMmPerMin: z.number().positive().max(100_000),
+      holdSupported: z.boolean().optional(),
     }),
     frame,
     job: z.object({
       active: z.boolean(),
       state: z.enum(['idle', 'starting', 'running', 'paused', 'tool_change', 'unknown']),
       progressPercent: z.number().min(0).max(100).optional(),
+      elapsedSeconds: z.number().nonnegative().max(31_536_000).optional(),
+      remainingSeconds: z.number().nonnegative().max(31_536_000).optional(),
     }),
+    homing: z.enum(['confirmed', 'required', 'not_supported', 'unknown']).optional(),
+    camera: z.object({ available: z.boolean() }).optional(),
+    machineSeq: count.optional(),
     motion: z.object({ kind: z.enum(['idle', 'jog', 'frame', 'unknown']) }),
     operation: mcpControlOperationSchema.optional(),
   }),
@@ -137,4 +181,32 @@ export const mcpMachineOutputSchemas = {
   review_machine_job: operationResult,
   start_job: operationResult,
   abort_job: operationResult,
+  connect_machine: operationResult,
+  disconnect_machine: operationResult,
+  home_machine: operationResult,
+  set_work_origin: operationResult,
+  pause_job: operationResult,
+  resume_job: operationResult,
+  jog_hold_start: operationResult,
+  jog_hold_stop: operationResult,
+  get_camera_snapshot: z
+    .object({
+      revision,
+      status: z.enum(['ready', 'disabled', 'unavailable']),
+      message: message.optional(),
+      image: z
+        .object({
+          mimeType: z.literal('image/jpeg'),
+          data: z
+            .string()
+            .min(4)
+            .max(240_000)
+            .regex(/^\/9j\/[A-Za-z0-9+/]*={0,2}$/)
+            .refine((value) => value.length % 4 === 0),
+          widthPx: z.number().int().positive().max(1280),
+          heightPx: z.number().int().positive().max(1280),
+        })
+        .optional(),
+    })
+    .refine((value) => (value.status === 'ready') === (value.image !== undefined)),
 } as const;

@@ -18,6 +18,7 @@ type PairingRequestProps = {
 function PairingRequest({ request, busy, act }: PairingRequestProps): JSX.Element {
   const [edit, setEdit] = useState(false);
   const [control, setControl] = useState(false);
+  const [remember, setRemember] = useState(false);
   const decide = (approved: boolean): void => {
     void act('decide', {
       pairingId: request.pairingId,
@@ -27,6 +28,7 @@ function PairingRequest({ request, busy, act }: PairingRequestProps): JSX.Elemen
         ...(approved && edit ? ['edit'] : []),
         ...(approved && control ? ['control'] : []),
       ],
+      remember: approved && remember,
     });
   };
   return (
@@ -56,12 +58,12 @@ function PairingRequest({ request, busy, act }: PairingRequestProps): JSX.Elemen
           <label style={{ display: 'flex', gap: 8, padding: '8px 0', alignItems: 'start' }}>
             <input
               type="checkbox"
-              title="Approve this connection to jog, frame, start and abort machine work."
+              title="Approve this connection to connect, home, jog, frame, start, pause and abort machine work."
               checked={control}
               disabled={busy}
               onChange={(event) => setControl(event.currentTarget.checked)}
             />
-            <span>Allow Jog, Frame, Start and Abort</span>
+            <span>Allow Connect, Home, Jog, Frame, Start, Pause and Abort</span>
           </label>
           <p>
             This connection can move the machine and start a laser or spindle job. Keep the machine
@@ -69,6 +71,16 @@ function PairingRequest({ request, busy, act }: PairingRequestProps): JSX.Elemen
           </p>
         </>
       ) : null}
+      <label style={{ display: 'flex', gap: 8, padding: '8px 0', alignItems: 'start' }}>
+        <input
+          type="checkbox"
+          title="Keep this phone signed in for 30 days instead of 8 hours. You can revoke it at any time."
+          checked={remember}
+          disabled={busy}
+          onChange={(event) => setRemember(event.currentTarget.checked)}
+        />
+        <span>Keep this phone signed in for 30 days (otherwise 8 hours)</span>
+      </label>
       <p>
         Approve only a connection you are setting up. You can revoke it in Settings → Phone & MCP.
       </p>

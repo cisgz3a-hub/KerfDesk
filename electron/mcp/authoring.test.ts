@@ -13,7 +13,8 @@ import {
   type KerfDeskMcpCommand,
 } from './input-schemas.js';
 import { createKerfDeskMcpServer, type KerfDeskMcpToolMetadata } from './server.js';
-import { KERFDESK_WORKSPACE_UI_MIME, KERFDESK_WORKSPACE_UI_URI } from './workspace-ui.js';
+import { KERFDESK_WORKSPACE_UI_MIME } from './workspace-ui.js';
+import { KERFDESK_WORKSPACE_APP_URI as KERFDESK_WORKSPACE_UI_URI } from './workspace-app-ui.js';
 
 const admission = {
   expectedRevision: 'workspace-1',
@@ -37,6 +38,8 @@ const readTools = [
   'get_workspace_preview',
   'list_fonts',
   'get_text',
+  'get_workspace_scene',
+  'wait_for_change',
   'get_machine_status',
   'get_control_operation',
 ] as const;
@@ -52,6 +55,15 @@ const editTools = [
   'arrange_artwork',
   'undo',
   'redo',
+  'create_operation',
+  'assign_artwork_to_operation',
+  'reorder_operation',
+  'delete_operation',
+  'apply_material_recipe',
+  'add_svg',
+  'import_file',
+  'save_project',
+  'apply_edits',
 ] as const;
 const controlTools = [
   'jog_machine',
@@ -59,7 +71,28 @@ const controlTools = [
   'review_machine_job',
   'start_job',
   'abort_job',
+  'connect_machine',
+  'disconnect_machine',
+  'home_machine',
+  'set_work_origin',
+  'pause_job',
+  'resume_job',
 ] as const;
+/** Control-approved but not ledgered: no requestId, no motion (ADR-585). */
+const controlReadTools = ['get_camera_snapshot'] as const;
+/** Held jogs need the phone's live socket; they are never offered as MCP tools. */
+const phoneOnlyTools = ['jog_hold_start', 'jog_hold_stop'] as const;
+const nonDestructiveEdits = [
+  'set_selection',
+  'add_text',
+  'add_rectangle',
+  'add_ellipse',
+  'add_polyline',
+  'add_svg',
+  'import_file',
+  'create_operation',
+  'save_project',
+];
 
 afterEach(async () => {
   for (const close of closers.splice(0).reverse()) await close();
@@ -151,9 +184,12 @@ describe.each([false, true])('authoring SDK contract (modern=%s)', (modern) => {
       ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } },
     });
     expect('text' in resource ? resource.text : '').toContain('ui/initialize');
+    // The bundled MCP client SDK contains OAuth schema field names; real secrets, bearer
+    // tokens, local endpoints and the phone session API must never appear.
     expect('text' in resource ? resource.text : '').not.toMatch(
-      /ownerSecret|access_token|localhost/,
+      /ownerSecret|Bearer [A-Za-z0-9._~+/-]{16,}|https?:\/\/(localhost|127\.0\.0\.1)|api\/client\/command|X-KerfDesk-CSRF/,
     );
+    expect('text' in resource ? resource.text : '').not.toMatch(/<script src=|<link /);
     await expect(client.readResource({ uri: 'file:///C:/private/job.svg' })).rejects.toThrow();
     expect(request).not.toHaveBeenCalled();
   });
@@ -161,30 +197,32 @@ describe.each([false, true])('authoring SDK contract (modern=%s)', (modern) => {
   it('keeps read, artwork-edit and machine-control permissions distinct', async () => {
     const client = await clientFor({ request: async () => ({}) }, modern);
     const tools = (await client.listTools()).tools;
-    expect(tools).toHaveLength(26);
-    expect(new Set(tools.map((tool) => tool.name))).toEqual(
-      new Set([...readTools, ...editTools, ...controlTools]),
+    expect(tools).toHaveLength(
+      readTools.length + editTools.length + controlTools.length + controlReadTools.length,
     );
+    expect(new Set(tools.map((tool) => tool.name))).toEqual(
+      new Set([...readTools, ...editTools, ...controlTools, ...controlReadTools]),
+    );
+    for (const name of phoneOnlyTools) {
+      expect(tools.some((tool) => tool.name === name)).toBe(false);
+      expect(mcpCommandScope(name)).toBe('control');
+    }
     const writes = tools.filter((tool) => !tool.annotations?.readOnlyHint).map((tool) => tool.name);
     expect(writes).toEqual([...editTools, ...controlTools]);
     expect(MCP_WRITE_COMMANDS).toEqual(new Set(editTools));
-    expect(MCP_CONTROL_COMMANDS).toEqual(new Set(controlTools));
+    expect(MCP_CONTROL_COMMANDS).toEqual(new Set([...controlTools, ...phoneOnlyTools]));
     const edits = new Set<string>(editTools);
-    const controls = new Set<string>(controlTools);
+    const controls = new Set<string>([...controlTools, ...controlReadTools]);
     for (const tool of tools) {
       const control = controls.has(tool.name);
-      const readOnly = !control && !edits.has(tool.name);
+      const ledgered = control && !(controlReadTools as readonly string[]).includes(tool.name);
+      const readOnly = !ledgered && !edits.has(tool.name);
       expect(mcpCommandScope(tool.name as KerfDeskMcpCommand)).toBe(
         control ? 'control' : readOnly ? 'read' : 'edit',
       );
       expect(tool.annotations).toEqual({
         readOnlyHint: readOnly,
-        destructiveHint:
-          control ||
-          (!readOnly &&
-            !['set_selection', 'add_text', 'add_rectangle', 'add_ellipse', 'add_polyline'].includes(
-              tool.name,
-            )),
+        destructiveHint: ledgered || (!readOnly && !nonDestructiveEdits.includes(tool.name)),
         idempotentHint: readOnly,
         openWorldHint: false,
       });

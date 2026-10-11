@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { type KerfDeskMcpCommand, MCP_MAX_ITEMS } from './input-schemas.js';
 import { mcpMachineOutputSchemas } from './machine-schemas.js';
+import { mcpDesignOutputSchemas } from './design-schemas.js';
 import {
   MCP_TEXT_FIELDS,
   mcpAuthoringOutputSchemas,
@@ -34,8 +35,27 @@ export const mcpWriteResultSchema = z.object({
   selection: z.array(id).max(MCP_MAX_ITEMS).optional(),
   operationId: id.optional(),
   changedFields: z
-    .array(z.enum(['powerPercent', 'speedMmPerMin', 'passes', 'enabled', ...MCP_TEXT_FIELDS]))
-    .max(10)
+    .array(
+      z.enum([
+        'powerPercent',
+        'speedMmPerMin',
+        'passes',
+        'enabled',
+        'name',
+        'mode',
+        'minPowerPercent',
+        'airAssist',
+        'fillIntervalMm',
+        'fillAngleDeg',
+        'fillBidirectional',
+        'fillCrossHatch',
+        'linesPerMm',
+        'negativeImage',
+        'cnc',
+        ...MCP_TEXT_FIELDS,
+      ]),
+    )
+    .max(24)
     .optional(),
   history: mcpHistorySchema.optional(),
   message: z.string().max(2048).optional(),
@@ -71,6 +91,32 @@ export const mcpOutputSchemas = {
           name: label.optional(),
           enabled: z.boolean(),
           ...operationValues,
+          color: z
+            .string()
+            .regex(/^#[0-9a-f]{6}$/)
+            .optional(),
+          minPowerPercent: z.number().min(0).max(100).optional(),
+          airAssist: z.boolean().optional(),
+          fillIntervalMm: z.number().positive().max(100).optional(),
+          fillAngleDeg: z.number().min(-360).max(360).optional(),
+          fillBidirectional: z.boolean().optional(),
+          fillCrossHatch: z.boolean().optional(),
+          linesPerMm: z.number().positive().max(1000).optional(),
+          negativeImage: z.boolean().optional(),
+          artworkCount: count.optional(),
+          cnc: z
+            .object({
+              cutType: label,
+              toolId: id.optional(),
+              depthMm: z.number().nonnegative().max(1000).optional(),
+              depthPerPassMm: z.number().nonnegative().max(1000).optional(),
+              feedMmPerMin: z.number().nonnegative().max(100_000).optional(),
+              plungeMmPerMin: z.number().nonnegative().max(100_000).optional(),
+              spindleRpm: z.number().nonnegative().max(1_000_000).optional(),
+              stepoverPercent: z.number().nonnegative().max(1000).optional(),
+              pocketStrategy: label.optional(),
+            })
+            .optional(),
         }),
       )
       .max(MCP_MAX_ITEMS),
@@ -80,6 +126,7 @@ export const mcpOutputSchemas = {
     history: mcpHistorySchema.optional(),
     permissions: mcpPermissionsSchema.optional(),
     capabilities: mcpTouchCapabilitiesSchema.optional(),
+    saved: z.object({ hasFile: z.boolean() }).optional(),
   }),
   get_machine: z.object({
     revision,
@@ -164,6 +211,7 @@ export const mcpOutputSchemas = {
   undo: mcpWriteResultSchema,
   redo: mcpWriteResultSchema,
   ...mcpAuthoringOutputSchemas,
+  ...mcpDesignOutputSchemas,
   ...mcpMachineOutputSchemas,
 } as const;
 
