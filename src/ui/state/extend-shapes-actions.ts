@@ -72,7 +72,13 @@ function extendedObject(
     if (synced !== null) return synced;
   }
   notify('The extended artwork is now a plain path. Undo restores its editable settings.');
-  return { ...localPathArtwork(object), paths, bounds, ...anchors };
+  return {
+    ...localPathArtwork(object),
+    ...(object.name === undefined ? {} : { name: object.name }),
+    paths,
+    bounds,
+    ...anchors,
+  };
 }
 
 // Placed tabs resolve only on closed contours. A saved anchor on this open

@@ -67,6 +67,14 @@ describe('Extend artwork', () => {
     });
     expect(findExtendTarget(scene(closed), p(0, 0), 0.1)).toBeNull();
   });
+  it('does not expose coincident endpoints on an unflagged single-cubic loop', () => {
+    const loop = curveArt('loop', {
+      start: p(0, 0),
+      closed: false,
+      segments: [{ kind: 'cubic', control1: p(10, 0), control2: p(0, 10), to: p(0, 0) }],
+    });
+    expect(findExtendTarget(scene(loop, edge(-20)), p(0, 0), 0.1)).toBeNull();
+  });
   it('ignores hidden targets but permits locked boundaries and never edits them', () => {
     const hidden = edge(15, { operationIds: ['hidden'] });
     const locked = edge(20, { locked: true });

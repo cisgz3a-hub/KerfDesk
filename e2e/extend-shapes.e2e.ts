@@ -106,6 +106,8 @@ test('Extend previews, commits one endpoint, undoes, and leaves a missing bounda
   await expect(page.getByLabel('KerfDesk workspace', { exact: true })).toBeVisible();
   await seedScene(page);
   const before = await summary(page);
+  const end = await endpointScreen(page, 100, 100);
+  await page.mouse.move(end.x, end.y);
   const menu = page.getByRole('menubar', { name: 'Application menu' });
   await menu.getByRole('menuitem', { name: 'Tools', exact: true }).click();
   await menu
@@ -114,11 +116,15 @@ test('Extend previews, commits one endpoint, undoes, and leaves a missing bounda
     .filter({ has: page.getByText('Extend Shapes', { exact: true }) })
     .click();
   await expect(page.getByTestId('extend-shapes-layer')).toBeVisible();
+  await expect(page.getByTestId('extend-shapes-status')).toHaveCount(0);
 
-  const end = await endpointScreen(page, 100, 100);
   await page.mouse.move(end.x, end.y);
   await expect(page.getByTestId('extend-shapes-status')).toContainText('Click to extend');
   expect(await summary(page)).toEqual(before);
+  await page.mouse.move(5, 5);
+  await expect(page.getByTestId('extend-shapes-status')).toHaveCount(0);
+  await page.mouse.move(end.x, end.y);
+  await expect(page.getByTestId('extend-shapes-status')).toContainText('Click to extend');
   await page.mouse.click(end.x, end.y);
   const extended = await summary(page);
   const source = extended.objects[0];

@@ -8,6 +8,7 @@ import {
   type ImportedSvg,
   type SceneObject,
   type ShapeObject,
+  type TextObject,
   type Vec2,
 } from '../../core/scene';
 import { useStore } from './store';
@@ -52,6 +53,33 @@ beforeEach(() => {
 });
 
 describe('Extend Shapes store action', () => {
+  it('preserves an assigned name when an open text stroke becomes a plain path', () => {
+    const text: TextObject = {
+      ...source(),
+      kind: 'text',
+      name: 'Serial number engraving',
+      content: '1',
+      fontKey: 'single-line',
+      sizeMm: 10,
+      alignment: 'left',
+      lineHeight: 1.2,
+      letterSpacing: 0,
+      color: '#000000',
+    };
+    load([text, boundary()]);
+    const before = useStore.getState().project;
+    expect(useStore.getState().extendShapeAt(point(10, 10), 0.5)).toBe(true);
+    expect(current()).toMatchObject({
+      kind: 'imported-svg',
+      id: 'source',
+      name: 'Serial number engraving',
+      operationIds: ['cut'],
+      transform: text.transform,
+    });
+    expect(current().paths[0]?.polylines[0]?.points.at(-1)).toEqual(point(20, 10));
+    useStore.getState().undo();
+    expect(useStore.getState().project).toBe(before);
+  });
   it.each(['imported-svg', 'shape'] as const)(
     'keeps a %s cubic intact and adds a straight tangent in one Undo step',
     (kind) => {

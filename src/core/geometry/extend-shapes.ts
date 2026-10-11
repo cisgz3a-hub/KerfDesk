@@ -85,6 +85,9 @@ function pickEndpoint(
   previous: EndpointPick | null,
 ): EndpointPick | null {
   if (contour.closed || !contour.trimmable) return previous;
+  const first = endpoint(contour, 'start');
+  const last = endpoint(contour, 'end');
+  if (Math.hypot(first.x - last.x, first.y - last.y) <= EXTEND_EPS_MM) return previous;
   let nearest = previous;
   for (const end of ['start', 'end'] as const) {
     const at = endpoint(contour, end);
