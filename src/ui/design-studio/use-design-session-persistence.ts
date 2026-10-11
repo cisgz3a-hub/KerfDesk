@@ -41,13 +41,24 @@ export function useDesignSessionPersistence(): void {
       });
     };
 
-    const unsubscribe = useDesignStudioStore.subscribe(() => {
+    const scheduleSave = () => {
       if (timer !== null) return;
       timer = setTimeout(save, SAVE_DEBOUNCE_MS);
+    };
+    const unsubscribe = useDesignStudioStore.subscribe(scheduleSave);
+    // Main-workspace edits change the saved project identity even while the
+    // Studio drawing is stashed. Keep that same document's recovery owner current.
+    const unsubscribeProject = useStore.subscribe((next, previous) => {
+      if (
+        next.project !== previous.project &&
+        next.projectDocumentEpoch === previous.projectDocumentEpoch
+      )
+        scheduleSave();
     });
 
     return () => {
       unsubscribe();
+      unsubscribeProject();
       if (timer === null) return;
       clearTimeout(timer);
       // A pending write at unmount is the reload case itself — flush it.
