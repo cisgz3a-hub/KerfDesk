@@ -14,6 +14,7 @@ import {
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 import { useToastStore } from './toast-store';
+import { MAX_FLATTENED_CURVE_SEGMENTS } from '../../core/scene/curve-path';
 
 const point = (x: number, y: number): Vec2 => ({ x, y });
 function line(id: string, points: readonly Vec2[], patch: Partial<ImportedSvg> = {}): ImportedSvg {
@@ -53,6 +54,68 @@ beforeEach(() => {
 });
 
 describe('Extend Shapes store action', () => {
+  it('rebuilds a stale canonical cubic cache before synchronizing a placed polyline spec', () => {
+    const curve: CurveSubpath = {
+      start: point(100, 0),
+      closed: false,
+      segments: [
+        { kind: 'cubic', control1: point(103, 6), control2: point(107, 0), to: point(110, 0) },
+      ],
+    };
+    const stale = [point(0, 0), point(10, 0)];
+    const shape: ShapeObject = {
+      ...line('source', stale),
+      kind: 'shape',
+      color: '#000000',
+      spec: { kind: 'polyline', points: stale, closed: false },
+      transform: { ...IDENTITY_TRANSFORM, x: 5, scaleX: 2, scaleY: 3 },
+      paths: [{ color: '#000000', polylines: [{ closed: false, points: stale }], curves: [curve] }],
+    };
+    const boundary = line('boundary', [point(245, -100), point(245, 100)]);
+    load([shape, boundary]);
+    const before = useStore.getState().project;
+    expect(useStore.getState().extendShapeAt(point(225, 0), 0.5)).toBe(true);
+    const after = useStore.getState().project.scene.objects[0];
+    if (after?.kind !== 'shape' || after.spec.kind !== 'polyline')
+      throw new Error('Expected polyline shape');
+    const edited = after.paths[0]?.curves?.[0];
+    expect(edited).toEqual({
+      ...curve,
+      segments: [...curve.segments, { kind: 'line', to: point(120, 0) }],
+    });
+    const expected = flattenCurveSubpath(edited!, { toleranceMm: 0.025 / 3 });
+    if (expected.kind !== 'ok') throw new Error('Expected fixture to flatten');
+    expect(after.paths[0]?.polylines[0]).toEqual(expected.polyline);
+    expect(after.spec.points).toEqual(expected.polyline.points);
+    expect(after.spec.points).toContainEqual(point(110, 0));
+    expect(after.spec.points).not.toContainEqual(point(10, 0));
+    expect(after.transform).toEqual(shape.transform);
+    expect(useStore.getState().project.scene.objects[1]).toBe(boundary);
+    expect(useStore.getState().undoStack).toEqual([before]);
+    useStore.getState().undo();
+    expect(useStore.getState().project).toBe(before);
+  });
+
+  it('reports a bounded cache rebuild failure without changing geometry or history', () => {
+    const curve: CurveSubpath = {
+      start: point(0, 0),
+      closed: false,
+      segments: [
+        ...Array.from({ length: MAX_FLATTENED_CURVE_SEGMENTS }, () => ({
+          kind: 'line' as const,
+          to: point(0, 0),
+        })),
+        { kind: 'cubic', control1: point(1, 20), control2: point(7, 10), to: point(10, 10) },
+      ],
+    };
+    const source = line('source', [point(0, 0), point(10, 10)]);
+    load([{ ...source, paths: [{ ...source.paths[0]!, curves: [curve] }] }, boundary()]);
+    const before = useStore.getState();
+    expect(useStore.getState().extendShapeAt(point(10, 10), 0.5)).toBe(false);
+    expect(useStore.getState()).toBe(before);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toContain('could not be extended');
+  });
+
   it('retains canonical extrema of an untouched curve under nonuniform scale', () => {
     const curve: CurveSubpath = {
       closed: false,

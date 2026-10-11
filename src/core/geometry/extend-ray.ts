@@ -41,7 +41,10 @@ export function segmentRayContacts(
     return unitRoots(sideCoefficients).flatMap((t) => contact(evaluate(alongCoefficients, t)));
   }
   const arc = endpointArc(from, segment);
-  if (arc === null) return lineContacts(origin, direction, world(from), world(segment.to));
+  // A very short valid arc can lose its sweep through floating-point rounding.
+  // Keep its finite chord instead of treating a zero-sign span as the whole ellipse.
+  if (arc === null || arc.delta === 0)
+    return lineContacts(origin, direction, world(from), world(segment.to));
   const center = world(arc.center);
   const cos = Math.cos(arc.rotationRad);
   const sin = Math.sin(arc.rotationRad);

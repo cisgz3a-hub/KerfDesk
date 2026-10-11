@@ -1,6 +1,8 @@
 import {
   applyTransform,
   curveSubpathBounds,
+  DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+  flattenCurveSubpath,
   type ColoredPath,
   type CurveSubpath,
   type PathSegment,
@@ -230,8 +232,35 @@ export function extendEdit(
   const point = localPoint(target.to, object.transform);
   if (source === null || source.segments.closed || !source.trimmable || point === null) return null;
   if (!matchesEndpoint(object, source, target)) return null;
-  const replacement = replaceEndpoint(path, target, point);
+  const replacement = rebuildCompatibilityPolyline(
+    replaceEndpoint(path, target, point),
+    polylineIndex,
+    object.transform,
+  );
+  if (replacement === null) return null;
   return object.paths.map((p, i) => (i === pathIndex ? replacement : p));
+}
+
+/** Canonical edits must also replace stale caches used by rendering and shape specs. */
+function rebuildCompatibilityPolyline(
+  path: ColoredPath,
+  index: number,
+  transform: Transform,
+): ColoredPath | null {
+  if (path.curves === undefined) return path;
+  const curve = path.curves[index];
+  if (curve === undefined) return null;
+  const scale = Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY));
+  const flattened = flattenCurveSubpath(curve, {
+    toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM / scale,
+  });
+  // The existing flattener enforces its segment budget. Never return a partial
+  // edit with new canonical geometry but an old compatibility representation.
+  if (flattened.kind !== 'ok') return null;
+  return {
+    ...path,
+    polylines: path.polylines.map((polyline, i) => (i === index ? flattened.polyline : polyline)),
+  };
 }
 
 function matchesEndpoint(

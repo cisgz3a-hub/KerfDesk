@@ -15,6 +15,20 @@ const arc: PathSegment = {
 const transform = { ...IDENTITY_TRANSFORM, scaleX: 1e5, scaleY: 1e5 };
 
 describe('finite arc ray contacts use a world-distance endpoint tolerance', () => {
+  it('keeps an unresolvably short rotated arc finite and retains its chord contacts', () => {
+    const short = { ...arc, rotationDeg: 45, to: { x: 1e-10, y: 0 } };
+    const start = { x: 0, y: 0 };
+    // At this radius the computed sweep rounds to zero. The finite endpoints
+    // are still 1e-5 mm apart in world space; they must not become a full circle.
+    expect(
+      segmentRayContacts({ x: 5e-6, y: 1e11 }, { x: 1, y: 0 }, start, short, transform),
+    ).toEqual([]);
+    for (const x of [0, 5e-6, 1e-5]) {
+      const contacts = segmentRayContacts({ x, y: -1 }, { x: 0, y: 1 }, start, short, transform);
+      expect(contacts).toEqual([{ distance: 1, overlap: false }]);
+    }
+  });
+
   it.each([
     [
       { x: -5, y: 0 },

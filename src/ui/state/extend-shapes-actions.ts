@@ -47,7 +47,10 @@ function extendMutation(
     return state;
   }
   const paths = extendEdit(object, target);
-  if (paths === null) return state;
+  if (paths === null) {
+    notify('This outline could not be extended. Its geometry was not changed.');
+    return state;
+  }
   const extended = extendedObject(object, paths, target);
   return {
     project: { ...state.project, scene: replaceObject(scene, object.id, extended) },
