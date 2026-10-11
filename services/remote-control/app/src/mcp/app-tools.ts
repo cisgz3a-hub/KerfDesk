@@ -1,5 +1,6 @@
 import type { App } from '@modelcontextprotocol/ext-apps';
 import { z } from 'zod';
+import { flushSync } from 'react-dom';
 import { controller } from '../core/controller';
 import { selectionBox, unionBox, artworkBox } from '../core/scene';
 import { store, type Tab } from '../core/store';
@@ -57,8 +58,9 @@ export function registerViewTools(app: App, openFullscreen: () => Promise<void>)
         artworkIds.length === 0
           ? unionBox(artwork.flatMap((item) => artworkBox(item) ?? []))
           : selectionBox(artworkIds, artwork);
+      // App tools run outside React; finish mounting Design before measuring it.
+      flushSync(() => store.set({ tab: 'design', sheet: null }));
       const element = document.querySelector('.canvas-wrap');
-      store.set({ tab: 'design' });
       if (box !== null && element !== null) {
         const { width, height } = element.getBoundingClientRect();
         store.set({ view: fitView(box, width, height, 56, RAIL_INSET) });

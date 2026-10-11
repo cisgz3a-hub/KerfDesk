@@ -1,5 +1,6 @@
 import { connectOptionsForDevice } from '../commands/connect-options';
-import { isActiveJob } from '../state/laser-store-helpers';
+import { isActiveJob, setupCommandBlockMessage } from '../state/laser-store-helpers';
+import { hasPendingControllerWrite } from '../state/laser-start-queue-fence';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import type { MachineExecutionOwner } from '../state/machine-execution-owner';
@@ -73,14 +74,24 @@ export async function executeConnect(
 }
 
 export async function executeDisconnect(operation: OwnedMachineOperation): Promise<void> {
-  const laser = useLaserStore.getState();
-  if (isActiveJob(laser.streamer) || laser.motionOperation !== null)
-    throw new MachineRefusal('Stop the job or motion before disconnecting.');
+  const blocked = disconnectMachineBlockMessage(useLaserStore.getState());
+  if (blocked !== null) throw new MachineRefusal(blocked);
   await settle(
     operation,
     () => useLaserStore.getState().disconnect(),
     'Disconnect did not finish.',
     'Disconnected.',
+  );
+}
+
+export function disconnectMachineBlockMessage(
+  laser: ReturnType<typeof useLaserStore.getState>,
+): string | null {
+  return (
+    setupCommandBlockMessage(laser) ??
+    (hasPendingControllerWrite(laser)
+      ? 'Wait for the pending controller command before disconnecting.'
+      : null)
   );
 }
 
