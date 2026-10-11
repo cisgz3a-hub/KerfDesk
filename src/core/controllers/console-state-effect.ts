@@ -19,7 +19,9 @@ export type ConsoleStateEffect =
 
 const COORDINATE_COMMAND_RE = /G(?:10(?:\.0+)?|5[4-9](?:\.[123])?|92(?:\.[123])?)(?=$|[^0-9.])/;
 const FULL_COORDINATE_COMMAND_RE = /G(?:5[4-9](?:\.[123])?|92\.[123])(?=$|[^0-9.])/;
-const TOOL_COMMAND_RE = /(?:G(?:43\.1|49)|M0?6|T\d+)(?=$|[^0-9.])/;
+// GRBL accepts fractional T values and truncates them to a tool number. They
+// still invalidate the same tool-reference evidence as integer selections.
+const TOOL_COMMAND_RE = /(?:G(?:43\.1|49)|M0?6|T\d+(?:\.\d+)?)(?=$|[^0-9.])/;
 const ACCESSORY_COMMAND_RE = /M0?[345789](?=$|[^0-9.])/;
 const MOTION_COMMAND_RE = /G(?:0|1|2|3|38\.[2345])(?=$|[^0-9.])/;
 const DWELL_COMMAND_RE = /G4(?=$|[^0-9.])/;

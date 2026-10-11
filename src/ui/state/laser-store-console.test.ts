@@ -316,7 +316,14 @@ describe('laser-store console commands', () => {
   });
 
   it.each([
+    ['T2', true],
+    ['T2.5', true],
+    ['T+002.5', true],
+    ['T 2 . 5', true],
     ['G92 X0 T2', false],
+    ['G92 X0 T2.5', false],
+    ['G92 X0 T+002.5', false],
+    ['G92 X0 T 2 . 5', false],
     ['G92.1 G49', false],
     ['G092 Z0', true],
     ['G 92 Z 0', true],

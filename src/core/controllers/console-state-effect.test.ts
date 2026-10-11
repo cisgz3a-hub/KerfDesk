@@ -16,6 +16,14 @@ describe('commonConsoleStateEffect', () => {
     }
   });
 
+  it.each(['T2', 'T2.5', 'T+002.5', 'T 2 . 5', 'T.5'])(
+    'recognizes accepted numeric tool selections in %s',
+    (command) => {
+      expect(commonConsoleStateEffect(command)).toBe('tool');
+      expect(commonConsoleStateEffect(`G92 X0 ${command}`)).toBe('coordinates-all');
+    },
+  );
+
   it('separates motion from accessory-only and non-positional commands', () => {
     expect(commonConsoleStateEffect('G0 X10 Y10')).toBe('machine-state');
     for (const command of ['M3 S12000', 'M4 S500', 'M5', 'M7', 'M8', 'M9']) {
@@ -47,6 +55,7 @@ describe('commonConsoleStateEffect', () => {
     expect(commonConsoleStateEffect('G092 Z0 (T2 X0) ; G55')).toBe('coordinates-z');
     expect(commonConsoleStateEffect('G92 X0 (T2)')).toBe('coordinates-xy');
     expect(commonConsoleStateEffect('G92 X0 (T2')).toBe('coordinates-xy');
+    expect(commonConsoleStateEffect('G92 X0 (T2.5) ; T+002.5')).toBe('coordinates-xy');
     expect(hasAccessoryCommand('M 003.00 S500')).toBe(true);
     expect(hasAccessoryCommand('G1 X0 (M003) ; M009')).toBe(false);
   });
