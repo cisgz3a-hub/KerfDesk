@@ -1,0 +1,4232 @@
+[
+  {
+    "id": "svg-paint-opacity",
+    "findings": ["FND-001"],
+    "title": "Preserve SVG child paint opacity overrides",
+    "auditBatch": 1,
+    "branch": "codex/audit-svg-paint-opacity-20261011",
+    "files": [
+      "THIRD_PARTY_NOTICES.md",
+      "package.json",
+      "pnpm-lock.yaml",
+      "public/third-party-notices.txt",
+      "src/io/svg/parse-svg-opacity-attr.test.ts",
+      "src/io/svg/parse-svg-opacity-math.test.ts",
+      "src/io/svg/parse-svg-opacity-unresolved.test.ts",
+      "src/io/svg/parse-svg-opacity-variables.test.ts",
+      "src/io/svg/parse-svg-paint-opacity.test.ts",
+      "src/io/svg/parse-svg.ts",
+      "src/io/svg/svg-import-notes.ts",
+      "src/io/svg/svg-opacity-attr.ts",
+      "src/io/svg/svg-opacity-math.ts",
+      "src/io/svg/svg-opacity-variables.ts",
+      "src/io/svg/svg-paint-opacity.ts",
+      "src/io/svg/svg-presentation.ts",
+      "src/io/svg/svg-stylesheet.ts",
+      "src/ui/app/import-toasts.ts",
+      "src/ui/app/svg-import-action.test.ts",
+      "src/ui/app/svg-import-action.ts"
+    ],
+    "status": "merged-ci-verified",
+    "newRegressions": 81,
+    "integrationCommit": "0947a16c9718aac146c2f7cb136c20354aa0bde6",
+    "publishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+    "pullRequest": {
+      "number": 1139,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139"
+    },
+    "localVerification": {
+      "previousVerification": {
+        "result": "passed",
+        "testsPassed": 727,
+        "testFiles": 14,
+        "typecheck": "passed",
+        "scopedLint": "passed",
+        "changedFormatting": "passed",
+        "fileSizePolicy": "passed",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-repair-report.md",
+        "previousVerification": {
+          "result": "passed",
+          "testsPassed": 602,
+          "testFiles": 14,
+          "typecheck": "passed",
+          "scopedLint": "passed",
+          "changedFormatting": "passed",
+          "fileSizePolicy": "passed",
+          "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-repair-report.md",
+          "previousVerification": {
+            "result": "passed",
+            "testsPassed": 464,
+            "testFiles": 13,
+            "typecheck": "passed",
+            "scopedLint": "passed",
+            "changedFormatting": "passed",
+            "fileSizePolicy": "passed",
+            "report": "docs/audits/2026-10-11-pr-history/publication/svg-math-followup.md",
+            "previousReports": [
+              "docs/audits/2026-10-11-pr-history/publication/svg-opacity-follow-up.md"
+            ],
+            "licenseCheck": "passed: 63 production packages, 9 allowed licences",
+            "productionBuild": "passed"
+          }
+        }
+      },
+      "result": "passed",
+      "testsPassed": 896,
+      "testFiles": 17,
+      "typecheck": "passed with escalated real filesystem access; earlier sandbox inference errors retained as environment evidence",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "whitespace": "passed",
+      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-repair-report.md"
+    },
+    "ci": {
+      "status": "passed",
+      "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.596Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:42:56Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012172/job/114418504634",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:46:00Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504623",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:40:10Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012231/job/114418505057",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:37:49Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012231/job/114418505848",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T07:37:49Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:57:45Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012172/job/114418504840",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:41:16Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504817",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:56:39Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012172/job/114418504789",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T08:01:08Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012172/job/114418504778",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:54:18Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012172/job/114418504842",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:37:49Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012231/job/114418505747",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T07:37:49Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T08:01:38Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012172/job/114422428447",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T08:01:10Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:51:24Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504860",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:49:05Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504799",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:51:33Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504873",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:51:54Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504896",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:42:19Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504814",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:52:33Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114420858430",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T07:51:56Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T07:37:54Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "isolatedVerification": {
+      "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+      "testsPassed": 1535,
+      "testFiles": 54,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "licenseCheck": "passed",
+      "productionBuild": "passed",
+      "productionWorkerSmoke": "passed",
+      "productionWorkerSmokeScript": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-worker-smoke.mjs",
+      "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/svg-paint-opacity-followup-fe225a5a7f7d-2026-10-11T07-34-15-976Z-",
+      "checkedAt": "2026-10-11T07:37:49.668Z",
+      "productionWorkerSmokeReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-svg-published-review.md"
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "foundation_prs",
+      "kind": "Independent eight-file typed attribute, escaped importance and worker entity follow-up; earlier approved repairs retained",
+      "integrationCommit": "fe225a5a7f7d5bdfb177b6dfb28c7d3bc2b20cc1",
+      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
+      "supersedes": "Earlier bounded review missed invalid cascade candidates; final review explicitly corrects that assessment.",
+      "previousApproval": {
+        "status": "approved",
+        "reviewer": "foundation_prs",
+        "kind": "Independent seven-file environment substitution and typed scalar-function follow-up; earlier approved repairs retained",
+        "integrationCommit": "5c9adae0c6423dc27fc44620f529f98807524855",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
+        "supersedes": "Earlier bounded review missed invalid cascade candidates; final review explicitly corrects that assessment.",
+        "previousApproval": {
+          "status": "approved",
+          "reviewer": "foundation_prs",
+          "kind": "Independent complete six-file variable-opacity follow-up; earlier approved repairs retained",
+          "integrationCommit": "73db1309d8d7941e472971e2d564e8cd713774e3",
+          "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md",
+          "supersedes": "Earlier bounded review missed invalid cascade candidates; final review explicitly corrects that assessment.",
+          "previousApproval": {
+            "status": "approved",
+            "reviewer": "foundation_prs",
+            "kind": "Independent complete sibling-authored follow-up, browser math controls and replacement warning delivery; original repair review retained",
+            "integrationCommit": "695484d591ba8a9265c13bbcfea7e514bd17e68c",
+            "report": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+            "supersedes": "Earlier bounded review missed invalid cascade candidates; final review explicitly corrects that assessment.",
+            "previousApproval": {
+              "status": "approved",
+              "reviewer": "early_dependencies_tooling",
+              "kind": "independent source and regression review plus Chrome oracle",
+              "integrationCommit": "2a3f70bd54647524852c7f297e87d7f4f94775d0",
+              "report": "docs/audits/2026-10-11-pr-history/publication/svg-followup-peer-review.md",
+              "supersedes": "Earlier bounded review missed invalid cascade candidates; final review explicitly corrects that assessment.",
+              "verifiedPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+              "sourceAttestation": {
+                "reviewedCommit": "2a3f70bd54647524852c7f297e87d7f4f94775d0",
+                "publishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+                "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+                "checkedAt": "2026-10-11T05:18:54.249Z"
+              }
+            },
+            "fileManifest": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-files.json",
+            "verifiedPublishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+            "sourceAttestation": {
+              "reviewedCommit": "695484d591ba8a9265c13bbcfea7e514bd17e68c",
+              "publishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+              "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+              "checkedAt": "2026-10-11T06:12:10.466Z"
+            }
+          },
+          "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-files.json",
+          "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-commit-attestation.json",
+          "verifiedPublishedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
+          "sourceAttestation": {
+            "reviewedCommit": "73db1309d8d7941e472971e2d564e8cd713774e3",
+            "publishedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
+            "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+            "checkedAt": "2026-10-11T06:39:54.734Z"
+          }
+        },
+        "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-files.json",
+        "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-commit-attestation.json",
+        "pendingComments": [],
+        "verifiedPublishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+        "sourceAttestation": {
+          "reviewedCommit": "5c9adae0c6423dc27fc44620f529f98807524855",
+          "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+          "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+          "checkedAt": "2026-10-11T07:12:19.719Z"
+        },
+        "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-published-review.md"
+      },
+      "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-files.json",
+      "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-commit-attestation.json",
+      "pendingComments": [],
+      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-svg-published-review.md",
+      "verifiedPublishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+      "sourceAttestation": {
+        "reviewedCommit": "fe225a5a7f7d5bdfb177b6dfb28c7d3bc2b20cc1",
+        "publishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+        "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+        "checkedAt": "2026-10-11T07:54:26.303Z"
+      }
+    },
+    "followUpCommits": [
+      "2a3f70bd54647524852c7f297e87d7f4f94775d0",
+      "695484d591ba8a9265c13bbcfea7e514bd17e68c",
+      "73db1309d8d7941e472971e2d564e8cd713774e3",
+      "5c9adae0c6423dc27fc44620f529f98807524855",
+      "fe225a5a7f7d5bdfb177b6dfb28c7d3bc2b20cc1"
+    ],
+    "independentVerification": {
+      "previousVerification": {
+        "previousVerification": {
+          "testsPassed": 114,
+          "chromeOracleCases": 38,
+          "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md",
+          "note": "Three assertions per case, through both parser routes and exact state. Variables use a qualified approximation; no browser-equality claim for these values.",
+          "previousVerification": {
+            "testsPassed": 54,
+            "chromeComparisons": 366,
+            "report": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+            "previousReport": "docs/audits/2026-10-11-pr-history/publication/svg-followup-peer-review.md",
+            "chromeOracleCases": 122,
+            "warningActionChecks": 10,
+            "productionWorkerBrowserChecks": 126,
+            "productionWorkerNodeChecks": 252,
+            "note": "Overlapping verification scopes are reported separately, not added to a single test total. Relative-unit approximation is explicitly qualified."
+          }
+        },
+        "testsPassed": 252,
+        "chromeOracleCases": 84,
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
+        "secondOracleTestsPassed": 129,
+        "secondOracleAssertions": 354,
+        "secondOracleReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-candidate-independent.md",
+        "note": "Independent scopes overlap; counts are separate. Environment/custom-property values use a disclosed opacity-1 approximation, not browser equality."
+      },
+      "testsPassed": 310,
+      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
+      "actualChromeSanitizedMainCases": 119,
+      "actualChromeSourceWorkerCases": 8,
+      "additionalUnknownUnitChromeCases": 6,
+      "secondOracleTestsPassed": 101,
+      "secondOracleAssertions": 289,
+      "secondOracleReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-candidate-report.md",
+      "note": "Distinct, overlapping scopes are reported separately. One jsdom serialization artifact is excluded from the source oracle and closed by actual Chrome main-parser proof. Attribute opacity retains an explicit approximation; no full substitution parity is claimed."
+    },
+    "cycleVerified": true,
+    "previousPublishedHeads": [
+      "c3d0e07962846e4ca07d12632fbb2ff66489dc0c",
+      "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+      "282b60d3c71320ad7884299d7d40924ab59c73f8",
+      "a4c1968b50ab735953b064ec65f8055aa74ced28",
+      "447b4bc8a520a387a7d205ed073330955c6e86d5"
+    ],
+    "publishedFollowUpCommits": [
+      "2a3f70bd54647524852c7f297e87d7f4f94775d0",
+      "695484d591ba8a9265c13bbcfea7e514bd17e68c",
+      "73db1309d8d7941e472971e2d564e8cd713774e3",
+      "5c9adae0c6423dc27fc44620f529f98807524855",
+      "fe225a5a7f7d5bdfb177b6dfb28c7d3bc2b20cc1"
+    ],
+    "completionBlockers": [],
+    "reviewComments": {
+      "checkedAt": "2026-10-11T05:27:47.5743979Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1139.json",
+      "items": [
+        {
+          "id": 4240305758,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305758",
+          "commentedHead": "c3d0e07962846e4ca07d12632fbb2ff66489dc0c",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4"
+        },
+        {
+          "id": 4240305762,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305762",
+          "commentedHead": "c3d0e07962846e4ca07d12632fbb2ff66489dc0c",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4"
+        },
+        {
+          "id": 4240305766,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305766",
+          "commentedHead": "c3d0e07962846e4ca07d12632fbb2ff66489dc0c",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4"
+        },
+        {
+          "id": 4240305771,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305771",
+          "commentedHead": "c3d0e07962846e4ca07d12632fbb2ff66489dc0c",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4"
+        },
+        {
+          "id": 4240364150,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364150",
+          "commentedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md"
+        },
+        {
+          "id": 4240364155,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364155",
+          "commentedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md"
+        },
+        {
+          "id": 4240505326,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240505326",
+          "commentedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+          "status": "resolved-in-published-followup",
+          "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-reproduction.md",
+          "resolvedByPublishedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md"
+        },
+        {
+          "id": 4240505330,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240505330",
+          "commentedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+          "status": "rejected-not-reproduced",
+          "dispositionId": "DISP-042",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-reproduction.md",
+          "result": "Published source preserves numeric Infinity/NaN through the pinned library; outer opacity maps NaN to zero. Independent actual Chrome/parser and direct-library controls pass."
+        },
+        {
+          "id": 4240569209,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240569209",
+          "commentedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
+          "status": "resolved-in-published-followup",
+          "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-reproduction.md",
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
+          "resolvedByPublishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5"
+        },
+        {
+          "id": 4240569210,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240569210",
+          "commentedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
+          "status": "documented-limitation",
+          "dispositionId": "DISP-043",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
+          "result": "Exact ratio rendering claim not reproduced; conflicting specification/browser support retained explicitly. Separate sign(fr) defect independently repaired."
+        },
+        {
+          "id": 4240648358,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648358",
+          "commentedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+          "status": "documented-limitation",
+          "dispositionId": "DISP-044",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md"
+        },
+        {
+          "id": 4240648361,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648361",
+          "commentedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+          "status": "rejected-not-reproduced",
+          "dispositionId": "DISP-045",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md"
+        },
+        {
+          "id": 4240648365,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648365",
+          "commentedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+          "status": "resolved-in-published-followup",
+          "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md",
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
+          "resolvedByPublishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8"
+        },
+        {
+          "id": 4240648371,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648371",
+          "commentedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+          "status": "resolved-in-published-followup",
+          "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md",
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
+          "resolvedByPublishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8"
+        }
+      ],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      }
+    },
+    "verificationTestFiles": [
+      "src/io/svg/export-scene-svg-owned-clip.test.ts",
+      "src/io/svg/export-scene-svg-precision.test.ts",
+      "src/io/svg/export-scene-svg.test.ts",
+      "src/io/svg/flatten-curves.test.ts",
+      "src/io/svg/import-perceptual.test.ts",
+      "src/io/svg/malicious-corpus.test.ts",
+      "src/io/svg/parse-path-d.test.ts",
+      "src/io/svg/parse-svg-blob.test.ts",
+      "src/io/svg/parse-svg-fill-rule.test.ts",
+      "src/io/svg/parse-svg-image-opacity.test.ts",
+      "src/io/svg/parse-svg-internal-entities.test.ts",
+      "src/io/svg/parse-svg-opacity-attr.test.ts",
+      "src/io/svg/parse-svg-opacity-math.test.ts",
+      "src/io/svg/parse-svg-opacity-unresolved.test.ts",
+      "src/io/svg/parse-svg-opacity-variables.test.ts",
+      "src/io/svg/parse-svg-paint-opacity.test.ts",
+      "src/io/svg/parse-svg-paint.test.ts",
+      "src/io/svg/parse-svg-percentage-lengths.test.ts",
+      "src/io/svg/parse-svg-presentation-diagnostics.test.ts",
+      "src/io/svg/parse-svg-presentation-state.test.ts",
+      "src/io/svg/parse-svg-root-viewport.test.ts",
+      "src/io/svg/parse-svg-structure.test.ts",
+      "src/io/svg/parse-svg-stylesheet.test.ts",
+      "src/io/svg/parse-svg-vector-clip-effects.test.ts",
+      "src/io/svg/parse-svg-vector-clip-intersect.test.ts",
+      "src/io/svg/parse-svg-vector-clip-proof.test.ts",
+      "src/io/svg/parse-svg-vector-clip.test.ts",
+      "src/io/svg/parse-svg-viewport-clip.test.ts",
+      "src/io/svg/parse-svg-worker.test.ts",
+      "src/io/svg/parse-svg.test.ts",
+      "src/io/svg/pipeline.snapshot.test.ts",
+      "src/io/svg/raw-open-tag-scanner.test.ts",
+      "src/io/svg/sanitize.test.ts",
+      "src/io/svg/shape-to-polylines.test.ts",
+      "src/io/svg/svg-artwork-origin.test.ts",
+      "src/io/svg/svg-clip-presentation.test.ts",
+      "src/io/svg/svg-composition.test.ts",
+      "src/io/svg/svg-conditional-processing.test.ts",
+      "src/io/svg/svg-css-color.test.ts",
+      "src/io/svg/svg-curve-transform.test.ts",
+      "src/io/svg/svg-embedded-bitmap-size.test.ts",
+      "src/io/svg/svg-id-resolver.test.ts",
+      "src/io/svg/svg-import-entries.test.ts",
+      "src/io/svg/svg-object-bbox.test.ts",
+      "src/io/svg/svg-stylesheet.test.ts",
+      "src/io/svg/svg-units.test.ts",
+      "src/io/svg/svg-use-expansion.test.ts",
+      "src/io/svg/svg-viewport.test.ts",
+      "src/ui/app/import-dispatch.test.ts",
+      "src/ui/app/import-toasts.test.ts",
+      "src/ui/app/reimport-legacy-svg-mode.test.ts",
+      "src/ui/app/reimport-selected-artwork.test.ts",
+      "src/ui/app/svg-import-action.test.ts",
+      "src/ui/app/use-import-drag-drop.test.tsx"
+    ],
+    "dependencyVerificationRequired": true,
+    "publicationDescription": "SVG import could discard visible children that override inherited fill or stroke opacity. Resolve inherited paint-opacity properties through the author cascade before deciding whether geometry is visible.\n\nReviewed follow-ups preserve valid cascade rollback, evaluate context-free typed CSS math, and retain valid variable- or attribute-containing winners. Values needing custom-property, environment or attribute substitution or layout use an explicit fully opaque approximation; fresh imports and replacements warn that source-hidden artwork may be included and advise resolving expressions in an SVG editor for exact visibility. Invalid nested var/env/attr syntax preserves lower valid declarations. Escaped important identifiers are recognized from decoded CSS tokens. Both import paths consume decoded paint-opacity attribute values exactly once, including XML-encoded typed attr syntax in the worker. Scalar functions reject unsupported numeric types even when the delegated library could reduce them to a number. Full custom-property/environment/attribute substitution, named cascade layers and browser layout remain outside this importer scope.\n\nThe reported intermediate Infinity/NaN regression did not reproduce against the pinned library and actual browser controls. The reported flex-unit ratio matches current Chrome rejection, although CSS Values4 and Grid2 differ on support; that limitation is explicit. The independently reproduced sign(fr) type escape is repaired and legitimate round/clamp keyword controls remain covered.\n\nThree previously locked MIT CSSTools packages are runtime dependencies with selected/generated notices. Independent source review covers both parser paths, syntax controls, approximation warnings and publication source identity.",
+    "productionWorkerSmokeScript": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-worker-smoke.mjs",
+    "isolatedVerificationHistory": [
+      {
+        "head": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+        "testsPassed": 1121,
+        "testFiles": 52,
+        "typecheck": "passed",
+        "scopedLint": "passed",
+        "changedFormatting": "passed",
+        "fileSizePolicy": "passed",
+        "checkedAt": "2026-10-11T06:08:33.578Z",
+        "licenseCheck": "passed",
+        "productionBuild": "passed",
+        "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/svg-paint-opacity-followup-"
+      },
+      {
+        "head": "a4c1968b50ab735953b064ec65f8055aa74ced28",
+        "testsPassed": 1259,
+        "testFiles": 53,
+        "typecheck": "passed",
+        "scopedLint": "passed",
+        "changedFormatting": "passed",
+        "fileSizePolicy": "passed",
+        "licenseCheck": "passed",
+        "productionBuild": "passed",
+        "productionWorkerSmoke": "passed",
+        "productionWorkerSmokeScript": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-repair-worker-smoke.mjs",
+        "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/svg-paint-opacity-followup-73db1309d8d7-2026-10-11T06-35-54-216Z-",
+        "checkedAt": "2026-10-11T06:39:27.448Z",
+        "productionWorkerSmokeTests": 12,
+        "productionWorkerSmokeEvidence": "docs/audits/2026-10-11-pr-history/publication/svg-paint-opacity-followup-73db1309d8d7-2026-10-11T06-35-54-216Z-worker-smoke.json",
+        "productionWorkerSmokeReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-worker-smoke-review.md"
+      },
+      {
+        "head": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+        "testsPassed": 1384,
+        "testFiles": 53,
+        "typecheck": "passed",
+        "scopedLint": "passed",
+        "changedFormatting": "passed",
+        "fileSizePolicy": "passed",
+        "licenseCheck": "passed",
+        "productionBuild": "passed",
+        "productionWorkerSmoke": "passed",
+        "productionWorkerSmokeScript": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-worker-smoke.mjs",
+        "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/svg-paint-opacity-followup-5c9adae0c642-2026-10-11T07-04-35-159Z-",
+        "checkedAt": "2026-10-11T07:08:16.404Z",
+        "productionWorkerSmokeTests": 24,
+        "productionWorkerSmokeAssertions": 132,
+        "productionWorkerSmokeEvidence": "docs/audits/2026-10-11-pr-history/publication/svg-paint-opacity-followup-5c9adae0c642-2026-10-11T07-04-35-159Z-worker-smoke.json",
+        "productionWorkerSmokeReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-published-review.md"
+      }
+    ],
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:54:38Z",
+      "mergeCommit": "da1ff076fb97959cead57182326b8f89aa6841c5",
+      "publishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+      "reviewedCommit": "fe225a5a7f7d5bdfb177b6dfb28c7d3bc2b20cc1",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  },
+  {
+    "id": "raster-outline-boundaries",
+    "findings": ["BITMAP-01"],
+    "title": "Retain raster outlines at pixel rounding boundaries",
+    "auditBatch": 1,
+    "branch": "codex/audit-raster-outline-boundaries-20261011",
+    "files": [
+      "src/core/raster/rasterize-vector.ts",
+      "src/core/raster/rasterize-vector-outline-boundary.test.ts",
+      "src/ui/raster/bitmap-assembly-outline-boundary.test.ts"
+    ],
+    "status": "merged-ci-verified",
+    "newRegressions": 21,
+    "integrationCommit": "620d688877958c519f3d4948c09f2804b9a77b6e",
+    "publishedHead": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
+    "pullRequest": {
+      "number": 1140,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1140"
+    },
+    "localVerification": {
+      "report": "docs/audits/2026-10-11-pr-history/repair-summary.md",
+      "result": "passed",
+      "scope": "Focused regressions and related suites; typecheck, lint, changed formatting, file size and diff checks"
+    },
+    "ci": {
+      "status": "passed",
+      "head": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.600Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:53:32Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649829/job/114391229329",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T04:48:48Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:01:04Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649819/job/114391229165",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T04:53:18Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:00:20Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649820/job/114391229366",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T04:57:28Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:46:32Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649820/job/114391229758",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T04:46:33Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:46:00Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649829/job/114391229424",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T05:25:41Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:53:39Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649819/job/114391229226",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T04:50:20Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:38:01Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649829/job/114391229426",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T05:18:32Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:18:42Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649829/job/114391229416",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T05:00:41Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:20:50Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649829/job/114391229445",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T05:00:45Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:46:32Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649820/job/114391229881",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T04:46:33Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:52:04Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649829/job/114400465619",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T05:51:33Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:33:15Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649819/job/114391229318",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T05:19:39Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:23:18Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649819/job/114391229302",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T05:13:02Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:10:08Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649819/job/114391229256",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T05:00:40Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:31:30Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649819/job/114391229306",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T05:18:38Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:57:54Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649819/job/114391229271",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T04:53:23Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:51:05Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112649819/job/114398475278",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T05:50:38Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T04:46:39Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "isolatedVerification": {
+      "head": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
+      "testsPassed": 21,
+      "testFiles": 2,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "checkedAt": "2026-10-11T04:46:20.810Z"
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "early_ui_materials",
+      "kind": "independent exact-diff review plus two long-shallow geometry probes (24 rasters)",
+      "head": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
+      "integrationCommit": "620d688877958c519f3d4948c09f2804b9a77b6e",
+      "report": "docs/audits/2026-10-11-pr-history/publication/bitmap-peer-review.md",
+      "hostedReview": "Codex review usage limit; CodeRabbit skipped automatic review. Local peer review supplies the review evidence.",
+      "verifiedPublishedHead": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
+      "sourceAttestation": {
+        "reviewedCommit": "620d688877958c519f3d4948c09f2804b9a77b6e",
+        "publishedHead": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
+        "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+        "checkedAt": "2026-10-11T07:54:26.555Z"
+      }
+    },
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "reviewComments": {
+      "checkedAt": "2026-10-11T05:27:46.3582178Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1140.json",
+      "items": [],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      }
+    },
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:55:33Z",
+      "mergeCommit": "5d446fb1798fdaae7e0e6b3b971942c486f80ed5",
+      "publishedHead": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
+      "reviewedCommit": "620d688877958c519f3d4948c09f2804b9a77b6e",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  },
+  {
+    "id": "material-preset-roundtrip",
+    "findings": ["EUM-01", "EUM-02", "EUM-03"],
+    "title": "Preserve material preset identity and process metadata when editing",
+    "auditBatch": 1,
+    "branch": "codex/audit-material-preset-roundtrip-20261011",
+    "files": [
+      "src/ui/material-library/wizard/WizardIdentityStep.tsx",
+      "src/ui/material-library/wizard/wizard-recipe.ts",
+      "src/ui/material-library/wizard/MaterialPresetWizard.identity.test.tsx"
+    ],
+    "status": "merged-ci-verified",
+    "newRegressions": 20,
+    "integrationCommit": "d44779477d438f1f36fdf3aaca55e6f9fa9843be",
+    "publishedHead": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
+    "pullRequest": {
+      "number": 1141,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1141"
+    },
+    "localVerification": {
+      "report": "docs/audits/2026-10-11-pr-history/repair-summary.md",
+      "result": "passed",
+      "scope": "Focused regressions and related suites; typecheck, lint, changed formatting, file size and diff checks"
+    },
+    "ci": {
+      "status": "passed",
+      "head": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.601Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:25:36Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754423/job/114391541489",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T05:20:48Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:28:57Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754451/job/114391541823",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T05:21:04Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:00:38Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754437/job/114391541257",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T04:58:10Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:48:36Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754437/job/114391541865",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T04:48:36Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:07:59Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754423/job/114391541321",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T04:53:33Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:19:37Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754451/job/114391541394",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T05:16:21Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:15:25Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754423/job/114391541445",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T04:56:08Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:33:13Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754423/job/114391541465",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T05:11:49Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:16:38Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754423/job/114391541446",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T05:00:38Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:48:36Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754437/job/114391541959",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T04:48:36Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:43:00Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754423/job/114398470277",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T05:42:33Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:30:19Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754451/job/114391541419",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T05:16:41Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:32:45Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754451/job/114391541396",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T05:18:42Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:16:20Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754451/job/114391541395",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T05:02:49Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:15:28Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754451/job/114391541354",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T05:01:18Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:05:54Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754451/job/114391541372",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T05:01:19Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:50:22Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112754451/job/114398393959",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T05:49:55Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T04:48:42Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "isolatedVerification": {
+      "head": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
+      "testsPassed": 20,
+      "testFiles": 1,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "checkedAt": "2026-10-11T04:48:23.466Z"
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "foundation_prs",
+      "kind": "independent bounded source and regression review",
+      "integrationCommit": "d44779477d438f1f36fdf3aaca55e6f9fa9843be",
+      "report": "docs/audits/2026-10-11-pr-history/publication-review-ui.md",
+      "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
+      "verifiedPublishedHead": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
+      "sourceAttestation": {
+        "reviewedCommit": "d44779477d438f1f36fdf3aaca55e6f9fa9843be",
+        "publishedHead": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
+        "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+        "checkedAt": "2026-10-11T07:54:26.849Z"
+      }
+    },
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "reviewComments": {
+      "checkedAt": "2026-10-11T05:27:46.2534429Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1141.json",
+      "items": [],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      }
+    },
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:55:46Z",
+      "mergeCommit": "d03f7d088ad3bccda8f89d7c9692c49accc32e6b",
+      "publishedHead": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
+      "reviewedCommit": "d44779477d438f1f36fdf3aaca55e6f9fa9843be",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  },
+  {
+    "id": "camera-preview-url",
+    "findings": ["CCA-001"],
+    "title": "Keep camera cache busting outside the upstream snapshot URL",
+    "auditBatch": 2,
+    "branch": "codex/audit-camera-preview-url-20261011",
+    "files": [
+      "src/ui/camera/NetworkCameraView.tsx",
+      "src/ui/camera/frame-source.ts",
+      "src/ui/camera/NetworkCameraView.preview.test.tsx"
+    ],
+    "status": "merged-ci-verified",
+    "newRegressions": 4,
+    "integrationCommit": "2950eaaed7019b506bad9e4756d5170187aaae07",
+    "publishedHead": "335b6e8438f2694b005c906bce761894cc479e98",
+    "pullRequest": {
+      "number": 1142,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1142"
+    },
+    "localVerification": {
+      "report": "docs/audits/2026-10-11-pr-history/batch-02/repair-summary.md",
+      "result": "passed",
+      "scope": "Focused regressions and related suites; typecheck, lint, changed formatting, file size and diff checks"
+    },
+    "ci": {
+      "status": "passed",
+      "head": "335b6e8438f2694b005c906bce761894cc479e98",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.601Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:00:39Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848869/job/114391820245",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T04:57:16Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:58:59Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848885/job/114391820159",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T04:51:05Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:04:19Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848879/job/114391820336",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T05:00:52Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:50:25Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848879/job/114391820926",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T04:50:26Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:35:14Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848869/job/114391820346",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T05:23:19Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:51:59Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848885/job/114391820258",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T05:48:35Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:52:26Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848869/job/114391820390",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T05:36:05Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:55:34Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848869/job/114391820376",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T05:32:44Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:03:38Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848869/job/114391820403",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T05:49:26Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:50:25Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848879/job/114391821003",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T04:50:26Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:21:14Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848869/job/114403238156",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T06:20:47Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:27:02Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848885/job/114391820270",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T05:18:41Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:55:00Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848885/job/114391820288",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T05:41:21Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:59:07Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848885/job/114391820303",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T05:45:26Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:20:46Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848885/job/114391820229",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T05:11:45Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:45:13Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848885/job/114391820299",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T05:41:16Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:09:16Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112848885/job/114402485076",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T06:08:47Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T04:50:31Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "isolatedVerification": {
+      "head": "335b6e8438f2694b005c906bce761894cc479e98",
+      "testsPassed": 4,
+      "testFiles": 1,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "checkedAt": "2026-10-11T04:50:12.497Z"
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "early_dependencies_tooling",
+      "kind": "independent bounded source and regression review",
+      "integrationCommit": "2950eaaed7019b506bad9e4756d5170187aaae07",
+      "report": "docs/audits/2026-10-11-pr-history/batch-03/camera-peer-review.md",
+      "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
+      "verifiedPublishedHead": "335b6e8438f2694b005c906bce761894cc479e98",
+      "sourceAttestation": {
+        "reviewedCommit": "2950eaaed7019b506bad9e4756d5170187aaae07",
+        "publishedHead": "335b6e8438f2694b005c906bce761894cc479e98",
+        "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+        "checkedAt": "2026-10-11T07:54:27.086Z"
+      }
+    },
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "reviewComments": {
+      "checkedAt": "2026-10-11T05:28:08.3215371Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1142.json",
+      "items": [],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      }
+    },
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:56:01Z",
+      "mergeCommit": "ca3833d928882fe09bc5d31bcfe417ec64f14424",
+      "publishedHead": "335b6e8438f2694b005c906bce761894cc479e98",
+      "reviewedCommit": "2950eaaed7019b506bad9e4756d5170187aaae07",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  },
+  {
+    "id": "selected-node-drag",
+    "findings": ["CCA-002"],
+    "title": "Anchor node selection drags and snapping to the grabbed node",
+    "auditBatch": 2,
+    "branch": "codex/audit-selected-node-drag-20261011",
+    "files": [
+      "src/ui/workspace/path-node-drag.ts",
+      "src/ui/workspace/workspace-pointer-snap.ts",
+      "src/ui/workspace/path-node-drag.test.ts",
+      "src/ui/workspace/workspace-pointer-snap.test.ts",
+      "src/ui/workspace/use-workspace-node-drag.test.tsx"
+    ],
+    "status": "merged-ci-verified",
+    "newRegressions": 18,
+    "integrationCommit": "9b12370cdbbb4b866f990729e29b94f06eb69d93",
+    "publishedHead": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
+    "pullRequest": {
+      "number": 1143,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1143"
+    },
+    "localVerification": {
+      "report": "docs/audits/2026-10-11-pr-history/batch-02/repair-summary.md",
+      "result": "passed",
+      "scope": "Focused regressions and related suites; typecheck, lint, changed formatting, file size and diff checks"
+    },
+    "ci": {
+      "status": "passed",
+      "head": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.601Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:00:56Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958549/job/114392140557",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T04:56:44Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:13:40Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958567/job/114392140474",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T05:05:36Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:01:20Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958537/job/114392140194",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T04:57:58Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:52:28Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958537/job/114392140980",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T04:52:29Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:02:05Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958549/job/114392140770",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T05:43:02Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:01:16Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958567/job/114392140440",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T04:57:54Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:29:44Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958549/job/114392140672",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T05:10:10Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:06:53Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958549/job/114392140888",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T05:47:52Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:36:21Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958549/job/114392140716",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T05:18:30Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:52:28Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958537/job/114392140820",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T04:52:29Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:22:44Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958549/job/114403752417",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T06:22:09Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:18:28Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958567/job/114392140468",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T05:04:49Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:11:34Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958567/job/114392140434",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T04:57:40Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:13:00Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958567/job/114392140454",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T04:59:17Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:18:36Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958567/job/114392140513",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T05:09:54Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:56:06Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958567/job/114392140316",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T04:52:48Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:40:43Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38112958567/job/114396210337",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T05:40:11Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T04:52:34Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "isolatedVerification": {
+      "head": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
+      "testsPassed": 27,
+      "testFiles": 3,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "checkedAt": "2026-10-11T04:52:15.031Z"
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "foundation_prs",
+      "kind": "independent bounded source and regression review",
+      "integrationCommit": "9b12370cdbbb4b866f990729e29b94f06eb69d93",
+      "report": "docs/audits/2026-10-11-pr-history/publication-review-ui.md",
+      "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
+      "verifiedPublishedHead": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
+      "sourceAttestation": {
+        "reviewedCommit": "9b12370cdbbb4b866f990729e29b94f06eb69d93",
+        "publishedHead": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
+        "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+        "checkedAt": "2026-10-11T07:54:27.329Z"
+      }
+    },
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "reviewComments": {
+      "checkedAt": "2026-10-11T05:28:03.9146754Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1143.json",
+      "items": [],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      }
+    },
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:56:12Z",
+      "mergeCommit": "21115ae4a9216f3241bbf5b09ddc0a2c01857a4d",
+      "publishedHead": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
+      "reviewedCommit": "9b12370cdbbb4b866f990729e29b94f06eb69d93",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  },
+  {
+    "id": "closed-contour-fairing",
+    "findings": ["B02-TRACE-001"],
+    "title": "Close contour fairing spans at their actual corner",
+    "auditBatch": 2,
+    "branch": "codex/audit-closed-contour-fairing-20261011",
+    "files": [
+      "src/core/trace/fair-chain.ts",
+      "src/core/trace/fair-chain-closed.test.ts",
+      "src/core/trace/contour-fairing-measured.test.ts"
+    ],
+    "status": "merged-ci-verified",
+    "newRegressions": 13,
+    "integrationCommit": "1a707ba87f6af1f3bd8f93c3d319f044bdf2e6eb",
+    "publishedHead": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
+    "pullRequest": {
+      "number": 1144,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1144"
+    },
+    "localVerification": {
+      "report": "docs/audits/2026-10-11-pr-history/batch-02/repair-summary.md",
+      "result": "passed",
+      "scope": "Focused regressions and related suites; typecheck, lint, changed formatting, file size and diff checks"
+    },
+    "ci": {
+      "status": "passed",
+      "head": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.601Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:04:59Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117403/job/114392600066",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T05:01:05Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:51:30Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117415/job/114392600344",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T05:45:56Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:00:43Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117411/job/114392600150",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T04:57:44Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:55:26Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117411/job/114392600730",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T04:55:26Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:55:34Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117403/job/114392600288",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T05:36:02Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:00:51Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117415/job/114392600091",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T04:57:56Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:53:45Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117403/job/114392600224",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T05:33:28Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:05:27Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117403/job/114392600283",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T05:42:35Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:29:46Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117403/job/114392600376",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T06:08:47Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:55:26Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117411/job/114392600843",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T04:55:26Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:32:54Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117403/job/114407431945",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T06:32:16Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:17:15Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117415/job/114392600277",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T05:03:26Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:34:58Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117415/job/114392600314",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T05:26:35Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:24:16Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117415/job/114392600475",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T06:10:43Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:15:25Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117415/job/114392600427",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T06:06:55Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:04:59Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117415/job/114392600346",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T06:00:25Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:36:03Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113117415/job/114406546723",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T06:35:30Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T04:55:33Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "isolatedVerification": {
+      "head": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
+      "testsPassed": 13,
+      "testFiles": 2,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "checkedAt": "2026-10-11T04:55:14.100Z"
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "root",
+      "kind": "coordinator source review; implementer publication self-review separately labelled",
+      "integrationCommit": "1a707ba87f6af1f3bd8f93c3d319f044bdf2e6eb",
+      "report": "docs/audits/2026-10-11-pr-history/batch-03/svg-fairing-publication-review.md",
+      "limitation": "The written publication report is author self-review; root supplied the separate source review. No browser or hardware qualification.",
+      "verifiedPublishedHead": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
+      "sourceAttestation": {
+        "reviewedCommit": "1a707ba87f6af1f3bd8f93c3d319f044bdf2e6eb",
+        "publishedHead": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
+        "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+        "checkedAt": "2026-10-11T07:54:27.632Z"
+      }
+    },
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "reviewComments": {
+      "checkedAt": "2026-10-11T05:28:05.4881314Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1144.json",
+      "items": [],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      }
+    },
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:56:24Z",
+      "mergeCommit": "74a5deb15320e319656019c97afdb7f4b19e3326",
+      "publishedHead": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
+      "reviewedCommit": "1a707ba87f6af1f3bd8f93c3d319f044bdf2e6eb",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  },
+  {
+    "id": "board-correction-ownership",
+    "findings": ["BRP-01"],
+    "title": "Preserve restored board dimensions when a stale correction completes",
+    "auditBatch": 2,
+    "branch": "codex/audit-board-correction-ownership-20261011",
+    "files": [
+      "src/ui/laser/board-capture/use-board-capture-handlers.ts",
+      "src/ui/laser/board-capture/BoardCapturePanel.correction-ownership.test.tsx"
+    ],
+    "status": "merged-ci-verified",
+    "newRegressions": 13,
+    "integrationCommit": "9b6465c7daf8cbc4609d7439084951d7200cdf3b",
+    "publishedHead": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
+    "pullRequest": {
+      "number": 1145,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1145"
+    },
+    "localVerification": {
+      "report": "docs/audits/2026-10-11-pr-history/batch-02/repair-summary.md",
+      "result": "passed",
+      "scope": "Focused regressions and related suites; typecheck, lint, changed formatting, file size and diff checks"
+    },
+    "ci": {
+      "status": "passed",
+      "head": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.601Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:49:53Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244277/job/114392969474",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T05:45:15Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:00:23Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244261/job/114392969497",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T05:52:28Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:02:22Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244268/job/114392969498",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T04:59:01Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:57:51Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244268/job/114392970371",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T04:57:52Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:50:02Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244277/job/114392969485",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T05:33:49Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:21:30Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244261/job/114392969483",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T06:18:01Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:20:41Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244277/job/114392969478",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T05:01:22Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:05:30Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244277/job/114392969514",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T05:43:52Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:47:50Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244277/job/114392969473",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T05:27:42Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T04:57:51Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244268/job/114392970331",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T04:57:52Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:16:04Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244277/job/114403530974",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T06:15:31Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:32:00Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244261/job/114392969543",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T06:18:36Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:20:58Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244261/job/114392969525",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T06:07:00Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:40:09Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244261/job/114392969475",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T05:31:32Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:33:15Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244261/job/114392969552",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T06:19:12Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:33:26Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244261/job/114392969337",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T05:28:58Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:40:17Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113244261/job/114407995441",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T06:39:41Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T04:57:57Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "isolatedVerification": {
+      "head": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
+      "testsPassed": 13,
+      "testFiles": 1,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "checkedAt": "2026-10-11T04:57:39.783Z"
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "foundation_prs",
+      "kind": "independent bounded source and regression review",
+      "integrationCommit": "9b6465c7daf8cbc4609d7439084951d7200cdf3b",
+      "report": "docs/audits/2026-10-11-pr-history/publication-review-ui.md",
+      "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
+      "verifiedPublishedHead": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
+      "sourceAttestation": {
+        "reviewedCommit": "9b6465c7daf8cbc4609d7439084951d7200cdf3b",
+        "publishedHead": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
+        "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+        "checkedAt": "2026-10-11T07:54:27.884Z"
+      }
+    },
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "reviewComments": {
+      "checkedAt": "2026-10-11T05:28:18.9693137Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1145.json",
+      "items": [],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      }
+    },
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:56:40Z",
+      "mergeCommit": "59e88f1b23d641bcdc727826d346a35a7fd9c403",
+      "publishedHead": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
+      "reviewedCommit": "9b6465c7daf8cbc4609d7439084951d7200cdf3b",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  },
+  {
+    "id": "concave-helical-pockets",
+    "findings": ["B03-CNC-001"],
+    "title": "Check complete ring containment for concave helical pockets",
+    "auditBatch": 3,
+    "branch": "codex/audit-concave-helical-pockets-20261011",
+    "files": ["src/core/cnc/helical-entry.ts", "src/core/cnc/helical-entry-containment.test.ts"],
+    "status": "merged-ci-verified",
+    "newRegressions": 8,
+    "integrationCommit": "23c7eb110fb82bf776ea0947367a95739e4a7d22",
+    "publishedHead": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
+    "pullRequest": {
+      "number": 1146,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1146"
+    },
+    "localVerification": {
+      "result": "passed",
+      "testsPassed": 30,
+      "testFiles": 5,
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "report": "docs/audits/2026-10-11-pr-history/publication/helical-performance-repair.md"
+    },
+    "ci": {
+      "status": "passed",
+      "head": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.601Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:12:20Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357229/job/114398574447",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T06:08:48Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:17:05Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357246/job/114402539661",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T06:09:18Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:42:15Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357243/job/114396180928",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T05:38:51Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:18:24Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357243/job/114396181811",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T05:18:25Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:06:09Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357229/job/114398574163",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T05:46:29Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:17:17Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357246/job/114402539772",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T06:14:56Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:18:09Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357229/job/114398574437",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T05:59:30Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:28:03Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357229/job/114398574475",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T06:12:21Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:14:54Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357229/job/114398574378",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T05:53:33Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:18:24Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357243/job/114396181598",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T05:18:25Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:38:28Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357229/job/114407161434",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T06:37:59Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:34:52Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357246/job/114402539821",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T06:22:17Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:30:33Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357246/job/114402539798",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T06:21:49Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:46:44Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357246/job/114402539813",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T06:32:56Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:42:23Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357246/job/114402539852",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T06:28:05Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:25:56Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357246/job/114402539801",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T06:21:32Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:49:07Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114357246/job/114410136180",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T06:48:41Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T05:18:31Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "isolatedVerification": {
+      "head": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
+      "testsPassed": 30,
+      "testFiles": 5,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "checkedAt": "2026-10-11T05:18:24.904Z"
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "early_ui_materials",
+      "kind": "independent source review, complete-plan differential controls and bounded before/after performance measurement",
+      "integrationCommit": "736fa82bda025ff773ede5be32f4683100e6c62a",
+      "report": "docs/audits/2026-10-11-pr-history/publication/remaining-pr-triage.md",
+      "scope": "33 differential controls and dense 512/1024/2048-vertex rings; contact-heavy and pre-existing entry-search complexity retained",
+      "verifiedPublishedHead": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
+      "sourceAttestation": {
+        "reviewedCommit": "736fa82bda025ff773ede5be32f4683100e6c62a",
+        "publishedHead": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
+        "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+        "checkedAt": "2026-10-11T07:54:28.155Z"
+      }
+    },
+    "previousReviews": [
+      {
+        "status": "approved",
+        "reviewer": "foundation_prs",
+        "kind": "independent bounded source and regression review",
+        "integrationCommit": "23c7eb110fb82bf776ea0947367a95739e4a7d22",
+        "report": "docs/audits/2026-10-11-pr-history/batch-03/cnc-peer-review.md",
+        "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate."
+      }
+    ],
+    "followUpCommits": ["736fa82bda025ff773ede5be32f4683100e6c62a"],
+    "verificationTestFiles": [
+      "src/core/cnc/helical-entry-containment.test.ts",
+      "src/core/cnc/helical-entry.test.ts",
+      "src/core/cnc/compile-cnc-pocket-strategies.test.ts",
+      "src/core/output/cnc-grbl-helical.test.ts",
+      "src/core/cnc/vcarve-boundary-segment-index.test.ts"
+    ],
+    "publicationDescription": "Valid concave helical pockets were rejected because their area centroid can lie outside the enclosing pocket. Validate the complete ring, including closing edges, with the existing segment-containment predicate. Reuse the existing boundary index to skip repeated full scans only where a conservatively padded edge box cannot contact the boundary; possible contacts retain complete interval checks.\n\nRegressions cover concavity, closing-edge crossings, tangency, coincidence, disconnected rings, islands and dense separated rings. Independent differential controls preserve complete generated plans. In the bounded eight-ring, 2048-vertex benchmark, the first repair took about 2.38 seconds and the indexed version 1.12 seconds, matching the earlier 1.15-second baseline. A deterministic regression reduces full-boundary checks from 768 to 3 for separated rings. Contact-heavy cases and the existing entry search retain their previous worst-case work.",
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "previousPublishedHeads": ["21c8971e9232fe04b39f2edfab8ef601c0bbaa3a"],
+    "publishedFollowUpCommits": ["736fa82bda025ff773ede5be32f4683100e6c62a"],
+    "reviewComments": {
+      "checkedAt": "2026-10-11T05:28:26.5785450Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1146.json",
+      "items": [
+        {
+          "id": 4240337078,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1146#discussion_r4240337078",
+          "commentedHead": "21c8971e9232fe04b39f2edfab8ef601c0bbaa3a",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2"
+        }
+      ],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      }
+    },
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:56:53Z",
+      "mergeCommit": "5aa66e668ae51c6e961f759fb56aae19d13aaf7c",
+      "publishedHead": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
+      "reviewedCommit": "736fa82bda025ff773ede5be32f4683100e6c62a",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  },
+  {
+    "id": "manual-tabs-binding",
+    "findings": ["B03-CNC-002"],
+    "title": "Preserve manual tabs across explicit operation bindings",
+    "auditBatch": 3,
+    "branch": "codex/audit-manual-tabs-binding-20261011",
+    "files": [
+      "src/core/cnc/collect-cnc-contours.ts",
+      "src/core/cnc/compile-cnc-manual-tabs.test.ts"
+    ],
+    "status": "merged-ci-verified",
+    "newRegressions": 4,
+    "integrationCommit": "04790c91049360688bddfb486a44bd01786281f5",
+    "publishedHead": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
+    "pullRequest": {
+      "number": 1147,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1147"
+    },
+    "localVerification": {
+      "result": "passed",
+      "testsPassed": 63,
+      "testFiles": 11,
+      "scope": "Combined CNC repairs and surrounding geometry/compiler suites; independent five-probe review; full integrated TypeScript",
+      "report": "docs/audits/2026-10-11-pr-history/batch-03/cnc-repairs.md"
+    },
+    "ci": {
+      "status": "passed",
+      "head": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.601Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:17:38Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496254/job/114393696321",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T06:12:36Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:17:05Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496221/job/114393696080",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T06:08:49Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:38:42Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496231/job/114393695877",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T05:35:15Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:02:24Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496231/job/114393696862",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T05:02:25Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:12:34Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496254/job/114393696062",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T05:50:39Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:58:55Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496221/job/114393695951",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T05:55:36Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:07:47Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496254/job/114393696122",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T05:55:35Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:53:31Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496254/job/114393696049",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T05:30:20Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:38:49Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496254/job/114393696034",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T05:26:06Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:02:24Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496231/job/114393696759",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T05:02:25Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:22:07Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496254/job/114405481245",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T06:21:34Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:23:57Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496221/job/114393696073",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T06:15:26Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:12:02Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496221/job/114393695987",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T05:59:08Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:30:29Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496221/job/114393696032",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T06:16:49Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:45:54Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496221/job/114393695953",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T05:34:40Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:33:47Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496221/job/114393695844",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T05:29:45Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:37:57Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113496221/job/114407547963",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T06:37:28Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T05:02:32Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "isolatedVerification": {
+      "head": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
+      "testsPassed": 7,
+      "testFiles": 1,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "checkedAt": "2026-10-11T05:02:10.210Z"
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "foundation_prs",
+      "kind": "independent bounded source and regression review",
+      "integrationCommit": "04790c91049360688bddfb486a44bd01786281f5",
+      "report": "docs/audits/2026-10-11-pr-history/batch-03/cnc-peer-review.md",
+      "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
+      "verifiedPublishedHead": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
+      "sourceAttestation": {
+        "reviewedCommit": "04790c91049360688bddfb486a44bd01786281f5",
+        "publishedHead": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
+        "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+        "checkedAt": "2026-10-11T07:54:28.459Z"
+      }
+    },
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "reviewComments": {
+      "checkedAt": "2026-10-11T05:28:23.2994166Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1147.json",
+      "items": [],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      }
+    },
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:57:03Z",
+      "mergeCommit": "06151587703a8566bd4003aaf9b1122ccbb150fa",
+      "publishedHead": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
+      "reviewedCommit": "04790c91049360688bddfb486a44bd01786281f5",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  },
+  {
+    "id": "zero-z-owner",
+    "findings": ["MTX-001"],
+    "title": "Bind manual Zero Z evidence to its initiating tool and reference",
+    "auditBatch": 3,
+    "branch": "codex/audit-zero-z-owner-20261011",
+    "files": [
+      "src/ui/state/laser-origin-actions.ts",
+      "src/ui/state/laser-store-zero-z-ownership.test.ts"
+    ],
+    "status": "merged-ci-verified",
+    "newRegressions": 6,
+    "integrationCommit": "ca04af210e1f0499bfc1e5ace953b8f694167c9c",
+    "publishedHead": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
+    "pullRequest": {
+      "number": 1148,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1148"
+    },
+    "localVerification": {
+      "result": "passed",
+      "testsPassed": 61,
+      "testFiles": 8,
+      "scope": "Origin, evidence, advisory, tool change and transaction ownership; full TypeScript after test union narrowing",
+      "report": "docs/audits/2026-10-11-pr-history/batch-03/zero-z-repair.md"
+    },
+    "ci": {
+      "status": "passed",
+      "head": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.602Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:17:20Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623696/job/114394061867",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T05:12:15Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:34:38Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623694/job/114394062066",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T05:27:03Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:23:59Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623690/job/114394061810",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T05:20:42Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:04:44Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623690/job/114394062468",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T05:04:44Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:05:12Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623696/job/114394062027",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T05:52:01Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:58:23Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623694/job/114394062048",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T05:55:02Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:33:17Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623696/job/114394061969",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T05:17:21Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:04:21Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623696/job/114394062051",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T05:40:45Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:46:01Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623696/job/114394062016",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T05:33:15Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:04:44Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623690/job/114394062473",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T05:04:44Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:21:31Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623696/job/114403484920",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T06:21:00Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:17:08Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623694/job/114394062069",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T06:06:38Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:26:34Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623694/job/114394062013",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T05:15:27Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:48:33Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623694/job/114394062098",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T05:35:00Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:27:08Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623694/job/114394062085",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T06:18:11Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:09:17Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623694/job/114394061947",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T05:05:01Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:29:47Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113623694/job/114407015272",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T06:29:13Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T05:04:50Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "early_dependencies_tooling",
+      "kind": "independent bounded source and regression review",
+      "integrationCommit": "ca04af210e1f0499bfc1e5ace953b8f694167c9c",
+      "report": "docs/audits/2026-10-11-pr-history/batch-03/zero-z-peer-review.md",
+      "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
+      "verifiedPublishedHead": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
+      "sourceAttestation": {
+        "reviewedCommit": "ca04af210e1f0499bfc1e5ace953b8f694167c9c",
+        "publishedHead": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
+        "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+        "checkedAt": "2026-10-11T07:54:28.722Z"
+      }
+    },
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "isolatedVerification": {
+      "head": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
+      "testsPassed": 6,
+      "testFiles": 1,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "checkedAt": "2026-10-11T05:04:32.721Z"
+    },
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "reviewComments": {
+      "checkedAt": "2026-10-11T05:29:18.9017394Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1148.json",
+      "items": [],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      }
+    },
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:57:15Z",
+      "mergeCommit": "baebdb26f4bb8753cd26bce1ac37353cc9bc70ee",
+      "publishedHead": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
+      "reviewedCommit": "ca04af210e1f0499bfc1e5ace953b8f694167c9c",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  },
+  {
+    "id": "external-program-timing",
+    "findings": ["WUX-001"],
+    "title": "Use imported program timing for 2D playback",
+    "auditBatch": 3,
+    "branch": "codex/audit-external-program-timing-20261011",
+    "files": [
+      "src/core/execution-plan/assemble-executable-plan.ts",
+      "src/core/execution-plan/executable-plan-schema.test.ts",
+      "src/core/execution-plan/executable-plan-types.ts",
+      "src/core/gcode-time/gcode-timing-dwell-progress.test.ts",
+      "src/core/gcode-time/gcode-timing-plan.ts",
+      "src/core/gcode-time/program-dwell-order.test.ts",
+      "src/core/gcode-time/program-time.ts",
+      "src/core/gcode-time/program-timeline.ts",
+      "src/core/gcode-view/canned-cycle-modal.test.ts",
+      "src/core/gcode-view/render-model-types.ts",
+      "src/core/gcode-view/render-model-words.ts",
+      "src/core/gcode/modal-axes.test.ts",
+      "src/core/gcode/modal-axes.ts",
+      "src/io/gcode/gcode-program-line-parser.ts",
+      "src/ui/app/gcode-open-action.ts",
+      "src/ui/app/gcode-open-preview-timing.test.ts",
+      "src/ui/import/gcode-preview-timing-supported.test.ts",
+      "src/ui/import/gcode-preview-timing.test.ts",
+      "src/ui/import/gcode-preview-timing.ts",
+      "src/ui/import/import-worker-client.ts",
+      "src/ui/import/import-worker-protocol.ts",
+      "src/ui/import/import-worker.ts",
+      "src/ui/import/packed-gcode-result.ts",
+      "src/ui/import/parse-gcode-blob.ts",
+      "src/ui/state/external-gcode-actions.ts",
+      "src/ui/state/live-job-timing.test.ts",
+      "src/ui/state/store.ts",
+      "src/ui/state/ui-store.ts",
+      "src/ui/workspace/Workspace.tsx",
+      "src/ui/workspace/WorkspaceButtons.audit.test.tsx",
+      "src/ui/workspace/imported-preview-controls.test.tsx",
+      "src/ui/workspace/imported-preview-playback.test.tsx",
+      "src/ui/workspace/preview-estimate-breakdown.tsx",
+      "src/ui/workspace/preview-overlays.tsx",
+      "src/ui/workspace/use-preview-estimate.ts",
+      "src/ui/workspace/use-preview-playback.ts",
+      "src/ui/workspace/use-preview-toolpath.test.tsx",
+      "src/ui/workspace/use-preview-toolpath.ts"
+    ],
+    "status": "merged-ci-verified",
+    "newRegressions": null,
+    "integrationCommit": "6676114a9594f8b79fc2eeb5acc13c9294235e27",
+    "publishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+    "pullRequest": {
+      "number": 1149,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149"
+    },
+    "localVerification": {
+      "previousVerification": {
+        "previousVerification": {
+          "result": "passed",
+          "scope": "17 suites/111 initial tests, affected 35 and final 27 test executions; full TypeScript, scoped lint, formatting, file-size policy and independent peer review plus three probes; execution counts overlap",
+          "report": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md",
+          "followUpReport": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md",
+          "originalReport": "docs/audits/2026-10-11-pr-history/batch-03/external-preview-repair.md"
+        },
+        "result": "passed",
+        "testsPassed": 35,
+        "testFiles": 5,
+        "scopedLint": "passed",
+        "changedFormatting": "passed",
+        "whitespace": "passed",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-repair.md"
+      },
+      "result": "passed",
+      "testsPassed": 130,
+      "testFiles": 14,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "whitespace": "passed",
+      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-repair.md"
+    },
+    "ci": {
+      "status": "passed",
+      "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.602Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:57:59Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904796/job/114421135682",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:59:23Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421135754",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:56:05Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904798/job/114421135650",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:53:35Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904798/job/114421136685",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T07:53:36Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T08:09:06Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904796/job/114421135638",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:56:09Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421135617",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T08:10:01Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904796/job/114421135701",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T08:11:04Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904796/job/114421135531",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T08:08:53Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904796/job/114421135588",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:53:35Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904798/job/114421136434",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T07:53:35Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T08:11:36Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904796/job/114424161896",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T08:11:06Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T08:01:50Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421135740",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T08:07:27Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421136224",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T08:04:27Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421135897",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T08:07:49Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421135782",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:57:34Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421135721",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T08:08:18Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114423596491",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T08:07:51Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T07:53:40Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "browserVerification": {
+      "head": "c2dda26f4d60bd4b8c2850aacad56b0b51a4efc2",
+      "result": "passed",
+      "report": "docs/audits/2026-10-11-pr-history/batch-03/external-preview-browser.md",
+      "scope": "Actual Chrome UI and real import worker; F60/F6000 timing and speed plus stationary G4 dwell; fixture file picker, warm runtime, no hardware"
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "foundation_prs",
+      "kind": "Independent six-file same-block dwell progress and closed-v1 event projection review; earlier approved source retained",
+      "integrationCommit": "b87f289594735c5f1dc54f635a15078907f36619",
+      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
+      "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
+      "previousApproval": {
+        "status": "approved",
+        "reviewer": "foundation_prs",
+        "kind": "Independent two-file CI render-loop reproduction and idempotence repair; earlier approved source retained",
+        "integrationCommit": "fc43c8ded36066a8a4885b1c8fcb73e7c65c91e8",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-review.md",
+        "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
+        "previousApproval": {
+          "status": "approved",
+          "reviewer": "foundation_prs",
+          "kind": "Independent full follow-up diff, real emitter comparisons and control regressions; original focused diff review retained",
+          "integrationCommit": "f142cb016818ade49a51bf8859086b8e007aaf18",
+          "report": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md",
+          "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
+          "previousApproval": {
+            "status": "approved",
+            "reviewer": "foundation_prs",
+            "kind": "independent bounded source and regression review",
+            "integrationCommit": "6676114a9594f8b79fc2eeb5acc13c9294235e27",
+            "report": "docs/audits/2026-10-11-pr-history/batch-03/external-preview-peer-review.md",
+            "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
+            "verifiedPublishedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
+            "sourceAttestation": {
+              "reviewedCommit": "6676114a9594f8b79fc2eeb5acc13c9294235e27",
+              "publishedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
+              "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+              "checkedAt": "2026-10-11T05:18:56.756Z"
+            }
+          },
+          "fileManifest": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-files.json",
+          "verifiedPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+          "sourceAttestation": {
+            "reviewedCommit": "f142cb016818ade49a51bf8859086b8e007aaf18",
+            "publishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+            "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+            "checkedAt": "2026-10-11T06:39:57.226Z"
+          }
+        },
+        "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-files.json",
+        "pendingCiFinding": {
+          "run": 38115826326,
+          "job": 114401184688,
+          "head": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-failure.log",
+          "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-red.json",
+          "result": "Confirmed inactive state-update loop repaired in an independently approved two-file commit. The previously unfinished unchanged suite passed all three modes; replacement latest-head hosted CI is pending.",
+          "status": "repaired-published-awaiting-ci",
+          "repairPublishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e"
+        },
+        "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-commit-attestation.json",
+        "verifiedPublishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+        "sourceAttestation": {
+          "reviewedCommit": "fc43c8ded36066a8a4885b1c8fcb73e7c65c91e8",
+          "publishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+          "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+          "checkedAt": "2026-10-11T07:12:21.750Z"
+        },
+        "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-published-review.md"
+      },
+      "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-files.json",
+      "pendingCiFinding": {
+        "run": 38115826326,
+        "job": 114401184688,
+        "head": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-failure.log",
+        "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-red.json",
+        "result": "Confirmed inactive-clear state loop was independently repaired and published; the unchanged previously unfinished suite passed all three modes. Latest replacement-head CI is tracked in ci.",
+        "status": "repaired-published",
+        "repairPublishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e"
+      },
+      "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-commit-attestation.json",
+      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-published-review.md",
+      "pendingComments": [],
+      "verifiedPublishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+      "sourceAttestation": {
+        "reviewedCommit": "b87f289594735c5f1dc54f635a15078907f36619",
+        "publishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+        "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+        "checkedAt": "2026-10-11T07:54:28.991Z"
+      }
+    },
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "isolatedVerification": {
+      "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+      "testsPassed": 294,
+      "testFiles": 35,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/external-program-timing-followup-b87f28959473-2026-10-11T07-49-42-581Z-",
+      "checkedAt": "2026-10-11T07:53:39.570Z"
+    },
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "reviewComments": {
+      "checkedAt": "2026-10-11T05:28:45.1478067Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1149.json",
+      "items": [
+        {
+          "id": 4240361096,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361096",
+          "commentedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+        },
+        {
+          "id": 4240361100,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361100",
+          "commentedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+        },
+        {
+          "id": 4240361105,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361105",
+          "commentedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+        },
+        {
+          "id": 4240361108,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361108",
+          "commentedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+        },
+        {
+          "id": 4240361112,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361112",
+          "commentedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+        },
+        {
+          "id": 4240361117,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361117",
+          "commentedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
+          "status": "resolved-in-published-followup",
+          "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+        },
+        {
+          "id": 4240671071,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240671071",
+          "commentedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+          "status": "resolved-in-published-followup",
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
+          "resolvedByPublishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4"
+        },
+        {
+          "id": 4240671073,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240671073",
+          "commentedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+          "status": "resolved-in-published-followup",
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
+          "resolvedByPublishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4"
+        }
+      ],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      }
+    },
+    "followUpCommits": [
+      "f142cb016818ade49a51bf8859086b8e007aaf18",
+      "fc43c8ded36066a8a4885b1c8fcb73e7c65c91e8",
+      "b87f289594735c5f1dc54f635a15078907f36619"
+    ],
+    "verificationTestFiles": [
+      "src/core/execution-plan/build-executable-plan.test.ts",
+      "src/core/execution-plan/executable-plan-schema.test.ts",
+      "src/core/gcode-time/estimator-parity.test.ts",
+      "src/core/gcode-time/gcode-fractional-feed-time.test.ts",
+      "src/core/gcode-time/gcode-timing-calibration.test.ts",
+      "src/core/gcode-time/gcode-timing-dwell-progress.test.ts",
+      "src/core/gcode-time/gcode-timing-plan.test.ts",
+      "src/core/gcode-time/program-dwell-order.test.ts",
+      "src/core/gcode-time/program-native-controller-timing.test.ts",
+      "src/core/gcode-time/program-planner-window.test.ts",
+      "src/core/gcode-time/program-time-3d.test.ts",
+      "src/core/gcode-time/program-time-arc-length.test.ts",
+      "src/core/gcode-time/program-time-coordinate-representation.test.ts",
+      "src/core/gcode-time/program-time.test.ts",
+      "src/core/gcode-time/program-timeline.test.ts",
+      "src/core/gcode-time/program-transport-time.test.ts",
+      "src/core/gcode-view/canned-cycle-modal.test.ts",
+      "src/core/gcode-view/gcode-render-model-native-laser.test.ts",
+      "src/core/gcode-view/gcode-render-model.test.ts",
+      "src/core/gcode/modal-axes.test.ts",
+      "src/core/gcode/parser-equivalence.test.ts",
+      "src/ui/app/gcode-open-preview-timing.test.ts",
+      "src/ui/import/gcode-preview-timing-supported.test.ts",
+      "src/ui/import/gcode-preview-timing.test.ts",
+      "src/ui/import/packed-gcode-result.test.ts",
+      "src/ui/import/parse-gcode-blob.test.ts",
+      "src/ui/state/live-job-timing.test.ts",
+      "src/ui/state/ui-store.test.ts",
+      "src/ui/workspace/WorkspaceButtons.audit.test.tsx",
+      "src/ui/workspace/imported-preview-controls.test.tsx",
+      "src/ui/workspace/imported-preview-playback.test.tsx",
+      "src/ui/workspace/preview-overlays.test.tsx",
+      "src/ui/workspace/use-preview-playback.test.tsx",
+      "src/ui/workspace/use-preview-toolpath.test.tsx",
+      "src/ui/workspace/workspace-status-poll-renders.test.tsx"
+    ],
+    "publicationDescription": "Imported G-code preview previously used the background project estimate. Capture timing with the imported source and its machine assumptions, then use that same timeline for the displayed ETA and playback. Feed changes and dwell intervals now affect the imported route consistently.\n\nThe reviewed follow-up preserves timing for supported exported dialect words and explicit incremental arc centers, places same-block G4 before movement, and reports non-finite estimates as unavailable while retaining geometry. Play resumes a paused final dwell; Restart resets an initial dwell even when the distance scrubber is already zero. Unsupported source syntax keeps an explicit geometry-only fallback.\n\nHosted CI exposed a render loop when inactive preview received a new scheduler callback each render. Clearing an already-empty route now preserves state identity for the same imported owner. The original three status-poll tests remain unchanged and pass; bounded regressions cover idle owner changes and exit/reentry without stale geometry.\n\nLive route progress now counts same-block G4 dwell as complete when physical movement proves it has elapsed, without pre-crediting leading, future or trailing waits at stationary boundaries. ExecutablePlan v1 assembly projects dwell events to its existing kind/line/seconds contract; internal ordering metadata remains available to parser-based timing, and the exact G-code bytes and closed schema are unchanged.",
+    "previousPublishedHeads": [
+      "5bb3558b051251b575da6ccad93916ae8f4039e6",
+      "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+      "522e79f03d4ccc25494c23d0eda8aad33f33981e"
+    ],
+    "publishedFollowUpCommits": [
+      "f142cb016818ade49a51bf8859086b8e007aaf18",
+      "fc43c8ded36066a8a4885b1c8fcb73e7c65c91e8",
+      "b87f289594735c5f1dc54f635a15078907f36619"
+    ],
+    "independentVerification": {
+      "previousVerification": {
+        "testsPassed": 5,
+        "beforeFailed": 3,
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-review.md",
+        "note": "Bounded copy of the exact unfinished CI suite plus real imported-owner and cancellation controls; default application scheduler is stable, so no universal application OOM claim."
+      },
+      "testsPassed": 25,
+      "beforeFailed": 20,
+      "beforePassed": 5,
+      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
+      "note": "Identical independent baseline/candidate probes cover actual live ETA, line/route boundaries, after-motion stops, dwell schema validation and lexical round-trip; no hardware claim."
+    },
+    "isolatedVerificationHistory": [
+      {
+        "head": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+        "testsPassed": 225,
+        "testFiles": 29,
+        "typecheck": "passed",
+        "scopedLint": "passed",
+        "changedFormatting": "passed",
+        "fileSizePolicy": "passed",
+        "checkedAt": "2026-10-11T05:45:36.358Z"
+      },
+      {
+        "head": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+        "testsPassed": 242,
+        "testFiles": 31,
+        "typecheck": "passed",
+        "scopedLint": "passed",
+        "changedFormatting": "passed",
+        "fileSizePolicy": "passed",
+        "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/external-program-timing-followup-fc43c8ded360-2026-10-11T07-09-06-952Z-",
+        "checkedAt": "2026-10-11T07:11:29.309Z"
+      }
+    ],
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:57:27Z",
+      "mergeCommit": "c71f562381d3624b1048000644f3c1819ab9e757",
+      "publishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+      "reviewedCommit": "b87f289594735c5f1dc54f635a15078907f36619",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  },
+  {
+    "id": "variable-counter-bounds",
+    "findings": ["B03-VAR-001"],
+    "title": "Keep editable variable counters inside the persistence integer range",
+    "auditBatch": 3,
+    "branch": "codex/audit-variable-counter-bounds-20261011",
+    "files": [
+      "src/ui/text/VariableTextControls.tsx",
+      "src/ui/text/VariableTextControls.persistence.test.tsx"
+    ],
+    "status": "merged-ci-verified",
+    "newRegressions": 12,
+    "integrationCommit": "bbd9e3b055327212866f842be19fe45e6d5f5d57",
+    "publishedHead": "5db629ff40eb51254d39695cce9bee3fdb850109",
+    "pullRequest": {
+      "number": 1150,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1150"
+    },
+    "localVerification": {
+      "report": "docs/audits/2026-10-11-pr-history/batch-03/variable-counter-repair.md",
+      "testsPassed": 52,
+      "testFiles": 6,
+      "result": "passed",
+      "scope": "Real mounted text controls, store, sequence and Save/autosave preparation; scoped lint and formatting"
+    },
+    "ci": {
+      "status": "passed",
+      "head": "5db629ff40eb51254d39695cce9bee3fdb850109",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.602Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:08:53Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855568/job/114394726125",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T06:03:39Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:50:36Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855559/job/114394726143",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T05:43:29Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:49:49Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855540/job/114394726040",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T05:46:26Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:08:59Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855540/job/114394726704",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T05:09:00Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:25:14Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855568/job/114394726235",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T06:04:23Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:41:20Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855559/job/114394726147",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T05:38:02Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:36:03Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855568/job/114394726190",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T05:17:07Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:40:26Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855568/job/114394726224",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T06:17:39Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:36:00Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855568/job/114394726165",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T05:15:30Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:08:59Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855540/job/114394726682",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T05:09:00Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:41:08Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855568/job/114409145050",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T06:40:30Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:16:48Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855559/job/114394726198",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T06:03:04Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:17:59Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855559/job/114394726403",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T06:05:01Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:03:57Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855559/job/114394726176",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T05:51:06Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:06:59Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855559/job/114394726172",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T05:53:47Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T05:17:04Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855559/job/114394726058",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T05:12:34Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T06:19:10Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38113855559/job/114405536781",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T06:18:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T05:09:06Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "early_dependencies_tooling",
+      "kind": "independent bounded source and regression review",
+      "integrationCommit": "bbd9e3b055327212866f842be19fe45e6d5f5d57",
+      "report": "docs/audits/2026-10-11-pr-history/batch-03/variable-counter-peer-review.md",
+      "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
+      "verifiedPublishedHead": "5db629ff40eb51254d39695cce9bee3fdb850109",
+      "sourceAttestation": {
+        "reviewedCommit": "bbd9e3b055327212866f842be19fe45e6d5f5d57",
+        "publishedHead": "5db629ff40eb51254d39695cce9bee3fdb850109",
+        "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+        "checkedAt": "2026-10-11T07:54:29.404Z"
+      }
+    },
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "isolatedVerification": {
+      "head": "5db629ff40eb51254d39695cce9bee3fdb850109",
+      "testsPassed": 12,
+      "testFiles": 1,
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "checkedAt": "2026-10-11T05:08:45.016Z"
+    },
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "reviewComments": {
+      "checkedAt": "2026-10-11T05:28:40.8259247Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1150.json",
+      "items": [],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      }
+    },
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:57:39Z",
+      "mergeCommit": "f06a15800075c5b8aeb1230a91a0433f7c08948b",
+      "publishedHead": "5db629ff40eb51254d39695cce9bee3fdb850109",
+      "reviewedCommit": "bbd9e3b055327212866f842be19fe45e6d5f5d57",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  },
+  {
+    "id": "trace-diagnostic-defaults",
+    "findings": ["B04-DIAGNOSTIC-001"],
+    "title": "fix(test): align Edge diagnostics with current app defaults",
+    "auditBatch": 4,
+    "branch": "codex/audit-trace-diagnostic-defaults-20261011",
+    "files": [
+      "src/__fixtures__/perceptual/_edge-rough-smoothness.test.ts",
+      "src/__fixtures__/perceptual/_small-letter-facet.test.ts",
+      "src/__fixtures__/perceptual/_new-problems-audit.test.ts",
+      "src/__fixtures__/perceptual/region-enhance-recovery.test.ts"
+    ],
+    "status": "merged-ci-verified",
+    "ci": {
+      "status": "passed",
+      "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T11:08:26.602Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:26:54Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666932/job/114447089200",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:28:20Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447088961",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:23:57Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666876/job/114447089225",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:21:35Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666876/job/114447089979",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T10:21:35Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:33:27Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666932/job/114447089311",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:24:48Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447088958",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:37:28Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666932/job/114447089395",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:41:53Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666932/job/114447089425",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:38:14Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666932/job/114447089415",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:21:35Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666876/job/114447090076",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T10:21:35Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:42:32Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666932/job/114450655593",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T10:41:55Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:30:25Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447089005",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:34:41Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447088927",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:35:07Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447089034",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:30:53Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447089052",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:25:42Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447088833",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:35:40Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114449459713",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T10:35:09Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T10:21:44Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "checkpoint_0948",
+      "kind": "independent complete repair diff and source-byte review",
+      "integrationCommit": "1e41e1a8fd8dfa0ba3e8fe61767cea50a599b8ab",
+      "report": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-peer-review.md",
+      "fileManifest": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-peer-review.json",
+      "limitation": "Diagnostic source and option-fidelity evidence; independent callback inputs mocked, actual raster corpus execution independently inspected in author receipts.",
+      "verifiedPublishedHead": "b121d97e71c17f4eed04373d68f54de925c0386d",
+      "sourceAttestation": {
+        "reviewedCommit": "1e41e1a8fd8dfa0ba3e8fe61767cea50a599b8ab",
+        "publishedHead": "b121d97e71c17f4eed04373d68f54de925c0386d",
+        "files": [
+          "src/__fixtures__/perceptual/_edge-rough-smoothness.test.ts",
+          "src/__fixtures__/perceptual/_new-problems-audit.test.ts",
+          "src/__fixtures__/perceptual/_small-letter-facet.test.ts",
+          "src/__fixtures__/perceptual/region-enhance-recovery.test.ts"
+        ],
+        "method": "Complete changed-file manifest and every file match the independently reviewed Git tree",
+        "checkedAt": "2026-10-11T10:21:33.805Z"
+      },
+      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-published-review.json"
+    },
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "publicationOwner": "root",
+    "publicationProbe": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-author-controls.mjs",
+    "publicationDescription": "Three opt-in Edge diagnostics claim to reproduce a fresh Trace Image dialog but copy a 3-pixel minimum line length while the app retains the preset minimum of 12. A closed 8-pixel contour therefore appears in the diagnostics and is discarded by the app. Reuse the existing pure app settings merger in those diagnostics so their inputs follow current defaults.\n\nKeep the separate region-enhancement regression at its intentional historical 3-pixel setting and label it explicitly. This changes diagnostic fidelity only; application tracing code and defaults are unchanged.\n\nHistorical audit finding B04-DIAGNOSTIC-001 was discovered while reviewing PR #18, whose opt-in gating edit did not introduce the copied-setting mismatch. Independent author and reviewer controls reproduce the original mismatch and exercise the actual diagnostic entry points after the fix.",
+    "integrationCommit": "1e41e1a8fd8dfa0ba3e8fe61767cea50a599b8ab",
+    "localVerification": {
+      "report": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-author.md",
+      "testsPassed": 27,
+      "testFiles": 5,
+      "result": "passed",
+      "scope": "Actual opt-in logo/font diagnostics, unchanged historical recovery scenario, app merge controls; independent14call/42contour oracle; scoped lint/format"
+    },
+    "publishedHead": "b121d97e71c17f4eed04373d68f54de925c0386d",
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "pullRequest": {
+      "number": 1152,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1152"
+    },
+    "isolatedVerification": {
+      "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
+      "testsPassed": 4,
+      "testsSkipped": 0,
+      "testFiles": 4,
+      "parityControls": "passed",
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/diagnostic-1e41e1a8fd8d-1791713911385-",
+      "checkedAt": "2026-10-11T10:21:33.805Z"
+    },
+    "reviewComments": {
+      "items": [],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T11:01:43.156Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "All collections compared by ID and edited body; no new repair finding. All prior dispositions and follow-up publication evidence retained."
+      },
+      "checkedAt": "2026-10-11T10:23:44.858Z",
+      "discussionDispositions": [
+        {
+          "id": 6108025434,
+          "status": "informational-no-review-performed",
+          "result": "CodeRabbit reports automatic review skipped; no finding or review completion inferred."
+        },
+        {
+          "id": 6108025787,
+          "status": "informational-review-completed-no-findings",
+          "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
+          "result": "Edited status body and all paginated feedback read: Code and Security reviews completed at the published head with no inline or submitted review findings at this snapshot.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-tracking-publication-review-complete.json"
+        }
+      ]
+    },
+    "mergeVerification": {
+      "state": "MERGED",
+      "mergedAt": "2026-10-11T10:58:33Z",
+      "mergeCommit": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "publishedHead": "b121d97e71c17f4eed04373d68f54de925c0386d",
+      "reviewedCommit": "1e41e1a8fd8dfa0ba3e8fe61767cea50a599b8ab",
+      "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "checkedAt": "2026-10-11T10:59:30.851Z",
+      "reviewer": "/root/batch04_gate",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "allRepairFilesMatchReviewedSource": true
+    }
+  }
+]
