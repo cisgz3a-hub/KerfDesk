@@ -8,7 +8,11 @@ import {
   settingsNoteStyle,
   settingsRowStyle,
 } from '../settings/settings-styles';
-import { useRemoteAccessStore, type RemoteAccessStatus } from './remote-access-store';
+import {
+  REMOTE_DISCONNECTED_SUMMARY,
+  useRemoteAccessStore,
+  type RemoteAccessStatus,
+} from './remote-access-store';
 
 const remoteNoteStyle: React.CSSProperties = {
   ...settingsNoteStyle,
@@ -53,14 +57,15 @@ export function ArtworkSharingConsent(): JSX.Element {
     </section>
   );
 }
-function connectionText(status: RemoteAccessStatus | null): string {
+function connectionText(status: RemoteAccessStatus | null, connectionLost: boolean): string {
+  if (status?.enabled === false) return 'Remote access is off';
+  if (connectionLost) return REMOTE_DISCONNECTED_SUMMARY;
   if (status === null) return 'Loading connection status…';
-  if (status?.enabled !== true) return 'Remote access is off';
   return status.connected ? 'Ready to pair' : 'Connecting to the remote service…';
 }
 /** This consent never prevents ordinary desktop use. */
 function RemoteConsent(): JSX.Element {
-  const { status, busy, message, act } = useRemoteAccessStore();
+  const { status, connectionLost, busy, message, act } = useRemoteAccessStore();
   return (
     <section style={settingsGroupStyle}>
       <h3 style={settingsHeadingStyle}>Phone & MCP access</h3>
@@ -90,7 +95,7 @@ function RemoteConsent(): JSX.Element {
         />
         <span>Allow approved remote connections</span>
       </label>
-      <p role="status">{connectionText(status)}</p>
+      <p role="status">{connectionText(status, connectionLost)}</p>
       <p style={remoteNoteStyle}>
         Turning this off disconnects clients immediately and revokes their access when this computer
         next connects.

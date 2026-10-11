@@ -8,6 +8,7 @@ import {
   type RemoteAccessStatus,
 } from './remote-access-store';
 import { pairingFixture } from './pairing-test-support';
+import { RemoteAccessSection } from './RemoteAccessSection';
 
 const runtime = vi.hoisted(() => ({ desktop: true }));
 vi.mock('./desktop-only', () => ({ isRemoteAccessRenderer: () => runtime.desktop }));
@@ -63,6 +64,38 @@ async function openPanel(): Promise<HTMLElement> {
 }
 
 describe('Phone & MCP toolbar button', () => {
+  it.each([false, true])(
+    'keeps a terminal disconnect visible (prior status: %s)',
+    async (priorStatus) => {
+      if (priorStatus) await publish({ statusRevision: 1, clients: [phone] });
+      await act(async () =>
+        useRemoteAccessStore
+          .getState()
+          .disconnected('toolbar-test', 'Reopen the app to reconnect.'),
+      );
+      expect(trigger()?.dataset['remoteState']).toBe('disconnected');
+      expect(trigger()?.title).toBe('Phone & MCP: Disconnected. Reopen the app to reconnect.');
+      const opened = await openPanel();
+      expect(opened.querySelector('[role="status"]')?.textContent).toBe(
+        'Disconnected. Reopen the app to reconnect.',
+      );
+      await act(async () => useRemoteAccessStore.getState().setMessage(null));
+      expect(trigger()?.dataset['remoteState']).toBe('disconnected');
+      await publish({ statusRevision: 2, connected: true });
+      expect(trigger()?.dataset['remoteState']).toBe('disconnected');
+      await act(async () => root?.render(<RemoteAccessSection />));
+      expect(host.querySelector('[role="status"]')?.textContent).toBe(
+        'Disconnected. Reopen the app to reconnect.',
+      );
+      await act(async () => {
+        setRemoteSession('successor');
+        root?.render(<Toolbar commands={[]} machineKind="laser" />);
+      });
+      await publish({ statusRevision: 1 });
+      expect(trigger()?.dataset['remoteState']).toBe('ready');
+    },
+  );
+
   it('appears only in the desktop app', async () => {
     expect(trigger()).not.toBeNull();
     runtime.desktop = false;

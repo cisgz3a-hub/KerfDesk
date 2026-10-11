@@ -10,18 +10,26 @@ import { openSettings } from '../settings/settings-dialog-store';
 import { isRemoteAccessRenderer } from './desktop-only';
 import { PairingControls } from './PairingControls';
 import { ApprovedClients, ArtworkSharingConsent } from './RemoteAccessSection';
-import { useRemoteAccessStore, type RemoteAccessStatus } from './remote-access-store';
+import {
+  REMOTE_DISCONNECTED_SUMMARY,
+  useRemoteAccessStore,
+  type RemoteAccessStatus,
+} from './remote-access-store';
 import './remote-toolbar.css';
 
-export type RemoteTone = 'off' | 'connecting' | 'ready' | 'live' | 'attention';
+export type RemoteTone = 'off' | 'connecting' | 'disconnected' | 'ready' | 'live' | 'attention';
 
-export function remoteToolbarSummary(status: RemoteAccessStatus | null): {
+export function remoteToolbarSummary(
+  status: RemoteAccessStatus | null,
+  connectionLost = false,
+): {
   readonly tone: RemoteTone;
   readonly text: string;
 } {
+  if (status?.available === false) return { tone: 'off', text: 'Unavailable on this computer' };
+  if (status?.enabled === false) return { tone: 'off', text: 'Remote access is off' };
+  if (connectionLost) return { tone: 'disconnected', text: REMOTE_DISCONNECTED_SUMMARY };
   if (status === null) return { tone: 'connecting', text: 'Loading connection status…' };
-  if (!status.available) return { tone: 'off', text: 'Unavailable on this computer' };
-  if (!status.enabled) return { tone: 'off', text: 'Remote access is off' };
   if (status.requests.length > 0)
     return { tone: 'attention', text: 'A connection is waiting for your approval' };
   if (!status.connected) return { tone: 'connecting', text: 'Connecting to the remote service…' };
@@ -36,12 +44,13 @@ export function RemoteToolbarButton(): JSX.Element | null {
 
 function RemoteToolbarControl(): JSX.Element {
   const status = useRemoteAccessStore((state) => state.status);
+  const connectionLost = useRemoteAccessStore((state) => state.connectionLost);
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const triggerId = useId();
   const panelId = useId();
   const close = useCallback(() => setOpen(false), []);
-  const summary = remoteToolbarSummary(status);
+  const summary = remoteToolbarSummary(status, connectionLost);
   return (
     <>
       <button
@@ -126,8 +135,8 @@ function RemoteQuickPanel(props: { readonly onClose: () => void }): JSX.Element 
 }
 
 function RemotePanelHeader(): JSX.Element {
-  const { status, busy, act } = useRemoteAccessStore();
-  const summary = remoteToolbarSummary(status);
+  const { status, connectionLost, busy, act } = useRemoteAccessStore();
+  const summary = remoteToolbarSummary(status, connectionLost);
   const enabled = status?.enabled === true;
   return (
     <div className="lf-remote-panel__header">
