@@ -9,6 +9,7 @@ import {
 } from '../scene';
 import { ellipticalArcEndDirection } from '../scene/curve-path';
 import { isBooleanCompoundObject } from '../scene/boolean-compound';
+import { CLOSURE_EPS_MM } from '../scene/polyline-closure';
 import {
   boundsOverlap,
   contourSource,
@@ -85,6 +86,15 @@ function pickEndpoint(
   previous: EndpointPick | null,
 ): EndpointPick | null {
   if (contour.closed || !contour.trimmable) return previous;
+  const localStart = contour.segments.start;
+  const localEnd = contour.segments.segments.at(-1)?.to ?? localStart;
+  // Match the shared closure policy in local coordinates, including unflagged
+  // single-cubic loops. Scaling must not turn a filled loop into an open source.
+  if (
+    Math.abs(localStart.x - localEnd.x) < CLOSURE_EPS_MM &&
+    Math.abs(localStart.y - localEnd.y) < CLOSURE_EPS_MM
+  )
+    return previous;
   const first = endpoint(contour, 'start');
   const last = endpoint(contour, 'end');
   if (Math.hypot(first.x - last.x, first.y - last.y) <= EXTEND_EPS_MM) return previous;

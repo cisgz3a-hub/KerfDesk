@@ -75,6 +75,24 @@ describe('Extend artwork', () => {
     });
     expect(findExtendTarget(scene(loop, edge(-20)), p(0, 0), 0.1)).toBeNull();
   });
+  it.each([1, 1000])(
+    'uses shared local closure tolerance for a near-closed cubic at scale %s',
+    (scale) => {
+      const loop = curveArt(
+        'loop',
+        {
+          start: p(0, 0),
+          closed: false,
+          segments: [
+            { kind: 'cubic', control1: p(10, 0), control2: p(0, 10), to: p(0.00005, 0.00005) },
+          ],
+        },
+        { transform: { ...IDENTITY_TRANSFORM, scaleX: scale, scaleY: scale } },
+      );
+      expect(findExtendTarget(scene(loop), p(0, 0), 0.01)).toBeNull();
+      expect(findExtendTarget(scene(loop), p(0.00005 * scale, 0.00005 * scale), 0.01)).toBeNull();
+    },
+  );
   it('ignores hidden targets but permits locked boundaries and never edits them', () => {
     const hidden = edge(15, { operationIds: ['hidden'] });
     const locked = edge(20, { locked: true });

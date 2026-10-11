@@ -53,6 +53,83 @@ beforeEach(() => {
 });
 
 describe('Extend Shapes store action', () => {
+  it('retains canonical extrema of an untouched curve under nonuniform scale', () => {
+    const curve: CurveSubpath = {
+      closed: false,
+      start: point(0, 30),
+      segments: [
+        { kind: 'cubic', control1: point(0, 50), control2: point(10, 50), to: point(10, 30) },
+      ],
+    };
+    // Deliberately coarse compatibility points omit the exact y = 45 maximum.
+    const curvePath = {
+      color: '#000000',
+      curves: [curve],
+      polylines: [{ closed: false, points: [curve.start, point(10, 30)] }],
+    };
+    const transform = { ...IDENTITY_TRANSFORM, x: 5, y: 7, scaleX: 2, scaleY: 3 };
+    const original = source();
+    load([
+      {
+        ...original,
+        transform,
+        paths: [...original.paths, curvePath],
+        bounds: { minX: 0, minY: 10, maxX: 10, maxY: 45 },
+      },
+      line('boundary', [point(45, 0), point(45, 80)], { locked: true }),
+    ]);
+    const before = useStore.getState().project;
+    expect(useStore.getState().extendShapeAt(point(25, 37), 0.5)).toBe(true);
+    expect(current().bounds).toEqual({ minX: 0, minY: 10, maxX: 20, maxY: 45 });
+    expect(current().transform).toBe(transform);
+    expect(current().paths[1]).toBe(curvePath);
+    expect(current().bounds.maxY * transform.scaleY + transform.y).toBe(142);
+    useStore.getState().undo();
+    expect(useStore.getState().project).toBe(before);
+  });
+
+  it.each([undefined, 'evenodd'] as const)(
+    'preserves text fill semantics (%s) when extending one of mixed open and closed contours',
+    (fillRule) => {
+      const closed = {
+        closed: true,
+        points: [point(30, 30), point(40, 30), point(40, 40), point(30, 40)],
+      };
+      const open = source().paths[0]!.polylines[0]!;
+      const text: TextObject = {
+        ...source(),
+        kind: 'text',
+        name: 'Mixed glyphs',
+        content: '10',
+        fontKey: 'single-line',
+        sizeMm: 10,
+        alignment: 'left',
+        lineHeight: 1.2,
+        letterSpacing: 0,
+        color: '#000000',
+        paths: [
+          {
+            color: '#000000',
+            polylines: [open, closed],
+            ...(fillRule === undefined ? {} : { fillRule }),
+          },
+        ],
+      };
+      load([text, boundary()]);
+      const before = useStore.getState().project;
+      expect(useStore.getState().extendShapeAt(point(10, 10), 0.5)).toBe(true);
+      expect(current()).toMatchObject({ kind: 'imported-svg', name: 'Mixed glyphs' });
+      expect(current().paths[0]?.fillRule).toBe(fillRule ?? 'nonzero');
+      expect(current().paths[0]?.polylines[0]?.points.at(-1)).toEqual(point(20, 10));
+      expect(current().paths[0]?.polylines[1]).toBe(closed);
+      const edited = useStore.getState().project;
+      expect(useStore.getState().undoStack).toEqual([before]);
+      useStore.getState().undo();
+      expect(useStore.getState().project).toBe(before);
+      useStore.getState().redo();
+      expect(useStore.getState().project).toBe(edited);
+    },
+  );
   it('preserves an assigned name when an open text stroke becomes a plain path', () => {
     const text: TextObject = {
       ...source(),

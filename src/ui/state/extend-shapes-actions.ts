@@ -1,10 +1,11 @@
 import { extendEdit, findExtendTarget, type ExtendTarget } from '../../core/geometry/extend-shapes';
 import { localPathArtwork } from '../../core/geometry/local-path-artwork';
 import { isUnlockedVectorArtwork } from '../../core/geometry/trim-contours';
-import { boundsForPaths, type VectorSceneObject } from '../../core/geometry/vector-path-tools';
+import type { VectorSceneObject } from '../../core/geometry/vector-path-tools';
 import { replaceObject, type ColoredPath, type SceneObject, type Vec2 } from '../../core/scene';
 import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
+import { boundsForPaths } from './path-node-edit-geometry';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 import { useToastStore } from './toast-store';
@@ -63,7 +64,7 @@ function extendedObject(
   paths: readonly ColoredPath[],
   target: ExtendTarget,
 ): SceneObject {
-  const bounds = boundsForPaths(paths) ?? object.bounds;
+  const bounds = boundsForPaths(paths);
   const anchors = extendedAnchors(object, target);
   if (object.kind === 'imported-svg' || object.kind === 'traced-image')
     return { ...object, paths, bounds, ...anchors };
@@ -73,11 +74,8 @@ function extendedObject(
   }
   notify('The extended artwork is now a plain path. Undo restores its editable settings.');
   return {
-    ...localPathArtwork(object),
+    ...localPathArtwork({ ...object, paths, bounds, ...anchors }),
     ...(object.name === undefined ? {} : { name: object.name }),
-    paths,
-    bounds,
-    ...anchors,
   };
 }
 
