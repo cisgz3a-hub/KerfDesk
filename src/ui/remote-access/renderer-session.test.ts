@@ -60,7 +60,12 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
   setRemoteSession(null);
-  useRemoteAccessStore.setState({ status: null, message: null, busy: false });
+  useRemoteAccessStore.setState({
+    status: null,
+    connectionLost: false,
+    message: null,
+    busy: false,
+  });
   setArtworkSharingEnabled(false);
   polls = [];
   calls = [];

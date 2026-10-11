@@ -65,6 +65,26 @@ async function openPanel(): Promise<HTMLElement> {
 
 describe('Phone & MCP toolbar button', () => {
   it.each([false, true])(
+    'starts keyboard focus at the switch when remote access is %s',
+    async (enabled) => {
+      await publish({ statusRevision: 1, enabled });
+      const opened = await openPanel();
+      expect(document.activeElement).toBe(opened.querySelector('[role="switch"]'));
+    },
+  );
+
+  it.each(['unavailable', 'busy'] as const)(
+    'focuses an enabled button when the switch is %s',
+    async (reason) => {
+      await publish({ statusRevision: 1, available: reason !== 'unavailable' });
+      if (reason === 'busy') await act(async () => useRemoteAccessStore.setState({ busy: true }));
+      const opened = await openPanel();
+      expect(opened.querySelector('[role="switch"]')).toHaveProperty('disabled', true);
+      expect(document.activeElement).toBe(opened.querySelector('button:not(:disabled)'));
+    },
+  );
+
+  it.each([false, true])(
     'keeps a terminal disconnect visible (prior status: %s)',
     async (priorStatus) => {
       if (priorStatus) await publish({ statusRevision: 1, clients: [phone] });
@@ -183,4 +203,30 @@ describe('Phone & MCP toolbar button', () => {
     expect(document.activeElement).toBe(trigger());
     expect(trigger()?.getAttribute('aria-expanded')).toBe('false');
   });
+
+  it.each(['blur', 'Escape'] as const)(
+    'closes when keyboard focus returns to the trigger then receives %s',
+    async (exit) => {
+      await publish({ statusRevision: 1 });
+      await openPanel();
+      await act(async () => trigger()?.focus());
+      expect(panel()).not.toBeNull();
+      const next = document.createElement('button');
+      document.body.appendChild(next);
+      try {
+        await act(async () => {
+          if (exit === 'blur') next.focus();
+          else
+            trigger()?.dispatchEvent(
+              new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+            );
+        });
+        expect(panel()).toBeNull();
+        expect(trigger()?.getAttribute('aria-expanded')).toBe('false');
+        expect(document.activeElement).toBe(exit === 'blur' ? next : trigger());
+      } finally {
+        next.remove();
+      }
+    },
+  );
 });

@@ -36,6 +36,8 @@ type RemoteState = {
   readonly busy: boolean;
   readonly message: string | null;
   readonly publish: (status: RemoteAccessStatus, owner?: string | null) => void;
+  readonly attaching: () => void;
+  readonly attachFailed: (message: string) => void;
   readonly disconnected: (owner: string, message: string) => void;
   readonly setMessage: (message: string | null) => void;
   readonly act: (action: string, args?: Readonly<Record<string, unknown>>) => Promise<void>;
@@ -279,6 +281,12 @@ export const useRemoteAccessStore = create<RemoteState>((set, get) => {
     busy: false,
     message: null,
     publish: (status, owner = sessionId) => publish(status, owner),
+    attaching: () => {
+      if (sessionId === null) set({ connectionLost: false, message: null });
+    },
+    attachFailed: (message) => {
+      if (sessionId === null) set({ connectionLost: true, busy: false, message });
+    },
     disconnected: (owner, message) => {
       if (owner !== sessionId) return;
       activeAction = null;
