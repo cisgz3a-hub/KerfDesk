@@ -13,6 +13,12 @@
 // attributes and the style attribute outranks rules (SVG 1.1 §6.4); an
 // !important declaration outranks every normal one.
 
+import {
+  isSvgPaintOpacityProperty,
+  svgPaintOpacityDeclaration,
+  svgPaintOpacityText,
+} from './svg-paint-opacity';
+
 /** Declarations that win for an element, given its parsed style attribute. */
 export type SvgStyleCascade = (
   el: Element,
@@ -92,7 +98,12 @@ function cascadeDeclarations(
     return inline;
   }
   rules.sort((a, b) => a.selector.specificity - b.selector.specificity || a.order - b.order);
-  const attached = [...inline].map(([name, raw]) => ({ name, ...splitImportance(raw) }));
+  const attached = [...inline].flatMap(([name, raw]) => {
+    const value = isSvgPaintOpacityProperty(name)
+      ? svgPaintOpacityDeclaration(raw)
+      : splitImportance(raw);
+    return value === null ? [] : [{ name, ...value }];
+  });
   const ordered = [...rules.flatMap((rule) => rule.declarations), ...attached];
   const styles = new Map<string, string>();
   // Normal declarations first, then !important ones. Within each pass the
@@ -114,7 +125,10 @@ function splitImportance(raw: string): { readonly value: string; readonly import
 }
 
 function parseStylesheet(css: string, rules: StyleRule[]): void {
-  const text = withoutComments(css);
+  // Preserve comments until opacity values are validated: deleting them can
+  // turn invalid `0/**/%` into a valid zero percent. Other properties and
+  // selectors retain their existing comment removal behavior.
+  const text = css;
   let at = 0;
   while (at < text.length) {
     at = skipSheetNoise(text, at);
@@ -136,7 +150,7 @@ function addRules(prelude: string, body: string, rules: StyleRule[]): void {
   if (declarations.length === 0) return;
   // Every selector in a list shares the rule's place in source order.
   const order = rules.length;
-  for (const text of splitTopLevel(prelude, ',')) {
+  for (const text of splitTopLevel(withoutComments(prelude), ',')) {
     const selector = parseSelector(text);
     if (selector !== null) rules.push({ selector, declarations, order });
   }
@@ -145,13 +159,39 @@ function addRules(prelude: string, body: string, rules: StyleRule[]): void {
 function parseDeclarations(body: string): Declaration[] {
   const declarations: Declaration[] = [];
   for (const text of splitTopLevel(body, ';')) {
-    const colon = text.indexOf(':');
-    if (colon < 0) continue;
-    const name = text.slice(0, colon).trim().toLowerCase();
-    const { value, important } = splitImportance(text.slice(colon + 1));
-    if (PROPERTY_NAME.test(name) && value !== '') declarations.push({ name, value, important });
+    const colon = scanTo(text, 0, ':');
+    if (colon >= text.length) continue;
+    const rawName = text.slice(0, colon);
+    const name = withoutComments(rawName).trim().toLowerCase();
+    if (isSvgPaintOpacityProperty(name) && svgPaintOpacityText(rawName) !== name) continue;
+    const parsed = declarationValue(name, text.slice(colon + 1));
+    if (PROPERTY_NAME.test(name) && parsed !== null && parsed.value !== '') {
+      declarations.push({ name, ...parsed });
+    }
   }
   return declarations;
+}
+
+function declarationValue(name: string, raw: string) {
+  return isSvgPaintOpacityProperty(name)
+    ? svgPaintOpacityDeclaration(raw)
+    : splitImportance(withoutComments(raw));
+}
+
+/** Valid inline paint-opacity declarations, before the stylesheet cascade. */
+export function svgInlinePaintOpacityStyles(style: string): ReadonlyMap<string, string> {
+  const declarations = parseDeclarations(style).filter(({ name }) =>
+    isSvgPaintOpacityProperty(name),
+  );
+  const values = new Map<string, string>();
+  for (const important of [false, true]) {
+    for (const declaration of declarations) {
+      if (declaration.important === important) {
+        values.set(declaration.name, `${declaration.value}${important ? ' !important' : ''}`);
+      }
+    }
+  }
+  return values;
 }
 
 function parseSelector(text: string): Selector | null {
@@ -327,7 +367,8 @@ function withoutComments(css: string): string {
 function skipSheetNoise(text: string, from: number): number {
   let at = from;
   for (;;) {
-    if (/\s/.test(text.charAt(at))) at += 1;
+    if (text.startsWith('/*', at)) at = commentEnd(text, at);
+    else if (/\s/.test(text.charAt(at))) at += 1;
     else if (text.startsWith('<!--', at)) at += 4;
     else if (text.startsWith('-->', at)) at += 3;
     else return at;
@@ -359,6 +400,10 @@ function scanTo(text: string, from: number, stops: string): number {
   let at = from;
   while (at < text.length) {
     const char = text.charAt(at);
+    if (text.startsWith('/*', at)) {
+      at = commentEnd(text, at);
+      continue;
+    }
     if (char === '"' || char === "'") {
       at = stringEnd(text, at);
       continue;
@@ -370,6 +415,11 @@ function scanTo(text: string, from: number, stops: string): number {
     at += char === '\\' ? 2 : 1;
   }
   return text.length;
+}
+
+function commentEnd(text: string, start: number): number {
+  const close = text.indexOf('*/', start + 2);
+  return close < 0 ? text.length : close + 2;
 }
 
 // A CSS string ends at its closing quote; an unescaped newline also ends it.

@@ -23,9 +23,172 @@ const parsers: readonly (readonly [string, Parser])[] = [
 ];
 const colors = (result: ParseSvgResult) => result.object?.paths.map((path) => path.color) ?? [];
 
+type CascadeCase = {
+  name: string;
+  attribute?: string;
+  style?: string;
+  sheet?: string;
+  parent?: string;
+  visible: boolean;
+};
+const cascadeCases: readonly CascadeCase[] = [
+  {
+    name: 'comments around the opacity property name remain valid',
+    style: '/*x*/OPACITY/*x*/:0',
+    visible: false,
+  },
+  {
+    name: 'invalid inline preserves a valid class rule',
+    attribute: '0',
+    style: 'OPACITY:bogus',
+    sheet: '.SUBJECT{OPACITY:1}',
+    visible: true,
+  },
+  {
+    name: 'invalid important rule preserves a valid lower rule',
+    sheet: '.SUBJECT{OPACITY:0}.SUBJECT{OPACITY:bogus !important}',
+    visible: false,
+  },
+  {
+    name: 'invalid duplicate inline preserves an earlier value',
+    style: 'OPACITY:0;OPACITY:bogus',
+    visible: false,
+  },
+  {
+    name: 'important inline survives later normal inline',
+    style: 'OPACITY:0 !important;OPACITY:1',
+    visible: false,
+  },
+  {
+    name: 'later valid important inline wins',
+    style: 'OPACITY:0 !important;OPACITY:1 !important',
+    visible: true,
+  },
+  {
+    name: 'important in a presentation attribute is invalid',
+    parent: '0',
+    attribute: '1 !important',
+    visible: false,
+  },
+  {
+    name: 'invalid presentation attribute inherits',
+    parent: '0',
+    attribute: 'garbage',
+    visible: false,
+  },
+  {
+    name: 'revert rolls back the author attribute',
+    attribute: '0',
+    style: 'OPACITY:revert',
+    visible: true,
+  },
+  {
+    name: 'revert inherits the parent opacity',
+    parent: '0',
+    attribute: '1',
+    style: 'OPACITY:revert',
+    visible: false,
+  },
+  {
+    name: 'important stylesheet revert rolls back inline and attribute',
+    attribute: '0',
+    style: 'OPACITY:0',
+    sheet: '.SUBJECT{OPACITY:revert !important}',
+    visible: true,
+  },
+  { name: 'trailing attribute comment preserves zero', attribute: '0/**/', visible: false },
+  { name: 'leading attribute comment preserves zero', attribute: '/*x*/0', visible: false },
+  {
+    name: 'inline comment containing semicolon preserves zero',
+    style: 'OPACITY:0/*;OPACITY:1*/',
+    visible: false,
+  },
+  {
+    name: 'comment around important tokens preserves priority',
+    style: 'OPACITY:0 !/**/important;OPACITY:1',
+    visible: false,
+  },
+  { name: 'stylesheet comment preserves zero', sheet: '.SUBJECT{OPACITY:0/*x*/}', visible: false },
+  { name: 'comment cannot join numeric tokens', attribute: '0/**/0', visible: true },
+  {
+    name: 'comment cannot join a number and percent token',
+    sheet: '.SUBJECT{OPACITY:1;OPACITY:0/**/%}',
+    visible: true,
+  },
+  {
+    name: 'comment cannot join a sign and number',
+    parent: '0',
+    attribute: '+/**/1',
+    visible: false,
+  },
+  {
+    name: 'comment cannot join a keyword',
+    attribute: '0',
+    style: 'OPACITY:in/**/herit',
+    visible: false,
+  },
+  {
+    name: 'trailing-dot number cannot replace zero',
+    style: 'OPACITY:0;OPACITY:1.',
+    visible: false,
+  },
+  { name: 'trailing-dot zero cannot replace one', style: 'OPACITY:1;OPACITY:0.', visible: true },
+  {
+    name: 'positive numeric overflow clamps to one',
+    parent: '0',
+    attribute: '1e999',
+    visible: true,
+  },
+  { name: 'negative numeric overflow clamps to zero', attribute: '-1e999', visible: false },
+];
+
+function cascadeFixture(testCase: CascadeCase): string {
+  return ['fill', 'stroke']
+    .map((paint) => {
+      const property = `${paint}-opacity`;
+      const sheet =
+        testCase.sheet?.replaceAll('SUBJECT', paint).replaceAll('OPACITY', property) ?? '';
+      const style = testCase.style?.replaceAll('OPACITY', property) ?? '';
+      const attribute =
+        testCase.attribute === undefined ? '' : `${property}="${testCase.attribute}"`;
+      const parent = testCase.parent === undefined ? '' : `${property}="${testCase.parent}"`;
+      const shape =
+        paint === 'fill'
+          ? '<rect width="10" height="10" fill="red"'
+          : '<path d="M1 1L9 9" fill="none" stroke="blue"';
+      return `<style>${sheet}</style><g ${parent}>${shape} class="${paint}" ${attribute} style="${style}"/></g>`;
+    })
+    .join('');
+}
+
 // Paint opacity inherits as a value. Unlike overall group opacity, a child's
 // explicit fill/stroke opacity can replace its parent's zero and become visible.
 describe.each(parsers)('SVG paint opacity through %s', (_name, parse) => {
+  it.each(cascadeCases)('$name', async (testCase) => {
+    const result = await parse(svg(cascadeFixture(testCase)));
+    expect(colors(result)).toEqual(testCase.visible ? ['#ff0000', '#0000ff'] : []);
+  });
+
+  it('leaves non-opacity inline value parsing unchanged when a stylesheet is present', async () => {
+    const result = await parse(
+      svg(
+        '<style>rect{stroke:none}</style><rect width="10" height="10" fill="blue" style="fill:r/**/ed"/>',
+      ),
+    );
+    expect(colors(result)).toEqual(['#0000ff']);
+  });
+
+  it('rejects comments splitting an opacity property name', async () => {
+    const result = await parse(
+      svg(
+        '<style>rect{fill-/**/opacity:0}path{stroke-/**/opacity:0}</style>' +
+          '<rect width="10" height="10" fill="red" style="fill-/**/opacity:0"/>' +
+          '<path d="M1 1L9 9" fill="none" stroke="blue" style="stroke-/**/opacity:0"/>',
+      ),
+    );
+    expect(colors(result)).toEqual(['#ff0000', '#0000ff']);
+  });
+
   it.each(['1', '50%', '5e-1', 'initial'])(
     'keeps visible children overriding inherited zero with %s',
     async (value) => {

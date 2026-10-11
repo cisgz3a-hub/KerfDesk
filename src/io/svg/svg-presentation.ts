@@ -10,7 +10,8 @@ import {
   type SvgPaint,
 } from './svg-paint';
 import { NO_MARKERS, svgMarkerReferences, type SvgMarkerReferences } from './svg-markers';
-import type { SvgStyleCascade } from './svg-stylesheet';
+import { svgInlinePaintOpacityStyles, type SvgStyleCascade } from './svg-stylesheet';
+import { isSvgPaintOpacityProperty, parseSvgPaintOpacity } from './svg-paint-opacity';
 import type { SvgRect, SvgViewportSize } from './svg-viewport';
 import { svgOverflow, type SvgOverflow } from './svg-overflow';
 
@@ -217,14 +218,10 @@ function specifiedPaint(
 // opacity compounds. Invalid declarations fall through to the next candidate.
 function inheritedPaintOpacity(values: readonly (string | null)[], inherited: number): number {
   for (const value of values) {
-    const normalized = keyword(value);
-    if (normalized === 'inherit' || normalized === 'unset') return inherited;
-    if (normalized === 'initial') return 1;
-    const match = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(%)?$/.exec(normalized ?? '');
-    if (match === null) continue;
-    const amount = Number(match[1]);
-    const fraction = match[2] === '%' ? amount / 100 : amount;
-    return Math.min(1, Math.max(0, fraction));
+    const parsed = parseSvgPaintOpacity(value);
+    if (parsed === 'inherit') return inherited;
+    if (parsed === 'initial') return 1;
+    if (parsed !== null) return parsed;
   }
   return inherited;
 }
@@ -247,8 +244,11 @@ function styleMap(style: string | null): Map<string, string> {
     if (separator < 0) continue;
     const name = declaration.slice(0, separator).trim().toLowerCase();
     const value = declaration.slice(separator + 1).trim();
-    if (name !== '') map.set(name, value);
+    if (name !== '' && !isSvgPaintOpacityProperty(name)) map.set(name, value);
   }
+  // Opacity declarations must be validated before duplicate names collapse,
+  // including inline !important precedence and comments containing semicolons.
+  for (const [name, value] of svgInlinePaintOpacityStyles(style)) map.set(name, value);
   return map;
 }
 
