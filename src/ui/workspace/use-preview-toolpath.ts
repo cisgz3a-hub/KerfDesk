@@ -68,7 +68,13 @@ export function usePreviewToolpath(
 
   useEffect(() => {
     if (!previewMode) {
-      setPreview({ toolpath: null, externalOwner: externalGcodePreview });
+      // Clearing an already idle owner must be a no-op even when a caller
+      // supplies a fresh scheduler (or another effect input changes).
+      setPreview((current) =>
+        current.toolpath === null && current.externalOwner === externalGcodePreview
+          ? current
+          : { toolpath: null, externalOwner: externalGcodePreview },
+      );
       return;
     }
     // NB: no setToolpath(null) here — keep the previous route painted until the
