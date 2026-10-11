@@ -106,6 +106,25 @@ test('reconciliation needs admin authentication before any provider read', async
   }
 });
 
+test('reconciliation retains the original catalogue after configured price IDs rotate', async () => {
+  const f = await pending();
+  try {
+    const before = order(f);
+    f.env.PADDLE_PURCHASE_PRICE_ID = `pri_${'x'.repeat(26)}`;
+    f.env.PADDLE_RENEWAL_PRICE_ID = `pri_${'y'.repeat(26)}`;
+    assert.equal((await route(f, answer(f.data))).status, 200);
+    assert.equal(order(f).priceId, before.priceId);
+    assert.equal(order(f).amount, before.amount);
+    assert.equal(f.records.get(`license:${before.licenseId}`), undefined);
+    const replaced = structuredClone(f.data);
+    replaced.items[0].price.id = f.env.PADDLE_PURCHASE_PRICE_ID;
+    assert.equal((await route(f, answer(replaced))).status, 409);
+    assert.equal(order(f).providerOrderId, f.data.id);
+  } finally {
+    f.database.close();
+  }
+});
+
 test('wrong proof, identity, catalogue, state or checkout never attaches a transaction', async () => {
   const changes = [
     (data) => delete data.custom_data.kerfdesk_order_proof,

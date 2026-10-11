@@ -10,6 +10,7 @@ import {
 import {
   COMMERCIAL_CATALOG_LIMIT,
   COMMERCIAL_CATALOG_URL,
+  compareCommercialVersions,
   commercialArtifactNames,
   commercialReleaseUrl,
   verifyCommercialCatalog,
@@ -20,6 +21,11 @@ import {
   manualDownloadUrl,
   verifyManualDownload,
 } from './desktop-manual-download.mjs';
+import {
+  MANUAL_CATALOG_LIMIT,
+  MANUAL_CATALOG_URL,
+  verifyManualCatalog,
+} from './desktop-manual-catalog.mjs';
 
 function requestOptions(signal) {
   return {
@@ -43,7 +49,8 @@ export async function populatePreviewDownloads(document, search, fetchRequest = 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8_000);
   try {
-    const requested = new URLSearchParams(search).get('version');
+    const value = new URLSearchParams(search).get('version');
+    const requested = isStableVersion(value) ? null : value;
     if (requested !== null && !isPreviewVersion(requested))
       throw new Error('Invalid requested version');
     const manifestUrl = `${PREVIEW_ORIGIN}/${PREVIEW_PREFIX}/${requested === null ? 'latest.json' : `${requested}/release.json`}`;
@@ -97,7 +104,7 @@ const COMMERCIAL_UNVERIFIED =
 
 // Prefer the signed installer catalogue. Only its absent/empty state permits a
 // separately authenticated manual commercial download; invalid stable is an error.
-export async function populateCommercialDownload(document, fetchRequest = fetch) {
+export async function populateCommercialDownload(document, fetchRequest = fetch, search = '') {
   const status = document.getElementById('commercial-status');
   const links = [
     document.getElementById('commercial-download'),
@@ -111,7 +118,16 @@ export async function populateCommercialDownload(document, fetchRequest = fetch)
   showEarlierReleases(document, []);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8_000);
+  let requested = null;
   try {
+    const params = new URLSearchParams(search);
+    const value = params.get('version');
+    requested = value === null || isPreviewVersion(value) ? null : value;
+    if (
+      requested !== null &&
+      (params.getAll('version').length !== 1 || !isStableVersion(requested))
+    )
+      throw new Error('Invalid requested desktop version');
     const options = requestOptions(controller.signal);
     const [catalog, keys] = await Promise.all([
       fetchRequest(COMMERCIAL_CATALOG_URL, options),
@@ -125,23 +141,47 @@ export async function populateCommercialDownload(document, fetchRequest = fetch)
             await readBoundedManifest(catalog, COMMERCIAL_CATALOG_LIMIT),
             keys,
           );
-    if (releases.length === 0) {
-      if (!(await showManualDownload(document, links, fetchRequest, options, keys)))
-        status.textContent = COMMERCIAL_NOT_RELEASED;
+    let manual;
+    try {
+      manual = await manualDownloads(fetchRequest, options, keys);
+    } catch {
+      if (releases.length === 0) throw new Error('Manual downloads unavailable');
+      manual = { releases: [], latest: null, historyUnavailable: true };
+    }
+    // Prefer the signed lane for versions available in both. Keep historical
+    // unsigned releases reachable after the first code-signed release arrives.
+    const all = [
+      ...releases,
+      ...manual.releases.filter(
+        (item) => !releases.some((release) => release.version === item.version),
+      ),
+    ].sort((a, b) => compareCommercialVersions(b.version, a.version));
+    let release =
+      requested === null
+        ? (releases[0] ?? manual.latest)
+        : all.find((item) => item.version === requested);
+    // An unavailable archive can recover an exact version from its immutable
+    // signed manifest. A healthy catalogue controls which versions are offered.
+    if (
+      !release &&
+      requested !== null &&
+      manual.historyUnavailable &&
+      manual.latest &&
+      compareCommercialVersions(requested, manual.latest.version) <= 0
+    ) {
+      release = await manualVersion(fetchRequest, options, keys, requested);
+    }
+    if (!release) {
+      if (requested !== null) throw new Error('Requested desktop version unavailable');
+      status.textContent = COMMERCIAL_NOT_RELEASED;
       return;
     }
-    const [release, ...earlier] = releases;
-    const installer = windowsInstaller(release);
-    links[0].href = commercialReleaseUrl(release.version, installer.name);
-    links[1].href = commercialReleaseUrl(release.version, 'update-manifest.json');
-    links[1].textContent = 'Signed update manifest';
-    for (const link of links) link.hidden = false;
-    document.getElementById('commercial-asset').textContent = installer.name;
-    document.getElementById('commercial-hash').textContent = `SHA-256: ${installer.sha256}`;
-    showEarlierReleases(document, earlier);
-    status.textContent = `KerfDesk ${release.version} · Released ${release.publishedAt.slice(0, 10)} · Publisher signature verified.`;
-    document.getElementById('commercial-installation').textContent =
-      'This installer is code-signed. If Windows reports an unknown publisher, do not run it; download it again from this page. Updates install only after you quit KerfDesk yourself, never during a job.';
+    if (release.kind === 'manual-download') showManualDownload(document, links, release);
+    else showSignedDownload(document, links, release);
+    const earlier = all.filter(
+      (item) => compareCommercialVersions(item.version, release.version) < 0,
+    );
+    showEarlierReleases(document, earlier, manual.historyUnavailable);
   } catch {
     for (const link of links) {
       link.hidden = true;
@@ -149,19 +189,80 @@ export async function populateCommercialDownload(document, fetchRequest = fetch)
     }
     document.getElementById('commercial-hash').textContent = '';
     showEarlierReleases(document, []);
-    status.textContent = COMMERCIAL_UNVERIFIED;
+    status.textContent =
+      requested !== null
+        ? 'That desktop version could not be verified. Check the version number or contact support for an installer your licence covers.'
+        : COMMERCIAL_UNVERIFIED;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function showManualDownload(document, links, fetchRequest, options, keys) {
-  const response = await fetchRequest(MANUAL_DOWNLOAD_LATEST_URL, options);
-  if (response.status === 404) return false;
+function isStableVersion(value) {
+  try {
+    commercialArtifactNames(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function manualVersion(fetchRequest, options, keys, version) {
+  const response = await fetchRequest(
+    manualDownloadUrl(version, 'download-manifest.json'),
+    options,
+  );
   const release = await verifyManualDownload(
     await readBoundedManifest(response, MANUAL_DOWNLOAD_LIMIT),
     keys,
   );
+  if (release.version !== version) throw new Error('Requested desktop version mismatch');
+  return release;
+}
+
+async function manualDownloads(fetchRequest, options, keys) {
+  const response = await fetchRequest(MANUAL_DOWNLOAD_LATEST_URL, options);
+  if (response.status === 404) return { latest: null, releases: [], historyUnavailable: false };
+  const latest = await verifyManualDownload(
+    await readBoundedManifest(response, MANUAL_DOWNLOAD_LIMIT),
+    keys,
+  );
+  try {
+    const catalog = await fetchRequest(MANUAL_CATALOG_URL, options);
+    if (catalog.status === 404) return { latest, releases: [latest], historyUnavailable: true };
+    const entries = await verifyManualCatalog(
+      await readBoundedManifest(catalog, MANUAL_CATALOG_LIMIT),
+      keys,
+    );
+    const releases = entries
+      .map((entry) => entry.release)
+      .filter((release) => compareCommercialVersions(release.version, latest.version) <= 0);
+    const listed = releases.find((release) => release.version === latest.version);
+    if (listed && JSON.stringify(listed) !== JSON.stringify(latest))
+      throw new Error('Manual download history conflicts with latest');
+    if (!listed) releases.unshift(latest);
+    return { latest, releases, historyUnavailable: !listed };
+  } catch {
+    // An archive outage must not hide an independently verified latest installer.
+    return { latest, releases: [latest], historyUnavailable: true };
+  }
+}
+
+function showSignedDownload(document, links, release) {
+  const installer = windowsInstaller(release);
+  links[0].href = commercialReleaseUrl(release.version, installer.name);
+  links[1].href = commercialReleaseUrl(release.version, 'update-manifest.json');
+  links[1].textContent = 'Signed update manifest';
+  for (const link of links) link.hidden = false;
+  document.getElementById('commercial-asset').textContent = installer.name;
+  document.getElementById('commercial-hash').textContent = `SHA-256: ${installer.sha256}`;
+  document.getElementById('commercial-status').textContent =
+    `KerfDesk ${release.version} · Released ${release.publishedAt.slice(0, 10)} · Publisher signature verified.`;
+  document.getElementById('commercial-installation').textContent =
+    'This installer is code-signed. If Windows reports an unknown publisher, do not run it; download it again from this page. Updates install only after you quit KerfDesk yourself, never during a job.';
+}
+
+function showManualDownload(document, links, release) {
   const [installer] = release.artifacts;
   links[0].href = manualDownloadUrl(release.version, installer.name);
   links[1].href = manualDownloadUrl(release.version, 'download-manifest.json');
@@ -175,7 +276,6 @@ async function showManualDownload(document, links, fetchRequest, options, keys) 
   document.getElementById('commercial-installation').textContent = signed
     ? 'This installer is Windows code-signed. If Windows reports an unknown publisher, do not run it; download it again from this page. After installing, KerfDesk updates itself and installs updates only after you close it, never during a job.'
     : 'KerfDesk tells you when an update is ready. Choose Download update, then Install when I close KerfDesk: the installer opens only after you close KerfDesk yourself, never during a job. KerfDesk never downloads or installs unsigned updates without your approval. The download details are signature-checked, but this installer is not Windows code-signed yet, so Windows may warn about an unknown publisher.';
-  return true;
 }
 
 function megabytes(bytes) {
@@ -189,7 +289,7 @@ function windowsInstaller(release) {
 
 // Customers whose update year ended still own the versions released before it, so
 // every verified older release stays downloadable (built with text nodes, no HTML).
-function showEarlierReleases(document, releases) {
+function showEarlierReleases(document, releases, unavailable = false) {
   const history = document.getElementById('commercial-history');
   const list = document.getElementById('commercial-history-list');
   list.replaceChildren(
@@ -197,19 +297,28 @@ function showEarlierReleases(document, releases) {
       const installer = windowsInstaller(release);
       const item = document.createElement('li');
       const link = document.createElement('a');
-      link.href = commercialReleaseUrl(release.version, installer.name);
+      link.href =
+        release.kind === 'manual-download'
+          ? manualDownloadUrl(release.version, installer.name)
+          : commercialReleaseUrl(release.version, installer.name);
       link.textContent = `KerfDesk ${release.version}`;
       const detail = document.createElement('span');
       detail.className = 'artifact-hash';
-      detail.textContent = ` · Released ${release.publishedAt.slice(0, 10)} · SHA-256: ${installer.sha256}`;
+      const unsigned = release.kind === 'manual-download' && release.codeSigning === 'unsigned';
+      detail.textContent = ` · Released ${release.publishedAt.slice(0, 10)} · ${unsigned ? 'Unsigned installer' : 'Code-signed installer'} · SHA-256: ${installer.sha256}`;
       item.append(link, detail);
       return item;
     }),
   );
-  history.hidden = releases.length === 0;
+  const notice = document.getElementById('commercial-history-status');
+  if (notice)
+    notice.textContent = unavailable
+      ? 'Some earlier versions could not be listed. Contact KerfDesk support if you need an installer covered by your licence.'
+      : '';
+  history.hidden = releases.length === 0 && !unavailable;
 }
 
 if (typeof document !== 'undefined') {
-  void populateCommercialDownload(document);
+  void populateCommercialDownload(document, fetch, location.search);
   void populatePreviewDownloads(document, location.search);
 }

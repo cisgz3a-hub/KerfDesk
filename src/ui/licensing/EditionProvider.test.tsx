@@ -309,29 +309,66 @@ it('names the edition in the status bar', () => {
   expect(editionLabel(trial, 2_000_000_000 - 86_400 * 3 + 10)).toBe('Pro trial · 3 days left');
   expect(editionLabel({ ...trial, tier: 'paid', accessExpiresAt: null }, 0)).toBe('Pro');
 });
-it('opens Help > Licence with the copied key when a kerfdesk://licence link starts or reaches the app', async () => {
+it.each([free, trial])(
+  'opens Help > Licence with a purchase-link key from $state / $tier',
+  async (status) => {
+    const key = `KD1.0f8fad5b-d9cb-469f-a165-70867728950e.${'a'.repeat(43)}`;
+    const licenceLink = vi
+      .fn()
+      .mockResolvedValueOnce({ open: true, licenseKey: key })
+      .mockResolvedValue({ open: false, licenseKey: null });
+    const api = { ...client(status), licenceLink };
+    await act(async () =>
+      root.render(
+        <EditionProvider client={api}>
+          <div>workspace</div>
+        </EditionProvider>,
+      ),
+    );
+    const field = () => document.querySelector<HTMLInputElement>('#kerfdesk-licence-key');
+    expect(field()?.value).toBe(key);
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('[aria-label="Close licence settings"]')?.click(),
+    );
+    expect(field()).toBeNull();
+    // A later link reaching the running app opens the panel again, once.
+    licenceLink.mockResolvedValueOnce({ open: true, licenseKey: null });
+    await act(async () => window.dispatchEvent(new Event('kerfdesk:licence-link')));
+    expect(field()?.value).toBe('');
+    expect(licenceLink).toHaveBeenCalledTimes(2);
+  },
+);
+
+it('activates a purchase during an active trial without signing the trial out first', async () => {
   const key = `KD1.0f8fad5b-d9cb-469f-a165-70867728950e.${'a'.repeat(43)}`;
-  const licenceLink = vi
-    .fn()
-    .mockResolvedValueOnce({ open: true, licenseKey: key })
-    .mockResolvedValue({ open: false, licenseKey: null });
-  const api = { ...client(), licenceLink };
+  const api = client(trial);
+  vi.mocked(api.activate)
+    .mockResolvedValueOnce({ ...trial, message: 'The licence could not be confirmed. Try again.' })
+    .mockResolvedValueOnce({ ...trial, tier: 'paid', accessExpiresAt: null, licenseKey: key });
   await act(async () =>
     root.render(
       <EditionProvider client={api}>
-        <div>workspace</div>
+        <div data-workspace>workspace</div>
       </EditionProvider>,
     ),
   );
-  const field = () => document.querySelector<HTMLInputElement>('#kerfdesk-licence-key');
-  expect(field()?.value).toBe(key);
-  await act(async () =>
-    document.querySelector<HTMLButtonElement>('[aria-label="Close licence settings"]')?.click(),
-  );
-  expect(field()).toBeNull();
-  // A later link reaching the running app opens the panel again, once.
-  licenceLink.mockResolvedValueOnce({ open: true, licenseKey: null });
-  await act(async () => window.dispatchEvent(new Event('kerfdesk:licence-link')));
-  expect(field()?.value).toBe('');
-  expect(licenceLink).toHaveBeenCalledTimes(2);
+  await act(async () => window.dispatchEvent(new Event(LICENCE_SETTINGS_EVENT)));
+  const input = host.querySelector<HTMLInputElement>('#kerfdesk-licence-key');
+  expect(input).not.toBeNull();
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, key);
+    input?.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => button('Activate licence').click());
+  expect(host.textContent).toContain('30-day Pro trial');
+  expect(input?.value).toBe(key);
+  expect(proFeaturesUnlocked()).toBe(true);
+  await act(async () => button('Activate licence').click());
+  expect(api.activate).toHaveBeenNthCalledWith(2, key);
+  expect(api.deactivate).not.toHaveBeenCalled();
+  expect(host.textContent).toContain('Pro licence');
+  expect(host.textContent).not.toContain('30-day Pro trial');
+  expect(host.querySelector<HTMLInputElement>('#kerfdesk-saved-licence-key')?.value).toBe(key);
+  expect(host.querySelector('[data-workspace]')).not.toBeNull();
+  expect(proFeaturesUnlocked()).toBe(true);
 });

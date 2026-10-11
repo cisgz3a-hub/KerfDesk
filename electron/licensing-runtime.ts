@@ -29,8 +29,8 @@ import {
 import { LicensingUpdateCache } from './licensing-update-cache.js';
 import { findLicenceKey } from '../public/licence-key-text.mjs';
 import { manageLicenceDevices, type DeviceInput } from './licensing-devices.js';
-import { TrialSessionClock, withTrialBudget } from './licensing-trial-clock.js';
-import { clockErrorMessage, LicenceClockError, nextClockMark } from './licensing-clock.js';
+import { saveTrialClock, TrialSessionClock, withTrialBudget } from './licensing-trial-clock.js';
+import { clockErrorMessage, LicenceClockError } from './licensing-clock.js';
 import {
   activationBody,
   grantedRecord,
@@ -126,11 +126,12 @@ class LicensingService {
       ended ? Math.max(this.now(), clock.expiresAt) : this.now(),
       clock === null && this.proUnlocked(),
     );
+    // An observed expiry stays ended even if its disk checkpoint cannot be saved.
+    if (result.accessExpiresAt !== null && clock?.expiresAt !== result.accessExpiresAt)
+      this.trialClock = new TrialSessionClock(result.accessExpiresAt, this.now, saved.lastSeenAt);
     if (result.state === 'ready' && this.config.channel === 'commercial') {
       this.proLatched = true;
       if (result.tier !== 'trial') this.trialClock = null;
-      else if (result.accessExpiresAt !== null && clock?.expiresAt !== result.accessExpiresAt)
-        this.trialClock = new TrialSessionClock(result.accessExpiresAt, this.now, saved.lastSeenAt);
     } else if (this.trialClock !== null || result.tier === 'trial') this.proLatched = false;
     return withTrialBudget(result, saved.lastSeenAt, this.trialNow);
   };
@@ -140,21 +141,10 @@ class LicensingService {
     const { saved, device } = await this.load();
     return this.evaluate(saved, device);
   };
-  /**
-   * Saves how far a trial's clock has got, so an ended trial cannot come back by
-   * winding the clock back before the next launch. Paid rights ignore the clock,
-   * and an unchanged whole-second mark is not rewritten. Even a short session's
-   * observed progress must survive the next launch.
-   */
-  private readonly rememberClock = async (
-    saved: LicenceRecord,
-    device: string,
-    status: LicenceStatus,
-  ): Promise<void> => {
-    const mark = nextClockMark(status, saved.lastSeenAt, Math.floor(this.trialNow()));
-    if (mark !== null) await this.write({ ...saved, lastSeenAt: mark }, device);
-  };
-  private readonly safe = (work: () => Promise<LicenceStatus>, mutation = false) => {
+  private readonly safe = (
+    work: () => Promise<LicenceStatus>,
+    mutation: boolean | 'activation' = false,
+  ) => {
     if (mutation) this.updateCache.beginMutation();
     return this.serial(async () => {
       try {
@@ -162,7 +152,13 @@ class LicensingService {
         // Every verified trial status, including order/reset actions, saves observed time.
         if (result.tier === 'trial') {
           const { saved, device } = await this.load();
-          await this.rememberClock(saved, device, result);
+          return await saveTrialClock(
+            result,
+            saved,
+            this.trialNow(),
+            (next) => this.write(next, device),
+            mutation === 'activation' ? () => this.evaluate(saved, device) : undefined,
+          );
         }
         return result;
       } catch (error) {
@@ -189,18 +185,16 @@ class LicensingService {
     if (this.config.channel !== 'commercial') return this.readStatus();
     const { saved, device } = await this.load();
     const current = this.evaluate(saved, device);
+    if (current.state === 'unavailable') return current;
     // A pending deactivation no longer blocks an explicit activation or trial;
     // the new grant replaces it (ADR-523 Amendment 2).
-    const call =
-      current.state === 'unavailable'
-        ? null
-        : grantRequest(this.config, {
-            action,
-            saved,
-            device,
-            deviceName: this.options.deviceName,
-            licenseKey,
-          });
+    const call = grantRequest(this.config, {
+      action,
+      saved,
+      device,
+      deviceName: this.options.deviceName,
+      licenseKey,
+    });
     if (call === null) return current;
     let value: unknown;
     try {
@@ -211,7 +205,14 @@ class LicensingService {
         return this.dropRevokedRights(saved, device, error.code);
       return { ...this.evaluate(saved, device), message: requestFailureMessage(error) };
     }
-    return this.acceptGrant(action, value, { saved, device }, licenseKey, onAccepted);
+    try {
+      return await this.acceptGrant(action, value, { saved, device }, licenseKey, onAccepted);
+    } catch (error) {
+      if (action !== 'activate' || current.tier !== 'trial') throw error;
+      // A rejected or unsaved paid grant cannot replace an existing trial.
+      // Re-evaluate its signed deadline; never extend it while the request waits.
+      return { ...this.evaluate(saved, device), message: MESSAGES.unavailable };
+    }
   };
   private readonly acceptGrant = async (
     action: GrantAction,
@@ -278,14 +279,14 @@ class LicensingService {
   });
   readonly status = () => this.safe(this.readStatus);
   readonly activate = (licenseKey: string) =>
-    this.safe(() => {
+    this.safe(async () => {
       // Accept the key inside whatever was pasted; anything else keeps the plain rule
       // and the service decides. The form, not this, warns about a partial key.
       const key = findLicenceKey(licenseKey) ?? licenseKey.trim();
       if (!validLicenceKey(key))
-        return Promise.resolve(this.summary('activation-required', null, MESSAGES.invalidKey));
+        return { ...(await this.readStatus()), message: MESSAGES.invalidKey };
       return this.acquire('activate', key);
-    }, true);
+    }, 'activation');
   readonly startTrial = () => this.safe(() => this.acquire('trial'), true);
   readonly refresh = () => this.safe(() => this.acquire('refresh'), true);
   /**

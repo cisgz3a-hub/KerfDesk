@@ -88,8 +88,8 @@ async function resolveManualRelease(fetchRequest, signal, keys) {
     sha256: installer.sha256,
     bytes: installer.bytes,
     publishedAt: release.publishedAt,
-    codeSigning: 'unsigned',
-    updates: 'manual',
+    codeSigning: release.codeSigning === 'authenticode' ? 'signed' : 'unsigned',
+    updates: release.codeSigning === 'authenticode' ? 'automatic' : 'manual',
   };
 }
 

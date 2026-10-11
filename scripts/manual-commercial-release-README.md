@@ -7,7 +7,7 @@ Preparation writes a UTF-8 BOM-marked `commercial-installer-terms.txt` beside th
 Prepare the package with the explicit unsigned commercial profile, then use:
 
 ```text
-node scripts/publish-manual-commercial-release.mjs --expected-latest-sha256 <64-hex|none> <release-directory> <commercial-release-identity.json> <packaged-resources-directory>
+node scripts/publish-manual-commercial-release.mjs --expected-latest-sha256 <64-hex|none> [--reviewed-history <file>] <release-directory> <commercial-release-identity.json> <packaged-resources-directory>
 ```
 
 The operator process needs `DESKTOP_STABLE_MANIFEST_PRIVATE_KEY`, `DESKTOP_STABLE_MANIFEST_KEY_ID`, `COMMERCIAL_CLOUDFLARE_ACCOUNT_ID` and `COMMERCIAL_R2_API_TOKEN`. Use the actual independently pinned stable key. Never substitute a sandbox key or expose secret values in logs or command-line arguments. The source must be clean, match the signed release identity, and belong to the declared main commit or matching version tag. Follow repository publication and current licence checks before running the command.
@@ -21,9 +21,39 @@ The publisher writes only:
 - `desktop/commercial-manual/releases/X.Y.Z/KerfDesk-X.Y.Z-windows-x64-setup.exe`
 - `desktop/commercial-manual/releases/X.Y.Z/download-manifest.json`
 - `desktop/commercial-manual/releases/X.Y.Z/release-notes.json`
+- `desktop/commercial-manual/catalog.json`
 - `desktop/commercial-manual/latest.json`
 
-The first three are immutable and read back before advancing `latest.json` with `Cache-Control: no-store`. State the SHA-256 of the exact latest manifest reviewed, or `none` only if it does not exist. The tool reports the new SHA-256. It refuses changed reviewed state, conflicting immutable bytes, rollback, backdating, invalid signatures and package differences. An exact interrupted retry is safe. Operators must be serialized; the final state comparison is not a distributed lock against another administrator.
+The first three are immutable and read back before writing history and advancing `latest.json`, both with `Cache-Control: no-store`. State the SHA-256 of the exact latest manifest reviewed, or `none` only if it does not exist. The tool reports the new SHA-256. It refuses changed reviewed state, conflicting immutable bytes, rollback, backdating, invalid signatures and package differences. An exact interrupted retry is safe. Operators must be serialized; the final state comparison is not a distributed lock against another administrator.
+
+When `latest.json` already exists but `catalog.json` does not, backfill requires one reviewed history file. Immutable uploaded files alone cannot prove that a version ever became latest: an interrupted candidate may have a lower version than a later successful release. Review the successful publication step in `release-desktop-unsigned.yml` (or an authorised local publisher's retained success receipt), its reported version and latest SHA-256, and the corresponding signed immutable manifest. An overall failed workflow may still have promoted latest before a later step failed; inspect the publication result and retained readback evidence rather than classifying by the overall workflow conclusion. Missing receipts are an unresolved migration prerequisite, not permission to classify an unknown release as abandoned. Do not use version order, source ancestry or object existence as publication proof.
+
+Use this schema, replacing the illustrative values with reviewed evidence:
+
+```json
+{
+  "schemaVersion": 1,
+  "expectedLatestSha256": "<SHA-256 of the exact current latest.json bytes>",
+  "entries": [
+    {
+      "version": "1.0.1",
+      "manifestSha256": "<SHA-256 of the exact immutable download-manifest.json bytes>",
+      "status": "published",
+      "evidence": "<workflow run and publication step, or retained local success receipt>"
+    },
+    {
+      "version": "1.0.2",
+      "manifestSha256": "<SHA-256 of the exact immutable download-manifest.json bytes>",
+      "status": "abandoned",
+      "evidence": "<reviewed interruption evidence establishing no latest promotion>"
+    }
+  ]
+}
+```
+
+Include every immutable manifest at or below authenticated latest exactly once, including latest with `status: "published"`. Each entry needs a matching digest and nonempty evidence reference; the tool checks the file against the complete bounded listing and authenticated manifests. Receipt references are operator attestations, not automatically fetched or authenticated by the tool. A published entry requires its installer object; an abandoned upload is left intact and excluded from history. Missing, extra, duplicate, stale or conflicting evidence refuses before writes. For the normal workflow, review and commit the file as `docs/releases/manual-download-history.json` in the release source; the workflow passes it when present. For an authorised local recovery use `--reviewed-history <file>`. No evidence is fabricated or provider state changed by adding this interface. After a catalogue exists, normal publications retain its entries and no longer use the migration file. A future missing catalogue requires evidence pinned to the then-current latest.
+
+The catalogue assumes the serialized publisher and trusted administrators control membership. Per-release signatures cannot detect an administrator replacing it with a valid subset that still contains latest. Do not repair such a replacement by importing every immutable upload. Recover from reviewed publication receipts; the current protocol does not claim to prove completeness against arbitrary trusted-store corruption. Missing latest or invalid catalogue bytes remain detectable errors.
 
 Before each release, review `docs/releases/desktop-update-notes.json` in the release PR. Set `sinceSourceSha` to the exact source of the authenticated current manual release and write one to six short, plain customer highlights (at most 240 Unicode characters each). Summarise the reviewed changes since that release; do not copy PR titles, invent benefits or claim a backend deployment from a desktop build. For the first publication only, use `null` as the baseline. The release planner checks these committed notes before starting a Windows build and again when planning the version. Publication reads the notes from the exact signed source commit, requires the declared baseline to match authenticated latest, verifies ancestry, and refuses highlights unchanged from the baseline tree. Changing only the baseline field is insufficient. Merge, squash and rebase workflows need no predicted candidate SHA. After another release advances latest, a new reviewed notes change is required; the release-now override does not bypass this check.
 

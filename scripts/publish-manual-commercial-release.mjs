@@ -18,13 +18,21 @@ import {
 } from './unsigned-commercial-package.mjs';
 
 const USAGE =
-  'Usage: publish-manual-commercial-release.mjs --expected-latest-sha256 <64-hex|none> <release-directory> <commercial-release-identity.json> <packaged-resources-directory>';
+  'Usage: publish-manual-commercial-release.mjs --expected-latest-sha256 <64-hex|none> [--reviewed-history <file>] <release-directory> <commercial-release-identity.json> <packaged-resources-directory>';
 
 export function parseManualPublicationArguments(args) {
-  const flag = args.indexOf('--expected-latest-sha256');
-  const expectedLatestSha256 = flag === -1 ? undefined : args[flag + 1]?.toLowerCase();
-  const paths =
-    flag === -1 ? args : args.filter((_, index) => index !== flag && index !== flag + 1);
+  const paths = [...args];
+  const option = (name) => {
+    const index = paths.indexOf(name);
+    if (index === -1) return undefined;
+    const value = paths[index + 1];
+    if (!value || value.startsWith('--') || paths.lastIndexOf(name) !== index)
+      throw new CommercialReleaseError(USAGE);
+    paths.splice(index, 2);
+    return value;
+  };
+  const expectedLatestSha256 = option('--expected-latest-sha256')?.toLowerCase();
+  const reviewedHistoryPath = option('--reviewed-history');
   if (
     !/^(?:none|[a-f0-9]{64})$/u.test(expectedLatestSha256 ?? '') ||
     paths.length !== 3 ||
@@ -32,7 +40,13 @@ export function parseManualPublicationArguments(args) {
   )
     throw new CommercialReleaseError(USAGE);
   const [releaseDirectory, identityPath, resourcesDirectory] = paths;
-  return { expectedLatestSha256, releaseDirectory, identityPath, resourcesDirectory };
+  return {
+    expectedLatestSha256,
+    releaseDirectory,
+    identityPath,
+    resourcesDirectory,
+    ...(reviewedHistoryPath === undefined ? {} : { reviewedHistoryPath }),
+  };
 }
 
 export function requireManualPublicationContext(env, platform = process.platform) {
@@ -53,8 +67,13 @@ export function requireManualPublicationContext(env, platform = process.platform
 }
 
 async function main() {
-  const { expectedLatestSha256, releaseDirectory, identityPath, resourcesDirectory } =
-    parseManualPublicationArguments(process.argv.slice(2));
+  const {
+    expectedLatestSha256,
+    releaseDirectory,
+    identityPath,
+    resourcesDirectory,
+    reviewedHistoryPath,
+  } = parseManualPublicationArguments(process.argv.slice(2));
   requireManualPublicationContext(process.env);
   const json = (bytes) => JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   const keySet = json(
@@ -76,6 +95,10 @@ async function main() {
     release.sourceSha,
     fileURLToPath(new URL('..', import.meta.url)),
   );
+  const reviewedHistory =
+    reviewedHistoryPath === undefined
+      ? undefined
+      : json(await readCommercialInput(reviewedHistoryPath, 524_288));
   const { resourceDigests } = await readUnsignedCommercialPackage(
     resolve(resourcesDirectory),
     identity,
@@ -101,6 +124,7 @@ async function main() {
     verifyInstaller,
     expectedLatestSha256,
     reviewedNotes,
+    reviewedHistory,
     privateKeyPem: process.env.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY,
     keyId: process.env.DESKTOP_STABLE_MANIFEST_KEY_ID,
   });

@@ -51,6 +51,55 @@ export async function createStableReleaseStore({ accountId, apiToken, fetchReque
     throw new Error('Stable R2 bucket response is invalid.');
   }
   return {
+    async list(prefix) {
+      if (typeof prefix !== 'string' || !prefix.endsWith('/'))
+        throw new Error('Invalid stable release object prefix.');
+      objectUrl(bucketUrl, prefix.slice(0, -1));
+      const keys = new Set();
+      const cursors = new Set();
+      let cursor;
+      for (;;) {
+        const url = new URL(`${bucketUrl}/objects`);
+        url.searchParams.set('prefix', prefix);
+        url.searchParams.set('per_page', '1000');
+        if (cursor !== undefined) url.searchParams.set('cursor', cursor);
+        const response = await request(url.href, { method: 'GET' });
+        if (response.status !== 200)
+          throw new Error(`Stable R2 list failed: HTTP ${response.status}.`);
+        const value = JSON.parse(
+          (await readObjectBytes(response, 2 * 1024 * 1024)).toString('utf8'),
+        );
+        if (
+          value.success !== true ||
+          !Array.isArray(value.result) ||
+          value.result.length > 1000 ||
+          typeof value.result_info?.is_truncated !== 'boolean'
+        )
+          throw new Error('Invalid stable R2 object listing.');
+        for (const object of value.result) {
+          if (
+            typeof object?.key !== 'string' ||
+            !object.key.startsWith(prefix) ||
+            keys.has(object.key)
+          )
+            throw new Error('Invalid stable R2 listed object key.');
+          objectUrl(bucketUrl, object.key);
+          keys.add(object.key);
+          if (keys.size > 4096) throw new Error('Stable R2 object listing exceeds the size limit.');
+        }
+        if (!value.result_info.is_truncated) return [...keys];
+        cursor = value.result_info.cursor;
+        if (
+          typeof cursor !== 'string' ||
+          !cursor ||
+          cursor.length > 8192 ||
+          cursors.has(cursor) ||
+          cursors.size >= 16
+        )
+          throw new Error('Invalid stable R2 listing cursor.');
+        cursors.add(cursor);
+      }
+    },
     async get(key) {
       const response = await request(objectUrl(bucketUrl, key), { method: 'GET' });
       if (response.status === 404) {
@@ -87,9 +136,9 @@ function objectUrl(bucketUrl, key) {
   return `${bucketUrl}/objects/${key}`;
 }
 
-async function readObjectBytes(response) {
+async function readObjectBytes(response, limit = MAX_OBJECT_BYTES) {
   if (response.body === null) throw new Error('Invalid stable R2 object response.');
-  if (Number(response.headers.get('content-length')) > MAX_OBJECT_BYTES) {
+  if (Number(response.headers.get('content-length')) > limit) {
     await response.body.cancel();
     throw new Error('Invalid stable R2 object response.');
   }
@@ -100,7 +149,7 @@ async function readObjectBytes(response) {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > MAX_OBJECT_BYTES) {
+    if (size > limit) {
       await reader.cancel();
       throw new Error('Stable R2 object response exceeds the size limit.');
     }
