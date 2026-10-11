@@ -1,4 +1,5 @@
 import { checkEditorLease, saveEditorLease } from './artcraft-process-lease.js';
+import { ArtcraftSessionUnavailableError } from './artcraft-session-unavailable.js';
 import { randomBytes } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -26,7 +27,7 @@ export async function launchArtcraftProcess(
   const key =
     process.platform === 'win32' ? path.resolve(directory).toLowerCase() : path.resolve(directory);
   if (ownedDirectories.has(key)) {
-    throw new Error(
+    throw new ArtcraftSessionUnavailableError(
       'The previous editor for this session is still running. Close its window before retrying.',
     );
   }
@@ -45,7 +46,7 @@ async function launchOwnedProcess(
   directory: string,
   key: string,
 ): Promise<ArtcraftProcess> {
-  await checkEditorLease(directory);
+  await checkSessionLease(directory);
   const port = await reservePort();
   const token = editor === 'photo' ? randomBytes(32).toString('hex') : undefined;
   const options = token === undefined ? { port } : { port, token };
@@ -113,6 +114,17 @@ async function launchOwnedProcess(
   throw new Error(
     'The full editor opened but its connection is not ready. Close that editor and retry.',
   );
+}
+
+async function checkSessionLease(directory: string): Promise<void> {
+  try {
+    await checkEditorLease(directory);
+  } catch (error) {
+    throw new ArtcraftSessionUnavailableError(
+      error instanceof Error ? error.message : 'Cannot verify the previous editor process.',
+      { cause: error },
+    );
+  }
 }
 
 function editorEnvironment(): NodeJS.ProcessEnv {

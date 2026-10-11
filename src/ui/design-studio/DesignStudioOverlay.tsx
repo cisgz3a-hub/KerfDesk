@@ -12,6 +12,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useDialogA11y } from '../common/use-dialog-a11y';
+import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { useRegisterModal } from '../common/use-register-modal';
 import { useStore } from '../state';
 import { DesignCanvas } from './DesignCanvas';
@@ -77,7 +78,7 @@ export function DesignStudioOverlay(): JSX.Element | null {
       style={overlayStyle}
       onKeyDown={(event) => {
         if (workspaceMode === 'vectors') handleDesignStudioKey(event, handleFit);
-        else if (useImageEditorStore.getState().session !== null) handleEditorKeyDown(event);
+        else handlePhotoWorkspaceKey(event, () => changeWorkspace('vectors'));
       }}
       onKeyUp={workspaceMode === 'photos' ? handleEditorKeyUp : undefined}
     >
@@ -100,6 +101,25 @@ export function DesignStudioOverlay(): JSX.Element | null {
       )}
     </div>
   );
+}
+
+function handlePhotoWorkspaceKey(
+  event: React.KeyboardEvent<HTMLDivElement>,
+  onBack: () => void,
+): void {
+  if (useImageEditorStore.getState().session !== null) {
+    handleEditorKeyDown(event);
+  } else if (
+    event.key === 'Escape' &&
+    !event.defaultPrevented &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    !isEditableShortcutTarget(event.target)
+  ) {
+    event.preventDefault();
+    onBack();
+  }
 }
 
 function StudioNavigation({

@@ -48,7 +48,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   const project = createProject();
   useStore.setState({ project: { ...project, scene: { ...project.scene, objects: [photo] } } });
-  useImageEditorStore.setState({ openEditor, closeEditor });
+  useImageEditorStore.setState({
+    openEditor,
+    closeEditor,
+    session: null,
+    loadState: { kind: 'idle' },
+  });
   studio.setState({ session: null, stash: null });
   studio.getState().openStudio();
   studio.getState().setView({ panXmm: 12, panYmm: 34, pxPerMm: 3 });
@@ -57,6 +62,24 @@ beforeEach(() => {
     .drawEntity({ kind: 'line', id: 'drawing', start: { x: 20, y: 20 }, end: { x: 60, y: 60 } });
 });
 afterEach(() => useImageEditorStore.setState(originalActions));
+
+it('returns from the Photos chooser with Escape and completes the Studio close ladder', async () => {
+  const host = await mountControl(<DesignStudioOverlay />);
+  const before = studio.getState().session!;
+  await clickControl(host, 'Photos');
+  const dialog = host.querySelector<HTMLDivElement>('[role="dialog"]')!;
+  const escape = () =>
+    act(async () => {
+      dialog.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      );
+    });
+  await escape();
+  expect(host.querySelector('canvas')).not.toBeNull();
+  expect(studio.getState().session?.history).toBe(before.history);
+  for (let count = 0; count < 3 && studio.getState().session !== null; count++) await escape();
+  expect(studio.getState().session).toBeNull();
+});
 
 it('opens the current project photo and returns to the same composition, sketch and view', async () => {
   const host = await mountControl(<DesignStudioOverlay />);

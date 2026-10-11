@@ -93,6 +93,45 @@ beforeEach(() => {
 afterEach(clearPersistedSession);
 
 describe('Design Studio Apply and the project limits', () => {
+  it.each(['entities', 'points'] as const)(
+    'refuses source-only %s over the saved-document limit',
+    (kind) => {
+      const guide = {
+        kind: 'line' as const,
+        id: 'guide',
+        start: { x: 0, y: 0 },
+        end: { x: 1, y: 1 },
+        construction: true,
+      };
+      const drawing: Sketch =
+        kind === 'entities'
+          ? {
+              entities: Array.from({ length: 100_001 }, (_, i) => ({ ...guide, id: `guide-${i}` })),
+            }
+          : {
+              entities: [
+                {
+                  kind: 'path',
+                  id: 'guide',
+                  points: Array.from({ length: 1_000_001 }, () => ({ x: 0, y: 0 })),
+                  closed: false,
+                  construction: true,
+                },
+              ],
+            };
+      const before = loadScene([], []);
+      expect(
+        useStore.getState().applyDesignSketch(
+          drawing,
+          drawing.entities.map((entity) => entity.id),
+          null,
+        ),
+      ).toBe('refused');
+      expectUnchanged(before);
+      expect(lastToast()?.variant).toBe('warning');
+    },
+  );
+
   it('refuses an Apply that would take the project past its limit', () => {
     const before = loadScene(rects(OBJECT_LIMIT - 1), []);
 

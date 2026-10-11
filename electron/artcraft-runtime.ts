@@ -1,6 +1,7 @@
 import { readArtcraftDocument } from './artcraft-document.js';
 import { readEditorProcessIdentity } from './artcraft-process-identity.js';
 import { checkEditorLease } from './artcraft-process-lease.js';
+import { ArtcraftSessionUnavailableError } from './artcraft-session-unavailable.js';
 import type { ArtcraftWindowHost } from './artcraft-window-host.js';
 import { prepareRecoveredSession } from './artcraft-recovery.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -221,34 +222,44 @@ class DesktopStudio implements ArtcraftRuntime {
       if ((session.documentId ?? session.id) !== document.id || session.editor !== document.editor)
         continue;
       try {
-        if (this.processes.get(session.id)?.running() === true) {
-          // Capture live edits first: a previously matching revision must not reuse changed work.
-          if ((await this.capture(session.id)).nativeSha256 === document.nativeSha256)
-            return await this.resume(session.id);
-          continue;
-        }
-        const directory = studioDirectory(this.root, session.id);
-        // A disconnected editor may still own this directory. Candidate inspection must not
-        // restore working files or bypass the launcher's independent lease check.
-        await checkEditorLease(directory);
-        const file = await studioFile(directory, workingFile(session.editor)).catch(
-          (error: unknown) => {
-            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-            return session.nativeFile === undefined
-              ? undefined
-              : studioFile(directory, session.nativeFile);
-          },
-        );
-        if (file === undefined) continue;
-        const bytes = await boundedStudioRead(file);
-        if (createHash('sha256').update(bytes).digest('hex') === document.nativeSha256)
-          return await this.resume(session.id);
+        if (!(await this.sessionMatchesDocument(session, document))) continue;
       } catch {
-        // An unusable cached session cannot prevent restoring validated embedded bytes.
-        // Preserve it for recovery and try another candidate, then a fresh directory.
+        // Preserve changed, unreadable or already-owned candidates for recovery.
+        continue;
+      }
+      try {
+        return await this.resume(session.id);
+      } catch (error) {
+        // Only a directory ownership race can benefit from a fresh copy. Global
+        // installation/launch failures must not allocate another source on every retry.
+        if (!(error instanceof ArtcraftSessionUnavailableError)) throw error;
       }
     }
     return undefined;
+  }
+  private async sessionMatchesDocument(
+    session: StoredArtcraftSession,
+    document: ArtcraftDocument,
+  ): Promise<boolean> {
+    if (this.processes.get(session.id)?.running() === true) {
+      // Capture live edits first: a previously matching revision must not reuse changed work.
+      return (await this.capture(session.id)).nativeSha256 === document.nativeSha256;
+    }
+    const directory = studioDirectory(this.root, session.id);
+    // A disconnected editor may still own this directory. Candidate inspection must not
+    // restore working files or bypass the launcher's independent lease check.
+    await checkEditorLease(directory);
+    const file = await studioFile(directory, workingFile(session.editor)).catch(
+      (error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        return session.nativeFile === undefined
+          ? undefined
+          : studioFile(directory, session.nativeFile);
+      },
+    );
+    if (file === undefined) return false;
+    const bytes = await boundedStudioRead(file);
+    return createHash('sha256').update(bytes).digest('hex') === document.nativeSha256;
   }
   async capture(id: string): Promise<ArtcraftDocument> {
     await this.load();

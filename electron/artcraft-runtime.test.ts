@@ -9,6 +9,8 @@ import { createArtcraftRuntime } from './artcraft-runtime';
 import { initialiseEditor, inspectEditor, saveEditorRevision } from './artcraft-operations';
 import { launchArtcraftProcess } from './artcraft-process';
 import { checkEditorLease } from './artcraft-process-lease';
+import { readArtcraftInstallation } from './artcraft-installation';
+import { ArtcraftSessionUnavailableError } from './artcraft-session-unavailable';
 
 vi.mock('./artcraft-installation.js', () => ({
   ARTCRAFT_VERSIONS: { photo: '0.7.0', vector: '0.9.0' },
@@ -184,6 +186,21 @@ it('reuses identical restored documents concurrently and after restarting the ru
   expect((await restarted.restore!(document)).id).toBe(first.id);
   expect((await restarted.status()).sessions).toHaveLength(1);
 });
+it.each(['installation', 'process'] as const)(
+  'does not duplicate a matching source after global launch failure: %s',
+  async (failure) => {
+    const original = createArtcraftRuntime(root, 'editors');
+    const source = await original.open({ editor: 'photo' });
+    const document = await original.capture!(source.id);
+    const restarted = createArtcraftRuntime(root, 'editors');
+    if (failure === 'installation') vi.mocked(readArtcraftInstallation).mockResolvedValue(null);
+    else vi.mocked(launchArtcraftProcess).mockRejectedValue(new Error('Editor cannot launch'));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await expect(restarted.restore!(document)).rejects.toThrow();
+      expect((await restarted.status()).sessions).toHaveLength(1);
+    }
+  },
+);
 it('keeps newer working bytes when restoring an older embedded revision', async () => {
   const original = createArtcraftRuntime(root, 'editors');
   const source = await original.open({ editor: 'photo' });
@@ -261,7 +278,9 @@ it('falls back after a candidate cannot resume but propagates a fresh launch fai
   const source = await original.open({ editor: 'photo' });
   const document = await original.capture!(source.id);
   const restarted = createArtcraftRuntime(root, 'editors');
-  vi.mocked(launchArtcraftProcess).mockRejectedValueOnce(new Error('Candidate lease changed'));
+  vi.mocked(launchArtcraftProcess).mockRejectedValueOnce(
+    new ArtcraftSessionUnavailableError('Candidate lease changed'),
+  );
   const restored = await restarted.restore!(document);
   expect(restored.id).not.toBe(source.id);
   expect((await restarted.capture!(restored.id)).nativeSha256).toBe(document.nativeSha256);

@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import type { ChildProcess } from 'node:child_process';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { launchArtcraftProcess } from './artcraft-process';
+import { ArtcraftSessionUnavailableError } from './artcraft-session-unavailable';
 
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn(),
@@ -33,6 +34,18 @@ beforeEach(() => {
 });
 
 describe('editor launch failure ownership', () => {
+  it('distinguishes a candidate lease failure before launching a process', async () => {
+    const cause = new Error('The previous editor is still running');
+    mocks.check.mockRejectedValueOnce(cause);
+    await expect(
+      launchArtcraftProcess('editor.exe', 'photo', 'owned-candidate'),
+    ).rejects.toMatchObject({
+      constructor: ArtcraftSessionUnavailableError,
+      cause,
+    });
+    expect(mocks.spawn).not.toHaveBeenCalled();
+  });
+
   it('unrefs an unrecorded child and blocks retries until that child exits', async () => {
     const process = child();
     mocks.spawn.mockReturnValue(process as unknown as ChildProcess);

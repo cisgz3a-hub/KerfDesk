@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createProject,
+  createLayer,
   IDENTITY_TRANSFORM,
   type RasterImage,
   type SceneObject,
@@ -85,6 +86,31 @@ async function importPhoto(): Promise<void> {
 }
 
 describe('Design Studio project photo workflow', () => {
+  it.each(['locked', 'hidden'] as const)(
+    'does not open locked and hidden photos: %s',
+    async (kind) => {
+      const existing = { ...photo(), ...(kind === 'locked' ? { locked: true } : {}) };
+      setPhotos(existing);
+      if (kind === 'hidden') {
+        const project = useStore.getState().project;
+        useStore.setState({
+          project: {
+            ...project,
+            scene: {
+              ...project.scene,
+              layers: [{ ...createLayer({ id: 'hidden', color: existing.color }), visible: false }],
+            },
+          },
+        });
+      }
+      await act(async () => root.render(<DesignPhotoWorkspace />));
+      const card = host.querySelector<HTMLButtonElement>('[aria-label="Edit photo photo.png"]')!;
+      expect(card.disabled).toBe(true);
+      await act(async () => card.click());
+      expect(openEditor).not.toHaveBeenCalled();
+    },
+  );
+
   it('prevents choosing another photo while an import is pending', async () => {
     setPhotos(photo('existing'));
     let resolve!: (value: null) => void;

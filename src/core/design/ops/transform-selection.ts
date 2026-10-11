@@ -1,6 +1,6 @@
 import type { Bounds, Vec2 } from '../../scene';
 import { entityBounds } from '../sketch-bounds';
-import type { Sketch, SketchArc, SketchEntity } from '../sketch-entity';
+import { sanitizeEntity, type Sketch, type SketchArc, type SketchEntity } from '../sketch-entity';
 
 export type DesignTransformKind =
   | 'rotate-left'
@@ -17,8 +17,12 @@ export function transformSelection(
   ids: ReadonlySet<string>,
   kind: DesignTransformKind,
 ): Sketch {
-  const selected = sketch.entities.filter((entity) => ids.has(entity.id));
+  // Match materialization's admission without tessellating curves or losing exact bounds.
+  const selected = sketch.entities.filter(
+    (entity) => ids.has(entity.id) && sanitizeEntity(entity) !== null,
+  );
   if (selected.length === 0) return sketch;
+  const drawableIds = new Set(selected.map((entity) => entity.id));
   const boxes = selected.map(transformBounds);
   const bounds = {
     minX: Math.min(...boxes.map((box) => box.minX)),
@@ -31,7 +35,7 @@ export function transformSelection(
   const point = (at: Vec2): Vec2 => transformPoint(at, pivot, kind);
   let changed = false;
   const entities = sketch.entities.map((entity) => {
-    if (!ids.has(entity.id)) return entity;
+    if (!drawableIds.has(entity.id)) return entity;
     const next = transformEntity(entity, point, kind);
     if (sameGeometry(entity, next)) return entity;
     changed = true;

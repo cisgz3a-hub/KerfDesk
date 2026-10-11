@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { sceneObjectHasVisibleLayer } from '../../core/scene';
 import { usePlatformOptional } from '../app/platform-context';
 import { runImagePickAction } from '../commands/image-pick-action';
 import { ImageEditorHost } from '../image-editor/ImageEditorHost';
@@ -9,12 +10,12 @@ import './design-workspace.css';
 
 /** Photos belong to the current project; the sketch keeps its own draft and Undo. */
 export function DesignPhotoWorkspace(): JSX.Element {
-  const objects = useStore((s) => s.project.scene.objects);
+  const scene = useStore((s) => s.project.scene);
   const session = useImageEditorStore((s) => s.session);
   const loadState = useImageEditorStore((s) => s.loadState);
   const openEditor = useImageEditorStore((s) => s.openEditor);
   const { importing, importPhoto, available } = useImportStudioPhoto();
-  const photos = objects.filter((object) => object.kind === 'raster-image');
+  const photos = scene.objects.filter((object) => object.kind === 'raster-image');
   if (session !== null || loadState.kind === 'loading') return <ImageEditorHost embedded />;
   return (
     <section className="design-photos" aria-label="Project photos">
@@ -50,7 +51,9 @@ export function DesignPhotoWorkspace(): JSX.Element {
               onClick={() => openEditor(photo)}
               aria-label={`Edit photo ${photo.source}`}
               title={`Open ${photo.source} and its editable photo layers`}
-              disabled={importing}
+              disabled={
+                importing || photo.locked === true || !sceneObjectHasVisibleLayer(scene, photo)
+              }
             >
               {photo.dataUrl ? <img src={photo.dataUrl} alt="" /> : <span>Photo</span>}
               <strong>{photo.source}</strong>

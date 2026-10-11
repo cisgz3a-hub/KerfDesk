@@ -66,6 +66,35 @@ function expectClose(actual: unknown, expected: unknown): void {
 }
 
 describe('quarter turn and mirror selection', () => {
+  it.each(kinds)('%s ignores non-materialized selected entities', (kind) => {
+    const empty: SketchEntity[] = [
+      { id: 'empty', kind: 'path', points: [], closed: false },
+      { id: 'zero', kind: 'circle', center: { x: -1000, y: -1000 }, radiusMm: 0 },
+      {
+        id: 'flat',
+        kind: 'rect',
+        origin: { x: 500, y: 500 },
+        widthMm: 0,
+        heightMm: 20,
+        cornerRadiusMm: 0,
+      },
+    ];
+    const sketch: Sketch = { entities: [rect, ...empty] };
+    const next = transformSelection(
+      sketch,
+      new Set(sketch.entities.map((entity) => entity.id)),
+      kind,
+    );
+    expect(next.entities[0]).toEqual(
+      transformSelection({ entities: [rect] }, new Set([rect.id]), kind).entities[0],
+    );
+    expect(next.entities.slice(1)).toEqual(empty);
+    const onlyEmpty = { entities: empty };
+    expect(transformSelection(onlyEmpty, new Set(empty.map((entity) => entity.id)), kind)).toBe(
+      onlyEmpty,
+    );
+  });
+
   it('turns a rounded rectangle clockwise around its centre while keeping it editable', () => {
     const sketch = { entities: [rect] };
     const next = transformSelection(sketch, new Set(['rect']), 'rotate-right');
