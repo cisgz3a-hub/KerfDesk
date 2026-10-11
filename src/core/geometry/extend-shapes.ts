@@ -85,17 +85,7 @@ function pickEndpoint(
   tolerance: number,
   previous: EndpointPick | null,
 ): EndpointPick | null {
-  if (contour.closed || !contour.trimmable) return previous;
-  const localStart = contour.segments.start;
-  const localEnd = contour.segments.segments.at(-1)?.to ?? localStart;
-  // Match the shared closure policy in local coordinates, including unflagged
-  // single-cubic loops. Scaling must not turn a filled loop into an open source.
-  if (
-    (contour.segments.segments.length > 1 || contour.segments.segments[0]?.kind !== 'line') &&
-    Math.abs(localStart.x - localEnd.x) < CLOSURE_EPS_MM &&
-    Math.abs(localStart.y - localEnd.y) < CLOSURE_EPS_MM
-  )
-    return previous;
+  if (contour.closed || !contour.trimmable || isLocalLoop(contour.segments)) return previous;
   const first = endpoint(contour, 'start');
   const last = endpoint(contour, 'end');
   if (Math.hypot(first.x - last.x, first.y - last.y) <= EXTEND_EPS_MM) return previous;
@@ -107,6 +97,17 @@ function pickEndpoint(
     nearest = { contour, end, distance };
   }
   return nearest;
+}
+
+function isLocalLoop(curve: CurveSubpath): boolean {
+  if (curve.segments.length === 1 && curve.segments[0]?.kind === 'line') return false;
+  const end = curve.segments.at(-1)?.to ?? curve.start;
+  // Match local fill closure, including unflagged single-cubic loops, without
+  // treating a short straight segment enlarged by its transform as a loop.
+  return (
+    Math.abs(curve.start.x - end.x) < CLOSURE_EPS_MM &&
+    Math.abs(curve.start.y - end.y) < CLOSURE_EPS_MM
+  );
 }
 
 function endpoint(contour: TrimContour, end: 'start' | 'end'): Vec2 {
