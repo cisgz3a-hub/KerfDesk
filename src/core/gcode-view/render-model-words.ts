@@ -248,7 +248,12 @@ function resolveDwell(tally: LineTally, line: number, accounting: WordAccounting
     tally.sawUnsupported = true;
     return;
   }
-  accounting.pushEvent({ kind: 'dwell', line, seconds: Math.max(0, tally.dwellSeconds) });
+  accounting.pushEvent({
+    kind: 'dwell',
+    line,
+    seconds: Math.max(0, tally.dwellSeconds),
+    isBeforeMotion: true,
+  });
 }
 
 function resolveHome(

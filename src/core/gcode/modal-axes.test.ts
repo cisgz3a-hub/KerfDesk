@@ -16,10 +16,18 @@ describe('applySharedGCode', () => {
 
   it('returns false and mutates nothing for codes outside the shared set', () => {
     const state = freshModal();
-    for (const code of [4, 17, 18, 54, 94, 38.2]) {
+    for (const code of [4, 17, 18, 54, 94, 38.2, 90.1]) {
       expect(applySharedGCode(state, code)).toBe(false);
     }
     expect(state).toEqual(freshModal());
+  });
+
+  it('accepts incremental arc-center mode without changing endpoint distance mode', () => {
+    for (const absolute of [true, false]) {
+      const state = { ...freshModal(), absolute };
+      expect(applySharedGCode(state, 91.1)).toBe(true);
+      expect(state).toEqual({ ...freshModal(), absolute });
+    }
   });
 });
 

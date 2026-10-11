@@ -48,12 +48,14 @@ export function VariableTextControls(props: ControlsProps): JSX.Element {
           label="Record"
           value={props.variables.recordIndex + 1}
           min={1}
+          max={Number.MAX_SAFE_INTEGER + 1}
           onChange={(value) => props.setSettings({ recordIndex: Math.max(0, value - 1) })}
         />
         <Counter
           label="Serial"
           value={props.variables.serialValue}
           min={0}
+          max={Number.MAX_SAFE_INTEGER}
           onChange={(serialValue) => props.setSettings({ serialValue })}
         />
         <Advancement value={props.variables.advancement} setSettings={props.setSettings} />
@@ -115,6 +117,7 @@ function Counter(props: {
   readonly label: string;
   readonly value: number;
   readonly min: number;
+  readonly max: number;
   readonly onChange: (value: number) => void;
 }): JSX.Element {
   return (
@@ -123,9 +126,10 @@ function Counter(props: {
       <DraftNumberInput
         aria-label={`Variable ${props.label.toLowerCase()}`}
         min={props.min}
+        max={props.max}
         step={1}
         value={props.value}
-        normalize={(next) => Math.max(props.min, Math.floor(next))}
+        normalize={(next) => Math.min(props.max, Math.max(props.min, Math.floor(next)))}
         onValueChange={props.onChange}
       />
     </label>

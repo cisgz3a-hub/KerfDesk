@@ -27,6 +27,8 @@ describe('beginPathNodeDrag', () => {
     expect(drag).toEqual({
       kind: 'path-node',
       startScenePoint: { x: 10.25, y: 0.2 },
+      startNodeScenePoint: { x: 10, y: 0 },
+      startPrimaryScenePoint: { x: 10, y: 0 },
     });
     expect(selectPathNode).toHaveBeenCalledWith(
       {
@@ -114,7 +116,12 @@ describe('beginPathNodeDrag', () => {
     const setSelectedPathNodePositionDuringInteraction = vi.fn();
 
     updatePathNodeDrag({
-      drag: { kind: 'path-node', startScenePoint: { x: 0, y: 0 } },
+      drag: {
+        kind: 'path-node',
+        startScenePoint: { x: 0, y: 0 },
+        startNodeScenePoint: { x: 0, y: 0 },
+        startPrimaryScenePoint: { x: 0, y: 0 },
+      },
       point: { x: 15, y: 7 },
       setSelectedPathNodePositionDuringInteraction,
     });
@@ -126,7 +133,12 @@ describe('beginPathNodeDrag', () => {
     const setSelectedPathNodePositionDuringInteraction = vi.fn();
 
     updatePathNodeDrag({
-      drag: { kind: 'path-node', startScenePoint: { x: 0, y: 0 } },
+      drag: {
+        kind: 'path-node',
+        startScenePoint: { x: 0, y: 0 },
+        startNodeScenePoint: { x: 0, y: 0 },
+        startPrimaryScenePoint: { x: 0, y: 0 },
+      },
       point: null,
       setSelectedPathNodePositionDuringInteraction,
     });

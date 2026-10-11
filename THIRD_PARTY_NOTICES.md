@@ -26,6 +26,7 @@ macOS; JS license banners also remain in shipped assets.
 | zustand | MIT | © 2019 Paul Henschel — https://github.com/pmndrs/zustand |
 | three | MIT | © 2010-2024 three.js authors — https://github.com/mrdoob/three.js |
 | dompurify | MPL-2.0 OR Apache-2.0 | © Cure53 and other contributors — https://github.com/cure53/DOMPurify |
+| @csstools/css-calc 2.1.4, @csstools/css-parser-algorithms 3.0.5, @csstools/css-tokenizer 3.0.4 | MIT | © 2022 Romain Menke, Antonio Laguna — https://github.com/csstools/postcss-plugins |
 | opentype.js | MIT | © 2020 Frederik De Bleser — https://github.com/opentypejs/opentype.js |
 | harfbuzzjs 1.6.3 / HarfBuzz | MIT / Old MIT | HarfBuzz contributors — https://github.com/harfbuzz/harfbuzzjs; native notices included separately |
 | bidi-js 1.1.0 | MIT | Loov Communications — https://github.com/lojjic/bidi-js |

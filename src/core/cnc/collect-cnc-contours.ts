@@ -92,7 +92,7 @@ function appendObjectContours(
       // longer identifies the source polyline that owns a persisted tab anchor.
       const manualTabPoints = usesStrokeOutline
         ? []
-        : objectTabPoints(object, layer.color, pathIndex, polylineIndex, device);
+        : objectTabPoints(object, path.color, pathIndex, polylineIndex, device);
       out.push({
         polyline: {
           points: polyline.points.map((point) =>

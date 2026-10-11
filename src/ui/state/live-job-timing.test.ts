@@ -26,6 +26,25 @@ function plan(gcode: string): GcodeTimingPlanResult {
 }
 
 describe('live job timing', () => {
+  it.each([1, 2])('subtracts same-block dwell from observed pace at %sx motion time', (pace) => {
+    const built = plan('G4 P4 G1 X20 F60\nG4 P8');
+    if (built.kind !== 'ok') throw new Error('Expected a timing plan.');
+    const motionOnly = plan('G1 X20 F60');
+    if (motionOnly.kind !== 'ok') throw new Error('Expected motion-only timing.');
+    const observedMotion = plannedProgressAtRoute(motionOnly.plan, 10).motionSeconds;
+    const atMs = (observedMotion * pace + 4) * 1000;
+    let timing = startLiveJobTiming(built, 0);
+    timing = observeTrustedLiveJobProgress(timing, 0, 0);
+    timing = observeTrustedLiveJobProgress(timing, 10, atMs);
+    if (timing.kind !== 'running') throw new Error('Expected running timing.');
+    const expectedPace = 0.75 + 0.25 * pace;
+    expect(timing.motionPace).toBeCloseTo(expectedPace, 9);
+    expect(timing.remainingSecondsAtUpdate).toBeCloseTo(
+      (built.plan.motionSeconds - observedMotion) * expectedPace + 8,
+      9,
+    );
+  });
+
   it('retains calibrated motion through partial-route pacing and pause without scaling dwell', () => {
     const built = buildGcodeTimingPlan(
       'G21 G90\nM4 S100\nG1 X1000 F3000\nG4 P7',

@@ -1,5 +1,6 @@
 import type { ParseDxfResult } from '../../io/dxf';
-import type { ParseGcodeProgramResult } from '../../io/gcode';
+import type { GcodePreviewParseResult } from './gcode-preview-timing';
+import type { GcodeInspectionContext } from '../gcode-inspector/gcode-inspection-source';
 import type { ParseHpglResult } from '../../io/hpgl';
 import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
 import type { PreparedPsdImport } from './psd-import-preparation';
@@ -59,8 +60,13 @@ export function parseDxfOffThread(
 export function parseGcodeOffThread(
   blob: Blob,
   options: ImportWorkerRequestOptions = {},
-): Promise<ParseGcodeProgramResult> | null {
-  const packed = request<'gcode', PackedGcodeResult>({ kind: 'gcode', blob }, 'gcode', options);
+  timingContext?: GcodeInspectionContext,
+): Promise<GcodePreviewParseResult> | null {
+  const packed = request<'gcode', PackedGcodeResult>(
+    { kind: 'gcode', blob, ...(timingContext === undefined ? {} : { timingContext }) },
+    'gcode',
+    options,
+  );
   return packed === null ? null : packed.then(unpackGcodeResult);
 }
 
