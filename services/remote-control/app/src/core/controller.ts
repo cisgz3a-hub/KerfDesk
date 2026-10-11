@@ -1,4 +1,6 @@
 import { canControl, canEdit, store } from './store';
+import { HeldJogController } from './held-jog';
+import { readCameraSnapshot } from './camera-snapshot';
 import { RemoteError, uuid, type LiveEvent, type RemoteTransport } from './transport';
 import {
   TERMINAL_STATES,
@@ -14,7 +16,6 @@ import type { Box } from './scene';
 
 const MACHINE_MIN_INTERVAL_MS = 1000;
 const FALLBACK_POLL_MS = 5000;
-const HEARTBEAT_MS = 150;
 
 type Reader = {
   running: boolean;
@@ -23,7 +24,6 @@ type Reader = {
   timer: ReturnType<typeof setTimeout> | null;
 };
 const reader = (): Reader => ({ running: false, again: false, last: 0, timer: null });
-
 /**
  * Owns reads, live sync and every write. Writes always carry the latest revision and a fresh
  * UUID; the PC decides. A stale revision refreshes the view and asks the user to try again.
@@ -36,7 +36,7 @@ export class Controller {
   private liveMode: 'socket' | 'wait' | 'poll' = 'poll';
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private waitAbort: AbortController | null = null;
-  private hold: { operationId: string; timer: ReturnType<typeof setInterval> } | null = null;
+  private readonly heldJog = new HeldJogController();
   private stopped = false;
   private sceneSupported = true;
   private readonly uncertain = new WeakMap<
@@ -49,13 +49,15 @@ export class Controller {
     this.stopped = false;
     this.transport = transport;
     this.unsubscribe = transport.subscribe((event) => this.live(event));
-    this.liveMode = transport.kind === 'phone' ? 'poll' : 'wait';
+    this.liveMode = 'poll';
+    this.lastSeq = -1;
+    store.set({ liveUpdates: false });
     document.addEventListener('visibilitychange', this.visibility);
     window.addEventListener('pagehide', this.pageHidden);
     void this.refreshAll();
     void this.loadLibraries();
     this.scheduleFallback();
-    if (this.liveMode === 'wait') void this.waitLoop();
+    if (transport.kind === 'mcp') void this.waitLoop();
   }
 
   stop(): void {
@@ -64,6 +66,7 @@ export class Controller {
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.waitAbort?.abort();
+    this.waitAbort = null;
     if (this.pollTimer !== null) clearTimeout(this.pollTimer);
     document.removeEventListener('visibilitychange', this.visibility);
     window.removeEventListener('pagehide', this.pageHidden);
@@ -79,13 +82,26 @@ export class Controller {
   private live(event: LiveEvent): void {
     if (event.type === 'socket') {
       store.set({ socket: event.open });
-      this.liveMode = event.open ? 'socket' : 'poll';
+      // An open socket alone says nothing about an older PC's change support.
+      this.liveMode = 'poll';
+      store.set({ liveUpdates: false });
       if (event.open) void this.refreshAll();
       else this.stopHold();
       this.scheduleFallback();
     } else if (event.type === 'presence') {
       store.set({ pcOnline: event.online });
+      if (!event.online) {
+        this.liveMode = 'poll';
+        store.set({ liveUpdates: false });
+        this.stopHold();
+        this.scheduleFallback();
+      }
     } else if (event.type === 'changed') {
+      if (this.t.socketOpen()) {
+        this.liveMode = 'socket';
+        store.set({ liveUpdates: true });
+        this.scheduleFallback();
+      }
       this.applyChange(event.revision, event.machineSeq);
     } else {
       const text = {
@@ -120,6 +136,7 @@ export class Controller {
   /** No push channel: long-poll the relay; it answers without contacting the PC. */
   private async waitLoop(): Promise<void> {
     if (this.waitAbort !== null) return;
+    const transport = this.t;
     const controller = new AbortController();
     this.waitAbort = controller;
     try {
@@ -129,7 +146,7 @@ export class Controller {
         document.visibilityState === 'visible'
       ) {
         const workspace = store.get().workspace;
-        const result = await this.t
+        const result = await transport
           .call<{ revision: string; machineSeq: number; reason: string }>(
             'wait_for_change',
             {
@@ -140,12 +157,25 @@ export class Controller {
             { signal: controller.signal },
           )
           .catch(() => null);
-        if (result === null) await delay(4000);
-        else if (result.reason === 'unsupported') {
+        if (this.stopped || controller.signal.aborted || this.transport !== transport) return;
+        // Direct MCP desktops may advertise the tool but reject it in the renderer.
+        // A failed/unsupported probe must never disable ordinary status polling.
+        if (
+          result === null ||
+          result.reason === 'unsupported' ||
+          typeof result.revision !== 'string' ||
+          !Number.isSafeInteger(result.machineSeq) ||
+          result.machineSeq < 0
+        ) {
           this.liveMode = 'poll';
+          store.set({ liveUpdates: false });
           this.scheduleFallback();
           return;
-        } else this.applyChange(result.revision, result.machineSeq);
+        }
+        this.liveMode = 'wait';
+        store.set({ liveUpdates: true });
+        this.scheduleFallback();
+        this.applyChange(result.revision, result.machineSeq);
       }
     } finally {
       if (this.waitAbort === controller) this.waitAbort = null;
@@ -440,62 +470,26 @@ export class Controller {
 
   /** Held jog: the PC stops it if these heartbeats stop (ADR-585). */
   async startHold(axis: 'x' | 'y' | 'z', direction: -1 | 1, feedMmPerMin?: number): Promise<void> {
-    if (this.hold !== null || !this.t.socketOpen()) return;
-    const operation = await this.machineAction('jog_hold_start', {
-      axis,
-      direction,
-      ...(feedMmPerMin === undefined ? {} : { feedMmPerMin }),
-    });
-    if (operation === null) return;
-    const operationId = operation.operationId;
-    this.t.heartbeat(operationId);
-    this.hold = {
-      operationId,
-      timer: setInterval(() => this.t.heartbeat(operationId), HEARTBEAT_MS),
-    };
+    if (this.stopped) return;
+    await this.heldJog.start(this.t, () =>
+      this.machineAction('jog_hold_start', {
+        axis,
+        direction,
+        ...(feedMmPerMin === undefined ? {} : { feedMmPerMin }),
+      }),
+    );
   }
 
   stopHold(): void {
-    const hold = this.hold;
-    if (hold === null) return;
-    this.hold = null;
-    clearInterval(hold.timer);
-    this.transport?.releaseHolds();
-    void this.transport
-      ?.call('jog_hold_stop', { requestId: uuid(), operationId: hold.operationId })
-      .catch(() => undefined)
-      .finally(() => void this.refreshMachine(true));
+    this.heldJog.stop();
   }
 
   holdActive(): boolean {
-    return this.hold !== null;
+    return this.heldJog.active();
   }
 
-  async cameraSnapshot(): Promise<void> {
-    try {
-      const result = await this.t.call<{
-        status: string;
-        message?: string;
-        image?: { data: string; widthPx: number; heightPx: number };
-      }>('get_camera_snapshot');
-      if (result.image === undefined) {
-        store.toast(result.message ?? 'The camera isn’t available.', 'warning');
-        return;
-      }
-      store.set({
-        camera: {
-          data: result.image.data,
-          width: result.image.widthPx,
-          height: result.image.heightPx,
-          at: Date.now(),
-        },
-      });
-    } catch (error) {
-      store.toast(
-        error instanceof RemoteError ? error.message : 'The camera isn’t available.',
-        'error',
-      );
-    }
+  cameraSnapshot(): Promise<void> {
+    return readCameraSnapshot(this.t);
   }
 }
 

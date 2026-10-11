@@ -4,9 +4,9 @@ import { useCameraStore } from '../state/camera-store';
 import { RemoteFault } from './fault';
 import type { MachineAuthority } from './machine-types';
 import type { RemoteControlOptions } from './types';
+import { fitsRemoteResponse } from './response-budget';
 
 const MAX_SIDE_PX = 1024;
-const BASE64_LIMIT = 240_000;
 const JPEG_PREFIX = 'data:image/jpeg;base64,';
 const DISABLED = {
   status: 'disabled',
@@ -62,11 +62,11 @@ function encodeStill(frame: RgbaImage): Record<string, unknown> {
   for (const quality of [0.8, 0.65, 0.5, 0.35]) {
     const encoded = canvas.toDataURL('image/jpeg', quality);
     const data = encoded.startsWith(JPEG_PREFIX) ? encoded.slice(JPEG_PREFIX.length) : '';
-    if (data.length > 0 && data.length <= BASE64_LIMIT)
-      return {
-        status: 'ready',
-        image: { mimeType: 'image/jpeg', data, widthPx: width, heightPx: height },
-      };
+    const result = {
+      status: 'ready',
+      image: { mimeType: 'image/jpeg', data, widthPx: width, heightPx: height },
+    };
+    if (data.length > 0 && fitsRemoteResponse(result)) return result;
   }
   return unavailable('The camera picture is too large to share.');
 }

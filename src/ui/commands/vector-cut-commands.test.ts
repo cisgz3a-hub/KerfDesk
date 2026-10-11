@@ -10,6 +10,17 @@ afterEach(() => {
 });
 
 describe('Trim Shapes and Cut Shapes commands', () => {
+  it('offers Extend Shapes and toggles the endpoint tool', () => {
+    const context = vectorCutCommandContext(useStore.getState());
+    const command = commandById(buildAppCommands(baseCtx(context)), 'tools.extend-shapes');
+    expect(command).toMatchObject({ enabled: true, active: false, label: 'Extend Shapes' });
+    expect(runCommand(command)).toBe(true);
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'extend-shapes' });
+    expect(vectorCutCommandContext(useStore.getState()).extendShapesActive).toBe(true);
+    context.extendShapes();
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
+  });
+
   it('offers Cut Shapes once something is selected', () => {
     const cutShapes = vi.fn();
     const idle = commandById(buildAppCommands(baseCtx({ cutShapes })), 'tools.cut-shapes');

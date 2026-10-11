@@ -775,6 +775,19 @@ textarea {
   padding: 8px 12px 0;
   background: var(--bg);
 }
+/* Leave the stop outside every editing overlay, with room for its wrapped note. */
+.app:has(.sheet) .abort-dock {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 42;
+  padding-bottom: calc(8px + var(--safe-bottom));
+}
+.app:has(.abort-dock) .sheet {
+  bottom: var(--abort-dock-height, 0px);
+  max-height: calc(86dvh - var(--abort-dock-height, 0px));
+}
 .abort-btn {
   width: 100%;
   min-height: 56px;
