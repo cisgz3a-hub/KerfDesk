@@ -12,6 +12,7 @@ import type { Polyline, Vec2 } from '../../core/scene';
 import { TRACE_PRESETS } from '../../core/trace';
 import { traceImageToEdgePaths } from '../../core/trace/edge-trace';
 import type { RawImageData, TraceOptions } from '../../core/trace/trace-image';
+import { mergeLightBurnTraceSettings } from '../../ui/trace/trace-options';
 import { decodePngFile } from './png-decode';
 import { renderTraceOverlay } from './render-overlay';
 import { requiredArchHouseFixtureStatus } from './trace-artifact-runner';
@@ -20,13 +21,9 @@ const OUT_DIR = join(process.cwd(), 'trace-audit-artifacts');
 const SLIVER_AREA_MAX_PX2 = 30;
 const SLIVER_PERIM_MIN_PX = 12;
 
+// A fresh dialog uses the preset with no operator overrides.
 function mergedAppEdgeOptions(): TraceOptions {
-  return {
-    ...(TRACE_PRESETS['Edge Detection'] as TraceOptions),
-    edgeLowThresholdRatio: 0.074,
-    edgeHighThresholdRatio: 0.185,
-    edgeMinLengthPx: 3,
-  };
+  return mergeLightBurnTraceSettings(TRACE_PRESETS['Edge Detection'] as TraceOptions, {});
 }
 
 type Band = { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number };
