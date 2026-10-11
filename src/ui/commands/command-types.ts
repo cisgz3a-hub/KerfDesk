@@ -83,6 +83,7 @@ export type CommandId =
   | 'tools.print-and-cut'
   | 'tools.labs'
   | 'tools.adjust-image'
+  | 'tools.photo-engraving'
   | 'tools.edit-image'
   | 'tools.apply-image-mask'
   | 'tools.crop-image'
@@ -191,6 +192,7 @@ export type AppCommandContext = CommandContextSlices & {
   readonly canRedo: boolean;
   readonly hasSelection: boolean;
   readonly hasRasterSelection: boolean;
+  readonly canPhotoEngraveSelection?: boolean;
   readonly canRetraceOriginal: boolean;
   readonly hasConvertibleSelection: boolean;
   readonly canConvertSelectionToPath: boolean;
@@ -271,6 +273,7 @@ export type AppCommandContext = CommandContextSlices & {
   readonly printAndCut: () => void;
   readonly labsSettings: () => void;
   readonly adjustImage: () => void;
+  readonly photoEngraving?: () => void;
   readonly editImage: () => void;
   readonly saveProcessedBitmap: () => void;
   readonly traceImage: () => void;

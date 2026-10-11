@@ -1,0 +1,140 @@
+.lf-photo-engraving {
+  width: min(1160px, calc(100vw - 40px));
+  max-width: calc(100vw - 40px);
+}
+
+.lf-photo-engraving__intro {
+  margin: 6px 0;
+}
+
+.lf-photo-engraving__filename {
+  color: var(--lf-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0 0 16px;
+}
+
+.lf-photo-engraving__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+.lf-photo-engraving__previews {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.lf-photo-engraving__previews figure {
+  margin: 0;
+  min-width: 0;
+}
+
+.lf-photo-engraving__previews figcaption {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.lf-photo-engraving__preview-surface {
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+  height: 330px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--lf-bg-input);
+}
+
+.lf-photo-engraving__preview-surface img,
+.lf-photo-engraving__preview-surface canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lf-photo-engraving__preview-surface [hidden] {
+  display: none;
+}
+
+.lf-photo-engraving__preview-surface p {
+  padding: 20px;
+}
+
+.lf-photo-engraving__previews p,
+.lf-photo-engraving__hint {
+  color: var(--lf-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 6px 0 10px;
+}
+
+.lf-photo-engraving__preview-note {
+  grid-column: 1 / -1;
+}
+
+.lf-photo-engraving__operation {
+  overflow-wrap: anywhere;
+}
+
+.lf-photo-engraving__controls {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lf-photo-engraving__controls label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.lf-photo-engraving__controls select,
+.lf-photo-engraving__controls input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.lf-photo-engraving__controls .lf-photo-engraving__number {
+  grid-template-columns: minmax(0, 1fr) 94px;
+  align-items: center;
+}
+
+.lf-photo-engraving__controls h3 {
+  font-size: 13px;
+  margin: 6px 0;
+}
+
+.lf-photo-engraving__tone-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lf-photo-engraving__guide {
+  border-top: 1px solid var(--lf-border);
+  padding-top: 12px;
+  margin: 12px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.lf-photo-engraving__guide summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+@media (max-width: 880px) {
+  .lf-photo-engraving__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lf-photo-engraving__preview-surface {
+    height: 230px;
+  }
+}

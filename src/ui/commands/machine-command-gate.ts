@@ -37,6 +37,7 @@ export const LASER_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>
   'tools.close-fill-contours-with-tolerance',
   'tools.convert-to-bitmap',
   'tools.adjust-image',
+  'tools.photo-engraving',
   'tools.save-processed-bitmap',
   'tools.registration-jig',
   'tools.print-and-cut',

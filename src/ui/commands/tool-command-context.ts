@@ -4,6 +4,7 @@
 
 import type { usePlatform } from '../app/platform-context';
 import { handleSaveProcessedBitmap } from '../app/save-processed-bitmap';
+import { openPhotoEngraving } from '../raster/photo-engraving-store';
 import type { useStore } from '../state';
 import type { useToastStore } from '../state/toast-store';
 import type {
@@ -34,6 +35,8 @@ type ToolCommandContext = Pick<
   | 'rotarySetup'
   | 'labsSettings'
   | 'adjustImage'
+  | 'photoEngraving'
+  | 'canPhotoEngraveSelection'
   | 'saveProcessedBitmap'
   | 'traceImage'
   | 'retraceOriginal'
@@ -76,6 +79,12 @@ export function toolCommandContext(
     rotarySetup: callbacks.requestRotarySetup,
     labsSettings: callbacks.requestLabsSettings,
     adjustImage: callbacks.requestAdjustImage,
+    photoEngraving: openPhotoEngraving,
+    canPhotoEngraveSelection:
+      selection.selectedIds.length === 1 &&
+      selection.selected?.kind === 'raster-image' &&
+      selection.selected.role !== 'trace-source' &&
+      selection.selected.locked !== true,
     saveProcessedBitmap: saveProcessedBitmapAction(platform, app, pushToast),
     traceImage: traceImageAction(selection.selected, dialogs.openImageDialog),
     retraceOriginal: retraceOriginalAction(

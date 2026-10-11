@@ -3697,6 +3697,26 @@ or traced image) with at least one closed polyline.
 
 ### F-F2. Image-engrave a raster (Phase F.2 — code shipped through F.2.e; hardware burn pending)
 
+For portraits, import a sharp photograph, set its physical size, select it and choose
+**Photo engraving...** in the toolbar or Tools → Image (ADR-581). Compare Jarvis and
+Stucki, select whether the material marks dark or light, then adjust midtones before
+brightness and contrast. Higher gamma lightens midtones in KerfDesk. The preview
+uses the selected engraving grid and reports when its display has been reduced;
+it simulates relative marks, not material colour or beam/heat spread. **Apply photo
+settings** preserves original pixels and writes only that photo's settings in one
+Undo step. Cancel discards the draft. Image Studio supplies cropping, background
+cleanup and sharpening; Trace Image → Photo shading supplies a lined illustration.
+The dialog names its target operation: the first assigned operation with output
+enabled. If all assigned operations have output off, it prepares the first one
+and clearly reports that output must be enabled before those settings engrave.
+Fractional DPI and tone values remain valid within their displayed ranges.
+
+Focus and use Material Test and Interval Test for the actual machine/material.
+Higher DPI can darken a portrait through overlapping marks. The photo tool supplies
+no universal power/speed recipe. Review all passes in the job Preview, then use
+the ordinary Frame and Start workflow. Software previews are not physical burn
+qualification.
+
 ADR-020 shipped through F.2.e (dither + per-pixel S-modulation raster
 emit); only the F.2.f on-hardware burn verification is pending. This
 section documents the flow.

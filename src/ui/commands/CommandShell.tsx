@@ -16,6 +16,7 @@ import { OptimizationSettingsDialog } from '../laser/OptimizationSettingsDialog'
 import { LabsSettingsDialog } from '../laser/LabsSettingsDialog';
 import { RotarySetupHost } from '../laser/RotarySetupHost';
 import { AdjustImageDialog, type AdjustImageApply } from '../raster/AdjustImageDialog';
+import { PhotoEngravingDialogHost } from '../raster/PhotoEngravingDialogHost';
 import { type ConvertibleVector } from '../raster/vector-to-bitmap';
 import { usePlatform } from '../app/platform-context';
 import { useImportDragDrop } from '../app/use-import-drag-drop';
@@ -172,6 +173,7 @@ function StoreOpenedDialogs(): JSX.Element {
       <ExportSvgDialogHost />
       <SettingsWindowHost />
       <AiAssistantDialogHost />
+      <PhotoEngravingDialogHost />
     </>
   );
 }

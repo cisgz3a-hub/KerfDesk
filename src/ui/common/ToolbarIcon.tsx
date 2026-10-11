@@ -36,6 +36,7 @@ const TOOLBAR_ICONS: Partial<Readonly<Record<ToolbarIconKey, string>>> = {
   'tools.box-generator': box,
   'tools.barcode': qrCode,
   'tools.trace-image': scanLine,
+  'tools.photo-engraving': imageIcon,
   'tools.edit-image': imageIcon,
   'tools.convert-to-bitmap': imageDown,
   'file.save-gcode': fileDown,

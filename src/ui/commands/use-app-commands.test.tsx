@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { StatusReport, StreamerState } from '../../core/controllers/grbl';
 import { mockPlatform } from '../../__fixtures__/file-actions';
 import { repairArtwork, repairRectangle } from '../../__fixtures__/vector-repair-fixtures';
-import { createLayer, type RasterImage } from '../../core/scene';
+import { createLayer, IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { initialLaserState } from '../state/laser-store-helpers';
@@ -153,6 +153,43 @@ describe('useAppCommands store subscriptions', () => {
     act(() => useStore.setState({ additionalSelectedIds: new Set(['b', 'c']) }));
     expect(enabled('arrange.align-left')).toBe(true);
     expect(enabled('arrange.distribute-horizontal-centers')).toBe(false);
+  });
+
+  it.each<[string, Partial<RasterImage>, boolean, readonly string[]]>([
+    ['ordinary image', {}, true, []],
+    ['trace source', { role: 'trace-source' }, false, []],
+    ['locked image', { locked: true }, false, []],
+    ['multiple images', {}, false, ['other-photo']],
+  ])('offers Photo engraving for an eligible %s', (_name, patch, enabled, additional) => {
+    const image: RasterImage = {
+      kind: 'raster-image',
+      id: 'photo',
+      source: 'portrait.png',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+      color: '#000000',
+      pixelWidth: 1,
+      pixelHeight: 1,
+      linesPerMm: 10,
+      dither: 'jarvis',
+      dataUrl: 'data:image/png;base64,AQID',
+      ...patch,
+    };
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          objects: [image, ...additional.map((id) => ({ ...image, id }))],
+        },
+      },
+      selectedObjectId: image.id,
+      additionalSelectedIds: new Set(additional),
+    }));
+
+    render();
+
+    expect(latest.find((command) => command.id === 'tools.photo-engraving')?.enabled).toBe(enabled);
   });
 });
 
