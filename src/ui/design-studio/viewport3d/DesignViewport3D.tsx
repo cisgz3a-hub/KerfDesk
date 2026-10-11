@@ -149,6 +149,7 @@ function useOverlaySync(
           draft: session.draft,
           pointSequence: session.pointSequence,
           snapMm: session.activeSnap?.atMm ?? null,
+          extendPreview: session.tool === 'extend' ? session.extendPreview : null,
           frame,
         }),
       );
@@ -176,6 +177,7 @@ function useOverlaySync(
         draft: session.draft,
         pointSequence: session.pointSequence,
         snapMm: session.activeSnap?.atMm ?? null,
+        extendPreview: session.tool === 'extend' ? session.extendPreview : null,
         frame,
       }),
     );

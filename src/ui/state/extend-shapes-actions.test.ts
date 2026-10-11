@@ -1,0 +1,176 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  createLayer,
+  createProject,
+  flattenCurveSubpath,
+  IDENTITY_TRANSFORM,
+  type CurveSubpath,
+  type ImportedSvg,
+  type SceneObject,
+  type ShapeObject,
+  type Vec2,
+} from '../../core/scene';
+import { useStore } from './store';
+import { resetStore } from './test-helpers';
+import { useToastStore } from './toast-store';
+
+const point = (x: number, y: number): Vec2 => ({ x, y });
+function line(id: string, points: readonly Vec2[], patch: Partial<ImportedSvg> = {}): ImportedSvg {
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: 0, minY: 0, maxX: 30, maxY: 30 },
+    transform: IDENTITY_TRANSFORM,
+    operationIds: ['cut'],
+    paths: [{ color: '#000000', polylines: [{ points, closed: false }] }],
+    ...patch,
+  };
+}
+const source = () => line('source', [point(0, 10), point(10, 10)]);
+const boundary = () => line('boundary', [point(20, 0), point(20, 20)], { locked: true });
+function load(objects: readonly SceneObject[]): void {
+  const project = createProject();
+  useStore.setState({
+    project: {
+      ...project,
+      scene: {
+        ...project.scene,
+        objects,
+        layers: [createLayer({ id: 'cut', name: 'Cut', color: '#000000' })],
+      },
+    },
+    selectedObjectId: 'source',
+  });
+}
+function current(): ImportedSvg {
+  return useStore.getState().project.scene.objects[0] as ImportedSvg;
+}
+beforeEach(() => {
+  resetStore();
+  useToastStore.setState({ toasts: [] });
+});
+
+describe('Extend Shapes store action', () => {
+  it.each(['imported-svg', 'shape'] as const)(
+    'keeps a %s cubic intact and adds a straight tangent in one Undo step',
+    (kind) => {
+      const curve: CurveSubpath = {
+        closed: false,
+        start: point(0, 0),
+        segments: [
+          { kind: 'cubic', control1: point(1, 20), control2: point(7, 10), to: point(10, 10) },
+        ],
+      };
+      const flat = flattenCurveSubpath(curve, { toleranceMm: 0.025 });
+      if (flat.kind !== 'ok') throw new Error('Cannot flatten test curve');
+      const imported = line('source', flat.polyline.points, {
+        paths: [{ color: '#000000', polylines: [flat.polyline], curves: [curve] }],
+      });
+      const artwork: ImportedSvg | ShapeObject =
+        kind === 'imported-svg'
+          ? imported
+          : {
+              ...imported,
+              kind: 'shape',
+              color: '#000000',
+              spec: { kind: 'polyline', points: flat.polyline.points, closed: false },
+            };
+      load([artwork, boundary()]);
+      const before = useStore.getState().project;
+      expect(useStore.getState().extendShapeAt(point(10, 10), 0.5)).toBe(true);
+      const after = useStore.getState().project.scene.objects[0];
+      expect(after).toMatchObject({ kind, id: 'source', operationIds: ['cut'] });
+      expect(after !== undefined && 'paths' in after && after.paths[0]?.curves?.[0]).toEqual({
+        ...curve,
+        segments: [...curve.segments, { kind: 'line', to: point(20, 10) }],
+      });
+      if (after?.kind === 'shape' && after.spec.kind === 'polyline') {
+        expect(after.spec.points.at(-1)).toEqual(point(20, 10));
+      }
+      expect(useStore.getState().undoStack).toEqual([before]);
+      useStore.getState().undo();
+      expect(useStore.getState().project).toBe(before);
+    },
+  );
+  it('extends one endpoint, preserves the boundary and metadata, and supports Undo and Redo', () => {
+    const target = boundary();
+    load([{ ...source(), name: 'Named outline', powerScale: 0.75 }, target]);
+    const before = useStore.getState().project;
+    expect(useStore.getState().extendShapeAt(point(10, 10), 0.5)).toBe(true);
+    const after = useStore.getState().project;
+    expect(current().paths[0]?.polylines[0]?.points.at(-1)).toEqual(point(20, 10));
+    expect(current()).toMatchObject({
+      id: 'source',
+      name: 'Named outline',
+      powerScale: 0.75,
+      operationIds: ['cut'],
+    });
+    expect(after.scene.objects[1]).toBe(target);
+    expect(useStore.getState().selectedObjectId).toBe('source');
+    expect(useStore.getState().undoStack).toEqual([before]);
+    expect(useStore.getState().dirty).toBe(true);
+    useStore.getState().undo();
+    expect(useStore.getState().project).toBe(before);
+    useStore.getState().redo();
+    expect(useStore.getState().project).toBe(after);
+  });
+
+  it('leaves project, dirty flag and history intact when the endpoint has no boundary', () => {
+    load([source()]);
+    const before = useStore.getState().project;
+    expect(useStore.getState().extendShapeAt(point(10, 10), 0.5)).toBe(false);
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().undoStack).toEqual([]);
+    expect(useStore.getState().dirty).toBe(false);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toContain('No boundary ahead');
+  });
+
+  it('does not edit from a line interior, a locked source, or an already touching endpoint', () => {
+    for (const [object, click] of [
+      [source(), point(5, 10)],
+      [{ ...source(), locked: true }, point(10, 10)],
+      [line('source', [point(0, 10), point(20, 10)]), point(20, 10)],
+    ] as const) {
+      load([object, boundary()]);
+      const before = useStore.getState().project;
+      expect(useStore.getState().extendShapeAt(click, 0.5)).toBe(false);
+      expect(useStore.getState().project).toBe(before);
+      expect(useStore.getState().undoStack).toEqual([]);
+    }
+  });
+
+  it('synchronizes a drawn polyline spec and preserves its placement', () => {
+    const original = source();
+    const shape: ShapeObject = {
+      ...original,
+      kind: 'shape',
+      color: '#000000',
+      spec: { kind: 'polyline', points: [point(0, 10), point(10, 10)], closed: false },
+      transform: { ...IDENTITY_TRANSFORM, x: 5 },
+    };
+    load([shape, boundary()]);
+    expect(useStore.getState().extendShapeAt(point(15, 10), 0.5)).toBe(true);
+    expect(current()).toMatchObject({
+      kind: 'shape',
+      transform: shape.transform,
+      spec: { kind: 'polyline', points: [point(0, 10), point(15, 10)], closed: false },
+    });
+  });
+
+  it('removes stale tabs only on the edited open contour and restores them with Undo', () => {
+    const anchor = { layerColor: '#000000', pathIndex: 0, polylineIndex: 0, pathT: 0.5 };
+    const other = { ...anchor, polylineIndex: 1 };
+    load([
+      { ...source(), cncTabAnchors: [anchor, other], laserTabAnchors: [anchor, other] },
+      boundary(),
+    ]);
+    const before = useStore.getState().project;
+    expect(useStore.getState().extendShapeAt(point(10, 10), 0.5)).toBe(true);
+    expect(current().cncTabAnchors).toEqual([other]);
+    expect(current().laserTabAnchors).toEqual([other]);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toContain('Placed tabs');
+    useStore.getState().undo();
+    expect(useStore.getState().project).toBe(before);
+  });
+});

@@ -62,6 +62,8 @@ import {
 } from './design-session';
 import type { DesignToolKind } from './design-tool';
 import type { DesignPointSequence } from './design-point-sequence';
+import { findSketchExtension } from '../../core/design/ops/extend-sketch';
+import { extendSessionAt } from './design-extend';
 
 type DesignStudioState = {
   readonly session: DesignSession | null;
@@ -72,6 +74,8 @@ type DesignStudioState = {
   readonly setTool: (tool: DesignToolKind) => void;
   readonly setView: (view: DesignView) => void;
   readonly setCursorMm: (point: Vec2 | null) => void;
+  readonly previewExtension: (point: Vec2, toleranceMm: number) => void;
+  readonly extendAt: (point: Vec2, toleranceMm: number) => void;
   readonly setActiveSnap: (target: SnapTarget | null) => void;
   readonly setSelection: (ids: ReadonlyArray<string>) => void;
   readonly toggleSnap: () => void;
@@ -138,7 +142,7 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
 
   setTool: (tool) => set(mapSession((session) => setSessionTool(session, tool))),
   setView: (view) => set(mapSession((session) => ({ ...session, view }))),
-  setCursorMm: (cursorMm) => set(mapSession((session) => ({ ...session, cursorMm }))),
+  ...extendCursorActions(set),
   setActiveSnap: (activeSnap) => set(mapSession((session) => ({ ...session, activeSnap }))),
   // Selecting arms the selection's layer, so the layers panel shows the cut,
   // depth, and bit of the shape just clicked.
@@ -222,6 +226,30 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   toggleSurface3d: () =>
     set(mapSession((session) => ({ ...session, surface3d: !session.surface3d }))),
 }));
+
+function extendCursorActions(
+  set: (change: (state: DesignStudioState) => Partial<DesignStudioState>) => void,
+): Pick<DesignStudioState, 'setCursorMm' | 'previewExtension' | 'extendAt'> {
+  return {
+    setCursorMm: (cursorMm) =>
+      set(
+        mapSession((session) => ({
+          ...session,
+          cursorMm,
+          ...(cursorMm === null ? { extendPreview: null } : {}),
+        })),
+      ),
+    previewExtension: (point, toleranceMm) =>
+      set(
+        mapSession((session) => ({
+          ...session,
+          extendPreview: findSketchExtension(session.history.present, point, toleranceMm),
+        })),
+      ),
+    extendAt: (point, toleranceMm) =>
+      set(mapSession((session) => extendSessionAt(session, point, toleranceMm))),
+  };
+}
 
 // Reopening prefers the stash (this page's drawing, untouched), then the
 // drawing the last page left behind (ADR-272 Amendment 3), and only then

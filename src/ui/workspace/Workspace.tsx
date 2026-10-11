@@ -35,6 +35,7 @@ import { WorkspacePointerOverlays } from './WorkspacePointerOverlays';
 import { WorkspacePreviewDock } from './WorkspacePreviewDock';
 import { NodeEditHint } from './NodeEditHint';
 import { LaserTabHint } from './LaserTabHint';
+import { ExtendShapesHint } from './ExtendShapesHint';
 import { TrimShapesHint } from './TrimShapesHint';
 import { WarpDeformHint } from './WarpDeformHint';
 import './workspace-preview.css';
@@ -144,6 +145,7 @@ function WorkspaceDesignChrome(props: {
       <NodeEditHint />
       <LaserTabHint />
       <TrimShapesHint />
+      <ExtendShapesHint />
       <WarpDeformHint />
       <ZoomControls />
     </>
