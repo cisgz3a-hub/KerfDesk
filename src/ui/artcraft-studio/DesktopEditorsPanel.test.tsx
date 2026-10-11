@@ -71,6 +71,13 @@ beforeEach(() => {
     running: true,
   });
   vi.mocked(captureStudioDocument).mockResolvedValue(nativeDocument);
+  vi.mocked(restoreStudioDocument).mockResolvedValue({
+    id: 'new-session',
+    documentId,
+    editor: 'vector',
+    title: 'Drawing',
+    running: true,
+  });
   resetStore();
   vi.mocked(getStudioStatus).mockResolvedValue(status);
   useUiStore.setState({ modalDepth: 0 });
@@ -97,45 +104,44 @@ function button(label: string): HTMLButtonElement {
   if (!result) throw new Error(`Button ${label} not found`);
   return result;
 }
-it('registers a modal, traps workspace shortcuts and checkpoints before returning to the old studio', async () => {
+it('registers a modal, traps workspace shortcuts and checkpoints before returning to Design Studio', async () => {
   await render();
   expect(useUiStore.getState().modalDepth).toBe(1);
   const key = vi.fn();
   window.addEventListener('keydown', key);
   await act(async () =>
-    button('Back to old studio').dispatchEvent(
+    button('Back to Design Studio').dispatchEvent(
       new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }),
     ),
   );
   expect(key).not.toHaveBeenCalled();
   await act(async () =>
-    button('Back to old studio').dispatchEvent(
+    button('Back to Design Studio').dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
     ),
   );
   expect(close).not.toHaveBeenCalled();
-  await act(async () => button('Back to old studio').click());
+  await act(async () => button('Back to Design Studio').click());
   expect(close).toHaveBeenCalledOnce();
   window.removeEventListener('keydown', key);
   await act(async () => root?.unmount());
   root = undefined;
   expect(useUiStore.getState().modalDepth).toBe(0);
 });
-it('opens the full vector editor with explicit physical dimensions', async () => {
+it('offers only recovery of saved legacy sources without new-document controls', async () => {
+  useStore.setState({
+    project: { ...useStore.getState().project, studioDocuments: [nativeDocument] },
+  });
   await render();
-  await act(async () => button('Open VectorCraft').click());
-  expect(openStudioEditor).toHaveBeenCalledWith('vector', null, { widthMm: 100, heightMm: 100 });
+  expect(document.querySelector('[aria-label="Create studio document"]')).toBeNull();
+  expect(document.querySelector('input[type="file"]')).toBeNull();
+  expect(document.body.textContent).not.toContain('New document');
+  expect(document.body.textContent).not.toContain('Create a vector or photo document');
+  expect(openStudioEditor).not.toHaveBeenCalled();
 });
 it('restores editable source from this project instead of showing another project sessions', async () => {
   useStore.setState({
     project: { ...useStore.getState().project, studioDocuments: [nativeDocument] },
-  });
-  vi.mocked(restoreStudioDocument).mockResolvedValue({
-    id: 'new-session',
-    documentId,
-    editor: 'vector',
-    title: 'Drawing',
-    running: true,
   });
   await render();
   expect(button('Apply to KerfDesk').disabled).toBe(true);
@@ -147,6 +153,9 @@ it('restores editable source from this project instead of showing another projec
   expect(button('Apply to KerfDesk').disabled).toBe(false);
 });
 it('does not apply an asynchronously returned snapshot after closing', async () => {
+  useStore.setState({
+    project: { ...useStore.getState().project, studioDocuments: [nativeDocument] },
+  });
   let resolve: (value: StudioSnapshot) => void = () => undefined;
   vi.mocked(getStudioSnapshot).mockImplementation(
     () =>
@@ -155,7 +164,7 @@ it('does not apply an asynchronously returned snapshot after closing', async () 
       }),
   );
   await render();
-  await act(async () => button('Open VectorCraft').click());
+  await act(async () => button('DrawingVectorCraft').click());
   await act(async () => button('Apply to KerfDesk').click());
   await act(async () => root?.unmount());
   root = undefined;
@@ -163,13 +172,16 @@ it('does not apply an asynchronously returned snapshot after closing', async () 
   expect(applyStudioSnapshot).not.toHaveBeenCalled();
 });
 it('captures project ownership before requesting a snapshot', async () => {
+  useStore.setState({
+    project: { ...useStore.getState().project, studioDocuments: [nativeDocument] },
+  });
   const snapshot = { id: documentId } as StudioSnapshot;
   vi.mocked(getStudioSnapshot).mockImplementation(async () => {
     useStore.setState({ projectDocumentEpoch: 2 });
     return snapshot;
   });
   await render();
-  await act(async () => button('Open VectorCraft').click());
+  await act(async () => button('DrawingVectorCraft').click());
   await act(async () => button('Apply to KerfDesk').click());
   expect(applyStudioSnapshot).not.toHaveBeenCalled();
 });

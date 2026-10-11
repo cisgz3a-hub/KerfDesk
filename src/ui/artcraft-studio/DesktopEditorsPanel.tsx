@@ -48,7 +48,7 @@ export function DesktopEditorsPanel({ onClose }: { readonly onClose: () => void 
       <div className="artcraft-workspace">
         <aside className="artcraft-sidebar">
           <h3>Project documents</h3>
-          <p className="artcraft-hint">Full editable sources travel with your .lf2 project.</p>
+          <p className="artcraft-hint">Restore an existing legacy source saved in this project.</p>
           <div className="artcraft-documents">
             {bridge.documents.map((document) => (
               <button
@@ -63,16 +63,15 @@ export function DesktopEditorsPanel({ onClose }: { readonly onClose: () => void 
                 <small>{document.editor === 'photo' ? 'PhotoCraft' : 'VectorCraft'}</small>
               </button>
             ))}
-            {bridge.documents.length === 0 && <p>No studio documents yet.</p>}
+            {bridge.documents.length === 0 && <p>This project has no legacy editor documents.</p>}
           </div>
-          <NewDocument bridge={bridge} />
         </aside>
         <main className="artcraft-editor" ref={viewport} aria-label="Native artwork editor">
           {bridge.session === null && (
             <div className="artcraft-empty">
-              <h2>Your complete creative workspace</h2>
-              <p>Create a vector or photo document, or choose one saved in this project.</p>
-              <p>VectorCraft and PhotoCraft open here with their full editing tools.</p>
+              <h2>Restore a legacy document</h2>
+              <p>Choose a saved source to continue editing it in VectorCraft or PhotoCraft.</p>
+              <p>Create new artwork in Design Studio's Vectors or Photos workspace.</p>
             </div>
           )}
         </main>
@@ -87,82 +86,6 @@ export function DesktopEditorsPanel({ onClose }: { readonly onClose: () => void 
     document.body,
   );
 }
-function NewDocument({ bridge }: { readonly bridge: EditorBridge }): JSX.Element {
-  return (
-    <section className="artcraft-create" aria-label="Create studio document">
-      <h3>New document</h3>
-      <div className="artcraft-editor-choices">
-        <button
-          type="button"
-          disabled={bridge.busy}
-          aria-pressed={bridge.editor === 'vector'}
-          title="Create a document with VectorCraft's vector drawing tools"
-          onClick={() => bridge.chooseEditor('vector')}
-        >
-          VectorCraft
-        </button>
-        <button
-          type="button"
-          disabled={bridge.busy}
-          aria-pressed={bridge.editor === 'photo'}
-          title="Create a document with PhotoCraft's photo editing tools"
-          onClick={() => bridge.chooseEditor('photo')}
-        >
-          PhotoCraft
-        </button>
-      </div>
-      <label>
-        Start with a file (optional)
-        <input
-          key={bridge.editor}
-          type="file"
-          title="Choose an SVG for VectorCraft or a PNG or JPEG for PhotoCraft"
-          accept={bridge.editor === 'vector' ? '.svg' : '.png,.jpg,.jpeg'}
-          disabled={bridge.busy}
-          onChange={(event) => bridge.setFile(event.target.files?.[0] ?? null)}
-        />
-      </label>
-      <div className="artcraft-dimensions">
-        <label>
-          Width (mm)
-          <input
-            type="number"
-            min="0.01"
-            step="any"
-            value={bridge.width}
-            title="Set the artwork width in millimetres"
-            disabled={bridge.busy}
-            onChange={(event) => bridge.setWidth(event.target.value)}
-          />
-        </label>
-        <label>
-          Height (mm)
-          <input
-            type="number"
-            min="0.01"
-            step="any"
-            value={bridge.height}
-            title="Set the artwork height in millimetres"
-            disabled={bridge.busy}
-            onChange={(event) => bridge.setHeight(event.target.value)}
-          />
-        </label>
-      </div>
-      <Button
-        variant="primary"
-        disabled={bridge.busy || bridge.status?.editors[bridge.editor].installed !== true}
-        onClick={() => void bridge.open()}
-      >
-        Open {bridge.editor === 'vector' ? 'VectorCraft' : 'PhotoCraft'}
-      </Button>
-      <p className="artcraft-hint">
-        Save project keeps native layers. Apply sends SVG or a flattened photo to the machining
-        workspace.
-      </p>
-    </section>
-  );
-}
-
 function StudioHeader({
   bridge,
   close,
@@ -173,8 +96,8 @@ function StudioHeader({
   return (
     <header className="artcraft-heading">
       <div>
-        <span className="artcraft-preview">KERFDESK · DESKTOP PREVIEW</span>
-        <h2 id="artcraft-title">Design Studio</h2>
+        <span className="artcraft-preview">KERFDESK · LEGACY RECOVERY</span>
+        <h2 id="artcraft-title">Legacy editor documents</h2>
       </div>
       <div className="artcraft-toolbar">
         <Button disabled={bridge.busy} onClick={() => void bridge.save()}>
@@ -190,7 +113,7 @@ function StudioHeader({
           Apply to KerfDesk
         </Button>
         <Button disabled={bridge.busy} onClick={close}>
-          Back to old studio
+          Back to Design Studio
         </Button>
       </div>
     </header>

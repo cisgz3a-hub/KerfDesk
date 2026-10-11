@@ -40,6 +40,12 @@ function validateOwnership(document: DesignStudioDocument): string | null {
       : [DEFAULT_DESIGN_LAYER_ID],
   );
   if (!layerIds.has(document.activeLayerId)) return 'activeLayerId';
+  if (
+    document.sketch.entities.some(
+      (entity) => entity.layerId !== undefined && !layerIds.has(entity.layerId),
+    )
+  )
+    return 'sketch.entity layerId';
   const targets = document.appliedEntityObjectIds.map(([, id]) => id);
   if (
     new Set(targets).size !== targets.length ||
@@ -191,7 +197,8 @@ function validateLayers(value: unknown): string | null {
       typeof layer['color'] !== 'string' ||
       !/^#[\da-f]{6}$/i.test(layer['color']) ||
       !DESIGN_CUT_TYPES.some((kind) => kind === layer['cutType']) ||
-      !nonnegative(layer['depthMm'])
+      !nonnegative(layer['depthMm']) ||
+      layer['depthMm'] === 0
     )
       return 'sketch.layer settings';
     ids.push(layer['id'] as string);
