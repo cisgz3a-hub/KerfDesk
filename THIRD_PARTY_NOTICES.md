@@ -134,3 +134,16 @@ preserved without alteration.
 > strings are no longer a manual check — `generate-third-party-notices.mjs`
 > reads them out of each `.ttf`'s `name` table and fails the build if a
 > copyright record is missing.
+
+## Test-only font fixture
+
+`src/core/text/__fixtures__/NotoSansArabic-Regular.ttf` is an unmodified test
+fixture, excluded from runtime imports and the bundled product font catalogue.
+Copyright 2018 The Noto Project Authors (github.com/googlei18n/noto-fonts).
+It is distributed under the SIL Open Font License 1.1 (OFL-1.1); its original
+copyright and full licence accompany it in
+[`src/core/text/__fixtures__/OFL-Noto.txt`](src/core/text/__fixtures__/OFL-Noto.txt).
+The pinned source is
+[notofonts/noto-fonts at ffebf8c1ee449e544955a7e813c54f9b73848eac](https://github.com/notofonts/noto-fonts/blob/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf).
+The unmodified font SHA-256 is
+`ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b`.
