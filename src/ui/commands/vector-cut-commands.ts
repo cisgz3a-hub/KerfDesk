@@ -7,6 +7,18 @@ import { disabled, enabled, type AppCommand, type AppCommandContext } from './co
 
 export function vectorCutCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
+    {
+      ...enabled(
+        'tools.extend-shapes',
+        'tools',
+        'Extend Shapes',
+        ctx.extendShapesActive
+          ? 'Stop extending and return to the Select tool'
+          : 'Extend an open endpoint to the nearest boundary ahead',
+        ctx.extendShapes,
+      ),
+      active: ctx.extendShapesActive,
+    },
     ctx.hasSelection
       ? enabled(
           'tools.cut-shapes',

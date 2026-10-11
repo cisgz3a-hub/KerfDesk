@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { artworkBox, unionBox, type Box } from '../core/scene';
-import type { Preview, View } from '../core/store';
+import { store, type Preview, type View } from '../core/store';
 import { useApp } from './hooks';
 
 /** Width the floating tool rail covers on the left of an editable canvas. */
@@ -52,4 +52,29 @@ export function normalize(box: Box): Box {
     maxX: Math.max(box.minX, box.maxX),
     maxY: Math.max(box.minY, box.maxY),
   };
+}
+
+/** Fit new content, but never overwrite a view explicitly chosen by the user or an app tool. */
+export function useAutomaticFit(
+  size: { width: number; height: number },
+  view: View | null,
+  interactive: boolean,
+  content: Box,
+  bedKnown: boolean,
+): void {
+  const fittedBed = useRef(false);
+  const lastAutomaticView = useRef<View | null>(null);
+  useEffect(() => {
+    if (size.width === 0) return;
+    if (
+      view !== null &&
+      interactive &&
+      (fittedBed.current || !bedKnown || view !== lastAutomaticView.current)
+    )
+      return;
+    fittedBed.current = bedKnown;
+    const fitted = fitView(content, size.width, size.height, 28, interactive ? RAIL_INSET : 0);
+    lastAutomaticView.current = fitted;
+    store.set({ view: fitted });
+  }, [size.width, size.height, view === null, interactive, content, bedKnown]);
 }

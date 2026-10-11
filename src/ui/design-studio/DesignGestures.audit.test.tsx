@@ -10,6 +10,7 @@ import { ShapeInspector } from './ShapeInspector';
 const scene = vi.hoisted(() => ({
   pointerToSceneMm: vi.fn((x: number, y: number) => ({ x, y })),
   pxPerMmAtTarget: () => 1,
+  sceneMmToViewport: (point: { x: number; y: number }) => point,
   updateOverlay: vi.fn(),
   setPreset: vi.fn(),
 }));

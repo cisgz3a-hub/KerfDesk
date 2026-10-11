@@ -7,6 +7,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import type { Project } from '../../core/scene';
 import type { ToolMode } from '../state/ui-store';
 import { dispatchPositionLaser } from './position-laser-click';
+import { extendAtPointer } from './extend-shapes-tool';
 import { trimAtPointer } from './trim-shapes-tool';
 import { canvasMouseToScene, type ViewState } from './view-transform';
 
@@ -21,6 +22,10 @@ export function runClickTool(args: {
   if (args.toolMode.kind === 'position-laser') {
     const point = canvasMouseToScene(args.e, args.canvas, args.project, args.viewState);
     if (point !== null) dispatchPositionLaser(point, args.project.device);
+    return true;
+  }
+  if (args.toolMode.kind === 'extend-shapes') {
+    extendAtPointer(args);
     return true;
   }
   if (args.toolMode.kind === 'trim-shapes') {

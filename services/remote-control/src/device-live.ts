@@ -150,10 +150,9 @@ export abstract class LiveDevice extends DevicePairing {
 
   /** ADR-583 alerts; a no-op unless the maintainer configured VAPID secrets. */
   private async notify(kind: string): Promise<void> {
-    await this.pushAlerts.deliver(kind, (clientId) =>
-      Boolean(
-        this.state?.clients.some((item) => item.id === clientId && item.status === 'approved'),
-      ),
-    );
+    await this.pushAlerts.deliver(kind, (clientId) => {
+      const client = this.state?.clients.find((item) => item.id === clientId);
+      return client !== undefined && this.phoneAllowed(clientId, client.sessionDigest, 'read');
+    });
   }
 }

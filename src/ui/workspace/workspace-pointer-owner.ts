@@ -68,7 +68,10 @@ export function createOwnedPointerHandlers(args: {
     // A hover marker must not stay behind when the pointer leaves the canvas;
     // a captured drag keeps its feedback until it ends.
     onPointerLeave: () => {
-      if (args.activePointerId.current === null) clearSnapFeedback();
+      if (args.activePointerId.current === null) {
+        args.deps.setCursorMm(null);
+        clearSnapFeedback();
+      }
     },
   };
 }
