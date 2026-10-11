@@ -3,11 +3,17 @@
   "repository": "cisgz3a-hub/KerfDesk",
   "startedAt": "2026-10-11T04:39:21.762Z",
   "status": "active",
-  "phase": "await-required-ci",
+  "phase": "tracking-follow-up-publication",
   "integrationBranch": "codex/pr-history-audit-20261011",
   "mainAtLastFetch": "ef9f5435c93f5595370832d21950e4777af8ac7c",
   "ledgerBranch": "codex/pr-audit-ledger-20261011",
-  "ledgerPr": null,
+  "ledgerPr": {
+    "number": 1151,
+    "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151",
+    "head": "a0ace701f12c880bc897a8c5d48ec20ba548c045",
+    "integrationCommit": "77f70d9a31defa4b786f20f17843bc1e97702752",
+    "base": "ef9f5435c93f5595370832d21950e4777af8ac7c"
+  },
   "publisherWorktree": "C:/Users/Asus/.codex/worktrees/6fd9/pr-audit-publish",
   "automationId": "continue-kerfdesk-pr-audit",
   "sequence": ["fix", "test", "commit", "push", "PR", "CI verification"],
@@ -18,7 +24,16 @@
     43, 44, 48, 50, 51, 53, 54, 56, 57, 58, 61, 62, 63, 64, 67, 69, 70, 74, 75, 77, 78, 79, 80, 81,
     82, 83, 84, 85, 86, 88, 89, 90
   ],
-  "activeClaims": [],
+  "activeClaims": [
+    {
+      "scope": "audit-ledger",
+      "pr": 1151,
+      "owner": "root",
+      "publicationOwner": "root",
+      "activity": "Final frozen snapshot review, focused commit and existing PR update",
+      "claimedAt": "2026-10-11T05:30:55.349Z"
+    }
+  ],
   "completionCriteria": [
     "A refreshed GitHub inventory has no unstarted or partial PR review scopes.",
     "Every confirmed current bug is repaired, peer reviewed, tested and published as a reviewable PR.",
@@ -52,12 +67,225 @@
   "latestIntegratedVerification": "docs/audits/2026-10-11-pr-history/publication/integrated-verification.json",
   "advanceOnlyWhen": "Every repair in the current cycle has cycleVerified true: published head, complete manifest and source match independent review; all follow-ups published; current main reconciled; required CI successful. Closed-unmerged is incomplete.",
   "automationCompletionGuardUpdated": true,
-  "publicationCompletedAt": "2026-10-11T05:19:24.755Z",
-  "finalSourceHead": "736fa82bda025ff773ede5be32f4683100e6c62a",
+  "publicationCompletedAt": "2026-10-11T06:08:33.578Z",
+  "finalSourceHead": "695484d591ba8a9265c13bbcfea7e514bd17e68c",
   "ledgerReview": {
     "status": "approved",
     "reviewer": "foundation_prs",
     "report": "docs/audits/2026-10-11-pr-history/publication/ledger-peer-review.md",
-    "verification": "21 offline control fixtures; source attestation, reciprocal associations and per-category counts validated"
-  }
+    "verification": "21 offline control fixtures; source attestation, reciprocal associations and per-category counts validated",
+    "followUpReview": {
+      "status": "approved-awaiting-publication",
+      "reviewer": "foundation_prs",
+      "report": "docs/audits/2026-10-11-pr-history/publication/tracker-comment-peer-review.md",
+      "verification": "24 offline composite scenarios covering required CI, cycle blockers, evidence associations and null fallback",
+      "publisherGuards": "Independent reviewer confirmed commit-bound approval, complete nine-file manifest and reviewed source equality; dependency verification derives from relevant files, with package licence checks separate from exact notice bytes."
+    },
+    "approvalScope": "Tracking comment source corrections approved; this frozen publication snapshot still requires final independent manifest attestation before commit/push.",
+    "reviewComments": [
+      {
+        "id": 4240384675,
+        "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240384675",
+        "status": "confirmed-repaired-awaiting-publication",
+        "result": "Four null repair evidence references now use the canonical repair reports. Renderer has explicit fallback.",
+        "report": "docs/audits/2026-10-11-pr-history/publication/tracker-comment-peer-review.md"
+      },
+      {
+        "id": 4240384677,
+        "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240384677",
+        "status": "reporting-ambiguity-corrected-awaiting-publication",
+        "result": "Queued aggregates already kept cycleVerified false. absentRequired and unmetRequired now distinguish absence from all unsuccessful required checks.",
+        "report": "docs/audits/2026-10-11-pr-history/publication/tracker-comment-peer-review.md"
+      }
+    ]
+  },
+  "ledgerCi": {
+    "status": "pending",
+    "head": "a0ace701f12c880bc897a8c5d48ec20ba548c045",
+    "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "checkedAt": "2026-10-11T06:13:20.180Z",
+    "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+    "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+    "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+    "checks": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475337/job/114396521262",
+        "name": "Browser test checks and production-bundle smoke",
+        "startedAt": "2026-10-11T05:20:39Z",
+        "status": "QUEUED",
+        "workflowName": "Browser smoke"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475297/job/114396521106",
+        "name": "Typecheck, lint and format",
+        "startedAt": "2026-10-11T06:08:55Z",
+        "status": "IN_PROGRESS",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-11T05:35:22Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475335/job/114396521250",
+        "name": "Package, check and launch the desktop app",
+        "startedAt": "2026-10-11T05:32:02Z",
+        "status": "COMPLETED",
+        "workflowName": "Desktop package check"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475337/job/114396521393",
+        "name": "Chrome UX smoke (1/4)",
+        "startedAt": "2026-10-11T05:20:39Z",
+        "status": "QUEUED",
+        "workflowName": "Browser smoke"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475297/job/114396521107",
+        "name": "Policy checks and builds",
+        "startedAt": "2026-10-11T05:20:39Z",
+        "status": "QUEUED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-11T05:20:38Z",
+        "conclusion": "SKIPPED",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475335/job/114396522107",
+        "name": "Package, install and launch the Windows desktop app",
+        "startedAt": "2026-10-11T05:20:39Z",
+        "status": "COMPLETED",
+        "workflowName": "Desktop package check"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475337/job/114396521420",
+        "name": "Chrome UX smoke (2/4)",
+        "startedAt": "2026-10-11T05:20:39Z",
+        "status": "QUEUED",
+        "workflowName": "Browser smoke"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475337/job/114396521401",
+        "name": "Chrome UX smoke (3/4)",
+        "startedAt": "2026-10-11T05:20:39Z",
+        "status": "QUEUED",
+        "workflowName": "Browser smoke"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475337/job/114396521367",
+        "name": "Chrome UX smoke (4/4)",
+        "startedAt": "2026-10-11T05:20:39Z",
+        "status": "QUEUED",
+        "workflowName": "Browser smoke"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475297/job/114396521169",
+        "name": "Unit tests (1/4)",
+        "startedAt": "2026-10-11T05:20:39Z",
+        "status": "QUEUED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-11T05:20:38Z",
+        "conclusion": "SKIPPED",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475335/job/114396522224",
+        "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+        "startedAt": "2026-10-11T05:20:39Z",
+        "status": "COMPLETED",
+        "workflowName": "Desktop package check"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475297/job/114396521150",
+        "name": "Unit tests (2/4)",
+        "startedAt": "2026-10-11T05:20:39Z",
+        "status": "QUEUED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-11T05:43:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475297/job/114396521135",
+        "name": "Unit tests (3/4)",
+        "startedAt": "2026-10-11T05:32:46Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475297/job/114396521231",
+        "name": "Unit tests (4/4)",
+        "startedAt": "2026-10-11T05:20:39Z",
+        "status": "QUEUED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-11T05:27:40Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38114475297/job/114396520996",
+        "name": "Phone and MCP service",
+        "startedAt": "2026-10-11T05:24:01Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "StatusContext",
+        "context": "CodeRabbit",
+        "startedAt": "2026-10-11T05:20:44Z",
+        "state": "SUCCESS",
+        "targetUrl": ""
+      }
+    ]
+  },
+  "pendingRepairPrs": [1139, 1142, 1143, 1144, 1145, 1146, 1147, 1148, 1149, 1150],
+  "lastContinuationCheck": {
+    "checkedAt": "2026-10-11T06:14:53.211Z",
+    "main": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "phase": "tracking-follow-up-publication",
+    "repairHeadsUnchanged": false,
+    "liveManifestEvidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-live-manifests.json",
+    "independentVerification": "docs/audits/2026-10-11-pr-history/publication/heartbeat-cycle-verification.md",
+    "cycleVerified": 2,
+    "pendingRepairs": [1139, 1142, 1143, 1144, 1145, 1146, 1147, 1148, 1149, 1150],
+    "nextBatchStarted": false,
+    "trackingCiStatus": "pending",
+    "reviewFollowupsDetected": true,
+    "pendingReviewWork": ["Final consolidated tracking snapshot review and publication"],
+    "publishedFollowups": [1139, 1149],
+    "repairSourceAttestation": {
+      "checkedAt": "2026-10-11T06:12:10.466Z",
+      "method": "All 12 complete manifests and file contents compared against independently reviewed Git trees"
+    }
+  },
+  "reviewCommentProtocol": "Read all current-head comments and compare IDs with explicit dispositions; do not infer processing from posting-time cutoffs."
 }

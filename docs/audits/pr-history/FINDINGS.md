@@ -18,14 +18,16 @@ Review follow-ups:
 - Raw presentation attributes incorrectly accept declaration importance: Confirmed parent-zero / child 1 !important case. Keep attribute property-value syntax separate from CSS declaration priority. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305762).
 - Revert falls back to a same-element author attribute: Confirmed against Chrome. For supported author-only paint-opacity declarations, revert removes author candidates and inherits the parent value. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305766).
 - Comments and malformed numeric tokens change imported visibility: Confirmed comment rejection in the first candidate. Accept surrounding comments without joining number, percent, sign or keyword tokens; reject trailing-dot numbers and clamp large numeric values consistently. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305771).
+- Valid revert-layer incorrectly exposes lower opacity from the same cascade layer: Confirmed in the earlier audit repair. Inline revert-layer now reveals stylesheet opacity, and stylesheet rollback reveals the presentation attribute with importance order preserved. Independently reviewed and published; latest-head hosted CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364150).
+- Valid CSS math opacity is rejected before cascade resolution: Context-free CSS math now retains valid winning opacity, including typed absolute-unit cancellation and scalar functions; invalid numeric types preserve valid lower declarations. Layout-dependent winners retain an explicitly warned opaque approximation because exact visibility requires layout. Fresh imports and replacements both display the warning. Independently reviewed and published; latest-head hosted CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364155).
 
-These examples exposed regressions in the first audit repair and interacted with older cascade limitations. They are repaired within FND-001, not attributed wholesale to historical PR #10. The original candidate is superseded; prior green tests did not cover these cases.
+The first four follow-ups were corrected in the earlier audit repair. The later rollback, typed math and replacement-warning defects are repaired and published at the recorded follow-up head; required CI is still pending. These audit-repair regressions and older cascade limitations are not attributed wholesale to historical PR #10.
 
-Local evidence: docs/audits/2026-10-11-pr-history/foundation.md. Repair evidence: docs/audits/2026-10-11-pr-history/publication/svg-opacity-follow-up.md.
+Local evidence: docs/audits/2026-10-11-pr-history/foundation.md. Repair evidence: docs/audits/2026-10-11-pr-history/publication/svg-math-followup.md.
 
 ## BITMAP-01: Retain boundary outlines after pixel-coordinate rounding
 
-Repair: [#1140](https://github.com/cisgz3a-hub/KerfDesk/pull/1140). State: pr-open-ci-pending.
+Repair: [#1140](https://github.com/cisgz3a-hub/KerfDesk/pull/1140). State: pr-open-ci-verified.
 
 Trigger: Convert a 10.01 by 10 mm rectangle to Outlines at 254 DPI
 
@@ -37,7 +39,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/controller-raster.md. Repair e
 
 ## EUM-01: Preserve valid imported thicknesses when opening the material editor
 
-Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: pr-open-ci-pending.
+Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: pr-open-ci-verified.
 
 Trigger: Deserialize and import a valid preset with thicknessMm=3.175 (one-eighth-inch stock), open MaterialPresetWizard with that preset, then click native Next. The draft displays 3.17, the number input has step=0.1 and stepMismatch=true, the form is invalid, and clicking Next stays at Step 1 despite the button being enabled.
 
@@ -49,7 +51,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/early-ui-materials.md. Repair 
 
 ## EUM-02: Keep the canonical material identity during an unchanged preset edit
 
-Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: pr-open-ci-pending.
+Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: pr-open-ci-verified.
 
 Trigger: Import a valid line/cut preset with material='Birch', materialName='Birch plywood premium', thicknessMm=3. It initially matches job material Birch. Open Edit and click Next/Next/Next/Save without editing. The stored material is replaced with Birch plywood premium; bestRecipeForOperation for the existing Birch job returns undefined.
 
@@ -61,7 +63,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/early-ui-materials.md. Repair 
 
 ## EUM-03: Update operation metadata when changing a preset's process mode
 
-Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: pr-open-ci-pending.
+Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: pr-open-ci-verified.
 
 Trigger: Edit a saved line/cut preset, choose Fill in Step 2 and finish the wizard. The stored recipe.mode is fill but operation remains cut. bestRecipeForOperation for the same material's Fill operation returns undefined.
 
@@ -147,7 +149,7 @@ Impact: The UI stores and displays anchors by the source red path color. Compila
 
 Historical origin: #193.
 
-Local evidence: docs/audits/2026-10-11-pr-history/batch-03/cnc-geometry.json. Repair evidence: null.
+Local evidence: docs/audits/2026-10-11-pr-history/batch-03/cnc-geometry.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-03/cnc-repairs.md.
 
 ## MTX-001: Bind Zero Z acknowledgement to the tool that initiated it
 
@@ -159,7 +161,7 @@ Impact: The old command records manual-zero evidence for the newly selected 6.35
 
 Historical origin: #110. PR #88 created the acknowledged origin transaction callback. The faulty live selectedCncToolId read was added by PR #110 (outside this assigned historical range), whose implementation is a current descendant; no claim that #110 received a complete audit.
 
-Local evidence: docs/audits/2026-10-11-pr-history/batch-03/machine-transactions.json. Repair evidence: null.
+Local evidence: docs/audits/2026-10-11-pr-history/batch-03/machine-transactions.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-03/zero-z-repair.md.
 
 ## WUX-001: Imported-program playback uses the background project timing
 
@@ -171,7 +173,18 @@ Impact: Playback and displayed timing describe unrelated project output, hiding 
 
 Historical origin: #80. PR80 introduced estimate-dependent playback; the displayed project estimate mismatch predates PR80 (Workspace estimate call blame 8f24e8d2d5).
 
-Local evidence: docs/audits/2026-10-11-pr-history/batch-03/workspace-ux.json. Repair evidence: null.
+Review follow-ups:
+
+- Incremental arc-center declarations unnecessarily disable imported timing: Explicit incremental arc centers preserve the already-supported route and timing; absolute centers remain unsupported. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361096).
+- Pausing a trailing dwell makes Play restart the entire route: Play resumes remaining trailing dwell and replays only after actual timeline completion. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361100).
+- Supported exported dialect words unnecessarily disable imported timing: Only represented G54, Marlin fan and Smoothieware power words pass the source-model validation and retain timing. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361105).
+- Restart during a leading dwell retains elapsed wait time: An explicit restart revision clears elapsed time even when the scrubber distance is already zero. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361108).
+- Same-block dwell is scheduled after motion: Ordinary G4 executes before same-block motion in both planning boundaries and preview timestamps; existing cycle dwell representation is preserved. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361112).
+- Non-finite dwell publishes an infinite estimate and unfinishable playback: Non-finite totals or segments retain geometry and report timing unavailable instead of publishing an unfinishable timeline. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361117).
+
+These six cases were reproduced against the first published imported-program timing repair. Their repair remains in the same focused PR; they are not attributed wholesale to historical PR #80. Source and mock playback evidence do not qualify controller hardware.
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-03/workspace-ux.json. Repair evidence: docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md.
 
 ## B03-VAR-001: Keep the editable current serial inside the persistence integer domain
 
@@ -183,4 +196,4 @@ Impact: Manual Save preparation and autosave preparation reject variables.serial
 
 Historical origin: #58. The current-value Counter originated in PR #58 (e3fb1903c8); #72 preserved it while adding bounded controls; #1041 (2f3c83ab5a) moved the same lower-bound-only rule to DraftNumberInput. This is not newly introduced by #72.
 
-Local evidence: docs/audits/2026-10-11-pr-history/batch-03/root-coverage.json. Repair evidence: null.
+Local evidence: docs/audits/2026-10-11-pr-history/batch-03/root-coverage.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-03/variable-counter-repair.md.

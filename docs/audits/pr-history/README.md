@@ -14,7 +14,7 @@ The maintainer authorised continuing the audit through the complete PR history o
 
 ## Repeatable procedure
 
-1. Fetch `origin`, inspect the checkout, refresh live PR/CI state and reconcile changes to `origin/main`. Preserve unrelated changes and use isolated publication worktrees. Search existing open repair PRs before creating another one.
+1. Fetch `origin`, inspect the checkout, refresh live PR/CI state and reconcile changes to `origin/main`. Read all review comments on the current repair and tracking PR heads, compare comment IDs with recorded dispositions, and retain unresolved follow-ups regardless of their posting time. A timestamp cutoff alone is not evidence that a comment was handled. Preserve unrelated changes and use isolated publication worktrees. Search existing open repair PRs before creating another one.
 2. Finish the current repair batch before starting the next audit batch. Take a bounded chronological slice, and reserve a lane for the oldest unfinished review scope. Do not mark a large checkpoint complete from its title, tests or a sampled subsystem.
 3. Divide independent review scopes between agents. One coordinator owns the Git index, integration, findings ledger and publication. Separate the repair author from its reviewer where possible; label self-review accurately.
 4. Trace suspected historical flaws to current code. Reproduce substantive bugs, retain a passing control and record their actual introduction when later descendants caused them. Distinguish current defects, resolved defects, unmerged proposals and documented limitations.
@@ -26,3 +26,5 @@ The maintainer authorised continuing the audit through the complete PR history o
 Completion requires a refreshed inventory with no remaining review gaps, all confirmed current defects repaired and published, and successful required CI for the latest repair heads. PRs stay open for maintainer review. Merging, deployment, release publication, provider changes and hardware operation require separate authorisation.
 
 Advance to the next audit batch only when every current repair has `cycleVerified: true`: required CI passed, review applies to the published head, no reviewed follow-up remains unpublished, and an open branch has been reconciled with the current main snapshot. A closed, unmerged PR does not count as delivery. An external merge does not erase unresolved review or unpublished changes. Preserve these combined conditions when refreshing status or disabling the continuation automation.
+
+CI snapshots distinguish `absentRequired` (required check names not yet present) from `unmetRequired` (every required check without a completed successful result, including queued, running, failed and skipped checks). `missingRequired` is retained as a legacy alias for `absentRequired`; an empty value does not mean CI passed. Only the complete combined cycle conditions above allow advancement.

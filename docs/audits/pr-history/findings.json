@@ -9,7 +9,7 @@
     "attribution": null,
     "group": "svg-paint-opacity",
     "localEvidence": "docs/audits/2026-10-11-pr-history/foundation.md",
-    "repairReport": "docs/audits/2026-10-11-pr-history/publication/svg-opacity-follow-up.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/publication/svg-math-followup.md",
     "followUps": [
       {
         "title": "Invalid winning CSS and duplicate inline declarations discard a valid lower opacity",
@@ -30,10 +30,36 @@
         "title": "Comments and malformed numeric tokens change imported visibility",
         "result": "Confirmed comment rejection in the first candidate. Accept surrounding comments without joining number, percent, sign or keyword tokens; reject trailing-dot numbers and clamp large numeric values consistently.",
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305771"
+      },
+      {
+        "title": "Valid revert-layer incorrectly exposes lower opacity from the same cascade layer",
+        "result": "Confirmed in the earlier audit repair. Inline revert-layer now reveals stylesheet opacity, and stylesheet rollback reveals the presentation attribute with importance order preserved. Independently reviewed and published; latest-head hosted CI remains pending.",
+        "status": "published-awaiting-ci",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364150",
+        "publishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md"
+      },
+      {
+        "title": "Valid CSS math opacity is rejected before cascade resolution",
+        "result": "Context-free CSS math now retains valid winning opacity, including typed absolute-unit cancellation and scalar functions; invalid numeric types preserve valid lower declarations. Layout-dependent winners retain an explicitly warned opaque approximation because exact visibility requires layout. Fresh imports and replacements both display the warning. Independently reviewed and published; latest-head hosted CI remains pending.",
+        "status": "published-awaiting-ci",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364155",
+        "additionalCases": [
+          "Compound absolute-unit products and quotients reduce without losing valid winning opacity.",
+          "CSS scalar functions reject invalid dimension powers; round strategies and clamp none retain reduced typed arguments.",
+          "Relative-unit division can depend on zero-font 0/0; recognized unresolved winners retain a qualified opaque approximation and warn that source-hidden artwork may be included.",
+          "Replacement and reimport now deliver presentation warnings after the replacement summary; actual visible-toast controls cover the three-toast window."
+        ],
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/svg-math-limits.json",
+        "publishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md"
       }
     ],
-    "followUpAttribution": "These examples exposed regressions in the first audit repair and interacted with older cascade limitations. They are repaired within FND-001, not attributed wholesale to historical PR #10. The original candidate is superseded; prior green tests did not cover these cases.",
-    "followUpEvidence": "docs/audits/2026-10-11-pr-history/publication/review-comment-triage.md"
+    "followUpAttribution": "The first four follow-ups were corrected in the earlier audit repair. The later rollback, typed math and replacement-warning defects are repaired and published at the recorded follow-up head; required CI is still pending. These audit-repair regressions and older cascade limitations are not attributed wholesale to historical PR #10.",
+    "followUpEvidence": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+    "previousRepairReports": [
+      "docs/audits/2026-10-11-pr-history/publication/svg-opacity-follow-up.md"
+    ]
   },
   {
     "id": "BITMAP-01",
@@ -161,7 +187,7 @@
     "attribution": null,
     "group": "manual-tabs-binding",
     "localEvidence": "docs/audits/2026-10-11-pr-history/batch-03/cnc-geometry.json",
-    "repairReport": null
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-03/cnc-repairs.md"
   },
   {
     "id": "MTX-001",
@@ -173,7 +199,7 @@
     "attribution": "PR #88 created the acknowledged origin transaction callback. The faulty live selectedCncToolId read was added by PR #110 (outside this assigned historical range), whose implementation is a current descendant; no claim that #110 received a complete audit.",
     "group": "zero-z-owner",
     "localEvidence": "docs/audits/2026-10-11-pr-history/batch-03/machine-transactions.json",
-    "repairReport": null
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-03/zero-z-repair.md"
   },
   {
     "id": "WUX-001",
@@ -185,7 +211,46 @@
     "attribution": "PR80 introduced estimate-dependent playback; the displayed project estimate mismatch predates PR80 (Workspace estimate call blame 8f24e8d2d5).",
     "group": "external-program-timing",
     "localEvidence": "docs/audits/2026-10-11-pr-history/batch-03/workspace-ux.json",
-    "repairReport": null
+    "repairReport": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md",
+    "followUps": [
+      {
+        "title": "Incremental arc-center declarations unnecessarily disable imported timing",
+        "result": "Explicit incremental arc centers preserve the already-supported route and timing; absolute centers remain unsupported. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
+        "status": "published-awaiting-ci",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361096"
+      },
+      {
+        "title": "Pausing a trailing dwell makes Play restart the entire route",
+        "result": "Play resumes remaining trailing dwell and replays only after actual timeline completion. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
+        "status": "published-awaiting-ci",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361100"
+      },
+      {
+        "title": "Supported exported dialect words unnecessarily disable imported timing",
+        "result": "Only represented G54, Marlin fan and Smoothieware power words pass the source-model validation and retain timing. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
+        "status": "published-awaiting-ci",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361105"
+      },
+      {
+        "title": "Restart during a leading dwell retains elapsed wait time",
+        "result": "An explicit restart revision clears elapsed time even when the scrubber distance is already zero. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
+        "status": "published-awaiting-ci",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361108"
+      },
+      {
+        "title": "Same-block dwell is scheduled after motion",
+        "result": "Ordinary G4 executes before same-block motion in both planning boundaries and preview timestamps; existing cycle dwell representation is preserved. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
+        "status": "published-awaiting-ci",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361112"
+      },
+      {
+        "title": "Non-finite dwell publishes an infinite estimate and unfinishable playback",
+        "result": "Non-finite totals or segments retain geometry and report timing unavailable instead of publishing an unfinishable timeline. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
+        "status": "published-awaiting-ci",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361117"
+      }
+    ],
+    "followUpAttribution": "These six cases were reproduced against the first published imported-program timing repair. Their repair remains in the same focused PR; they are not attributed wholesale to historical PR #80. Source and mock playback evidence do not qualify controller hardware."
   },
   {
     "id": "B03-VAR-001",
@@ -197,6 +262,6 @@
     "attribution": "The current-value Counter originated in PR #58 (e3fb1903c8); #72 preserved it while adding bounded controls; #1041 (2f3c83ab5a) moved the same lower-bound-only rule to DraftNumberInput. This is not newly introduced by #72.",
     "group": "variable-counter-bounds",
     "localEvidence": "docs/audits/2026-10-11-pr-history/batch-03/root-coverage.json",
-    "repairReport": null
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-03/variable-counter-repair.md"
   }
 ]
