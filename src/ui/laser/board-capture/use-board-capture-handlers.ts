@@ -16,6 +16,7 @@ import {
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { MIN_BOARD_DIMENSION_MM } from './constants';
+import { capturedBoardOutlineMatches } from './captured-board-outline';
 import {
   boardCaptureCanCommit,
   type BoardCapture,
@@ -203,15 +204,66 @@ function createBoardCorrectionHandler(
     setError(null);
     setNotice(null);
     try {
+      const assertCurrent = boardCorrectionOwner(args.capture, target);
       const correction = correctedGeometry(args, target, confirmed);
       if (verificationTargetChangesOrigin(target)) await args.setOriginHere();
+      const registrationEpoch = assertCurrent();
       args.updateCapturedBoard(capturedBoardShape(correction.geometry));
-      args.capture.updateGeometry(correction.geometry, currentRegistrationEpoch());
+      args.capture.updateGeometry(correction.geometry, registrationEpoch);
       setCrossAxisNotice(correction.crossAxisErrorMm, setNotice);
     } catch (error) {
       setError(errorMessage(error, 'Could not update the captured board.'));
       throw error;
     }
+  };
+}
+
+function boardCorrectionOwner(
+  capture: BoardCapture,
+  target: BoardVerificationTarget,
+): () => BoardRegistrationEpoch {
+  const owner = useStore.getState();
+  const outline = findRegistrationBoxes(owner.project.scene).find(
+    (box) => box.provenance === 'captured-board',
+  );
+  const registered = capture.state.registrationEpoch;
+  if (
+    !capture.isSessionCurrent() ||
+    outline?.id !== capture.state.outlineId ||
+    registered === null ||
+    !capturedBoardOutlineMatches(
+      owner.project.scene,
+      capture.state.outlineId,
+      capture.state.geometry,
+    )
+  ) {
+    throw new Error('The captured board changed. Capture the board again before correcting it.');
+  }
+  return () => {
+    const current = useStore.getState();
+    const currentOutline = findRegistrationBoxes(current.project.scene).find(
+      (box) => box.provenance === 'captured-board',
+    );
+    if (
+      !capture.isSessionCurrent() ||
+      current.projectDocumentEpoch !== owner.projectDocumentEpoch ||
+      currentOutline !== outline
+    ) {
+      throw new Error('The captured board changed. Capture the board again before correcting it.');
+    }
+    const epoch = currentRegistrationEpoch();
+    // Setting this correction's origin may advance its version once. Other
+    // coordinate/session changes cannot transfer ownership to this completion.
+    const originAdvance = epoch.workOriginVersion - registered.workOriginVersion;
+    if (
+      epoch.controllerSessionEpoch !== registered.controllerSessionEpoch ||
+      epoch.trustedPositionEpoch !== registered.trustedPositionEpoch ||
+      originAdvance < 0 ||
+      originAdvance > (verificationTargetChangesOrigin(target) ? 1 : 0)
+    ) {
+      throw new Error('Machine coordinates changed. Capture the board again before correcting it.');
+    }
+    return epoch;
   };
 }
 

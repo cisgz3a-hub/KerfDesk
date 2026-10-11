@@ -34,6 +34,7 @@ this feature.
 | zustand | MIT | © 2019 Paul Henschel — https://github.com/pmndrs/zustand |
 | three | MIT | © 2010-2024 three.js authors — https://github.com/mrdoob/three.js |
 | dompurify | MPL-2.0 OR Apache-2.0 | © Cure53 and other contributors — https://github.com/cure53/DOMPurify |
+| @csstools/css-calc 2.1.4, @csstools/css-parser-algorithms 3.0.5, @csstools/css-tokenizer 3.0.4 | MIT | © 2022 Romain Menke, Antonio Laguna — https://github.com/csstools/postcss-plugins |
 | opentype.js | MIT | © 2020 Frederik De Bleser — https://github.com/opentypejs/opentype.js |
 | imagetracerjs | Unlicense (public domain) | András Jankovics — https://github.com/jankovicsandras/imagetracerjs |
 | clipper2-ts | BSL-1.0 (Boost Software License 1.0) | Port of Angus Johnson's Clipper2 — https://github.com/ErikSom/Clipper2-ts |

@@ -13,6 +13,7 @@ import { TRACE_PRESETS } from '../../core/trace';
 import { traceImageToColoredPaths } from '../../core/trace';
 import type { RawImageData, TraceOptions } from '../../core/trace/trace-image';
 import { textToPolylines } from '../../core/text/text-to-polylines';
+import { mergeLightBurnTraceSettings } from '../../ui/trace/trace-options';
 import { renderTraceOverlay } from './render-overlay';
 
 const OUT_DIR = join(process.cwd(), 'trace-audit-artifacts');
@@ -21,14 +22,9 @@ const CORNER_TURN_RAD = (55 * Math.PI) / 180;
 const AA_SUPERSAMPLE = 3;
 const PAD_PX = 10;
 
-// App default merged Edge options (see _edge-rough-smoothness.test.ts).
+// A fresh dialog uses the preset with no operator overrides.
 function mergedEdgeOptions(): TraceOptions {
-  return {
-    ...(TRACE_PRESETS['Edge Detection'] as TraceOptions),
-    edgeLowThresholdRatio: 0.074,
-    edgeHighThresholdRatio: 0.185,
-    edgeMinLengthPx: 3,
-  };
+  return mergeLightBurnTraceSettings(TRACE_PRESETS['Edge Detection'] as TraceOptions, {});
 }
 
 function readFontBuffer(fileName: string): ArrayBuffer {

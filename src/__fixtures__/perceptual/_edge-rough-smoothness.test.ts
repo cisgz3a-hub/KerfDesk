@@ -14,6 +14,7 @@ import type { Polyline, Vec2 } from '../../core/scene';
 import { TRACE_PRESETS } from '../../core/trace';
 import { traceImageToEdgePaths } from '../../core/trace/edge-trace';
 import type { RawImageData, TraceOptions } from '../../core/trace/trace-image';
+import { mergeLightBurnTraceSettings } from '../../ui/trace/trace-options';
 import { decodePngFile } from './png-decode';
 import { renderTraceOverlay } from './render-overlay';
 import { requiredArchHouseFixtureStatus } from './trace-artifact-runner';
@@ -23,19 +24,10 @@ const REF_DIR = join(OUT_DIR, 'ref');
 const FACET_TURN_RAD = (14 * Math.PI) / 180;
 const CORNER_TURN_RAD = (55 * Math.PI) / 180;
 
-// The app's DEFAULT merged Edge options (src/ui/trace/trace-options.ts:
-// DEFAULT_EDGE_SENSITIVITY=50 -> thresholds 0.074/0.185; DETAIL=68 -> blur 1.2
-// joinGap 5; MINIMUM_LINE_PX=3). Replicated here (a perceptual fixture must not
-// import from ui/ per the boundary rule) so we trace what the USER traces, not
-// the raw preset.
+// A fresh dialog has no operator overrides. Use its merge so this diagnostic
+// follows the app defaults as the preset and settings model evolve.
 function mergedAppEdgeOptions(): TraceOptions {
-  const raw = TRACE_PRESETS['Edge Detection'] as TraceOptions;
-  return {
-    ...raw,
-    edgeLowThresholdRatio: 0.074,
-    edgeHighThresholdRatio: 0.185,
-    edgeMinLengthPx: 3,
-  };
+  return mergeLightBurnTraceSettings(TRACE_PRESETS['Edge Detection'] as TraceOptions, {});
 }
 
 // Curved-letter regions of the 1024^2 logo (source px). The ORIGINAL bands

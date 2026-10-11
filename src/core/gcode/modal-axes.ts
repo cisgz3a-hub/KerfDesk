@@ -20,10 +20,13 @@ export type CoreMotionModal = {
 
 /**
  * Applies the shared modal G words (G0–G3 motion, G20/G21 units, G90/G91
- * distance). Returns false when the code is none of them, so each caller
+ * distance, G91.1 incremental arc centers). Returns false otherwise, so each caller
  * keeps its own policy for the rest (no-op table, unsupported note, …).
  */
 export function applySharedGCode(state: CoreMotionModal, code: number): boolean {
+  // Both parsers already interpret I/J relative to the arc start. G91.1
+  // explicitly selects that sole supported mode; G90.1 remains unsupported.
+  if (code === 91.1) return true;
   if (code === 0 || code === 1 || code === 2 || code === 3) state.motion = code;
   else if (code === 20) state.unitScale = INCH_TO_MM;
   else if (code === 21) state.unitScale = 1;

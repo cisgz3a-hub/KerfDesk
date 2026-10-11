@@ -84,7 +84,7 @@ describe('canned-cycle modal motion', () => {
     expect(built.events.filter((event) => event.kind === 'dwell')).toEqual([
       { kind: 'dwell', line: 1, seconds: 2 },
       { kind: 'dwell', line: 2, seconds: 2 },
-      { kind: 'dwell', line: 4, seconds: 0.5 },
+      { kind: 'dwell', line: 4, seconds: 0.5, isBeforeMotion: true },
     ]);
     const time = buildProgramTime(built, {
       accelMmPerSec2: 100,

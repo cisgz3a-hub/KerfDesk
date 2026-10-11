@@ -74,20 +74,24 @@ function smoothBetweenCorners(
   // Rotate closed chains so segments never straddle the seam.
   const first = cornerIndices[0] ?? 0;
   const ring = closed ? [...points.slice(first), ...points.slice(0, first)] : [...points];
+  // The closing span ends at the first corner, not the last ordinary
+  // sample. Repeat that corner temporarily so both endpoints are clamped.
+  if (closed) ring.push(ring[0] as Vec2);
   const bounds: number[] = closed
     ? [
         0,
         ...cornerIndices.slice(1).map((i) => (i - first + points.length) % points.length),
-        ring.length,
+        ring.length - 1,
       ]
     : [0, ...cornerIndices.filter((i) => i > 0 && i < points.length - 1), ring.length - 1];
   const out = [...ring];
   for (let b = 0; b + 1 < bounds.length; b += 1) {
     const from = bounds[b] as number;
-    const to = Math.min(bounds[b + 1] as number, ring.length - 1);
+    const to = bounds[b + 1] as number;
     smoothOpenSegmentInto(out, ring, from, to, lambda);
   }
   if (!closed) return out;
+  out.pop(); // Drop the repeated corner before restoring the original order.
   // Rotate back so callers see the original ordering.
   const back = points.length - first;
   return [...out.slice(back), ...out.slice(0, back)];

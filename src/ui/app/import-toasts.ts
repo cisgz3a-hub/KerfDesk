@@ -52,11 +52,18 @@ export function describeImportResult(
     });
   }
 
-  for (const note of result.notes.filter((note) => note.startsWith('SVG presentation:'))) {
-    out.push({ message: `${filename}: ${note}`, variant: 'warning' });
-  }
+  out.push(...describeSvgPresentationWarnings(filename, result));
 
   return out;
+}
+
+export function describeSvgPresentationWarnings(
+  filename: string,
+  result: Pick<ParseSvgResult, 'notes'>,
+): ReadonlyArray<ToastDescriptor> {
+  return result.notes
+    .filter((note) => note.startsWith('SVG presentation:'))
+    .map((note) => ({ message: `${filename}: ${note}`, variant: 'warning' }));
 }
 
 export function describeImportError(filename: string, err: unknown): ToastDescriptor {
