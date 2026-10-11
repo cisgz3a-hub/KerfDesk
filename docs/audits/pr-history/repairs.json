@@ -1,9 +1,7 @@
 [
   {
     "id": "svg-paint-opacity",
-    "findings": [
-      "FND-001"
-    ],
+    "findings": ["FND-001"],
     "title": "Preserve SVG child paint opacity overrides",
     "auditBatch": 1,
     "branch": "codex/audit-svg-paint-opacity-20261011",
@@ -715,9 +713,7 @@
   },
   {
     "id": "raster-outline-boundaries",
-    "findings": [
-      "BITMAP-01"
-    ],
+    "findings": ["BITMAP-01"],
     "title": "Retain raster outlines at pixel rounding boundaries",
     "auditBatch": 1,
     "branch": "codex/audit-raster-outline-boundaries-20261011",
@@ -1003,11 +999,7 @@
   },
   {
     "id": "material-preset-roundtrip",
-    "findings": [
-      "EUM-01",
-      "EUM-02",
-      "EUM-03"
-    ],
+    "findings": ["EUM-01", "EUM-02", "EUM-03"],
     "title": "Preserve material preset identity and process metadata when editing",
     "auditBatch": 1,
     "branch": "codex/audit-material-preset-roundtrip-20261011",
@@ -1292,9 +1284,7 @@
   },
   {
     "id": "camera-preview-url",
-    "findings": [
-      "CCA-001"
-    ],
+    "findings": ["CCA-001"],
     "title": "Keep camera cache busting outside the upstream snapshot URL",
     "auditBatch": 2,
     "branch": "codex/audit-camera-preview-url-20261011",
@@ -1579,9 +1569,7 @@
   },
   {
     "id": "selected-node-drag",
-    "findings": [
-      "CCA-002"
-    ],
+    "findings": ["CCA-002"],
     "title": "Anchor node selection drags and snapping to the grabbed node",
     "auditBatch": 2,
     "branch": "codex/audit-selected-node-drag-20261011",
@@ -1868,9 +1856,7 @@
   },
   {
     "id": "closed-contour-fairing",
-    "findings": [
-      "B02-TRACE-001"
-    ],
+    "findings": ["B02-TRACE-001"],
     "title": "Close contour fairing spans at their actual corner",
     "auditBatch": 2,
     "branch": "codex/audit-closed-contour-fairing-20261011",
@@ -2155,9 +2141,7 @@
   },
   {
     "id": "board-correction-ownership",
-    "findings": [
-      "BRP-01"
-    ],
+    "findings": ["BRP-01"],
     "title": "Preserve restored board dimensions when a stale correction completes",
     "auditBatch": 2,
     "branch": "codex/audit-board-correction-ownership-20261011",
@@ -2441,16 +2425,11 @@
   },
   {
     "id": "concave-helical-pockets",
-    "findings": [
-      "B03-CNC-001"
-    ],
+    "findings": ["B03-CNC-001"],
     "title": "Check complete ring containment for concave helical pockets",
     "auditBatch": 3,
     "branch": "codex/audit-concave-helical-pockets-20261011",
-    "files": [
-      "src/core/cnc/helical-entry.ts",
-      "src/core/cnc/helical-entry-containment.test.ts"
-    ],
+    "files": ["src/core/cnc/helical-entry.ts", "src/core/cnc/helical-entry-containment.test.ts"],
     "status": "merged-ci-verified",
     "newRegressions": 8,
     "integrationCommit": "23c7eb110fb82bf776ea0947367a95739e4a7d22",
@@ -2694,9 +2673,7 @@
         "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate."
       }
     ],
-    "followUpCommits": [
-      "736fa82bda025ff773ede5be32f4683100e6c62a"
-    ],
+    "followUpCommits": ["736fa82bda025ff773ede5be32f4683100e6c62a"],
     "verificationTestFiles": [
       "src/core/cnc/helical-entry-containment.test.ts",
       "src/core/cnc/helical-entry.test.ts",
@@ -2707,12 +2684,8 @@
     "publicationDescription": "Valid concave helical pockets were rejected because their area centroid can lie outside the enclosing pocket. Validate the complete ring, including closing edges, with the existing segment-containment predicate. Reuse the existing boundary index to skip repeated full scans only where a conservatively padded edge box cannot contact the boundary; possible contacts retain complete interval checks.\n\nRegressions cover concavity, closing-edge crossings, tangency, coincidence, disconnected rings, islands and dense separated rings. Independent differential controls preserve complete generated plans. In the bounded eight-ring, 2048-vertex benchmark, the first repair took about 2.38 seconds and the indexed version 1.12 seconds, matching the earlier 1.15-second baseline. A deterministic regression reduces full-boundary checks from 768 to 3 for separated rings. Contact-heavy cases and the existing entry search retain their previous worst-case work.",
     "cycleVerified": true,
     "completionBlockers": [],
-    "previousPublishedHeads": [
-      "21c8971e9232fe04b39f2edfab8ef601c0bbaa3a"
-    ],
-    "publishedFollowUpCommits": [
-      "736fa82bda025ff773ede5be32f4683100e6c62a"
-    ],
+    "previousPublishedHeads": ["21c8971e9232fe04b39f2edfab8ef601c0bbaa3a"],
+    "publishedFollowUpCommits": ["736fa82bda025ff773ede5be32f4683100e6c62a"],
     "reviewComments": {
       "checkedAt": "2026-10-11T05:28:26.5785450Z",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1146.json",
@@ -2765,9 +2738,7 @@
   },
   {
     "id": "manual-tabs-binding",
-    "findings": [
-      "B03-CNC-002"
-    ],
+    "findings": ["B03-CNC-002"],
     "title": "Preserve manual tabs across explicit operation bindings",
     "auditBatch": 3,
     "branch": "codex/audit-manual-tabs-binding-20261011",
@@ -3053,9 +3024,7 @@
   },
   {
     "id": "zero-z-owner",
-    "findings": [
-      "MTX-001"
-    ],
+    "findings": ["MTX-001"],
     "title": "Bind manual Zero Z evidence to its initiating tool and reference",
     "auditBatch": 3,
     "branch": "codex/audit-zero-z-owner-20261011",
@@ -3341,9 +3310,7 @@
   },
   {
     "id": "external-program-timing",
-    "findings": [
-      "WUX-001"
-    ],
+    "findings": ["WUX-001"],
     "title": "Use imported program timing for 2D playback",
     "auditBatch": 3,
     "branch": "codex/audit-external-program-timing-20261011",
@@ -3935,9 +3902,7 @@
   },
   {
     "id": "variable-counter-bounds",
-    "findings": [
-      "B03-VAR-001"
-    ],
+    "findings": ["B03-VAR-001"],
     "title": "Keep editable variable counters inside the persistence integer range",
     "auditBatch": 3,
     "branch": "codex/audit-variable-counter-bounds-20261011",
@@ -4223,9 +4188,7 @@
   },
   {
     "id": "trace-diagnostic-defaults",
-    "findings": [
-      "B04-DIAGNOSTIC-001"
-    ],
+    "findings": ["B04-DIAGNOSTIC-001"],
     "title": "fix(test): align Edge diagnostics with current app defaults",
     "auditBatch": 4,
     "branch": "codex/audit-trace-diagnostic-defaults-20261011",
@@ -4537,12 +4500,7 @@
   },
   {
     "id": "console-coordinate-effects",
-    "findings": [
-      "B05-CONSOLE-001",
-      "B05-CONSOLE-002",
-      "B05-CONSOLE-003",
-      "B05-CONSOLE-004"
-    ],
+    "findings": ["B05-CONSOLE-001", "B05-CONSOLE-002", "B05-CONSOLE-003", "B05-CONSOLE-004"],
     "title": "Invalidate console coordinate evidence for equivalent and combined commands",
     "auditBatch": 5,
     "branch": "codex/audit-console-coordinate-effects-20261011",
@@ -4565,18 +4523,9 @@
       "containsFetchedMain": true,
       "needsMainReconciliation": false,
       "checkedAt": "2026-10-11T14:56:58.965Z",
-      "absentRequired": [
-        "Lint, typecheck, license, test, build",
-        "Chrome UX smoke"
-      ],
-      "unmetRequired": [
-        "Lint, typecheck, license, test, build",
-        "Chrome UX smoke"
-      ],
-      "missingRequired": [
-        "Lint, typecheck, license, test, build",
-        "Chrome UX smoke"
-      ],
+      "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+      "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+      "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
       "checks": [
         {
           "__typename": "CheckRun",
@@ -4653,9 +4602,7 @@
       "verifiedPublishedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3"
     },
     "cycleVerified": false,
-    "completionBlockers": [
-      "Hosted CI is pending"
-    ],
+    "completionBlockers": ["Hosted CI is pending"],
     "publicationOwner": "root",
     "integrationCommit": "1ab8b751df1690f81487986f3b34fc0b45d245df",
     "publishedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
@@ -4830,9 +4777,7 @@
           "needsMainReconciliation": true,
           "checkedAt": "2026-10-11T14:22:59.956Z",
           "absentRequired": [],
-          "unmetRequired": [
-            "Lint, typecheck, license, test, build"
-          ],
+          "unmetRequired": ["Lint, typecheck, license, test, build"],
           "missingRequired": [],
           "checks": [
             {
@@ -5027,18 +4972,9 @@
           "containsFetchedMain": true,
           "needsMainReconciliation": false,
           "checkedAt": "2026-10-11T14:29:30.387Z",
-          "absentRequired": [
-            "Lint, typecheck, license, test, build",
-            "Chrome UX smoke"
-          ],
-          "unmetRequired": [
-            "Lint, typecheck, license, test, build",
-            "Chrome UX smoke"
-          ],
-          "missingRequired": [
-            "Lint, typecheck, license, test, build",
-            "Chrome UX smoke"
-          ],
+          "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+          "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+          "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
           "checks": [
             {
               "__typename": "CheckRun",
@@ -5205,10 +5141,7 @@
   },
   {
     "id": "gcode-comment-realtime-bytes",
-    "findings": [
-      "B05-C-REALTIME-COMMENTS",
-      "B05-CI-ESLINT-001"
-    ],
+    "findings": ["B05-C-REALTIME-COMMENTS", "B05-CI-ESLINT-001"],
     "title": "Remove realtime command bytes from exported G-code comments",
     "auditBatch": 5,
     "branch": "codex/audit-gcode-comment-realtime-bytes-20261011",
@@ -5228,18 +5161,9 @@
       "containsFetchedMain": true,
       "needsMainReconciliation": false,
       "checkedAt": "2026-10-11T14:56:59.020Z",
-      "absentRequired": [
-        "Lint, typecheck, license, test, build",
-        "Chrome UX smoke"
-      ],
-      "unmetRequired": [
-        "Lint, typecheck, license, test, build",
-        "Chrome UX smoke"
-      ],
-      "missingRequired": [
-        "Lint, typecheck, license, test, build",
-        "Chrome UX smoke"
-      ],
+      "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+      "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+      "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
       "checks": [
         {
           "__typename": "CheckRun",
@@ -5430,9 +5354,7 @@
       }
     },
     "cycleVerified": false,
-    "completionBlockers": [
-      "Hosted CI is pending"
-    ],
+    "completionBlockers": ["Hosted CI is pending"],
     "publicationOwner": "root",
     "integrationCommit": "af8705b5ae2cf24eece761fb04a71dd4444bc92f",
     "publishedHead": "d843e2aebb838d41583e40f0b380f8a31c46b6a0",
@@ -5520,9 +5442,7 @@
         "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
       }
     },
-    "previousPublishedHeads": [
-      "d0247b688e2fad0d7fe2911c7a81ebe7ab2ebd2c"
-    ],
+    "previousPublishedHeads": ["d0247b688e2fad0d7fe2911c7a81ebe7ab2ebd2c"],
     "publicationHistory": [
       {
         "head": "72dbd3b37bcd125f14dd221cbc51d5ebbe5edbca",
@@ -5732,18 +5652,9 @@
           "containsFetchedMain": true,
           "needsMainReconciliation": false,
           "checkedAt": "2026-10-11T14:29:30.447Z",
-          "absentRequired": [
-            "Lint, typecheck, license, test, build",
-            "Chrome UX smoke"
-          ],
-          "unmetRequired": [
-            "Lint, typecheck, license, test, build",
-            "Chrome UX smoke"
-          ],
-          "missingRequired": [
-            "Lint, typecheck, license, test, build",
-            "Chrome UX smoke"
-          ],
+          "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+          "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+          "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
           "checks": [
             {
               "__typename": "CheckRun",
@@ -5922,11 +5833,7 @@
         "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-peer-review.json"
       }
     ],
-    "followUpCommits": [
-      "50c2204fe8777f1b314b5eaba46a2e26337c52d4"
-    ],
-    "publishedFollowUpCommits": [
-      "50c2204fe8777f1b314b5eaba46a2e26337c52d4"
-    ]
+    "followUpCommits": ["50c2204fe8777f1b314b5eaba46a2e26337c52d4"],
+    "publishedFollowUpCommits": ["50c2204fe8777f1b314b5eaba46a2e26337c52d4"]
   }
 ]

@@ -534,10 +534,6 @@
     "group": "gcode-comment-realtime-bytes",
     "localEvidence": "docs/audits/2026-10-11-pr-history/batch-05/main-eaae-comment-ci-direct.log",
     "repairReport": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-author.json",
-    "affectedPrs": [
-      1161,
-      1162,
-      1163
-    ]
+    "affectedPrs": [1161, 1162, 1163]
   }
 ]
