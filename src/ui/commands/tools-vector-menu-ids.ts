@@ -23,4 +23,5 @@ export const TOOLS_VECTOR_IDS: ReadonlyArray<CommandId> = [
   'tools.exclude',
   'tools.cut-shapes',
   'tools.trim-shapes',
+  'tools.extend-shapes',
 ];

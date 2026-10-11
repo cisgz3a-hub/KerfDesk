@@ -28,6 +28,8 @@ import {
 import { useDesignStudioStore } from './design-studio-store';
 import { applyOrthoMm, snapPointMm } from './design-snap';
 import type { DesignSurface } from './design-surface';
+import { EXTEND_PICK_RADIUS_PX } from './design-extend';
+import type { DesignToolKind } from './design-tool';
 
 export type DesignPointerHandlers = {
   readonly onPointerDown: (event: React.PointerEvent<HTMLCanvasElement>) => void;
@@ -68,10 +70,7 @@ export function useDesignPointer(
         return;
       }
       const pxPerMm = surface.pxPerMm();
-      if (session.tool === 'fillet' || session.tool === 'chamfer') {
-        applyCornerAt(at, session.tool, pxPerMm);
-        return;
-      }
+      if (runDesignClickTool(at, session.tool, surface, event)) return;
       // A grip beats everything under it: the grips sit ON the selection's
       // corners, so hit-testing shapes first would always start a move instead.
       if (session.tool === 'select' && beginResizeAt(at, pxPerMm)) return;
@@ -87,6 +86,10 @@ export function useDesignPointer(
       const session = store.session;
       if (at === null || session === null) return;
       store.setCursorMm(at);
+      if (session.tool === 'extend') {
+        store.previewExtension(at, EXTEND_PICK_RADIUS_PX, endpointDistance(surface, event));
+        return;
+      }
       if (session.pointSequence !== null) {
         updatePointToolPointer(at, session, surface.pxPerMm());
         return;
@@ -143,7 +146,15 @@ function resolvePointerMm(
   const store = useDesignStudioStore.getState();
   const session = store.session;
   const raw = surface.toMm(event);
+  if (raw === null && session?.tool === 'extend') {
+    store.setCursorMm(null);
+    store.setActiveSnap(null);
+  }
   if (session === null || raw === null) return null;
+  if (session.tool === 'extend') {
+    store.setActiveSnap(null);
+    return raw;
+  }
   const resolved = truthfulPointToolSnap(
     session,
     snapPointMm({
@@ -222,6 +233,36 @@ function applyCornerAt(at: Vec2, op: 'fillet' | 'chamfer', pxPerMm: number): voi
   const pick = pickCorner(session.history.present, at, toleranceMm);
   if (pick === null) return;
   store.applyCorner(pick, op);
+}
+
+function endpointDistance(
+  surface: DesignSurface,
+  event: React.PointerEvent<HTMLCanvasElement>,
+): (endpoint: Vec2) => number {
+  const { clientX, clientY } = event;
+  return (endpoint) => {
+    const pixel = surface.toClient(endpoint);
+    return pixel === null ? Infinity : Math.hypot(pixel.x - clientX, pixel.y - clientY);
+  };
+}
+
+function runDesignClickTool(
+  at: Vec2,
+  tool: DesignToolKind,
+  surface: DesignSurface,
+  event: React.PointerEvent<HTMLCanvasElement>,
+): boolean {
+  if (tool === 'extend') {
+    useDesignStudioStore
+      .getState()
+      .extendAt(at, EXTEND_PICK_RADIUS_PX, endpointDistance(surface, event));
+    return true;
+  }
+  if (tool === 'fillet' || tool === 'chamfer') {
+    applyCornerAt(at, tool, surface.pxPerMm());
+    return true;
+  }
+  return false;
 }
 
 // Resolve the selection first, then — if the press landed ON a shape rather than in

@@ -34,6 +34,36 @@ const sketch: Sketch = {
 };
 
 describe('buildViewportOverlay', () => {
+  it('previews the added extension as a dashed segment and marks the exact contact', () => {
+    const input = {
+      sketch: { entities: [] },
+      selectedIds: new Set<string>(),
+      draft: null,
+      snapMm: null,
+      frame: FRAME,
+    };
+    const baseline = buildViewportOverlay(input);
+    const overlay = buildViewportOverlay({
+      ...input,
+      extendPreview: {
+        entityId: 'line',
+        end: 'end',
+        reason: 'ready',
+        from: { x: 120, y: 60 },
+        to: { x: 140, y: 60 },
+      },
+    });
+    expect(baseline.buckets).toHaveLength(0);
+    expect(overlay.buckets).toHaveLength(1);
+    expect(overlay.buckets[0]?.dashed).toBe(true);
+    expect(overlay.buckets[0]?.positions).toHaveLength(6);
+    expect(overlay.snapLocal).not.toBeNull();
+    expect(Array.from(overlay.buckets[0]!.positions).slice(3)).toEqual([
+      overlay.snapLocal!.x,
+      overlay.snapLocal!.y,
+      overlay.snapLocal!.z,
+    ]);
+  });
   it('buckets by layer colour, dashes construction, and floats above the stock', () => {
     const overlay = buildViewportOverlay({
       sketch,

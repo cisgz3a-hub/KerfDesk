@@ -228,11 +228,16 @@ export class PhoneTransport implements RemoteTransport {
     } catch {
       return;
     }
-    if ((value.type === 'changed' || value.type === 'hello') && typeof value.revision === 'string')
+    if (
+      (value.type === 'changed' || value.type === 'hello') &&
+      typeof value.revision === 'string' &&
+      Number.isSafeInteger(value.machineSeq) &&
+      Number(value.machineSeq) >= 0
+    )
       this.emit({
         type: 'changed',
         revision: value.revision,
-        machineSeq: Number(value.machineSeq) || 0,
+        machineSeq: Number(value.machineSeq),
       });
     if (value.type === 'hello' || value.type === 'presence' || value.type === 'pong')
       if (typeof value.online === 'boolean') this.emit({ type: 'presence', online: value.online });
