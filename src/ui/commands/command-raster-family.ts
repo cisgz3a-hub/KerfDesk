@@ -27,6 +27,7 @@ export function editImageCommand(ctx: AppCommandContext): AppCommand {
 export function processedRasterToolCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
     editImageCommand(ctx),
+    photoEngravingCommand(ctx),
     rasterToolCommand(
       ctx,
       'tools.save-processed-bitmap',
@@ -37,6 +38,27 @@ export function processedRasterToolCommands(ctx: AppCommandContext): ReadonlyArr
     rasterToolCommand(ctx, 'tools.trace-image', 'Trace Image...', 'Trace selected image', 'Alt+T'),
     retraceOriginalCommand(ctx),
   ];
+}
+
+function photoEngravingCommand(ctx: AppCommandContext): AppCommand {
+  const invoke = (): void => ctx.photoEngraving?.();
+  return ctx.hasRasterSelection &&
+    ctx.canPhotoEngraveSelection !== false &&
+    ctx.photoEngraving !== undefined
+    ? enabled(
+        'tools.photo-engraving',
+        'tools',
+        'Photo engraving...',
+        'Prepare portraits and photo shading with laser dots.',
+        invoke,
+      )
+    : disabled(
+        'tools.photo-engraving',
+        'tools',
+        'Photo engraving...',
+        'Select one unlocked photo or image first.',
+        invoke,
+      );
 }
 
 function retraceOriginalCommand(ctx: AppCommandContext): AppCommand {
