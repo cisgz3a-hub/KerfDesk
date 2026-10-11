@@ -1,7 +1,7 @@
 import { useLaserStore } from '../state/laser-store';
 import { useJobReviewStore } from '../laser/job-review/job-review-store';
 import { operationIsTerminal, type OwnedMachineOperation } from './machine-operation-state';
-import type { MachineAuthority, MachineCommand } from './machine-types';
+import type { MachineAuthority, MachineCommand, MachineOperationKind } from './machine-types';
 import type { RemoteAppStore } from './types';
 import { RemoteFault } from './fault';
 
@@ -9,7 +9,25 @@ export type MachineAction = Exclude<
   MachineCommand,
   { readonly command: 'get_machine_status' | 'get_control_operation' }
 >;
-export type BackgroundMachineAction = Exclude<MachineAction, { readonly command: 'start_job' }>;
+export type BackgroundMachineAction = Exclude<
+  MachineAction,
+  { readonly command: 'start_job' | 'jog_hold_stop' }
+>;
+const MACHINE_OPERATION_KINDS: Record<MachineAction['command'], MachineOperationKind> = {
+  jog_machine: 'jog',
+  frame_job: 'frame',
+  review_machine_job: 'job',
+  start_job: 'job',
+  abort_job: 'abort',
+  connect_machine: 'connect',
+  disconnect_machine: 'disconnect',
+  home_machine: 'home',
+  set_work_origin: 'origin',
+  pause_job: 'pause',
+  resume_job: 'resume',
+  jog_hold_start: 'hold',
+  jog_hold_stop: 'hold',
+};
 
 export function assertMachineOperationOwned(
   operation: OwnedMachineOperation,
@@ -65,14 +83,7 @@ export function ownMachineOperation(
   store: RemoteAppStore,
   revision: () => string,
 ): OwnedMachineOperation {
-  const kind =
-    input.command === 'jog_machine'
-      ? 'jog'
-      : input.command === 'frame_job'
-        ? 'frame'
-        : input.command === 'abort_job'
-          ? 'abort'
-          : 'job';
+  const kind = MACHINE_OPERATION_KINDS[input.command];
   const operation: OwnedMachineOperation = {
     authority,
     controller: new AbortController(),

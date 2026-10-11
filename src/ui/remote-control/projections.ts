@@ -60,6 +60,10 @@ export function workspaceProjection(state: AppState, shareArtwork = false) {
         ...(operationId === undefined ? {} : { operationId }),
       };
     });
+  const artworkCounts = new Map<string, number>();
+  for (const object of scene.objects)
+    for (const id of operationIdsForObject(object, scene.layers))
+      artworkCounts.set(id, (artworkCounts.get(id) ?? 0) + 1);
   const operations = scene.layers
     .filter((layer) => publicIdentifier(layer.id))
     .slice(0, LIMIT)
@@ -70,7 +74,10 @@ export function workspaceProjection(state: AppState, shareArtwork = false) {
       // old wording here. Labels therefore share the explicit artwork opt-in.
       name: shareArtwork ? safeLabel(layer.name, 'Operation') : 'Operation',
       enabled: layer.output,
-      ...(mode === 'laser' ? operationValues(layer) : {}),
+      ...(/^#[0-9a-f]{6}$/.test(layer.color) ? { color: layer.color } : {}),
+      artworkCount: artworkCounts.get(layer.id) ?? 0,
+      ...(mode === 'laser' ? { ...operationValues(layer), ...laserDetails(layer) } : {}),
+      ...(mode === 'cnc' && layer.cnc !== undefined ? { cnc: cncDetails(layer.cnc) } : {}),
     }));
   const allSelected = selectedIds(state).filter(publicIdentifier);
   return {
@@ -86,6 +93,38 @@ export function workspaceProjection(state: AppState, shareArtwork = false) {
       artwork.length < scene.objects.length ||
       operations.length < scene.layers.length ||
       allSelected.length > LIMIT,
+  };
+}
+function laserDetails(layer: Layer) {
+  return {
+    ...(finite(layer.minPower, 0, 100) ? { minPowerPercent: layer.minPower } : {}),
+    airAssist: layer.airAssist,
+    ...(finite(layer.hatchSpacingMm, Number.MIN_VALUE, 100)
+      ? { fillIntervalMm: layer.hatchSpacingMm }
+      : {}),
+    ...(finite(layer.hatchAngleDeg, -360, 360) ? { fillAngleDeg: layer.hatchAngleDeg } : {}),
+    fillBidirectional: layer.fillBidirectional,
+    fillCrossHatch: layer.fillCrossHatch,
+    ...(finite(layer.linesPerMm, Number.MIN_VALUE, 1000) ? { linesPerMm: layer.linesPerMm } : {}),
+    negativeImage: layer.negativeImage,
+  };
+}
+function cncDetails(cnc: NonNullable<Layer['cnc']>) {
+  const number = (value: unknown, max: number) =>
+    finite(value, 0, max) ? (value as number) : undefined;
+  const values = {
+    depthMm: number(cnc.depthMm, 1000),
+    depthPerPassMm: number(cnc.depthPerPassMm, 1000),
+    feedMmPerMin: number(cnc.feedMmPerMin, 100_000),
+    plungeMmPerMin: number(cnc.plungeMmPerMin, 100_000),
+    spindleRpm: number(cnc.spindleRpm, 1_000_000),
+    stepoverPercent: number(cnc.stepoverPercent, 1000),
+  };
+  return {
+    cutType: cnc.cutType,
+    ...(publicIdentifier(cnc.toolId) ? { toolId: cnc.toolId } : {}),
+    ...Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)),
+    ...(cnc.pocketStrategy === undefined ? {} : { pocketStrategy: cnc.pocketStrategy }),
   };
 }
 export function operationValues(layer: Pick<Layer, 'power' | 'speed' | 'passes'>) {
