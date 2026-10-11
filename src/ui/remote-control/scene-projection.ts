@@ -22,10 +22,9 @@ import {
 } from './preview-validation';
 import { publicIdentifier, remoteBounds } from './projections';
 import type { RemoteControlOptions } from './types';
+import { fitsRemoteResponse } from './response-budget';
 
 export const SCENE_OBJECT_LIMIT = 200;
-/** Leaves room inside the 256 KiB relay frame for envelope fields. */
-export const SCENE_BYTE_BUDGET = 200_000;
 // eslint-disable-next-line no-restricted-syntax -- scene DATA: stands in for an unparseable layer colour key (ADR-047).
 const FALLBACK_LAYER_COLOR = '#000000';
 const DISABLED = {
@@ -126,9 +125,7 @@ export function buildScene(project: Project): Record<string, unknown> {
   const base = Math.max(0.01, Math.max(area.maxX - area.minX, area.maxY - area.minY) / 8000);
   for (const factor of [1, 2, 4, 8, 16, 32]) {
     const objects = resolved.map((item) => projectObject(item, units, scene.layers, base * factor));
-    if (JSON.stringify(objects).length + JSON.stringify(images).length > SCENE_BYTE_BUDGET)
-      continue;
-    return {
+    const result = {
       status: 'ready',
       bed,
       extent: {
@@ -145,6 +142,7 @@ export function buildScene(project: Project): Record<string, unknown> {
         ? { message: 'Image artwork is shown as its placement frame; pixels stay on the PC.' }
         : {}),
     };
+    if (fitsRemoteResponse(result)) return result;
   }
   return previewTooLarge();
 }
