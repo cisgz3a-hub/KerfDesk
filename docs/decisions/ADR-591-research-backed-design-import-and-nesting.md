@@ -21,7 +21,11 @@ features, not a claim that all documents or layouts will improve.
 - Pin `ag-psd@31.0.3` for a saved merged Photoshop composite. Support `.psd`,
   8-bit RGB/grayscale, raw/RLE, correct alpha and physical density. Preflight
   byte ranges, dimensions and resource limits before decoding in the existing
-  cancellable import worker. Reuse bitmap engraving/trace flows. Editable layers,
+  cancellable import worker. The embedded decoder/PNG encoder reserves 64 bytes
+  per source pixel plus two file copies against a 512 MiB working-allocation
+  budget before reading the whole file; over-budget PSDs require resizing or a
+  PNG export. This resource budget is separate from the canvas edge limit.
+  Reuse bitmap engraving/trace flows. Editable layers,
   PSB, unsupported compression and higher bit depths are outside this slice.
 - Package the official PackingSolver WASM artifact at source
   `49bf6c7d9d2204f17d698ee4e5a54a4882ebabf4`. Offer advanced nesting as an

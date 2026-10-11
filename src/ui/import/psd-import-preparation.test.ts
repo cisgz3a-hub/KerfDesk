@@ -52,4 +52,24 @@ describe('PSD worker preparation', () => {
     await expect(preparePsdImport(blob)).rejects.toThrow(/limit|canvas/);
     expect(read).not.toHaveBeenCalled();
   });
+  it('rejects a compressed large composite before reading or allocating its full pixels', async () => {
+    const bytes = psdDocument({ rle: true }).slice(0, 26);
+    const view = new DataView(bytes.buffer);
+    view.setUint32(14, 16384);
+    view.setUint32(18, 16384);
+    const blob = new Blob([bytes]);
+    const read = vi.spyOn(blob, 'arrayBuffer');
+    const canvas = vi.fn();
+    vi.stubGlobal('OffscreenCanvas', canvas);
+    await expect(preparePsdImport(blob)).rejects.toThrow(/memory budget/);
+    expect(read).not.toHaveBeenCalled();
+    expect(canvas).not.toHaveBeenCalled();
+  });
+  it('includes the source file allocation in its preflight budget', async () => {
+    const blob = new Blob([psdDocument()]);
+    vi.spyOn(blob, 'size', 'get').mockReturnValue(512 * 1024 * 1024);
+    const read = vi.spyOn(blob, 'arrayBuffer');
+    await expect(preparePsdImport(blob)).rejects.toThrow(/memory budget/);
+    expect(read).not.toHaveBeenCalled();
+  });
 });

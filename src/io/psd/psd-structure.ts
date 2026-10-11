@@ -16,7 +16,14 @@ export type PsdComposite = PsdHeader & {
   readonly hasColorProfile: boolean;
 };
 
-export function readPsdHeader(bytes: Uint8Array): PsdHeader {
+// The embedded PSD route retains decoded RGBA, optional alpha, sampled pixels,
+// canvas/ImageData, PNG bytes and base64 strings. Reserve 64 bytes per source
+// pixel plus two source-file copies within a 512 MiB working-allocation budget.
+// This is this decoder/encoder's budget, not a browser canvas dimension claim.
+const PSD_WORKING_BYTES = 512 * 1024 * 1024;
+const PSD_BYTES_PER_PIXEL = 64;
+
+export function readPsdHeader(bytes: Uint8Array, sourceBytes = bytes.byteLength): PsdHeader {
   const view = viewOf(bytes);
   requireBytes(view, 0, 26);
   if (view.getUint32(0) !== 0x38425053) throw new Error('This file is not a Photoshop PSD.');
@@ -32,6 +39,7 @@ export function readPsdHeader(bytes: Uint8Array): PsdHeader {
   if (width > 16384 || height > 16384) {
     throw new Error('PSD dimensions exceed the embedded image canvas. Resize or export a PNG.');
   }
+  assertPsdWorkingSize(width, height, sourceBytes);
   if (view.getUint16(22) !== 8)
     throw new Error('PSD import supports 8-bit samples. Export an 8-bit RGB or grayscale copy.');
   const colorMode = view.getUint16(24);
@@ -45,6 +53,14 @@ export function readPsdHeader(bytes: Uint8Array): PsdHeader {
     );
   }
   return { width, height, channels, colorMode };
+}
+
+function assertPsdWorkingSize(width: number, height: number, sourceBytes: number): void {
+  if (width * height * PSD_BYTES_PER_PIXEL + sourceBytes * 2 > PSD_WORKING_BYTES) {
+    throw new Error(
+      "PSD composite exceeds this importer's memory budget. Resize the document or export PNG.",
+    );
+  }
 }
 
 export function inspectPsdComposite(bytes: Uint8Array): PsdComposite {
@@ -106,7 +122,10 @@ function readResources(
   let hasColorProfile = false;
   while (start < end) {
     requireBytes(view, start, 7);
-    if (view.getUint32(start) !== 0x3842494d)
+    // The same resource signatures accepted by the pinned ag-psd reader.
+    if (
+      ![0x3842494d, 0x4d655361, 0x41674867, 0x50485554, 0x44435352].includes(view.getUint32(start))
+    )
       throw new Error('PSD image resource signature is invalid.');
     const id = view.getUint16(start + 4);
     const nameBytes = view.getUint8(start + 6) + 1;

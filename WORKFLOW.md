@@ -342,7 +342,9 @@ Identical to the format-specific import flows except:
   transparency and independent X/Y density. Save an 8-bit RGB or grayscale PSD with a compatible
   merged composite, or export PNG if compression, colour mode or depth is unsupported. Layers
   remain flattened; PSB and editable Photoshop layers are outside this import route. Cancelling
-  or failing a decode leaves the current artwork unchanged.
+  or failing a decode leaves the current artwork unchanged. The PSD decoder/PNG encoder checks
+  its estimated working allocations before reading the full file; if its 512 MiB budget is
+  exceeded, resize the document or export PNG for the existing PNG import route.
 - BMP honours embedded density. GIF imports a still image of the first/default frame.
 - HPGL/PLT imports supported pen geometry at 40 plotter units/mm. Scaling needs explicit reference
   points. Unsupported drawing commands reject the file with their source location. Pen colours

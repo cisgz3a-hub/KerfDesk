@@ -76,6 +76,25 @@ describe('PSD stored composite import', () => {
       (await decodePsdComposite(psdDocument({ resolution: [0, 1, 300, 1] }))).dpi,
     ).toBeUndefined();
   });
+  it.each(['MeSa', 'AgHg', 'PHUT', 'DCSR'])(
+    'skips a bounded unknown %s image resource without losing the composite',
+    async (signature) => {
+      const bytes = psdDocument({ profile: true, rle: true });
+      bytes.set(Buffer.from(signature), 34);
+      new DataView(bytes.buffer).setUint16(38, 3000);
+      const image = await decodePsdComposite(bytes);
+      expect([...image.data]).toEqual([20, 70, 120, 255, 40, 90, 140, 255, 60, 110, 160, 255]);
+      expect(image.hasColorProfile).toBe(false);
+      // The alternate signature must not bypass the existing section-length proof.
+      new DataView(bytes.buffer).setUint32(42, 0xffffffff);
+      await expect(decodePsdComposite(bytes)).rejects.toThrow(/incomplete|declared size/);
+    },
+  );
+  it('continues to reject unknown image-resource signatures', async () => {
+    const bytes = psdDocument({ profile: true });
+    bytes.set(Buffer.from('FAKE'), 34);
+    await expect(decodePsdComposite(bytes)).rejects.toThrow(/resource signature/);
+  });
   it('refuses missing or explicitly invalid merged previews', async () => {
     await expect(decodePsdComposite(psdDocument({ hasMergedPreview: false }))).rejects.toThrow(
       /no real merged preview/,
