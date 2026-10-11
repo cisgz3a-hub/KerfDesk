@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "67d109ffd84c833ea80f6fd4e49cd00214837f36",
+  "sinceSourceSha": "997b22f63cabf5ef0b0bdce712a27af3b8286ccc",
   "highlights": [
-    "Desktop updates now appear above the canvas, with separate choices to download and install. Licence keys are easier to paste, and the purchase page can open licence settings in KerfDesk.",
-    "The Laser/CNC switch is in the machine toolbar. Positioning actions stay beside the jog controls, and Machine Setup has clearer review, focus and discard choices.",
-    "Create artwork now provides clearer sketch and part workflows, accessible project sheets and editable relief tools. Older relief projects retain their composition settings.",
-    "STL reliefs keep model proportions, finish against the mesh and support two-sided setups with carved-stock previews. V-carving uses modelled conical cutters and catches empty geometry before output.",
-    "Checkout recovery and licence device ownership are more reliable. Saved-document recovery is preserved, unsendable output is caught before Start, and Abort can be retried after an unconfirmed reset.",
-    "Updated safety guidance explains direct supervision, machine safety features and fire response. Refund Policy 1.2 considers new requests case by case while preserving existing promises and mandatory rights."
+    "Portrait photo engraving adds an output-grid preview. Autosave recovery now sits in a compact status-bar control, keeping recovery choices close without covering the workspace.",
+    "Extend open artwork to the next boundary with a hover preview and Undo. Workspace curve ends extend along their tangent; Design Studio supports straight source ends and curved boundaries.",
+    "SVG imports preserve child opacity overrides, raster outlines survive pixel rounding, and closed contours join at the correct corner. Node drags and snapping follow the node you grab.",
+    "Material preset edits retain their identity and process settings. Camera previews preserve the snapshot address, and stale board corrections no longer overwrite restored dimensions.",
+    "CNC manual tabs survive explicit operation bindings. Manual Zero Z evidence stays with the tool and reference that initiated it, and helical pocket checks test the complete ring inside concave boundaries.",
+    "Imported G-code uses its own timing for 2D playback, including dwell behaviour. Editable variable counters stay within the range that saved projects can retain."
   ]
 }
