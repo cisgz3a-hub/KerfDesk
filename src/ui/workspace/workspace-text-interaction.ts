@@ -121,7 +121,7 @@ function openCanvasObjectEditor(
   const id = point === null ? null : hitTest(app.project.scene, point);
   if (id === null) return;
   app.selectObject(id);
-  openEditorForSelectedObject();
+  openEditorForSelectedObject(id);
 }
 
 // Rendering a draft must not change the saved project, output, or undo history.

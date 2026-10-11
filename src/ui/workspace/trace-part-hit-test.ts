@@ -9,10 +9,11 @@ import {
   type Layer,
   type Polyline,
   type Scene,
-  type TracedImage,
+  type SceneObject,
   type Vec2,
 } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
+import { hitTestObject } from '../../core/scene/hit-test';
 import { tracePartGroups } from '../state/trace-part-geometry';
 import { displayCurveToleranceMm } from './display-polylines';
 
@@ -31,6 +32,7 @@ type IndexedLine = {
 };
 type NearestHit = { readonly hit: TracePartHit; readonly distance: number };
 type PathHitPaint = 'hidden' | 'stroke' | 'fill';
+type VectorObject = Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>;
 const pathIndexCache = new WeakMap<ColoredPath, ReadonlyArray<IndexedLine>>();
 const curveLineCache = new WeakMap<
   CurveSubpath,
@@ -47,8 +49,13 @@ export function hitTracePart(
   const visibility = sceneLayerVisibility.lookup(scene.layers);
   for (let index = scene.objects.length - 1; index >= 0; index -= 1) {
     const object = scene.objects[index];
-    if (object?.kind !== 'traced-image' || object.locked === true) continue;
+    if (object === undefined || object.locked === true) continue;
     if (!sceneLayerVisibility.hasObject(object, visibility)) continue;
+    if (!('paths' in object)) {
+      // Ordinary bounds artwork occludes the pick inside its transformed rectangle.
+      if (hitTestObject(visibility, object, point).kind === 'primary') return null;
+      continue;
+    }
     const hit = hitObjectPart(object, point, HIT_RADIUS_PX * pxToMm, scene.layers, (path) => {
       const { visible, operation } = sceneLayerVisibility.resolvePath(object, path, visibility);
       if (!visible) return 'hidden';
@@ -60,13 +67,15 @@ export function hitTracePart(
         ? 'fill'
         : 'stroke';
     });
-    if (hit !== null) return hit;
+    // Reuse the painted paths, including holes and wireframe, for foreground
+    // artwork. An empty vector bounding box must not hide a lower trace.
+    if (hit !== null) return object.kind === 'traced-image' ? hit : null;
   }
   return null;
 }
 
 function hitObjectPart(
-  object: TracedImage,
+  object: VectorObject,
   point: Vec2,
   radius: number,
   layers: ReadonlyArray<Layer>,
@@ -105,7 +114,7 @@ function hitObjectPart(
 
 function nearestEdge(
   args: {
-    readonly object: TracedImage;
+    readonly object: SceneObject;
     readonly lines: ReadonlyArray<IndexedLine>;
     readonly local: Vec2;
     readonly point: Vec2;
@@ -130,7 +139,7 @@ function nearestEdge(
 }
 
 function filledPart(
-  object: TracedImage,
+  object: VectorObject,
   pathIndex: number,
   path: ColoredPath,
   lines: ReadonlyArray<IndexedLine>,
@@ -148,7 +157,14 @@ function filledPart(
   // The canvas fills the entire compound path. Even separately editable
   // strokes can cancel one another after their operation changes to Fill.
   const total = windings.reduce((sum, winding) => sum + winding, 0);
-  if (path.fillRule === 'nonzero' ? total === 0 : Math.abs(total) % 2 === 0) return null;
+  const fillRule = path.fillRule ?? (object.kind === 'text' ? 'nonzero' : 'evenodd');
+  if (fillRule === 'nonzero' ? total === 0 : Math.abs(total) % 2 === 0) return null;
+  if (object.kind !== 'traced-image')
+    return {
+      objectId: object.id,
+      pathIndex,
+      subpathIndex: windings.findIndex((value) => value !== 0),
+    };
   for (const group of tracePartGroups(object, pathIndex, layers)) {
     const winding = group.reduce((sum, index) => sum + (windings[index] ?? 0), 0);
     const inside = path.fillRule === 'nonzero' ? winding !== 0 : Math.abs(winding) % 2 === 1;
@@ -199,7 +215,7 @@ function visibleLine(entry: IndexedLine, tolerance: number): Polyline {
   return line;
 }
 
-function localPoint(object: TracedImage, point: Vec2): Vec2 | null {
+function localPoint(object: SceneObject, point: Vec2): Vec2 | null {
   const t = object.transform;
   if (t.scaleX === 0 || t.scaleY === 0) return null;
   const angle = (t.rotationDeg * Math.PI) / 180;
@@ -220,7 +236,7 @@ function insideBounds(point: Vec2, bounds: Bounds, padding: number): boolean {
   );
 }
 
-function edgeDistance(object: TracedImage, line: Polyline, point: Vec2): number {
+function edgeDistance(object: SceneObject, line: Polyline, point: Vec2): number {
   let distance = Infinity;
   const previous = line.closed ? line.points.at(-1) : undefined;
   let a = previous === undefined ? undefined : applyTransform(previous, object.transform);

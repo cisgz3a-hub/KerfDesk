@@ -12,10 +12,11 @@ import { useImageEditorStore } from '../image-editor/image-editor-store';
 import { useCanvasTextStore } from '../text/canvas-text-store';
 import { activateTracePartTool } from './trace-part-tool';
 
-export function openEditorForSelectedObject(): void {
+export function openEditorForSelectedObject(objectId?: string): void {
   const s = useStore.getState();
   if (s.previewMode || isModalOpen(useUiStore.getState())) return;
-  const id = s.selectedObjectId;
+  // Canvas dispatch retains its actual hit even when selection expands a group.
+  const id = objectId ?? s.selectedObjectId;
   if (id === null) return;
   const obj = s.project.scene.objects.find((object) => object.id === id);
   if (obj === undefined || obj.locked === true) return;
