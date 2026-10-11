@@ -70,8 +70,9 @@ function RemoteConsent(): JSX.Element {
       </p>
       <p style={remoteNoteStyle}>
         Viewing shows workspace summaries, machine limits, recipes and job review. Editing lets an
-        approved connection change artwork and laser settings. Separately approving machine control
-        enables Jog, Frame, Start and Abort from that connection.
+        approved connection change artwork, layers and operation settings. Separately approving
+        machine control enables Connect, Home, Jog, Frame, Start, Pause and Abort from that
+        connection. Phones open KerfDesk Remote, which can be added to the home screen.
       </p>
       <p style={remoteNoteStyle}>
         Requests and these summaries pass through KerfDesk’s Cloudflare service. An MCP client may

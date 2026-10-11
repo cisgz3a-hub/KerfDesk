@@ -50,8 +50,8 @@ describe('one-time pairing link boundary', () => {
     })),
     { ...pairingFixture, pairing: { ...pairingFixture.pairing!, expiresAt: -1 } },
     ...[
-      'http://kerfdesk-phone-control.cisgz3a.workers.dev/control',
-      'https://foreign.example/control',
+      'http://kerfdesk-phone-control.cisgz3a.workers.dev/app/',
+      'https://foreign.example/app/',
       'https://owner:secret@kerfdesk-phone-control.cisgz3a.workers.dev/control',
       'https://kerfdesk-phone-control.cisgz3a.workers.dev/mcp',
       'file:///private/control',

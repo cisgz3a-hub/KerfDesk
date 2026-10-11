@@ -1,4 +1,10 @@
-import { PAIR_TTL_MS, SESSION_TTL_MS, normalizedScopes, uuid } from './protocol.js';
+import {
+  PAIR_TTL_MS,
+  REMEMBERED_SESSION_TTL_MS,
+  SESSION_TTL_MS,
+  normalizedScopes,
+  uuid,
+} from './protocol.js';
 import { digest, pairingCode, remainingPairingMs } from './security.js';
 import { DeviceApprovals } from './approvals.js';
 
@@ -39,7 +45,8 @@ export abstract class DevicePairing extends DeviceApprovals {
     else {
       client.status = 'approved';
       client.scopes = scopes;
-      client.sessionExpiresAt = Date.now() + SESSION_TTL_MS;
+      client.sessionExpiresAt =
+        Date.now() + (value.remember === true ? REMEMBERED_SESSION_TTL_MS : SESSION_TTL_MS);
       client.leaseExpiresAt = client.sessionExpiresAt;
     }
     await this.persist();

@@ -40,6 +40,17 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `update_text` | `artworkId`, nonempty `patch` | Ordinary text: `text`, bundled `fontId`, positive `fontSizeMm` ≤1000, `alignment` left/center/right, `lineHeight` 0.1–20 or `letterSpacing` −1–20. Spacing is a multiplier of font size. |
 | `arrange_artwork` | Nonempty `artworkIds`, `action` | Align left/center/right/top/middle/bottom, distribute horizontal/vertical centres, mirror horizontal/vertical, group, ungroup, duplicate or delete. |
 | `undo`, `redo` | Only write admission | Shared desktop history; current edit approval still required. |
+| `get_workspace_scene` | None | Opt-in bounded vector scene (ADR-582): bed, per-artwork bounds, unit/group, editability and flattened polylines encoded as cumulative hundredths of a millimetre; image footprints only. |
+| `wait_for_change` | Optional `sinceRevision`, `sinceMachineSeq`, `timeoutMs` 0–15000 | Answered by the relay from desktop change counters; `reason` is `workspace`, `machine`, `both`, `timeout` or `unsupported` (older desktop). |
+| `create_operation` | Optional `color`, Laser `mode` line/fill/image, `name` ≤128 | New operation through the desktop's manual layer actions, one Undo step; returns `operationId`. |
+| `assign_artwork_to_operation` | Nonempty `artworkIds`, `operationId` | Moves whole editable groups to that operation. |
+| `reorder_operation` | `operationId`, `direction` up/down | Desktop layer order. |
+| `delete_operation` | `operationId` | Desktop Delete layer, including artwork only it uses; never the last operation. Destructive. |
+| `apply_material_recipe` | `operationId`, `recipeId` | Applies a user-saved recipe to a Laser operation. |
+| `add_svg` | `svg` ≤180000 characters, optional `xMm`, `yMm`, `widthMm` | Sanitised desktop SVG import; scripts, foreign content and external references are dropped. |
+| `import_file` | `fileName`, `mimeType` SVG/PNG/JPEG/DXF, `dataBase64` ≤240000, optional placement | Ordinary desktop import path; image magic bytes checked. |
+| `save_project` | Only write admission | Saves to the existing file only; `saved:false` when never saved. Opens no picker and returns no path. |
+| `apply_edits` | `edits`: 1–40 `{command,args}` | All-or-nothing batch as one "Remote edits" Undo step. Allowed commands are the single edit tools above (without admission fields); `"$n"` in `artworkIds`/`operationId` refers to edit n's result. |
 | `get_machine_status` | None | Current connection, labelled work position, actual jog capabilities, Frame, job and action readiness. |
 | `get_control_operation` | `operationId` UUID | This client's bounded operation receipt; no movement or automatic retry. |
 | `jog_machine` | `axis` x/y/z, `direction` -1/1, `distanceMm` 0.01–100, optional `feedMmPerMin` 1–100000 | One canonical discrete jog, using the actual desktop's axis/direction/feed limits. |
@@ -47,6 +58,23 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `review_machine_job` | Machine write admission | Prepare the ordinary exact Job Review with a one-use handle; does not confirm Start. |
 | `start_job` | Machine write admission, `reviewId` UUID | Explicitly confirm the owned current review; changed review facts require another confirmation. |
 | `abort_job` | `requestId` UUID | Canonical network Abort, independently admitted while another command waits; no artwork revision required. |
+| `connect_machine`, `disconnect_machine` | Machine write admission | ADR-585. Reconnect only to the port already chosen on the PC (`portSelection: 'automatic'`); disconnect refused during a job or motion. |
+| `home_machine` | Machine write admission | Desktop Home with all its guards. |
+| `set_work_origin` | Machine write admission, `axes` xy/z | Desktop Set origin here / Zero Z; no motion. |
+| `pause_job`, `resume_job` | `requestId` UUID | Desktop Pause/Resume with controller confirmation; no artwork revision required. |
+| `get_camera_snapshot` | None | Control scope plus artwork sharing: one JPEG still ≤1024 px and ≤240000 base64 characters of the live PC camera. |
+
+`jog_hold_start` and `jog_hold_stop` exist in the shared schemas for the phone
+app only. The server never registers them as MCP tools, and the relay refuses
+them on `/mcp` and without a live phone socket. The desktop stops a held jog
+when heartbeats are 600 ms late (ADR-585).
+
+KerfDesk Remote (`workspace-app-ui.ts`, generated from
+`services/remote-control/app`) is the MCP Apps resource
+`ui://kerfdesk/workspace/v6.html`, linked from the workspace, scene, preview and
+machine tools. Do not edit the generated file; run
+`pnpm --dir services/remote-control build:app`. `workspace-ui.ts` and its
+helpers are the previous v5 panel, kept only for their regression tests.
 
 `arrange_artwork.action` uses `align_left`, `align_center`, `align_right`,
 `align_top`, `align_middle`, `align_bottom`, `distribute_horizontal`,

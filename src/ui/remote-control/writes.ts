@@ -1,9 +1,9 @@
-import { IDENTITY_TRANSFORM, type Layer } from '../../core/scene';
+import { IDENTITY_TRANSFORM } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives/create-rectangle';
 import { DEFAULT_TEXT_COLOR } from '../../core/text';
 import type { AppState } from '../state/store';
-import type { RemoteAppStore, RemoteOperationPatch, RemoteWrite } from './types';
-import { RemoteFault } from './fault';
+import type { RemoteAppStore, RemoteWrite } from './types';
+import { updateOperationFull } from './design-operations';
 import { editableArtwork, expandedArtworkGroupIds, prepareTransforms } from './transforms';
 import { prepareRemoteText } from './text';
 import { editableText, prepareTextEdit } from './text-edit';
@@ -38,7 +38,6 @@ export async function applyRemoteWrite(
       });
     }
     case 'add_text': {
-      requireLaser(state);
       const object = await prepareRemoteText(write.args, signal);
       return commit(() => {
         store.getState().upsertTextObject(object, undefined, { placement: 'canvas' });
@@ -55,7 +54,7 @@ export async function applyRemoteWrite(
       });
     }
     case 'update_operation':
-      return commit(() => updateOperation(state, write.args.operationId, write.args.patch));
+      return commit(() => updateOperationFull(store, write.args.operationId, write.args.patch));
     case 'update_text': {
       const object = editableText(state, write.args.artworkId);
       const prepared = await prepareTextEdit(state, object, write.args.patch, signal);
@@ -77,14 +76,11 @@ export async function applyRemoteWrite(
       return commit(() => applyHistory(state, store, write.command));
   }
 }
-function requireLaser(state: AppState): void {
-  if (state.project.machine?.kind === 'cnc') throw new RemoteFault('unsupported_operation');
-}
+// ADR-584: CNC workspaces create the same ordinary artwork; CNC defaults seed fresh layers.
 function addRectangle(
   state: AppState,
   args: Extract<RemoteWrite, { command: 'add_rectangle' }>['args'],
 ) {
-  requireLaser(state);
   const id = crypto.randomUUID();
   state.drawShape(
     createRectangle({
@@ -95,27 +91,4 @@ function addRectangle(
     }),
   );
   return { changedArtworkIds: [id] };
-}
-function updateOperation(state: AppState, id: string, patch: RemoteOperationPatch) {
-  if (!publicIdentifier(id)) throw new RemoteFault('unsupported_operation');
-  requireLaser(state);
-  const layer = state.project.scene.layers.find((candidate) => candidate.id === id);
-  if (layer === undefined) throw new RemoteFault('not_found');
-  const updates: Partial<Omit<Layer, 'id' | 'color'>> = {
-    ...(patch.powerPercent === undefined ? {} : { power: patch.powerPercent }),
-    ...(patch.speedMmPerMin === undefined ? {} : { speed: patch.speedMmPerMin }),
-    ...(patch.passes === undefined ? {} : { passes: patch.passes }),
-    ...(patch.enabled === undefined ? {} : { output: patch.enabled }),
-  };
-  const changedFields = (Object.keys(patch) as (keyof RemoteOperationPatch)[]).filter((key) => {
-    const source = {
-      powerPercent: layer.power,
-      speedMmPerMin: layer.speed,
-      passes: layer.passes,
-      enabled: layer.output,
-    };
-    return patch[key] !== source[key];
-  });
-  if (changedFields.length > 0) state.setLayerParam(id, updates);
-  return { operationId: id, changedFields };
 }
