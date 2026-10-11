@@ -7,12 +7,14 @@
 import { useMemo } from 'react';
 import type { Vec2 } from '../../core/scene';
 import { useDesignStudioStore } from './design-studio-store';
-import { pxToMm } from './design-view';
+import { mmToPx, pxToMm } from './design-view';
 
 export type DesignSurface = {
   // Raw pointer position → sketch mm, or null when the surface cannot map it
   // yet (no measured view, or a ray that misses the drawing plane).
   readonly toMm: (event: React.PointerEvent<HTMLCanvasElement>) => Vec2 | null;
+  // Sketch mm → CSS client pixels, for exact endpoint picking from either camera.
+  readonly toClient: (point: Vec2) => Vec2 | null;
   // Screen pixels per millimetre AT the drawing plane.
   readonly pxPerMm: () => number;
 };
@@ -30,6 +32,13 @@ export function useCanvas2dSurface(
         return pxToMm(view, { x: event.clientX - rect.left, y: event.clientY - rect.top });
       },
       pxPerMm: () => useDesignStudioStore.getState().session?.view?.pxPerMm ?? 1,
+      toClient: (point) => {
+        const view = useDesignStudioStore.getState().session?.view ?? null;
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (view === null || rect === undefined) return null;
+        const px = mmToPx(view, point);
+        return { x: px.x + rect.left, y: px.y + rect.top };
+      },
     }),
     [canvasRef],
   );

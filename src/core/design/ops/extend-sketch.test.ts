@@ -20,6 +20,23 @@ const query = (boundaries: SketchEntity[], line: SketchEntity = source) =>
   findSketchExtension({ entities: [line, ...boundaries] }, source.end, 0.1);
 
 describe('Sketch Extend geometry', () => {
+  it('uses a supplied screen distance for both eligibility and nearest endpoint ranking', () => {
+    const upper = { ...source, id: 'upper', start: { x: 0, y: 3 }, end: { x: 10, y: 3 } };
+    const sketch = { entities: [source, upper, edge(20)] };
+    // In an oblique projection the mm-nearest source can be farther away in pixels.
+    const target = findSketchExtension(sketch, source.end, 8, (point) =>
+      point.x === 10 ? (point.y === 3 ? 7 : 9) : Infinity,
+    );
+    expect(target).toMatchObject({ entityId: 'upper', from: { x: 10, y: 3 }, to: { x: 20, y: 3 } });
+    expect(
+      findSketchExtension(sketch, source.end, 8, (point) =>
+        point.x === 10 ? (point.y === 3 ? 7 : 6) : Infinity,
+      )?.entityId,
+    ).toBe('source');
+    expect(findSketchExtension(sketch, source.end, 8, () => NaN)).toBeNull();
+    expect(findSketchExtension(sketch, source.end, 8, () => -1)).toBeNull();
+  });
+
   it('chooses the first forward contact and preserves source identity and metadata', () => {
     const sketch: Sketch = { entities: [source, edge(30, 'far'), edge(-10, 'behind'), edge(20)] };
     const target = findSketchExtension(sketch, source.end, 0.1)!;

@@ -70,7 +70,7 @@ export function useDesignPointer(
         return;
       }
       const pxPerMm = surface.pxPerMm();
-      if (runDesignClickTool(at, session.tool, pxPerMm)) return;
+      if (runDesignClickTool(at, session.tool, surface, event)) return;
       // A grip beats everything under it: the grips sit ON the selection's
       // corners, so hit-testing shapes first would always start a move instead.
       if (session.tool === 'select' && beginResizeAt(at, pxPerMm)) return;
@@ -87,7 +87,7 @@ export function useDesignPointer(
       if (at === null || session === null) return;
       store.setCursorMm(at);
       if (session.tool === 'extend') {
-        store.previewExtension(at, EXTEND_PICK_RADIUS_PX / Math.max(surface.pxPerMm(), 1e-6));
+        store.previewExtension(at, EXTEND_PICK_RADIUS_PX, endpointDistance(surface, event));
         return;
       }
       if (session.pointSequence !== null) {
@@ -146,6 +146,10 @@ function resolvePointerMm(
   const store = useDesignStudioStore.getState();
   const session = store.session;
   const raw = surface.toMm(event);
+  if (raw === null && session?.tool === 'extend') {
+    store.setCursorMm(null);
+    store.setActiveSnap(null);
+  }
   if (session === null || raw === null) return null;
   if (session.tool === 'extend') {
     store.setActiveSnap(null);
@@ -231,13 +235,31 @@ function applyCornerAt(at: Vec2, op: 'fillet' | 'chamfer', pxPerMm: number): voi
   store.applyCorner(pick, op);
 }
 
-function runDesignClickTool(at: Vec2, tool: DesignToolKind, pxPerMm: number): boolean {
+function endpointDistance(
+  surface: DesignSurface,
+  event: React.PointerEvent<HTMLCanvasElement>,
+): (endpoint: Vec2) => number {
+  const { clientX, clientY } = event;
+  return (endpoint) => {
+    const pixel = surface.toClient(endpoint);
+    return pixel === null ? Infinity : Math.hypot(pixel.x - clientX, pixel.y - clientY);
+  };
+}
+
+function runDesignClickTool(
+  at: Vec2,
+  tool: DesignToolKind,
+  surface: DesignSurface,
+  event: React.PointerEvent<HTMLCanvasElement>,
+): boolean {
   if (tool === 'extend') {
-    useDesignStudioStore.getState().extendAt(at, EXTEND_PICK_RADIUS_PX / Math.max(pxPerMm, 1e-6));
+    useDesignStudioStore
+      .getState()
+      .extendAt(at, EXTEND_PICK_RADIUS_PX, endpointDistance(surface, event));
     return true;
   }
   if (tool === 'fillet' || tool === 'chamfer') {
-    applyCornerAt(at, tool, pxPerMm);
+    applyCornerAt(at, tool, surface.pxPerMm());
     return true;
   }
   return false;

@@ -19,18 +19,27 @@ type Endpoint = {
   readonly adjacent: Vec2 | null;
 };
 
+/** Tolerance is in mm by default, or in the supplied endpoint distance's units. */
 export function findSketchExtension(
   sketch: Sketch,
   pointer: Vec2,
-  toleranceMm: number,
+  tolerance: number,
+  distanceToEndpoint?: (endpoint: Vec2) => number,
 ): SketchExtension | null {
-  if (!Number.isFinite(toleranceMm) || toleranceMm < 0) return null;
+  if (!Number.isFinite(tolerance) || tolerance < 0) return null;
   let picked: Endpoint | null = null;
-  let best = toleranceMm;
+  let best = tolerance;
   for (const entity of [...sketch.entities].reverse()) {
     for (const endpoint of endpoints(entity)) {
-      const distance = Math.hypot(pointer.x - endpoint.from.x, pointer.y - endpoint.from.y);
-      if (distance <= toleranceMm && (picked === null || distance < best - EXTEND_EPS_MM)) {
+      const distance = distanceToEndpoint
+        ? distanceToEndpoint(endpoint.from)
+        : Math.hypot(pointer.x - endpoint.from.x, pointer.y - endpoint.from.y);
+      if (
+        Number.isFinite(distance) &&
+        distance >= 0 &&
+        distance <= tolerance &&
+        (picked === null || distance < best - EXTEND_EPS_MM)
+      ) {
         picked = endpoint;
         best = distance;
       }

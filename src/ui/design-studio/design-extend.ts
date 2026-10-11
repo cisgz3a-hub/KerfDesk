@@ -11,14 +11,15 @@ export const EXTEND_PICK_RADIUS_PX = 8;
 export function extendSessionAt(
   session: DesignSession,
   at: Vec2,
-  toleranceMm: number,
+  tolerance: number,
+  distanceToEndpoint?: (endpoint: Vec2) => number,
 ): DesignSession {
-  const target = findSketchExtension(session.history.present, at, toleranceMm);
+  const target = findSketchExtension(session.history.present, at, tolerance, distanceToEndpoint);
   if (target === null) return { ...session, extendPreview: null };
   const next = applySketchExtension(session.history.present, target);
   return {
     ...withSketch(session, next),
-    extendPreview: findSketchExtension(next, at, toleranceMm),
+    extendPreview: findSketchExtension(next, at, tolerance, distanceToEndpoint),
   };
 }
 

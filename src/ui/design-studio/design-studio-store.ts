@@ -74,8 +74,16 @@ type DesignStudioState = {
   readonly setTool: (tool: DesignToolKind) => void;
   readonly setView: (view: DesignView) => void;
   readonly setCursorMm: (point: Vec2 | null) => void;
-  readonly previewExtension: (point: Vec2, toleranceMm: number) => void;
-  readonly extendAt: (point: Vec2, toleranceMm: number) => void;
+  readonly previewExtension: (
+    point: Vec2,
+    tolerance: number,
+    distanceToEndpoint?: (endpoint: Vec2) => number,
+  ) => void;
+  readonly extendAt: (
+    point: Vec2,
+    tolerance: number,
+    distanceToEndpoint?: (endpoint: Vec2) => number,
+  ) => void;
   readonly setActiveSnap: (target: SnapTarget | null) => void;
   readonly setSelection: (ids: ReadonlyArray<string>) => void;
   readonly toggleSnap: () => void;
@@ -239,15 +247,20 @@ function extendCursorActions(
           ...(cursorMm === null ? { extendPreview: null } : {}),
         })),
       ),
-    previewExtension: (point, toleranceMm) =>
+    previewExtension: (point, tolerance, distanceToEndpoint) =>
       set(
         mapSession((session) => ({
           ...session,
-          extendPreview: findSketchExtension(session.history.present, point, toleranceMm),
+          extendPreview: findSketchExtension(
+            session.history.present,
+            point,
+            tolerance,
+            distanceToEndpoint,
+          ),
         })),
       ),
-    extendAt: (point, toleranceMm) =>
-      set(mapSession((session) => extendSessionAt(session, point, toleranceMm))),
+    extendAt: (point, tolerance, distanceToEndpoint) =>
+      set(mapSession((session) => extendSessionAt(session, point, tolerance, distanceToEndpoint))),
   };
 }
 

@@ -10,6 +10,11 @@ import { DesignStatusBar } from './DesignStatusBar';
 import { extensionHint } from './design-extend';
 import { applyDesignSketch } from '../state/design-apply-mutation';
 import { createProject } from '../../core/scene';
+import type { Vec2 } from '../../core/scene';
+import type { DesignSurface } from './design-surface';
+import * as three from 'three';
+import { projectSketchToViewport } from './viewport3d/viewport-projection';
+import { sceneFromLocal } from '../cnc-viewer3d/viewer3d-picking';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -21,8 +26,12 @@ const sketch: Sketch = {
   ],
 };
 let scale = 8;
-const surface = {
-  toMm: (event: React.PointerEvent<HTMLCanvasElement>) => ({ x: event.clientX, y: event.clientY }),
+let rayMiss = false;
+let project = (point: Vec2): Vec2 | null => ({ x: point.x * scale, y: point.y * scale });
+let unproject = (point: Vec2): Vec2 | null => ({ x: point.x / scale, y: point.y / scale });
+const surface: DesignSurface = {
+  toMm: (event) => (rayMiss ? null : unproject({ x: event.clientX, y: event.clientY })),
+  toClient: (point) => project(point),
   pxPerMm: () => scale,
 };
 
@@ -41,10 +50,14 @@ describe('Design Studio Extend interaction', () => {
   let root: Root;
   let canvas: HTMLCanvasElement;
   const session = () => studio.getState().session!;
-  const pointer = (type: string, x: number, y: number, button = 0) =>
+  const pointerClient = (type: string, x: number, y: number, button = 0) =>
     act(() => {
       canvas.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button }));
     });
+  const pointer = (type: string, x: number, y: number, button = 0) => {
+    const pixel = project({ x, y })!;
+    pointerClient(type, pixel.x, pixel.y, button);
+  };
   const key = (value: string, ctrlKey = false) =>
     act(() => {
       canvas.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value, ctrlKey }));
@@ -52,6 +65,9 @@ describe('Design Studio Extend interaction', () => {
 
   beforeEach(() => {
     scale = 8;
+    rayMiss = false;
+    project = (point) => ({ x: point.x * scale, y: point.y * scale });
+    unproject = (point) => ({ x: point.x / scale, y: point.y / scale });
     studio.setState({ session: createDesignSession(sketch), stash: null });
     host = document.createElement('div');
     document.body.appendChild(host);
@@ -116,6 +132,87 @@ describe('Design Studio Extend interaction', () => {
     key('Escape');
     expect(session().tool).toBe('select');
     expect(session().extendPreview).toBeNull();
+  });
+
+  it.each(['pointermove', 'pointerdown'])(
+    'clears cursor and preview on a missed plane ray during %s',
+    (event) => {
+      pointer('pointermove', 13, 2);
+      expect(session().extendPreview?.reason).toBe('ready');
+      rayMiss = true;
+      pointer(event, 13, 2);
+      expect(session().cursorMm).toBeNull();
+      expect(session().extendPreview).toBeNull();
+      expect(session().history.past).toHaveLength(0);
+    },
+  );
+
+  it('exits Extend with one Escape while retaining the existing selection', () => {
+    act(() => studio.getState().setSelection(['line']));
+    pointer('pointermove', 13, 2);
+    key('Escape');
+    expect(session().tool).toBe('select');
+    expect(session().extendPreview).toBeNull();
+    expect([...session().selectedIds]).toEqual(['line']);
+    key('Escape');
+    expect(session().selectedIds.size).toBe(0);
+  });
+
+  it.each([
+    { x: 0, y: -140, z: 45, shiftY: 0 },
+    { x: 0, y: -140, z: 45, shiftY: 80 },
+    { x: -100, y: 0, z: 65, shiftY: 0 },
+  ])('picks within eight CSS pixels in both axes under perspective at $x/$y/$z', (position) => {
+    const shifted = {
+      entities: sketch.entities.map((entity) => {
+        if (entity.kind !== 'line') return entity;
+        return {
+          ...entity,
+          start: { ...entity.start, y: entity.start.y + position.shiftY },
+          end: { ...entity.end, y: entity.end.y + position.shiftY },
+        };
+      }),
+    };
+    act(() => studio.setState({ session: { ...createDesignSession(shifted), tool: 'extend' } }));
+    const frame = { originMm: { x: 0, y: 0 }, widthMm: 100, heightMm: 100, thicknessMm: 6 };
+    const camera = new three.PerspectiveCamera(40, 800 / 600, 0.5, 20000);
+    camera.up.set(0, 0, 1);
+    camera.position.set(position.x, position.y, position.z);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld(true);
+    project = (point) => projectSketchToViewport(three, camera, point, frame, 800, 600);
+    unproject = (point) => {
+      const ray = new three.Raycaster();
+      ray.setFromCamera(new three.Vector2(point.x / 400 - 1, 1 - point.y / 300), camera);
+      const hit = ray.ray.intersectPlane(
+        new three.Plane(new three.Vector3(0, 0, 1), 0),
+        new three.Vector3(),
+      );
+      return hit === null ? null : sceneFromLocal(hit, frame.originMm, frame);
+    };
+    // The target-scale estimate is deliberately unrelated to local projection.
+    scale = 100;
+    const pixel = project({ x: 13, y: 2 + position.shiftY })!;
+    for (const delta of [
+      { x: 7, y: 0 },
+      { x: 0, y: 7 },
+    ]) {
+      pointerClient('pointermove', pixel.x + delta.x, pixel.y + delta.y);
+      expect(session().extendPreview).toMatchObject({
+        entityId: 'line',
+        end: 'end',
+        reason: 'ready',
+      });
+    }
+    pointerClient('pointermove', pixel.x, pixel.y + 9);
+    expect(session().extendPreview).toBeNull();
+    pointerClient('pointerdown', pixel.x, pixel.y + 9);
+    expect(session().history.past).toHaveLength(0);
+    pointerClient('pointermove', pixel.x, pixel.y + 7);
+    const preview = session().extendPreview!;
+    pointerClient('pointerdown', pixel.x, pixel.y + 7);
+    expect(session().history.present.entities[0]).toMatchObject({ end: preview.to });
+    expect(session().history.past).toHaveLength(1);
   });
 
   it('uses the existing Apply boundary and preserves construction exclusion', () => {
