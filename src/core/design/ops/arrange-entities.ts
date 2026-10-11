@@ -2,18 +2,21 @@ import { alignDelta, type SelectionAlignKind } from '../../scene/selection-align
 import type { SelectionDistributeKind } from '../../scene/selection-distribute';
 import type { Bounds, Vec2 } from '../../scene';
 import { entityBounds } from '../sketch-bounds';
-import type { Sketch, SketchEntity } from '../sketch-entity';
+import { sanitizeEntity, type Sketch, type SketchEntity } from '../sketch-entity';
 import { translateEntity } from './translate-entities';
 
 export type DesignAlignKind = Exclude<SelectionAlignKind, 'centers'>;
 export type DesignDistributeKind = SelectionDistributeKind;
 
 type PositionedEntity = { readonly entity: SketchEntity; readonly box: Bounds };
+type EntityMove = { readonly entity: SketchEntity; readonly delta: Vec2 };
 
 function selectedEntities(sketch: Sketch, ids: ReadonlySet<string>): PositionedEntity[] {
-  return sketch.entities
-    .filter((entity) => ids.has(entity.id))
-    .map((entity) => ({ entity, box: entityBounds(entity) }));
+  // Match materialization: empty geometry contributes neither bounds nor an item.
+  return sketch.entities.flatMap((entity) => {
+    const clean = ids.has(entity.id) ? sanitizeEntity(entity) : null;
+    return clean === null ? [] : [{ entity: clean, box: entityBounds(clean) }];
+  });
 }
 
 /** Align against the selection's bounding box, retaining the outside edge. */
@@ -36,7 +39,12 @@ export function alignEntities(
   );
   return moveByDeltas(
     sketch,
-    new Map(selected.map(({ entity, box }) => [entity.id, alignDelta(box, reference, kind)])),
+    new Map(
+      selected.map(({ entity, box }) => [
+        entity.id,
+        { entity, delta: alignDelta(box, reference, kind) },
+      ]),
+    ),
   );
 }
 
@@ -63,28 +71,32 @@ export function distributeEntities(
     ? (position(last.box) - position(first.box)) / (sorted.length - 1)
     : (max(last.box) - min(first.box) - totalSize) / (sorted.length - 1);
   let cursor = centers ? position(first.box) + step : max(first.box) + step;
-  const deltas = new Map<string, Vec2>();
+  const deltas = new Map<string, EntityMove>();
   for (const item of sorted.slice(1, -1)) {
     const delta = cursor - position(item.box);
-    deltas.set(item.entity.id, horizontal ? { x: delta, y: 0 } : { x: 0, y: delta });
+    deltas.set(item.entity.id, {
+      entity: item.entity,
+      delta: horizontal ? { x: delta, y: 0 } : { x: 0, y: delta },
+    });
     cursor += step + (centers ? 0 : max(item.box) - min(item.box));
   }
   return moveByDeltas(sketch, deltas);
 }
 
-function moveByDeltas(sketch: Sketch, deltas: ReadonlyMap<string, Vec2>): Sketch {
+function moveByDeltas(sketch: Sketch, deltas: ReadonlyMap<string, EntityMove>): Sketch {
   let changed = false;
   const entities = sketch.entities.map((entity) => {
-    const delta = deltas.get(entity.id);
+    const move = deltas.get(entity.id);
+    if (move === undefined) return entity;
+    const { delta } = move;
     if (
-      delta === undefined ||
       !Number.isFinite(delta.x) ||
       !Number.isFinite(delta.y) ||
       (Math.abs(delta.x) < 1e-9 && Math.abs(delta.y) < 1e-9)
     )
       return entity;
     changed = true;
-    return translateEntity(entity, delta);
+    return translateEntity(move.entity, delta);
   });
   return changed ? { ...sketch, entities } : sketch;
 }
