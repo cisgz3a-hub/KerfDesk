@@ -13,11 +13,24 @@ import {
   type RemoteScope,
 } from './protocol.js';
 import { json, sameDigest } from './security.js';
-import { DevicePairing } from './pairing.js';
 import { McpRequests } from './mcp-requests.js';
 import { ControlActions } from './control-actions.js';
-import { plainObject, metadataBytes, parseEnvelope } from './device-envelope.js';
-type OwnerAttachment = { role: 'desktop'; connectionId: string };
+import { plainObject, metadataBytes } from './device-envelope.js';
+import { isPhoneAttachment } from './live.js';
+import {
+  LiveDevice,
+  controlLookupId,
+  errorResult,
+  unavailableResponse,
+  type CommandResponse,
+} from './device-live.js';
+import { MCP_PRIORITY_COMMANDS } from '../../../electron/mcp/input-schemas.js';
+type OwnerAttachment = {
+  role: 'desktop';
+  connectionId: string;
+  revision?: string;
+  machineSeq?: number;
+};
 type Pending = {
   requestId: string;
   clientId: string;
@@ -32,32 +45,9 @@ type Pending = {
   resolve: (value: CommandResponse) => void;
   timer: ReturnType<typeof setTimeout>;
 };
-type CommandResponse = {
-  result: Record<string, unknown> | null;
-  error: { code: KerfDeskMcpErrorCode; message: string } | null;
-};
-
-const errorResult = (code: KerfDeskMcpErrorCode): CommandResponse => ({
-  result: null,
-  error: { code, message: mcpErrorMessages[code] },
-});
-function controlLookupId(parsed: NonNullable<ReturnType<typeof parseCommand>>): string | undefined {
-  return parsed.name === 'get_control_operation' && 'operationId' in parsed.args
-    ? parsed.args.operationId
-    : undefined;
-}
-function unavailableResponse(
-  actions: ControlActions,
-  props: GrantProps,
-  receiptId: string | undefined,
-): CommandResponse {
-  return receiptId
-    ? { result: actions.unknown(props, receiptId), error: null }
-    : errorResult('unavailable');
-}
 
 /** Outbound desktop connection, bounded command exchanges and durable motion admission. */
-export class RemoteDevice extends DevicePairing {
+export class RemoteDevice extends LiveDevice {
   private readonly pending = new Map<string, Pending>();
   private readonly mcpRequests = new McpRequests();
   private readonly controlActions = new ControlActions(this.ctx.storage);
@@ -86,9 +76,14 @@ export class RemoteDevice extends DevicePairing {
 
   async fetch(request: Request): Promise<Response> {
     await this.ctx.blockConcurrencyWhile(() => this.pruneExpired());
+    const path = new URL(request.url).pathname;
+    if (path === '/client') return this.acceptClientSocket(request);
+    return path === '/owner' ? this.acceptOwner(request) : json({ error: 'unavailable' }, 401);
+  }
+
+  private acceptOwner(request: Request): Response {
     // The Worker sends only a digest to this private DO route. No credentials in its URL.
     if (
-      new URL(request.url).pathname !== '/owner' ||
       request.headers.get('Upgrade')?.toLowerCase() !== 'websocket' ||
       this.state === null ||
       !sameDigest(this.state.ownerDigest, request.headers.get('X-Owner-Digest') ?? '')
@@ -114,10 +109,12 @@ export class RemoteDevice extends DevicePairing {
     for (const item of this.state.clients) {
       if (item.status === 'pending' && item.claimExpiresAt > Date.now()) this.sendPairRequest(item);
     }
+    this.live.desktopOnline(true);
     return new Response(null, { status: 101, webSocket: client });
   }
 
   protected revokePending(clientId: string): void {
+    this.releaseLiveClient(clientId);
     this.controlActions.revoke(clientId);
     this.mcpRequests.revoke(clientId);
     for (const item of [...this.pending.values()])
@@ -158,6 +155,7 @@ export class RemoteDevice extends DevicePairing {
   }
 
   async cancelCommand(clientId: string, requestId: string): Promise<void> {
+    this.live.cancelWait(requestId);
     const item = this.pending.get(requestId);
     if (item?.clientId === clientId) this.finish(item, errorResult('cancelled'), true);
   }
@@ -219,6 +217,15 @@ export class RemoteDevice extends DevicePairing {
     if (!parsed || !uuid.safeParse(requestId).success) return errorResult('invalid_input');
     if (!this.commandAuthorized(props, scopes, parsed, sessionDigest))
       return errorResult('unavailable');
+    const relayed = await this.liveCommand(
+      parsed,
+      requestId,
+      props,
+      sessionDigest,
+      mcpReservation,
+      () => this.commandAuthorized(props, scopes, parsed, sessionDigest),
+    );
+    if (relayed !== null) return relayed;
     const control = await this.admitControl(props, scopes, parsed, sessionDigest);
     if (!this.commandAuthorized(props, scopes, parsed, sessionDigest))
       return errorResult('cancelled');
@@ -226,7 +233,7 @@ export class RemoteDevice extends DevicePairing {
     const controlId = control.controlId;
     const lookupId = controlLookupId(parsed);
     const owner = this.owner();
-    const priority = parsed.name === 'abort_job';
+    const priority = MCP_PRIORITY_COMMANDS.has(parsed.name);
     if (!owner || this.pending.size >= (priority ? 36 : 32) || this.pending.has(requestId))
       return unavailableResponse(this.controlActions, props, controlId ?? lookupId);
     return this.dispatch(
@@ -356,37 +363,34 @@ export class RemoteDevice extends DevicePairing {
       );
     }
   }
-  private resultAuthorized(item: Pending): boolean {
-    const props = { deviceId: '', clientId: item.clientId, leaseId: item.leaseId };
-    return (
-      this.isAuthorized(props, item.scopes) &&
-      (!item.sessionDigest ||
-        this.sessionInfo(item.clientId, item.sessionDigest).status === 'approved')
-    );
+
+  /** Anything but the owner's bounded JSON closes the desktop connection. */
+  private desktopEnvelope(
+    socket: WebSocket,
+    message: string | ArrayBuffer,
+  ): Record<string, unknown> | null {
+    const value = this.ownerEnvelope(socket, message);
+    if (value !== null) return value;
+    this.cancelConnection(socket, 'failed');
+    try {
+      socket.close(1008, 'Invalid message');
+    } catch {
+      /* Already closed. */
+    }
+    return null;
   }
   async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    if (
-      this.owner()?.socket !== socket ||
-      typeof message !== 'string' ||
-      new TextEncoder().encode(message).byteLength > MAX_BYTES
-    ) {
-      this.cancelConnection(socket, 'failed');
-      try {
-        socket.close(1008, 'Invalid message');
-      } catch {
-        /* Already closed. */
-      }
+    if (isPhoneAttachment(socket.deserializeAttachment())) {
+      this.live.phoneMessage(socket, message);
       return;
     }
-    const value = parseEnvelope(message);
-    if (value === null) {
-      socket.close(1008, 'Invalid message');
-      return;
-    }
+    const value = this.desktopEnvelope(socket, message);
+    if (value === null) return;
     if (value.type === 'result' || value.type === 'error') {
       this.handleResult(value);
       return;
     }
+    if (this.liveMessage(socket, value)) return;
     if (metadataBytes(value) > MAX_METADATA_BYTES) {
       socket.close(1008, 'Invalid metadata');
       return;
@@ -398,7 +402,11 @@ export class RemoteDevice extends DevicePairing {
     });
   }
   webSocketClose(socket: WebSocket, code: number): void {
-    this.cancelConnection(socket, 'unavailable');
+    if (isPhoneAttachment(socket.deserializeAttachment())) this.live.phoneClosed(socket);
+    else {
+      this.cancelConnection(socket, 'unavailable');
+      if (this.owner() === null) this.live.desktopOnline(false);
+    }
     try {
       socket.close(code, 'Disconnected');
     } catch {
@@ -406,6 +414,7 @@ export class RemoteDevice extends DevicePairing {
     }
   }
   webSocketError(socket: WebSocket): void {
-    this.cancelConnection(socket, 'unavailable');
+    if (isPhoneAttachment(socket.deserializeAttachment())) this.live.phoneClosed(socket);
+    else this.cancelConnection(socket, 'unavailable');
   }
 }

@@ -85,6 +85,7 @@ export type ToolMode =
   | { readonly kind: 'position-laser' }
   // LBG-T04 Trim Shapes: hover highlights a stretch of outline, a click deletes it.
   | { readonly kind: 'trim-shapes' }
+  | { readonly kind: 'extend-shapes' }
   | { readonly kind: 'draw'; readonly shape: 'rect' | 'ellipse' | 'polygon' | 'star' | 'polyline' };
 
 // Pen-tool in-progress polyline (ADR-051 B6). Null unless the pen is mid-draw.

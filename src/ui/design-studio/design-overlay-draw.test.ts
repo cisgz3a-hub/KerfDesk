@@ -21,6 +21,10 @@ function recordingContext(): {
       lineTo: record('lineTo'),
       stroke: record('stroke'),
       setLineDash: record('setLineDash'),
+      save: record('save'),
+      restore: record('restore'),
+      arc: record('arc'),
+      fill: record('fill'),
     } as unknown as CanvasRenderingContext2D,
     calls,
   };
@@ -39,6 +43,45 @@ const basePaint: DesignOverlayPaint = {
 };
 
 describe('paintDesignOverlay point sequence', () => {
+  it('draws only the proposed extension and marks its source and destination', () => {
+    const { ctx, calls } = recordingContext();
+    paintDesignOverlay(ctx, {
+      ...basePaint,
+      extendPreview: {
+        entityId: 'line',
+        end: 'end',
+        reason: 'ready',
+        from: { x: 10, y: 20 },
+        to: { x: 30, y: 20 },
+      },
+    });
+    expect(calls.filter((call) => call.op === 'moveTo')).toEqual([
+      { op: 'moveTo', args: [20, 40] },
+    ]);
+    expect(calls.filter((call) => call.op === 'lineTo')).toEqual([
+      { op: 'lineTo', args: [60, 40] },
+    ]);
+    expect(calls.filter((call) => call.op === 'arc').map((call) => call.args.slice(0, 2))).toEqual([
+      [60, 40],
+      [20, 40],
+    ]);
+  });
+
+  it('marks an unsupported endpoint without drawing a false extension', () => {
+    const { ctx, calls } = recordingContext();
+    paintDesignOverlay(ctx, {
+      ...basePaint,
+      extendPreview: {
+        entityId: 'arc',
+        end: 'end',
+        reason: 'curved-source',
+        from: { x: 10, y: 20 },
+        to: null,
+      },
+    });
+    expect(calls.filter((call) => call.op === 'lineTo')).toHaveLength(0);
+    expect(calls.filter((call) => call.op === 'arc')).toHaveLength(1);
+  });
   it('strokes confirmed Polyline segments plus the live pointer segment', () => {
     const { ctx, calls } = recordingContext();
     paintDesignOverlay(ctx, {

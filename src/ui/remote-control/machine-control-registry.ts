@@ -15,6 +15,7 @@ import {
   type BackgroundMachineAction,
 } from './machine-owned-operation';
 import { RemoteFault } from './fault';
+import { HoldDeadman, releaseHeldMotion } from './machine-hold';
 import type {
   MachineAuthority,
   MachineCommand,
@@ -48,6 +49,7 @@ export class MachineControlRegistry {
   private readonly receipts = new Map<string, Receipt>();
   private readonly operations = new Map<string, OwnedMachineOperation>();
   private readonly sources = new WeakMap<object, ProjectionSource>();
+  private readonly holds = new HoldDeadman();
   private readonly store: RemoteAppStore;
   private disposed = false;
   constructor(
@@ -83,15 +85,40 @@ export class MachineControlRegistry {
     this.retireRevokedReceipts();
     this.assertCapacity(input, caller);
     if (input.command === 'start_job') return this.approve(input, caller, authority, fingerprint);
+    if (input.command === 'jog_hold_stop') return this.stopHold(input, caller, fingerprint);
     this.assertVacant(input);
     const operation = ownMachineOperation(input, authority, this.store, this.revision);
-    if (input.command === 'abort_job')
+    if (input.command === 'abort_job') {
+      this.holds.releaseClient(null);
       for (const existing of new Set(this.operations.values()))
         cancelMachineOperation(existing, false);
+    }
     this.reserve(input.args.requestId, caller, fingerprint, operation);
+    if (input.command === 'jog_hold_start')
+      this.holds.arm(input.args.requestId, caller.clientId, operation);
     this.schedule(input, operation);
     return this.result(caller, input.args.requestId, operation, false);
   };
+  /** Heartbeat from the caller's phone socket. Unknown or foreign holds are ignored. */
+  readonly holdBeat = (clientId: string, operationId: string): boolean =>
+    !this.disposed && this.holds.beat(clientId, operationId);
+  /** Socket closed, grant lost or page hidden: stop every hold that client owns (null: all). */
+  readonly holdRelease = (clientId: string | null): void => this.holds.releaseClient(clientId);
+  readonly holdActive = (): boolean => this.holds.active();
+  private stopHold(
+    input: Extract<MachineCommand, { readonly command: 'jog_hold_stop' }>,
+    caller: RemoteCaller,
+    fingerprint: string,
+  ): RemoteCommandResult {
+    const operation =
+      this.holds.find(caller.clientId, input.args.operationId) ??
+      this.operations.get(key(caller, input.args.operationId));
+    if (operation === undefined || operation.kind !== 'hold') throw new RemoteFault('not_found');
+    this.holds.release(input.args.operationId);
+    releaseHeldMotion(operation);
+    this.reserve(input.args.requestId, caller, fingerprint, operation);
+    return this.result(caller, input.args.requestId, operation, false);
+  }
   private caller(execution: Execution): RemoteCaller {
     const caller =
       execution.remoteCaller === undefined
@@ -144,7 +171,7 @@ export class MachineControlRegistry {
       throw new RemoteFault('request_limit');
   }
   private assertVacant(input: BackgroundMachineAction): void {
-    if (input.command === 'abort_job') return;
+    if (['abort_job', 'pause_job', 'resume_job'].includes(input.command)) return;
     const activePreparation = [...new Set(this.operations.values())].some(
       (operation) =>
         !operationIsTerminal(operation) &&
@@ -293,6 +320,7 @@ export class MachineControlRegistry {
   };
   readonly dispose = (): void => {
     this.disposed = true;
+    this.holds.releaseClient(null);
     for (const operation of new Set(this.operations.values())) cancelMachineOperation(operation);
   };
 }
