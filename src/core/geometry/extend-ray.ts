@@ -1,10 +1,12 @@
 // Forward-ray contacts with canonical paths. All distances are world mm;
 // cubic roots are isolated between derivative roots so tangencies are retained.
-import { endpointArc } from '../scene/curve-path';
+import { endpointArc, type CenterArc } from '../scene/curve-path';
 import { applyTransform, type PathSegment, type Transform, type Vec2 } from '../scene';
 
 export const EXTEND_EPS_MM = 1e-7;
 export type RayContact = { readonly distance: number; readonly overlap: boolean };
+/** Canonical segment parameter, absent only for a non-unique collinear overlap. */
+export type ParametricRayContact = RayContact & { readonly parameter: number | null };
 const cross = (a: Vec2, b: Vec2): number => a.x * b.y - a.y * b.x;
 const minus = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x - b.x, y: a.y - b.y });
 const dot = (a: Vec2, b: Vec2): number => a.x * b.x + a.y * b.y;
@@ -16,6 +18,19 @@ export function segmentRayContacts(
   segment: PathSegment,
   transform: Transform,
 ): RayContact[] {
+  return segmentRayParametricContacts(origin, direction, from, segment, transform).map(
+    ({ distance, overlap }) => ({ distance, overlap }),
+  );
+}
+
+/** Shared analytic contacts for Extend and finite line/curve Trim intersections. */
+export function segmentRayParametricContacts(
+  origin: Vec2,
+  direction: Vec2,
+  from: Vec2,
+  segment: PathSegment,
+  transform: Transform,
+): ParametricRayContact[] {
   const world = (p: Vec2): Vec2 => applyTransform(p, transform);
   if (segment.kind === 'line')
     return lineContacts(origin, direction, world(from), world(segment.to));
@@ -38,13 +53,51 @@ export function segmentRayContacts(
       const values = extrema.map((t) => evaluate(alongCoefficients, t));
       return overlapContact(Math.min(...values), Math.max(...values));
     }
-    return unitRoots(sideCoefficients).flatMap((t) => contact(evaluate(alongCoefficients, t)));
+    return unitRoots(sideCoefficients).flatMap((t) => contact(evaluate(alongCoefficients, t), t));
   }
   const arc = endpointArc(from, segment);
   // A very short valid arc can lose its sweep through floating-point rounding.
   // Keep its finite chord instead of treating a zero-sign span as the whole ellipse.
   if (arc === null || arc.delta === 0)
     return lineContacts(origin, direction, world(from), world(segment.to));
+  const basis = rayArcBasis(arc, transform);
+  if (basis === null) return [];
+  const { center, u, v, determinant } = basis;
+  const local = (p: Vec2): Vec2 => ({ x: cross(p, v) / determinant, y: cross(u, p) / determinant });
+  const p = local(minus(origin, center));
+  const d = local(direction);
+  const endpoints = [world(from), world(segment.to)];
+  const start = local(minus(endpoints[0] as Vec2, center));
+  const end = local(minus(endpoints[1] as Vec2, center));
+  return quadraticRoots(dot(d, d), 2 * dot(p, d), dot(p, p) - 1).flatMap((distance) => {
+    const unitPoint = { x: p.x + distance * d.x, y: p.y + distance * d.y };
+    // Angular slack grows with radius and object scale. Outside the strict arc
+    // span, accept only float noise within the physical endpoint tolerance.
+    const point = { x: origin.x + distance * direction.x, y: origin.y + distance * direction.y };
+    const gaps = endpoints.map((end) => Math.hypot(point.x - end.x, point.y - end.y));
+    const nearestEnd = (gaps[0] as number) <= (gaps[1] as number) ? 0 : 1;
+    const atEndpoint = (gaps[nearestEnd] as number) <= EXTEND_EPS_MM;
+    if (!withinArcSpan(unitPoint, start, end, arc.delta) && !atEndpoint) return [];
+    const parameter = atEndpoint ? nearestEnd : arcParameter(unitPoint, start, arc.delta);
+    return contact(distance, parameter);
+  });
+}
+
+/** Whether an empty contact list is a solved miss, rather than an unsupported arc. */
+export function supportsParametricRayContacts(
+  from: Vec2,
+  segment: PathSegment,
+  transform: Transform,
+): boolean {
+  if (segment.kind !== 'elliptical-arc') return true;
+  const arc = endpointArc(from, segment);
+  return arc === null || arc.delta === 0 || rayArcBasis(arc, transform) !== null;
+}
+
+function rayArcBasis(arc: CenterArc, transform: Transform) {
+  // Rotation can leave a tiny nonzero floating determinant for a collapsed axis.
+  if (transform.scaleX === 0 || transform.scaleY === 0) return null;
+  const world = (p: Vec2): Vec2 => applyTransform(p, transform);
   const center = world(arc.center);
   const cos = Math.cos(arc.rotationRad);
   const sin = Math.sin(arc.rotationRad);
@@ -57,33 +110,17 @@ export function segmentRayContacts(
     center,
   );
   const determinant = cross(u, v);
-  if (determinant === 0 || !Number.isFinite(determinant)) return [];
-  const local = (p: Vec2): Vec2 => ({ x: cross(p, v) / determinant, y: cross(u, p) / determinant });
-  const p = local(minus(origin, center));
-  const d = local(direction);
-  const endpoints = [world(from), world(segment.to)];
-  const start = local(minus(endpoints[0] as Vec2, center));
-  const end = local(minus(endpoints[1] as Vec2, center));
-  return quadraticRoots(dot(d, d), 2 * dot(p, d), dot(p, p) - 1).flatMap((distance) => {
-    const unitPoint = { x: p.x + distance * d.x, y: p.y + distance * d.y };
-    // Angular slack grows with radius and object scale. Outside the strict arc
-    // span, accept only float noise within the physical endpoint tolerance.
-    const point = { x: origin.x + distance * direction.x, y: origin.y + distance * direction.y };
-    const onArc =
-      withinArcSpan(unitPoint, start, end, arc.delta) ||
-      endpoints.some((end) => Math.hypot(point.x - end.x, point.y - end.y) <= EXTEND_EPS_MM);
-    return onArc ? contact(distance) : [];
-  });
+  return determinant === 0 || !Number.isFinite(determinant) ? null : { center, u, v, determinant };
 }
 
-function lineContacts(origin: Vec2, direction: Vec2, a: Vec2, b: Vec2): RayContact[] {
+function lineContacts(origin: Vec2, direction: Vec2, a: Vec2, b: Vec2): ParametricRayContact[] {
   const edge = minus(b, a);
   const offset = minus(a, origin);
   const length = Math.hypot(edge.x, edge.y);
   const denominator = cross(direction, edge);
   if (length <= EXTEND_EPS_MM)
     return Math.abs(cross(offset, direction)) <= EXTEND_EPS_MM
-      ? contact(dot(offset, direction))
+      ? contact(dot(offset, direction), 0)
       : [];
   if (Math.abs(denominator) <= 1e-12 * length) {
     if (Math.abs(cross(offset, direction)) > EXTEND_EPS_MM) return [];
@@ -94,18 +131,18 @@ function lineContacts(origin: Vec2, direction: Vec2, a: Vec2, b: Vec2): RayConta
   const t = cross(offset, direction) / denominator;
   return t < -EXTEND_EPS_MM / length || t > 1 + EXTEND_EPS_MM / length
     ? []
-    : contact(cross(offset, edge) / denominator);
+    : contact(cross(offset, edge) / denominator, Math.min(1, Math.max(0, t)));
 }
 
-function contact(distance: number): RayContact[] {
+function contact(distance: number, parameter: number): ParametricRayContact[] {
   return Number.isFinite(distance) && distance >= -EXTEND_EPS_MM
-    ? [{ distance: Math.max(0, distance), overlap: false }]
+    ? [{ distance: Math.max(0, distance), overlap: false, parameter }]
     : [];
 }
-function overlapContact(min: number, max: number): RayContact[] {
+function overlapContact(min: number, max: number): ParametricRayContact[] {
   if (max < -EXTEND_EPS_MM) return [];
   const distance = Math.max(0, min);
-  return [{ distance, overlap: max - distance > EXTEND_EPS_MM }];
+  return [{ distance, overlap: max - distance > EXTEND_EPS_MM, parameter: null }];
 }
 function withinArcSpan(point: Vec2, start: Vec2, end: Vec2, delta: number): boolean {
   // Avoid atan2/subtraction/modulo rounding a tiny off-end angle onto a seam.
@@ -113,6 +150,13 @@ function withinArcSpan(point: Vec2, start: Vec2, end: Vec2, delta: number): bool
   const fromStart = Math.sign(delta) * cross(start, point);
   const toEnd = Math.sign(delta) * cross(point, end);
   return Math.abs(delta) <= Math.PI ? fromStart >= 0 && toEnd >= 0 : fromStart >= 0 || toEnd >= 0;
+}
+
+function arcParameter(point: Vec2, start: Vec2, delta: number): number {
+  const angle = Math.sign(delta) * Math.atan2(cross(start, point), dot(start, point));
+  // Preserve small positive angles instead of losing them when adding 2π.
+  const travel = angle < 0 ? angle + Math.PI * 2 : angle;
+  return Math.min(1, Math.max(0, travel / Math.abs(delta)));
 }
 
 type CubicCoefficients = readonly [number, number, number, number];
