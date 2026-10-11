@@ -9062,6 +9062,17 @@ again.
 2. Construction guides are excluded from output every time; they exist to design
    against, not to cut.
 
+#### Capacity — large photos and inactive sheets
+
+An active photo can retain up to 128 MiB of editable layer pixels. Inactive
+sheets, production variants and retained-array snapshots share a separate
+50-million-character archive budget (ADR-570). Large layered photos, and large
+flattened images, can fit the active project but exceed that archive budget.
+**Add Sheet** or switching sheets then reports the archive limit and keeps the
+current artwork, editable source, selection and history unchanged. Save that
+working sheet as a separate project to retain the full-size source; reducing a
+copy's size or layer count is optional.
+
 ### F-DS9. Snap to existing geometry (DS-4)
 
 1. With **Snap** on, moving the pointer near existing geometry captures it on the
