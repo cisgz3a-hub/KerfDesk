@@ -86,7 +86,13 @@ export function importLightBurnProjectDocument(
   });
   const geometry = importLbrnGeometry(root, sourceName, frame);
   if (geometry.objects.length === 0) {
-    return { ok: false, reason: 'LightBurn project contains no supported vector geometry.' };
+    return {
+      ok: false,
+      reason: [
+        'LightBurn project contains no supported vector geometry.',
+        ...geometry.warnings,
+      ].join(' '),
+    };
   }
   const layerImport = importedLayers(
     root,

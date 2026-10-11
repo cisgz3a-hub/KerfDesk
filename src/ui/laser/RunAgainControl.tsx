@@ -44,11 +44,12 @@ export function RunAgainControl(props: Props): JSX.Element | null {
   useLaserStore((state) => state.trustedPositionEpoch);
   useExperimentalLaserFeatures((state) => state.features.printAndCut);
 
+  // The signature fingerprints the whole job, so with no receipt to compare it
+  // against it is not worth computing on every edit.
+  if (receipt === null) return null;
   const registration = currentPrintCutOutputRegistration(app.project);
   const currentSignature = currentReplayExecutionSignature(app, registration);
-  const eligible = receipt !== null && receipt.artifact.executionSignature === currentSignature;
-
-  if (!eligible || receipt === null) return null;
+  if (receipt.artifact.executionSignature !== currentSignature) return null;
   const framedReady = framedRunReadinessIssue(currentCompletedFrame(laser), app, laser) === null;
 
   const runAgain = async (): Promise<void> => {

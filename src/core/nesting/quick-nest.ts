@@ -51,7 +51,7 @@ export function quickNest(
   let free = insetRect(bin, inset);
   if (free.length === 0) return { ok: false, unplacedIds: items.map((item) => item.id) };
   for (const obstacle of options.obstacles ?? []) {
-    free = subtractUsed(free, expandRect(obstacle, inset));
+    free = subtractUsedFreeRects(free, expandRect(obstacle, inset));
   }
   const ordered = orderNestItems(items, options.itemOrder);
   const placements: NestPlacement[] = [];
@@ -69,7 +69,7 @@ export function quickNest(
       rotated90: candidate.rotated90,
       ...(candidate.rotationDeg === undefined ? {} : { rotationDeg: candidate.rotationDeg }),
     });
-    free = subtractUsed(free, candidate.packed);
+    free = subtractUsedFreeRects(free, candidate.packed);
   }
   return unplacedIds.length === 0 ? { ok: true, placements } : { ok: false, unplacedIds };
 }
@@ -113,8 +113,38 @@ function bestCandidate(
   return best;
 }
 
-function subtractUsed(freeRects: ReadonlyArray<NestRect>, used: NestRect): NestRect[] {
-  return pruneContained(freeRects.flatMap((free) => splitFreeRect(free, used)));
+/**
+ * Split every free rectangle the used one overlaps, then drop each rectangle
+ * another one contains. The incoming rectangles were already pruned that way,
+ * so an untouched one is never contained by another untouched one, nor by a
+ * piece, which lies inside the rectangle it was cut from. Only the new pieces
+ * need checking, which keeps a placement linear in the free rectangles rather
+ * than quadratic. The result, order included, is the all-pairs prune's.
+ */
+export function subtractUsedFreeRects(
+  freeRects: ReadonlyArray<NestRect>,
+  used: NestRect,
+): NestRect[] {
+  const next: NestRect[] = [];
+  const pieces: number[] = [];
+  for (const free of freeRects) {
+    if (!intersects(free, used)) {
+      next.push(free);
+      continue;
+    }
+    for (const piece of splitFreeRect(free, used)) {
+      pieces.push(next.length);
+      next.push(piece);
+    }
+  }
+  const dropped = new Set<number>();
+  for (const index of pieces) {
+    const piece = next[index] as NestRect;
+    if (next.some((other, otherIndex) => otherIndex !== index && contains(other, piece))) {
+      dropped.add(index);
+    }
+  }
+  return dropped.size === 0 ? next : next.filter((_, index) => !dropped.has(index));
 }
 
 function splitFreeRect(free: NestRect, used: NestRect): NestRect[] {
@@ -125,13 +155,6 @@ function splitFreeRect(free: NestRect, used: NestRect): NestRect[] {
   if (used.minY > free.minY) pieces.push({ ...free, maxY: Math.min(used.minY, free.maxY) });
   if (used.maxY < free.maxY) pieces.push({ ...free, minY: Math.max(used.maxY, free.minY) });
   return pieces.filter(validRect);
-}
-
-function pruneContained(rects: ReadonlyArray<NestRect>): NestRect[] {
-  return rects.filter(
-    (rect, index) =>
-      !rects.some((other, otherIndex) => otherIndex !== index && contains(other, rect)),
-  );
 }
 
 function compareItems(a: NestItem, b: NestItem): number {

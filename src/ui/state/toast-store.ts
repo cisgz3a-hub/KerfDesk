@@ -25,12 +25,17 @@ export type Toast = {
   readonly id: string;
   readonly message: string;
   readonly variant: ToastVariant;
+  /** A keyed toast is one slot: pushing the same key again rewrites it. */
+  readonly key?: string;
 };
+
+export type ToastOptions = { readonly key?: string };
 
 type ToastState = {
   readonly toasts: ReadonlyArray<Toast>;
-  readonly pushToast: (message: string, variant?: ToastVariant) => void;
+  readonly pushToast: (message: string, variant?: ToastVariant, options?: ToastOptions) => void;
   readonly dismissToast: (id: string) => void;
+  readonly dismissToastKey: (key: string) => void;
 };
 
 // Active auto-dismiss timers, keyed by toast id. Held outside the store
@@ -44,20 +49,26 @@ const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
-  pushToast: (message, variant = 'info') => {
+  pushToast: (message, variant = 'info', options = {}) => {
+    const { key } = options;
+    const existing = key === undefined ? undefined : get().toasts.find((t) => t.key === key);
+    if (existing !== undefined) {
+      // Same slot, new text: progress reads as one updating line, not a stack.
+      clearTimeout(timers.get(existing.id));
+      set((s) => ({
+        toasts: s.toasts.map((t) => (t.id === existing.id ? { ...t, message, variant } : t)),
+      }));
+      scheduleDismiss(existing.id, variant, get);
+      return;
+    }
     const id =
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
         : `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    set((s) => ({ toasts: [...s.toasts, { id, message, variant }] }));
-    // Schedule auto-dismiss out of band — toast lifetime is decoupled from
-    // React commit cycles so a fast burst of toasts doesn't extend each
-    // other's lifetimes.
-    const handle = setTimeout(() => {
-      timers.delete(id);
-      get().dismissToast(id);
-    }, AUTO_DISMISS_MS[variant]);
-    timers.set(id, handle);
+    set((s) => ({
+      toasts: [...s.toasts, { id, message, variant, ...(key === undefined ? {} : { key }) }],
+    }));
+    scheduleDismiss(id, variant, get);
   },
   dismissToast: (id) => {
     const handle = timers.get(id);
@@ -67,4 +78,19 @@ export const useToastStore = create<ToastState>((set, get) => ({
     }
     set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
   },
+  dismissToastKey: (key) => {
+    const keyed = get().toasts.find((t) => t.key === key);
+    if (keyed !== undefined) get().dismissToast(keyed.id);
+  },
 }));
+
+function scheduleDismiss(id: string, variant: ToastVariant, get: () => ToastState): void {
+  // Schedule auto-dismiss out of band — toast lifetime is decoupled from
+  // React commit cycles so a fast burst of toasts doesn't extend each
+  // other's lifetimes.
+  const handle = setTimeout(() => {
+    timers.delete(id);
+    get().dismissToast(id);
+  }, AUTO_DISMISS_MS[variant]);
+  timers.set(id, handle);
+}

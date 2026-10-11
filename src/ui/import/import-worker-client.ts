@@ -149,8 +149,10 @@ function request<K extends ResultKind, R>(
     });
     options.signal?.addEventListener('abort', handleAbort, { once: true });
     requestQueue.push(id);
-    reportQueuePositions();
+    // Start first: a request the idle worker takes at once was never queued,
+    // and reporting it as "queued behind 1" misled the operator.
     startNextRequest();
+    reportQueuePositions();
   });
 }
 

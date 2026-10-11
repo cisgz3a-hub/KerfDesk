@@ -67,6 +67,22 @@ describe('parseStlBlob', () => {
     expect(Array.from(result.mesh.positions)).toEqual([0, 0, 0, 2, 0, 1e39, 0, 3, 4]);
   });
 
+  it.each([Number.NaN, Number.POSITIVE_INFINITY])(
+    'refuses a binary vertex coordinate of %s',
+    async (bad) => {
+      const bytes = binaryStl(3);
+      new DataView(bytes.buffer).setFloat32(84 + 50 + 12 + 8, bad, true);
+
+      const result = await parseStlBlob(new NodeBlob([bytes]) as unknown as Blob);
+
+      expect(result).toEqual({
+        kind: 'error',
+        reason:
+          'Binary STL triangle 2 has a vertex coordinate that is not a finite number; the file may be damaged.',
+      });
+    },
+  );
+
   it('preserves the binary size-integrity diagnosis before allocating positions', async () => {
     const truncated = binaryStl(2).slice(0, -10);
 

@@ -1,6 +1,10 @@
 import { FLOATS_PER_TRIANGLE } from '../../core/relief';
 import { readBlobLines, type BlobReadProgress } from '../blob-line-reader';
-import { BINARY_STL_HEADER_BYTES, BINARY_STL_RECORD_BYTES } from './parse-stl-binary';
+import {
+  BINARY_STL_HEADER_BYTES,
+  BINARY_STL_RECORD_BYTES,
+  nonFiniteVertexReason,
+} from './parse-stl-binary';
 import type { ParseStlResult } from './parse-stl';
 
 const COUNT_BYTES = 4;
@@ -55,7 +59,9 @@ async function parseBinaryBlob(
       recordBytes += take;
       offset += take;
       if (recordBytes === BINARY_STL_RECORD_BYTES) {
-        writeBinaryTriangle(record, positions, triangle);
+        if (!writeBinaryTriangle(record, positions, triangle)) {
+          return { kind: 'error', reason: nonFiniteVertexReason(triangle) };
+        }
         triangle += 1;
         recordBytes = 0;
       }
@@ -66,12 +72,20 @@ async function parseBinaryBlob(
   return { kind: 'ok', mesh: { positions }, format: 'binary' };
 }
 
-function writeBinaryTriangle(record: Uint8Array, positions: Float32Array, triangle: number): void {
+// False when a vertex coordinate is NaN or infinite.
+function writeBinaryTriangle(
+  record: Uint8Array,
+  positions: Float32Array,
+  triangle: number,
+): boolean {
   const view = new DataView(record.buffer, record.byteOffset, record.byteLength);
   const outputBase = triangle * FLOATS_PER_TRIANGLE;
   for (let value = 0; value < FLOATS_PER_TRIANGLE; value += 1) {
-    positions[outputBase + value] = view.getFloat32(12 + value * 4, true);
+    const coordinate = view.getFloat32(12 + value * 4, true);
+    if (!Number.isFinite(coordinate)) return false;
+    positions[outputBase + value] = coordinate;
   }
+  return true;
 }
 
 async function parseAsciiBlob(
