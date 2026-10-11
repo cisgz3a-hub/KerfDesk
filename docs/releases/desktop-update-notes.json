@@ -6,7 +6,7 @@
     "Extend open artwork to the next boundary with a hover preview and Undo. Workspace curve ends extend along their tangent; Design Studio supports straight source ends and curved boundaries.",
     "KerfDesk Remote brings phone and MCP access into one interface, with artwork editing, layer controls, remembered phones and machine status. Remote controls handle held-jog release and connection ownership more reliably.",
     "SVG imports preserve child opacity overrides, raster outlines survive pixel rounding, and closed contours join at the correct corner. Node drags and snapping follow the node you grab.",
-    "Material presets retain their identity and process settings. Camera addresses and restored board sizes survive preview updates. Imported G-code keeps its playback timing, including dwells, and variable counters stay within saved-project limits.",
+    "Presets retain their identity and process settings. Camera addresses and restored board sizes survive preview updates. Imported G-code keeps its playback timing, including dwells, and variable counters stay within saved-project limits.",
     "CNC manual tabs survive explicit operation bindings. Manual Zero Z evidence stays with the tool and reference that initiated it, and helical pocket checks test the complete ring inside concave boundaries."
   ]
 }
