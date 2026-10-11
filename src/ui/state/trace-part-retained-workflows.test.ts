@@ -48,13 +48,15 @@ it('retains every contour in an ungrouped production part after splitting and re
   expect(useStore.getState().project).toBe(after);
 });
 
-function recipeTrace(): Project {
+function recipeTrace(includeEmptyPaths = false): Project {
   const project = recipeProject(true);
+  const paths = [
+    { ...rings(), operationIds: ['cut'] },
+    { color: rings().color, polylines: [square(130)], operationIds: ['fill'] },
+  ];
+  const empty = { color: rings().color, polylines: [], operationIds: ['disabled'] };
   const object = {
-    ...trace([
-      { ...rings(), operationIds: ['cut'] },
-      { color: rings().color, polylines: [square(130)], operationIds: ['fill'] },
-    ]),
+    ...trace(includeEmptyPaths ? [...paths.flatMap((path) => [empty, path]), empty] : paths),
     name: 'Artwork',
   };
   const source = { ...project, scene: { ...project.scene, objects: [object] } };
@@ -70,13 +72,20 @@ function recipeTrace(): Project {
   return result.value;
 }
 
-it.each([0, 1])(
-  'retains recipe path baselines when splitting path %s and reapplies a new step to both pieces',
-  (pathIndex) => {
-    useStore.setState({ project: recipeTrace() });
+it.each([
+  [0, false],
+  [1, false],
+  [0, true],
+  [1, true],
+] as const)(
+  'retains recipe baselines splitting path %s with empty paths=%s and reapplies to both pieces',
+  (pickedPath, includeEmptyPaths) => {
+    const pathIndex = includeEmptyPaths ? pickedPath * 2 + 1 : pickedPath;
+    useStore.setState({ project: recipeTrace(includeEmptyPaths) });
     const before = useStore.getState().project;
+    expect(deserializeProject(serializeProject(before)).kind).toBe('ok');
     const original = before.processRecipeApplications![0]!;
-    const id = useStore.getState().detachTracePart('trace', pathIndex, pathIndex === 0 ? 2 : 0)!;
+    const id = useStore.getState().detachTracePart('trace', pathIndex, pickedPath === 0 ? 2 : 0)!;
     const split = useStore.getState().project;
     const application = split.processRecipeApplications![0]!;
     expect(application.objectIds).toEqual(['trace', id]);
@@ -86,10 +95,11 @@ it.each([0, 1])(
     const remainderPaths = application.bindings.find(
       (binding) => binding.objectId === 'trace',
     )?.pathOperationIds;
+    const survivingPaths = (pickedPath === 0 ? [0, 1] : [0]).map((index) =>
+      includeEmptyPaths ? index * 2 + 1 : index,
+    );
     expect(remainderPaths).toEqual(
-      pathIndex === 0
-        ? original.bindings[0]!.pathOperationIds
-        : [original.bindings[0]!.pathOperationIds![0]],
+      survivingPaths.map((index) => original.bindings[0]!.pathOperationIds![index]),
     );
     const recipe = {
       ...application.recipe,

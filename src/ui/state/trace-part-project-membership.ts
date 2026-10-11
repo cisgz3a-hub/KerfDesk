@@ -33,6 +33,7 @@ export function withTracePartMembership(
   const nest = project.productionNest;
   const applications = project.processRecipeApplications;
   const cncSetup = expandedSides(project.cncSetup, expand);
+  const remainderPathIndices = survivingPathIndices(source, remainder, pathIndex);
   return {
     ...project,
     ...(cncSetup === undefined || cncSetup === project.cncSetup ? {} : { cncSetup }),
@@ -57,16 +58,7 @@ export function withTracePartMembership(
                 binding.objectId !== source.id
                   ? [binding]
                   : [
-                      subsetBinding(
-                        binding,
-                        remainder.id,
-                        source.paths
-                          .map((_, index) => index)
-                          .filter(
-                            (index) =>
-                              source.paths.length === remainder.paths.length || index !== pathIndex,
-                          ),
-                      ),
+                      subsetBinding(binding, remainder.id, remainderPathIndices),
                       subsetBinding(binding, part.id, [pathIndex]),
                     ],
               ),
@@ -74,6 +66,21 @@ export function withTracePartMembership(
           }),
         }),
   };
+}
+
+function survivingPathIndices(
+  source: TracedImage,
+  remainder: TracedImage,
+  pickedPathIndex: number,
+): readonly number[] {
+  // Geometry retains untouched path references, drops empty paths, and creates
+  // a new path only when some of the picked path remains after extraction.
+  const original = new Set(source.paths);
+  const retained = new Set(remainder.paths);
+  const pickedRemains = remainder.paths.some((path) => !original.has(path));
+  return source.paths.flatMap((path, index) =>
+    (index === pickedPathIndex ? pickedRemains : retained.has(path)) ? [index] : [],
+  );
 }
 
 /** Reuse the file's existing retained-intent limits before committing a split. */
