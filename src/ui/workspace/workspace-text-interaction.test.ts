@@ -122,6 +122,49 @@ describe('canvas text pointer routing', () => {
 });
 
 describe('canvas text double-click routing', () => {
+  it.each(['traced-image', 'text'] as const)(
+    'edits the double-clicked %s rather than an earlier member of its group',
+    (kind) => {
+      const text = textObject('target');
+      const target =
+        kind === 'text'
+          ? text
+          : {
+              id: text.id,
+              kind,
+              source: 'trace.png',
+              paths: text.paths,
+              bounds: text.bounds,
+              transform: text.transform,
+            };
+      const other = {
+        ...textObject('earlier'),
+        transform: { ...IDENTITY_TRANSFORM, x: 220, y: 220 },
+      };
+      const project: Project = {
+        ...projectWithText(other),
+        scene: {
+          objects: [other, target],
+          layers: [createLayer({ id: 'text-operation', color: '#ff0000', mode: 'fill' })],
+          groups: [{ id: 'group', name: 'Artwork', objectIds: [other.id, target.id] }],
+        },
+      };
+      const { canvas } = pointerHarness(project);
+      useUiStore.setState({ toolMode: { kind: 'select' }, ...VIEW });
+      handleCanvasDoubleClick({
+        ...pointerAt(project, applyTransform({ x: 8, y: 4 }, target.transform)),
+        detail: 2,
+        currentTarget: canvas,
+      });
+      if (kind === 'traced-image') {
+        expect(useUiStore.getState().toolMode.kind).toBe('trace-parts');
+        expect(useCanvasTextStore.getState().session).toBeNull();
+        expect(useStore.getState().selectedObjectId).toBeNull();
+      } else expect(useCanvasTextStore.getState().session?.original).toBe(target);
+      expect(useStore.getState().undoStack).toHaveLength(0);
+    },
+  );
+
   it('edits the actual hit instead of a different primary object in a selection', () => {
     const object = textObject('target');
     const other = {

@@ -22,6 +22,7 @@ import { beginDrawDrag } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
 import { beginPathNodeDrag } from './path-node-drag';
+import { beginTracePartDrag } from './trace-part-tool';
 import { hitCncTabAnchor } from './cnc-tab-editor';
 import { finishLaserTabDrag } from './laser-tab-editor';
 import { beginHandleToolDrag } from './handle-tool-drag';
@@ -190,6 +191,7 @@ function beginWorkspaceDrag(args: {
   readonly selectionAnchor: SelectionAnchor;
 }): DragState | null {
   if (!args.previewMode && args.e.button === 0 && !useUiStore.getState().spaceDown) {
+    if (args.toolMode.kind === 'trace-parts') return beginTracePartDrag(args);
     const tool = beginToolDrag(args);
     if (tool.kind === 'handled') return tool.drag;
   }

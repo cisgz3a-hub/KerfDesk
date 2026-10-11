@@ -43,6 +43,8 @@ export type MoveStartTransform = {
 export type DragState =
   | {
       readonly kind: 'move';
+      /** A part pick snapshots before separating geometry, so the drag shares its undo. */
+      readonly interactionStarted?: boolean;
       readonly objectId: string;
       readonly startScenePoint: Vec2;
       readonly startTx: number;
@@ -252,7 +254,7 @@ function pickSelectionRotateDrag(args: {
 
 // Resolve any handle-based drag from a mouse-down: the multi-selection rotate
 // or scale handles first, then a single object's own scale/rotate handles.
-function pickHandleOrRotateDrag(args: {
+export function pickHandleOrRotateDrag(args: {
   readonly selectedObjects: ReadonlyArray<SceneObject>;
   readonly selectedObj: SceneObject | undefined;
   readonly selectedObjectId: string | null;

@@ -1,0 +1,22 @@
+.lf-trace-parts-hint {
+  position: absolute;
+  left: 12px;
+  bottom: 52px;
+  z-index: 8;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: min(480px, calc(100% - 24px));
+  padding: 8px 12px;
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+  color: var(--lf-text);
+  background: var(--lf-bg-1);
+  box-shadow: var(--lf-shadow);
+  font-size: 12px;
+}
+
+.lf-trace-parts-hint > span {
+  flex-basis: 100%;
+}

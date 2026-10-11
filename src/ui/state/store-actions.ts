@@ -27,6 +27,7 @@ import {
 } from './cnc-machine-setup-scene';
 import { projectWithParkedCnc } from './parked-cnc-machine';
 import { captureSetupHistoryContext, setupHistoryContextFor } from './setup-history-context';
+import { tracePartHistorySelection } from './trace-part-history';
 import { machineSetupActions } from './machine-setup-actions';
 import { synchronizeCncTabCount } from './cnc-tab-count-sync';
 import { sceneWithModeSwitchRecipe } from './laser-recipe-seeding';
@@ -180,7 +181,10 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           // Keep the selection whose ids still resolve to a live object in the
           // restored scene (CNV-13); node selection is cleared because its
           // indices reference the pre-restore geometry.
-          ...withCarriedReference(s, visibleSelectionState(s, prev)),
+          ...withCarriedReference(
+            s,
+            visibleSelectionState(tracePartHistorySelection(s, prev) ?? s, prev),
+          ),
           selectedPathNode: null,
           selectedPathNodes: [],
           registrationArtworkOutputSnapshot: null,
@@ -201,7 +205,10 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           undoStack: limitProjectHistory([...s.undoStack, s.project]),
           // Symmetric with undo: keep the selection that still resolves in the
           // restored scene (CNV-13); node selection is cleared (stale indices).
-          ...withCarriedReference(s, visibleSelectionState(s, next)),
+          ...withCarriedReference(
+            s,
+            visibleSelectionState(tracePartHistorySelection(s, next) ?? s, next),
+          ),
           selectedPathNode: null,
           selectedPathNodes: [],
           registrationArtworkOutputSnapshot: null,
