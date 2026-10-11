@@ -508,5 +508,18 @@
     "group": "console-coordinate-effects",
     "localEvidence": "docs/audits/2026-10-11-pr-history/batch-05/console-wcs-finding.json",
     "repairReport": "docs/audits/2026-10-11-pr-history/batch-05/repair-console-author.json"
+  },
+  {
+    "id": "B05-CONSOLE-004",
+    "priority": 2,
+    "title": "Fractional Console tool words preserve stale work-Z evidence",
+    "originPr": 94,
+    "discoveredDuringPr": 94,
+    "trigger": "Send accepted GRBL T2.5, T+002.5 or T 2 . 5, alone or combined with G92 X0.",
+    "impact": "Accepted numeric tool identity changes preserve work-Z proof and reference epoch, unlike equivalent canonical T2. This is inconsistent coordinate-evidence invalidation; stock GRBL only tracks the tool number, so no physical tool-motion claim is made.",
+    "attribution": "Original PR94 tool regex admits integer T words only; the first batch05 lexical normalization still retained that restriction.",
+    "group": "console-coordinate-effects",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-finding.json",
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-author.json"
   }
 ]

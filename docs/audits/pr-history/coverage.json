@@ -1,6 +1,6 @@
 {
   "repository": "cisgz3a-hub/KerfDesk",
-  "inventoryRefreshedAt": "2026-10-11T12:37:55.472Z",
+  "inventoryRefreshedAt": "2026-10-11T12:46:13.062Z",
   "snapshot": "Live GitHub paginated pull-request inventory, all authors and states",
   "definitions": {
     "full-diff": "Changed diff inspected within stated scope; not whole-feature, upstream-dependency, hosted or hardware qualification",
@@ -8,7 +8,7 @@
     "not-started": "Inventory only; no code review claimed"
   },
   "counts": {
-    "full-diff": 61,
+    "full-diff": 62,
     "partial": 50,
     "not-started": 1045
   },
@@ -25367,15 +25367,6 @@
         ],
         "remaining": [],
         "limitations": "Documentation and workflow record. CI applies only to its recorded head and does not complete the historical audit or qualify product deployment/hardware."
-      },
-      "ciSnapshot": {
-        "head": "7c09d6559187e51ccb20da23829e1dff1ee13d3c",
-        "status": "passed",
-        "checkedAt": "2026-10-11T12:38:37.550Z",
-        "matchesInventoriedHead": true,
-        "absentRequired": [],
-        "unmetRequired": [],
-        "source": "state.json:ledgerCi"
       }
     },
     {
@@ -25414,15 +25405,15 @@
       "title": "Add endpoint Extend with tangent preview and Undo",
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1153",
       "state": "open",
-      "draft": false,
+      "draft": true,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T10:49:24Z",
-      "updated_at": "2026-10-11T12:34:38Z",
+      "updated_at": "2026-10-11T12:45:07Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "8cc3e88866484cab76f964299fc6e2bb7e24e4de",
-      "head": "85b1e131ea8206c5db3faae9e47317c744ba3f62",
-      "base": "8214c10fb6621f47f5e9bea250f1dccce074d426",
+      "merge_commit_sha": "6b75d716bc902123a5a1a23836bb08bda0f57fa4",
+      "head": "f18bc5981e1d2a8f78362103ff6fb2083e55fb57",
+      "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "review": {
         "coverage": "not-started",
         "report": null,
@@ -25437,7 +25428,12 @@
               "report": null,
               "previousReview": {
                 "coverage": "not-started",
-                "report": null
+                "report": null,
+                "previousReview": {
+                  "coverage": "not-started",
+                  "report": null
+                },
+                "reason": "Open PR head changed since the recorded review"
               },
               "reason": "Open PR head changed since the recorded review"
             },
@@ -25456,15 +25452,20 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T10:56:49Z",
-      "updated_at": "2026-10-11T11:01:43Z",
+      "updated_at": "2026-10-11T12:46:10Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "fadba3f850394bcd897c652887734598cfa919d2",
-      "head": "b3ab325692ec65b652cf5b80d2ada75e892aea35",
-      "base": "59e88f1b23d641bcdc727826d346a35a7fd9c403",
+      "merge_commit_sha": "ecd93af123ba5c0f2ad2f510daddf51f53b9b9f3",
+      "head": "53d80c01ded2f236a27588616a9d21566ae091f1",
+      "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "review": {
         "coverage": "not-started",
-        "report": null
+        "report": null,
+        "previousReview": {
+          "coverage": "not-started",
+          "report": null
+        },
+        "reason": "Open PR head changed since the recorded review"
       }
     },
     {
@@ -25542,18 +25543,23 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T11:38:41Z",
-      "updated_at": "2026-10-11T12:22:58Z",
+      "updated_at": "2026-10-11T12:38:59Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "9bc57b8ba3d11451e90c1d496f93528cd53b7456",
-      "head": "942e0c8ef165d67d84a0eeacd920b9e6de4b0f93",
-      "base": "8214c10fb6621f47f5e9bea250f1dccce074d426",
+      "merge_commit_sha": "f966f26fd2d91e89b21489edd21006239eaeda5f",
+      "head": "352da8328a451af989ff01bb0856b7eed82db719",
+      "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "review": {
         "coverage": "not-started",
         "report": null,
         "previousReview": {
           "coverage": "not-started",
-          "report": null
+          "report": null,
+          "previousReview": {
+            "coverage": "not-started",
+            "report": null
+          },
+          "reason": "Open PR head changed since the recorded review"
         },
         "reason": "Open PR head changed since the recorded review"
       }
@@ -25604,7 +25610,7 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T12:30:38Z",
-      "updated_at": "2026-10-11T12:37:40Z",
+      "updated_at": "2026-10-11T12:40:55Z",
       "closed_at": null,
       "merged_at": null,
       "merge_commit_sha": "8d4662c734349247bff6e02159af9c61e25edd5d",
@@ -25630,7 +25636,7 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T12:33:59Z",
-      "updated_at": "2026-10-11T12:37:28Z",
+      "updated_at": "2026-10-11T12:40:38Z",
       "closed_at": null,
       "merged_at": null,
       "merge_commit_sha": "0e2694efa609190dd2c2e52a5185fd6ab4b0b5b6",
@@ -25652,6 +25658,61 @@
         "remaining": [],
         "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
         "repairGroup": "console-coordinate-effects"
+      }
+    },
+    {
+      "number": 1163,
+      "title": "Track audit batch five and coordinate/output repairs",
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1163",
+      "state": "open",
+      "draft": false,
+      "author": "cisgz3a-hub",
+      "created_at": "2026-10-11T12:42:53Z",
+      "updated_at": "2026-10-11T12:43:03Z",
+      "closed_at": null,
+      "merged_at": null,
+      "merge_commit_sha": "519b1f91ad303a67b18a3849377aa98cc6ced14a",
+      "head": "0710628dd0f9ee3edd3cca45cda04be4e918e9f6",
+      "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
+      "review": {
+        "coverage": "full-diff",
+        "report": "docs/audits/2026-10-11-pr-history/publication/batch05-ledger-published-review.json",
+        "reviewer": "/root/batch05_a",
+        "reviewedHead": "0710628dd0f9ee3edd3cca45cda04be4e918e9f6",
+        "reviewedFiles": [
+          "docs/audits/pr-history/DISPOSITIONS.md",
+          "docs/audits/pr-history/FINDINGS.md",
+          "docs/audits/pr-history/STATUS.md",
+          "docs/audits/pr-history/coverage.json",
+          "docs/audits/pr-history/dispositions.json",
+          "docs/audits/pr-history/findings.json",
+          "docs/audits/pr-history/repairs.json",
+          "docs/audits/pr-history/state.json"
+        ],
+        "changedFileCount": 8,
+        "frozenSnapshotFiles": [
+          "docs/audits/pr-history/DISPOSITIONS.md",
+          "docs/audits/pr-history/FINDINGS.md",
+          "docs/audits/pr-history/README.md",
+          "docs/audits/pr-history/STATUS.md",
+          "docs/audits/pr-history/coverage.json",
+          "docs/audits/pr-history/dispositions.json",
+          "docs/audits/pr-history/findings.json",
+          "docs/audits/pr-history/repairs.json",
+          "docs/audits/pr-history/state.json"
+        ],
+        "remaining": [],
+        "scope": "Complete tracking diff and frozen snapshot independently reviewed at reviewedHead. Source-review coverage and per-head CI are separate; see ciSnapshot and state.json:ledgerCi.",
+        "limitations": "Documentation and workflow record. CI applies only to its recorded head and does not complete the historical audit or qualify product deployment/hardware."
+      },
+      "ciSnapshot": {
+        "head": "0710628dd0f9ee3edd3cca45cda04be4e918e9f6",
+        "status": "pending",
+        "checkedAt": "2026-10-11T12:59:18.456Z",
+        "matchesInventoriedHead": true,
+        "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+        "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+        "source": "state.json:ledgerCi"
       }
     }
   ]

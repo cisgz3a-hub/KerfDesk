@@ -1,10 +1,10 @@
 # PR audit progress
 
-Updated: 2026-10-11T12:39:38.828Z. Repository: cisgz3a-hub/KerfDesk.
+Updated: 2026-10-11T13:04:09.327Z. Repository: cisgz3a-hub/KerfDesk.
 
-The loop is active. 1156 PRs are inventoried: 61 full-diff reviews, 50 partial reviews and 1045 unstarted. Partial reviews retain their explicit gaps in coverage.json. This is not a whole-history completion claim.
+The loop is active. 1157 PRs are inventoried: 62 full-diff reviews, 50 partial reviews and 1045 unstarted. Partial reviews retain their explicit gaps in coverage.json. This is not a whole-history completion claim.
 
-19 original findings, plus their recorded review follow-ups, are tracked in 15 coherent repair groups. 15 repair PRs are open or recorded; 13 have successful required CI recorded at their published heads.
+20 original findings, plus their recorded review follow-ups, are tracked in 15 coherent repair groups. 15 repair PRs are open or recorded; 13 have successful required CI recorded at their published heads.
 
 | Finding | Historical origin | Defect / repair | Current state | Repair PR |
 | --- | --- | --- | --- | --- |
@@ -25,11 +25,12 @@ The loop is active. 1156 PRs are inventoried: 61 full-diff reviews, 50 partial r
 | B04-DIAGNOSTIC-001 | See attribution | Opt-in Edge diagnostics use copied settings that differ from the app defaults they claim | merged-ci-verified | [#1152](https://github.com/cisgz3a-hub/KerfDesk/pull/1152) |
 | B05-CONSOLE-001 | [#94](https://github.com/cisgz3a-hub/KerfDesk/pull/94) | Combined tool and XY mutations retain stale XY origin evidence | pr-open-ci-pending | [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162) |
 | B05-CONSOLE-002 | [#94](https://github.com/cisgz3a-hub/KerfDesk/pull/94) | Firmware-equivalent GRBL numeric spellings preserve stale work Z | pr-open-ci-pending | [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162) |
-| B05-C-REALTIME-COMMENTS | [#541](https://github.com/cisgz3a-hub/KerfDesk/pull/541) | Saved G-code comments preserve GRBL realtime command bytes | pr-open-ci-pending | [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161) |
+| B05-C-REALTIME-COMMENTS | [#541](https://github.com/cisgz3a-hub/KerfDesk/pull/541) | Saved G-code comments preserve GRBL realtime command bytes | pr-open-ci-failed | [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161) |
 | B05-CONSOLE-003 | [#923](https://github.com/cisgz3a-hub/KerfDesk/pull/923) | Console WCS spellings and comments leave a stale G54 selection | pr-open-ci-pending | [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162) |
+| B05-CONSOLE-004 | [#94](https://github.com/cisgz3a-hub/KerfDesk/pull/94) | Fractional Console tool words preserve stale work-Z evidence | pr-open-ci-pending | [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162) |
 
 Repairs use focused commits and independent main-based PR branches. Commit IDs, local test evidence, current heads and CI check URLs are in repairs.json. A pending CI result is not a passing check; source evidence is separate from deployment, packaging and hardware qualification.
 
-The chronological unstarted cursor is #96; 50 earlier partial scopes also remain. Next action: Independently review and commit this frozen nine-file snapshot, then push a new tracking branch and create a new reviewable tracking PR (previous #1151 is merged). Verify its exact-head CI plus both batch-05 repair heads #1161/#1162, all prior cycles and complete review-comment dispositions. Retain active hosted review IDs and root publication ownership; no batch-06 audit until every cycle passes.
+The chronological unstarted cursor is #96; 50 earlier partial scopes also remain. Next action: Independently review, commit and push this tracking follow-up to #1163. For #1161, investigate ESLint heap exhaustion and retry the failed CI after its run completes; the attempted early retry was rejected while the run remained active. Verify both required aggregates at latest heads for #1161/#1162/#1163, current main reconciliation and all review IDs/bodies. Do not start batch-06 until all cycles pass.
 
 13 of 15 repair groups have completed the entire review/publication/CI cycle. Review follow-ups, unpublished commits, stale review heads and closed-unmerged PRs remain blockers even if an older CI run is green.

@@ -252,7 +252,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-04/early-supporting-diff
 
 Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
 
-Recorded CI: pending at commit ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b.
+Recorded CI: pending at commit 05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a.
 
 Trigger: G92 X0 T2 or G92.1 G49
 
@@ -266,7 +266,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-a.json. Repair e
 
 Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
 
-Recorded CI: pending at commit ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b.
+Recorded CI: pending at commit 05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a.
 
 Trigger: G092 Z0 or G 92 Z0
 
@@ -278,9 +278,9 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-a.json. Repair e
 
 ## B05-C-REALTIME-COMMENTS: Saved G-code comments preserve GRBL realtime command bytes
 
-Repair: [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161). State: pr-open-ci-pending.
+Repair: [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161). State: pr-open-ci-failed.
 
-Recorded CI: pending at commit 72dbd3b37bcd125f14dd221cbc51d5ebbe5edbca.
+Recorded CI: failed at commit 72dbd3b37bcd125f14dd221cbc51d5ebbe5edbca.
 
 Trigger: Profile name Shop!~ exported with ordinary build metadata; a sender transmits comments verbatim.
 
@@ -294,7 +294,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-c.json. Repair e
 
 Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
 
-Recorded CI: pending at commit ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b.
+Recorded CI: pending at commit 05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a.
 
 Trigger: Known activeWcs G54, then Console selects G55 using G055, G 55, G55X0, G55 (G54), or G55 ; G54.
 
@@ -304,15 +304,16 @@ Historical origin: #923. GitHub commit-to-pulls API associates rewritten introdu
 
 Local evidence: docs/audits/2026-10-11-pr-history/batch-05/console-wcs-finding.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/repair-console-author.json.
 
-## Tracking record corrections
+## B05-CONSOLE-004: Fractional Console tool words preserve stale work-Z evidence
 
-These concern the audit records and are separate from application defect counts.
+Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
 
-- [4240384675](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240384675): Four null repair evidence references now use the canonical repair reports. Renderer has explicit fallback. Status: resolved-in-published-followup.
-- [4240384677](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240384677): Queued aggregates already kept cycleVerified false. absentRequired and unmetRequired now distinguish absence from all unsuccessful required checks. Status: resolved-in-published-followup.
-- [pending-ledger-review](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312): Confirmed queue inconsistency: the frozen snapshot awaited independent review but omitted its pending task. The next snapshot retains an explicit review token and sequences review before publication; only commit-bound approval and verified committed blobs clear the local token. Independent evidence shows the previous snapshot was reviewed; a publication bypass was not reproduced. Status: resolved-in-published-followup.
-- [tracking-coverage-ci](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312): Confirmed same-head contradiction: coverage still called passed tracking CI pending. Coverage now has neutral source-review prose and a structured CI receipt synchronized to state, including its observed head and whether that head matches the inventory. A green result cannot silently advance source review or inventory identity. Status: resolved-in-published-followup.
-- [4240863024](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240863024): Confirmed mixed JSON priority types: four P2 display strings differed from ten numeric values. Normalize the four records to numeric 2 and document the numeric 0-3 convention. A strict numeric selection omitted those four records; no existing production consumer failure is claimed. Status: resolved-in-published-followup.
-- [4240943303](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240943303): Confirmed three SVG result descriptions contradicted successful CI receipts in the same snapshot. Replace transient pending wording with neutral behavior prose and render recorded CI status together with its observed commit from the repair ledger. Underlying repair CI was already successful. Status: resolved-in-published-followup.
-- [4241008264](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241008264): The status page used a generic repair-publication instruction while the structured next action identified pending tracking review/publication/CI. Render state.nextAction directly so the visible continuation step follows the recorded phase. No machine-readable gate bypass or application defect is claimed. Status: resolved-in-published-followup.
-- [4241339123](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241339123): Confirmed ambiguous historical milestone. Preserve its exact timestamp under publicationHistory tied to tracker1151 headf7833a46; remove unscoped current-completion field. No consumer failure or gate bypass demonstrated. Independent snapshot review also scoped the superseded83bd verification timestamp, aligned the current b060 source receipt and refreshed the feedback pointer. Status: resolved-in-published-followup.
+Recorded CI: pending at commit 05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a.
+
+Trigger: Send accepted GRBL T2.5, T+002.5 or T 2 . 5, alone or combined with G92 X0.
+
+Impact: Accepted numeric tool identity changes preserve work-Z proof and reference epoch, unlike equivalent canonical T2. This is inconsistent coordinate-evidence invalidation; stock GRBL only tracks the tool number, so no physical tool-motion claim is made.
+
+Historical origin: #94. Original PR94 tool regex admits integer T words only; the first batch05 lexical normalization still retained that restriction.
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-finding.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-author.json.

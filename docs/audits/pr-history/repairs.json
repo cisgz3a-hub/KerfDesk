@@ -88,7 +88,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.283Z",
+      "checkedAt": "2026-10-11T12:59:15.339Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -555,11 +555,37 @@
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
-      }
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
+      },
+      "discussionDispositions": [
+        {
+          "id": 6105542871,
+          "status": "informational-review-not-run",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "1281bd2874f85f8521935650f052b24239b067d9fa66958373884eb2f3b54fa7",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105542899,
+          "status": "informational-hosted-review-completed",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "ea828e80f26f7ea09438a2849f194a5b56519c8a6312b7ad0958ea208f715305",
+          "result": "Unchanged completed hosted-review summary refers to historical head 447b4bc8a520a387a7d205ed073330955c6e86d5. Retained as terminal historical information only; it is not current-head review approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6106749619,
+          "status": "informational-review-unavailable",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "e39b189a2ed6388c9d919876a2893ca0216a023301e11d788df190b4366991b9",
+          "result": "Historical service usage notice, no code finding and not a successful review.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        }
+      ]
     },
     "verificationTestFiles": [
       "src/io/svg/export-scene-svg-owned-clip.test.ts",
@@ -716,7 +742,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.285Z",
+      "checkedAt": "2026-10-11T12:59:15.342Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -934,11 +960,29 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1140.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
-      }
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
+      },
+      "discussionDispositions": [
+        {
+          "id": 6105555355,
+          "status": "informational-review-unavailable",
+          "head": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
+          "bodySha256": "e39b189a2ed6388c9d919876a2893ca0216a023301e11d788df190b4366991b9",
+          "result": "Historical service usage notice, no code finding and not a successful review.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105555935,
+          "status": "informational-review-not-run",
+          "head": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
+          "bodySha256": "8c113df8a3e1b31ac7e2b6f0a9372c1d9b9f77fd52bd5cb77e4a10f8aee4da64",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        }
+      ]
     },
     "mergeVerification": {
       "state": "MERGED",
@@ -984,7 +1028,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.285Z",
+      "checkedAt": "2026-10-11T12:59:15.342Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1201,11 +1245,29 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1141.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
-      }
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
+      },
+      "discussionDispositions": [
+        {
+          "id": 6105569560,
+          "status": "informational-review-not-run",
+          "head": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
+          "bodySha256": "dd12fe970575166b17fd701ef2be2c5e0f4012203e372206529a8a1afc171612",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105570119,
+          "status": "informational-hosted-review-completed",
+          "head": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
+          "bodySha256": "1e48a64076de6297be8652018753c936dfa3d096df63755b47872fa0782111d5",
+          "result": "Review activity summary reports completed; no separate finding body. This does not substitute for independent source review or required CI.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        }
+      ]
     },
     "mergeVerification": {
       "state": "MERGED",
@@ -1251,7 +1313,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.285Z",
+      "checkedAt": "2026-10-11T12:59:15.342Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1468,11 +1530,29 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1142.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
-      }
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
+      },
+      "discussionDispositions": [
+        {
+          "id": 6105581077,
+          "status": "informational-review-not-run",
+          "head": "335b6e8438f2694b005c906bce761894cc479e98",
+          "bodySha256": "4bb61352c44a44794b4811b80209855445153731ac03732f1f246d135078cd13",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105581688,
+          "status": "informational-hosted-review-completed",
+          "head": "335b6e8438f2694b005c906bce761894cc479e98",
+          "bodySha256": "f078254902f0f8fbb7664d218403cd52e3dfc4a28d32db8b1b55dac10b75c976",
+          "result": "Review activity summary reports completed; no separate finding body. This does not substitute for independent source review or required CI.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        }
+      ]
     },
     "mergeVerification": {
       "state": "MERGED",
@@ -1520,7 +1600,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.285Z",
+      "checkedAt": "2026-10-11T12:59:15.342Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1737,11 +1817,29 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1143.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
-      }
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
+      },
+      "discussionDispositions": [
+        {
+          "id": 6105594562,
+          "status": "informational-review-not-run",
+          "head": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
+          "bodySha256": "f119968712f96d60c045e5126263383a9ed0bbe81e106633405a220552438a77",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105595233,
+          "status": "informational-hosted-review-completed",
+          "head": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
+          "bodySha256": "c71430fe5cc4dfa199b7a73babc1796356a926d4be59aa5bdb3899b9ebbea37b",
+          "result": "Review activity summary reports completed; no separate finding body. This does not substitute for independent source review or required CI.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        }
+      ]
     },
     "mergeVerification": {
       "state": "MERGED",
@@ -1787,7 +1885,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.285Z",
+      "checkedAt": "2026-10-11T12:59:15.342Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2004,11 +2102,29 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1144.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
-      }
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
+      },
+      "discussionDispositions": [
+        {
+          "id": 6105614117,
+          "status": "informational-review-not-run",
+          "head": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
+          "bodySha256": "d433e28e1d3dea2db1090be32fae099c34f601ed7347b422866585aae5f5a557",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105614282,
+          "status": "informational-hosted-review-completed",
+          "head": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
+          "bodySha256": "67e2df790ed2cde1fb9e844156d48819aa5d59c552e10737790d6642293d28eb",
+          "result": "Review activity summary reports completed; no separate finding body. This does not substitute for independent source review or required CI.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        }
+      ]
     },
     "mergeVerification": {
       "state": "MERGED",
@@ -2053,7 +2169,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.285Z",
+      "checkedAt": "2026-10-11T12:59:15.342Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2270,11 +2386,29 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1145.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
-      }
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
+      },
+      "discussionDispositions": [
+        {
+          "id": 6105629820,
+          "status": "informational-hosted-review-completed",
+          "head": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
+          "bodySha256": "16d76ea18f171232b4c898b9f591b6a0b6fc5a6a243b2ed01aa6417bde963d17",
+          "result": "Review activity summary reports completed; no separate finding body. This does not substitute for independent source review or required CI.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105629848,
+          "status": "informational-review-not-run",
+          "head": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
+          "bodySha256": "7776955493c48679658456461e4b83e1e528c2bdb4f073f822b2b1ddf3113aae",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        }
+      ]
     },
     "mergeVerification": {
       "state": "MERGED",
@@ -2319,7 +2453,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.285Z",
+      "checkedAt": "2026-10-11T12:59:15.342Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2565,11 +2699,29 @@
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
-      }
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
+      },
+      "discussionDispositions": [
+        {
+          "id": 6105647257,
+          "status": "informational-hosted-review-completed",
+          "head": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
+          "bodySha256": "1362ae65f8d5f8477b68169332840066e153d8a33a1b1c5f0e8f9a0a5d79fd4d",
+          "result": "Review activity summary reports completed; no separate finding body. This does not substitute for independent source review or required CI.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105647325,
+          "status": "informational-review-not-run",
+          "head": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
+          "bodySha256": "b595db9a6525672295afc184ee0d8e656db1648a6ccc101130d144ec64c747c4",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        }
+      ]
     },
     "mergeVerification": {
       "state": "MERGED",
@@ -2616,7 +2768,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.285Z",
+      "checkedAt": "2026-10-11T12:59:15.342Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2833,11 +2985,29 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1147.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
-      }
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
+      },
+      "discussionDispositions": [
+        {
+          "id": 6105660251,
+          "status": "informational-hosted-review-completed",
+          "head": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
+          "bodySha256": "62c1b3d7e357f2ee6b2d3fab72caf99e78791ba68d190a7a9fe826aca7fd56c2",
+          "result": "Review activity summary reports completed; no separate finding body. This does not substitute for independent source review or required CI.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105660328,
+          "status": "informational-review-not-run",
+          "head": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
+          "bodySha256": "e79f1b33897650769d378d59ca022fde792478ee9b84597a82076b7033a1e949",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        }
+      ]
     },
     "mergeVerification": {
       "state": "MERGED",
@@ -2884,7 +3054,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.285Z",
+      "checkedAt": "2026-10-11T12:59:15.342Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -3101,11 +3271,29 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1148.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
-      }
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
+      },
+      "discussionDispositions": [
+        {
+          "id": 6105676153,
+          "status": "informational-hosted-review-completed",
+          "head": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
+          "bodySha256": "c88bfd0c8fc156d02538e40d560d36b3705ee38b6d463f2f19bd405a7dca2fcd",
+          "result": "Review activity summary reports completed; no separate finding body. This does not substitute for independent source review or required CI.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105676166,
+          "status": "informational-review-not-run",
+          "head": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
+          "bodySha256": "4cbe51eefd19781b63ef50dc2362d4a304829cfb658a174d4c54df0d4835aee3",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        }
+      ]
     },
     "mergeVerification": {
       "state": "MERGED",
@@ -3208,7 +3396,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.285Z",
+      "checkedAt": "2026-10-11T12:59:15.343Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -3570,11 +3758,37 @@
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
-      }
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
+      },
+      "discussionDispositions": [
+        {
+          "id": 6105691663,
+          "status": "informational-review-not-run",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "0e79947b250e5db0581c1f3ac764f0c15f82619e06299d33a2733ec28bcfca0a",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105692020,
+          "status": "informational-hosted-review-completed",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "04484b94969921d7c78195d95b345db841a5d7d4e6404d8045419a385d256f00",
+          "result": "Review activity summary reports completed; no separate finding body. This does not substitute for independent source review or required CI.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105950937,
+          "status": "informational-review-unavailable",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "e39b189a2ed6388c9d919876a2893ca0216a023301e11d788df190b4366991b9",
+          "result": "Historical service usage notice, no code finding and not a successful review.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        }
+      ]
     },
     "followUpCommits": [
       "f142cb016818ade49a51bf8859086b8e007aaf18",
@@ -3710,7 +3924,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.285Z",
+      "checkedAt": "2026-10-11T12:59:15.343Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -3927,11 +4141,29 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1150.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
-      }
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
+      },
+      "discussionDispositions": [
+        {
+          "id": 6105704930,
+          "status": "informational-review-unavailable",
+          "head": "5db629ff40eb51254d39695cce9bee3fdb850109",
+          "bodySha256": "e39b189a2ed6388c9d919876a2893ca0216a023301e11d788df190b4366991b9",
+          "result": "Historical service usage notice, no code finding and not a successful review.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        },
+        {
+          "id": 6105705441,
+          "status": "informational-review-not-run",
+          "head": "5db629ff40eb51254d39695cce9bee3fdb850109",
+          "bodySha256": "fcc724e4867e8c5a14d2bb83adbcbc4bf89f0c9b0debedc897200fb185f8f1ab",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
+        }
+      ]
     },
     "mergeVerification": {
       "state": "MERGED",
@@ -3966,7 +4198,7 @@
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.285Z",
+      "checkedAt": "2026-10-11T12:59:15.343Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -4208,24 +4440,40 @@
     "reviewComments": {
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All prior IDs/bodies unchanged and terminal dispositions retained."
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
       },
       "checkedAt": "2026-10-11T10:23:44.858Z",
       "discussionDispositions": [
         {
           "id": 6108025434,
-          "status": "informational-no-review-performed",
-          "result": "CodeRabbit reports automatic review skipped; no finding or review completion inferred."
+          "status": "informational-review-not-run",
+          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+          "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
+          "bodySha256": "f221a175fe9967d373dfebe052fddf2cb09e0522dbeb2b0daa93caa9c1ba6c44",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+          "previousDisposition": {
+            "id": 6108025434,
+            "status": "informational-no-review-performed",
+            "result": "CodeRabbit reports automatic review skipped; no finding or review completion inferred."
+          }
         },
         {
           "id": 6108025787,
-          "status": "informational-review-completed-no-findings",
+          "status": "informational-hosted-review-completed",
           "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
-          "result": "Edited status body and all paginated feedback read: Code and Security reviews completed at the published head with no inline or submitted review findings at this snapshot.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-tracking-publication-review-complete.json"
+          "result": "Review activity summary reports completed; no separate finding body. This does not substitute for independent source review or required CI.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+          "bodySha256": "3f8978f5468db0867d05edc50b21e71b8cf05db4870dd07cfbf3a4f9ee8c5f8a",
+          "previousDisposition": {
+            "id": 6108025787,
+            "status": "informational-review-completed-no-findings",
+            "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
+            "result": "Edited status body and all paginated feedback read: Code and Security reviews completed at the published head with no inline or submitted review findings at this snapshot.",
+            "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-tracking-publication-review-complete.json"
+          }
         }
       ]
     },
@@ -4244,7 +4492,7 @@
   },
   {
     "id": "console-coordinate-effects",
-    "findings": ["B05-CONSOLE-001", "B05-CONSOLE-002", "B05-CONSOLE-003"],
+    "findings": ["B05-CONSOLE-001", "B05-CONSOLE-002", "B05-CONSOLE-003", "B05-CONSOLE-004"],
     "title": "Invalidate console coordinate evidence for equivalent and combined commands",
     "auditBatch": 5,
     "branch": "codex/audit-console-coordinate-effects-20261011",
@@ -4258,12 +4506,12 @@
     "status": "pr-open-ci-pending",
     "ci": {
       "status": "pending",
-      "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
+      "head": "05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a",
       "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": true,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.334Z",
+      "checkedAt": "2026-10-11T12:59:15.453Z",
       "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
       "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
       "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
@@ -4272,19 +4520,9 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749375/job/114470979183",
-          "name": "Browser test checks and production-bundle smoke",
-          "startedAt": "2026-10-11T12:34:02Z",
-          "status": "QUEUED",
-          "workflowName": "Browser smoke"
-        },
-        {
-          "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749373/job/114470979421",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38141284925/job/114475651571",
           "name": "Typecheck, lint and format",
-          "startedAt": "2026-10-11T12:34:03Z",
+          "startedAt": "2026-10-11T12:58:40Z",
           "status": "QUEUED",
           "workflowName": "CI"
         },
@@ -4292,39 +4530,29 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749376/job/114470979616",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38141284917/job/114475509829",
           "name": "Package, check and launch the desktop app",
-          "startedAt": "2026-10-11T12:37:36Z",
-          "status": "IN_PROGRESS",
+          "startedAt": "2026-10-11T12:57:55Z",
+          "status": "QUEUED",
           "workflowName": "Desktop package check"
         },
         {
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749375/job/114470979357",
-          "name": "Chrome UX smoke (1/4)",
-          "startedAt": "2026-10-11T12:34:02Z",
-          "status": "QUEUED",
-          "workflowName": "Browser smoke"
-        },
-        {
-          "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749373/job/114470979593",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38141284925/job/114475651526",
           "name": "Policy checks and builds",
-          "startedAt": "2026-10-11T12:34:03Z",
+          "startedAt": "2026-10-11T12:58:40Z",
           "status": "QUEUED",
           "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "2026-10-11T12:34:02Z",
+          "completedAt": "2026-10-11T12:57:55Z",
           "conclusion": "SKIPPED",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749376/job/114470980641",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38141284917/job/114475510589",
           "name": "Package, install and launch the Windows desktop app",
-          "startedAt": "2026-10-11T12:34:03Z",
+          "startedAt": "2026-10-11T12:57:55Z",
           "status": "COMPLETED",
           "workflowName": "Desktop package check"
         },
@@ -4332,49 +4560,19 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749375/job/114470979365",
-          "name": "Chrome UX smoke (2/4)",
-          "startedAt": "2026-10-11T12:34:02Z",
-          "status": "QUEUED",
-          "workflowName": "Browser smoke"
-        },
-        {
-          "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749375/job/114470979366",
-          "name": "Chrome UX smoke (3/4)",
-          "startedAt": "2026-10-11T12:34:02Z",
-          "status": "QUEUED",
-          "workflowName": "Browser smoke"
-        },
-        {
-          "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749375/job/114470979393",
-          "name": "Chrome UX smoke (4/4)",
-          "startedAt": "2026-10-11T12:34:02Z",
-          "status": "QUEUED",
-          "workflowName": "Browser smoke"
-        },
-        {
-          "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749373/job/114470979618",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38141284925/job/114475651565",
           "name": "Unit tests (1/4)",
-          "startedAt": "2026-10-11T12:34:03Z",
+          "startedAt": "2026-10-11T12:58:40Z",
           "status": "QUEUED",
           "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "2026-10-11T12:34:02Z",
+          "completedAt": "2026-10-11T12:57:55Z",
           "conclusion": "SKIPPED",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749376/job/114470980521",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38141284917/job/114475510679",
           "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
-          "startedAt": "2026-10-11T12:34:03Z",
+          "startedAt": "2026-10-11T12:57:55Z",
           "status": "COMPLETED",
           "workflowName": "Desktop package check"
         },
@@ -4382,9 +4580,9 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749373/job/114470979619",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38141284925/job/114475651530",
           "name": "Unit tests (2/4)",
-          "startedAt": "2026-10-11T12:34:03Z",
+          "startedAt": "2026-10-11T12:58:40Z",
           "status": "QUEUED",
           "workflowName": "CI"
         },
@@ -4392,9 +4590,9 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749373/job/114470979555",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38141284925/job/114475651539",
           "name": "Unit tests (3/4)",
-          "startedAt": "2026-10-11T12:34:03Z",
+          "startedAt": "2026-10-11T12:58:40Z",
           "status": "QUEUED",
           "workflowName": "CI"
         },
@@ -4402,9 +4600,9 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749373/job/114470979577",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38141284925/job/114475651584",
           "name": "Unit tests (4/4)",
-          "startedAt": "2026-10-11T12:34:03Z",
+          "startedAt": "2026-10-11T12:58:40Z",
           "status": "QUEUED",
           "workflowName": "CI"
         },
@@ -4412,16 +4610,16 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139749373/job/114470979575",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38141284925/job/114475651387",
           "name": "Phone and MCP service",
-          "startedAt": "2026-10-11T12:34:03Z",
+          "startedAt": "2026-10-11T12:58:40Z",
           "status": "QUEUED",
           "workflowName": "CI"
         },
         {
           "__typename": "StatusContext",
           "context": "CodeRabbit",
-          "startedAt": "2026-10-11T12:34:08Z",
+          "startedAt": "2026-10-11T12:58:00Z",
           "state": "SUCCESS",
           "targetUrl": ""
         }
@@ -4431,12 +4629,12 @@
       "status": "approved",
       "reviewer": "/root/batch05_c",
       "kind": "Independent reproduction and complete repair-file review",
-      "head": "1ab8b751df1690f81487986f3b34fc0b45d245df",
-      "report": "docs/audits/2026-10-11-pr-history/batch-05/console-independent-review.json",
-      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/batch-05/console-published-review.json",
+      "head": "f5129cd68486f2b7cd9896cea31ac1acc59ed1f0",
+      "report": "docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-independent-review.json",
+      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/batch-05/console-fractional-published-review.json",
       "sourceAttestation": {
-        "reviewedCommit": "1ab8b751df1690f81487986f3b34fc0b45d245df",
-        "publishedHead": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
+        "reviewedCommit": "f5129cd68486f2b7cd9896cea31ac1acc59ed1f0",
+        "publishedHead": "05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a",
         "files": [
           "src/core/controllers/console-state-effect.ts",
           "src/core/controllers/console-state-effect.test.ts",
@@ -4444,16 +4642,16 @@
           "src/ui/state/frame-wcs-selection.test.ts",
           "src/ui/state/laser-store-console.test.ts"
         ],
-        "method": "Complete live PR and Git manifests and every file blob independently match the reviewed source tree",
-        "checkedAt": "2026-10-11T12:35:09.667Z"
+        "method": "Independent complete five-file manifest and blob equality to reviewed focused follow-up tree",
+        "checkedAt": "2026-10-11T12:58:44.290Z"
       },
-      "verifiedPublishedHead": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b"
+      "verifiedPublishedHead": "05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a"
     },
     "cycleVerified": false,
     "completionBlockers": ["Hosted CI is pending"],
     "publicationOwner": "root",
     "integrationCommit": "1ab8b751df1690f81487986f3b34fc0b45d245df",
-    "publishedHead": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
+    "publishedHead": "05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a",
     "pullRequest": {
       "number": 1162,
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1162"
@@ -4461,36 +4659,89 @@
     "localVerification": {
       "report": "docs/audits/2026-10-11-pr-history/batch-05/repair-console-author.json",
       "result": "passed",
-      "scope": "111 related tests plus 28 affected follow-up tests; 47 independent lexical/effect/store/WCS dispatch controls; full TypeScript, scoped lint/format/file-size/diff checks"
+      "scope": "111 related tests plus 28 affected follow-up tests; 47 independent lexical/effect/store/WCS dispatch controls; full TypeScript, scoped lint/format/file-size/diff checks",
+      "followUp": {
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-author.json",
+        "tests": 157,
+        "independentTests": 57,
+        "result": "passed"
+      }
     },
     "reviewComments": {
       "items": [],
       "discussionDispositions": [
         {
           "id": 6109068224,
-          "status": "informational-review-not-run",
-          "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
-          "bodySha256": "864d3ea3951956381d83c11303e939fd61b95114f9fcd0887f66a916dd89d03c",
-          "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json"
+          "status": "informational-no-review-performed",
+          "head": "05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a",
+          "bodySha256": "8938e807e86959e8b4fefb93ae7abf9087b5a69bfc9c31835d27af3461ed18b5",
+          "result": "Edited same-ID skipped automatic review notice has a new run ID. Full body contains no code finding or completed review.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+          "previousDisposition": {
+            "id": 6109068224,
+            "status": "informational-review-not-run",
+            "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
+            "bodySha256": "864d3ea3951956381d83c11303e939fd61b95114f9fcd0887f66a916dd89d03c",
+            "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+            "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-tracking-review-complete.json"
+          }
         },
         {
           "id": 6109069941,
-          "status": "hosted-review-in-progress",
-          "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
-          "bodySha256": "6f49d127db2866ac660363a5e0de16078787f0702af71eb34f0ab1215503ea6f",
-          "result": "Current-head hosted review is still running in this exact collected body. Retain active review ownership and refresh by ID/body; do not mark terminal.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json"
+          "status": "informational-review-completed-no-new-findings",
+          "head": "05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a",
+          "bodySha256": "0e7be18636caaaf9d6bb0925752d4652e45fa2e818bf7eb5bd842e56892d9b56",
+          "result": "Unchanged completed hosted-review summary refers to historical head ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b. Retained as terminal historical information only; it is not current-head review approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+          "previousDisposition": {
+            "id": 6109069941,
+            "status": "informational-review-completed-no-new-findings",
+            "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
+            "bodySha256": "0e7be18636caaaf9d6bb0925752d4652e45fa2e818bf7eb5bd842e56892d9b56",
+            "result": "Edited same-ID current-head summary now reports both code and security reviews completed. Complete collection contains no new inline finding or review for this PR.",
+            "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-tracking-review-complete.json",
+            "previousDisposition": {
+              "id": 6109069941,
+              "status": "hosted-review-in-progress",
+              "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
+              "bodySha256": "6f49d127db2866ac660363a5e0de16078787f0702af71eb34f0ab1215503ea6f",
+              "result": "Current-head hosted review is still running in this exact collected body. Retain active review ownership and refresh by ID/body; do not mark terminal.",
+              "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json"
+            }
+          }
+        },
+        {
+          "id": 6109264136,
+          "status": "informational-review-unavailable",
+          "head": "05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a",
+          "bodySha256": "e39b189a2ed6388c9d919876a2893ca0216a023301e11d788df190b4366991b9",
+          "result": "New current-head usage-limit notice. Hosted review was unavailable; not approval and not a code finding.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All IDs/bodies read; two hosted review summaries remain active across the current repairs."
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
       }
     },
-    "publicationBase": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f"
+    "publicationBase": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
+    "independentFollowUps": [
+      {
+        "id": "B05-CONSOLE-004",
+        "status": "resolved-in-published-followup",
+        "evidence": "docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-finding.json",
+        "author": "/root/batch05_a",
+        "reviewer": "/root/batch05_c",
+        "publicationOwner": "root",
+        "publishedHead": "05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a",
+        "commit": "f5129cd68486f2b7cd9896cea31ac1acc59ed1f0",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/console-fractional-published-review.json"
+      }
+    ],
+    "followUpCommits": ["f5129cd68486f2b7cd9896cea31ac1acc59ed1f0"],
+    "publishedFollowUpCommits": ["f5129cd68486f2b7cd9896cea31ac1acc59ed1f0"]
   },
   {
     "id": "gcode-comment-realtime-bytes",
@@ -4499,38 +4750,58 @@
     "auditBatch": 5,
     "branch": "codex/audit-gcode-comment-realtime-bytes-20261011",
     "files": ["src/core/gcode-comments.ts", "src/core/gcode-comments.test.ts"],
-    "status": "pr-open-ci-pending",
+    "status": "pr-open-ci-failed",
     "ci": {
-      "status": "pending",
+      "status": "failed",
       "head": "72dbd3b37bcd125f14dd221cbc51d5ebbe5edbca",
       "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "fetchedMain": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "containsFetchedMain": true,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T12:37:53.382Z",
+      "checkedAt": "2026-10-11T12:59:15.512Z",
       "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
       "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
       "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
       "checks": [
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
+          "completedAt": "2026-10-11T12:57:16Z",
+          "conclusion": "FAILURE",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139869921/job/114471588534",
           "name": "Typecheck, lint and format",
-          "startedAt": "2026-10-11T12:37:15Z",
-          "status": "QUEUED",
+          "startedAt": "2026-10-11T12:49:55Z",
+          "status": "COMPLETED",
           "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139869903/job/114472689780",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T12:43:01Z",
+          "status": "QUEUED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T12:54:00Z",
+          "conclusion": "SUCCESS",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139869915/job/114471385263",
           "name": "Package, check and launch the desktop app",
-          "startedAt": "2026-10-11T12:36:10Z",
-          "status": "QUEUED",
+          "startedAt": "2026-10-11T12:51:35Z",
+          "status": "COMPLETED",
           "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139869903/job/114472689781",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T12:43:01Z",
+          "status": "QUEUED",
+          "workflowName": "Browser smoke"
         },
         {
           "__typename": "CheckRun",
@@ -4551,6 +4822,36 @@
           "startedAt": "2026-10-11T12:36:10Z",
           "status": "COMPLETED",
           "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139869903/job/114472689782",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T12:43:01Z",
+          "status": "QUEUED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139869903/job/114472689615",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T12:57:33Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139869903/job/114472689712",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T12:58:44Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "Browser smoke"
         },
         {
           "__typename": "CheckRun",
@@ -4598,8 +4899,8 @@
           "conclusion": "",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38139869921/job/114471588643",
           "name": "Unit tests (4/4)",
-          "startedAt": "2026-10-11T12:37:15Z",
-          "status": "QUEUED",
+          "startedAt": "2026-10-11T12:51:16Z",
+          "status": "IN_PROGRESS",
           "workflowName": "CI"
         },
         {
@@ -4638,7 +4939,7 @@
       }
     },
     "cycleVerified": false,
-    "completionBlockers": ["Hosted CI is pending"],
+    "completionBlockers": ["Hosted CI is failed"],
     "publicationOwner": "root",
     "integrationCommit": "af8705b5ae2cf24eece761fb04a71dd4444bc92f",
     "publishedHead": "72dbd3b37bcd125f14dd221cbc51d5ebbe5edbca",
@@ -4662,22 +4963,30 @@
           "head": "72dbd3b37bcd125f14dd221cbc51d5ebbe5edbca",
           "bodySha256": "bf15cef2ce336bb99d1aa37da4f29a235c8e3ff1eab3430337bb27ed467b055b",
           "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json"
         },
         {
           "id": 6109041276,
-          "status": "hosted-review-in-progress",
+          "status": "informational-review-completed-no-new-findings",
           "head": "72dbd3b37bcd125f14dd221cbc51d5ebbe5edbca",
-          "bodySha256": "26ab0347d6494cbbf3d0ec0a8f954037a1f4e59879c4628940ca8af18d071acf",
-          "result": "Current-head hosted review is still running in this exact collected body. Retain active review ownership and refresh by ID/body; do not mark terminal.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json"
+          "bodySha256": "d615d0cd07afe1ccc597f460f6075bd5f9fdd5625486c711363793fe58935781",
+          "result": "Edited same-ID current-head summary now reports both code and security reviews completed. Complete collection contains no new inline finding or review for this PR.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+          "previousDisposition": {
+            "id": 6109041276,
+            "status": "hosted-review-in-progress",
+            "head": "72dbd3b37bcd125f14dd221cbc51d5ebbe5edbca",
+            "bodySha256": "26ab0347d6494cbbf3d0ec0a8f954037a1f4e59879c4628940ca8af18d071acf",
+            "result": "Current-head hosted review is still running in this exact collected body. Retain active review ownership and refresh by ID/body; do not mark terminal.",
+            "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json"
+          }
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T12:37:31.847Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/repairs-feedback-review.json",
-        "result": "All IDs/bodies read; two hosted review summaries remain active across the current repairs."
+        "checkedAt": "2026-10-11T12:59:29.421Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/fractional-feedback-review.json",
+        "result": "Complete IDs and bodies independently reviewed; no unresolved current finding. Historical hosted summaries are not current-head approval."
       }
     },
     "previousPublishedHeads": ["d0247b688e2fad0d7fe2911c7a81ebe7ab2ebd2c"]
