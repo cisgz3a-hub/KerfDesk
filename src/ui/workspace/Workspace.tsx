@@ -27,7 +27,7 @@ import { useCncRemovalGridState } from './use-cnc-removal-grid';
 import type { RemovalGrid } from '../../core/sim';
 import { useDragMove } from './use-workspace-drag';
 import { useWorkspaceWheelZoom } from './use-workspace-wheel';
-import { useJobEstimate } from '../laser/use-job-estimate';
+import { usePreviewEstimate } from './use-preview-estimate';
 import { useCanvasMotionOverlay } from './use-canvas-motion-overlay';
 import { CanvasMotionBadge } from './canvas-motion-badge';
 import { ArtworkNumberingPrompt } from './ArtworkNumberingPrompt';
@@ -58,7 +58,7 @@ export function Workspace(): JSX.Element {
   const viewState = useViewState();
   const previewToolpath = usePreviewToolpath(project, previewMode);
   const canvasMotionOverlay = useCanvasMotionOverlay(project, previewMode);
-  const jobEstimate = useJobEstimate();
+  const jobEstimate = usePreviewEstimate();
   usePreviewPlayback(previewMode, previewToolpath, jobEstimate);
   const cncRemoval = useCncRemovalGridState(project, previewMode, previewToolpath, scrubberT);
   const cncRemovalGrid = cncRemoval.grid;

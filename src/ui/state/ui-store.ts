@@ -132,6 +132,9 @@ export type UiState = ArtworkRunOrderUiState &
     readonly setShowCanvasStartMarkers: (next: boolean) => void;
     readonly previewPlaying: boolean;
     readonly setPreviewPlaying: (next: boolean) => void;
+    /** Explicit restart identity: distance alone cannot represent time inside a dwell. */
+    readonly previewRestartRevision: number;
+    readonly restartPreviewPlayback: () => void;
     readonly previewPlaybackSpeed: PreviewPlaybackSpeed;
     readonly setPreviewPlaybackSpeed: (next: PreviewPlaybackSpeed) => void;
     readonly selectionAnchor: SelectionAnchor;
@@ -329,6 +332,13 @@ export const useUiStore = create<UiState>((set) => ({
   },
   previewPlaying: false,
   setPreviewPlaying: (next) => set({ previewPlaying: next }),
+  previewRestartRevision: 0,
+  restartPreviewPlayback: () =>
+    set((state) => ({
+      scrubberT: 0,
+      previewPlaying: false,
+      previewRestartRevision: state.previewRestartRevision + 1,
+    })),
   previewPlaybackSpeed: 'normal',
   setPreviewPlaybackSpeed: (next) => set({ previewPlaybackSpeed: next }),
   selectionAnchor: 'nw',

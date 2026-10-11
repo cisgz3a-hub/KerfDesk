@@ -3,10 +3,17 @@
 // platform exposes one (both machine modes — ADR-255 lifted the ADR-101
 // CNC-only gate). The F-CNC10 2D simulator flow remains.
 
-import type { Toolpath } from '../../core/job';
-import { parseGcodeProgram } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
 import type { GcodeInspectionSource } from '../gcode-inspector';
+import {
+  deviceInspectionContext,
+  type GcodeInspectionContext,
+} from '../gcode-inspector/gcode-inspection-source';
+import {
+  parseTimedGcodePreview,
+  type GcodePreviewParseResult,
+} from '../import/gcode-preview-timing';
+import { useStore } from '../state/store';
 import {
   parseGcodeOffThread,
   type ImportWorkerRequestOptions,
@@ -19,6 +26,7 @@ import { createImportWorkerControls, isImportCancellation } from './import-worke
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
 type GcodeSourceFile = BlobSourceFile;
+type OpenPreview = ReturnType<typeof useStore.getState>['openExternalGcodePreview'];
 
 const GCODE_ACCEPT = ['.nc', '.gcode', '.tap'];
 
@@ -82,7 +90,7 @@ export async function handleOpenGcodeInspector(
 
 export async function handleOpenGcodePreview(
   platform: PlatformAdapter,
-  openPreview: (name: string, toolpath: Toolpath) => void,
+  openPreview: OpenPreview,
   pushToast: PushToast,
 ): Promise<void> {
   const file = await pickGcodeFile(platform, pushToast);
@@ -102,28 +110,37 @@ export async function handleOpenGcodePreview(
 export function open2dSimulatorFromText(
   name: string,
   text: string,
-  openPreview: (name: string, toolpath: Toolpath) => void,
+  openPreview: OpenPreview,
   pushToast: PushToast,
 ): void {
-  open2dSimulatorFromResult(name, parseGcodeProgram(text), openPreview, pushToast);
+  open2dSimulatorFromResult(
+    name,
+    parseTimedGcodePreview(text, previewTimingContext()),
+    openPreview,
+    pushToast,
+  );
 }
 
 export async function open2dSimulatorFromSource(
   name: string,
   source: GcodeInspectionSource,
-  openPreview: (name: string, toolpath: Toolpath) => void,
+  openPreview: OpenPreview,
   pushToast: PushToast,
   options: ImportWorkerRequestOptions = {},
 ): Promise<void> {
   try {
+    const context = previewTimingContext(source);
     const offThread =
       source.kind === 'blob'
-        ? parseGcodeOffThread(source.blob, options)
-        : parseGcodeOffThread(new Blob([source.text]), options);
+        ? parseGcodeOffThread(source.blob, options, context)
+        : parseGcodeOffThread(new Blob([source.text]), options, context);
     const result =
       offThread ??
       (pushToast(mainThreadImportFallbackAdvisory(name), 'warning'),
-      parseGcodeProgram(source.kind === 'text' ? source.text : await source.blob.text()));
+      parseTimedGcodePreview(
+        source.kind === 'text' ? source.text : await source.blob.text(),
+        context,
+      ));
     open2dSimulatorFromResult(name, await result, openPreview, pushToast);
   } catch (error) {
     pushToast(
@@ -137,8 +154,8 @@ export async function open2dSimulatorFromSource(
 
 function open2dSimulatorFromResult(
   name: string,
-  result: ReturnType<typeof parseGcodeProgram>,
-  openPreview: (name: string, toolpath: Toolpath) => void,
+  result: GcodePreviewParseResult,
+  openPreview: OpenPreview,
   pushToast: PushToast,
 ): void {
   if (result.kind === 'error') {
@@ -149,11 +166,22 @@ function open2dSimulatorFromResult(
     pushToast(`${name}: no motion found — nothing to simulate.`, 'warning');
     return;
   }
-  openPreview(name, annotateGcode2dPreviewPressure(result.toolpath));
+  openPreview(name, annotateGcode2dPreviewPressure(result.toolpath), result.timing);
   const skipped = result.notes.length > 0 ? ` (${result.notes.join(', ')})` : '';
   pushToast(
     `Simulating ${name}: ${result.summary.cutMm.toFixed(0)} mm cut, ` +
       `${result.summary.travelMm.toFixed(0)} mm travel${skipped}. Exit Preview to return.`,
     'success',
   );
+}
+
+function previewTimingContext(source: GcodeInspectionContext = {}): GcodeInspectionContext {
+  const project = useStore.getState().project;
+  const current = deviceInspectionContext(project.device, project.machine?.kind ?? 'laser');
+  const timing = source.timing ?? current.timing;
+  return {
+    machineKind: source.machineKind ?? current.machineKind,
+    laserPowerControl: source.laserPowerControl ?? current.laserPowerControl,
+    ...(timing === undefined ? {} : { timing }),
+  };
 }

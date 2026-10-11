@@ -135,6 +135,13 @@ async function zeroZHere(
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
+  // Tool edits and Undo can run while readiness or the G92 acknowledgement is
+  // pending. The reference belongs to the tool/epoch that initiated this action.
+  const workZZeroEvidence = captureWorkZZeroEvidence(
+    'manual-zero',
+    get().workZReferenceEpoch,
+    selectedCncToolId(useStore.getState().project),
+  );
   await assertOriginActionReady(set, get, refs, safeWrite);
   const machineBeforeG92 = hostRecordedMachinePosition(get());
   await runOriginTransaction(
@@ -145,11 +152,7 @@ async function zeroZHere(
     'Zero work Z',
     (write) => zeroZHereAction(write, usesPrimaryWcs(get())),
     () => ({
-      workZZeroEvidence: captureWorkZZeroEvidence(
-        'manual-zero',
-        get().workZReferenceEpoch,
-        selectedCncToolId(useStore.getState().project),
-      ),
+      workZZeroEvidence,
       ...hostRecordedZeroZPatch(machineBeforeG92, get().wcoCache),
     }),
   );

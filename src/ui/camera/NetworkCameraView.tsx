@@ -6,6 +6,7 @@
 // camera pixel, for tools that let the operator point at the picture.
 
 import { type CSSProperties, useEffect, useState } from 'react';
+import { withCacheBuster } from './frame-source';
 
 const NETWORK_FRAME_INTERVAL_MS = 1500;
 
@@ -53,7 +54,9 @@ export function NetworkCameraView(props: { readonly frameUrl: string }): JSX.Ele
   return (
     <img
       crossOrigin="anonymous"
-      src={`${props.frameUrl}?t=${tick}`}
+      // Keep the bridge's nested camera URL unchanged so slow polls can share
+      // its in-flight fetch instead of queuing a different upstream address.
+      src={withCacheBuster(props.frameUrl, tick)}
       alt="Laser machine camera"
       style={feedStyle}
     />

@@ -10,7 +10,8 @@ import {
   type SvgPaint,
 } from './svg-paint';
 import { NO_MARKERS, svgMarkerReferences, type SvgMarkerReferences } from './svg-markers';
-import type { SvgStyleCascade } from './svg-stylesheet';
+import { svgInlinePaintOpacityStyles, type SvgStyleCascade } from './svg-stylesheet';
+import { isSvgPaintOpacityProperty, parseSvgPaintOpacity } from './svg-paint-opacity';
 import type { SvgRect, SvgViewportSize } from './svg-viewport';
 import { svgOverflow, type SvgOverflow } from './svg-overflow';
 
@@ -47,6 +48,8 @@ export type PresentationState = {
   readonly opacity: number;
   readonly strokeOpacity: number;
   readonly fillOpacity: number;
+  readonly strokeOpacityUnresolved: boolean;
+  readonly fillOpacityUnresolved: boolean;
   /** The computed visibility keyword; null until something sets it (visible). */
   readonly visibility: string | null;
   /** A zero stroke-width paints no stroke (SVG 2 painting.html#StrokeWidth). */
@@ -72,6 +75,8 @@ export const INITIAL_PRESENTATION_STATE: PresentationState = {
   opacity: 1,
   strokeOpacity: 1,
   fillOpacity: 1,
+  strokeOpacityUnresolved: false,
+  fillOpacityUnresolved: false,
   visibility: null,
   strokeWidthZero: false,
   markers: NO_MARKERS,
@@ -93,10 +98,16 @@ export function presentationStateFor(
   const stroke = specifiedPaint(specifiedValues(el, styles, 'stroke'), parent.stroke);
   const fill = specifiedPaint(specifiedValues(el, styles, 'fill'), parent.fill);
   const opacity = parent.opacity * parseOpacity(presentationValue(el, styles, 'opacity'));
-  const strokeOpacity =
-    parent.strokeOpacity * parseOpacity(presentationValue(el, styles, 'stroke-opacity'));
-  const fillOpacity =
-    parent.fillOpacity * parseOpacity(presentationValue(el, styles, 'fill-opacity'));
+  const strokeOpacity = inheritedPaintOpacity(
+    specifiedValues(el, styles, 'stroke-opacity'),
+    parent.strokeOpacity,
+    parent.strokeOpacityUnresolved,
+  );
+  const fillOpacity = inheritedPaintOpacity(
+    specifiedValues(el, styles, 'fill-opacity'),
+    parent.fillOpacity,
+    parent.fillOpacityUnresolved,
+  );
   const transform = multiplySvgMatrix(
     parent.transform,
     parseSvgTransform(presentationValue(el, styles, 'transform')),
@@ -125,8 +136,10 @@ export function presentationStateFor(
     ),
     ...visibilityState(property, parent, opacity),
     opacity,
-    strokeOpacity,
-    fillOpacity,
+    strokeOpacity: strokeOpacity.value,
+    fillOpacity: fillOpacity.value,
+    strokeOpacityUnresolved: strokeOpacity.unresolved,
+    fillOpacityUnresolved: fillOpacity.unresolved,
     strokeWidthZero: strokeWidthZero(property('stroke-width'), parent.strokeWidthZero),
     markers: svgMarkerReferences(property, parent.markers),
     viewport: parent.viewport,
@@ -180,7 +193,10 @@ export function svgPresentationStyles(
   el: Element,
   cascadeStyles: SvgStyleCascade,
 ): ReadonlyMap<string, string> {
-  return cascadeStyles(el, styleMap(el.getAttribute('style')));
+  return cascadeStyles(
+    el,
+    styleMap(el.getAttribute('style'), el.getAttributeNode('style')?.value ?? null),
+  );
 }
 
 // The style declaration outranks the presentation attribute. Each is tried in
@@ -190,7 +206,13 @@ function specifiedValues(
   styles: ReadonlyMap<string, string>,
   name: string,
 ): readonly (string | null)[] {
-  return [styles.get(name) ?? null, el.getAttribute(name)];
+  // linkedom XML getAttribute() re-escapes the already decoded Attr.value.
+  // CSS must consume that value once; another entity decoder would wrongly
+  // turn literal &lt; text (source &amp;lt;) into syntax.
+  const attribute = isSvgPaintOpacityProperty(name)
+    ? (el.getAttributeNode(name)?.value ?? null)
+    : el.getAttribute(name);
+  return [styles.get(name) ?? null, attribute];
 }
 
 // fill and stroke inherit: an unset, `inherit` or invalid value keeps the
@@ -208,6 +230,25 @@ function specifiedPaint(
   return inherited;
 }
 
+// Fill/stroke opacity belongs to each element's paint and inherits as a value
+// (SVG 2 painting). A child can replace its parent's zero; only overall group
+// opacity compounds. Invalid declarations fall through to the next candidate.
+function inheritedPaintOpacity(
+  values: readonly (string | null)[],
+  inherited: number,
+  unresolved: boolean,
+): { value: number; unresolved: boolean } {
+  const parent = { value: inherited, unresolved };
+  for (const value of values) {
+    const parsed = parseSvgPaintOpacity(value);
+    if (parsed === 'inherit' || parsed === 'revert-layer') return parent;
+    if (parsed === 'unresolved') return { value: 1, unresolved: true };
+    if (parsed === 'initial') return { value: 1, unresolved: false };
+    if (parsed !== null) return { value: parsed, unresolved: false };
+  }
+  return parent;
+}
+
 function presentationValue(
   el: Element,
   styles: ReadonlyMap<string, string>,
@@ -218,7 +259,7 @@ function presentationValue(
   return el.getAttribute(name);
 }
 
-function styleMap(style: string | null): Map<string, string> {
+function styleMap(style: string | null, paintStyle: string | null): Map<string, string> {
   const map = new Map<string, string>();
   if (style === null) return map;
   for (const declaration of style.split(';')) {
@@ -226,8 +267,11 @@ function styleMap(style: string | null): Map<string, string> {
     if (separator < 0) continue;
     const name = declaration.slice(0, separator).trim().toLowerCase();
     const value = declaration.slice(separator + 1).trim();
-    if (name !== '') map.set(name, value);
+    if (name !== '' && !isSvgPaintOpacityProperty(name)) map.set(name, value);
   }
+  // Opacity declarations must be validated before duplicate names collapse,
+  // including inline !important precedence and comments containing semicolons.
+  for (const [name, value] of svgInlinePaintOpacityStyles(paintStyle ?? '')) map.set(name, value);
   return map;
 }
 

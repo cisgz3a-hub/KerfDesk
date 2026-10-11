@@ -49,7 +49,7 @@ export function assembleExecutablePlan(input: AssembleExecutablePlanInput): Exec
       lineEnding: detectLineEnding(gcode),
     },
     motions,
-    events: model.events,
+    events: model.events.map(executablePlanEvent),
     bounds: {
       allMotionMm: motionBounds(motions),
       processMm: motionBounds(motions, (motion) => motion.intent === 'process'),
@@ -59,6 +59,14 @@ export function assembleExecutablePlan(input: AssembleExecutablePlanInput): Exec
     diagnostics: { unsupportedWords: model.unsupportedWords },
     compatibility: { serializer: 'legacy-gcode-v1', exactProgram: gcode },
   };
+}
+
+function executablePlanEvent(event: ProgramEvent): ExecutablePlanV1['events'][number] {
+  // Dwell ordering is parser/timing metadata, outside the closed v1 schema.
+  // Keep the parser event intact for timing and preserve the event sequence.
+  return event.kind === 'dwell'
+    ? { kind: event.kind, line: event.line, seconds: event.seconds }
+    : event;
 }
 
 function motionBounds(

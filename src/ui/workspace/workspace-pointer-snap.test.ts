@@ -10,7 +10,12 @@ afterEach(() => {
 
 describe('snapContextFor', () => {
   it('snaps node drags against the scene as it was, and draw and measure drags freely', () => {
-    const nodeDrag = { kind: 'path-node', startScenePoint: origin } as const;
+    const nodeDrag = {
+      kind: 'path-node',
+      startScenePoint: origin,
+      startNodeScenePoint: origin,
+      startPrimaryScenePoint: origin,
+    } as const;
 
     expect(snapContextFor(nodeDrag, { kind: 'select' }, false)).toEqual({
       kind: 'node',

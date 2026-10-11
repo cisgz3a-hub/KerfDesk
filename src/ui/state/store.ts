@@ -231,7 +231,11 @@ export type AppState = PartGeneratorActions &
     // External .nc program shown in the simulator instead of the compiled
     // job (H.6b); cleared when Preview exits. Session-only, never persisted.
     readonly externalGcodePreview: ExternalGcodePreview | null;
-    readonly openExternalGcodePreview: (name: string, toolpath: Toolpath) => void;
+    readonly openExternalGcodePreview: (
+      name: string,
+      toolpath: Toolpath,
+      timing?: ExternalGcodePreview['timing'],
+    ) => void;
     readonly closeExternalGcodePreview: () => void;
     readonly undoStack: ReadonlyArray<Project>;
     readonly redoStack: ReadonlyArray<Project>;
