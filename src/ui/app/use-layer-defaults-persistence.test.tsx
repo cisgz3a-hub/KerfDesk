@@ -14,6 +14,7 @@ import {
   type LayerDefaultsState,
 } from '../state/layer-default-actions';
 import { useLayerDefaultsPersistence } from './use-layer-defaults-persistence';
+import { useLayerDefaultsPreference } from '../state/layer-defaults-preference';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -48,6 +49,7 @@ async function mountHook(): Promise<{ readonly unmount: () => Promise<void> }> {
 }
 
 afterEach(() => {
+  useLayerDefaultsPreference.setState({ autoApply: false });
   localStorage.clear();
   resetStore();
 });
@@ -206,4 +208,18 @@ describe('useLayerDefaultsPersistence', () => {
       }
     },
   );
+});
+
+describe('applying saved defaults to new projects and the next session', () => {
+  it('restores defaults as active when the operator opted in', async () => {
+    useLayerDefaultsPreference.getState().setAutoApply(true);
+    persistLayerDefaults(localStorage, useStore.getState().project.device.name, defaultsFixture());
+    const { unmount } = await mountHook();
+    try {
+      expect(useStore.getState().layerDefaults.applyToNewOperations).toBe(true);
+      expect(localStorage.getItem('lf2:layer-defaults-auto-apply:v1')).toBe('true');
+    } finally {
+      await unmount();
+    }
+  });
 });
