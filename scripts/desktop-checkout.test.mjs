@@ -23,6 +23,32 @@ function page(search = `?_ptxn=${transaction}`) {
   return new JSDOM(html, { url: `https://kerfdesk.com/buy.html${search}` }).window;
 }
 
+test('www purchase links move to the canonical origin before requests or order creation', async () => {
+  for (const path of ['/buy', '/buy/', '/buy.html']) {
+    for (const query of ['', `?_ptxn=${transaction}`]) {
+      const window = page();
+      const redirected = [];
+      let requests = 0;
+      const aliasWindow = {
+        document: window.document,
+        location: {
+          href: `https://www.kerfdesk.com${path}${query}#licence`,
+          replace: (url) => redirected.push(url),
+        },
+      };
+      await startCheckoutPage(aliasWindow, async () => {
+        requests += 1;
+        throw new Error('The www page must not request checkout');
+      });
+      assert.deepEqual(redirected, [`https://kerfdesk.com${path}${query}#licence`]);
+      assert.equal(requests, 0);
+      assert.equal(window.document.getElementById('browser-purchase').hidden, true);
+      assert.equal(window.document.querySelector('script[src^="https://"]'), null);
+      window.close();
+    }
+  }
+});
+
 test('only an exact server-created transaction URL can start checkout', async () => {
   for (const search of [
     '?price=1',

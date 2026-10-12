@@ -1,4 +1,4 @@
-/* global setTimeout, clearTimeout, fetch, window */
+/* global URL, setTimeout, clearTimeout, fetch, window */
 import { checkoutTransaction, publicConfig } from './desktop-checkout-api.mjs';
 import { startBrowserPurchase } from './desktop-browser-purchase.mjs';
 export { checkoutTransaction, checkoutConfiguration } from './desktop-checkout-api.mjs';
@@ -60,6 +60,18 @@ export async function startCheckoutPage(window, fetcher = fetch) {
   const status = window.document.getElementById('checkout-status');
   const button = window.document.getElementById('checkout-open');
   if (!status || !button) return;
+  // The licence service accepts only the canonical purchase origin. The www
+  // alias serves this page too, so move there before checking availability or
+  // reading saved orders. Keep payment-link queries for the same transaction.
+  const page = new URL(window.location.href);
+  if (
+    page.origin === 'https://www.kerfdesk.com' &&
+    ['/buy', '/buy/', '/buy.html'].includes(page.pathname)
+  ) {
+    page.hostname = 'kerfdesk.com';
+    window.location.replace(page.href);
+    return;
+  }
   const transaction = checkoutTransaction(window.location.search);
   if (transaction === null) {
     if (window.location.search === '') return startBrowserPurchase(window, fetcher, openCheckout);

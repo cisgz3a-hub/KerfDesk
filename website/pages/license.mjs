@@ -2,9 +2,9 @@
 // owner's settled offer, commerce.config.mjs, ADR-524 Amendment 1); the MIT
 // License of the versions up to the mit-final cutoff (ADR-543) is named in
 // currentLicenseSection and nowhere else on the site, with no link to the
-// private source repository; bundled parts keep their own licenses. No sale, no
-// sale terms (they are published before sales open) and no selling points about
-// source access. The app's License & Safety Notice is public/eula.txt.
+// private source repository; bundled parts keep their own licenses. Purchase
+// availability follows commerce.config.mjs. The app's License & Safety Notice
+// is public/eula.txt.
 
 import {
   actions,
@@ -60,8 +60,7 @@ function currentLicenseSection() {
         You may use the web app and the desktop app free of charge, for personal or business work,
         under the License &amp; Safety Notice that comes with them. That free use doesn’t cover the
         tools the app marks as Pro: they need an active trial or a paid license under the KerfDesk
-        Licence Agreement, which is published before sales open. Bypassing or disabling the license
-        checks isn’t allowed.
+        Licence Agreement. Bypassing or disabling the license checks isn’t allowed.
       </p>
       <p>
         Versions up to and including the one tagged “mit-final” in KerfDesk’s source history were
@@ -78,7 +77,7 @@ function proLicenseSection(commerce) {
     id: 'pro-license',
     eyebrow: 'Free and Pro',
     title: 'The Free edition and the Pro license',
-    lead: 'Free has no time limit. Pro adds the Pro tools with a one-time license. Purchase opens soon; nothing can be bought yet.',
+    lead: `Free has no time limit. Pro adds the Pro tools with a one-time license.${commerce.salesOpen ? ' You can buy Pro through the KerfDesk purchase page.' : ' Purchase opens soon; nothing can be bought yet.'}`,
     content: html`${featureGrid(proLicenseFacts(commerce))}
     ${actions(button('/pricing/', 'See pricing', { iconName: 'tag', variant: 'secondary' }))}`,
   });
