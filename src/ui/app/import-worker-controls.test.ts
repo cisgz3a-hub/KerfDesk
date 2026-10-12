@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useToastStore } from '../state/toast-store';
+import { bindImportActionsToDocument, captureImportDocumentOwner } from './import-dispatch';
 import { createImportWorkerControls } from './import-worker-controls';
+import { claimProjectOpenRequest } from './project-open-request-owner';
 
 afterEach(() => {
   for (const toast of useToastStore.getState().toasts)
@@ -64,4 +66,45 @@ describe('createImportWorkerControls', () => {
     ]);
     second.dispose();
   });
+
+  it.each(['artwork import', 'project open'] as const)(
+    'keeps and dismisses keyed progress through the %s document owner',
+    (kind) => {
+      let documentEpoch = 0;
+      const getProjectDocumentEpoch = () => documentEpoch;
+      const { pushToast } = useToastStore.getState();
+      const ownedPushToast =
+        kind === 'artwork import'
+          ? bindImportActionsToDocument(
+              {
+                getProjectDocumentEpoch,
+                importSvgObject: vi.fn(),
+                importRasterImage: vi.fn(),
+                pushToast,
+              },
+              captureImportDocumentOwner(getProjectDocumentEpoch),
+            ).pushToast
+          : claimProjectOpenRequest(
+              pushToast,
+              () => 1,
+              () => 1,
+              getProjectDocumentEpoch,
+            ).pushToast;
+      const controls = createImportWorkerControls('grid.svg', ownedPushToast);
+      try {
+        controls.options.onProgress?.({ phase: 'reading', queuePosition: 0 });
+        controls.options.onProgress?.({ phase: 'parsing', queuePosition: 0 });
+        expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
+          'grid.svg: parsing in worker. Press Esc to cancel.',
+        ]);
+
+        documentEpoch += 1;
+        ownedPushToast('Late completion', 'success');
+        expect(useToastStore.getState().toasts).toHaveLength(1);
+      } finally {
+        controls.dispose();
+      }
+      expect(useToastStore.getState().toasts).toEqual([]);
+    },
+  );
 });
