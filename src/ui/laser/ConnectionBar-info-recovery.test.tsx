@@ -39,10 +39,58 @@ async function render(props: Partial<Props>): Promise<HTMLDivElement> {
 }
 
 function findButton(container: HTMLElement, label: string): HTMLButtonElement | undefined {
-  return [...container.querySelectorAll('button')].find((button) => button.textContent === label);
+  return [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === label || button.getAttribute('aria-label') === label,
+  );
 }
 
 describe('ConnectionBar controller information recovery', () => {
+  it('dismisses and reopens the notification without invoking a controller action', async () => {
+    const onRetry = vi.fn();
+    const onReconnect = vi.fn();
+    const container = await render({
+      reconnectRecommended: true,
+      onRetryQualification: onRetry,
+      onReconnectQualification: onReconnect,
+    });
+    const trigger = findButton(container, 'Controller info');
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+    const dismiss = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Dismiss controller notification"]',
+    );
+    await act(async () => dismiss?.click());
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
+    expect(onRetry).not.toHaveBeenCalled();
+    expect(onReconnect).not.toHaveBeenCalled();
+
+    await act(async () => trigger?.click());
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    const retry = findButton(container, 'Retry reading controller settings');
+    await act(async () => {
+      retry?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('keeps a dismissed failure hidden through status updates and opens a new session failure', async () => {
+    const container = await render({});
+    await act(async () => findButton(container, 'Controller info')?.click());
+    await render({ qualificationReadBlockReason: 'Controller is in Alarm.' });
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+
+    await render({
+      qualification: { kind: 'failed', epoch: 5, message: 'The settings response was empty.' },
+    });
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+
+    await render({ qualification: { kind: 'qualified', epoch: 5, settings: 'verified' } });
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(findButton(container, 'Controller info')).toBeUndefined();
+  });
+
   it('disables Retry until the authoritative read readiness clears', async () => {
     const onRetry = vi.fn();
     const reason =
