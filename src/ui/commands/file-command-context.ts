@@ -1,3 +1,4 @@
+import { handleImportGcodeArtwork } from '../app/import-gcode-artwork';
 import { handleExportPalette } from '../app/export-palette';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { handleImportDxf, handleImportSvg, handleSaveProject } from '../app/file-actions';
@@ -46,6 +47,7 @@ type FileCommandContext = Pick<
   | 'exportGeoJson'
   | 'exportAi'
   | 'exportPalette'
+  | 'importGcodeArtwork'
   | 'openGcodePreview'
   | 'inspectCurrentGcode'
   | 'exitApp'
@@ -136,12 +138,20 @@ function artworkFormatExports(
   pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
 ): Pick<
   AppCommandContext,
-  'exportPdf' | 'exportAi' | 'exportPalette' | 'exportEps' | 'exportGeoJson'
+  'exportPdf' | 'exportAi' | 'exportPalette' | 'exportEps' | 'exportGeoJson' | 'importGcodeArtwork'
 > {
   return {
     exportPdf: () => exportArtworkFormat(platform, pushToast, 'pdf'),
     exportAi: () => exportArtworkFormat(platform, pushToast, 'ai'),
     exportPalette: () => void handleExportPalette({ platform, pushToast }),
+    importGcodeArtwork: () =>
+      void handleImportGcodeArtwork({
+        platform,
+        project: () => useStore.getState().project,
+        importObject: (object) => useStore.getState().importSvgObject(object),
+        getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+        pushToast,
+      }),
     exportEps: () => exportArtworkFormat(platform, pushToast, 'eps'),
     exportGeoJson: () => exportArtworkFormat(platform, pushToast, 'geojson'),
   };

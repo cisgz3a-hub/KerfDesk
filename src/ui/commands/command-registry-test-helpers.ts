@@ -30,6 +30,7 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     exportGeoJson: vi.fn(),
     exportAi: vi.fn(),
     exportPalette: vi.fn(),
+    importGcodeArtwork: vi.fn(),
     ...baseCtxAppearance(),
     ...overrides,
   } as AppCommandContext;

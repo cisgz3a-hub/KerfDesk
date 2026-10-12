@@ -103,6 +103,11 @@ export const FILE_COMMAND_HELP: Readonly<
     tooltip:
       "Save KerfDesk's operation colours as a palette for other design software: .gpl for GIMP, Inkscape and Krita, .ase for Adobe Illustrator and Photoshop, or .xml for CorelDRAW, chosen by the file type you save as. Draw in these colours and the artwork imports onto matching operations.",
   },
+  'file.import-gcode-artwork': {
+    family: 'file',
+    tooltip:
+      'Bring the cutting moves of a G-code file in as one editable vector object, placed where the program cuts on this bed (travel moves and laser-off moves are left out; arcs come in as short lines). Only the shapes come across, not speeds, powers or passes. To check or run a program as it is, open it in the G-code Inspector instead.',
+  },
   'file.exit': {
     family: 'file',
     tooltip:
