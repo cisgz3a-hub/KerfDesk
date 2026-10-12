@@ -30,7 +30,7 @@ test('one studio preserves vector drafts and photo edits through Apply and proje
   const height = studio.getByRole('textbox', { name: 'Height in mm', exact: true });
   const originalWidth = await width.inputValue();
   const originalHeight = await height.inputValue();
-  await studio.getByRole('button', { name: '↷ 90° right', exact: true }).click();
+  await studio.getByRole('button', { name: '90° right', exact: true }).click();
   await expect(width).toHaveValue(originalHeight);
   await expect(height).toHaveValue(originalWidth);
   await studio.getByRole('button', { name: 'Undo', exact: true }).click();
