@@ -39,10 +39,88 @@ async function render(props: Partial<Props>): Promise<HTMLDivElement> {
 }
 
 function findButton(container: HTMLElement, label: string): HTMLButtonElement | undefined {
-  return [...container.querySelectorAll('button')].find((button) => button.textContent === label);
+  return [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === label || button.getAttribute('aria-label') === label,
+  );
 }
 
 describe('ConnectionBar controller information recovery', () => {
+  it('dismisses and reopens the notification without invoking a controller action', async () => {
+    const onRetry = vi.fn();
+    const onReconnect = vi.fn();
+    const container = await render({
+      reconnectRecommended: true,
+      onRetryQualification: onRetry,
+      onReconnectQualification: onReconnect,
+    });
+    const trigger = findButton(container, 'More connection options');
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    const dismiss = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Dismiss controller notification"]',
+    );
+    await act(async () => dismiss?.click());
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(onRetry).not.toHaveBeenCalled();
+    expect(onReconnect).not.toHaveBeenCalled();
+
+    await act(async () => trigger?.click());
+    await act(async () => findButton(document.body, 'Controller info')?.click());
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(document.activeElement?.getAttribute('aria-label')).toBe(
+      'Dismiss controller notification',
+    );
+    const retry = findButton(container, 'Retry reading controller settings');
+    await act(async () => {
+      retry?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('focuses the existing toast when Controller info is selected while it is visible', async () => {
+    const container = await render({});
+    await act(async () => findButton(container, 'More connection options')?.click());
+    await act(async () => findButton(document.body, 'Controller info')?.click());
+    expect(document.activeElement).toBe(findButton(container, 'Dismiss controller notification'));
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it('keeps a dismissed failure hidden through status updates and opens a new session failure', async () => {
+    const container = await render({});
+    await act(async () => findButton(container, 'Dismiss controller notification')?.click());
+    await render({ qualificationReadBlockReason: 'Controller is in Alarm.' });
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+
+    await render({
+      qualification: { kind: 'failed', epoch: 5, message: 'The settings response was empty.' },
+    });
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+
+    await render({ qualification: { kind: 'qualified', epoch: 5, settings: 'verified' } });
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(findButton(container, 'Controller info')).toBeUndefined();
+  });
+
+  it('opens a changed failure and resets dismissal after a retry or disconnect', async () => {
+    const container = await render({});
+    const dismiss = async () => {
+      await act(async () => findButton(container, 'Dismiss controller notification')?.click());
+      expect(container.querySelector('[role="alert"]')).toBeNull();
+    };
+    await dismiss();
+    await render({ qualification: { kind: 'failed', epoch: 4, message: 'A new timeout.' } });
+    expect(container.textContent).toContain('A new timeout.');
+    await dismiss();
+    await render({ qualification: { kind: 'qualifying', epoch: 4, phase: 'settings-read' } });
+    await render({ qualification: { kind: 'failed', epoch: 4, message: 'A new timeout.' } });
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    await dismiss();
+    await render({ connection: { kind: 'disconnected' } });
+    await render({ qualification: { kind: 'failed', epoch: 4, message: 'A new timeout.' } });
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+  });
+
   it('disables Retry until the authoritative read readiness clears', async () => {
     const onRetry = vi.fn();
     const reason =

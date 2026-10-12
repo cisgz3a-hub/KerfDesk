@@ -1,0 +1,52 @@
+.lf-controller-recovery-toast {
+  position: fixed;
+  top: 64px;
+  right: 16px;
+  z-index: var(--lf-z-toast);
+  box-sizing: border-box;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100dvh - 96px);
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--lf-bg-1);
+  box-shadow: var(--lf-shadow);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.lf-controller-recovery-toast__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.lf-controller-recovery-toast__close {
+  flex: 0 0 auto;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.lf-controller-recovery-toast p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.lf-controller-recovery-toast__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lf-controller-qualification-progress {
+  color: var(--lf-text-muted);
+  border: 1px solid var(--lf-border);
+}

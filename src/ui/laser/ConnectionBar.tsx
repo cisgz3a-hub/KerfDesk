@@ -13,12 +13,13 @@
 // the action that fits the state. machineNoun keeps the hover copy
 // machine-aware ("laser" / "router", ADR-101 §7).
 
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { assertNever } from '../../core/scene';
 import { AnchoredPopover, movePopoverFocus } from '../common/AnchoredPopover';
 import type { ControllerQualification } from '../state/laser-controller-qualification';
 import type { ConnectionState } from '../state/laser-store';
 import { CompactConnectionControls } from './CompactConnectionControls';
+import { ControllerRecoveryToast } from './ControllerRecoveryToast';
 import './ConnectionBar.css';
 
 type Props = {
@@ -53,6 +54,7 @@ type Props = {
 
 export function ConnectionBar(props: Props): JSX.Element {
   const { connection } = props;
+  const notice = useControllerNotice(props);
   return (
     <section
       className="lf-connection-compact"
@@ -69,13 +71,8 @@ export function ConnectionBar(props: Props): JSX.Element {
       >
         <PrimaryAction {...props} />
         {props.setup}
-        <ConnectionMenu {...props} />
+        <ConnectionMenu {...props} notice={notice} />
       </CompactConnectionControls>
-      {connection.kind === 'failed' && (
-        <p role="alert" className="lf-connection-card-error">
-          {connectionFailureText(connection.error, props.machineNoun)}
-        </p>
-      )}
       <QualificationNotice
         connection={connection}
         qualification={props.qualification}
@@ -84,7 +81,13 @@ export function ConnectionBar(props: Props): JSX.Element {
         onRetry={props.onRetryQualification}
         onReconnect={props.onReconnectQualification}
         disabled={props.disabled}
+        notice={notice}
       />
+      {connection.kind === 'failed' && (
+        <p role="alert" className="lf-connection-card-error">
+          {connectionFailureText(connection.error, props.machineNoun)}
+        </p>
+      )}
     </section>
   );
 }
@@ -141,9 +144,9 @@ function autoConnectTitle(props: Props): string {
     : `Connect by itself when KerfDesk starts or the ${props.machineNoun} is plugged in, to the port it used last time. Connecting only reads settings; nothing moves.`;
 }
 
-function ConnectionMenu(props: Props): JSX.Element {
+function ConnectionMenu(props: Props & { readonly notice: ControllerNotice }): JSX.Element {
   const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = props.notice.triggerRef;
   const menuId = useId();
   const close = (): void => setOpen(false);
   const run = (action: () => void): void => {
@@ -163,7 +166,7 @@ function ConnectionMenu(props: Props): JSX.Element {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        title="Choose another port, connect automatically, or forget this controller"
+        title="Show controller info, choose another port, connect automatically, or forget this controller"
         onClick={() => setOpen((value) => !value)}
       >
         <span aria-hidden="true">⋯</span>
@@ -178,6 +181,13 @@ function ConnectionMenu(props: Props): JSX.Element {
           onClose={close}
           onKeyDown={movePopoverFocus}
         >
+          {props.notice.show === undefined ? null : (
+            <MenuItem
+              label="Controller info"
+              title="Show controller information and connection recovery actions."
+              onClick={() => run(props.notice.show ?? (() => undefined))}
+            />
+          )}
           {props.onChoosePort === undefined ? null : (
             <MenuItem
               label="Use a different port…"
@@ -261,7 +271,48 @@ export function connectionFailureText(error: string, machineNoun: string): strin
   return error;
 }
 
+type ControllerNotice = {
+  readonly triggerRef: RefObject<HTMLButtonElement>;
+  readonly toastCloseRef: RefObject<HTMLButtonElement>;
+  readonly open: boolean;
+  readonly focusOnOpen: boolean;
+  readonly show: (() => void) | undefined;
+  readonly dismiss: () => void;
+};
+
+function useControllerNotice(props: Props): ControllerNotice {
+  const qualification = props.qualification;
+  const key =
+    props.connection.kind === 'connected' && qualification?.kind === 'failed'
+      ? JSON.stringify([qualification.epoch, qualification.message])
+      : null;
+  const [notice, setNotice] = useState({ key, dismissed: false, focusOnOpen: false });
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const toastCloseRef = useRef<HTMLButtonElement>(null);
+  // A new failure or a completed retry starts a fresh notice; readiness updates
+  // for the same failure leave the user's dismissal intact.
+  if (notice.key !== key) setNotice({ key, dismissed: false, focusOnOpen: false });
+  return {
+    triggerRef,
+    toastCloseRef,
+    open: key !== null && !notice.dismissed,
+    focusOnOpen: notice.focusOnOpen,
+    show:
+      key === null
+        ? undefined
+        : () => {
+            setNotice({ key, dismissed: false, focusOnOpen: true });
+            toastCloseRef.current?.focus();
+          },
+    dismiss: () => {
+      setNotice({ key, dismissed: true, focusOnOpen: false });
+      triggerRef.current?.focus();
+    },
+  };
+}
+
 type QualificationNoticeProps = {
+  readonly notice: ControllerNotice;
   readonly connection: ConnectionState;
   readonly qualification: ControllerQualification | undefined;
   readonly readBlockReason: string | null | undefined;
@@ -278,67 +329,34 @@ function QualificationNotice(props: QualificationNoticeProps): JSX.Element | nul
   if (qualification.kind === 'qualified') return null;
   if (qualification.kind === 'qualifying') {
     return (
-      <div role="status" style={qualificationStyle}>
+      <span
+        role="status"
+        className="lf-controller-recovery-toast lf-controller-qualification-progress"
+        aria-label="Controller information"
+        title={props.readBlockReason ?? qualificationMessage(qualification.phase)}
+      >
         {qualification.phase !== 'settings-read' && props.readBlockReason != null
           ? 'Waiting to read controller settings…'
           : qualificationMessage(qualification.phase)}
         {qualification.phase !== 'settings-read' && props.readBlockReason != null ? (
-          <p style={qualificationMessageStyle}>{props.readBlockReason}</p>
+          <span> {props.readBlockReason}</span>
         ) : null}
-      </div>
+      </span>
     );
   }
+  if (!props.notice.open) return null;
   return (
-    <div role="alert" className="lf-banner lf-banner--warning" style={qualificationErrorStyle}>
-      <strong style={qualificationTitleStyle}>
-        {props.reconnectRecommended
-          ? 'Controller connection needs recovery'
-          : 'Controller information unavailable'}
-      </strong>
-      <p style={qualificationMessageStyle}>{qualification.message}</p>
-      {props.readBlockReason != null ? (
-        <p role="status" style={qualificationMessageStyle}>
-          Waiting to retry: {props.readBlockReason}
-        </p>
-      ) : null}
-      <QualificationActions {...props} />
-    </div>
-  );
-}
-
-function QualificationActions(
-  props: Pick<
-    QualificationNoticeProps,
-    'onRetry' | 'onReconnect' | 'disabled' | 'readBlockReason' | 'reconnectRecommended'
-  >,
-): JSX.Element {
-  return (
-    <div style={qualificationActionsStyle}>
-      {props.onRetry !== undefined && (
-        <button
-          type="button"
-          className="lf-btn"
-          onClick={props.onRetry}
-          disabled={props.disabled || props.readBlockReason !== null}
-          title={
-            props.readBlockReason ?? 'Read controller settings again using the current connection.'
-          }
-        >
-          Retry reading controller settings
-        </button>
-      )}
-      {props.reconnectRecommended && props.onReconnect !== undefined && (
-        <button
-          type="button"
-          className="lf-btn"
-          onClick={props.onReconnect}
-          disabled={props.disabled}
-          title="Close this controller connection and reconnect. This ends any paused job."
-        >
-          Reconnect controller
-        </button>
-      )}
-    </div>
+    <ControllerRecoveryToast
+      closeRef={props.notice.toastCloseRef}
+      onDismiss={props.notice.dismiss}
+      focusOnOpen={props.notice.focusOnOpen}
+      message={qualification.message}
+      readBlockReason={props.readBlockReason}
+      reconnectRecommended={props.reconnectRecommended}
+      onRetry={props.onRetry}
+      onReconnect={props.onReconnect}
+      disabled={props.disabled}
+    />
   );
 }
 
@@ -388,22 +406,3 @@ function connectionStatusColor(connection: ConnectionState): string {
       return assertNever(connection, 'ConnectionState');
   }
 }
-
-const qualificationStyle: React.CSSProperties = {
-  color: 'var(--lf-text-muted)',
-  fontSize: 11,
-};
-// Missing controller information is recoverable through the open connection.
-// A transport problem supplies its own contextual reconnect recommendation.
-const qualificationErrorStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: 6,
-  fontSize: 11,
-};
-const qualificationTitleStyle: React.CSSProperties = { fontSize: 12 };
-const qualificationMessageStyle: React.CSSProperties = { margin: 0, lineHeight: 1.45 };
-const qualificationActionsStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 6,
-  flexWrap: 'wrap',
-};
