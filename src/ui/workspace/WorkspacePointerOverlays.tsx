@@ -11,6 +11,7 @@ import { useMemo } from 'react';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { HoverSizeReadout } from './HoverSizeReadout';
+import { MeasureHoverReadout } from './MeasureHoverReadout';
 import { RulerCursorOverlay } from './RulerCursorOverlay';
 import { ExtendShapesOverlay } from './ExtendShapesOverlay';
 import { NodeEditOverlay } from './NodeEditOverlay';
@@ -36,6 +37,12 @@ export function WorkspacePointerOverlays(props: {
         // Measuring is for the select tool at rest: a drag has its own readout
         // and owns the pointer, and Preview is not an editing surface.
         enabled={!previewMode && !props.dragging && toolMode.kind === 'select'}
+      />
+      <MeasureHoverReadout
+        project={project}
+        canvasSize={props.canvasSize}
+        viewState={viewState}
+        enabled={!previewMode && !props.dragging && toolMode.kind === 'measure'}
       />
       <ExtendShapesOverlay
         project={project}
