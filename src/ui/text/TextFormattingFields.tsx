@@ -4,6 +4,7 @@ import { FontImportButton } from './FontImportButton';
 import { FontPicker } from './FontPicker';
 import { FontUsageHint } from './FontUsageHint';
 import { TextBoxFields } from './TextBoxFields';
+import { TextStyleFields } from './TextStyleFields';
 import { PathTextFields } from './PathTextFields';
 import { TextDialogNumericFields } from './TextDialogNumericFields';
 import { VariableTextFields } from './VariableTextFields';
@@ -65,6 +66,7 @@ export function TextFormattingFields(props: Props): JSX.Element {
         setLetterSpacing={fields.setLetterSpacing}
         setBendDeg={fields.setBendDeg}
       />
+      <TextStyleFields style={values.textStyle} setStyle={fields.setTextStyle} />
       <TextBoxFields fields={fields} />
       <PathTextFields
         enabled={fields.pathEnabled}

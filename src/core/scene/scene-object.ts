@@ -238,6 +238,17 @@ export type PathTextSettings = {
   readonly acrossAlign?: PathTextAcrossAlign;
 };
 
+export type TextStyle = {
+  readonly bold?: boolean;
+  readonly italic?: boolean;
+  readonly uppercase?: boolean;
+  readonly forceRtl?: boolean;
+  /** Squeeze wider text horizontally to this width; height is kept. */
+  readonly maxWidthMm?: number;
+  /** Bend moves glyphs rigidly instead of bending their outlines. */
+  readonly bendUndistorted?: boolean;
+};
+
 export type TextObject = ObjectPowerScale & {
   readonly kind: 'text';
   readonly id: string;
@@ -252,6 +263,9 @@ export type TextObject = ObjectPowerScale & {
   // applies this as an extra advance after each glyph. Phase D.1 add.
   readonly letterSpacing: number;
   readonly bendDeg?: number;
+  // LightBurn text options (bold, italic, upper case, right-to-left, max width,
+  // undistorted bend). Absent keeps plain text.
+  readonly textStyle?: TextStyle;
   // Union this text object's overlapping outline glyphs while keeping its
   // editable source. Absent/false preserves legacy independent contours.
   readonly weldOverlaps?: boolean;

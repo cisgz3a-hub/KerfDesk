@@ -16,6 +16,7 @@ import type {
   Project,
   SceneObject,
   TextAlignment,
+  TextStyle,
   VariableTemplate,
 } from '../../core/scene';
 import type { PathTextAcrossAlign, PathTextAlongAlign } from '../../core/scene/scene-object';
@@ -41,6 +42,7 @@ export type DialogValues = TextDialogNumericValues & {
   readonly textBox?: TextBoxSettings;
   readonly pathGuide?: SceneObject;
   readonly variableTemplate?: VariableTemplate;
+  readonly textStyle?: TextStyle;
 };
 
 export type DialogFields = {
@@ -54,6 +56,7 @@ export type DialogFields = {
   readonly setBendDeg: (value: number) => void;
   readonly setTextBox: (value: TextBoxSettings | undefined) => void;
   readonly setWeldOverlaps: (value: boolean) => void;
+  readonly setTextStyle: (value: TextStyle | undefined) => void;
   readonly importFont: (file: File) => Promise<void>;
   readonly fontAvailable: boolean;
   readonly pathAvailable: boolean;
@@ -91,8 +94,15 @@ export function useTextDialogFields(
   );
   const variableTemplate = variableTemplateValue(state, variableEnabled, ignoreEmptyLines);
   const color = state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR;
+  const [textStyle, setTextStyle] = useState<TextStyle | undefined>(
+    state.mode === 'edit' ? state.textStyle : undefined,
+  );
   return {
-    values: dialogValues(basic, font, path, color, embeddedFonts, variableTemplate),
+    values: {
+      ...dialogValues(basic, font, path, color, embeddedFonts, variableTemplate),
+      ...(textStyle === undefined ? {} : { textStyle }),
+    },
+    setTextStyle,
     ...basic.setters,
     setFontKey: font.setFontKey,
     importFont: font.importFont,

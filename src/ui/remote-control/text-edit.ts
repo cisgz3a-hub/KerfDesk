@@ -1,5 +1,5 @@
 import type { AppState } from '../state/store';
-import { bendTextRender, findFontEntry } from '../../core/text';
+import { findFontEntry, styledBentRender, styledTextContent } from '../../core/text';
 import type { TextObject } from '../../core/scene';
 import { transformedBBox } from '../../core/scene/hit-test';
 import { renderTextGeometry } from '../text/render-text-geometry';
@@ -47,7 +47,7 @@ export async function prepareTextEdit(
   const rendered = await renderTextGeometry({
     fontKey,
     embeddedFonts: state.project.embeddedFonts,
-    content,
+    content: styledTextContent(content, object.textStyle),
     sizeMm: fields.fontSizeMm,
     alignment: fields.alignment,
     lineHeight: fields.lineHeight,
@@ -56,7 +56,7 @@ export async function prepareTextEdit(
   });
   signal.throwIfAborted();
   const final = await applyTextWeldInWorker(
-    bendTextRender(rendered, object.bendDeg ?? 0),
+    styledBentRender(rendered, { ...object, sizeMm: fields.fontSizeMm }),
     fontKey,
     object.weldOverlaps,
     signal,
