@@ -46,7 +46,11 @@ export function withClosingPoint(
 /** A closed curve whose segments end at its start, so a stroke draws its closing edge. */
 export function withClosingSegment(curve: CurveSubpath): CurveSubpath {
   const end = curve.segments.at(-1)?.to ?? curve.start;
-  return !curve.closed || (end.x === curve.start.x && end.y === curve.start.y)
+  // Match withClosingPoint so compatibility checks keep the same seam geometry.
+  const closedEnough =
+    Math.abs(end.x - curve.start.x) < CLOSURE_EPS_MM &&
+    Math.abs(end.y - curve.start.y) < CLOSURE_EPS_MM;
+  return !curve.closed || closedEnough
     ? curve
     : { ...curve, segments: [...curve.segments, { kind: 'line', to: curve.start }] };
 }
