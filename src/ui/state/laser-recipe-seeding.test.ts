@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { captureMaterialRecipe } from '../../core/material-library';
 import {
+  captureLayerOperationSettings,
   createLayer,
   IDENTITY_TRANSFORM,
   primaryOperationForObject,
@@ -129,6 +130,76 @@ describe('recipes that apply themselves (ADR-496)', () => {
     useStore.getState().setLayerParam(layer.id, { mode: 'fill' });
     expect(operationOf('rect')).toMatchObject({ mode: 'fill', power: 70, speed: 400 });
   });
+
+  it.each([
+    { powerMode: 'dynamic' as const },
+    { bidirectionalScanOffsetMm: 0.2 },
+    { powerMode: 'constant' as const, bidirectionalScanOffsetMm: 0.3 },
+  ])('records the applied recipe after clearing prior optional settings %j', (prior) => {
+    const layer = drawRectangle();
+    useStore.getState().setLayerParam(layer.id, prior);
+    useStore.getState().setJobLaserMaterial(BIRCH_3);
+    useStore.getState().applyBestRecipesToOperations();
+    const linked = operationOf('rect');
+    expect(linked.powerMode).toBeUndefined();
+    expect(linked.bidirectionalScanOffsetMm).toBeUndefined();
+    expect(linked.materialBinding?.lastResolved).toEqual(captureLayerOperationSettings(linked));
+    useStore.getState().setLayerParam(layer.id, { mode: 'fill' });
+    expect(operationOf('rect')).toMatchObject({
+      mode: 'fill',
+      power: 35,
+      speed: 3000,
+      materialBinding: { presetId: 'birch-3-engrave' },
+    });
+  });
+
+  it.each([{ power: 70 }, { powerMode: 'dynamic' as const }, { bidirectionalScanOffsetMm: 0.4 }])(
+    'preserves genuine edits after a recipe cleared optional settings %j',
+    (edit) => {
+      const layer = drawRectangle();
+      useStore
+        .getState()
+        .setLayerParam(layer.id, { powerMode: 'constant', bidirectionalScanOffsetMm: 0.2 });
+      useStore.getState().setJobLaserMaterial(BIRCH_3);
+      useStore.getState().applyBestRecipesToOperations();
+      useStore.getState().setLayerParam(layer.id, edit);
+      useStore.getState().setLayerParam(layer.id, { mode: 'fill' });
+      expect(operationOf('rect')).toMatchObject({ mode: 'fill', speed: 400, ...edit });
+    },
+  );
+
+  it.each(['refresh', 'apply-best'] as const)(
+    'repairs a stale saved snapshot on explicit %s only once',
+    (action) => {
+      useStore.getState().setJobLaserMaterial(BIRCH_3);
+      const layer = drawRectangle();
+      const binding = layer.materialBinding!;
+      useStore.getState().setLayerParam(layer.id, {
+        materialBinding: {
+          ...binding,
+          lastResolved: {
+            ...binding.lastResolved,
+            powerMode: 'dynamic',
+            bidirectionalScanOffsetMm: 0.2,
+          },
+        },
+      });
+      const apply = () =>
+        action === 'refresh'
+          ? useStore.getState().refreshLinkedMaterialLayer(layer.id)
+          : useStore.getState().applyBestRecipesToOperations().applied > 0;
+      const undoDepth = useStore.getState().undoStack.length;
+      expect(apply()).toBe(true);
+      expect(operationOf('rect').materialBinding?.lastResolved).toEqual(
+        captureLayerOperationSettings(operationOf('rect')),
+      );
+      expect(useStore.getState().undoStack).toHaveLength(undoDepth + 1);
+      expect(apply()).toBe(false);
+      expect(useStore.getState().undoStack).toHaveLength(undoDepth + 1);
+      useStore.getState().setLayerParam(layer.id, { mode: 'fill' });
+      expect(operationOf('rect')).toMatchObject({ mode: 'fill', power: 35, speed: 3000 });
+    },
+  );
 
   it('applies the best recipes to every operation as one undo step', () => {
     drawRectangle('a', '#0000ff');
