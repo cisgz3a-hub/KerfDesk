@@ -16,6 +16,7 @@ import { MenuBarHistoryControls } from './MenuBarHistoryControls';
 import { RecentProjectMenuGroup } from '../recent-projects/RecentProjectMenuGroup';
 import { MOVE_LASER_TO_SELECTION_IDS } from './machine-move-commands';
 import { ARRANGE_LAYOUT_IDS } from './arrange-command-family';
+import { DRAW_ORDER_IDS, MATCH_SIZE_IDS, MOVE_TOGETHER_IDS } from './layout-commands';
 import { TOOLS_VECTOR_IDS } from './tools-vector-menu-ids';
 
 export function AppMenuBar(props: {
@@ -192,8 +193,11 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
         'arrange.distribute-horizontal-spacing',
         'arrange.distribute-vertical-centers',
         'arrange.distribute-vertical-spacing',
+        ...MOVE_TOGETHER_IDS,
       ],
     },
+    { label: 'Size', ids: MATCH_SIZE_IDS },
+    { label: 'Draw order', ids: DRAW_ORDER_IDS },
     {
       label: 'Rotate & flip',
       ids: [

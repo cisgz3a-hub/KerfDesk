@@ -11,7 +11,7 @@ import type { AppCommandContext, CommandId } from './command-types';
 type Outcome = {
   readonly creation?: 'sketch' | 'part' | 'relief';
   readonly callback?: keyof AppCommandContext;
-  readonly args?: ReadonlyArray<string | number>;
+  readonly args?: ReadonlyArray<string | number | boolean>;
   readonly guard?: string;
   readonly url?: string;
   readonly special?: 'tutorials' | 'unavailable' | 'licence' | 'support-report' | 'check-updates';
@@ -144,6 +144,16 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'arrange.quick-nest': { callback: 'quickNest' },
   'arrange.flip-horizontal': { callback: 'flipHorizontal' },
   'arrange.flip-vertical': { callback: 'flipVertical' },
+  'arrange.bring-to-front': { callback: 'moveSelectionInDrawOrder', args: ['front'] },
+  'arrange.bring-forward': { callback: 'moveSelectionInDrawOrder', args: ['forward'] },
+  'arrange.send-backward': { callback: 'moveSelectionInDrawOrder', args: ['backward'] },
+  'arrange.send-to-back': { callback: 'moveSelectionInDrawOrder', args: ['back'] },
+  'arrange.same-width': { callback: 'matchSelectionSize', args: ['width', false] },
+  'arrange.same-height': { callback: 'matchSelectionSize', args: ['height', false] },
+  'arrange.same-width-proportional': { callback: 'matchSelectionSize', args: ['width', true] },
+  'arrange.same-height-proportional': { callback: 'matchSelectionSize', args: ['height', true] },
+  'arrange.move-together-horizontal': { callback: 'moveSelectionTogether', args: ['horizontal'] },
+  'arrange.move-together-vertical': { callback: 'moveSelectionTogether', args: ['vertical'] },
   'arrange.rotate-90-cw': { callback: 'rotateSelectionQuarterTurn', args: [1] },
   'arrange.rotate-90-ccw': { callback: 'rotateSelectionQuarterTurn', args: [-1] },
   'arrange.move-to-bed-center': { callback: 'moveSelectionToBed', args: ['c'] },

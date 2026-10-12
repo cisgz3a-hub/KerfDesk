@@ -7,12 +7,14 @@ import type {
   OptimizeShapesCommandContext,
   OptimizeShapesCommandId,
 } from './optimize-shapes-command-types';
+import type { LayoutCommandContext, LayoutCommandId } from './layout-command-types';
 import type { VectorCutCommandContext, VectorCutCommandId } from './vector-cut-command-types';
 import type { WarpDeformCommandContext, WarpDeformCommandId } from './warp-deform-command-types';
 
 export type DesignToolsCommandContext = VectorCutCommandContext &
   WarpDeformCommandContext &
-  OptimizeShapesCommandContext & {
+  OptimizeShapesCommandContext &
+  LayoutCommandContext & {
     readonly selectContainedShapes: () => void;
     readonly selectSmallerShapes: () => void;
     readonly deleteDuplicates: () => void;
@@ -29,6 +31,7 @@ export type DesignToolsCommandId =
   | VectorCutCommandId
   | WarpDeformCommandId
   | OptimizeShapesCommandId
+  | LayoutCommandId
   | 'edit.select-contained'
   | 'edit.select-smaller'
   | 'edit.delete-duplicates'

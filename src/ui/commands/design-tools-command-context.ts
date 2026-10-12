@@ -33,6 +33,9 @@ export function designToolsCommandContext(
     ),
     copyAlongPath: openCopyAlongPathDialog,
     optimizeShapes: openOptimizeShapesDialog,
+    moveSelectionInDrawOrder: app.moveSelectionInDrawOrder,
+    matchSelectionSize: app.matchSelectionSize,
+    moveSelectionTogether: app.moveSelectionTogether,
   };
 }
 

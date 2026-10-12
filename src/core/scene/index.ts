@@ -146,6 +146,13 @@ export type {
   SelectionDistributeResult,
 } from './selection-distribute';
 export { buildSelectionDistributeEdit } from './selection-distribute';
+export type { SelectionMatchSizeEdit, SelectionMatchSizeKind } from './selection-match-size';
+export { buildSelectionMatchSizeEdit } from './selection-match-size';
+export type {
+  SelectionMoveTogetherAxis,
+  SelectionMoveTogetherEdit,
+} from './selection-move-together';
+export { buildSelectionMoveTogetherEdit } from './selection-move-together';
 export { isClosedEnough, withClosingPoint } from './polyline-closure';
 export type { OutputScope, OutputScopeValidation } from './output-scope';
 export {

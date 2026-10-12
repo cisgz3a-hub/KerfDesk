@@ -71,6 +71,10 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     startDeform: vi.fn(),
     // LBG-T22 Optimize Shapes.
     optimizeShapes: vi.fn(),
+    // LightBurn parity layout commands.
+    moveSelectionInDrawOrder: vi.fn(),
+    matchSelectionSize: vi.fn(),
+    moveSelectionTogether: vi.fn(),
   };
 }
 

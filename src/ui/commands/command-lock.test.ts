@@ -177,6 +177,9 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     startWarp: vi.fn(),
     startDeform: vi.fn(),
     optimizeShapes: vi.fn(),
+    moveSelectionInDrawOrder: vi.fn(),
+    matchSelectionSize: vi.fn(),
+    moveSelectionTogether: vi.fn(),
     ...overrides,
   };
 }
