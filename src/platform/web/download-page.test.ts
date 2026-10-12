@@ -64,7 +64,7 @@ describe('desktop Preview download page', () => {
     // Only the verified script may give the installer link an href; static links
     // in this section may open checkout or jump within the page, never download.
     expect(commercial).not.toMatch(/<a class="download"[^>]*\shref=/);
-    const hrefs = [...commercial.matchAll(/\shref="([^"]*)"/g)].map((match) => match[1]);
+    const hrefs = [...commercial.matchAll(/\shref="([^"]*)"/g)].map((match) => match[1] ?? '');
     expect(hrefs.every((href) => href === '/buy.html' || href.startsWith('#'))).toBe(true);
     // Visitors on a phone cannot install Windows software, so the page must offer checkout.
     expect(hrefs).toContain('/buy.html');
