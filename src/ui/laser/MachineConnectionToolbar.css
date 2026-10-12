@@ -91,6 +91,12 @@
 
   /* One 32 px row: the compact Laser / CNC switch, then the machine name with
      its status inline, Connect, Machine Setup and the menu. */
+  .lf-machine-toolbar .lf-connection-machine-trigger {
+    /* Let the name yield space to recovery controls before flex-wrap makes
+       another row. Its intrinsic text width varies with profile and OS font. */
+    flex: 1 1 0%;
+  }
+
   .lf-machine-toolbar .lf-connection-machine-summary {
     display: flex;
     align-items: center;
