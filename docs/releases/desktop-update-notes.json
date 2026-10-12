@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "sinceSourceSha": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
   "highlights": [
-    "Pro licences now require an online confirmation within 30 days, and trials within three days, before choosing new Pro tools. Existing work, Frame, Start and Save G-code keep working. Approved full purchase refunds and chargebacks revoke the licence at its next online refresh.",
-    "Desktop Free can reopen Pro work saved by this computer and adjust its settings. Opening Pro work from another computer or changing its artwork asks for Pro. Older projects without a computer seal need Pro once to reopen and save them.",
-    "Trial registration uses a one-way firmware code, when available, to recognise a computer after Windows is reinstalled. The privacy notice explains this and the updated confirmation schedule.",
+    "Approved full purchase refunds and chargebacks revoke Pro at the next online refresh. New Pro choices require confirmation within 30 days for paid licences or three days for trials. Existing work and output remain available.",
+    "Desktop Free reopens this computer's saved Pro work for settings edits. Imported Pro work and artwork changes ask for Pro; older unsealed projects need Pro once. Trials use a one-way firmware code to recognise repeat use.",
     "KerfDesk Design Studio brings photo and vector work into one workspace. Individual traced lines and shapes can be selected and edited directly, with better Trim tangencies and curve-preserving Close Path.",
     "Offline multilingual text shaping, Photoshop composite import and advanced nesting add more design options. Phone & MCP controls are now in the main toolbar with a live status panel.",
-    "Licence purchases recover saved Paddle orders more reliably, work on www and older browsers, and keep covered earlier installers available. Console coordinate changes refresh machine evidence, and exported G-code comments exclude realtime control bytes."
+    "Licence purchases recover saved Paddle orders more reliably and work on www and older browsers. Console coordinate changes refresh machine evidence, and exported G-code comments exclude realtime control bytes.",
+    "Saved material recipes retain their effective linked settings. Import progress and cancellation stay consistent during overlapping file opens, and recovery messages give clearer guidance when saved work is unavailable."
   ]
 }

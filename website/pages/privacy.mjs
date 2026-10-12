@@ -68,7 +68,7 @@ function connections(site) {
     [
       'The desktop app confirms a saved trial or license',
       site.licensingHost,
-      'At startup and every 30 minutes while open, the app checks whether a quiet weekly license confirmation is due. When due, it sends the installation digest and saved credential. No project, design, machine or job details.',
+      'At startup and every 30 minutes while open, the app checks whether a quiet daily trial or weekly paid license confirmation is due. When due, it sends the installation digest and saved credential. No project, design, machine or job details.',
     ],
     [
       'You open the separate Buy Pro page or check a saved purchase',
@@ -236,6 +236,11 @@ function licensing(site, appPrivacy) {
       interrupt your work. New Pro choices require a confirmation within three days for trials or 30
       days for paid licenses. Developer licenses are exempt. Existing work, Frame, Start and Save
       G-code remain available, and the signed trial expiry still applies on your computer.
+    </p>
+    <p>
+      The licensing service retains trial installation and firmware digests to recognise repeat
+      trials, including after customer license records are deleted. The firmware UUID itself is
+      never stored.
     </p>
     <p>
       The licensing service records verified Paddle refund and chargeback references and their

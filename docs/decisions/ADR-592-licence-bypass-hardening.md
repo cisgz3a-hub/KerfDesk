@@ -43,7 +43,9 @@ check-in; a firmware (SMBIOS) hardware ID for trials with safeguards; and
    confirmation, so editing saved files cannot extend it. Trials refresh daily,
    paid licences weekly, and an overdue device tries at once. Developer licences
    are exempt. A paid session that already had Pro keeps it until the app closes
-   (ADR-540 item 4).
+   (ADR-540 item 4), unless the service definitively refuses that licence or seat:
+   a revoked licence or released activation removes the session allowance for new
+   Pro choices immediately. Existing work and output remain usable.
 3. **Trials bind to hardware.** Starting a trial also sends a one-way digest of the
    firmware UUID, read through the verified System32 Windows PowerShell. The server
    refuses `trial_already_used` when that hardware already holds another
