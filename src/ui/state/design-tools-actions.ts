@@ -29,6 +29,7 @@ import {
   type PathNodeDragJoinActions,
 } from './path-node-drag-join-actions';
 import { mirrorLineActions, type MirrorLineActions } from './mirror-line-actions';
+import { rasterReplaceActions, type RasterReplaceActions } from './raster-replace-actions';
 import { extendShapesActions, type ExtendShapesActions } from './extend-shapes-actions';
 import { trimShapesActions, type TrimShapesActions } from './trim-shapes-actions';
 import { warpDeformActions, type WarpDeformActions } from './warp-deform-actions';
@@ -51,7 +52,8 @@ export type DesignToolsActions = ShapeQueryActions &
   GuideActions &
   PenContinueActions &
   PathNodeDragJoinActions &
-  MirrorLineActions;
+  MirrorLineActions &
+  RasterReplaceActions;
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 type CopySetter = (
@@ -86,5 +88,6 @@ export function designToolsActions(
     ...penContinueActions(set),
     ...pathNodeDragJoinActions(set),
     ...mirrorLineActions(set),
+    ...rasterReplaceActions(set),
   };
 }
