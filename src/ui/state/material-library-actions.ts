@@ -220,14 +220,23 @@ function bindingMatches(
   layer: Layer,
   expected: Pick<
     NonNullable<Layer['materialBinding']>,
-    'libraryId' | 'presetId' | 'presetRevision'
+    'libraryId' | 'presetId' | 'presetRevision' | 'lastResolved'
   >,
 ): boolean {
   const binding = layer.materialBinding;
   return (
     binding?.libraryId === expected.libraryId &&
     binding.presetId === expected.presetId &&
-    binding.presetRevision === expected.presetRevision
+    binding.presetRevision === expected.presetRevision &&
+    bindingSnapshotMatches(binding.lastResolved, expected.lastResolved)
+  );
+}
+
+function bindingSnapshotMatches(a: object, b: object): boolean {
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  return [...new Set([...Object.keys(left), ...Object.keys(right)])].every(
+    (key) => JSON.stringify(left[key]) === JSON.stringify(right[key]),
   );
 }
 

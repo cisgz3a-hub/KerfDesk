@@ -3,11 +3,7 @@
 // say when the library has changed it. The laser counterpart of the CNC stock
 // seeding (cnc-auto-seeding.ts).
 
-import {
-  applyMaterialRecipe,
-  materialRecipePatch,
-  type MaterialRecipe,
-} from '../../core/material-library';
+import { applyMaterialRecipe } from '../../core/material-library';
 import { bestRecipeForOperation } from '../../core/material-library/auto-recipe';
 import {
   captureLayerOperationSettings,
@@ -23,14 +19,14 @@ export function linkedPresetLayer(
   library: Pick<MaterialLibraryDocument, 'libraryId'>,
   preset: Pick<MaterialPreset, 'id' | 'revision' | 'recipe'>,
 ): Layer {
-  const recipe: MaterialRecipe = materialRecipePatch(preset.recipe);
+  const applied = applyMaterialRecipe(layer, preset.recipe);
   return {
-    ...applyMaterialRecipe(layer, preset.recipe),
+    ...applied,
     materialBinding: {
       libraryId: library.libraryId,
       presetId: preset.id,
       presetRevision: preset.revision,
-      lastResolved: { ...captureLayerOperationSettings(layer), ...recipe },
+      lastResolved: captureLayerOperationSettings(applied),
     },
   };
 }
