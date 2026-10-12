@@ -7,6 +7,6 @@
     "KerfDesk Design Studio brings photo and vector work into one workspace. Individual traced lines and shapes can be selected and edited directly, with better Trim tangencies and curve-preserving Close Path.",
     "Offline multilingual text shaping, Photoshop composite import and advanced nesting add more design options. Phone & MCP controls are now in the main toolbar with a live status panel.",
     "Licence purchases recover saved Paddle orders more reliably and work on www and older browsers. Console coordinate changes refresh machine evidence, and exported G-code comments exclude realtime control bytes.",
-    "Saved material recipes retain their effective linked settings. Import progress and cancellation stay consistent during overlapping file opens, and recovery messages give clearer guidance when saved work is unavailable."
+    "Saved material recipes retain linked settings. Imports handle cancellation and overlapping file opens more reliably. Controller recovery uses a floating toast that keeps the toolbar in place."
   ]
 }
