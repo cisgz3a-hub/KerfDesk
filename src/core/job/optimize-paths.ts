@@ -61,6 +61,7 @@ import {
 import { removeCutOverlaps } from './remove-cut-overlaps';
 import { isBurningLineGroup, lineStartCursorForJob } from './line-start-region';
 import { orderTopologyScopes } from './topology-cut-packets';
+import { directionalSegmentOrder } from './directional-order';
 
 type PathOptimizationSettings = Pick<
   ProjectOptimizationSettings,
@@ -69,9 +70,14 @@ type PathOptimizationSettings = Pick<
   Partial<
     Pick<
       ProjectOptimizationSettings,
-      'removeOverlappingLines' | 'overlapMergeToleranceMm' | 'closedShapeStart' | 'lineStartRegion'
+      | 'removeOverlappingLines'
+      | 'overlapMergeToleranceMm'
+      | 'closedShapeStart'
+      | 'lineStartRegion'
+      | 'cutDirection'
     >
   >;
+type PlannerSettings = PathOptimizationSettings & { readonly origin: Origin };
 const DEFAULT_PATH_OPTIMIZATION: PathOptimizationSettings = {
   travelPolicy: 'nearest-neighbor',
   insideFirst: true,
@@ -97,7 +103,7 @@ export function optimizePaths(
       ? prioritized.map((group) => startClosedShapesInSourceOrder(group, settings, lineStartCursor))
       : optimizeGroups(
           topology.groups,
-          settings,
+          { ...settings, origin },
           scanningOffsets,
           lineStartCursor,
           topology.orderedCuts,
@@ -159,7 +165,7 @@ function reverseLayerGroups(groups: ReadonlyArray<Group>): Group[] {
 
 function optimizeGroups(
   groups: ReadonlyArray<Group>,
-  settings: PathOptimizationSettings,
+  settings: PlannerSettings,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
   lineStartCursor: Vec2 | null,
   orderedCuts: ReadonlySet<CutGroup>,
@@ -197,7 +203,7 @@ function optimizeGroups(
 // Offset/Follow Shape is optimized as contour segments.
 function optimizeGroupAny(
   group: Group,
-  settings: PathOptimizationSettings,
+  settings: PlannerSettings,
   lineStartCursor: Vec2 | null,
 ): Group {
   if (group.kind === 'cut') return optimizeGroup(group, settings, lineStartCursor);
@@ -207,10 +213,21 @@ function optimizeGroupAny(
 
 function optimizeGroup(
   group: CutGroup,
-  settings: PathOptimizationSettings,
+  settings: PlannerSettings,
   lineStartCursor: Vec2 | null,
 ): CutGroup {
   if (group.segments.length === 0) return group;
+  if (settings.cutDirection !== undefined && lineStartCursor === null) {
+    return {
+      ...group,
+      segments: directionalSegmentOrder(group.segments, {
+        direction: settings.cutDirection,
+        origin: settings.origin,
+        insideFirst: settings.insideFirst,
+        allowsReverse: settings.pathDirection === 'allow-reverse',
+      }),
+    };
+  }
   // No size ceiling: traced artwork routinely runs to tens of thousands of
   // segments, and those are the jobs with the most travel to recover. The
   // former 2,000 cap silently returned them unoptimized.
@@ -243,7 +260,8 @@ function startClosedShapesInSourceOrder(
   lineStartCursor: Vec2 | null,
 ): Group {
   if (group.kind === 'cut' && lineStartCursor !== null && isBurningLineGroup(group)) {
-    return optimizeGroup(group, settings, lineStartCursor);
+    // A Line start region takes precedence over a sweep, so origin is unused here.
+    return optimizeGroup(group, { ...settings, origin: 'front-left' }, lineStartCursor);
   }
   if ((settings.closedShapeStart ?? 'drawn') === 'drawn') return group;
   if (group.kind === 'cut') {

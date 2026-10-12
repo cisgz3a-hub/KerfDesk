@@ -42,11 +42,15 @@ function mergeOptimization(
   current: ProjectOptimizationSettings,
   patch: Partial<ProjectOptimizationSettings>,
 ): ProjectOptimizationSettings {
-  const { lineStartRegion, ...settings } = {
+  const { lineStartRegion, cutDirection, ...settings } = {
     ...current,
     ...synchronizeTravelPolicy(patch),
   };
-  return lineStartRegion === undefined ? settings : { ...settings, lineStartRegion };
+  return {
+    ...settings,
+    ...(lineStartRegion === undefined ? {} : { lineStartRegion }),
+    ...(cutDirection === undefined ? {} : { cutDirection }),
+  };
 }
 
 function synchronizeTravelPolicy(

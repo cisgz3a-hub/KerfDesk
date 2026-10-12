@@ -31,12 +31,12 @@ import {
 } from '../../core/scene';
 import { workspaceAids } from './normalize-workspace-aids';
 import { isObject } from './project-shape-primitives';
+import { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import {
-  clampOverlapMergeTolerance,
-  DEFAULT_PROJECT_OPTIMIZATION,
-  PROJECT_SCHEMA_VERSION,
-  isLineStartRegion,
-} from '../../core/scene/project';
+  normalizedCutDirection,
+  normalizedLineStartRegion,
+  overlapMergeTolerance,
+} from './normalize-optimization-fields';
 import { migrateToCurrent } from './migrations';
 import { normalizeCncTools } from './normalize-cnc-tools';
 import { normalizeCncMachiningSetup } from './project-cnc-setup-validator';
@@ -460,23 +460,8 @@ function normalizeOptimization(value: unknown): Project['optimization'] {
       value['closedShapeStart'] === 'nearest' || value['closedShapeStart'] === 'nearest-corner'
         ? value['closedShapeStart']
         : 'drawn',
+    ...normalizedCutDirection(value['cutDirection']),
   };
-}
-
-function normalizedLineStartRegion(
-  value: unknown,
-): Pick<Project['optimization'], 'lineStartRegion'> {
-  return isLineStartRegion(value) ? { lineStartRegion: value } : {};
-}
-
-// LBG-C13. Kept absent when a file never set it (every file before the option),
-// so such a project saves byte for byte as it was read.
-function overlapMergeTolerance(
-  value: unknown,
-): Pick<Project['optimization'], 'overlapMergeToleranceMm'> {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? { overlapMergeToleranceMm: clampOverlapMergeTolerance(value) }
-    : {};
 }
 
 function normalizeAirAssistCommand(value: unknown): Project['device']['airAssistCommand'] {
