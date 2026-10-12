@@ -239,7 +239,7 @@ function filesAndFeatures() {
   ];
 }
 
-function pricingAndLicense(commerce) {
+function pricingAndLicense(site, commerce) {
   const [plan] = commerce.plans;
   return [
     {
@@ -266,8 +266,11 @@ function pricingAndLicense(commerce) {
           One license is active on up to ${plan.deviceLimit} devices at a time, and each device can
           try ${plan.name} free for ${plan.trialDays} days with no
           card${commerce.trialOpen ? '' : ', once the desktop app is released'}. When a trial ends,
-          only the ${plan.name} tools lock, and a license never stops a job from running. Purchase
-          opens soon. See <a href="/pricing/">pricing</a>.
+          only the ${plan.name} tools lock, and a license never stops a job from running.
+          ${commerce.salesOpen
+            ? html`Buy through the <a href="${site.appUrl}/buy.html">KerfDesk purchase page</a>.`
+            : 'Purchase opens soon.'}
+          See <a href="/pricing/">pricing</a>.
         </p>`,
     },
     {
@@ -340,7 +343,11 @@ export function faqSections(site, commerce) {
       items: machinesAndConnection(site),
     },
     { id: 'files-features', title: 'Files and features', items: filesAndFeatures() },
-    { id: 'pricing-license', title: 'Pricing and license', items: pricingAndLicense(commerce) },
+    {
+      id: 'pricing-license',
+      title: 'Pricing and license',
+      items: pricingAndLicense(site, commerce),
+    },
     { id: 'privacy-data', title: 'Privacy and data', items: privacyAndData(site) },
   ];
 }

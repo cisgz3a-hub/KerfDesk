@@ -1,8 +1,7 @@
 // Content for the License page. Every line traces to LICENSE, public/eula.txt,
 // THIRD_PARTY_NOTICES.md or the owner's settled Free and Pro offer of
-// 2026-09-29 (commerce.config.mjs, ADR-524 Amendment 1). Purchase isn't open:
-// the terms of sale are published before sales open, so no refund or other
-// sale term is written here. This is a plain-language summary; the license
+// 2026-09-29 (commerce.config.mjs, ADR-524 Amendment 1). Purchase availability
+// follows commerce.config.mjs. This is a plain-language summary; the license
 // texts themselves decide.
 
 import { formatPrice } from '../lib/commerce.mjs';
@@ -49,8 +48,11 @@ export function proLicenseFacts(commerce) {
     },
     {
       icon: 'file-text',
-      title: 'Terms before any sale',
-      body: 'Purchase isn’t open yet. The terms of sale will be published before sales open, so you can read them first.',
+      title: commerce.salesOpen ? 'Terms of sale' : 'Terms before any sale',
+      body: commerce.salesOpen
+        ? html`Read the <a href="${commerce.termsUrl}">terms of sale</a> and
+            <a href="${commerce.refundPolicyUrl}">refund policy</a> before buying.`
+        : 'Purchase isn’t open yet. The terms of sale will be published before sales open, so you can read them first.',
     },
   ].filter(Boolean);
 }
@@ -75,8 +77,12 @@ export function faqItems(site, commerce) {
     {
       id: 'faq-buy',
       question: 'Do I need to buy a license to use KerfDesk?',
-      answer:
-        'No. KerfDesk Free has no time limit and needs no account. A Pro license adds the Pro tools, and purchase opens soon.',
+      answer: html`<p>
+        No. KerfDesk Free has no time limit and needs no account. A Pro license adds the Pro tools.
+        ${commerce.salesOpen
+          ? html`You can buy it through the <a href="${site.appUrl}/buy.html">purchase page</a>.`
+          : 'Purchase opens soon.'}
+      </p>`,
     },
     {
       id: 'faq-business',
@@ -84,7 +90,10 @@ export function faqItems(site, commerce) {
       answer: html`<p>
         The versions released so far can be used for personal and commercial work under the terms in
         <a href="#current-license">Current license</a>. You remain responsible for running your
-        machine safely. The terms for Pro will be published before sales open.
+        machine safely.
+        ${commerce.salesOpen
+          ? html`Read the <a href="${commerce.termsUrl}">terms of sale</a> for Pro.`
+          : 'The terms for Pro will be published before sales open.'}
       </p>`,
     },
     plan && {
@@ -93,7 +102,11 @@ export function faqItems(site, commerce) {
       answer: html`<p>
         ${formatPrice(plan.price, commerce.currency)}, paid once, with one year of updates. After
         that year, ${formatPrice(plan.updateYearPrice, commerce.currency)} adds another year of
-        updates if you want it. It never renews automatically. Purchase opens soon. See
+        updates if you want it. It never renews automatically.
+        ${commerce.salesOpen
+          ? html`Buy through the <a href="${site.appUrl}/buy.html">purchase page</a>.`
+          : 'Purchase opens soon.'}
+        See
         <a href="/pricing/">pricing</a>.
       </p>`,
     },

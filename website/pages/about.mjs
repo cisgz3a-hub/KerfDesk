@@ -139,7 +139,7 @@ function made() {
   });
 }
 
-function maker(site) {
+function maker(site, commerce) {
   return section({
     tone: 'alt',
     narrow: true,
@@ -149,7 +149,11 @@ function maker(site) {
       <p>The app’s startup screen reads “Created by ${site.studio}”.</p>
       <p>
         KerfDesk comes in a Free edition with no time limit and a Pro edition with a one-time
-        license. Purchase opens soon. <a href="/pricing/">See pricing</a>.
+        license.
+        ${commerce.salesOpen
+          ? html`Buy Pro through the <a href="${site.appUrl}/buy.html">purchase page</a>.`
+          : 'Purchase opens soon.'}
+        <a href="/pricing/">See pricing</a>.
       </p>
       <h3>Why the code still says LaserForge</h3>
       <p>
@@ -203,7 +207,7 @@ export const page = {
       lead: 'Four ideas shape how KerfDesk works and how this site talks about it.',
       content: featureGrid(PRINCIPLES, { columns: 4 }),
     })}
-    ${frameFirst()} ${labels()} ${made()} ${maker(ctx.site)} ${reporting(ctx.site)}
+    ${frameFirst()} ${labels()} ${made()} ${maker(ctx.site, ctx.commerce)} ${reporting(ctx.site)}
     ${ctaBand({
       title: 'Try KerfDesk',
       body: 'It runs in Chrome, Edge and other Chromium browsers. KerfDesk Free needs no account.',

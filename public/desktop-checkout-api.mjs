@@ -1,4 +1,4 @@
-/* global URL, URLSearchParams, AbortSignal, TextDecoder */
+/* global URL, URLSearchParams, AbortController, setTimeout, clearTimeout, TextDecoder */
 export const LICENSING_ORIGIN = 'https://license.kerfdesk.com';
 
 export function checkoutTransaction(search) {
@@ -33,27 +33,35 @@ export function checkoutConfiguration(value) {
 }
 
 export async function licensingRequest(fetcher, path, body) {
-  const response = await fetcher(`${LICENSING_ORIGIN}${path}`, {
-    method: body === undefined ? 'GET' : 'POST',
-    credentials: 'omit',
-    redirect: 'error',
-    cache: 'no-store',
-    referrerPolicy: 'no-referrer',
-    signal: AbortSignal.timeout(8000),
-    ...(body === undefined
-      ? {}
-      : {
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        }),
-  });
-  const value = await boundedJson(response);
-  if (!response.ok) {
-    const error = new Error('Licence service request failed');
-    error.code = typeof value?.error?.code === 'string' ? value.error.code : 'unavailable';
-    throw error;
+  // Older browsers can support secure storage and Web Locks without the newer
+  // AbortSignal.timeout API. Keep the same deadline through response body reading.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetcher(`${LICENSING_ORIGIN}${path}`, {
+      method: body === undefined ? 'GET' : 'POST',
+      credentials: 'omit',
+      redirect: 'error',
+      cache: 'no-store',
+      referrerPolicy: 'no-referrer',
+      signal: controller.signal,
+      ...(body === undefined
+        ? {}
+        : {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          }),
+    });
+    const value = await boundedJson(response);
+    if (!response.ok) {
+      const error = new Error('Licence service request failed');
+      error.code = typeof value?.error?.code === 'string' ? value.error.code : 'unavailable';
+      throw error;
+    }
+    return value;
+  } finally {
+    clearTimeout(timer);
   }
-  return value;
 }
 
 export async function publicConfig(fetcher) {
