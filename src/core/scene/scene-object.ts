@@ -457,6 +457,8 @@ export type PolygonShape = {
   readonly kind: 'polygon';
   readonly sides: number; // circumscribed regular polygon, 3..64
   readonly radiusMm: number; // circumradius
+  /** Sides bowed into arcs: sagitta = bulge x half the side, -1..1 (0 straight). */
+  readonly bulge?: number;
 };
 
 export type StarShape = {
@@ -464,6 +466,10 @@ export type StarShape = {
   readonly points: number; // alternating outer/inner vertices, 3..64 points
   readonly outerRadiusMm: number;
   readonly innerRadiusRatio: number; // innerRadiusMm / outerRadiusMm, 0..1
+  /** Every other tip at this share of the outer radius (dual-radius star), 0.05..1. */
+  readonly alternateRadiusRatio?: number;
+  /** Sides bowed into arcs, as for a polygon. */
+  readonly bulge?: number;
 };
 
 // An open or closed run of points â€” the pen tool's freeform primitive (B6).

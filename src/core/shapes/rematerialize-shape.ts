@@ -3,6 +3,8 @@ import { createEllipse } from './primitives/create-ellipse';
 import { createPolygon } from './primitives/create-polygon';
 import { createRectangle } from './primitives/create-rectangle';
 import { createStar } from './primitives/create-star';
+import { clampBulge } from './primitives/bulge-outline';
+import { clampAlternateRatio } from './primitives/star';
 
 // Barcodes re-encode their data rather than resize by field, so they are not
 // parametric in this sense (ADR-386).
@@ -44,7 +46,11 @@ function sanitizePolygon(
   spec: Extract<ParametricShapeSpec, { readonly kind: 'polygon' }>,
 ): ParametricShapeSpec | null {
   if (!positiveFinite(spec.radiusMm) || !Number.isFinite(spec.sides)) return null;
-  return { ...spec, sides: clampCount(spec.sides) };
+  return {
+    ...spec,
+    sides: clampCount(spec.sides),
+    ...(spec.bulge === undefined ? {} : { bulge: clampBulge(spec.bulge) }),
+  };
 }
 
 function sanitizeStar(
@@ -59,6 +65,10 @@ function sanitizeStar(
       MAX_INNER_RADIUS_RATIO,
       Math.max(MIN_INNER_RADIUS_RATIO, spec.innerRadiusRatio),
     ),
+    ...(spec.bulge === undefined ? {} : { bulge: clampBulge(spec.bulge) }),
+    ...(spec.alternateRadiusRatio === undefined
+      ? {}
+      : { alternateRadiusRatio: clampAlternateRatio(spec.alternateRadiusRatio) }),
   };
 }
 

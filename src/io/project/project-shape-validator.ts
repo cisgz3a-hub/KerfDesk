@@ -391,6 +391,7 @@ function validateShapeSpec(value: unknown, path: string): string | null {
     return firstError([
       requirePositiveInteger(value, `${path}.sides`),
       requirePositiveNumber(value, `${path}.radiusMm`),
+      optionalNumber(value, `${path}.bulge`),
     ]);
   }
   if (kind === 'star') {
@@ -398,6 +399,8 @@ function validateShapeSpec(value: unknown, path: string): string | null {
       requireIntegerInRange(value, `${path}.points`, 3, 64),
       requirePositiveNumber(value, `${path}.outerRadiusMm`),
       requireUnitRatio(value, `${path}.innerRadiusRatio`),
+      optionalNumber(value, `${path}.bulge`),
+      optionalPositiveNumber(value, `${path}.alternateRadiusRatio`),
     ]);
   }
   if (kind === 'polyline') {
