@@ -38,6 +38,7 @@ import { ArrayDialogHost } from './ArrayDialogHost';
 import { CopyAlongPathDialogHost } from './CopyAlongPathDialogHost';
 import { OptimizeShapesDialogHost } from './OptimizeShapesDialogHost';
 import { SaveOriginalImageDialogHost } from './SaveOriginalImageDialog';
+import { DockOptionsDialogHost } from './DockOptionsDialog';
 import { SelectCirclesDialogHost } from './SelectCirclesDialog';
 import { useShowNotesOnOpen } from './use-show-notes-on-open';
 import { BooleanDialogHost } from './BooleanDialogHost';
@@ -175,6 +176,7 @@ function StoreOpenedDialogs(): JSX.Element {
       <OptimizeShapesDialogHost />
       <SelectCirclesDialogHost />
       <SaveOriginalImageDialogHost />
+      <DockOptionsDialogHost />
       <BooleanDialogHost />
       <ExportSvgDialogHost />
       <SettingsWindowHost />

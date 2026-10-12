@@ -3,6 +3,7 @@
 // batch 5 slice so command-types.ts stays as it is.
 
 import type { DrawOrderMove } from '../../core/draw-order';
+import type { DockDirection } from '../../core/scene/selection-dock';
 import type { SelectionMatchSizeKind, SelectionMoveTogetherAxis } from '../../core/scene';
 
 export type LayoutCommandContext = {
@@ -11,6 +12,8 @@ export type LayoutCommandContext = {
   readonly moveSelectionTogether: (axis: SelectionMoveTogetherAxis) => void;
   readonly mirrorSelectionAcrossLine: () => void;
   readonly startTwoPointTransform: () => void;
+  readonly dockSelection: (direction: DockDirection) => void;
+  readonly dockOptions: () => void;
 };
 
 export type LayoutCommandId =
@@ -25,4 +28,9 @@ export type LayoutCommandId =
   | 'arrange.move-together-horizontal'
   | 'arrange.move-together-vertical'
   | 'arrange.mirror-across-line'
-  | 'arrange.two-point-rotate-scale';
+  | 'arrange.two-point-rotate-scale'
+  | 'arrange.dock-left'
+  | 'arrange.dock-right'
+  | 'arrange.dock-up'
+  | 'arrange.dock-down'
+  | 'arrange.dock-options';

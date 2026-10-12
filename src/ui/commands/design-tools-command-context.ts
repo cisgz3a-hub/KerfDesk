@@ -4,6 +4,7 @@ import type { Project } from '../../core/scene';
 import { objectVariableTemplate } from '../../core/variables/object-variable-template';
 import { bakeSelectedVariableText } from '../app/bake-variable-text';
 import { startTwoPointTool } from '../workspace/two-point-tool';
+import { useDockOptionsStore } from './dock-options-store';
 import type { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { openCopyAlongPathDialog } from './copy-along-path-dialog-store';
@@ -46,6 +47,9 @@ export function designToolsCommandContext(
     moveSelectionTogether: app.moveSelectionTogether,
     mirrorSelectionAcrossLine: app.mirrorSelectionAcrossLine,
     startTwoPointTransform: startTwoPointTool,
+    dockSelection: (direction) =>
+      app.dockSelection({ direction, ...useDockOptionsStore.getState().settings }),
+    dockOptions: () => useDockOptionsStore.getState().openDialog(),
   };
 }
 

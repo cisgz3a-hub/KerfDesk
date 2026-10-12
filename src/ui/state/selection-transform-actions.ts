@@ -27,6 +27,7 @@ import {
   buildSelectionQuarterTurnEdit,
   type QuarterTurnDirection,
 } from '../../core/scene/selection-placement';
+import { buildSelectionDockEdit, type DockOptions } from '../../core/scene/selection-dock';
 import {
   buildSelectionRotateByEdit,
   buildSelectionRotateScaleEdit,
@@ -56,6 +57,8 @@ export type SelectionTransformActions = SelectionReferenceState & {
   readonly rotateSelectionQuarterTurn: (direction: QuarterTurnDirection) => void;
   /** Turns the whole selection by `deltaDeg` about its combined centre, as one undo step. */
   readonly rotateSelectionBy: (deltaDeg: number) => void;
+  /** Dock: slide the selection until it meets other artwork or the bed edge. */
+  readonly dockSelection: (options: DockOptions) => void;
   /** Two-Point Rotate / Scale: turn and uniformly scale the selection about `pivot`. */
   readonly rotateScaleSelectionAbout: (pivot: Vec2, deltaDeg: number, scale: number) => void;
   // ADR-410: Move Selected Objects to the bed centre, a corner or an edge.
@@ -94,6 +97,24 @@ export function selectionTransformActions(set: Setter): SelectionTransformAction
         return result.kind === 'error'
           ? state
           : applySelectionTransformsToState(state, result.transforms);
+      }),
+    dockSelection: (options) =>
+      set((state) => {
+        const scene = state.project.scene;
+        const ids = new Set(selectedObjectIds(state));
+        const objects = selectedObjects(scene, [...ids]);
+        const obstacles = scene.objects.filter(
+          (object) => !ids.has(object.id) && sceneObjectHasVisibleLayer(scene, object),
+        );
+        const { bedWidth, bedHeight } = state.project.device;
+        const edits = buildSelectionDockEdit(
+          objects,
+          obstacles,
+          options,
+          { width: bedWidth, height: bedHeight },
+          scene.groups ?? [],
+        );
+        return applySelectionTransformsToState(state, edits);
       }),
     rotateScaleSelectionAbout: (pivot, deltaDeg, scale) =>
       set((state) => {

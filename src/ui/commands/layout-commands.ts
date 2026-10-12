@@ -107,6 +107,21 @@ const REFERENCED: ReadonlyArray<Spec> = [
   },
 ];
 
+export const DOCK_IDS: ReadonlyArray<LayoutCommandId> = [
+  'arrange.dock-left',
+  'arrange.dock-right',
+  'arrange.dock-up',
+  'arrange.dock-down',
+  'arrange.dock-options',
+];
+
+const DOCK: ReadonlyArray<Spec> = (['left', 'right', 'up', 'down'] as const).map((direction) => ({
+  id: `arrange.dock-${direction}`,
+  label: `Dock ${direction[0]?.toUpperCase()}${direction.slice(1)}`,
+  title: `Slide the selection ${direction} until it meets other artwork or the bed edge`,
+  invoke: (ctx) => ctx.dockSelection(direction),
+}));
+
 const TWO_POINT: Spec = {
   id: 'arrange.two-point-rotate-scale',
   label: 'Two-Point Rotate / Scale',
@@ -120,6 +135,16 @@ export function layoutCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
       command(ctx, spec, ctx.hasSelection, 'Select the artwork to restack first.'),
     ),
     command(ctx, TWO_POINT, ctx.hasSelection, 'Select the artwork to rotate or scale first.'),
+    ...DOCK.map((spec) =>
+      command(ctx, spec, ctx.hasSelection, 'Select the artwork to dock first.'),
+    ),
+    enabled(
+      'arrange.dock-options',
+      'arrange',
+      'Docking Options...',
+      'Set the docking padding, Move as group and Lock inner objects',
+      ctx.dockOptions,
+    ),
     ...REFERENCED.map((spec) =>
       command(
         ctx,

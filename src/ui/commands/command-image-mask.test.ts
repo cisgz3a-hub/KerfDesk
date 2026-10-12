@@ -188,6 +188,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     moveSelectionTogether: vi.fn(),
     mirrorSelectionAcrossLine: vi.fn(),
     startTwoPointTransform: vi.fn(),
+    dockSelection: vi.fn(),
+    dockOptions: vi.fn(),
     ...overrides,
   };
 }

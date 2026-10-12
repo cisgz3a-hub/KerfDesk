@@ -4,6 +4,16 @@ import type { CommandHelpTopic } from './command-help-topics';
 const DRAW_ORDER_NOTE =
   'Only what is drawn on top changes; the order the laser cuts in stays as set in the run order.';
 
+const DOCK_TIP =
+  'until its bounding box meets another object or the bed edge, keeping the docking padding. Artwork inside a frame docks past the frame. Docking Options sets the padding and grouping.';
+
+const DOCK_HELP = {
+  'arrange.dock-left': { family: 'arrange', tooltip: `Slide the selection left ${DOCK_TIP}` },
+  'arrange.dock-right': { family: 'arrange', tooltip: `Slide the selection right ${DOCK_TIP}` },
+  'arrange.dock-up': { family: 'arrange', tooltip: `Slide the selection up ${DOCK_TIP}` },
+  'arrange.dock-down': { family: 'arrange', tooltip: `Slide the selection down ${DOCK_TIP}` },
+} as const satisfies Partial<Record<LayoutCommandId, CommandHelpTopic>>;
+
 export const LAYOUT_COMMAND_HELP: Readonly<Record<LayoutCommandId, CommandHelpTopic>> = {
   'arrange.bring-to-front': {
     family: 'arrange',
@@ -55,6 +65,12 @@ export const LAYOUT_COMMAND_HELP: Readonly<Record<LayoutCommandId, CommandHelpTo
     family: 'arrange',
     tooltip:
       'Turn the selection about any point: click the pivot, click a reference point, then click where that point should go. Hold Shift on the last click to scale as well. Esc cancels.',
+  },
+  ...DOCK_HELP,
+  'arrange.dock-options': {
+    family: 'arrange',
+    tooltip:
+      'Docking options: the padding left between docked artwork and what it meets, Move as group (the selection moves as one piece), and Lock inner objects (selected artwork inside other selected artwork moves with it). Saved on this computer.',
   },
   'arrange.move-together-vertical': {
     family: 'arrange',
