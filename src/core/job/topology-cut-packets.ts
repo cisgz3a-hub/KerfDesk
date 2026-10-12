@@ -1,5 +1,7 @@
 // Only new explicitly scoped Jobs enter this planner. Historical nesting alone never opts in.
 import type { ProjectOptimizationSettings, Vec2 } from '../scene';
+import type { Origin } from '../devices';
+import { directionalSegmentOrder, sweepKey } from './directional-order';
 import type { CutGroup, CutSegment, FillGroup, Group } from './job';
 import {
   collectSegmentEntries,
@@ -15,9 +17,9 @@ type Settings = Pick<ProjectOptimizationSettings, 'insideFirst' | 'pathDirection
   Partial<
     Pick<
       ProjectOptimizationSettings,
-      'closedShapeStart' | 'removeOverlappingLines' | 'overlapMergeToleranceMm'
+      'closedShapeStart' | 'removeOverlappingLines' | 'overlapMergeToleranceMm' | 'cutDirection'
     >
-  >;
+  > & { readonly origin?: Origin };
 type Packet = {
   readonly depth: number;
   readonly main: CutGroup[];
@@ -120,7 +122,15 @@ function orderSinglePass(group: CutGroup, settings: Settings, cursor: Vec2 | nul
   // Order originals once: newly split endpoints never compete with this route.
   const ordered = {
     ...group,
-    segments: configuredSegmentOrder(group.segments, settings, cursor ?? undefined),
+    segments:
+      settings.cutDirection !== undefined && cursor === null
+        ? directionalSegmentOrder(group.segments, {
+            direction: settings.cutDirection,
+            origin: settings.origin ?? 'front-left',
+            insideFirst: settings.insideFirst,
+            allowsReverse: settings.pathDirection === 'allow-reverse',
+          })
+        : configuredSegmentOrder(group.segments, settings, cursor ?? undefined),
   };
   return settings.removeOverlappingLines === true
     ? removeCutOverlaps(ordered, settings.overlapMergeToleranceMm ?? 0)
@@ -139,20 +149,11 @@ function planPacketRoute(
   const route: PlannedCutPart[] = [];
   for (const depth of depths) {
     const peers = packets.filter((packet) => packet.depth === depth);
-    const nearest = createNearestEntryQuery(
-      peers.flatMap((packet, index) =>
-        collectSegmentEntries(packetSegments(packet), {
-          allowsReverse: settings.pathDirection === 'allow-reverse',
-          closedShapeStart: settings.closedShapeStart ?? 'drawn',
-        }).map((entry) => ({ ...entry, segmentIndex: index })),
-      ),
-    );
-    const placed = new Set<number>();
+    const next = peerPicker(peers, settings, lineCursor);
     for (;;) {
-      const pick = nearest(cursor, (index) => !placed.has(index));
-      if (pick === null) break;
-      placed.add(pick.segmentIndex);
-      const packet = peers[pick.segmentIndex];
+      const pick = next(cursor);
+      if (pick === undefined) break;
+      const packet = peers[pick];
       if (packet === undefined) continue;
       // Group passes stay intact: all main passes finish before this parent's low-power passes.
       for (const group of [...packet.main, ...packet.tabs]) {
@@ -172,6 +173,43 @@ function planPacketRoute(
     }
   }
   return route;
+}
+
+// The next packet at one depth: in the Cut direction sweep when one is set
+// (and no Line burn start), otherwise the nearest entry to the head.
+function peerPicker(
+  peers: ReadonlyArray<Packet>,
+  settings: Settings,
+  lineCursor: Vec2 | null,
+): (cursor: Vec2) => number | undefined {
+  const sweep = sweepOrder(peers, settings, lineCursor);
+  if (sweep !== null) return () => sweep.shift();
+  const nearest = createNearestEntryQuery(
+    peers.flatMap((packet, index) =>
+      collectSegmentEntries(packetSegments(packet), {
+        allowsReverse: settings.pathDirection === 'allow-reverse',
+        closedShapeStart: settings.closedShapeStart ?? 'drawn',
+      }).map((entry) => ({ ...entry, segmentIndex: index })),
+    ),
+  );
+  const placed = new Set<number>();
+  return (cursor) => {
+    const pick = nearest(cursor, (index) => !placed.has(index))?.segmentIndex;
+    if (pick !== undefined) placed.add(pick);
+    return pick;
+  };
+}
+// With a Cut direction (and no Line burn start), packets at one depth run in
+// the sweep instead of nearest first. Null keeps the nearest-first route.
+function sweepOrder(
+  peers: ReadonlyArray<Packet>,
+  settings: Settings,
+  lineCursor: Vec2 | null,
+): number[] | null {
+  if (settings.cutDirection === undefined || lineCursor !== null) return null;
+  const key = sweepKey(settings.cutDirection, settings.origin ?? 'front-left');
+  const keys = peers.map((packet) => Math.min(...packetSegments(packet).map(key)));
+  return peers.map((_, index) => index).sort((a, b) => (keys[a] ?? 0) - (keys[b] ?? 0) || a - b);
 }
 
 function coalescePeerParts(route: ReadonlyArray<PlannedCutPart>): CutGroup[] {

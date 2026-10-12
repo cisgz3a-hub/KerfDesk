@@ -27,7 +27,7 @@ export const CUT_DIRECTIONS: ReadonlyArray<CutDirection> = [
  * coordinates. The workspace top is the back of the bed: larger machine Y on
  * front and centre origins, smaller on rear ones; right-hand origins mirror X.
  */
-function sweepKey(direction: CutDirection, origin: Origin): (segment: CutSegment) => number {
+export function sweepKey(direction: CutDirection, origin: Origin): (segment: CutSegment) => number {
   const yUp = !origin.startsWith('rear');
   const xRight = !origin.endsWith('right');
   return (segment) => {

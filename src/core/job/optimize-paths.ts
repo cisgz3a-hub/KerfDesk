@@ -96,7 +96,7 @@ export function optimizePaths(
   const lineStartCursor = lineStartCursorForJob(job, settings.lineStartRegion, origin);
   const topology =
     settings.travelPolicy !== 'source-order' && settings.insideFirst
-      ? orderTopologyScopes(prioritized, settings, lineStartCursor)
+      ? orderTopologyScopes(prioritized, { ...settings, origin }, lineStartCursor)
       : { groups: prioritized, orderedCuts: new Set<CutGroup>() };
   const ordered =
     settings.travelPolicy === 'source-order'
