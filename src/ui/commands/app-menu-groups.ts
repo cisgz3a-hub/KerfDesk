@@ -105,6 +105,7 @@ export const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupL
         'tools.parametric-part',
         'tools.editable-relief',
         'tools.measure',
+        'tools.tangent-circle',
         'tools.add-text',
         'tools.registration-jig',
         'tools.camera',

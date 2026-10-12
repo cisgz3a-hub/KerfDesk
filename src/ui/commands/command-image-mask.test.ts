@@ -190,6 +190,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     startTwoPointTransform: vi.fn(),
     dockSelection: vi.fn(),
     dockOptions: vi.fn(),
+    hasThreeCircles: false,
+    tangentCircle: vi.fn(),
     ...overrides,
   };
 }

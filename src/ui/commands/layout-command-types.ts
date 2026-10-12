@@ -14,6 +14,8 @@ export type LayoutCommandContext = {
   readonly startTwoPointTransform: () => void;
   readonly dockSelection: (direction: DockDirection) => void;
   readonly dockOptions: () => void;
+  readonly hasThreeCircles: boolean;
+  readonly tangentCircle: () => void;
 };
 
 export type LayoutCommandId =
@@ -33,4 +35,5 @@ export type LayoutCommandId =
   | 'arrange.dock-right'
   | 'arrange.dock-up'
   | 'arrange.dock-down'
-  | 'arrange.dock-options';
+  | 'arrange.dock-options'
+  | 'tools.tangent-circle';

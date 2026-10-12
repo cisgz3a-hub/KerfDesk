@@ -85,6 +85,8 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     startTwoPointTransform: vi.fn(),
     dockSelection: vi.fn(),
     dockOptions: vi.fn(),
+    hasThreeCircles: false,
+    tangentCircle: vi.fn(),
   };
 }
 

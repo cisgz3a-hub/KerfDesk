@@ -5,6 +5,7 @@ import { objectVariableTemplate } from '../../core/variables/object-variable-tem
 import { bakeSelectedVariableText } from '../app/bake-variable-text';
 import { startTwoPointTool } from '../workspace/two-point-tool';
 import { useDockOptionsStore } from './dock-options-store';
+import { openTangentCircleDialog, selectedThreeCircles } from './TangentCircleDialog';
 import type { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { openCopyAlongPathDialog } from './copy-along-path-dialog-store';
@@ -50,6 +51,8 @@ export function designToolsCommandContext(
     dockSelection: (direction) =>
       app.dockSelection({ direction, ...useDockOptionsStore.getState().settings }),
     dockOptions: () => useDockOptionsStore.getState().openDialog(),
+    hasThreeCircles: selectedThreeCircles(app.project, selectedIds) !== null,
+    tangentCircle: openTangentCircleDialog,
   };
 }
 

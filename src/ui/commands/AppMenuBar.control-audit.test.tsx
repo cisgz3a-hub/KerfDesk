@@ -166,6 +166,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'arrange.dock-up': { callback: 'dockSelection', args: ['up'] },
   'arrange.dock-down': { callback: 'dockSelection', args: ['down'] },
   'arrange.dock-options': { callback: 'dockOptions' },
+  'tools.tangent-circle': { callback: 'tangentCircle' },
   'arrange.rotate-90-cw': { callback: 'rotateSelectionQuarterTurn', args: [1] },
   'arrange.rotate-90-ccw': { callback: 'rotateSelectionQuarterTurn', args: [-1] },
   'arrange.move-to-bed-center': { callback: 'moveSelectionToBed', args: ['c'] },

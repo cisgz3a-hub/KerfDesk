@@ -72,6 +72,11 @@ export const LAYOUT_COMMAND_HELP: Readonly<Record<LayoutCommandId, CommandHelpTo
     tooltip:
       'Docking options: the padding left between docked artwork and what it meets, Move as group (the selection moves as one piece), and Lock inner objects (selected artwork inside other selected artwork moves with it). Saved on this computer.',
   },
+  'tools.tangent-circle': {
+    family: 'tools',
+    tooltip:
+      'With exactly three circles selected, list every circle that touches all three (outside them, around them, or a mix) and add the one you pick as an ordinary circle. One undo step.',
+  },
   'arrange.move-together-vertical': {
     family: 'arrange',
     tooltip:

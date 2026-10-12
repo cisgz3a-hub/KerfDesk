@@ -145,6 +145,21 @@ export function layoutCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
       'Set the docking padding, Move as group and Lock inner objects',
       ctx.dockOptions,
     ),
+    ctx.hasThreeCircles
+      ? enabled(
+          'tools.tangent-circle',
+          'tools',
+          'Tangent Circle...',
+          'Add a circle that touches all three selected circles',
+          ctx.tangentCircle,
+        )
+      : disabled(
+          'tools.tangent-circle',
+          'tools',
+          'Tangent Circle...',
+          'Select exactly three circles first.',
+          ctx.tangentCircle,
+        ),
     ...REFERENCED.map((spec) =>
       command(
         ctx,
