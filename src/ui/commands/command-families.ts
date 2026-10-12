@@ -51,14 +51,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       'Trace multiple image files to SVG, DXF, PDF, EPS or GeoJSON exports',
       ctx.multiFileTrace,
     ),
-    convertToPathCommand(ctx),
-    enabled(
-      'tools.generate-path-from-cut',
-      'tools',
-      'Generate Path From Cut',
-      'Add what the laser burns, kerf, tabs and fill lines included, as new artwork',
-      ctx.generatePathFromCut,
-    ),
+    ...pathConversionCommands(ctx),
     weldCommand(ctx),
     ...vectorBooleanCommands(ctx),
     jointResizeCommand(ctx),
@@ -130,6 +123,20 @@ function canvasTextCommand(ctx: AppCommandContext): AppCommand {
     'Type and edit text on the canvas',
     ctx.addText,
     'T',
+  );
+}
+
+function pathConversionCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
+  return [convertToPathCommand(ctx), generatePathFromCutCommand(ctx)];
+}
+
+function generatePathFromCutCommand(ctx: AppCommandContext): AppCommand {
+  return enabled(
+    'tools.generate-path-from-cut',
+    'tools',
+    'Generate Path From Cut',
+    'Add what the laser burns, kerf, tabs and fill lines included, as new artwork',
+    ctx.generatePathFromCut,
   );
 }
 
