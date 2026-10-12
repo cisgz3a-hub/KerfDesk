@@ -47,6 +47,8 @@ export type CommandId =
   | 'file.export-pdf'
   | 'file.export-eps'
   | 'file.export-geojson'
+  | 'file.export-ai'
+  | 'file.export-palette'
   | 'file.open-gcode'
   | 'file.inspect-gcode'
   | 'file.exit'
@@ -236,6 +238,8 @@ export type AppCommandContext = CommandContextSlices & {
   readonly exportPdf: () => void;
   readonly exportEps: () => void;
   readonly exportGeoJson: () => void;
+  readonly exportAi: () => void;
+  readonly exportPalette: () => void;
   readonly undo: () => void;
   readonly redo: () => void;
   readonly selectAll: () => void;

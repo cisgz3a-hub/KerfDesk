@@ -96,6 +96,13 @@ function artworkExportCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
       ctx.exportPdf,
     ),
     enabled(
+      'file.export-ai',
+      'file',
+      ctx.hasSelection ? 'Export selected artwork as AI...' : 'Export artwork as AI...',
+      'Export selected artwork, or all artwork when nothing is selected, as a PDF-based Illustrator file',
+      ctx.exportAi,
+    ),
+    enabled(
       'file.export-eps',
       'file',
       ctx.hasSelection ? 'Export selected artwork as EPS...' : 'Export artwork as EPS...',
@@ -108,6 +115,13 @@ function artworkExportCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
       ctx.hasSelection ? 'Export selected artwork as GeoJSON...' : 'Export artwork as GeoJSON...',
       'Export selected artwork, or all artwork when nothing is selected, as GeoJSON in millimetres',
       ctx.exportGeoJson,
+    ),
+    enabled(
+      'file.export-palette',
+      'file',
+      'Download operation palette...',
+      'Save the operation colours as a GIMP/Inkscape, Adobe or CorelDRAW palette',
+      ctx.exportPalette,
     ),
   ];
 }

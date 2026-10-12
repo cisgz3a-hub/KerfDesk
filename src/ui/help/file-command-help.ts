@@ -93,6 +93,16 @@ export const FILE_COMMAND_HELP: Readonly<
     tooltip:
       'Export selected vector artwork, or all of it when nothing is selected, as GeoJSON: polygons with holes for filled artwork and lines for strokes, flattened within 0.01 mm. Coordinates are millimetres with y up from the lower-left corner, not longitude and latitude, so the file is not georeferenced (a deliberate departure from RFC 7946 section 4) and map tools will not place it on a map. Filled shapes follow their fill rule; shapes whose outlines cross are kept as separate, overlapping polygons rather than merged, and the export warns when that happens.',
   },
+  'file.export-ai': {
+    family: 'file',
+    tooltip:
+      "Export selected vector artwork, or all of it when nothing is selected, as an Illustrator .ai file. Like Illustrator's own files saved with PDF compatibility it is PDF inside, so Illustrator, Inkscape and CorelDRAW open it as artwork; it carries no Illustrator-only editing data. Curves stay curves; images are left out.",
+  },
+  'file.export-palette': {
+    family: 'file',
+    tooltip:
+      "Save KerfDesk's operation colours as a palette for other design software: .gpl for GIMP, Inkscape and Krita, .ase for Adobe Illustrator and Photoshop, or .xml for CorelDRAW, chosen by the file type you save as. Draw in these colours and the artwork imports onto matching operations.",
+  },
   'file.exit': {
     family: 'file',
     tooltip:

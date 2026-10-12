@@ -28,6 +28,8 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     exportPdf: vi.fn(),
     exportEps: vi.fn(),
     exportGeoJson: vi.fn(),
+    exportAi: vi.fn(),
+    exportPalette: vi.fn(),
     ...baseCtxAppearance(),
     ...overrides,
   } as AppCommandContext;

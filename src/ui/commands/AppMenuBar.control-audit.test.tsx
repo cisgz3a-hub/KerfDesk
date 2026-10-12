@@ -38,6 +38,8 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'file.export-pdf': { callback: 'exportPdf' },
   'file.export-eps': { callback: 'exportEps' },
   'file.export-geojson': { callback: 'exportGeoJson' },
+  'file.export-ai': { callback: 'exportAi' },
+  'file.export-palette': { callback: 'exportPalette' },
   'file.open-gcode': { callback: 'openGcodePreview' },
   'file.inspect-gcode': { callback: 'inspectCurrentGcode' },
   'file.exit': { callback: 'exitApp' },

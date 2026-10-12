@@ -69,6 +69,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     exportPdf: vi.fn(),
     exportEps: vi.fn(),
     exportGeoJson: vi.fn(),
+    exportAi: vi.fn(),
+    exportPalette: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
     selectAll: vi.fn(),
