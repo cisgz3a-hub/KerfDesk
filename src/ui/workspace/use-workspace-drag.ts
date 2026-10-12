@@ -21,8 +21,9 @@ import { applyTransformDrag } from './apply-transform-drag';
 import { beginDrawDrag } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
-import { beginPathNodeDrag } from './path-node-drag';
+import { beginPathNodeDrag, joinPathNodeOnDrop } from './path-node-drag';
 import { beginPathSegmentDrag } from './path-segment-drag';
+
 import { beginTracePartDrag } from './trace-part-tool';
 import { hitCncTabAnchor } from './cnc-tab-editor';
 import { finishLaserTabDrag } from './laser-tab-editor';
@@ -381,6 +382,12 @@ function finishWorkspaceDrag(args: {
   }
   if (args.drag.kind === 'laser-tab') {
     finishLaserTabDrag(args.drag);
+    return;
+  }
+  if (
+    args.drag.kind === 'path-node' &&
+    joinPathNodeOnDrop(args.ref.current, args.project, args.viewState)
+  ) {
     return;
   }
   args.endInteraction();

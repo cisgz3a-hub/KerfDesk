@@ -22,6 +22,10 @@ import { variableBakeActions, type VariableBakeActions } from './variable-bake-a
 import { pathSegmentActions, type PathSegmentActions } from './path-segment-actions';
 import { pathFilletActions, type PathFilletActions } from './path-fillet-actions';
 import { shearActions, type ShearActions } from './shear-actions';
+import {
+  pathNodeDragJoinActions,
+  type PathNodeDragJoinActions,
+} from './path-node-drag-join-actions';
 import { mirrorLineActions, type MirrorLineActions } from './mirror-line-actions';
 import { extendShapesActions, type ExtendShapesActions } from './extend-shapes-actions';
 import { trimShapesActions, type TrimShapesActions } from './trim-shapes-actions';
@@ -42,6 +46,7 @@ export type DesignToolsActions = ShapeQueryActions &
   PathSegmentActions &
   PathFilletActions &
   ShearActions &
+  PathNodeDragJoinActions &
   MirrorLineActions;
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -73,6 +78,7 @@ export function designToolsActions(
     ...pathSegmentActions(set),
     ...pathFilletActions(set),
     ...shearActions(set),
+    ...pathNodeDragJoinActions(set),
     ...mirrorLineActions(set),
   };
 }
