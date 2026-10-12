@@ -96,6 +96,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.save-processed-bitmap': { callback: 'saveProcessedBitmap' },
   'tools.save-original-image': { callback: 'saveOriginalImage' },
   'window.save-preview-image': { callback: 'savePreviewImage' },
+  'tools.generate-path-from-cut': { callback: 'generatePathFromCut' },
   'tools.trace-image': { callback: 'traceImage' },
   'tools.retrace-original': { callback: 'retraceOriginal' },
   'tools.multi-file-trace': { callback: 'multiFileTrace' },

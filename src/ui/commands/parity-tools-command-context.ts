@@ -21,5 +21,6 @@ export function parityToolsCommandContext(
     },
     savePreviewImage: () =>
       void saveWorkspacePreviewImage({ platform, savedName: app.savedName, pushToast }),
+    generatePathFromCut: app.generatePathFromCut,
   };
 }

@@ -52,6 +52,13 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       ctx.multiFileTrace,
     ),
     convertToPathCommand(ctx),
+    enabled(
+      'tools.generate-path-from-cut',
+      'tools',
+      'Generate Path From Cut',
+      'Add what the laser burns, kerf, tabs and fill lines included, as new artwork',
+      ctx.generatePathFromCut,
+    ),
     weldCommand(ctx),
     ...vectorBooleanCommands(ctx),
     jointResizeCommand(ctx),

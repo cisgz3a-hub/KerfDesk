@@ -81,6 +81,7 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     bakeVariableText: vi.fn(),
     saveOriginalImage: vi.fn(),
     savePreviewImage: vi.fn(),
+    generatePathFromCut: vi.fn(),
     moveSelectionInDrawOrder: vi.fn(),
     matchSelectionSize: vi.fn(),
     moveSelectionTogether: vi.fn(),
