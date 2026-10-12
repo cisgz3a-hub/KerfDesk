@@ -1,7 +1,7 @@
 import { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
 import { readFileAsDataUrl } from '../trace/image-loader';
 import type { ImportOutcome } from '../state/store';
-import type { ToastVariant } from '../state/toast-store';
+import { useToastStore, type ToastOptions, type ToastVariant } from '../state/toast-store';
 import { readImageDensity } from '../common/image-density';
 import {
   describeImportedImageSize,
@@ -155,12 +155,17 @@ type PngImportControls = {
   readonly dispose: () => void;
 };
 
+let nextPngProgressKey = 0;
+
 function createPngImportControls(
   name: string,
-  pushToast: (message: string, variant?: ToastVariant) => void,
+  pushToast: (message: string, variant?: ToastVariant, options?: ToastOptions) => void,
   signal?: AbortSignal,
 ): PngImportControls {
   const controller = new AbortController();
+  // One progress toast per import, rewritten per phase and removed on settle.
+  nextPngProgressKey += 1;
+  const progressKey = `png-import-progress-${nextPngProgressKey}`;
   const abort = (): void => controller.abort();
   if (signal?.aborted === true) abort();
   else signal?.addEventListener('abort', abort, { once: true });
@@ -175,12 +180,13 @@ function createPngImportControls(
       onProgress: (progress) => {
         if (progress.phase === lastPhase) return;
         lastPhase = progress.phase;
-        pushToast(pngProgressMessage(name, progress), 'info');
+        pushToast(pngProgressMessage(name, progress), 'info', { key: progressKey });
       },
     },
     dispose: () => {
       window.removeEventListener('keydown', handleKeyDown);
       signal?.removeEventListener('abort', abort);
+      useToastStore.getState().dismissToastKey(progressKey);
     },
   };
 }

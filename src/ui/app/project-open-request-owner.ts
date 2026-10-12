@@ -1,6 +1,6 @@
-import type { ToastVariant } from '../state/toast-store';
+import type { ToastOptions, ToastVariant } from '../state/toast-store';
 
-type PushToast = (message: string, variant?: ToastVariant) => void;
+type PushToast = (message: string, variant?: ToastVariant, options?: ToastOptions) => void;
 
 export type ProjectOpenRequestOwner = {
   readonly adoptCurrentDocument: () => void;
@@ -28,8 +28,8 @@ export function claimProjectOpenRequest(
       project = getProject?.();
     },
     isCurrent,
-    pushToast: (message, variant) => {
-      if (isCurrent()) pushToast(message, variant);
+    pushToast: (...toast) => {
+      if (isCurrent()) pushToast(...toast);
     },
   };
 }

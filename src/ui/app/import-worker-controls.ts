@@ -2,20 +2,26 @@ import type {
   ImportWorkerProgress,
   ImportWorkerRequestOptions,
 } from '../import/import-worker-client';
-import type { ToastVariant } from '../state/toast-store';
+import { useToastStore, type ToastOptions, type ToastVariant } from '../state/toast-store';
 
-type PushToast = (message: string, variant?: ToastVariant) => void;
+type PushToast = (message: string, variant?: ToastVariant, options?: ToastOptions) => void;
 
 export type ImportWorkerControls = {
   readonly options: ImportWorkerRequestOptions;
   readonly dispose: () => void;
 };
 
+let nextProgressKey = 0;
+
 export function createImportWorkerControls(
   name: string,
   pushToast: PushToast,
 ): ImportWorkerControls {
   const controller = new AbortController();
+  // One toast per import, rewritten as the phase advances and removed when
+  // the import settles: its "Press Esc to cancel" stops being true then.
+  nextProgressKey += 1;
+  const progressKey = `import-progress-${nextProgressKey}`;
   let lastProgress = '';
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') controller.abort();
@@ -25,11 +31,14 @@ export function createImportWorkerControls(
     const key = `${progress.phase}:${progress.queuePosition}`;
     if (key === lastProgress) return;
     lastProgress = key;
-    pushToast(progressMessage(name, progress), 'info');
+    pushToast(progressMessage(name, progress), 'info', { key: progressKey });
   };
   return {
     options: { signal: controller.signal, onProgress },
-    dispose: () => window.removeEventListener('keydown', handleKeyDown),
+    dispose: () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      useToastStore.getState().dismissToastKey(progressKey);
+    },
   };
 }
 

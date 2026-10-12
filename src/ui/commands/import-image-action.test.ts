@@ -127,6 +127,7 @@ describe('raster-image import resolution', () => {
     expect(pushToast).toHaveBeenCalledWith(
       'panorama.png: decoding and sampling in worker. Press Esc to cancel.',
       'info',
+      { key: expect.stringMatching(/^png-import-progress-/) },
     );
   });
 
@@ -246,6 +247,7 @@ describe('raster-image import resolution', () => {
     expect(pushToast).toHaveBeenCalledWith(
       'large.png: decoding and sampling in worker. Press Esc to cancel.',
       'info',
+      { key: expect.stringMatching(/^png-import-progress-/) },
     );
   });
 

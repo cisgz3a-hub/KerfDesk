@@ -11,6 +11,7 @@ import { parametricEllipseCurve } from '../../core/geometry';
 import { rectangleToCurve } from '../../core/shapes/primitives';
 import { multiplyMatrix, parseXFormText, transformCurve, type LbrnMatrix } from './lbrn-frame';
 import { parseLbrnVertexList, type LbrnVertex } from './lbrn-vertex-list';
+import { SVG_IMPORT_LIMITS } from '../svg/svg-import-budget';
 
 export type LbrnGeometryResult = {
   readonly objects: ReadonlyArray<ImportedSvg>;
@@ -27,10 +28,19 @@ type PathTables = {
   readonly vertices: ReadonlyMap<number, ReadonlyArray<LbrnVertex>>;
   readonly primitives: ReadonlyMap<number, PrimitiveList>;
 };
-/** How many shapes of each type were left out: a type KerfDesk does not open, or no geometry. */
-type LeftOut = { readonly unsupported: Map<string, number>; readonly empty: Map<string, number> };
+/** How many shapes of each type were left out: a type KerfDesk does not open,
+ * no geometry, or coordinates no machine output can represent. */
+type LeftOut = {
+  readonly unsupported: Map<string, number>;
+  readonly empty: Map<string, number>;
+  readonly outOfRange: Map<string, number>;
+};
 
 const TEXT_WITHOUT_OUTLINE = 'Text without BackupPath';
+// The SVG and DXF importers' cap: a non-finite or astronomically large
+// coordinate cannot produce meaningful G-code, and a project holding one
+// saves but cannot be reopened.
+const LBRN_COORDINATE_MAGNITUDE_MM = SVG_IMPORT_LIMITS.coordinateMagnitudeMm;
 
 /** `frame` places LightBurn project coordinates on the scene (lightBurnSceneFrame). */
 export function importLbrnGeometry(
@@ -39,7 +49,7 @@ export function importLbrnGeometry(
   frame: LbrnMatrix,
 ): LbrnGeometryResult {
   const objects: ImportedSvg[] = [];
-  const leftOut: LeftOut = { unsupported: new Map(), empty: new Map() };
+  const leftOut: LeftOut = { unsupported: new Map(), empty: new Map(), outOfRange: new Map() };
   const pathTables = buildPathTables(root);
   const topShapes = [...root.children].filter((element) => normalized(element.tagName) === 'shape');
   for (const shape of topShapes) visitShape(shape, frame, sourceName, objects, leftOut, pathTables);
@@ -61,7 +71,11 @@ function leftOutWarnings(leftOut: LeftOut): string[] {
     ([type, count]) =>
       `${count} ${type} shape${count === 1 ? '' : 's'} had no geometry KerfDesk could read and ${count === 1 ? 'was' : 'were'} not imported.`,
   );
-  return [...unsupported, ...empty];
+  const outOfRange = sortedCounts(leftOut.outOfRange).map(
+    ([type, count]) =>
+      `${count} ${type} shape${count === 1 ? '' : 's'} had coordinates that are not numbers or lie beyond ±${LBRN_COORDINATE_MAGNITUDE_MM.toLocaleString('en-US')} mm, and ${count === 1 ? 'was' : 'were'} not imported. The file may be damaged.`,
+  );
+  return [...unsupported, ...empty, ...outOfRange];
 }
 
 function shapeCount(count: number, type: string): string {
@@ -135,6 +149,13 @@ function visitVectorShape(
     return;
   }
   const transformed = curves.map((curve) => transformCurve(curve, matrix));
+  if (!transformed.every(curveWithinRange)) {
+    tally(
+      leftOut.outOfRange,
+      layerSource.getAttribute('Type') ?? layerSource.getAttribute('type') ?? 'Path',
+    );
+    return;
+  }
   const polylines = transformed.flatMap((curve) => {
     const flattened = flattenCurveSubpath(curve, { toleranceMm: 0.025 });
     return flattened.kind === 'ok' ? [flattened.polyline] : [];
@@ -149,6 +170,23 @@ function visitVectorShape(
     transform: IDENTITY_TRANSFORM,
     paths: [{ color, polylines, curves: transformed }],
   });
+}
+
+// Every point the curve is built from, control points included: a handle can
+// carry the damage as easily as an endpoint.
+function curveWithinRange(curve: CurveSubpath): boolean {
+  const inRange = (value: number): boolean => Math.abs(value) <= LBRN_COORDINATE_MAGNITUDE_MM;
+  const within = (point: Vec2): boolean => inRange(point.x) && inRange(point.y);
+  return (
+    within(curve.start) &&
+    curve.segments.every((segment) => {
+      if (!within(segment.to)) return false;
+      if (segment.kind === 'cubic') return within(segment.control1) && within(segment.control2);
+      if (segment.kind === 'elliptical-arc')
+        return inRange(segment.radiusX) && inRange(segment.radiusY);
+      return true;
+    })
+  );
 }
 
 function importedObjectId(sourceName: string, index: number): string {

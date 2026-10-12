@@ -39,4 +39,29 @@ describe('LightBurn shapes named in the import report', () => {
       '1 Rect shape had no geometry KerfDesk could read and was not imported.',
     ]);
   });
+
+  it('leaves out shapes whose coordinates are not finite or out of range', () => {
+    const path = (vertices: string) =>
+      `<Shape Type="Path" CutIndex="0"><VertList>${vertices}</VertList><PrimList>LineClosed</PrimList></Shape>`;
+    const huge = path('V0 0V1e308 0V0 10');
+    const scaled =
+      '<Shape Type="Rect" CutIndex="0" W="10" H="10"><XForm>1e300 0 0 1e300 0 0</XForm></Shape>';
+    const { warnings } = report(huge + scaled);
+    expect(warnings).toEqual([
+      '1 Path shape had coordinates that are not numbers or lie beyond ±1,000,000 mm, and was not imported. The file may be damaged.',
+      '1 Rect shape had coordinates that are not numbers or lie beyond ±1,000,000 mm, and was not imported. The file may be damaged.',
+    ]);
+  });
+
+  it('says why when every shape was out of range', () => {
+    const result = importLightBurnProject(
+      '<LightBurnProject AppVersion="1.7.08" FormatVersion="1"><Shape Type="Path" CutIndex="0"><VertList>V0 0V1e309 0V0 10</VertList><PrimList>LineClosed</PrimList></Shape></LightBurnProject>',
+      'sign.lbrn2',
+    );
+    expect(result).toEqual({
+      ok: false,
+      reason:
+        'LightBurn project contains no supported vector geometry. 1 Path shape had coordinates that are not numbers or lie beyond ±1,000,000 mm, and was not imported. The file may be damaged.',
+    });
+  });
 });

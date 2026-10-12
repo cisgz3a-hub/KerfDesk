@@ -26,7 +26,13 @@ import {
 import { usePreviewJobPlacement } from '../use-preview-job-placement';
 import { projectHasVariableData } from '../../core/variables/object-variable-template';
 
-export type PreviewBuildScheduler = (work: () => void) => () => void;
+/** `rebuild` is true when a route is already painted and an edit replaces it. */
+export type PreviewBuildScheduler = (work: () => void, rebuild?: boolean) => () => void;
+
+// Entering Preview builds at once. Edits made while Preview is open each
+// re-emit the whole job, so a burst of nudges coalesces into one rebuild
+// after the last of them; the previous route stays painted meanwhile.
+const PREVIEW_EDIT_REBUILD_DELAY_MS = 200;
 
 const ZERO_OFFSET = { x: 0, y: 0 } as const;
 
@@ -65,6 +71,8 @@ export function usePreviewToolpath(
   const head = useSettledHeadPosition();
   const headRef = useRef(head);
   headRef.current = head;
+  const paintedRef = useRef(false);
+  paintedRef.current = preview.toolpath !== null;
 
   useEffect(() => {
     if (!previewMode) {
@@ -93,7 +101,7 @@ export function usePreviewToolpath(
           setPreview({ toolpath: next, externalOwner: externalGcodePreview });
         },
       });
-    });
+    }, paintedRef.current);
     return () => {
       cancelled = true;
       cancelScheduledBuild();
@@ -242,7 +250,7 @@ function settleBuiltToolpath(args: {
   );
 }
 
-function schedulePreviewBuild(work: () => void): () => void {
-  const id = window.setTimeout(work, 0);
+function schedulePreviewBuild(work: () => void, rebuild = false): () => void {
+  const id = window.setTimeout(work, rebuild ? PREVIEW_EDIT_REBUILD_DELAY_MS : 0);
   return () => window.clearTimeout(id);
 }

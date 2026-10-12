@@ -181,6 +181,26 @@ describe('usePreviewToolpath', () => {
     expect(scheduleBuild.mock.calls.length).toBeGreaterThan(afterMount);
   });
 
+  it('builds at once on entry and marks later builds over a painted route as rebuilds', async () => {
+    const calls: Array<{ readonly work: () => void; readonly rebuild: boolean | undefined }> = [];
+    const scheduleBuild: PreviewBuildScheduler = (work, rebuild) => {
+      calls.push({ work, rebuild });
+      return () => undefined;
+    };
+    act(() => {
+      useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'front-left' } });
+      useLaserStore.setState({ statusReport: idleReport(0, 0) });
+    });
+
+    await renderHarness(true, scheduleBuild);
+    expect(calls.at(-1)?.rebuild).toBe(false);
+    await act(async () => calls.at(-1)?.work());
+    expect(probe.current).toBe(builtToolpath);
+
+    await act(async () => useLaserStore.setState({ statusReport: idleReport(40, 25) }));
+    expect(calls.at(-1)?.rebuild).toBe(true);
+  });
+
   it('builds a User Origin preview before the machine origin is set', async () => {
     let scheduled: (() => void) | null = null;
     const scheduleBuild: PreviewBuildScheduler = (work) => {

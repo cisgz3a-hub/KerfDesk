@@ -106,8 +106,10 @@ function request<R>(
     });
     options.signal?.addEventListener('abort', handleAbort, { once: true });
     queue.push(id);
-    reportQueue();
+    // Start first, so a request the idle worker takes at once is never
+    // reported as queued.
     startNext();
+    reportQueue();
   });
 }
 

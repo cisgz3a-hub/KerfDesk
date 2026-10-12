@@ -52,9 +52,17 @@ export function parseBinaryStl(bytes: ArrayBuffer): BinaryStlResult {
     // Skip the 12-byte normal; read the 9 vertex floats.
     const base = BINARY_STL_HEADER_BYTES + COUNT_BYTES + t * BINARY_STL_RECORD_BYTES + 12;
     for (let f = 0; f < FLOATS_PER_TRIANGLE; f += 1) {
-      positions[write] = view.getFloat32(base + f * 4, true);
+      const value = view.getFloat32(base + f * 4, true);
+      if (!Number.isFinite(value)) return { kind: 'error', reason: nonFiniteVertexReason(t) };
+      positions[write] = value;
       write += 1;
     }
   }
   return { kind: 'ok', mesh: { positions } };
+}
+
+/** A NaN or infinite float32 is a damaged record: it would turn the relief's
+ * cells it covers into NaN depths, so the file is refused as ASCII STL is. */
+export function nonFiniteVertexReason(triangle: number): string {
+  return `Binary STL triangle ${triangle + 1} has a vertex coordinate that is not a finite number; the file may be damaged.`;
 }

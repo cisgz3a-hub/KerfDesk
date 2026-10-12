@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/kerfdesk-test';
+import type { Browser } from '@playwright/test';
 import type { ProductionNestingInput } from '../src/core/nesting/production-nest';
 import type { startProductionNestingSearch } from '../src/ui/commands/production-nesting-worker-client';
 import type { validateProductionNest } from '../src/core/nesting/production-nest-validation';
@@ -63,6 +64,7 @@ function input(stockCount: number): ProductionNestingInput {
 
 test('advanced local nesting improves forty concave parts and preserves declared stock identities', async ({
   page,
+  browser,
 }) => {
   // Static same-origin harness also keeps development HMR from interrupting the workers.
   await page.goto('/packing-solver-worker.js');
@@ -103,11 +105,12 @@ test('advanced local nesting improves forty concave parts and preserves declared
   expect(result.limited?.produced).toBe(40);
   expect(result.limited?.valid).toBe(true);
   expect(result.limited?.ids.sort()).toEqual(['sheet-0', 'sheet-1']);
-  await expect.poll(() => page.workers().length).toBe(0);
+  await expectNoNestingWorkers(browser);
 });
 
 test('cancelling advanced nesting retains its standard draft and terminates owned workers', async ({
   page,
+  browser,
 }) => {
   await page.goto('/packing-solver-worker.js');
   const result = await page.evaluate(async (data) => {
@@ -120,5 +123,25 @@ test('cancelling advanced nesting retains its standard draft and terminates owne
     return { cancelled: result.cancelled, produced: result.best?.produced };
   }, input(4));
   expect(result).toEqual({ cancelled: true, produced: 40 });
-  await expect.poll(() => page.workers().length).toBe(0);
+  await expectNoNestingWorkers(browser);
 });
+
+async function expectNoNestingWorkers(browser: Browser): Promise<void> {
+  const session = await browser.newBrowserCDPSession();
+  try {
+    // This static harness has no unrelated workers. Check every live dedicated
+    // worker, including pthread descendants with blob or empty URLs.
+    // Playwright's nested-worker records depend on events through their parent
+    // sessions, which are detached when the owning engine is terminated.
+    await expect
+      .poll(async () => {
+        const { targetInfos } = await session.send('Target.getTargets');
+        return targetInfos
+          .filter(({ type }) => type === 'worker')
+          .map(({ targetId, url }) => ({ targetId, url }));
+      })
+      .toEqual([]);
+  } finally {
+    await session.detach();
+  }
+}

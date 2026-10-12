@@ -11,15 +11,20 @@ export function CncPreparationStatus(): JSX.Element | null {
   const epoch = useStore((state) => state.projectDocumentEpoch);
   const scope = useOutputScope();
   const evidence = useCncPreparationEvidenceStore((state) => state.evidence);
+  const cnc = project.machine?.kind === 'cnc';
+  // Hashing every machining input takes tens of milliseconds on a large design;
+  // a laser project never shows these rows, so it never pays for them.
   const rows = useMemo(
     () =>
-      cncDependencyStatuses(
-        cncPreparationInputs(project, scope),
-        evidence?.documentEpoch === epoch ? evidence.inputs : undefined,
-      ),
-    [project, scope, evidence, epoch],
+      cnc
+        ? cncDependencyStatuses(
+            cncPreparationInputs(project, scope),
+            evidence?.documentEpoch === epoch ? evidence.inputs : undefined,
+          )
+        : [],
+    [cnc, project, scope, evidence, epoch],
   );
-  if (project.machine?.kind !== 'cnc') return null;
+  if (!cnc) return null;
   return (
     <details aria-label="CNC preparation status" className="lf-artwork-disclosure">
       <summary title="Review machining input changes since the last Preview or Export in this document session. Output still prepares the current job.">

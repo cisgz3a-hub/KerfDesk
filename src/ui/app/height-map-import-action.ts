@@ -9,7 +9,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { pickPlatformPngFiles } from '../commands/platform-image-files';
 import { prepareReliefHeightfieldPng } from '../import/depth-map-import-preparation';
 import { prepareReliefHeightfieldPngOffThread } from '../import/import-worker-client';
-import type { ToastVariant } from '../state/toast-store';
+import type { ToastOptions, ToastVariant } from '../state/toast-store';
 import { captureImportDocumentOwner, type ImportDocumentOwner } from './import-dispatch';
 import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
@@ -18,7 +18,7 @@ import { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-impor
 type HeightMapImportContext = {
   readonly getProjectDocumentEpoch: () => number;
   readonly importObject: (object: SceneObject, batchIndex?: number) => unknown;
-  readonly pushToast: (message: string, variant?: ToastVariant) => void;
+  readonly pushToast: (message: string, variant?: ToastVariant, options?: ToastOptions) => void;
 };
 
 /** Select PNG height maps, import them sequentially, and report picker failures by toast. */
@@ -116,8 +116,8 @@ function pushOwnedToast(
   context: HeightMapImportContext,
   owner: ImportDocumentOwner,
 ): HeightMapImportContext['pushToast'] {
-  return (message, variant) => {
-    if (owner.isCurrent()) context.pushToast(message, variant);
+  return (...toast) => {
+    if (owner.isCurrent()) context.pushToast(...toast);
   };
 }
 

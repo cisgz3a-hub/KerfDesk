@@ -19,6 +19,15 @@ import { RunAgainControl } from './RunAgainControl';
 import type * as ExecutionTracking from './start-job-execution-tracking';
 
 const counter = vi.hoisted(() => ({ signatures: 0 }));
+// A completed receipt for some other job: the offer stays hidden, but the
+// control must derive the current signature to know that.
+const offer = vi.hoisted(() => ({
+  receipt: { artifact: { executionSignature: 'another job' } } as unknown,
+}));
+
+vi.mock('../state/use-recovery-repository', () => ({
+  useRecoveryRepositorySelection: () => offer.receipt,
+}));
 
 vi.mock('./start-job-execution-tracking', async (importOriginal) => {
   const actual = await importOriginal<typeof ExecutionTracking>();
@@ -45,6 +54,7 @@ beforeEach(() => {
   useLaserStore.setState(initialLaserState());
   usePrintCutSessionStore.getState().clear();
   counter.signatures = 0;
+  offer.receipt = { artifact: { executionSignature: 'another job' } };
 });
 
 afterEach(() => {
@@ -74,6 +84,15 @@ describe('RunAgainControl store subscription', () => {
     act(() => useStore.getState().setJobPlacement({ anchor: 'center' }));
 
     expect(counter.signatures).toBeGreaterThan(before);
+  });
+
+  it('does not derive the replay signature while no completed job is on offer', async () => {
+    offer.receipt = null;
+    await render();
+
+    act(() => useStore.getState().setJobPlacement({ anchor: 'center' }));
+
+    expect(counter.signatures).toBe(0);
   });
 });
 

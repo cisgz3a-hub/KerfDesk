@@ -81,6 +81,18 @@ describe('parseStl', () => {
     if (result.kind === 'error') expect(result.reason).toContain('truncated');
   });
 
+  it.each([Number.NaN, Number.NEGATIVE_INFINITY])(
+    'rejects a binary vertex coordinate of %s',
+    (bad) => {
+      const result = parseStl(binaryStl([TRI_A, [0, 0, 0, 1, 0, 0, 0, 1, bad]]));
+      expect(result).toEqual({
+        kind: 'error',
+        reason:
+          'Binary STL triangle 2 has a vertex coordinate that is not a finite number; the file may be damaged.',
+      });
+    },
+  );
+
   it('rejects ASCII with a partial facet', () => {
     const text =
       'solid x\n facet normal 0 0 1\n outer loop\n vertex 1 2 3\n endloop\n endfacet\nendsolid';

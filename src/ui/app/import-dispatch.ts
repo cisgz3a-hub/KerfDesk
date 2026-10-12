@@ -4,7 +4,7 @@ import type { FileHandle, PlatformAdapter } from '../../platform/types';
 import type { GcodeInspectionSource } from '../gcode-inspector';
 import { importImageFile } from '../commands/import-image-action';
 import type { ImportOutcome } from '../state/store';
-import type { ToastVariant } from '../state/toast-store';
+import type { ToastOptions, ToastVariant } from '../state/toast-store';
 import { importDxfFiles } from './dxf-import-action';
 import { importHpglFile } from './hpgl-import-action';
 import { openGcodeFileInInspector } from './gcode-open-action';
@@ -44,7 +44,7 @@ export type ImportDispatchActions = {
     object: SceneObject,
     batchIndex?: number,
   ) => ImportOutcome | undefined;
-  readonly pushToast: (message: string, variant?: ToastVariant) => void;
+  readonly pushToast: (message: string, variant?: ToastVariant, options?: ToastOptions) => void;
   readonly openGcodeInspector?: (name: string, source: GcodeInspectionSource) => void;
 };
 
@@ -234,8 +234,8 @@ export function bindImportActionsToDocument(
       assertCurrent();
       return actions.importRasterImage(object, batchIndex);
     },
-    pushToast: (message, variant) => {
-      if (owner.isCurrent()) actions.pushToast(message, variant);
+    pushToast: (...toast) => {
+      if (owner.isCurrent()) actions.pushToast(...toast);
     },
     ...(actions.openGcodeInspector === undefined
       ? {}
