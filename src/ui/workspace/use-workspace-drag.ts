@@ -22,6 +22,7 @@ import { beginDrawDrag } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
 import { beginPathNodeDrag } from './path-node-drag';
+import { beginPathSegmentDrag } from './path-segment-drag';
 import { beginTracePartDrag } from './trace-part-tool';
 import { hitCncTabAnchor } from './cnc-tab-editor';
 import { finishLaserTabDrag } from './laser-tab-editor';
@@ -274,7 +275,7 @@ function beginPathNodeDragForNodeTool(args: {
     return null;
   }
   const pxToMm = pxToMmForCanvas(args.ref.current, args.project, args.viewState);
-  return beginPathNodeDrag({
+  const nodeDrag = beginPathNodeDrag({
     project: args.project,
     scenePoint: point,
     pxToMm,
@@ -282,6 +283,8 @@ function beginPathNodeDragForNodeTool(args: {
     selectedPathNodes: useStore.getState().selectedPathNodes,
     selectPathNode: args.selectPathNode,
   });
+  // Off every node, a press on a line or curve grabs the segment to reshape it.
+  return nodeDrag ?? (args.e.shiftKey ? null : beginPathSegmentDrag(args.project, point, pxToMm));
 }
 
 function updateWorkspaceDrag(args: {

@@ -5,6 +5,7 @@ import {
   curveSegmentCount,
   curveSegmentPoint,
   deleteCurveSegment,
+  dragCurveSegment,
   insertCurveNode,
   nearestCurveSegment,
 } from './curve-segment-edit';
@@ -93,6 +94,27 @@ describe('breakOpenCurveAtNode', () => {
     ]);
     expect(breakOpenCurveAtNode(WAVE, 0)).toBeNull();
     expect(breakOpenCurveAtNode(SQUARE, 1)).toBeNull();
+  });
+});
+
+describe('dragCurveSegment', () => {
+  it('bends a line so the grabbed point follows the pointer and the ends stay', () => {
+    const dragged = dragCurveSegment(WAVE, 1, 0.5, { x: 0, y: 4 });
+    expect(dragged?.segments[1]?.kind).toBe('cubic');
+    expect(curveSegmentPoint(dragged as CurveSubpath, 1, 0.5)).toEqual({ x: 15, y: 4 });
+    expect(curveSegmentPoint(dragged as CurveSubpath, 1, 0)).toEqual({ x: 10, y: 0 });
+    expect(curveSegmentPoint(dragged as CurveSubpath, 1, 1)).toEqual({ x: 20, y: 0 });
+  });
+
+  it('moves the grabbed point of a cubic by exactly the drag', () => {
+    const before = curveSegmentPoint(WAVE, 0, 0.3) as { x: number; y: number };
+    const after = curveSegmentPoint(
+      dragCurveSegment(WAVE, 0, 0.3, { x: 1, y: -2 }) as CurveSubpath,
+      0,
+      0.3,
+    );
+    expect(after?.x).toBeCloseTo(before.x + 1, 9);
+    expect(after?.y).toBeCloseTo(before.y - 2, 9);
   });
 });
 

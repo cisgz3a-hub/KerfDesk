@@ -255,7 +255,7 @@ export function mutateObjectCurve(
   };
 }
 
-function materializeCurves(
+export function materializeCurves(
   path: ColoredPath,
   curves: ReadonlyArray<CurveSubpath>,
 ): ColoredPath | null {
@@ -272,7 +272,7 @@ function isAnchorRef(ref: PathNodeRef | null): ref is PathNodeRef {
   return ref !== null && ref.handle === undefined;
 }
 
-function isCurveCommandObject(
+export function isCurveCommandObject(
   object: SceneObject,
 ): object is Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }> {
   return (

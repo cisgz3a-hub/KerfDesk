@@ -6,6 +6,8 @@ import { constrainMeasureEnd, type MeasureDraft } from './measure-tool';
 import { moveLaserTabDrag } from './laser-tab-editor';
 import { moveWarpHandleDrag } from './warp-deform-tool';
 import { updatePathNodeDrag } from './path-node-drag';
+import { updatePathSegmentDrag } from './path-segment-drag';
+import { useStore } from '../state';
 import { updatePenCursor } from './pen-tool';
 import type { ViewState } from './view-transform';
 import { snappedDragEndPoint } from './workspace-pointer-snap';
@@ -56,6 +58,14 @@ export function handleNonTransformDragUpdate(args: NonTransformDragUpdateArgs): 
       setSelectedPathNodePositionDuringInteraction:
         args.setSelectedPathNodePositionDuringInteraction,
     });
+    return true;
+  }
+  if (args.drag?.kind === 'path-segment') {
+    updatePathSegmentDrag(
+      args.drag,
+      args.point,
+      useStore.getState().reshapePathSegmentDuringInteraction,
+    );
     return true;
   }
   if (handleLiveToolUpdate(args)) return true;

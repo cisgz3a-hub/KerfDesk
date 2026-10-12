@@ -102,6 +102,49 @@ function splitOpen(
   ];
 }
 
+const DRAG_T_MIN = 0.15;
+
+/**
+ * Reshapes one segment so the point grabbed at `t` follows `delta` (LightBurn
+ * drag a line or curve). A straight line becomes a cubic first. Both control
+ * points move together by delta / (3t(1 - t)), the shift that carries B(t) by
+ * exactly `delta` while the segment's end nodes stay put. Arcs are not dragged.
+ */
+export function dragCurveSegment(
+  curve: CurveSubpath,
+  segmentIndex: number,
+  t: number,
+  delta: Vec2,
+): CurveSubpath | null {
+  const contour = contourSegments(curve, curve.closed);
+  const segment = contour.segments[segmentIndex];
+  if (segment === undefined || segment.kind === 'elliptical-arc') return null;
+  const from = segmentStart(contour, segmentIndex);
+  const cubic =
+    segment.kind === 'cubic'
+      ? segment
+      : {
+          kind: 'cubic' as const,
+          control1: lerpPoint(from, segment.to, 1 / 3),
+          control2: lerpPoint(from, segment.to, 2 / 3),
+          to: segment.to,
+        };
+  const s = Math.min(1 - DRAG_T_MIN, Math.max(DRAG_T_MIN, t));
+  const k = 1 / (3 * s * (1 - s));
+  const shift = { x: delta.x * k, y: delta.y * k };
+  const segments = [...contour.segments];
+  segments[segmentIndex] = {
+    ...cubic,
+    control1: { x: cubic.control1.x + shift.x, y: cubic.control1.y + shift.y },
+    control2: { x: cubic.control2.x + shift.x, y: cubic.control2.y + shift.y },
+  };
+  return { ...curve, segments };
+}
+
+function lerpPoint(a: Vec2, b: Vec2, t: number): Vec2 {
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+
 export type CurveSegmentHit = {
   readonly segmentIndex: number;
   readonly t: number;

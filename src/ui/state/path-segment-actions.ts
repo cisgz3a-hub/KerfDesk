@@ -5,12 +5,27 @@
 import {
   curveSegmentCount,
   deleteCurveSegment,
+  dragCurveSegment,
   insertCurveNode,
 } from '../../core/geometry/curve-segment-edit';
-import { breakCurveAtNode, curveNodeCount, type ColoredPath } from '../../core/scene';
+import {
+  breakCurveAtNode,
+  curveNodeCount,
+  polylineToCurveSubpath,
+  type ColoredPath,
+  type CurveSubpath,
+  type Vec2,
+} from '../../core/scene';
 import { closedCurveBreak, brokenTabAnchors } from '../../core/cnc/cnc-tab-anchors';
 import type { PathNodeRef } from './path-node-edit-actions';
-import { mutateObjectCurve, withShiftedContourTabs } from './path-node-curve-command-actions';
+import {
+  isCurveCommandObject,
+  materializeCurves,
+  mutateObjectCurve,
+  withShiftedContourTabs,
+} from './path-node-curve-command-actions';
+import { boundsForPaths } from './path-node-edit-geometry';
+import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
 import type { AppState } from './store';
 
 export type PathSegmentRef = {
@@ -26,6 +41,16 @@ export type PathSegmentActions = {
   /** Inserts a node at the segment's `t`, or at its middle. */
   readonly insertPathNode: (ref: PathSegmentRef, at: 'point' | 'midpoint') => void;
   readonly deletePathSegment: (ref: PathSegmentRef) => void;
+  /**
+   * Live segment drag (LightBurn drag a line or curve): reshapes `original`
+   * so its grabbed point moves by `localDelta`, without an undo step of its
+   * own; the drag's interaction snapshot owns the history.
+   */
+  readonly reshapePathSegmentDuringInteraction: (
+    ref: PathSegmentRef,
+    original: CurveSubpath,
+    localDelta: Vec2,
+  ) => void;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -54,7 +79,43 @@ export function pathSegmentActions(set: Setter): PathSegmentActions {
           ? deleteClosedSegment(state, target, ref)
           : deleteOpenSegment(state, target, ref);
       }),
+    reshapePathSegmentDuringInteraction: (ref, original, localDelta) =>
+      set((state) => reshapeDuringInteraction(state, ref, original, localDelta)),
   };
+}
+
+function reshapeDuringInteraction(
+  state: AppState,
+  ref: PathSegmentRef,
+  original: CurveSubpath,
+  localDelta: Vec2,
+): AppState | Partial<AppState> {
+  const reshaped = dragCurveSegment(original, ref.segmentIndex, ref.t, localDelta);
+  if (reshaped === null) return state;
+  let changed = false;
+  const objects = state.project.scene.objects.map((object) => {
+    if (object.id !== ref.objectId || !isCurveCommandObject(object)) return object;
+    const path = object.paths[ref.pathIndex];
+    if (path === undefined) return object;
+    const curves = [...(path.curves ?? path.polylines.map(polylineToCurveSubpath))];
+    if (curves[ref.curveIndex] === undefined) return object;
+    curves[ref.curveIndex] = reshaped;
+    const nextPath = materializeCurves(path, curves);
+    if (nextPath === null) return object;
+    const paths = object.paths.map((candidate, index) =>
+      index === ref.pathIndex ? nextPath : candidate,
+    );
+    const bounds = boundsForPaths(paths);
+    const updated =
+      object.kind === 'shape'
+        ? synchronizePolylineShapeGeometry(object, paths, bounds)
+        : { ...object, paths, bounds };
+    if (updated === null) return object;
+    changed = true;
+    return updated;
+  });
+  if (!changed) return state;
+  return { project: { ...state.project, scene: { ...state.project.scene, objects } }, dirty: true };
 }
 
 // On a closed contour, deleting a segment is Break at the node it ends on, so

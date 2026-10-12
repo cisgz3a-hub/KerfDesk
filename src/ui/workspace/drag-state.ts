@@ -20,6 +20,7 @@ import { hitAabbHandle } from './selection-handles';
 import { handleAltSelectionCycle } from './selection-hit-cycle';
 import { hitSelectionMoveHandle } from './selection-move-handle';
 import type { PathNodeDragState } from './path-node-drag';
+import type { PathSegmentDragState } from './path-segment-drag';
 import type { CncTabDragState } from './cnc-tab-editor';
 import type { LaserTabDragState } from './laser-tab-editor';
 import type { WarpHandleDragState } from './warp-deform-tool';
@@ -97,6 +98,7 @@ export type DragState =
       readonly startScenePoint: Vec2;
     }
   | PathNodeDragState
+  | PathSegmentDragState
   | CncTabDragState
   | LaserTabDragState
   | WarpHandleDragState;
