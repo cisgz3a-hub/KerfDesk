@@ -23,10 +23,13 @@ export const MAX_DATE_PATTERN_LENGTH = 200;
 
 const pad = (value: number, width = 2) => String(value).padStart(width, '0');
 
+const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
 function dayOfYear(date: Date): number {
-  const start = new Date(date.getFullYear(), 0, 1);
-  const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  return Math.round((today.getTime() - start.getTime()) / 86_400_000) + 1;
+  const year = date.getFullYear();
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  const before = MONTH_DAYS.slice(0, date.getMonth()).reduce((sum, days) => sum + days, 0);
+  return before + (leap && date.getMonth() > 1 ? 1 : 0) + date.getDate();
 }
 
 const CODES: Readonly<Record<string, (date: Date) => string>> = {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { formatDatePattern } from './date-pattern';
 import { parseVariableTemplateSource, variableTemplateToSource } from './template-source';
 
-const DATE = new Date(2026, 9, 3, 14, 5, 9); // Saturday 3 October 2026, 14:05:09 local
+const DATE = new globalThis.Date(2026, 9, 3, 14, 5, 9); // Saturday 3 October 2026, 14:05:09 local
 
 describe('custom date formats', () => {
   it('formats the strftime codes in local time and keeps unknown codes as typed', () => {

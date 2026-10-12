@@ -40,6 +40,14 @@ function parseTag(
   if (tag.startsWith('csv-json:')) return parseEncodedCsv(tag.slice(9));
   if (tag.startsWith('serial-json:')) return parseEncodedSerial(tag.slice(12));
   if (tag.startsWith('date:')) return parseDatePattern(tag.slice(5));
+  return parsePrefixedTag(tag);
+}
+
+function parsePrefixedTag(
+  tag: string,
+):
+  | { readonly ok: true; readonly token: VariableTemplateToken }
+  | { readonly ok: false; readonly message: string } {
   if (tag.startsWith('csv:')) {
     const column = tag.slice(4).trim();
     return column === ''
@@ -137,14 +145,18 @@ const SIMPLE_TAGS: Readonly<Record<string, VariableTemplateToken>> = {
   air: { kind: 'cut-setting', field: 'air-assist' },
 };
 
+function dateTimeToSource(
+  token: Extract<VariableTemplateToken, { readonly kind: 'date-time' }>,
+): string {
+  if (token.format === 'custom') return `{{date:${token.pattern ?? ''}}}`;
+  const tag =
+    token.format === 'date-iso' ? 'date' : token.format === 'time-24h' ? 'time' : 'datetime';
+  return `{{${tag}}}`;
+}
+
 function tokenToSource(token: VariableTemplateToken): string {
   if (token.kind === 'literal') return literalToSource(token.value);
-  if (token.kind === 'date-time') {
-    if (token.format === 'custom') return `{{date:${token.pattern ?? ''}}}`;
-    const tag =
-      token.format === 'date-iso' ? 'date' : token.format === 'time-24h' ? 'time' : 'datetime';
-    return `{{${tag}}}`;
-  }
+  if (token.kind === 'date-time') return dateTimeToSource(token);
   if (token.kind === 'serial') {
     return token.prefix === '' && token.offset === undefined
       ? `{{serial:${token.width}}}`

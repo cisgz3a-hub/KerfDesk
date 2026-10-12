@@ -144,11 +144,7 @@ function isTemplateToken(value: unknown): value is VariableTemplateToken {
     case 'literal':
       return typeof token['value'] === 'string';
     case 'date-time':
-      return (
-        typeof token['format'] === 'string' &&
-        (['date-iso', 'time-24h', 'datetime-iso'].includes(token['format']) ||
-          (token['format'] === 'custom' && typeof token['pattern'] === 'string'))
-      );
+      return isDateTimeToken(token);
     case 'serial':
       return isSerialToken(token);
     case 'csv':
@@ -161,6 +157,12 @@ function isTemplateToken(value: unknown): value is VariableTemplateToken {
     default:
       return false;
   }
+}
+
+function isDateTimeToken(token: Record<string, unknown>): boolean {
+  const format = token['format'];
+  if (format === 'custom') return typeof token['pattern'] === 'string';
+  return typeof format === 'string' && ['date-iso', 'time-24h', 'datetime-iso'].includes(format);
 }
 
 function isSerialToken(token: Record<string, unknown>): boolean {
