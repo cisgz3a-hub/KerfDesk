@@ -5,6 +5,8 @@ export type PersonalArtworkRepository = {
   readonly list: () => Promise<readonly PersonalArtwork[]>;
   readonly add: (entries: readonly PersonalArtwork[]) => Promise<void>;
   readonly remove: (id: string) => Promise<void>;
+  /** Rename, recategorise or replace an entry in place, keeping its id. */
+  readonly put: (entry: PersonalArtwork) => Promise<void>;
 };
 
 /** A separate local database: project replacement and autosave cleanup never delete it. */
@@ -53,6 +55,18 @@ export function personalArtworkRepository(
         const tx = db.transaction('artwork', 'readwrite');
         const done = finished(tx);
         for (const entry of validated) tx.objectStore('artwork').add(entry);
+        await done;
+      } finally {
+        db.close();
+      }
+    },
+    put: async (entry) => {
+      const validated = parsePersonalArtwork(entry);
+      const db = await open();
+      try {
+        const tx = db.transaction('artwork', 'readwrite');
+        const done = finished(tx);
+        tx.objectStore('artwork').put(validated);
         await done;
       } finally {
         db.close();

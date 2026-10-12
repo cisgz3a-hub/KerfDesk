@@ -98,8 +98,54 @@ function PersonalArtworkResults(props: {
           >
             Delete from My artwork
           </button>
+          <PersonalArtworkEdit key={selected.id} library={props.library} entry={selected} />
         </div>
       )}
     </>
+  );
+}
+
+// Rename or recategorise a saved entry, or replace what it holds with the
+// current selection; the entry keeps its place and id.
+function PersonalArtworkEdit(props: {
+  readonly library: PersonalArtworkBrowser;
+  readonly entry: PersonalArtwork;
+}): JSX.Element {
+  const [name, setName] = useState(props.entry.name);
+  const [category, setCategory] = useState(props.entry.category);
+  const changed = name.trim() !== props.entry.name || category.trim() !== props.entry.category;
+  return (
+    <div className="lf-personal-artwork__edit">
+      <input
+        className="lf-input"
+        aria-label="Saved artwork name"
+        title="The name this saved artwork is listed under."
+        value={name}
+        onInput={(event) => setName(event.currentTarget.value)}
+      />
+      <input
+        className="lf-input"
+        aria-label="Saved artwork category"
+        title="The category this saved artwork is filed under."
+        value={category}
+        onInput={(event) => setCategory(event.currentTarget.value)}
+      />
+      <button
+        type="button"
+        disabled={props.library.busy || !changed || name.trim() === ''}
+        title="Save the new name and category."
+        onClick={() => props.library.rename(props.entry, name, category)}
+      >
+        Rename
+      </button>
+      <button
+        type="button"
+        disabled={props.library.busy}
+        title="Replace what this entry holds with the artwork selected now, keeping its name and category."
+        onClick={() => props.library.replace(props.entry)}
+      >
+        Replace with selection
+      </button>
+    </div>
   );
 }
