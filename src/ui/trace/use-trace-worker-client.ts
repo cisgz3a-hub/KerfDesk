@@ -39,6 +39,7 @@ import { collectTraceReports } from './trace-report-collector';
 import type { TraceReport } from '../../core/trace/trace-steps';
 import type { TraceNotice } from './trace-notices';
 import type { TraceProgress } from '../../core/trace/trace-progress';
+import { LAZY_LOAD_FAILURE_ADVICE } from '../common/lazy-load-failure';
 
 export type TraceResult = {
   readonly paths: ColoredPath[];
@@ -114,6 +115,19 @@ const TRACE_WORKER_SILENCE_MS = 30_000;
 
 class TraceWorkerRuntimeError extends Error {}
 
+// A worker whose script never loaded gets a plain `error` Event with no
+// message (measured in Chromium on a 404 module worker). Typically the window
+// still runs the previous build after an Update in another window, so the
+// hashed worker chunk is gone. An uncaught exception inside a loaded worker
+// arrives as an ErrorEvent carrying "Uncaught ...".
+export function traceWorkerFailureMessage(event: unknown): string {
+  const detail = (event as { readonly message?: unknown } | undefined)?.message;
+  if (typeof detail === 'string' && detail.length > 0) {
+    return `The tracing engine stopped unexpectedly (${detail}). Try the trace again.`;
+  }
+  return `The tracing engine could not load. ${LAZY_LOAD_FAILURE_ADVICE}`;
+}
+
 // Lazy-construct the worker. Returns null if the runtime doesn't have
 // a Worker constructor (vitest without jsdom workers, SSR) or if a
 // construction failed. Small-image callers try one fresh worker after a
@@ -136,13 +150,13 @@ function ensureWorker(): Worker | null {
     });
     workerInstance = worker;
     worker.onmessage = (event): void => handleWorkerMessage(worker, event);
-    worker.onerror = (): void => {
+    worker.onerror = (event): void => {
       // Worker crashed (e.g. module-resolution failure, syntax error
       // in worker bundle). Same shape as a kind:'error' response —
       // reject every in-flight promise so callers can fall back.
       rejectAllPendingAndRetireWorker(
         worker,
-        new TraceWorkerRuntimeError('Trace worker errored — falling back to inline tracing'),
+        new TraceWorkerRuntimeError(traceWorkerFailureMessage(event)),
       );
     };
     return worker;
@@ -276,10 +290,7 @@ async function traceImageForEpoch(
   } catch (err) {
     checkTraceEpoch(epoch);
     if (isTraceRequestSuperseded(err)) throw err;
-    if (canTraceInline(image)) {
-      return recoverSmallTrace(image, options, epoch, err, progress, flags);
-    }
-    throw err instanceof Error ? err : new Error(String(err));
+    return recoverTrace(image, options, epoch, err, progress, flags);
   }
 }
 
@@ -287,7 +298,7 @@ function checkTraceEpoch(epoch: number): void {
   if (epoch !== latestTraceEpoch) throw new TraceRequestSupersededError();
 }
 
-async function recoverSmallTrace(
+async function recoverTrace(
   image: RawImageData,
   options: TraceOptions,
   epoch: number,
@@ -296,7 +307,10 @@ async function recoverSmallTrace(
   flags: TraceRequestFlags,
 ): Promise<TraceResult> {
   // Request-level errors keep their existing fallback route. Only actual
-  // runtime death gets one fresh worker attempt; it can never retry forever.
+  // runtime death gets one fresh worker attempt, at any image size, so a
+  // transient worker death does not fail a large trace; it can never retry
+  // forever. Small images then still have the cooperative inline route.
+  let failure = error;
   if (error instanceof TraceWorkerRuntimeError) {
     const worker = ensureWorker();
     if (worker !== null) {
@@ -305,10 +319,12 @@ async function recoverSmallTrace(
       } catch (retryError) {
         checkTraceEpoch(epoch);
         if (isTraceRequestSuperseded(retryError)) throw retryError;
+        failure = retryError;
       }
     }
   }
-  return traceInline(image, options, epoch, progress, flags);
+  if (canTraceInline(image)) return traceInline(image, options, epoch, progress, flags);
+  throw failure instanceof Error ? failure : new Error(String(failure));
 }
 
 export function canTraceInline(image: {

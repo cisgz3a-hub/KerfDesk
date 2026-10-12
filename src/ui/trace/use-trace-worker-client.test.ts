@@ -225,9 +225,8 @@ describe('traceImage (worker client with inline fallback)', () => {
 
     const client = await import('./use-trace-worker-client');
 
-    await expect(client.traceImage(largeImage(), traceOptions)).rejects.toThrow(
-      'Trace worker errored',
-    );
+    // A large image cannot fall back inline, so the one fresh worker is what
+    // keeps a transient worker death from failing the trace.
     await expect(client.traceImage(largeImage(), traceOptions)).resolves.toEqual({
       paths: [],
       bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
@@ -237,6 +236,44 @@ describe('traceImage (worker client with inline fallback)', () => {
     expect(workers).toHaveLength(2);
     expect(workers[0]?.terminated).toBe(true);
     expect(workers[1]?.terminated).toBe(false);
+  });
+
+  it.each([
+    {
+      name: 'a worker script that never loaded (stale build)',
+      event: new Event('error'),
+      message: /could not load\. .*updated in another window/,
+    },
+    {
+      name: 'an uncaught exception inside the worker',
+      event: Object.assign(new Event('error'), { message: 'Uncaught RangeError: boom' }),
+      message: 'stopped unexpectedly (Uncaught RangeError: boom)',
+    },
+  ])('reports $name for a large image after one fresh worker', async ({ event, message }) => {
+    vi.resetModules();
+    const workers: AlwaysFailingWorker[] = [];
+    class AlwaysFailingWorker {
+      onmessage: ((e: MessageEvent<TraceWorkerResponse>) => void) | null = null;
+      onerror: ((e: Event) => void) | null = null;
+      terminated = false;
+      constructor() {
+        workers.push(this);
+      }
+      postMessage(): void {
+        queueMicrotask(() => this.onerror?.(event));
+      }
+      terminate(): void {
+        this.terminated = true;
+      }
+    }
+    vi.stubGlobal('Worker', AlwaysFailingWorker);
+    const client = await import('./use-trace-worker-client');
+
+    const failure = client.traceImage(largeImage(), traceOptions);
+    await expect(failure).rejects.toThrow(message);
+    await expect(failure).rejects.not.toThrow('falling back to inline');
+    expect(workers).toHaveLength(2);
+    expect(workers.every((worker) => worker.terminated)).toBe(true);
   });
 
   it('rejects and retires the worker when postMessage throws synchronously', async () => {
