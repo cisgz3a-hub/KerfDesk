@@ -1,5 +1,6 @@
 import { writeAudit } from './audit.mjs';
 import { ROUTE } from './routes.mjs';
+import { fullPurchaseRefund, refundItemFacts } from './payment-refund.mjs';
 import { identifier, requireValue } from './validation.mjs';
 
 // Paddle reports refunds and chargebacks as adjustments to the paid transaction.
@@ -52,6 +53,7 @@ export function paddleAdjustment(event) {
       action: short(data.action),
       status: short(data.status),
       type: short(data.type),
+      refundItem: data.action === 'refund' ? refundItemFacts(data) : null,
       createdAt: timestamp(data.created_at),
       occurredAt: timestamp(event.occurred_at),
     },
@@ -59,13 +61,57 @@ export function paddleAdjustment(event) {
 }
 
 /** What an adjustment does to the licence its transaction bought. */
-export function adjustmentEffect({ action, status, type }) {
+export function adjustmentEffect(adjustment, order) {
+  const { action, status } = adjustment;
   if (status === 'reversed' && CHARGEBACKS.has(action)) return 'restore';
   if (status !== 'approved') return null;
-  if (action === 'refund') return type === 'full' ? 'revoke' : 'review';
+  if (action === 'refund') return fullPurchaseRefund(adjustment, order) ? 'revoke' : 'review';
   if (REVOKING.has(action)) return 'revoke';
   if (RESTORING.has(action)) return 'restore';
   return null;
+}
+
+function sameEventIdentity(previous, adjustment) {
+  const current = { ...adjustment };
+  // Existing deliveries predate retained item facts. Their identity still proves
+  // the same event; redelivery must preserve deduplication and support overrides.
+  if (!Object.hasOwn(previous, 'refundItem')) delete current.refundItem;
+  else if (
+    previous.refundItem &&
+    !Object.hasOwn(previous.refundItem, 'amount') &&
+    current.refundItem
+  ) {
+    current.refundItem = { ...current.refundItem };
+    delete current.refundItem.amount;
+  }
+  return JSON.stringify(previous) === JSON.stringify(current);
+}
+
+function supportStatusAfter(tx, licenseId, approvedAt) {
+  // Audits use seconds, so a decision in the approval's second wins conservatively.
+  const since = Math.floor(approvedAt / 1000);
+  return tx.keysWhere('audit:', 'target', licenseId).some((key) => {
+    const audit = tx.get(key);
+    return (
+      audit.route === ROUTE.licenseStatus &&
+      typeof audit.credential === 'string' &&
+      ['active', 'revoked'].includes(audit.outcome) &&
+      audit.at >= since
+    );
+  });
+}
+
+function reviewedRefundReplay(tx, previousEvent, previous, adjustment, order) {
+  if (!previousEvent || Object.hasOwn(previousEvent.identity, 'refundItem')) return false;
+  if (previous?.outcome !== 'review' || Object.hasOwn(previous, 'refundItem')) return false;
+  if (order?.status !== 'fulfilled' || order.operation !== 'purchase') return false;
+  if (previous.occurredAt !== adjustment.occurredAt || previous.status !== 'approved') return false;
+  return (
+    adjustment.action === 'refund' &&
+    adjustment.status === 'approved' &&
+    fullPurchaseRefund(adjustment, order) &&
+    !supportStatusAfter(tx, order.licenseId, previous.approvedAt ?? previous.occurredAt)
+  );
 }
 
 /** Bind retained notifications only after this transaction has proved its order. */
@@ -89,7 +135,7 @@ export function applyPurchaseAdjustments(tx, authority, order, transactionId, ef
   if (license?.tier !== 'paid') return 'none';
   const blocking = adjustments.filter((item) => {
     if (item.approvedAt === undefined) return false;
-    if (item.action === 'refund') return item.type === 'full';
+    if (item.action === 'refund') return fullPurchaseRefund(item, order);
     if (!CHARGEBACKS.has(item.action) || item.status === 'reversed') return false;
     return !adjustments.some(
       (reverse) =>
@@ -139,11 +185,10 @@ export function receiveAdjustment(authority, adjustment) {
     const previousEvent = tx.get(eventKey);
     if (previousEvent) {
       requireValue(
-        JSON.stringify(previousEvent.identity) === JSON.stringify(adjustment),
+        sameEventIdentity(previousEvent.identity, adjustment),
         409,
         'idempotency_conflict',
       );
-      return { received: true, duplicate: true };
     }
     const orderId = tx.get(`provider-order:paddle:${adjustment.transactionId}`)?.orderId;
     const order = orderId === undefined ? undefined : tx.get(`order:${orderId}`);
@@ -151,6 +196,14 @@ export function receiveAdjustment(authority, adjustment) {
       order?.provider === 'paddle' && order.providerOrderId === adjustment.transactionId;
     const recordKey = `payment-adjustment:paddle:${adjustment.adjustmentId}`;
     const previous = tx.get(recordKey);
+    const enrich = reviewedRefundReplay(
+      tx,
+      previousEvent,
+      previous,
+      adjustment,
+      owned ? order : undefined,
+    );
+    if (previousEvent && !enrich) return { received: true, duplicate: true };
     if (previous)
       requireValue(
         ['transactionId', 'action', 'type', 'createdAt'].every(
@@ -166,12 +219,13 @@ export function receiveAdjustment(authority, adjustment) {
     });
     if (
       previous &&
+      !enrich &&
       (previous.occurredAt > adjustment.occurredAt ||
         (previous.occurredAt === adjustment.occurredAt &&
           (STATUS_ORDER.get(previous.status) ?? -1) >= (STATUS_ORDER.get(adjustment.status) ?? -1)))
     )
       return { received: true, duplicate: true };
-    const effect = adjustmentEffect(adjustment);
+    const effect = adjustmentEffect(adjustment, owned ? order : undefined);
     const record = {
       ...adjustment,
       ...(owned ? { orderId, licenseId: order.licenseId } : {}),
@@ -190,7 +244,7 @@ export function receiveAdjustment(authority, adjustment) {
     let outcome = 'none';
     if (effect !== null && (order.operation !== 'purchase' || effect === 'review'))
       outcome = 'review';
-    else if (effect !== null && previous?.status !== adjustment.status) {
+    else if (effect !== null && (previous?.status !== adjustment.status || enrich)) {
       if (order.status !== 'fulfilled') outcome = 'deferred';
       else
         outcome = applyPurchaseAdjustments(tx, authority, order, adjustment.transactionId, effect);
