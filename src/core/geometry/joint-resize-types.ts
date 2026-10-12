@@ -14,7 +14,8 @@ export type JointCandidate = {
   readonly objectId: string;
   readonly pathIndex: number;
   readonly contourIndex: number;
-  readonly kind: 'enclosed-rectangle' | 'inward-slot';
+  /** An outward tab is measured by its depth (how far it protrudes), the material it passes through. */
+  readonly kind: 'enclosed-rectangle' | 'inward-slot' | 'outward-tab';
   readonly widthMm: number;
   readonly depthMm: number;
   readonly centre: Vec2;
