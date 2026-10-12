@@ -29,7 +29,7 @@ describe('editable sketch geometry', () => {
     expect(built.paths).toHaveLength(3);
     expect(built.result).toMatchObject({ kind: 'solved', status: 'fully-constrained' });
     expect(built.bounds).toEqual({ minX: 0, minY: 0, maxX: 64, maxY: 54 });
-    const profile = built.paths?.find((p) => p.polylines[0]?.points.length === 4)?.polylines[0];
+    const profile = built.paths?.find((p) => p.polylines[0]?.points.length === 5)?.polylines[0];
     expect(profile).toEqual({
       closed: true,
       points: [
@@ -37,6 +37,7 @@ describe('editable sketch geometry', () => {
         { x: 40, y: 20 },
         { x: 40, y: 35 },
         { x: 10, y: 35 },
+        { x: 10, y: 20 },
       ],
     });
     expect(initial.lines).toHaveLength(0);
