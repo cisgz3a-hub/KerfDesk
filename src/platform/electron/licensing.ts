@@ -19,6 +19,7 @@ const STATES: ReadonlyArray<LicenceStatus['state']> = [
   'invalid-licence',
   'unavailable',
   'clock-error',
+  'checkin-required',
 ];
 
 function nullableText(value: unknown, max: number): boolean {
@@ -251,6 +252,10 @@ export function createDesktopLicenceAdapter(
           ...(licenseKey === undefined ? {} : { licenseKey }),
         }),
       ),
+    projectSealKey: async () => {
+      const key = ((await send('project-seal-key')) as { key?: unknown } | null)?.key;
+      return typeof key === 'string' && /^[A-Za-z0-9_-]{43}$/.test(key) ? key : null;
+    },
     startTrial: () => request('trial', {}),
     refresh: () => request('refresh', {}),
     deactivate: () => request('deactivate', {}),

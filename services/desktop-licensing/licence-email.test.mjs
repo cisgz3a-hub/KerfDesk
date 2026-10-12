@@ -124,6 +124,19 @@ test('a failed send records only its code and never undoes the purchase', async 
   assert.equal(JSON.stringify(order).includes('buyer@example.com'), false);
 });
 
+test('a revocation during customer lookup prevents licence key email disclosure', async () => {
+  const { f, env, sent, fetcher } = await emailing();
+  const revokeDuringLookup = async (...args) => {
+    const [key] = f.records.keysWhere('order:', 'providerOrderId', `txn_${'c'.repeat(26)}`);
+    const { licenseId } = f.records.get(key);
+    await f.authority.setLicenseStatus({ licenseId, status: 'revoked' });
+    return fetcher(...args);
+  };
+  const { response } = await pay(f, env, revokeDuringLookup);
+  assert.equal(response.received, true);
+  assert.equal(sent.length, 0);
+});
+
 test('customer lookup refuses malformed IDs and addresses, and the message carries the steps', async () => {
   const env = { PADDLE_ENVIRONMENT: 'live', PADDLE_API_KEY: 'k'.repeat(40) };
   let calls = 0;

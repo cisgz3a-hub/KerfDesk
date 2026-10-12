@@ -2,9 +2,10 @@ import { app, BrowserWindow, clipboard, net, Notification, safeStorage, shell } 
 import { installLicenceLink } from './licence-link.js';
 import { readLicensingConfig, type LicensingConfig } from './licensing-config.js';
 import { isLicenceCheckoutUrl, purchasePageUrl } from './licensing-commerce.js';
-import { licensingDeviceId, rememberDeviceId } from './licensing-device.js';
+import { licensingDeviceId, licensingHardwareId, rememberDeviceId } from './licensing-device.js';
 import {
   withLicensingRoutes,
+  type LicenceEntry,
   type ProtocolHandler,
   type RequestUpdateClose,
 } from './licensing-routes.js';
@@ -24,6 +25,7 @@ import {
 import { createDesktopUpdates, type DesktopUpdates } from './update-status.js';
 import { desktopManualUpdates } from './desktop-manual-updates.js';
 import { installManualUpdateQuit } from './manual-update-quit.js';
+import { createProjectSealKey } from './project-seal-key.js';
 
 // A plain label for the device list; the computer's own name is never sent.
 const DEVICE_NAMES: Readonly<Record<string, string>> = {
@@ -80,11 +82,12 @@ export function createDesktopLicensing(options: Options) {
     }),
     // reg.exe runs once per process, not on every licence read (ADR-523 Amendment 2).
     deviceId: rememberDeviceId(() => licensingDeviceId()),
+    hardwareId: () => licensingHardwareId(),
     deviceName: DEVICE_NAMES[process.platform] ?? 'KerfDesk device',
     fetch: (url, init) => net.fetch(url, init),
     ...browserOpeners(config.channel === 'commercial' && config.sandbox === true),
   });
-  const licenceLink = desktopLicenceLink(config, options.packaged);
+  const entry = licenceEntry(config, desktopLicenceLink(config, options.packaged), options);
   const rings = createUpdateRingStore(options.userDataPath);
   const manual = desktopManualUpdates(config, {
     ...options,
@@ -120,9 +123,7 @@ export function createDesktopLicensing(options: Options) {
         earlyUpdates,
         updates,
         manual === null ? undefined : options.requestManualUpdateClose,
-        config.channel === 'commercial'
-          ? { readClipboard: () => clipboard.readText(), licenceLink }
-          : {},
+        entry,
       ),
     /**
      * Runs once the window is open: a quiet weekly licence confirmation, then
@@ -149,6 +150,23 @@ export function createDesktopLicensing(options: Options) {
         pendingUpdate !== null &&
         runtime.isReleaseEligibleCached(pendingUpdate.envelope, pendingUpdate.version);
     },
+  };
+}
+
+/** Key entry helpers and the project seal key, for a commercial build only (ADR-579, ADR-592). */
+function licenceEntry(
+  config: LicensingConfig,
+  licenceLink: ReturnType<typeof desktopLicenceLink>,
+  options: Pick<Options, 'userDataPath'>,
+): LicenceEntry {
+  if (config.channel !== 'commercial') return {};
+  return {
+    readClipboard: () => clipboard.readText(),
+    licenceLink,
+    projectSealKey: createProjectSealKey({
+      userDataPath: options.userDataPath,
+      secureStorage: safeStorage,
+    }),
   };
 }
 

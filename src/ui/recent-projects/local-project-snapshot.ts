@@ -2,6 +2,7 @@ import type { Project } from '../../core/scene';
 import { prepareProjectForPersistence, serializeProject } from '../../io/project';
 import { portableProjectAssets } from '../app/portable-project-assets';
 import type { PagedRasterAssetReader } from '../import/paged-raster-hydration';
+import { projectSealReady, sealProjectText } from '../licensing/project-seal';
 
 export const MAX_LOCAL_SNAPSHOTS = 12;
 export const MAX_LOCAL_SNAPSHOT_BYTES = 128 * 1024 * 1024;
@@ -30,7 +31,8 @@ export async function captureLocalProjectSnapshot(
   const prepared = prepareProjectForPersistence(project);
   if (prepared.kind !== 'ok') throw new Error(prepared.reason);
   const portable = await portableProjectAssets(prepared.project, reader);
-  const projectJson = serializeProject(portable);
+  await projectSealReady();
+  const projectJson = sealProjectText(serializeProject(portable));
   const bytes = new TextEncoder().encode(projectJson).byteLength;
   if (bytes > MAX_LOCAL_SNAPSHOT_BYTES)
     throw new Error(

@@ -10,6 +10,18 @@ type PrivateReport = NodeJS.ProcessReport & { excludeEnv: boolean; excludeNetwor
  * installation identity without changing the registry or the packaged app.
  */
 export function windowsRegistryCommand(): string {
+  return realpathSync.native(registryCommandFromModules(loadedModules()));
+}
+
+/** Windows PowerShell from the same verified system directory as reg.exe (ADR-592). */
+export function windowsPowerShellCommand(): string {
+  const registry = registryCommandFromModules(loadedModules());
+  return realpathSync.native(
+    win32.join(win32.dirname(registry), 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+  );
+}
+
+function loadedModules(): unknown {
   const report = process.report as PrivateReport;
   const previous = { env: report.excludeEnv, network: report.excludeNetwork };
   let loaded: unknown;
@@ -22,7 +34,7 @@ export function windowsRegistryCommand(): string {
     report.excludeEnv = previous.env;
     report.excludeNetwork = previous.network;
   }
-  return realpathSync.native(registryCommandFromModules(loaded));
+  return loaded;
 }
 
 export function registryCommandFromModules(report: unknown): string {

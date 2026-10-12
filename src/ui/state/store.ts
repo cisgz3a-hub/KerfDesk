@@ -9,7 +9,10 @@ import {
 import { reliefAuthoringActions, type ReliefAuthoringActions } from './relief-authoring-actions';
 import { reliefLinkMutationSetter } from './relief-link-mutation';
 import { observeDesignHierarchyDocument } from './design-hierarchy-store';
-import { proOperationMutationSetter } from '../licensing/pro-operation-mutation';
+import {
+  freeProArtworkSetter,
+  proOperationMutationSetter,
+} from '../licensing/pro-operation-mutation';
 import { newlyIntroducedProOperationFeature } from '../licensing/pro-operation-policy';
 import type { SvgFragmentActions } from './svg-fragment-mutation';
 // Zustand store: project/UI state, undo/redo, and dirty/save tracking.
@@ -410,10 +413,15 @@ export type AppState = PartGeneratorActions &
   };
 
 export const useStore = create<AppState>((rawSet, get) => {
-  const set = reliefLinkMutationSetter(rawSet);
+  const documentSet = reliefLinkMutationSetter(rawSet);
+  // Free edits existing Pro work's settings, not its artwork (ADR-592). Document
+  // replacement, history and save tracking keep the unguarded setter.
+  // Refresh linked relief data before checking the resulting artwork, so a
+  // Free edit to a linked vector cannot silently author a different relief.
+  const set = reliefLinkMutationSetter(freeProArtworkSetter(rawSet));
   return {
     ...initialState(),
-    ...projectActions(set, get, initialState),
+    ...projectActions(documentSet, get, initialState),
     ...objectInsertActions(set, get),
     ...imageImportActions(set, get),
     ...breakApartActions(proOperationMutationSetter(set, get)),
@@ -464,10 +472,10 @@ export const useStore = create<AppState>((rawSet, get) => {
     ...sceneActions(set, proOperationMutationSetter(set, get)),
     ...duplicateAction(proOperationMutationSetter(set, get)),
     ...fitToSelectionAction(get),
-    ...historyActions(set),
+    ...historyActions(documentSet),
     ...viewActions(set),
     ...interactionActions(set),
-    ...saveTrackingActions(set, get),
+    ...saveTrackingActions(documentSet, get),
   };
 });
 

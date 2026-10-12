@@ -6,7 +6,7 @@ import {
   operationIdsForObject,
   type ImportedSvg,
 } from '../../core/scene';
-import { setActiveEdition } from '../licensing/edition';
+import { setActiveEdition, UNRESTRICTED_EDITION } from '../licensing/edition';
 import { operationProFeature } from '../licensing/pro-operation-policy';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
@@ -187,21 +187,20 @@ describe.each(independentActions)('$name independent operation admission', ({ na
 });
 
 it.each(proOperations)(
-  'keeps ordinary Weld of existing $feature operations editable in Free',
+  'asks for Pro before Weld changes existing $feature artwork in Free (ADR-592)',
   (pro) => {
     const request = edition();
     const before = load(pro);
     useStore.getState().weldSelection();
+    expect(useStore.getState().project).toBe(before);
+    expect(request).toHaveBeenCalledWith(pro.feature, expect.any(Function));
+    setActiveEdition(UNRESTRICTED_EDITION);
+    useStore.getState().weldSelection();
     const after = useStore.getState().project;
     expect(after.scene.objects).toHaveLength(1);
-    expect(after.scene.layers.map((layer) => layer.id)).toEqual(
-      before.scene.layers.map((layer) => layer.id),
-    );
     expect(operationIdsForObject(after.scene.objects[0]!, after.scene.layers)).toContain(
       'source-operation',
     );
-    expect(useStore.getState().undoStack).toEqual([before]);
-    expect(request).not.toHaveBeenCalled();
   },
 );
 

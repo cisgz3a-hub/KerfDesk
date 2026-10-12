@@ -21,6 +21,7 @@ import type { AppState } from './store';
 import { projectWithCurrentJobSetup } from './project-job-setup';
 import { visitWorkflowArchives } from '../../io/project/project-workflow-archives';
 import { useToastStore } from './toast-store';
+import { trustProject } from '../licensing/project-seal';
 
 type Set = (patch: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
 export type ProductionManifestActions = {
@@ -130,7 +131,8 @@ async function openRow(
     useToastStore.getState().pushToast(error, 'warning');
     return false;
   }
-  if (context.get().setProject(project).kind === 'desktop-required') return false;
+  // A row of the open, already admitted production document (ADR-592).
+  if (context.get().setProject(trustProject(project)).kind === 'desktop-required') return false;
   context.set({
     savedName: captured.savedName,
     lastSaveTarget: captured.lastSaveTarget,

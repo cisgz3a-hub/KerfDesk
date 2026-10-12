@@ -1,8 +1,9 @@
 import type { LicenceClaims } from './licensing-verification.js';
 
 // Clock rules for licences (ADR-523, ADR-523 Amendment 2). Only a trial ends by
-// the clock, so only a trial is checked against it: a paid or developer licence
-// never expires, and its eligible versions work offline whatever the clock says.
+// the clock: a paid or developer licence never expires. Trial and paid devices
+// must still confirm their rights online now and then before choosing new Pro
+// tools (ADR-592); existing work and output never wait for that.
 
 /** How far this computer's clock may differ from the licence service's, in seconds. */
 export const CLOCK_TOLERANCE = 300;
@@ -27,6 +28,35 @@ export function nextClockMark(
   now: number,
 ): number | null {
   return clockLimited(rights) && now > lastSeenAt ? now : null;
+}
+
+const DAY = 86_400;
+/**
+ * How long a device may go without the licence service confirming its rights
+ * before new Pro choices pause (ADR-592). The signed `issuedAt` of the last grant
+ * is the confirmation, so it cannot be moved on by editing saved files.
+ * Developer licences are exempt.
+ */
+export const CHECK_IN_LIMIT: Readonly<Partial<Record<LicenceClaims['tier'], number>>> = {
+  trial: 3 * DAY,
+  paid: 30 * DAY,
+};
+
+/**
+ * True when this device must reach the licence service before choosing new Pro
+ * tools: its last confirmation is older than the limit, or this computer's clock
+ * is earlier than that confirmation.
+ */
+export function checkInOverdue(
+  claims: Pick<LicenceClaims, 'tier' | 'issuedAt'>,
+  lastSeenAt: number,
+  now: number,
+): boolean {
+  const limit = CHECK_IN_LIMIT[claims.tier];
+  if (limit === undefined) return false;
+  return (
+    Math.max(now, lastSeenAt) - claims.issuedAt > limit || now + CLOCK_TOLERANCE < claims.issuedAt
+  );
 }
 
 /** A freshly issued grant whose time is too far from this computer's clock. */

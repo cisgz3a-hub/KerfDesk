@@ -10,6 +10,8 @@ import {
 import { resolveImportBlob, type BlobSourceFile } from '../import/import-file-blob';
 import type { ToastVariant } from '../state/toast-store';
 import { mainThreadImportFallbackAdvisory } from './import-size-advisory';
+import { projectSealReady, trustIfSealedHere } from '../licensing/project-seal';
+import { unadmittedProFeatures } from '../state/pending-pro-project';
 
 /** A chosen project file; `recentRef` lets Recent Projects reopen it. */
 export type OpenProjectFile = BlobSourceFile & { readonly recentRef?: RecentFileRef };
@@ -57,9 +59,27 @@ async function parseNativeProjectFile(
   options: DocumentImportRequestOptions,
   pushToast: PushToast,
 ): Promise<ReturnType<typeof deserializeProject>> {
-  if (blob === null) return deserializeProject(await file.text());
+  if (blob === null) {
+    const text = await file.text();
+    return admitSealedProject(deserializeProject(text), async () => text);
+  }
   const pending = parseProjectOffThread(blob, options);
-  if (pending !== null) return pending;
+  if (pending !== null) return admitSealedProject(await pending, () => file.text());
   pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
-  return deserializeProject(await file.text());
+  const text = await file.text();
+  return admitSealedProject(deserializeProject(text), async () => text);
+}
+
+/**
+ * A desktop session without Pro opens Pro work only from text this computer
+ * sealed (ADR-592). The text is read again only for a project that needs it.
+ */
+async function admitSealedProject(
+  result: ReturnType<typeof deserializeProject>,
+  text: () => Promise<string>,
+): Promise<ReturnType<typeof deserializeProject>> {
+  if (result.kind !== 'ok' || unadmittedProFeatures(result.project).length === 0) return result;
+  await projectSealReady();
+  trustIfSealedHere(result.project, await text());
+  return result;
 }

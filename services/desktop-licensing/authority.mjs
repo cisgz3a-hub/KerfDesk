@@ -115,10 +115,24 @@ export class LicensingAuthority {
   async startTrial(body) {
     const deviceId = device(body.deviceId);
     const deviceHash = await this.crypto.hash('device', deviceId);
+    // Optional: older apps and computers without a usable firmware UUID send none.
+    const hardwareHash =
+      body.hardwareId === undefined
+        ? null
+        : await this.crypto.hash('hardware', device(body.hardwareId));
     const trialId = `trial-${deviceHash}`;
     const now = this.now();
     this.records.transaction((tx) => {
-      if (tx.get(`license:${trialId}`)) return;
+      const hardwareKey = hardwareHash === null ? null : `trial-hardware:${hardwareHash}`;
+      const bound = hardwareKey === null ? undefined : tx.get(hardwareKey);
+      if (tx.get(`license:${trialId}`)) {
+        if (hardwareKey !== null && !bound) tx.put(hardwareKey, { trialId });
+        return;
+      }
+      // A new Windows installation ID on hardware that already had a trial is the
+      // same computer, so it gets no second trial (ADR-592).
+      requireValue(!bound || bound.trialId === trialId, 403, 'trial_already_used');
+      if (hardwareKey !== null) tx.put(hardwareKey, { trialId });
       tx.put(`license:${trialId}`, {
         licenseId: trialId,
         tier: 'trial',
@@ -299,6 +313,8 @@ export class LicensingAuthority {
       requireValue(license && license.tier !== 'trial', 404, 'license_not_found');
       const previousStatus = license.status;
       license.status = body.status;
+      // A support decision replaces any refund or chargeback revocation (ADR-592).
+      delete license.revokedBy;
       tx.put(`license:${licenseId}`, license);
       writeAudit(tx, this, admin, {
         route: ROUTE.licenseStatus,

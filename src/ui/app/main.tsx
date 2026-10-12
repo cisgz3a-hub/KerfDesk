@@ -34,6 +34,8 @@ import { initAppTheme } from '../theme/app-theme';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';
 import { EditionProvider } from '../licensing/EditionProvider';
+import { installProjectSealKey } from '../licensing/project-seal';
+import { startLicensedEditionLocked } from '../licensing/edition';
 import { watchPreloadErrors } from './preload-error-toast';
 import { DesktopStartupGate } from './DesktopStartupGate';
 
@@ -81,6 +83,10 @@ const desktopLicenceClient =
   adapter.id === 'electron' && window.location.protocol === 'app:'
     ? createDesktopLicenceAdapter()
     : undefined;
+// Before any project opens or saves: seals tell this computer's Pro work apart (ADR-592).
+const sealKey = desktopLicenceClient?.projectSealKey;
+if (sealKey !== undefined) installProjectSealKey(sealKey);
+if (desktopLicenceClient !== undefined) startLicensedEditionLocked();
 
 // If a render crash unmounts the App (and its Abort button + Ctrl+. listener),
 // the crash screen still needs a way to request a controller abort (F60/F65). Both

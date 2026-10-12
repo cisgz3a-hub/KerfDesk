@@ -18,6 +18,8 @@ export type LicenceEntry = {
   readonly readClipboard?: (() => string | Promise<string>) | undefined;
   /** kerfdesk://licence (licence-link.ts), consumed once by the renderer. */
   readonly licenceLink?: LicenceLink | null | undefined;
+  /** This computer's project seal key (ADR-592), for a commercial build's own renderer. */
+  readonly projectSealKey?: (() => Promise<string | null>) | undefined;
 };
 
 export function withLicensingRoutes(
@@ -45,8 +47,7 @@ export function withLicensingRoutes(
     )
       return updateRoute(action, request, updates, requestUpdateClose);
     if (action === 'status' && request.method === 'GET') return response(await runtime.status());
-    if (action === 'licence-link' || action === 'clipboard-key')
-      return entryRoute(action, request, entry);
+    if (ENTRY_ACTIONS.has(action)) return entryRoute(action as EntryAction, request, entry);
     if (!jsonPost(request)) return missing();
     const body = await readBody(request);
     if (!record(body)) return response({ error: 'invalid_request' }, 400);
@@ -185,15 +186,25 @@ async function devices(
   );
 }
 
-/** kerfdesk://licence (GET, answered once) and Paste key (empty JSON POST). */
+const ENTRY_ACTIONS = new Set(['licence-link', 'clipboard-key', 'project-seal-key']);
+type EntryAction = 'licence-link' | 'clipboard-key' | 'project-seal-key';
+
+/**
+ * kerfdesk://licence (GET, answered once), Paste key (empty JSON POST) and this
+ * computer's project seal key (GET, ADR-592).
+ */
 async function entryRoute(
-  action: 'licence-link' | 'clipboard-key',
+  action: EntryAction,
   request: Request,
   entry: LicenceEntry,
 ): Promise<Response> {
   if (action === 'licence-link')
     return request.method === 'GET' && entry.licenceLink
       ? response(await entry.licenceLink.consume())
+      : missing();
+  if (action === 'project-seal-key')
+    return request.method === 'GET' && entry.projectSealKey
+      ? response({ key: await entry.projectSealKey() })
       : missing();
   if (!jsonPost(request)) return missing();
   const body = await readBody(request);

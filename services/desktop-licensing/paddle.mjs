@@ -1,4 +1,5 @@
 /* global crypto, TextEncoder, URL, fetch, AbortSignal */
+import { isAdjustmentEvent, paddleAdjustment } from './payment-adjustments.mjs';
 import { CATALOG } from './payments.mjs';
 import { identifier, parseBody, readBody, requireValue, ServiceError } from './validation.mjs';
 
@@ -204,6 +205,7 @@ export function paddleVerifier(env, findOrder = () => undefined) {
       'invalid_payment_signature',
     );
     const event = parseBody(raw);
+    if (isAdjustmentEvent(event)) return paddleAdjustment(event);
     if (event.event_type !== 'transaction.completed') return { ignored: true };
     const data = event.data;
     const orderId = data?.custom_data?.kerfdesk_order_id;

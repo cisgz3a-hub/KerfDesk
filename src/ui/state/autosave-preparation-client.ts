@@ -1,7 +1,12 @@
 import type { Project } from '../../core/scene';
 import { packProjectMessage, type ProjectMessage } from '../packed-project-transfer';
 import { reserveWorkerMemory } from '../worker-memory-lane';
-import { prepareAutosaveRecord, type AutosavePreparation } from './autosave-record';
+import { currentProjectSealKey } from '../licensing/project-seal';
+import {
+  prepareAutosaveRecord,
+  sealAutosavePreparation,
+  type AutosavePreparation,
+} from './autosave-record';
 
 export type AutosavePreparationRequest = {
   /** A plain Project, or its geometry packed into transferred buffers (ADR-346). */
@@ -9,6 +14,8 @@ export type AutosavePreparationRequest = {
   readonly savedAt: number;
   readonly sessionId: string;
   readonly storageKey: string;
+  /** This computer's project seal key, when the window has one (ADR-592). */
+  readonly sealKey?: string;
 };
 
 // Each interval write owns a short-lived worker. Keep serialization and recovery
@@ -23,11 +30,12 @@ export async function prepareAutosaveRecordOffThread(
   if (typeof Worker === 'undefined') {
     return prepareAutosaveRecord(project, savedAt, sessionId, storageKey);
   }
-  return new Promise((resolve) => {
+  const prepared = await new Promise<AutosavePreparation>((resolve) => {
     reserveWorkerMemory((release) => {
       prepareWithWorker({ project, savedAt, sessionId, storageKey }, resolve, release);
     });
   });
+  return sealAutosavePreparation(prepared);
 }
 
 type LocalAutosavePreparationRequest = Omit<AutosavePreparationRequest, 'project'> & {
@@ -69,8 +77,12 @@ function prepareWithWorker(
     // A dense trace's geometry is transferred as buffers instead of being
     // structured-cloned on the canvas thread every interval (ADR-346).
     const packed = packProjectMessage(request.project);
-    const message: AutosavePreparationRequest =
-      packed.message === request.project ? request : { ...request, project: packed.message };
+    const sealKey = currentProjectSealKey();
+    const message: AutosavePreparationRequest = {
+      ...request,
+      project: packed.message,
+      ...(sealKey === null ? {} : { sealKey }),
+    };
     if (packed.transfer.length === 0) worker.postMessage(message);
     else worker.postMessage(message, packed.transfer);
   } catch (error) {

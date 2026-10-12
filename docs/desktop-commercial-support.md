@@ -257,11 +257,16 @@ customer renews from Help > Licence on an activated computer, pays, then selects
 
 ### Refund or chargeback
 
-Follow the refund policy in the published terms, then revoke the licence with
-`POST /v1/admin/licenses/status` (`status: "revoked"`). Its key stops activating
-at once, and connected computers drop Pro at their next weekly check. A computer
-kept offline keeps its signed rights until it reconnects, so do not promise more
-than that. Restore with `status: "active"` if a chargeback is reversed.
+An approved full refund, a chargeback or a chargeback warning on a purchase now
+revokes its licence automatically when Paddle's signed `adjustment.created` or
+`adjustment.updated` webhook arrives (ADR-592); a reversed chargeback restores a
+licence that chargeback revoked. Its key stops activating at once, and connected
+computers drop Pro at their next weekly check. A computer kept offline loses new
+Pro tools within 30 days, when its check-in falls due, so do not promise more
+than that. Partial refunds (a tax refund, say) and refunds of a renewal are only
+recorded for review: the lookup shows them under `payment-adjustment`. Decide
+those by hand with `POST /v1/admin/licenses/status`; a status you set by hand
+replaces the automatic one, so a later chargeback reversal never undoes it.
 
 ### A licence key leaked
 

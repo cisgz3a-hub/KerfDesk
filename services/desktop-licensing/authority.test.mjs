@@ -27,6 +27,50 @@ test('trial is signed, server anchored, restart stable, and ends exactly after 3
   await assert.rejects(f.authority.startTrial(body), { code: 'trial_expired' });
 });
 
+test('a new Windows installation ID on hardware that already had a trial gets no second trial', async () => {
+  const f = await fixture();
+  const hardwareId = deviceId(90);
+  const first = await f.authority.startTrial({
+    deviceId: deviceId(1),
+    deviceName: 'PC',
+    hardwareId,
+  });
+  // MachineGuid edited in the registry: a new device digest, the same firmware.
+  await assert.rejects(
+    f.authority.startTrial({ deviceId: deviceId(2), deviceName: 'PC', hardwareId }),
+    { code: 'trial_already_used' },
+  );
+  // The original installation still reaches its own trial.
+  const again = await f.authority.startTrial({
+    deviceId: deviceId(1),
+    deviceName: 'PC',
+    hardwareId,
+  });
+  assert.equal(claims(again).activationId, claims(first).activationId);
+  // Other hardware, or a computer that sends no usable firmware ID, still gets a trial.
+  await f.authority.startTrial({
+    deviceId: deviceId(3),
+    deviceName: 'PC',
+    hardwareId: deviceId(91),
+  });
+  await f.authority.startTrial({ deviceId: deviceId(4), deviceName: 'PC' });
+  await assert.rejects(
+    f.authority.startTrial({ deviceId: deviceId(5), deviceName: 'PC', hardwareId: 'short' }),
+    { code: 'invalid_request' },
+  );
+});
+
+test('a trial started by an older app binds its hardware the next time that device asks', async () => {
+  const f = await fixture();
+  await f.authority.startTrial({ deviceId: deviceId(1), deviceName: 'PC' });
+  const hardwareId = deviceId(92);
+  await f.authority.startTrial({ deviceId: deviceId(1), deviceName: 'PC', hardwareId });
+  await assert.rejects(
+    f.authority.startTrial({ deviceId: deviceId(2), deviceName: 'PC', hardwareId }),
+    { code: 'trial_already_used' },
+  );
+});
+
 test('named developer grants require distinct keys and idempotent names, carry perpetual updates', async () => {
   const f = await fixture();
   const johann = await f.authority.developerGrant({ grantId: 'johann', displayName: 'Johann' });

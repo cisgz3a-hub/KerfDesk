@@ -89,6 +89,7 @@ export async function emailLicenceKey(authority, env, event, result, fetcher = f
   const order = authority.records.get(`order:${event.orderId}`);
   if (order?.status !== 'fulfilled' || order.operation !== 'purchase' || order.keyEmail) return;
   const license = authority.records.get(`license:${order.licenseId}`);
+  if (license?.status !== 'active') return;
   let outcome;
   try {
     const to = await paddleCustomerEmail(env, event.customerId, fetcher);
@@ -98,6 +99,7 @@ export async function emailLicenceKey(authority, env, event, result, fetcher = f
         await authority.licenseKey(order.licenseId, license?.keyVersion),
         order.orderId,
       );
+      if (authority.records.get(`license:${order.licenseId}`)?.status !== 'active') return;
       await env.EMAIL.send({
         to,
         from: { email: env.LICENCE_EMAIL_FROM, name: 'KerfDesk' },

@@ -26,7 +26,7 @@ export function editingToolsActions(
   get: () => AppState,
 ): EditingToolsActions {
   return {
-    ...offsetShapesActions(set, copySet, get),
+    ...offsetShapesActions(copySet, get),
     ...selectionQueryActions(set),
     ...designToolsActions(set, copySet),
     ...laserTabActions(set),

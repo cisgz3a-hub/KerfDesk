@@ -215,6 +215,11 @@ function licensing(site, appPrivacy) {
         an installation digest: a one-way hash of your operating system’s installation ID, worked
         out on your computer, so the ID itself never leaves it
       </li>
+      <li>
+        when starting a trial, a one-way hash of the firmware UUID, if available, to recognise a
+        computer that has already had a trial after Windows is reinstalled. The UUID itself and
+        known placeholder values never leave your computer
+      </li>
       <li>a generic device label, such as “win32 computer”, not your computer’s name</li>
       <li>your license key or credential</li>
       <li>the order details that match a license to its purchase</li>
@@ -225,10 +230,18 @@ function licensing(site, appPrivacy) {
       connection details, such as your IP address and the time.
     </p>
     <p>
-      The desktop app also quietly confirms saved trial or license rights about once a week. It
-      checks whether that confirmation is due at startup and every 30 minutes while open, using the
-      same installation digest and saved credential. A failed connection does not interrupt your
-      work; the app continues to enforce the signed trial expiry on your computer.
+      The desktop app also quietly confirms saved trial rights daily and paid license rights about
+      once a week. It checks whether that confirmation is due at startup and every 30 minutes while
+      open, using the same installation digest and saved credential. A failed connection does not
+      interrupt your work. New Pro choices require a confirmation within three days for trials or 30
+      days for paid licenses. Developer licenses are exempt. Existing work, Frame, Start and Save
+      G-code remain available, and the signed trial expiry still applies on your computer.
+    </p>
+    <p>
+      The licensing service records verified Paddle refund and chargeback references and their
+      effect on a license. Approved full purchase refunds and chargebacks revoke the license;
+      partial and renewal refunds go to support for review. Your next online confirmation picks up a
+      revocation.
     </p>
     <h3>Buying Pro</h3>
     <p>

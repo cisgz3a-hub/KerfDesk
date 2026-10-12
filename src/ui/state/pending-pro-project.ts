@@ -4,6 +4,8 @@ import { BROWSER_FREE_BUILD } from '../../platform/build-capabilities';
 import type { ProFeature } from '../licensing/pro-features';
 import { operationProFeature } from '../licensing/pro-operation-policy';
 import { visitWorkflowArchives } from '../../io/project/project-workflow-archives';
+import { proFeaturesUnlocked } from '../licensing/edition';
+import { isTrustedProject } from '../licensing/project-seal';
 
 export type PendingProProject = {
   readonly id: string;
@@ -11,6 +13,8 @@ export type PendingProProject = {
   readonly features: ReadonlyArray<ProFeature>;
   readonly source: 'file' | 'autosave' | 'project';
   readonly name: string | null;
+  /** Browser Free never opens Pro work; desktop Free opens only work sealed here (ADR-592). */
+  readonly edition: 'browser' | 'desktop';
 };
 
 type PendingProProjectState = {
@@ -24,8 +28,18 @@ export const usePendingProProjectStore = create<PendingProProjectState>((set) =>
   dismiss: (expected) => set((state) => (state.pending === expected ? { pending: null } : {})),
 }));
 
-export function browserProjectProFeatures(project: Project): ReadonlyArray<ProFeature> {
-  if (!BROWSER_FREE_BUILD) return [];
+/**
+ * The Pro work that keeps `project` out of this session. Browser Free admits
+ * none. A desktop session without Pro admits a Pro project only when this
+ * computer sealed it, or it was derived from the open document (ADR-592).
+ */
+export function unadmittedProFeatures(project: Project): ReadonlyArray<ProFeature> {
+  if (BROWSER_FREE_BUILD) return projectProFeatures(project);
+  if (proFeaturesUnlocked() || isTrustedProject(project)) return [];
+  return projectProFeatures(project);
+}
+
+function projectProFeatures(project: Project): ReadonlyArray<ProFeature> {
   const features = new Set<ProFeature>();
   addSceneFeatures(project, features);
   // Whole-file admission already applies to saved Pro content. Inactive
@@ -68,13 +82,14 @@ function addSceneFeatures(project: Project, features: Set<ProFeature>): void {
 }
 
 /** Null means the project may load normally. No operation or artwork is removed. */
-export function preserveBrowserProProject(
+export function preserveUnadmittedProProject(
   project: Project,
   origin: Pick<PendingProProject, 'source' | 'name'> = { source: 'project', name: null },
 ): PendingProProject | null {
-  const features = browserProjectProFeatures(project);
+  const features = unadmittedProFeatures(project);
   if (features.length === 0) return null;
-  const pending = { id: crypto.randomUUID(), project, features, ...origin };
+  const edition = BROWSER_FREE_BUILD ? ('browser' as const) : ('desktop' as const);
+  const pending = { id: crypto.randomUUID(), project, features, ...origin, edition };
   usePendingProProjectStore.setState({ pending });
   return pending;
 }

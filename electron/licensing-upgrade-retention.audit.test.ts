@@ -38,7 +38,11 @@ function signed(value: unknown, release = false) {
   };
 }
 
-function rights(tier: 'paid' | 'trial'): LicenceClaims {
+// A trial checks in every three days (ADR-592). Deadline tests use a trial whose
+// last online confirmation was two days before its original expiry.
+const LATE = ISSUED + 28 * DAY;
+
+function rights(tier: 'paid' | 'trial', confirmedAt = ISSUED): LicenceClaims {
   const expires = tier === 'trial' ? ISSUED + 30 * DAY : null;
   return {
     schemaVersion: 1,
@@ -47,7 +51,7 @@ function rights(tier: 'paid' | 'trial'): LicenceClaims {
     activationId: 'upgrade-seat',
     deviceId: device,
     tier,
-    issuedAt: ISSUED,
+    issuedAt: confirmedAt,
     accessExpiresAt: expires,
     updatesUntil: expires ?? ISSUED + 365 * DAY,
     perpetualUpdates: false,
@@ -82,7 +86,7 @@ function config(version: string, publishedAt = ISSUED - DAY): LicensingConfig {
 // safeStorage and exact published modules are qualified separately.
 const encode = (value: unknown): Buffer =>
   Buffer.from(Buffer.from(JSON.stringify(value)).map((byte) => byte ^ 0x5a));
-async function harness(tier: 'paid' | 'trial') {
+async function harness(tier: 'paid' | 'trial', confirmedAt = ISSUED) {
   const profile = await mkdtemp(join(tmpdir(), 'kerfdesk-upgrade-audit-'));
   directories.push(profile);
   const file = join(profile, 'commercial-licence.v1');
@@ -99,8 +103,8 @@ async function harness(tier: 'paid' | 'trial') {
       }),
     },
   });
-  let now = ISSUED;
-  const entitlement = signed(rights(tier));
+  let now = confirmedAt;
+  const entitlement = signed(rights(tier, confirmedAt));
   const fetch = vi.fn<(_: string, init: RequestInit) => Promise<Response>>(async () =>
     Response.json({ entitlement, activationToken: token }),
   );
@@ -128,7 +132,7 @@ describe('saved commercial rights through a fresh 1.0.8 runtime', () => {
     async (tier) => {
       const h = await harness(tier);
       const original = await h.store.read();
-      h.time(ISSUED + 10 * DAY);
+      h.time(ISSUED + (tier === 'trial' ? 2 : 10) * DAY);
       for (let restart = 0; restart < 2; restart++) {
         const runtime = h.runtime();
         expect(await runtime.status()).toMatchObject({ state: 'ready', edition: 'pro', tier });
@@ -175,7 +179,8 @@ describe('saved commercial rights through a fresh 1.0.8 runtime', () => {
     'keeps saved %s rights and its key after a due offline startup refresh',
     async (tier) => {
       const h = await harness(tier);
-      h.time(ISSUED + 8 * DAY);
+      // A paid refresh is due weekly, a trial's daily.
+      h.time(ISSUED + (tier === 'trial' ? 2 : 8) * DAY);
       const saved = await h.store.read();
       expect(await h.runtime().refreshInBackground()).toMatchObject({
         state: 'ready',
@@ -200,15 +205,20 @@ describe('saved commercial rights through a fresh 1.0.8 runtime', () => {
     expect(await readFile(h.file)).toEqual(before);
   });
 
-  it.each([-1000 * DAY, 1000 * DAY])(
-    'keeps a covered paid version at clock offset %s',
-    async (offset) => {
+  it.each([
+    { offset: -300, state: 'ready' },
+    { offset: 30 * DAY, state: 'ready' },
+    { offset: -1000 * DAY, state: 'checkin-required' },
+    { offset: 1000 * DAY, state: 'checkin-required' },
+  ])(
+    'keeps a covered paid version at clock offset $offset as $state, without changing it',
+    async ({ offset, state }) => {
       const h = await harness('paid');
       const before = await readFile(h.file);
       h.time(ISSUED + offset);
       expect(await h.runtime().status()).toMatchObject({
-        state: 'ready',
-        edition: 'pro',
+        state,
+        edition: state === 'ready' ? 'pro' : 'free',
         licenseKey: key,
       });
       expect(await readFile(h.file)).toEqual(before);
@@ -238,7 +248,7 @@ describe('an upgraded trial keeps its original expiry and clock boundaries', () 
   );
 
   it('carries observed elapsed progress through short fresh sessions with a corrected wall clock', async () => {
-    const h = await harness('trial');
+    const h = await harness('trial', LATE);
     const expiry = ISSUED + 30 * DAY;
     let elapsed = 0;
     const elapsedClock = vi.spyOn(performance, 'now').mockImplementation(() => elapsed);
@@ -269,7 +279,7 @@ describe('an upgraded trial keeps its original expiry and clock boundaries', () 
   });
 
   it('persists the final second at expiry before the next fresh session', async () => {
-    const h = await harness('trial');
+    const h = await harness('trial', LATE);
     const expiry = ISSUED + 30 * DAY;
     let elapsed = 0;
     const elapsedClock = vi.spyOn(performance, 'now').mockImplementation(() => elapsed);
@@ -313,7 +323,7 @@ describe('an upgraded trial keeps its original expiry and clock boundaries', () 
 
   it('persists observed progress when a due quiet refresh is offline', async () => {
     const h = await harness('trial');
-    const observed = ISSUED + 8 * DAY;
+    const observed = ISSUED + 2 * DAY;
     h.time(observed);
     expect(await h.runtime().refreshInBackground()).toMatchObject({
       state: 'ready',
@@ -379,7 +389,7 @@ describe('an upgraded trial keeps its original expiry and clock boundaries', () 
   });
 
   it.each([-1, 0, 1])('evaluates an original deadline at offset %s seconds', async (offset) => {
-    const h = await harness('trial');
+    const h = await harness('trial', LATE);
     h.time(ISSUED + 30 * DAY + offset);
     expect(await h.runtime().status()).toMatchObject({
       state: offset < 0 ? 'ready' : 'trial-expired',
@@ -394,7 +404,7 @@ describe('an upgraded trial keeps its original expiry and clock boundaries', () 
   it.each(['checkout', 'claimPayment', 'discardPayment', 'resetStore'] as const)(
     'persists observed expiry returned by %s without erasing saved rights',
     async (action) => {
-      const h = await harness('trial');
+      const h = await harness('trial', LATE);
       const expiry = ISSUED + 30 * DAY;
       h.time(expiry - 1);
       const runtime = h.runtime();
@@ -415,14 +425,14 @@ describe('an upgraded trial keeps its original expiry and clock boundaries', () 
     'honours the documented rollback tolerance at %s seconds across restart',
     async (back) => {
       const h = await harness('trial');
-      h.time(ISSUED + 10 * DAY);
+      h.time(ISSUED + 2 * DAY);
       await h.runtime('1.0.7').status();
-      h.time(ISSUED + 10 * DAY - back);
+      h.time(ISSUED + 2 * DAY - back);
       expect(await h.runtime().status()).toMatchObject({
         state: back === 300 ? 'ready' : 'clock-error',
         edition: back === 300 ? 'pro' : 'free',
       });
-      expect((await h.store.read())?.lastSeenAt).toBe(ISSUED + 10 * DAY);
+      expect((await h.store.read())?.lastSeenAt).toBe(ISSUED + 2 * DAY);
     },
   );
 

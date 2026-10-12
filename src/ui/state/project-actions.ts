@@ -17,7 +17,7 @@ import {
   type ProjectMachineCapabilityLoadResult,
 } from './project-machine-capability';
 import { currentSavedLibrariesState } from './saved-libraries-actions';
-import { preserveBrowserProProject } from './pending-pro-project';
+import { preserveUnadmittedProProject } from './pending-pro-project';
 import {
   productionManifestActions,
   type ProductionManifestActions,
@@ -60,7 +60,7 @@ export function projectActions(
     ...productionManifestActions(set, get),
     ...retainedArrayActions(set),
     setProject: (project) => {
-      const preserved = preserveBrowserProProject(project);
+      const preserved = preserveUnadmittedProProject(project);
       if (preserved !== null) return { kind: 'desktop-required', features: preserved.features };
       const current = get();
       const resolution = resolveProjectMachineCapability(project, current.cncLibrary.customTools);

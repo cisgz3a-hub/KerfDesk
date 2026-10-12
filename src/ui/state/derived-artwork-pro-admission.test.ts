@@ -207,24 +207,20 @@ it.each([
   { direction: 'outward' as const, distanceMm: 1 },
   { direction: 'inward' as const, distanceMm: 1 },
   { direction: 'both' as const, distanceMm: 21 },
-])('keeps a single $direction replacement of existing V-carve work editable in Free', (options) => {
-  const request = edition();
-  const before = load();
-  expect(
-    useStore
-      .getState()
-      .offsetShapesSelection({ ...offsetRequest, ...options, deleteOriginals: true }),
-  ).toBe(true);
-  const after = useStore.getState();
-  expect(request).not.toHaveBeenCalled();
-  expect(after.project.scene.objects).toHaveLength(1);
-  expect(after.project.scene.objects[0]?.id).not.toBe('source');
-  expect(after.project.scene.layers).toHaveLength(1);
-  expect(after.project.scene.layers[0]?.cnc?.cutType).toBe('v-carve');
-  expect(after.undoStack).toEqual([before]);
-  after.undo();
-  expect(useStore.getState().project).toBe(before);
-});
+])(
+  'asks for Pro before a $direction replacement of existing V-carve artwork in Free (ADR-592)',
+  (options) => {
+    const request = edition();
+    const before = load();
+    expect(
+      useStore
+        .getState()
+        .offsetShapesSelection({ ...offsetRequest, ...options, deleteOriginals: true }),
+    ).toBe(false);
+    expect(useStore.getState().project).toBe(before);
+    expect(request).toHaveBeenCalledWith('vcarve', expect.any(Function));
+  },
+);
 
 it('does not mistake a collapsed retained-source offset for an existing-work replacement', () => {
   const request = edition();
@@ -239,13 +235,14 @@ it('does not mistake a collapsed retained-source offset for an existing-work rep
   expect(useToastStore.getState().toasts).toEqual([]);
 });
 
-it('reports committed collapsed replacement and dependency changes in Free', () => {
+it('holds a collapsed replacement with dependency changes until Pro, reporting nothing in Free', () => {
   const request = edition();
   const project = load();
   const text = dependentText('dependent-text', 'source');
   useStore.setState({
     project: { ...project, scene: { ...project.scene, objects: [...project.scene.objects, text] } },
   });
+  const held = useStore.getState().project;
   expect(
     useStore.getState().offsetShapesSelection({
       ...offsetRequest,
@@ -253,15 +250,10 @@ it('reports committed collapsed replacement and dependency changes in Free', () 
       distanceMm: 21,
       deleteOriginals: true,
     }),
-  ).toBe(true);
-  expect(request).not.toHaveBeenCalled();
-  expect(
-    useStore.getState().project.scene.objects.find((object) => object.id === text.id),
-  ).not.toHaveProperty('pathText');
-  expect(useToastStore.getState().toasts.map((toast) => toast.variant)).toEqual([
-    'info',
-    'warning',
-  ]);
+  ).toBe(false);
+  expect(request).toHaveBeenCalledWith('vcarve', expect.any(Function));
+  expect(useStore.getState().project).toBe(held);
+  expect(useToastStore.getState().toasts).toEqual([]);
 });
 
 it('keeps existing desktop V-carve operation edits available in Free', () => {

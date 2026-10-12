@@ -112,7 +112,8 @@ it.each(['timer', 'paused timers'] as const)(
     expect(open).toHaveBeenCalledOnce();
     expect(unmount).not.toHaveBeenCalled();
     expect(host.querySelector('[data-workspace]')?.textContent).toBe('Existing V-carve artwork');
-    expect(api.status).toHaveBeenCalledOnce();
+    // Local status polls cannot extend the already observed native budget.
+    expect(api.status).toHaveBeenCalledTimes(mode === 'timer' ? 4 : 1);
     expect(api.startTrial).not.toHaveBeenCalled();
     expect(status.accessExpiresAt).toBe(EXPIRY);
   },

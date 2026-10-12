@@ -1,6 +1,11 @@
 import type { Project } from '../../core/scene';
 import { prepareProjectForPersistence } from '../../io/project';
-import { parseProjectTemplate, serializeProjectTemplate } from '../../io/project/project-template';
+import {
+  parseProjectTemplateDocument,
+  serializeProjectTemplate,
+} from '../../io/project/project-template';
+import { projectSealReady, sealProjectText, trustIfSealedHere } from '../licensing/project-seal';
+import { unadmittedProFeatures } from '../state/pending-pro-project';
 import type { FileHandle, PlatformAdapter } from '../../platform/types';
 import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
 import type { ToastVariant } from '../state/toast-store';
@@ -48,7 +53,12 @@ export async function openTemplateFile(
   isCurrent: () => boolean,
   isUnchanged: () => boolean = () => true,
 ): Promise<void> {
-  const project = parseProjectTemplate(await file.text());
+  const { project, projectJson } = parseProjectTemplateDocument(await file.text());
+  // Desktop Free opens a Pro template only when this computer sealed it (ADR-592).
+  if (unadmittedProFeatures(project).length > 0) {
+    await projectSealReady();
+    trustIfSealedHere(project, projectJson);
+  }
   if (!isCurrent()) return;
   if (!isUnchanged()) {
     ctx.pushToast(
@@ -96,9 +106,9 @@ export async function saveProjectTemplate(ctx: {
       extensions: ['.lf2template'],
     });
     if (target === null) return;
-    const json = serializeProjectTemplate(
-      await portableProjectAssets(prepared.project, ctx.assetReader),
-    );
+    const portable = await portableProjectAssets(prepared.project, ctx.assetReader);
+    await projectSealReady();
+    const json = serializeProjectTemplate(portable, sealProjectText);
     await writer.write(target, json, (error) => {
       if (isCurrent())
         ctx.pushToast(

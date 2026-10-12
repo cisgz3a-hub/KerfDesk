@@ -15,9 +15,7 @@ import {
   MESSAGES,
   paymentFailureMessage,
   refreshFailureMessage,
-  RELEASED,
   requestFailureMessage,
-  REVOKED,
   staleOrderMessage,
 } from './licensing-messages.js';
 import {
@@ -30,13 +28,16 @@ import { LicensingUpdateCache } from './licensing-update-cache.js';
 import { findLicenceKey } from '../public/licence-key-text.mjs';
 import { manageLicenceDevices, type DeviceInput } from './licensing-devices.js';
 import { saveTrialClock, TrialSessionClock, withTrialBudget } from './licensing-trial-clock.js';
+import { licenceRefreshDue } from './licensing-schedule.js';
 import { clockErrorMessage, LicenceClockError } from './licensing-clock.js';
 import {
   activationBody,
   grantedRecord,
   grantRequest,
   renewalIdentity,
+  revokedRecord,
   verifyGrant,
+  withoutRejectedEntitlement,
   type GrantAction,
   type VerifiedGrant,
 } from './licensing-grant.js';
@@ -52,6 +53,8 @@ type RuntimeOptions = {
   readonly currentVersion: string;
   readonly store: LicensingStore;
   readonly deviceId: () => Promise<string>;
+  /** Read only when starting a trial; null when this computer has no usable one. */
+  readonly hardwareId?: () => Promise<string | null>;
   readonly deviceName: string;
   readonly fetch: (url: string, init: RequestInit) => Promise<Response>;
   readonly openCheckout?: (url: string) => Promise<void>;
@@ -60,8 +63,6 @@ type RuntimeOptions = {
 };
 
 const EMPTY: LicenceRecord = { schemaVersion: 1, lastSeenAt: 0 };
-// A background refresh picks up renewals and revocations about once a week.
-const REFRESH_INTERVAL = 7 * 86_400;
 export function createLicensingRuntime(options: RuntimeOptions) {
   return new LicensingService(options);
 }
@@ -71,6 +72,9 @@ class LicensingService {
   // Paid rights retain their session allowance. A trial's deadline applies to
   // new Pro choices even while open; existing work/output never reads this gate.
   private proLatched = false;
+  // A definitive refusal remains binding in this process even if removing the
+  // saved record fails. Only a newly accepted online grant may restore it.
+  private rejectedEntitlement: string | null = null;
   private trialClock: TrialSessionClock | null = null;
   private queue: Promise<unknown> = Promise.resolve();
   private readonly updateCache: LicensingUpdateCache;
@@ -116,6 +120,7 @@ class LicensingService {
     this.updateCache.update(saved, device);
   };
   private readonly evaluate = (saved: LicenceRecord, device: string): LicenceStatus => {
+    saved = withoutRejectedEntitlement(saved, this.rejectedEntitlement);
     const clock = this.trialClock;
     const ended = clock !== null && this.trialNow() >= clock.expiresAt;
     const result = evaluateLicence(
@@ -194,6 +199,7 @@ class LicensingService {
       device,
       deviceName: this.options.deviceName,
       licenseKey,
+      hardwareId: action === 'trial' ? await this.options.hardwareId?.() : undefined,
     });
     if (call === null) return current;
     let value: unknown;
@@ -238,6 +244,7 @@ class LicensingService {
     // rereading cached rights must not revive an already observed trial expiry.
     this.trialClock = null;
     this.proLatched = false;
+    this.rejectedEntitlement = null;
     this.updateCache.acceptAuthentication();
     onAccepted?.();
     const status = this.evaluate(next, device);
@@ -250,17 +257,15 @@ class LicensingService {
     device: string,
     code: string,
   ): Promise<LicenceStatus> => {
-    const revoked = REVOKED.has(code);
-    if (!revoked && !RELEASED.has(code))
+    const next = revokedRecord(saved, code, this.now());
+    if (next === null)
       return { ...this.evaluate(saved, device), message: refreshFailureMessage(code) };
-    const { credential: _credential, licenseKey, ...rest } = saved;
-    // A released seat keeps the key so the owner can activate again; a cancelled
-    // licence's key is useless, so it is not kept.
-    const next: LicenceRecord = {
-      ...rest,
-      refreshedAt: this.now(),
-      ...(revoked || licenseKey === undefined ? {} : { licenseKey }),
-    };
+    // The paid session allowance covers offline/overdue checks, never rights
+    // the service has explicitly revoked or released. Existing jobs and output
+    // do not read this Pro-tool gate (ADR-592).
+    this.proLatched = false;
+    this.trialClock = null;
+    this.rejectedEntitlement = saved.credential?.entitlement.payload ?? null;
     await this.write(next, device);
     return { ...this.evaluate(next, device), message: errorMessage(code) };
   };
@@ -299,10 +304,7 @@ class LicensingService {
       if (this.config.channel !== 'commercial') return this.readStatus();
       const { saved, device } = await this.load();
       const current = this.evaluate(saved, device);
-      const due =
-        ['ready', 'updates-expired', 'clock-error'].includes(current.state) &&
-        this.now() - (saved.refreshedAt ?? 0) >= REFRESH_INTERVAL;
-      if (due) return this.acquire('refresh');
+      if (licenceRefreshDue(current, saved.refreshedAt, this.now())) return this.acquire('refresh');
       return current;
     }, true);
   readonly deactivate = () =>

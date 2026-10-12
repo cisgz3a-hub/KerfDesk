@@ -1,7 +1,7 @@
 import { checkGrantTime } from './licensing-clock.js';
 import type { LicencePayment } from './licensing-commerce.js';
 import type { LicensingConfig } from './licensing-config.js';
-import { displayDeviceName } from './licensing-messages.js';
+import { displayDeviceName, RELEASED, REVOKED } from './licensing-messages.js';
 import { validLicenceKey, type LicenceCredential, type LicenceRecord } from './licensing-store.js';
 import { record, verifyEntitlement, type LicenceClaims } from './licensing-verification.js';
 
@@ -69,6 +69,8 @@ export function grantRequest(
     readonly device: string;
     readonly deviceName: string;
     readonly licenseKey?: string | undefined;
+    /** The firmware digest a trial is also bound to, when this computer has one (ADR-592). */
+    readonly hardwareId?: string | null | undefined;
   },
 ): { readonly path: string; readonly body: unknown } | null {
   const { action, saved, device } = request;
@@ -85,6 +87,9 @@ export function grantRequest(
       deviceId: device,
       deviceName: displayDeviceName(request.deviceName),
       ...(action === 'activate' ? { licenseKey: request.licenseKey } : {}),
+      ...(action === 'trial' && typeof request.hardwareId === 'string'
+        ? { hardwareId: request.hardwareId }
+        : {}),
     },
   };
 }
@@ -144,4 +149,32 @@ export function grantedRecord(
     ...(action === 'activate' && validLicenceKey(licenseKey) ? { licenseKey } : {}),
   };
   return { next, droppedOrder: stale ? (payment ?? null) : null };
+}
+
+/** A definitive refusal removes saved rights; an outage leaves them intact. */
+export function revokedRecord(
+  saved: LicenceRecord,
+  code: string,
+  now: number,
+): LicenceRecord | null {
+  const revoked = REVOKED.has(code);
+  if (!revoked && !RELEASED.has(code)) return null;
+  const { credential: _credential, licenseKey, ...rest } = saved;
+  // A released seat keeps its activation key; a revoked licence's key is useless.
+  return {
+    ...rest,
+    refreshedAt: now,
+    ...(revoked || licenseKey === undefined ? {} : { licenseKey }),
+  };
+}
+
+/** A failed disk write cannot re-arm a grant this process saw the service reject. */
+export function withoutRejectedEntitlement(
+  saved: LicenceRecord,
+  rejectedPayload: string | null,
+): LicenceRecord {
+  if (rejectedPayload === null || saved.credential?.entitlement.payload !== rejectedPayload)
+    return saved;
+  const { credential: _credential, ...rest } = saved;
+  return rest;
 }

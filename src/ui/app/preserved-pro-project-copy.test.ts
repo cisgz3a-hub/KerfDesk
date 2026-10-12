@@ -1,7 +1,10 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { serializeProject } from '../../io/project';
 import { assetReader, pagedProject } from '../library/personal-artwork-test-fixtures';
-import { preserveBrowserProProject, usePendingProProjectStore } from '../state/pending-pro-project';
+import {
+  preserveUnadmittedProProject,
+  usePendingProProjectStore,
+} from '../state/pending-pro-project';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
 import { portableProjectAssets } from './portable-project-assets';
@@ -23,7 +26,7 @@ it('saves a complete portable copy with all operations, fonts, groups, images an
     ...proProject(),
     scene: { ...proProject().scene, objects: [...paged.scene.objects, relief] },
   };
-  const pending = preserveBrowserProProject(project, { source: 'file', name: 'design.lf2' });
+  const pending = preserveUnadmittedProProject(project, { source: 'file', name: 'design.lf2' });
   if (pending === null) throw new Error('Expected desktop project');
   const current = useStore.getState();
   const write = vi.fn(async (_content: string | Blob) => undefined);
@@ -46,7 +49,7 @@ it('saves a complete portable copy with all operations, fonts, groups, images an
 });
 
 it('a cancelled copy leaves the preserved autosave and current file identity untouched', async () => {
-  const pending = preserveBrowserProProject(proProject(), { source: 'autosave', name: null });
+  const pending = preserveUnadmittedProProject(proProject(), { source: 'autosave', name: null });
   if (pending === null) throw new Error('Expected desktop project');
   const originalTarget = { displayName: 'working.lf2', write: vi.fn() };
   useStore.setState({
@@ -69,7 +72,7 @@ it('a cancelled copy leaves the preserved autosave and current file identity unt
 it('failed image hydration writes nothing and retains the complete original for another attempt', async () => {
   const base = proProject();
   const project = { ...base, scene: { ...base.scene, objects: pagedProject().scene.objects } };
-  const pending = preserveBrowserProProject(project);
+  const pending = preserveUnadmittedProProject(project);
   if (pending === null) throw new Error('Expected desktop project');
   const write = vi.fn(async () => undefined);
   const reader = { ...assetReader(), readManifest: async () => null };
