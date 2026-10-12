@@ -22,6 +22,11 @@ const DATA_HINTS: Readonly<Record<BarcodeSymbology, string>> = {
   ean13: '12 digits; the check digit is added. 13 digits are checked.',
   upca: '11 digits; the check digit is added. 12 digits are checked.',
   ean8: '7 digits; the check digit is added. 8 digits are checked.',
+  code93: 'ASCII text; Code 93 adds its two check characters.',
+  upce: '6 digits (number system 0), 7 with the number system 0 or 1 first, or 8 with the check digit.',
+  codabar: 'Digits and - $ : / . +; framed by A-D (A ... B when not given).',
+  itf: 'Digits; an odd count gets a leading zero.',
+  isbn: 'ISBN-10 or ISBN-13, with or without hyphens; printed as EAN-13.',
 };
 
 const ERROR_CORRECTION: ReadonlyArray<readonly [BarcodeShape['errorCorrection'], string]> = [

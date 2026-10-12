@@ -484,7 +484,12 @@ export type BarcodeSymbology =
   | 'code39'
   | 'ean13'
   | 'upca'
-  | 'ean8';
+  | 'ean8'
+  | 'code93'
+  | 'upce'
+  | 'codabar'
+  | 'itf'
+  | 'isbn';
 
 export type BarcodeShape = {
   readonly kind: 'barcode';

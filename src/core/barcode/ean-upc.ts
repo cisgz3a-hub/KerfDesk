@@ -9,7 +9,7 @@ export type EanKind = 'ean13' | 'upca' | 'ean8';
 
 // Left-half odd parity (L) codes; even parity (G) is the reversed R code and
 // the right-half R code is the complement of L.
-const L_CODES = [
+export const L_CODES = [
   '0001101',
   '0011001',
   '0010011',
