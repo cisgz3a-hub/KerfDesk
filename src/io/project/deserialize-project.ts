@@ -30,7 +30,7 @@ import {
   type Project,
 } from '../../core/scene';
 import { workspaceAids } from './normalize-workspace-aids';
-import { isObject } from './record-guards';
+import { isObject } from './project-shape-primitives';
 import {
   clampOverlapMergeTolerance,
   DEFAULT_PROJECT_OPTIMIZATION,

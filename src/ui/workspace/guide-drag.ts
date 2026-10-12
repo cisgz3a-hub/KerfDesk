@@ -46,7 +46,10 @@ function rulerUnder(e: PointerArgs['e'], canvas: HTMLCanvasElement | null): Guid
 }
 
 export function beginGuideDrag(args: PointerArgs): GuideDragState | null {
+  // Guides belong to the select tool: with the node, drawing or measure tools
+  // a press over the ruler strip still reaches artwork lying under it.
   if (useGuideLockStore.getState().locked) return null;
+  if (useUiStore.getState().toolMode.kind !== 'select') return null;
   const point = canvasMouseToScene(args.e, args.canvas, args.project, args.viewState);
   if (point === null) return null;
   const app = useStore.getState();
@@ -62,7 +65,6 @@ export function beginGuideDrag(args: PointerArgs): GuideDragState | null {
     app.setGuidesDuringInteraction([...guides, guide]);
     return { kind: 'guide', id: guide.id, axis: ruler, created: true };
   }
-  if (useUiStore.getState().toolMode.kind !== 'select') return null;
   if (hitTest(args.project.scene, point) !== null) return null;
   const reach = GUIDE_HIT_PX * pxToMmForCanvas(args.canvas, args.project, args.viewState);
   const hit = guides.find(
