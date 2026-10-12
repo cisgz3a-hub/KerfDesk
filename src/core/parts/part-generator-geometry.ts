@@ -7,6 +7,12 @@ export type GeneratedPartHole = {
   readonly diameterMm: number;
 };
 export function partGeneratorBoundary(definition: PartGeneratorDefinition): ReadonlyArray<Vec2> {
+  const corners = boundaryCorners(definition);
+  // Repeat the first corner: the stroke renderer does not closePath, so the
+  // closing edge exists only as an explicit final segment.
+  return corners[0] === undefined ? corners : [...corners, corners[0]];
+}
+function boundaryCorners(definition: PartGeneratorDefinition): ReadonlyArray<Vec2> {
   const { widthMm: w, heightMm: h } = definition;
   return definition.kind === 'bracket'
     ? [

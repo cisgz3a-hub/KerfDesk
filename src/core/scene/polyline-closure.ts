@@ -7,7 +7,7 @@
 // about which contours fill (Fill working while conversion produced an
 // all-white bitmap was exactly that disagreement).
 
-import type { Polyline, Vec2 } from './scene-object';
+import type { ColoredPath, CurveSubpath, Polyline, Vec2 } from './scene-object';
 
 // Same epsilon as text-to-polylines.flattenPath uses.
 export const CLOSURE_EPS_MM = 1e-4;
@@ -41,4 +41,24 @@ export function withClosingPoint(
     return points;
   }
   return [...points, first];
+}
+
+/** A closed curve whose segments end at its start, so a stroke draws its closing edge. */
+export function withClosingSegment(curve: CurveSubpath): CurveSubpath {
+  const end = curve.segments.at(-1)?.to ?? curve.start;
+  return !curve.closed || (end.x === curve.start.x && end.y === curve.start.y)
+    ? curve
+    : { ...curve, segments: [...curve.segments, { kind: 'line', to: curve.start }] };
+}
+
+/** `path` with every closed polyline and curve carrying its explicit closing edge. */
+export function withClosedPathEdges(path: ColoredPath): ColoredPath {
+  return {
+    ...path,
+    polylines: path.polylines.map((polyline) => ({
+      ...polyline,
+      points: withClosingPoint(polyline.points, polyline.closed),
+    })),
+    ...(path.curves === undefined ? {} : { curves: path.curves.map(withClosingSegment) }),
+  };
 }

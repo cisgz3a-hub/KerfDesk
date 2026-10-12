@@ -1,5 +1,6 @@
 import type { ColoredPath, ImportedSvg } from '../scene/scene-object';
 import { polylineToCurveSubpath } from '../scene/curve-path';
+import { withClosedPathEdges } from '../scene/polyline-closure';
 import { subpathGeometryKey } from '../scene/subpath-nesting';
 import { sameRecipeValue } from '../material-library/process-recipe';
 import { solveConstrainedSketch } from './solve-constrained-sketch';
@@ -28,8 +29,8 @@ export function retainedSketchPaths(previous: ImportedSvg | undefined): Retained
   const settings = new Map<string, ColoredPath>();
   const currentKeys: string[] = [];
   for (const current of previous.paths) {
-    const matches = (candidates.get(subpathGeometryKey(current)) ?? []).filter(({ path }) =>
-      sameSketchPathGeometry(path, current),
+    const matches = (candidates.get(subpathGeometryKey(withClosedPathEdges(current))) ?? []).filter(
+      ({ path }) => sameSketchPathGeometry(path, current),
     );
     const match = matches.length === 1 ? matches[0] : undefined;
     if (match === undefined || settings.has(match.key)) return ambiguousBindings();
@@ -61,7 +62,9 @@ function ambiguousBindings(): RetainedSketchPathsResult {
       "Cannot safely recover the sketch's machining bindings. Undo manual geometry edits or bake this sketch before regenerating.",
   };
 }
-function sameSketchPathGeometry(generated: ColoredPath, current: ColoredPath): boolean {
+function sameSketchPathGeometry(generated: ColoredPath, saved: ColoredPath): boolean {
+  // Sketches saved before profiles emitted their closing edge still bind.
+  const current = withClosedPathEdges(saved);
   return (
     sameRecipeValue(
       generated.curves,
