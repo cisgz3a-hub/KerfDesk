@@ -46,6 +46,7 @@ function ShearDialog(): JSX.Element {
     <label className="lf-field">
       <span>{label}</span>
       <input
+        title="Shear angle in degrees"
         className="lf-input"
         type="number"
         min={-MAX_SHEAR_DEG}

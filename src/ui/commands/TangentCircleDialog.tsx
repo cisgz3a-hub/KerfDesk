@@ -93,6 +93,7 @@ function TangentCircleDialog(): JSX.Element {
           {solutions.map((candidate, index) => (
             <label key={`${candidate.center.x},${candidate.center.y},${candidate.radius}`}>
               <input
+                title="Choose this tangent circle"
                 type="radio"
                 name="tangent-circle"
                 checked={index === chosen}

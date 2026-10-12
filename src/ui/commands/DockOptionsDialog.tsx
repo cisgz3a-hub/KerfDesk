@@ -34,6 +34,7 @@ function DockOptionsDialog(): JSX.Element {
       <label className="lf-field">
         <span>Padding</span>
         <input
+          title="Space kept between docked artwork and what it meets, in millimetres"
           className="lf-input"
           type="number"
           min="0"
@@ -46,6 +47,7 @@ function DockOptionsDialog(): JSX.Element {
       </label>
       <label>
         <input
+          title="Dock the whole selection as one piece"
           type="checkbox"
           checked={moveAsGroup}
           onChange={(event) => setMoveAsGroup(event.currentTarget.checked)}
@@ -54,6 +56,7 @@ function DockOptionsDialog(): JSX.Element {
       </label>
       <label>
         <input
+          title="Keep selected artwork inside other selected artwork moving with it"
           type="checkbox"
           checked={lockInner}
           onChange={(event) => setLockInner(event.currentTarget.checked)}

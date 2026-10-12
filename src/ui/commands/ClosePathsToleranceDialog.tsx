@@ -79,6 +79,7 @@ function ClosePathsToleranceDialog(): JSX.Element {
       <label className="lf-field">
         <span>Tolerance</span>
         <input
+          title="Largest gap between path ends to close, in millimetres"
           className="lf-input"
           type="number"
           min="0"
@@ -92,11 +93,17 @@ function ClosePathsToleranceDialog(): JSX.Element {
       <fieldset>
         <legend>Close by</legend>
         <label>
-          <input type="radio" checked={mode === 'bridge'} onChange={() => setMode('bridge')} />{' '}
+          <input
+            title="Close each gap with a new straight line"
+            type="radio"
+            checked={mode === 'bridge'}
+            onChange={() => setMode('bridge')}
+          />{' '}
           Adding a closing line (every point stays where it is)
         </label>
         <label>
           <input
+            title="Close each gap by moving both ends to their midpoint"
             type="radio"
             checked={mode === 'move-ends'}
             onChange={() => setMode('move-ends')}

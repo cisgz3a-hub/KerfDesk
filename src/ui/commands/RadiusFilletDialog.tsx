@@ -53,11 +53,17 @@ function RadiusFilletDialog(): JSX.Element {
       <fieldset>
         <legend>Corners</legend>
         <label>
-          <input type="radio" checked={action === 'round'} onChange={() => setAction('round')} />{' '}
+          <input
+            title="Round each corner with an arc tangent to both sides"
+            type="radio"
+            checked={action === 'round'}
+            onChange={() => setAction('round')}
+          />{' '}
           Round (arc tangent to both sides)
         </label>
         <label>
           <input
+            title="Bite each corner with a concave arc centred on the corner"
             type="radio"
             checked={action === 'reverse'}
             onChange={() => setAction('reverse')}
@@ -65,13 +71,19 @@ function RadiusFilletDialog(): JSX.Element {
           Reverse radius (concave bite centred on the corner)
         </label>
         <label>
-          <input type="radio" checked={action === 'remove'} onChange={() => setAction('remove')} />{' '}
+          <input
+            title="Replace tangent fillets with the sharp corner of their sides"
+            type="radio"
+            checked={action === 'remove'}
+            onChange={() => setAction('remove')}
+          />{' '}
           Remove fillets (restore sharp corners)
         </label>
       </fieldset>
       <label className="lf-field">
         <span>Radius</span>
         <input
+          title="Fillet radius in millimetres"
           className="lf-input"
           type="number"
           min="0"
