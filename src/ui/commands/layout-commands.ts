@@ -146,6 +146,14 @@ const CLOSE_WITH_TOLERANCE: Spec = {
   invoke: (ctx) => ctx.closePathsWithTolerance(),
 };
 
+const SHEAR: Spec = {
+  id: 'tools.shear',
+  family: 'tools',
+  label: 'Shear...',
+  title: 'Slant the selection horizontally or vertically about its centre',
+  invoke: (ctx) => ctx.shear(),
+};
+
 const RADIUS_FILLET: Spec = {
   id: 'tools.radius-fillet',
   family: 'tools',
@@ -171,7 +179,7 @@ export function layoutCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
       ctx.dockOptions,
     ),
     command(ctx, TANGENT_CIRCLE, ctx.hasThreeCircles, 'Select exactly three circles first.'),
-    ...[CLOSE_WITH_TOLERANCE, RADIUS_FILLET].map((spec) =>
+    ...[CLOSE_WITH_TOLERANCE, RADIUS_FILLET, SHEAR].map((spec) =>
       command(
         ctx,
         spec,

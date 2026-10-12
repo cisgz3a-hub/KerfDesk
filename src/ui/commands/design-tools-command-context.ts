@@ -7,6 +7,7 @@ import { startTwoPointTool } from '../workspace/two-point-tool';
 import { useDockOptionsStore } from './dock-options-store';
 import { openClosePathsToleranceDialog } from './ClosePathsToleranceDialog';
 import { openRadiusFilletDialog } from './RadiusFilletDialog';
+import { openShearDialog } from './ShearDialog';
 import { openTangentCircleDialog, selectedThreeCircles } from './TangentCircleDialog';
 import type { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -57,6 +58,7 @@ export function designToolsCommandContext(
     tangentCircle: openTangentCircleDialog,
     closePathsWithTolerance: openClosePathsToleranceDialog,
     radiusFillet: openRadiusFilletDialog,
+    shear: openShearDialog,
   };
 }
 

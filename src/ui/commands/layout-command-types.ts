@@ -18,6 +18,7 @@ export type LayoutCommandContext = {
   readonly tangentCircle: () => void;
   readonly closePathsWithTolerance: () => void;
   readonly radiusFillet: () => void;
+  readonly shear: () => void;
 };
 
 export type LayoutCommandId =
@@ -40,4 +41,5 @@ export type LayoutCommandId =
   | 'arrange.dock-options'
   | 'tools.tangent-circle'
   | 'tools.close-paths-with-tolerance'
-  | 'tools.radius-fillet';
+  | 'tools.radius-fillet'
+  | 'tools.shear';

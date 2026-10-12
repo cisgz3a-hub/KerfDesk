@@ -77,6 +77,11 @@ export const LAYOUT_COMMAND_HELP: Readonly<Record<LayoutCommandId, CommandHelpTo
     tooltip:
       'Close every selected open path whose ends lie within the tolerance, on any operation. Bridge adds a closing line and keeps every point; Move ends together meets both ends at their midpoint without a new segment. The dialog counts what will close and what stays open. One undo step.',
   },
+  'tools.shear': {
+    family: 'tools',
+    tooltip:
+      'Slant the selected vector artwork horizontally and/or vertically about the centre of the selection, up to 85 degrees each way. The shear is written exactly into the paths (lines, curves and arcs), so Undo reverses it. Text, drawn shapes and images need converting to paths first.',
+  },
   'tools.radius-fillet': {
     family: 'tools',
     tooltip:
