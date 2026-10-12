@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "997b22f63cabf5ef0b0bdce712a27af3b8286ccc",
+  "sinceSourceSha": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
   "highlights": [
-    "Portrait photo engraving adds an output-grid preview. Autosave recovery now sits in a compact status-bar control, keeping recovery choices close without covering the workspace.",
-    "Extend open artwork to the next boundary with a hover preview and Undo. Workspace curve ends extend along their tangent; Design Studio supports straight source ends and curved boundaries.",
-    "KerfDesk Remote brings phone and MCP access into one interface, with artwork editing, layer controls, remembered phones and machine status. Remote controls handle held-jog release and connection ownership more reliably.",
-    "SVG imports preserve child opacity overrides, raster outlines survive pixel rounding, and closed contours join at the correct corner. Node drags and snapping follow the node you grab.",
-    "Presets retain their identity and process settings. Camera addresses and restored board sizes survive preview updates. Imported G-code keeps its playback timing, including dwells, and variable counters stay within saved-project limits.",
-    "CNC manual tabs survive explicit operation bindings. Manual Zero Z evidence stays with the tool and reference that initiated it, and helical pocket checks test the complete ring inside concave boundaries."
+    "Design Studio now edits photos and vectors on one canvas, and saves editable photo layers and sketches with your project so you can reopen and change them later.",
+    "Outline text supports multilingual and right-to-left scripts. Import saved Photoshop (PSD) images, and try the experimental advanced nesting search, which can fit parts onto fewer sheets.",
+    "Edit trace parts lets you click and drag a single traced line or shape out of a large trace. Trim no longer deletes a whole line at a tangent curve, and closing a path keeps its curves intact.",
+    "Phone & MCP sits in the main toolbar with a live status dot and a quick panel for pairing, QR code and approved clients.",
+    "Saved G-code comments no longer contain characters that GRBL treats as hold, resume or status commands. Console coordinate and work-offset commands now refresh the stored reference correctly.",
+    "A purchased Pro key activates during a trial, licensed customers can find older verified installers, and switching a linked material operation from Line to Fill now picks up the recipe's settings."
   ]
 }
