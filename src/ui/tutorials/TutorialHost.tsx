@@ -1,5 +1,6 @@
 import { lazy, Suspense, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { Icon } from '../kit/icons';
 import { rejectAsLoadFailure } from '../common/lazy-load-failure';
 import { LazyOverlayBoundary } from '../common/LazyOverlayBoundary';
 import { useDialogA11y } from '../common/use-dialog-a11y';
@@ -44,7 +45,7 @@ function TutorialShell(): JSX.Element {
               title="Return to the tutorial library"
               onClick={() => open()}
             >
-              ← All tutorials
+              <Icon name="arrow-left" size={16} /> All tutorials
             </button>
           )}
           <button

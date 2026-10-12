@@ -64,7 +64,7 @@ extraMetadata:
 afterPack: scripts/electron-builder-preview-after-pack.mjs
 
 win:
-  icon: public/favicon.svg
+  icon: public/app-icon.ico
   target:
     - target: nsis
       arch:
@@ -73,6 +73,9 @@ win:
 
 nsis:
   include: scripts/nsis-file-associations.nsh
+  installerIcon: public/app-icon.ico
+  uninstallerIcon: public/app-icon.ico
+  installerHeaderIcon: public/app-icon.ico
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
@@ -91,7 +94,7 @@ fileAssociations:
 
 mac:
   appId: com.kerfdesk.app
-  icon: public/favicon.svg
+  icon: public/app-icon.icns
   target:
     - dmg
   artifactName: KerfDesk-${version}-macos-${arch}.${ext}

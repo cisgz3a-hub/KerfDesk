@@ -1,4 +1,5 @@
 import type { RefObject } from 'react';
+import { Icon } from '../kit/icons';
 import './controller-recovery-toast.css';
 
 type Props = {
@@ -42,7 +43,7 @@ export function ControllerRecoveryToast(props: Props): JSX.Element {
           autoFocus={props.focusOnOpen}
           onClick={props.onDismiss}
         >
-          ×
+          <Icon name="close" size={16} />
         </button>
       </div>
       <p>{props.message}</p>

@@ -1,5 +1,6 @@
 import type { Layer } from '../../core/scene';
 import { useStore } from '../state';
+import { Icon } from '../kit/icons';
 
 const orderControlStyle: React.CSSProperties = {
   display: 'flex',
@@ -8,6 +9,8 @@ const orderControlStyle: React.CSSProperties = {
 };
 
 const orderButtonStyle: React.CSSProperties = {
+  display: 'grid',
+  placeItems: 'center',
   width: 22,
   height: 18,
   padding: 0,
@@ -31,7 +34,7 @@ export function LayerOrderControls(props: {
         onClick={() => moveLayer(props.layer.id, 'up')}
         style={orderButtonStyle}
       >
-        ^
+        <Icon name="chevron-up" size={14} />
       </button>
       <button
         type="button"
@@ -41,7 +44,7 @@ export function LayerOrderControls(props: {
         onClick={() => moveLayer(props.layer.id, 'down')}
         style={orderButtonStyle}
       >
-        v
+        <Icon name="chevron-down" size={14} />
       </button>
     </span>
   );

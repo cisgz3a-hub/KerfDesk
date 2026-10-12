@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Icon } from '../kit/icons';
 import { searchTutorials, TUTORIALS } from './tutorial-catalog';
 import { useTutorialStore } from './tutorial-store';
 import { TUTORIAL_CATEGORIES, type Tutorial, type TutorialCategory } from './tutorial-types';
@@ -68,7 +69,7 @@ export function TutorialLibrary({ query, setQuery, topic, setTopic }: LibraryPro
             <span>
               <strong>Make your first project</strong>
             </span>
-            <span aria-hidden="true">→</span>
+            <Icon name="arrow-right" size={18} />
           </button>
           <TutorialTopics topic={topic} setTopic={setTopic} />
         </>
@@ -118,7 +119,7 @@ function LessonList({ tutorials }: { readonly tutorials: readonly Tutorial[] }):
             onClick={() => useTutorialStore.getState().openTutorial(tutorial.id)}
           >
             <span>{tutorial.title}</span>
-            <span aria-hidden="true">→</span>
+            <Icon name="arrow-right" size={18} />
           </button>
         </li>
       ))}

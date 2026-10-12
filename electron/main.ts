@@ -97,6 +97,7 @@ import { createDesktopRemoteAccess } from './remote-access/desktop.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const APP_ICON_DIRECTORY = app.isPackaged ? 'dist/web' : 'public';
 
 // A build that sells licences never loads its renderer under remote debugging
 // (ADR-544). This runs before any window, route or single-instance handoff.
@@ -270,6 +271,7 @@ function createMainWindow(bounds: ReturnType<typeof loadWindowPlacement>['bounds
     autoHideMenuBar: true,
     backgroundColor: '#fafafa',
     title: DESKTOP_PRODUCT_NAME,
+    icon: path.join(app.getAppPath(), APP_ICON_DIRECTORY, 'app-icon-512x512.png'),
     webPreferences: mainWindowWebPreferences(appMenu.shouldEnableDesktopDevTools(LOCKED_DOWN)),
   });
 }

@@ -1,4 +1,5 @@
 import type { DeviceSetupStepProps } from './device-setup-flow';
+import { IconFrame } from '../../kit/icon-frame';
 
 export function DeviceSetupMachineCapability({
   state,
@@ -84,29 +85,22 @@ function MachineChoice(props: {
 
 function MachineTypeIcon({ kind }: { readonly kind: 'laser' | 'cnc' | 'hybrid' }): JSX.Element {
   return (
-    <svg
-      className="lf-setup-type-icon"
-      viewBox="0 0 48 48"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M7 39h34M10 35V10h28v25M10 15h28" />
+    <IconFrame className="lf-setup-type-icon" size={44}>
+      <path d="M3 20h18M5 18V5h14v13M5 8h14" />
       {kind === 'cnc' ? (
         <>
-          <path d="M19 15v11h10V15M22 26v8l4-3v-5M22 31l4-3" />
-          <path d="M15 36h18" />
+          <path d="M9 8v6h6V8" />
+          <path className="lf-icon-accent" d="M11 14v4l2-1.5V14m-2 2.5 2-1.5M8 18h8" />
         </>
       ) : (
         <>
-          <path d="M19 15v8l5 4 5-4v-8M24 29v6M18 34l-3 2M30 34l3 2" />
-          <circle cx="24" cy="37" r="1" />
+          <path d="M9 8v4l3 2 3-2V8" />
+          <path className="lf-icon-accent" d="M12 14v4M9 17l-1 1M15 17l1 1" />
         </>
       )}
-      {kind === 'hybrid' ? <path d="M35 23h8m-3-3 3 3-3 3M43 31h-8m3-3-3 3 3 3" /> : null}
-    </svg>
+      {kind === 'hybrid' ? (
+        <path className="lf-icon-accent" d="M17 11h5m-2-2 2 2-2 2M22 16h-5m2-2-2 2 2 2" />
+      ) : null}
+    </IconFrame>
   );
 }

@@ -6,8 +6,10 @@ export const APP_ASSETS = new Set([
   '/app/sw.js',
   '/app/manifest.webmanifest',
   '/app/icon.svg',
+  '/app/icon-maskable.svg',
   '/app/icon-192.png',
   '/app/icon-512.png',
+  '/app/icon-maskable-512.png',
 ]);
 
 export function appAssetPath(pathname: string): string {

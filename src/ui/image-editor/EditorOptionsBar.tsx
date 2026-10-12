@@ -3,6 +3,7 @@
 // (Delete / Fill / Deselect / Invert). Contextual per active tool.
 
 import type { PaintColor } from '../../core/image-edit';
+import { Icon } from '../kit/icons';
 import {
   SelectionActions,
   SelectionModeButtons,
@@ -109,8 +110,9 @@ function CropActions(): JSX.Element {
         onClick={commitPendingCrop}
         disabled={!hasPending}
         title="Commit the crop (Enter) — history clears; mm size follows the same DPI"
+        aria-label="Crop"
       >
-        ✓ Crop
+        <Icon name="check" size={15} /> Crop
       </button>
       <button
         type="button"
@@ -119,8 +121,9 @@ function CropActions(): JSX.Element {
         onClick={() => setPendingCrop(null)}
         disabled={!hasPending}
         title="Discard the crop box (Esc)"
+        aria-label="Discard crop"
       >
-        ✕
+        <Icon name="close" size={15} />
       </button>
     </span>
   );

@@ -64,6 +64,9 @@ it('allows one explicit connection, closes on socket loss, and reconnects only b
   bridge.close(id);
   const next = await bridge.open('127.0.0.1', port);
   expect(next.sessionId).not.toBe(id);
+  expect(Buffer.from((await bridge.read(next.sessionId)).data, 'base64').toString()).toBe(
+    'ready\n',
+  );
   expect(count).toBe(2);
 });
 

@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import type { LayerMode } from '../../core/scene';
+import { IconFrame } from '../kit/icon-frame';
 
 const LASER_MODES = ['line', 'fill', 'image'] as const;
 const MIXED_PROCESS_HINT = 'Choose one process to use for all selected artwork.';
@@ -121,30 +122,20 @@ function ProcessIllustration(props: {
   readonly mixed: boolean;
 }): JSX.Element {
   return (
-    <svg
-      className="lf-laser-process__illustration"
-      viewBox="0 0 40 40"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <rect x="7" y="7" width="26" height="26" rx="5" />
+    <IconFrame className="lf-laser-process__illustration" size={40}>
+      <rect x="4" y="4" width="16" height="16" rx="3" />
       {props.mixed ? (
-        <path d="M14 15h12M14 20h8M14 25h12" />
+        <path className="lf-icon-accent" d="M8 9h8M8 12h5M8 15h8" />
       ) : props.mode === 'fill' ? (
-        <path d="m12 15 3-3m-3 9 9-9m-9 15 15-15m-12 16 13-13m-7 13 7-7m-1 7 1-1" />
+        <path className="lf-icon-accent" d="m7 10 3-3m-3 7 7-7m-7 10L17 7m-6 10 6-6m-2 6 2-2" />
       ) : props.mode === 'image' ? (
         <>
-          <circle cx="24" cy="15" r="2" />
-          <path d="m10 29 8-10 6 7 3-3 4 6" />
+          <circle className="lf-icon-accent" cx="15" cy="9" r="1.5" />
+          <path d="m6 17 5-6 4 4 2-2 2 4" />
         </>
       ) : (
-        <path d="M12 27V13h15M12 13l15 14" />
+        <path className="lf-icon-accent" d="M8 17V8h9M8 8l9 9" />
       )}
-    </svg>
+    </IconFrame>
   );
 }

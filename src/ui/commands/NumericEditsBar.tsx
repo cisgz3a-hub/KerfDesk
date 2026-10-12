@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import lock from 'lucide-static/icons/lock-keyhole.svg?raw';
-import unlock from 'lucide-static/icons/lock-keyhole-open.svg?raw';
+import { Icon } from '../kit/icons';
 import {
   evaluateNumericEntry,
   type NumericEntryKind,
@@ -202,10 +201,7 @@ function SizeFields({ model }: { readonly model: NumericEditModel }): JSX.Elemen
         disabled={!model.hasSelection}
         onClick={() => model.setPreserveAspect((value) => !value)}
       >
-        <span
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: model.preserveAspect ? lock : unlock }}
-        />
+        <Icon name={model.preserveAspect ? 'lock' : 'unlock'} size={16} />
       </button>
       <NumberField
         label="Selection height"

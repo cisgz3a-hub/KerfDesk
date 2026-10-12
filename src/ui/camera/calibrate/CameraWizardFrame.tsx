@@ -8,7 +8,7 @@
 
 import { TutorialButton } from '../../tutorials/TutorialButton';
 import type { CSSProperties, ReactNode } from 'react';
-import { Dialog } from '../../kit';
+import { Dialog, Icon } from '../../kit';
 
 export function CameraWizardFrame(props: {
   readonly title: string;
@@ -41,7 +41,7 @@ export function CameraWizardFrame(props: {
           aria-label={`Close ${props.title}`}
           title="Close the wizard."
         >
-          ×
+          <Icon name="close" size={16} />
         </button>
       </div>
     </div>

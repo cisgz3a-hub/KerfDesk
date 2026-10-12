@@ -7,6 +7,7 @@ import { useCallback, useId, useRef, useState } from 'react';
 import { AnchoredPopover } from '../common/AnchoredPopover';
 import { NumberField } from '../common/NumberField';
 import { Icon } from '../kit';
+import { IconFrame } from '../kit/icon-frame';
 import { useUiStore } from '../state/ui-store';
 import {
   MAX_SNAP_DISTANCE_PX,
@@ -26,47 +27,40 @@ type SnapToggleKey = Extract<
   | 'snapToObjects'
 >;
 
-// `glyph` is the marker the canvas draws for that kind (draw-snap-marker.ts).
+// These small diagrams repeat the canvas markers (draw-snap-marker.ts).
 const SNAP_TOGGLES: ReadonlyArray<{
   readonly key: SnapToggleKey;
   readonly name: string;
-  readonly glyph: string;
   readonly title: string;
 }> = [
   {
     key: 'snapToNodes',
     name: 'Nodes',
-    glyph: '■',
     title: 'Snap to path nodes and curve end points.',
   },
   {
     key: 'snapToMidpoints',
     name: 'Midpoints',
-    glyph: '△',
     title: 'Snap to the middle of each segment.',
   },
   {
     key: 'snapToCenters',
     name: 'Centres',
-    glyph: '⊕',
     title: 'Snap to the centre of each shape, circle, ellipse and closed outline.',
   },
   {
     key: 'snapToIntersections',
     name: 'Intersections',
-    glyph: '✕',
     title: 'Snap to where visible outlines cross.',
   },
   {
     key: 'snapToGrid',
     name: 'Grid',
-    glyph: '+',
     title: 'Snap to grid lines within the snap distance.',
   },
   {
     key: 'snapToObjects',
     name: 'Alignment guides',
-    glyph: '',
     title: 'While moving, line up box edges and centres with other artwork.',
   },
 ];
@@ -124,7 +118,7 @@ export function SnapSettingsPanel(): JSX.Element {
           />
           <span style={nameStyle}>{toggle.name}</span>
           <span style={glyphStyle} aria-hidden="true">
-            {toggle.glyph}
+            <SnapMarkerIcon kind={toggle.key} />
           </span>
         </label>
       ))}
@@ -160,6 +154,32 @@ export function SnapSettingsPanel(): JSX.Element {
         Hold Alt while dragging or drawing to place freely. Ctrl also skips snapping when moving.
       </p>
     </div>
+  );
+}
+
+function SnapMarkerIcon({ kind }: { readonly kind: SnapToggleKey }): JSX.Element {
+  return (
+    <IconFrame size={16}>
+      {kind === 'snapToNodes' ? (
+        <rect x="8" y="8" width="8" height="8" fill="currentColor" />
+      ) : null}
+      {kind === 'snapToMidpoints' ? <path d="m12 5 8 14H4L12 5Z" /> : null}
+      {kind === 'snapToCenters' ? (
+        <>
+          <circle cx="12" cy="12" r="7" />
+          <path d="M12 8v8M8 12h8" />
+        </>
+      ) : null}
+      {kind === 'snapToIntersections' ? <path d="m6 6 12 12M18 6 6 18" /> : null}
+      {kind === 'snapToGrid' ? <path d="M12 5v14M5 12h14" /> : null}
+      {kind === 'snapToObjects' ? (
+        <>
+          <rect x="4" y="5" width="7" height="6" rx="1" />
+          <rect x="4" y="15" width="12" height="5" rx="1" />
+          <path className="lf-icon-accent" d="M3 2v20" strokeDasharray="2 2" />
+        </>
+      ) : null}
+    </IconFrame>
   );
 }
 

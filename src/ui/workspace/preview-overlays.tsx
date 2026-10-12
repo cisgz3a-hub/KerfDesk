@@ -5,6 +5,7 @@
 // outline is a trust leak.
 
 import { useMemo } from 'react';
+import { IconFrame } from '../kit/icon-frame';
 import { summarizeToolpathDistances, type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 // Deep type import: core/sim's public barrel is hard-capped at 20 exports by
@@ -323,7 +324,10 @@ function PassStepButtons(props: {
           if (prev !== undefined) props.onJump(prev);
         }}
       >
-        ⏮ Pass
+        <IconFrame size={15}>
+          <path d="M5 5v14m14-14-10 7 10 7V5Z" />
+        </IconFrame>{' '}
+        Pass
       </button>
       <button
         type="button"
@@ -336,17 +340,16 @@ function PassStepButtons(props: {
           if (next !== undefined) props.onJump(next);
         }}
       >
-        Pass ⏭
+        Pass{' '}
+        <IconFrame size={15}>
+          <path d="M19 5v14M5 5l10 7-10 7V5Z" />
+        </IconFrame>
       </button>
     </>
   );
 }
 
-const stackStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 6,
-};
+const stackStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 
 const hintStyle: React.CSSProperties = {
   padding: '6px 12px',
@@ -354,9 +357,7 @@ const hintStyle: React.CSSProperties = {
   fontFamily: 'system-ui, sans-serif',
 };
 
-const bannerStyle: React.CSSProperties = {
-  fontFamily: 'system-ui, sans-serif',
-};
+const bannerStyle: React.CSSProperties = { fontFamily: 'system-ui, sans-serif' };
 
 const statsPanelStyle: React.CSSProperties = {
   display: 'flex',
@@ -411,10 +412,7 @@ const previewControlsPanelStyle: React.CSSProperties = {
   fontSize: 12,
 };
 
-const compactButtonStyle: React.CSSProperties = {
-  minHeight: 28,
-  padding: '4px 10px',
-};
+const compactButtonStyle: React.CSSProperties = { minHeight: 28, padding: '4px 10px' };
 
 const speedControlStyle: React.CSSProperties = {
   display: 'inline-flex',

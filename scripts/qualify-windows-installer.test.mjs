@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -400,7 +400,7 @@ test(
       'Launch must not leave a root that blocks HistoricalUpgrade',
     );
     for (const root of roots)
-      assert.equal(path.dirname(root).toLowerCase(), runnerTemp.toLowerCase());
+      assert.equal(path.dirname(root).toLowerCase(), realpathSync.native(runnerTemp).toLowerCase());
   },
 );
 
