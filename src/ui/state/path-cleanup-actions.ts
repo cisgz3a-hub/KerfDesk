@@ -12,6 +12,10 @@ import {
   isCloseablePolyline,
   reversePaths,
 } from '../../core/geometry/path-direction-edits';
+import {
+  closePathsWithinTolerance,
+  type CloseToleranceMode,
+} from '../../core/geometry/close-within-tolerance';
 import { closingLineFraction } from '../../core/cnc/cnc-tab-anchors';
 import type { CncTabAnchor, ColoredPath, Scene, SceneObject } from '../../core/scene';
 import { formatDisplayMillimetres } from '../format-display-millimetres';
@@ -27,6 +31,8 @@ export type PathCleanupActions = {
   readonly deleteDuplicates: () => void;
   /** Close the open paths of the selected artwork. */
   readonly closeSelectedPaths: () => void;
+  /** Close the selection's open paths whose ends lie within `toleranceMm`. */
+  readonly closeSelectedPathsWithTolerance: (toleranceMm: number, mode: CloseToleranceMode) => void;
   /** Reverse the drawing direction of the selected artwork's paths. */
   readonly reverseSelectedPaths: () => void;
 };
@@ -47,6 +53,31 @@ export function pathCleanupActions(set: Setter): PathCleanupActions {
           return { paths: result.paths, count: result.closed };
         });
         toast(closeMessage(edit.count, longestGapMm, skippedOpenObjects(state)));
+        return edit.state;
+      }),
+    closeSelectedPathsWithTolerance: (toleranceMm, mode) =>
+      set((state) => {
+        let remaining = 0;
+        const edit = editSelectedPaths(state, 'close', (object) => {
+          const result = closePathsWithinTolerance(
+            object.paths,
+            object.transform,
+            toleranceMm,
+            mode,
+          );
+          remaining += result.remaining;
+          return { paths: result.paths, count: result.closed };
+        });
+        const left =
+          remaining === 0
+            ? ''
+            : ` ${remaining === 1 ? '1 path stays' : `${remaining} paths stay`} open: the gap is wider than ${formatDisplayMillimetres(toleranceMm)} mm.`;
+        const done = edit.count === 1 ? 'Closed 1 path.' : `Closed ${edit.count} paths.`;
+        toast(
+          edit.count === 0 && remaining === 0
+            ? closeMessage(0, 0, skippedOpenObjects(state))
+            : `${done}${left}`,
+        );
         return edit.state;
       }),
     reverseSelectedPaths: () =>
@@ -94,7 +125,7 @@ type EditableObject = Extract<
   { readonly kind: 'imported-svg' | 'traced-image' | 'shape' }
 >;
 
-function isPathEditable(object: SceneObject): object is EditableObject {
+export function isPathEditable(object: SceneObject): object is EditableObject {
   return (
     !isBooleanCompoundObject(object) &&
     (object.kind === 'imported-svg' ||

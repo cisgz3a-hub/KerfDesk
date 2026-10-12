@@ -87,6 +87,7 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     dockOptions: vi.fn(),
     hasThreeCircles: false,
     tangentCircle: vi.fn(),
+    closePathsWithTolerance: vi.fn(),
   };
 }
 

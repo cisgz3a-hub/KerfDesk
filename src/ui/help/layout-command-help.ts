@@ -72,6 +72,11 @@ export const LAYOUT_COMMAND_HELP: Readonly<Record<LayoutCommandId, CommandHelpTo
     tooltip:
       'Docking options: the padding left between docked artwork and what it meets, Move as group (the selection moves as one piece), and Lock inner objects (selected artwork inside other selected artwork moves with it). Saved on this computer.',
   },
+  'tools.close-paths-with-tolerance': {
+    family: 'tools',
+    tooltip:
+      'Close every selected open path whose ends lie within the tolerance, on any operation. Bridge adds a closing line and keeps every point; Move ends together meets both ends at their midpoint without a new segment. The dialog counts what will close and what stays open. One undo step.',
+  },
   'tools.tangent-circle': {
     family: 'tools',
     tooltip:

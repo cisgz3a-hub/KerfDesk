@@ -192,6 +192,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     dockOptions: vi.fn(),
     hasThreeCircles: false,
     tangentCircle: vi.fn(),
+    closePathsWithTolerance: vi.fn(),
     ...overrides,
   };
 }

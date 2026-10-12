@@ -160,6 +160,21 @@ export function layoutCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
           'Select exactly three circles first.',
           ctx.tangentCircle,
         ),
+    ctx.canEditSelectedPaths
+      ? enabled(
+          'tools.close-paths-with-tolerance',
+          'tools',
+          'Close Paths With Tolerance...',
+          'Close the open paths whose ends lie within a chosen gap',
+          ctx.closePathsWithTolerance,
+        )
+      : disabled(
+          'tools.close-paths-with-tolerance',
+          'tools',
+          'Close Paths With Tolerance...',
+          'Select imported, traced or drawn-line artwork first.',
+          ctx.closePathsWithTolerance,
+        ),
     ...REFERENCED.map((spec) =>
       command(
         ctx,

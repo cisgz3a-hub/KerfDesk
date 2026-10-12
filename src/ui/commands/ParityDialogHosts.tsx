@@ -1,6 +1,7 @@
 // The store-opened dialogs added for LightBurn parity, mounted together so
 // CommandShell stays inside the file-size cap.
 
+import { ClosePathsToleranceDialogHost } from './ClosePathsToleranceDialog';
 import { DockOptionsDialogHost } from './DockOptionsDialog';
 import { SaveOriginalImageDialogHost } from './SaveOriginalImageDialog';
 import { SelectCirclesDialogHost } from './SelectCirclesDialog';
@@ -13,6 +14,7 @@ export function ParityDialogHosts(): JSX.Element {
       <SaveOriginalImageDialogHost />
       <DockOptionsDialogHost />
       <TangentCircleDialogHost />
+      <ClosePathsToleranceDialogHost />
     </>
   );
 }
