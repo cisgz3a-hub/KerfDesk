@@ -73,10 +73,10 @@ win:
   artifactName: KerfDesk-${version}-windows-${arch}-setup.${ext}
 
 nsis:
+  include: scripts/nsis-file-associations.nsh
   installerIcon: public/app-icon.ico
   uninstallerIcon: public/app-icon.ico
   installerHeaderIcon: public/app-icon.ico
-  include: scripts/nsis-file-associations.nsh
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true

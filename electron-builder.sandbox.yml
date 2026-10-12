@@ -50,10 +50,10 @@ extraMetadata:
     schema: 0
 fileAssociations: []
 nsis:
+  include: scripts/nsis-sandbox.nsh
   installerIcon: public/app-icon.ico
   uninstallerIcon: public/app-icon.ico
   installerHeaderIcon: public/app-icon.ico
-  include: scripts/nsis-sandbox.nsh
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
