@@ -50,6 +50,7 @@ function SaveOriginalImageDialog(props: { readonly image: RasterImage }): JSX.El
       <label className="lf-field">
         <span>Format</span>
         <select
+          title="File format for the saved original image"
           className="lf-input"
           aria-label="Image format"
           value={format}

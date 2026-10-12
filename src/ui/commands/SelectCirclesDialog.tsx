@@ -47,6 +47,7 @@ function SelectCirclesDialog(): JSX.Element {
         <legend>Diameter</legend>
         <label>
           <input
+            title="Select circles of one diameter"
             type="radio"
             name="select-circles-mode"
             checked={mode === 'exact'}
@@ -56,6 +57,7 @@ function SelectCirclesDialog(): JSX.Element {
         </label>
         <label>
           <input
+            title="Select circles with a diameter in a range"
             type="radio"
             name="select-circles-mode"
             checked={mode === 'range'}
@@ -96,6 +98,7 @@ function SizeField(props: {
     <label className="lf-field">
       <span>{props.label}</span>
       <input
+        title="Diameter in millimetres"
         className="lf-input"
         type="number"
         min="0"
