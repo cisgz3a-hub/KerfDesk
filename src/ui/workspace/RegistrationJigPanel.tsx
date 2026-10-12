@@ -286,13 +286,9 @@ function NextBurnBanner(props: {
   );
 }
 
-function bannerFor(
-  state: RegistrationRunState,
-  outlineCount: number,
-): {
-  readonly className: string;
-  readonly text: string;
-} {
+type BurnBanner = { readonly className: string; readonly text: string };
+
+function bannerFor(state: RegistrationRunState, outlineCount: number): BurnBanner {
   switch (state) {
     case 'none':
       return { className: 'lf-banner', text: 'Create a jig outline below to begin.' };

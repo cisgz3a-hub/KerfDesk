@@ -18,7 +18,7 @@ const maskable = source.replace(
 );
 // At taskbar/favicon sizes, omit the fine lamination lines. The silhouette and
 // kerf between the ivory stem and brass ribbon remain identical.
-const compact = source.replace(/  <g fill="none"[\s\S]*?<\/g>\n/, '');
+const compact = source.replace(/ {2}<g fill="none"[\s\S]*?<\/g>\n/, '');
 const outputs = new Map([
   ['public/favicon.svg', Buffer.from(compact)],
   ['public/app-icon-maskable.svg', Buffer.from(maskable)],

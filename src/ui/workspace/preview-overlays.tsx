@@ -349,11 +349,7 @@ function PassStepButtons(props: {
   );
 }
 
-const stackStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 6,
-};
+const stackStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 
 const hintStyle: React.CSSProperties = {
   padding: '6px 12px',
@@ -361,9 +357,7 @@ const hintStyle: React.CSSProperties = {
   fontFamily: 'system-ui, sans-serif',
 };
 
-const bannerStyle: React.CSSProperties = {
-  fontFamily: 'system-ui, sans-serif',
-};
+const bannerStyle: React.CSSProperties = { fontFamily: 'system-ui, sans-serif' };
 
 const statsPanelStyle: React.CSSProperties = {
   display: 'flex',
@@ -418,10 +412,7 @@ const previewControlsPanelStyle: React.CSSProperties = {
   fontSize: 12,
 };
 
-const compactButtonStyle: React.CSSProperties = {
-  minHeight: 28,
-  padding: '4px 10px',
-};
+const compactButtonStyle: React.CSSProperties = { minHeight: 28, padding: '4px 10px' };
 
 const speedControlStyle: React.CSSProperties = {
   display: 'inline-flex',
