@@ -1,13 +1,3 @@
-.lf-controller-info {
-  flex: 0 0 auto;
-  width: 21px;
-  height: 21px;
-  padding: 0;
-  line-height: 1;
-  color: var(--lf-warning-fg);
-  white-space: nowrap;
-}
-
 .lf-controller-recovery-toast {
   position: fixed;
   top: 64px;
@@ -54,4 +44,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.lf-controller-qualification-progress {
+  color: var(--lf-text-muted);
+  border: 1px solid var(--lf-border);
 }

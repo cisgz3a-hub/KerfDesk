@@ -1,7 +1,10 @@
-import { useId, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import './controller-recovery-toast.css';
 
 type Props = {
+  readonly closeRef: RefObject<HTMLButtonElement>;
+  readonly onDismiss: () => void;
+  readonly focusOnOpen: boolean;
   readonly message: string;
   readonly readBlockReason: string | null | undefined;
   readonly reconnectRecommended: boolean;
@@ -13,63 +16,41 @@ type Props = {
 // Keep recovery actions available without adding a row to the connection bar.
 // Dismissing this UI never acknowledges safety notices or changes the session.
 export function ControllerRecoveryToast(props: Props): JSX.Element {
-  const [open, setOpen] = useState(true);
-  const toastId = useId();
-  const trigger = useRef<HTMLButtonElement>(null);
-  const dismiss = (): void => {
-    setOpen(false);
-    trigger.current?.focus();
-  };
   return (
-    <>
-      <button
-        ref={trigger}
-        type="button"
-        className="lf-btn lf-controller-info"
-        aria-label="Controller info"
-        aria-expanded={open}
-        aria-controls={open ? toastId : undefined}
-        title="Show controller information and connection recovery actions."
-        onClick={() => setOpen((shown) => !shown)}
-      >
-        <span aria-hidden="true">ⓘ</span>
-      </button>
-      {open && (
-        <section
-          id={toastId}
-          role="alert"
-          className="lf-banner lf-banner--warning lf-controller-recovery-toast"
-          aria-label="Controller information"
-          onKeyDown={(event) => {
-            if (event.key !== 'Escape') return;
-            event.stopPropagation();
-            dismiss();
-          }}
+    <section
+      role="alert"
+      className="lf-banner lf-banner--warning lf-controller-recovery-toast"
+      aria-label="Controller information"
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        event.stopPropagation();
+        props.onDismiss();
+      }}
+    >
+      <div className="lf-controller-recovery-toast__heading">
+        <strong>
+          {props.reconnectRecommended
+            ? 'Controller connection needs recovery'
+            : 'Controller information unavailable'}
+        </strong>
+        <button
+          type="button"
+          className="lf-btn lf-controller-recovery-toast__close"
+          aria-label="Dismiss controller notification"
+          title="Hide this notification. Reopen it from More connection options, Controller info."
+          ref={props.closeRef}
+          autoFocus={props.focusOnOpen}
+          onClick={props.onDismiss}
         >
-          <div className="lf-controller-recovery-toast__heading">
-            <strong>
-              {props.reconnectRecommended
-                ? 'Controller connection needs recovery'
-                : 'Controller information unavailable'}
-            </strong>
-            <button
-              type="button"
-              className="lf-btn lf-controller-recovery-toast__close"
-              aria-label="Dismiss controller notification"
-              title="Hide this notification. Recovery actions remain under Controller info."
-              onClick={dismiss}
-            >
-              ×
-            </button>
-          </div>
-          <p>{props.message}</p>
-          {props.readBlockReason != null && (
-            <p role="status">Waiting to retry: {props.readBlockReason}</p>
-          )}
-          <RecoveryActions {...props} />
-        </section>
+          ×
+        </button>
+      </div>
+      <p>{props.message}</p>
+      {props.readBlockReason != null && (
+        <p role="status">Waiting to retry: {props.readBlockReason}</p>
       )}
-    </>
+      <RecoveryActions {...props} />
+    </section>
   );
 }
 
