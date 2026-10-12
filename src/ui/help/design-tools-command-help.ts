@@ -2,6 +2,7 @@ import type { DesignToolsCommandId } from '../commands/design-tools-command-type
 import type { CommandHelpTopic } from './command-help-topics';
 import { LAYOUT_COMMAND_HELP } from './layout-command-help';
 import { OPTIMIZE_SHAPES_COMMAND_HELP } from './optimize-shapes-command-help';
+import { PARITY_TOOLS_COMMAND_HELP } from './parity-tools-command-help';
 import { VECTOR_CUT_COMMAND_HELP } from './vector-cut-command-help';
 import { WARP_DEFORM_COMMAND_HELP } from './warp-deform-command-help';
 
@@ -11,6 +12,7 @@ export const DESIGN_TOOLS_COMMAND_HELP: Readonly<Record<DesignToolsCommandId, Co
   ...WARP_DEFORM_COMMAND_HELP,
   ...OPTIMIZE_SHAPES_COMMAND_HELP,
   ...LAYOUT_COMMAND_HELP,
+  ...PARITY_TOOLS_COMMAND_HELP,
   'edit.select-contained': {
     family: 'edit',
     tooltip:

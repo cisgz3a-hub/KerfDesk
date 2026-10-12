@@ -181,6 +181,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     optimizeShapes: vi.fn(),
     canBakeVariableText: false,
     bakeVariableText: vi.fn(),
+    saveOriginalImage: vi.fn(),
+    savePreviewImage: vi.fn(),
     moveSelectionInDrawOrder: vi.fn(),
     matchSelectionSize: vi.fn(),
     moveSelectionTogether: vi.fn(),

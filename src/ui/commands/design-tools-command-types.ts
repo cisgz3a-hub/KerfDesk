@@ -8,13 +8,15 @@ import type {
   OptimizeShapesCommandId,
 } from './optimize-shapes-command-types';
 import type { LayoutCommandContext, LayoutCommandId } from './layout-command-types';
+import type { ParityToolsCommandContext, ParityToolsCommandId } from './parity-tools-command-types';
 import type { VectorCutCommandContext, VectorCutCommandId } from './vector-cut-command-types';
 import type { WarpDeformCommandContext, WarpDeformCommandId } from './warp-deform-command-types';
 
 export type DesignToolsCommandContext = VectorCutCommandContext &
   WarpDeformCommandContext &
   OptimizeShapesCommandContext &
-  LayoutCommandContext & {
+  LayoutCommandContext &
+  ParityToolsCommandContext & {
     readonly selectContainedShapes: () => void;
     readonly selectSmallerShapes: () => void;
     readonly deleteDuplicates: () => void;
@@ -34,6 +36,7 @@ export type DesignToolsCommandId =
   | WarpDeformCommandId
   | OptimizeShapesCommandId
   | LayoutCommandId
+  | ParityToolsCommandId
   | 'edit.select-contained'
   | 'edit.select-smaller'
   | 'edit.delete-duplicates'

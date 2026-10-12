@@ -76,6 +76,8 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     // LightBurn parity layout commands.
     canBakeVariableText: false,
     bakeVariableText: vi.fn(),
+    saveOriginalImage: vi.fn(),
+    savePreviewImage: vi.fn(),
     moveSelectionInDrawOrder: vi.fn(),
     matchSelectionSize: vi.fn(),
     moveSelectionTogether: vi.fn(),

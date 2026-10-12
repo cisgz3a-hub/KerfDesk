@@ -238,6 +238,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
       label: 'View',
       ids: [
         'window.toggle-preview',
+        'window.save-preview-image',
         'window.toggle-wireframe',
         'window.fit-view',
         'window.project-notes',
@@ -288,8 +289,10 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
         'tools.flatten-image-mask',
         'tools.remove-image-mask',
         'tools.save-processed-bitmap',
+        'tools.save-original-image',
       ],
     },
+    { label: 'Variable data', ids: ['tools.bake-variable-text'] },
     {
       label: 'Trace',
       ids: ['tools.trace-image', 'tools.retrace-original', 'tools.multi-file-trace'],

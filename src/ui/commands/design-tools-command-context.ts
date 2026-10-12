@@ -7,6 +7,7 @@ import type { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { openCopyAlongPathDialog } from './copy-along-path-dialog-store';
 import type { DesignToolsCommandContext } from './design-tools-command-types';
+import type { ParityToolsCommandContext } from './parity-tools-command-types';
 import { flattenImageMaskAction } from './image-command-actions';
 import { openOptimizeShapesDialog } from './optimize-shapes-dialog-store';
 import { vectorCutCommandContext } from './vector-cut-command-context';
@@ -15,7 +16,7 @@ import { warpDeformCommandContext } from './warp-deform-command-context';
 export function designToolsCommandContext(
   app: ReturnType<typeof useStore.getState>,
   selectedIds: ReadonlyArray<string>,
-): DesignToolsCommandContext {
+): Omit<DesignToolsCommandContext, keyof ParityToolsCommandContext> {
   const selected =
     app.project.scene.objects.find((object) => object.id === app.selectedObjectId) ?? null;
   return {

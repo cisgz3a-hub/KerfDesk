@@ -37,6 +37,7 @@ import { WorkspaceContextBar } from './WorkspaceContextBar';
 import { ArrayDialogHost } from './ArrayDialogHost';
 import { CopyAlongPathDialogHost } from './CopyAlongPathDialogHost';
 import { OptimizeShapesDialogHost } from './OptimizeShapesDialogHost';
+import { SaveOriginalImageDialogHost } from './SaveOriginalImageDialog';
 import { SelectCirclesDialogHost } from './SelectCirclesDialog';
 import { useShowNotesOnOpen } from './use-show-notes-on-open';
 import { BooleanDialogHost } from './BooleanDialogHost';
@@ -173,6 +174,7 @@ function StoreOpenedDialogs(): JSX.Element {
       <CopyAlongPathDialogHost />
       <OptimizeShapesDialogHost />
       <SelectCirclesDialogHost />
+      <SaveOriginalImageDialogHost />
       <BooleanDialogHost />
       <ExportSvgDialogHost />
       <SettingsWindowHost />
