@@ -35,6 +35,8 @@ export type ArrayForm = {
   readonly reverseRows: boolean;
   readonly mirrorColumns: ArrayMirrorAxes;
   readonly mirrorRows: ArrayMirrorAxes;
+  readonly randomRotation: 'off' | 'quarter' | 'any';
+  readonly randomSeed: string;
   readonly count: string;
   readonly totalAngle: string;
   readonly centre: ArrayCentre;
@@ -62,6 +64,8 @@ export function defaultArrayForm(bounds: Bounds): ArrayForm {
     reverseRows: false,
     mirrorColumns: 'none',
     mirrorRows: 'none',
+    randomRotation: 'off',
+    randomSeed: '1',
     count: '6',
     totalAngle: '360',
     centre: { kind: 'selection' },
@@ -111,6 +115,12 @@ function gridSpec(form: ArrayForm): GridArraySpec {
   if (form.reverseRows) extras.reverseRows = true;
   if (form.mirrorColumns !== 'none') extras.mirrorColumns = form.mirrorColumns;
   if (form.mirrorRows !== 'none') extras.mirrorRows = form.mirrorRows;
+  if (form.randomRotation !== 'off') {
+    extras.randomRotation = {
+      seed: Math.trunc(finiteNumber(form.randomSeed)),
+      stepDeg: form.randomRotation === 'quarter' ? 90 : 0,
+    };
+  }
   return {
     kind: 'grid',
     rows: positiveInteger(form.rows),
@@ -249,4 +259,21 @@ function nonNegative(raw: string): number {
 function finiteNumber(raw: string): number {
   const value = Number(raw);
   return Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * The spacing that makes a row (or column) of `count` copies of `size` span
+ * `total`, measured the way the form measures spacing. Null for one copy or
+ * a total too small to fit.
+ */
+export function spacingForTotal(
+  total: number,
+  count: number,
+  size: number,
+  spaceBy: ArrayForm['spaceBy'],
+): number | null {
+  if (!Number.isFinite(total) || !Number.isInteger(count) || count < 2) return null;
+  const spacing =
+    spaceBy === 'centres' ? (total - size) / (count - 1) : (total - count * size) / (count - 1);
+  return spacing >= 0 ? spacing : null;
 }

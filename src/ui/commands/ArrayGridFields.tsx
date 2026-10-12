@@ -3,7 +3,8 @@
 // alternate-column shifts and mirrors, and which way the grid builds.
 
 import type { ArrayMirrorAxes } from '../../core/scene/array-layout-types';
-import type { ArrayForm } from './array-dialog-form';
+import type { Bounds } from '../../core/scene/scene-object';
+import { spacingForTotal, type ArrayForm } from './array-dialog-form';
 import { Check, Choice, Field, fieldsStyle, type ArrayFormPatch } from './ArrayDialogFields';
 
 const SPACE_BY: ReadonlyArray<readonly [ArrayForm['spaceBy'], string]> = [
@@ -22,6 +23,7 @@ export function GridArrayFields(props: {
   readonly form: ArrayForm;
   readonly onChange: ArrayFormPatch;
   readonly onSpaceBy: (spaceBy: ArrayForm['spaceBy']) => void;
+  readonly bounds: Bounds;
 }): JSX.Element {
   const { form, onChange } = props;
   const centres = form.spaceBy === 'centres';
@@ -72,7 +74,9 @@ export function GridArrayFields(props: {
         min={0}
         set={(spacingY) => onChange({ spacingY })}
       />
+      <GridTotalFields form={form} onChange={onChange} bounds={props.bounds} />
       <GridPatternFields form={form} onChange={onChange} />
+      <GridRandomFields form={form} onChange={onChange} />
     </div>
   );
 }
@@ -122,6 +126,78 @@ function GridPatternFields(props: {
         checked={form.reverseRows}
         set={(reverseRows) => onChange({ reverseRows })}
       />
+    </>
+  );
+}
+
+const RANDOM: ReadonlyArray<readonly [ArrayForm['randomRotation'], string]> = [
+  ['off', 'Off'],
+  ['quarter', 'Quarter turns'],
+  ['any', 'Any angle'],
+];
+
+// Total width and height: typing either sets the spacing that makes the grid that size.
+function GridTotalFields(props: {
+  readonly form: ArrayForm;
+  readonly onChange: ArrayFormPatch;
+  readonly bounds: Bounds;
+}): JSX.Element {
+  const { form, onChange, bounds } = props;
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
+  const total = (count: string, size: number, spacing: string): string => {
+    const n = Math.max(1, Math.trunc(Number(count)) || 1);
+    const gap = Number(spacing) || 0;
+    const value = form.spaceBy === 'centres' ? size + (n - 1) * gap : n * size + (n - 1) * gap;
+    return value.toFixed(2);
+  };
+  const apply = (value: string, count: string, size: number, key: 'spacingX' | 'spacingY') => {
+    const spacing = spacingForTotal(Number(value), Math.trunc(Number(count)), size, form.spaceBy);
+    if (spacing !== null) onChange({ [key]: spacing.toFixed(3) });
+  };
+  return (
+    <>
+      <Field
+        label="Total width (mm)"
+        title="The width of the whole grid. Typing a width sets the horizontal spacing that makes it."
+        value={total(form.columns, width, form.spacingX)}
+        min={0}
+        set={(value) => apply(value, form.columns, width, 'spacingX')}
+      />
+      <Field
+        label="Total height (mm)"
+        title="The height of the whole grid. Typing a height sets the vertical spacing that makes it."
+        value={total(form.rows, height, form.spacingY)}
+        min={0}
+        set={(value) => apply(value, form.rows, height, 'spacingY')}
+      />
+    </>
+  );
+}
+
+function GridRandomFields(props: {
+  readonly form: ArrayForm;
+  readonly onChange: ArrayFormPatch;
+}): JSX.Element {
+  const { form, onChange } = props;
+  return (
+    <>
+      <Choice
+        label="Random orientation"
+        title="Turn every copy but the original about its own centre by a random angle, for a scattered look or to vary grain direction. The seed fixes the pattern."
+        value={form.randomRotation}
+        options={RANDOM}
+        set={(randomRotation) => onChange({ randomRotation })}
+      />
+      {form.randomRotation === 'off' ? null : (
+        <Field
+          label="Random seed"
+          title="Change the seed for a different random pattern; the same seed always gives the same one."
+          value={form.randomSeed}
+          step={1}
+          set={(randomSeed) => onChange({ randomSeed })}
+        />
+      )}
     </>
   );
 }
