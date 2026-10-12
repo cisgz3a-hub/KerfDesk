@@ -47,16 +47,6 @@
     opacity: 0.35;
   }
 }
-@media (max-width: 1180px) {
-  .lf-toolbar-shell .lf-remote-toolbar-button {
-    width: 36px;
-    padding: 4px;
-  }
-  .lf-toolbar-shell .lf-remote-toolbar-button .lf-remote-toolbar-label {
-    display: none;
-  }
-}
-
 .lf-remote-panel {
   width: 360px;
   padding: 0;

@@ -1,4 +1,4 @@
-// Phone & MCP in the main toolbar: live connection status at a glance, and a
+// MCP in the main toolbar: live connection status at a glance, and a
 // quick panel that reuses the Settings controls for pairing, artwork sharing
 // and approved connections. Settings → Phone & MCP keeps the full page.
 
@@ -81,7 +81,7 @@ function RemoteToolbarControl(): JSX.Element {
           <ToolbarIcon icon="remote" />
           <span className="lf-remote-dot" aria-hidden="true" />
         </span>
-        <span className="lf-remote-toolbar-label">Phone & MCP</span>
+        <span className="lf-remote-toolbar-label">MCP</span>
       </button>
       {open ? (
         <AnchoredPopover
