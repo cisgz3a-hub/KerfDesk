@@ -195,6 +195,10 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     closePathsWithTolerance: vi.fn(),
     radiusFillet: vi.fn(),
     shear: vi.fn(),
+    hasGuides: false,
+    guidesLocked: false,
+    toggleGuidesLocked: vi.fn(),
+    clearGuides: vi.fn(),
     ...overrides,
   };
 }

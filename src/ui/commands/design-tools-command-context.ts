@@ -8,6 +8,7 @@ import { useDockOptionsStore } from './dock-options-store';
 import { openClosePathsToleranceDialog } from './ClosePathsToleranceDialog';
 import { openRadiusFilletDialog } from './RadiusFilletDialog';
 import { openShearDialog } from './ShearDialog';
+import { useGuideLockStore } from '../workspace/guide-lock-store';
 import { openTangentCircleDialog, selectedThreeCircles } from './TangentCircleDialog';
 import type { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -59,6 +60,10 @@ export function designToolsCommandContext(
     closePathsWithTolerance: openClosePathsToleranceDialog,
     radiusFillet: openRadiusFilletDialog,
     shear: openShearDialog,
+    hasGuides: (app.project.guides ?? []).length > 0,
+    guidesLocked: useGuideLockStore.getState().locked,
+    toggleGuidesLocked: () => useGuideLockStore.getState().toggle(),
+    clearGuides: app.clearGuides,
   };
 }
 

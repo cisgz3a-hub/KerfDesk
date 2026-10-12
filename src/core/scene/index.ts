@@ -209,6 +209,13 @@ export type {
   VariableTemplateToken,
 } from './variable-template';
 export { DEFAULT_PROJECT_VARIABLE_DATA } from './variable-template';
+export {
+  MAX_GUIDES,
+  nearestGuidePosition,
+  normalizeGuides,
+  type GuideAxis,
+  type ProjectGuide,
+} from './guides';
 
 export type {
   CncCoolantMode,

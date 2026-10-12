@@ -7,6 +7,7 @@ import { moveLaserTabDrag } from './laser-tab-editor';
 import { moveWarpHandleDrag } from './warp-deform-tool';
 import { updatePathNodeDrag } from './path-node-drag';
 import { updatePathSegmentDrag } from './path-segment-drag';
+import { updateGuideDrag } from './guide-drag';
 import { useStore } from '../state';
 import { updatePenCursor } from './pen-tool';
 import type { ViewState } from './view-transform';
@@ -60,20 +61,24 @@ export function handleNonTransformDragUpdate(args: NonTransformDragUpdateArgs): 
     });
     return true;
   }
-  if (args.drag?.kind === 'path-segment') {
-    updatePathSegmentDrag(
-      args.drag,
-      args.point,
-      useStore.getState().reshapePathSegmentDuringInteraction,
-    );
-    return true;
-  }
+  if (handleEditDragUpdate(args.drag, args.point)) return true;
   if (handleLiveToolUpdate(args)) return true;
   if (args.drag?.kind === 'draw') {
     updateDrawDraft({ ...args, drag: args.drag });
     return true;
   }
   return false;
+}
+
+// Segment reshaping and guideline moves: live edits inside the drag's interaction.
+function handleEditDragUpdate(drag: DragState | null, point: Vec2 | null): boolean {
+  if (drag?.kind === 'guide') {
+    updateGuideDrag(drag, point);
+    return true;
+  }
+  if (drag?.kind !== 'path-segment') return false;
+  updatePathSegmentDrag(drag, point, useStore.getState().reshapePathSegmentDuringInteraction);
+  return true;
 }
 
 function handleLiveToolUpdate(args: NonTransformDragUpdateArgs): boolean {

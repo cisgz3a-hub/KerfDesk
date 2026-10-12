@@ -33,7 +33,7 @@ type Spec = {
   readonly label: string;
   readonly title: string;
   readonly invoke: (ctx: AppCommandContext) => void;
-  readonly family?: 'arrange' | 'tools';
+  readonly family?: 'arrange' | 'tools' | 'window';
 };
 
 const DRAW_ORDER: ReadonlyArray<Spec> = [
@@ -154,6 +154,19 @@ const SHEAR: Spec = {
   invoke: (ctx) => ctx.shear(),
 };
 
+export const GUIDE_IDS: ReadonlyArray<LayoutCommandId> = [
+  'window.lock-guides',
+  'window.clear-guides',
+];
+
+const CLEAR_GUIDES: Spec = {
+  id: 'window.clear-guides',
+  family: 'window',
+  label: 'Clear Guidelines',
+  title: 'Remove every guideline from the project',
+  invoke: (ctx) => ctx.clearGuides(),
+};
+
 const RADIUS_FILLET: Spec = {
   id: 'tools.radius-fillet',
   family: 'tools',
@@ -187,6 +200,16 @@ export function layoutCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
         'Select imported, traced or drawn-line artwork first.',
       ),
     ),
+    enabled(
+      'window.lock-guides',
+      'window',
+      ctx.guidesLocked ? 'Unlock Guidelines' : 'Lock Guidelines',
+      ctx.guidesLocked
+        ? 'Let guidelines be pulled from the rulers and moved again'
+        : 'Stop guidelines being pulled from the rulers or moved',
+      ctx.toggleGuidesLocked,
+    ),
+    command(ctx, CLEAR_GUIDES, ctx.hasGuides, 'The project has no guidelines.'),
     ...REFERENCED.map((spec) =>
       command(
         ctx,

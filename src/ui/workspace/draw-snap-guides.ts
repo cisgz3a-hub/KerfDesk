@@ -1,4 +1,5 @@
 import { canvasTheme } from '../theme/canvas-theme';
+import type { ProjectGuide } from '../../core/scene';
 import type { SnapGuide } from './snapping';
 import type { ViewTransform } from './view-transform';
 
@@ -13,6 +14,36 @@ export function drawSnapGuides(
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 4]);
   for (const guide of guides) drawGuide(ctx, guide, view);
+  ctx.restore();
+}
+
+// Saved guidelines run edge to edge across the canvas, under the live snap feedback.
+
+export function drawProjectGuides(
+  ctx: CanvasRenderingContext2D,
+  guides: ReadonlyArray<ProjectGuide>,
+  view: ViewTransform,
+): void {
+  if (guides.length === 0) return;
+  const width = ctx.canvas.width;
+  const height = ctx.canvas.height;
+  ctx.save();
+  ctx.strokeStyle = canvasTheme.guideLine;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 3]);
+  for (const guide of guides) {
+    ctx.beginPath();
+    if (guide.axis === 'x') {
+      const x = Math.round(view.offsetX + guide.positionMm * view.scale) + 0.5;
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+    } else {
+      const y = Math.round(view.offsetY + guide.positionMm * view.scale) + 0.5;
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+    }
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

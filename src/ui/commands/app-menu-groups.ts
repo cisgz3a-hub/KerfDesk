@@ -6,6 +6,7 @@ import { MOVE_LASER_TO_SELECTION_IDS } from './machine-move-commands';
 import { ARRANGE_LAYOUT_IDS } from './arrange-command-family';
 import {
   DOCK_IDS,
+  GUIDE_IDS,
   DRAW_ORDER_IDS,
   FREE_TRANSFORM_IDS,
   MATCH_SIZE_IDS,
@@ -87,6 +88,7 @@ export const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupL
         'window.toggle-preview',
         'window.save-preview-image',
         'window.toggle-wireframe',
+        ...GUIDE_IDS,
         'window.fit-view',
         'window.project-notes',
         'window.undo-history',

@@ -45,6 +45,8 @@ export const canvasTheme = {
   selectionMarqueeFill: 'rgba(49, 117, 208, 0.12)',
   rotateHandleStroke: '#fff',
   snapGuide: '#00a884',
+  // Saved guidelines: blue, distinct from the green live snap guides.
+  guideLine: '#2f80ed',
   get measureStroke() {
     return themed('#7b1fa2', '#d6a5f5');
   },

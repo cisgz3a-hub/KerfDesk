@@ -170,6 +170,8 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.close-paths-with-tolerance': { callback: 'closePathsWithTolerance' },
   'tools.radius-fillet': { callback: 'radiusFillet' },
   'tools.shear': { callback: 'shear' },
+  'window.lock-guides': { callback: 'toggleGuidesLocked' },
+  'window.clear-guides': { callback: 'clearGuides' },
   'arrange.rotate-90-cw': { callback: 'rotateSelectionQuarterTurn', args: [1] },
   'arrange.rotate-90-ccw': { callback: 'rotateSelectionQuarterTurn', args: [-1] },
   'arrange.move-to-bed-center': { callback: 'moveSelectionToBed', args: ['c'] },

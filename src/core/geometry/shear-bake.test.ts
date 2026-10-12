@@ -8,15 +8,7 @@ const ARC_SQUARE: CurveSubpath = {
   start: { x: 0, y: 0 },
   segments: [
     { kind: 'line', to: { x: 10, y: 0 } },
-    {
-      kind: 'elliptical-arc',
-      radiusX: 5,
-      radiusY: 5,
-      rotationDeg: 0,
-      largeArc: false,
-      sweep: true,
-      to: { x: 10, y: 10 },
-    },
+    { kind: 'elliptical-arc', radiusX: 5, radiusY: 5, rotationDeg: 0, largeArc: false, sweep: true, to: { x: 10, y: 10 } },
     { kind: 'cubic', control1: { x: 7, y: 12 }, control2: { x: 3, y: 12 }, to: { x: 0, y: 10 } },
   ],
   closed: true,
@@ -31,15 +23,7 @@ function samples(curve: CurveSubpath) {
 
 describe('shear bake', () => {
   it('places the baked curves exactly where the world shear puts the originals', () => {
-    const transform: Transform = {
-      x: 40,
-      y: 20,
-      scaleX: 2,
-      scaleY: 1.5,
-      rotationDeg: 30,
-      mirrorX: true,
-      mirrorY: false,
-    };
+    const transform: Transform = { x: 40, y: 20, scaleX: 2, scaleY: 1.5, rotationDeg: 30, mirrorX: true, mirrorY: false };
     const world = worldShear({ x: 50, y: 30 }, 20, -10);
     const matrix = localBakeMatrix(transform, world);
     if (matrix === null) throw new Error('expected an invertible transform');
@@ -48,6 +32,7 @@ describe('shear bake', () => {
     const before = samples(ARC_SQUARE).map((p) => applyAffine(world, applyTransform(p, transform)));
     const after = samples(baked).map((p) => applyTransform(p, transform));
     after.forEach((point, index) => {
+      // The arc's image is rebuilt from its singular values: exact to rounding.
       expect(point.x).toBeCloseTo(before[index]?.x ?? NaN, 6);
       expect(point.y).toBeCloseTo(before[index]?.y ?? NaN, 6);
     });

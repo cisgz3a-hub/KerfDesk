@@ -19,6 +19,10 @@ export type LayoutCommandContext = {
   readonly closePathsWithTolerance: () => void;
   readonly radiusFillet: () => void;
   readonly shear: () => void;
+  readonly hasGuides: boolean;
+  readonly guidesLocked: boolean;
+  readonly toggleGuidesLocked: () => void;
+  readonly clearGuides: () => void;
 };
 
 export type LayoutCommandId =
@@ -42,4 +46,6 @@ export type LayoutCommandId =
   | 'tools.tangent-circle'
   | 'tools.close-paths-with-tolerance'
   | 'tools.radius-fillet'
-  | 'tools.shear';
+  | 'tools.shear'
+  | 'window.lock-guides'
+  | 'window.clear-guides';

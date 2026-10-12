@@ -90,6 +90,10 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     closePathsWithTolerance: vi.fn(),
     radiusFillet: vi.fn(),
     shear: vi.fn(),
+    hasGuides: false,
+    guidesLocked: false,
+    toggleGuidesLocked: vi.fn(),
+    clearGuides: vi.fn(),
   };
 }
 

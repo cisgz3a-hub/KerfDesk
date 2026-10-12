@@ -77,6 +77,16 @@ export const LAYOUT_COMMAND_HELP: Readonly<Record<LayoutCommandId, CommandHelpTo
     tooltip:
       'Close every selected open path whose ends lie within the tolerance, on any operation. Bridge adds a closing line and keeps every point; Move ends together meets both ends at their midpoint without a new segment. The dialog counts what will close and what stays open. One undo step.',
   },
+  'window.lock-guides': {
+    family: 'window',
+    tooltip:
+      'Lock or unlock the guidelines. Drag from the top ruler for a horizontal guideline, from the left ruler for a vertical one; drag a guideline back onto a ruler to delete it. Guidelines snap artwork and are saved with the project, never cut.',
+  },
+  'window.clear-guides': {
+    family: 'window',
+    tooltip:
+      'Remove every guideline from the project in one undo step. Guidelines never reach output.',
+  },
   'tools.shear': {
     family: 'tools',
     tooltip:

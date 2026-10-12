@@ -22,6 +22,7 @@ import { variableBakeActions, type VariableBakeActions } from './variable-bake-a
 import { pathSegmentActions, type PathSegmentActions } from './path-segment-actions';
 import { pathFilletActions, type PathFilletActions } from './path-fillet-actions';
 import { shearActions, type ShearActions } from './shear-actions';
+import { guideActions, type GuideActions } from './guide-actions';
 import {
   pathNodeDragJoinActions,
   type PathNodeDragJoinActions,
@@ -46,6 +47,7 @@ export type DesignToolsActions = ShapeQueryActions &
   PathSegmentActions &
   PathFilletActions &
   ShearActions &
+  GuideActions &
   PathNodeDragJoinActions &
   MirrorLineActions;
 
@@ -78,6 +80,7 @@ export function designToolsActions(
     ...pathSegmentActions(set),
     ...pathFilletActions(set),
     ...shearActions(set),
+    ...guideActions(set),
     ...pathNodeDragJoinActions(set),
     ...mirrorLineActions(set),
   };

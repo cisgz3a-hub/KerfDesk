@@ -21,6 +21,7 @@ import { handleAltSelectionCycle } from './selection-hit-cycle';
 import { hitSelectionMoveHandle } from './selection-move-handle';
 import type { PathNodeDragState } from './path-node-drag';
 import type { PathSegmentDragState } from './path-segment-drag';
+import type { GuideDragState } from './guide-drag';
 import type { CncTabDragState } from './cnc-tab-editor';
 import type { LaserTabDragState } from './laser-tab-editor';
 import type { WarpHandleDragState } from './warp-deform-tool';
@@ -99,6 +100,7 @@ export type DragState =
     }
   | PathNodeDragState
   | PathSegmentDragState
+  | GuideDragState
   | CncTabDragState
   | LaserTabDragState
   | WarpHandleDragState;

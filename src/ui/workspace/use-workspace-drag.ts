@@ -21,8 +21,10 @@ import { applyTransformDrag } from './apply-transform-drag';
 import { beginDrawDrag } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
-import { beginPathNodeDrag, joinPathNodeOnDrop } from './path-node-drag';
+import { beginPathNodeDrag } from './path-node-drag';
 import { beginPathSegmentDrag } from './path-segment-drag';
+import { beginGuideDrag } from './guide-drag';
+import { finishEditDrag } from './edit-drag-finish';
 
 import { beginTracePartDrag } from './trace-part-tool';
 import { hitCncTabAnchor } from './cnc-tab-editor';
@@ -193,6 +195,8 @@ function beginWorkspaceDrag(args: {
   readonly selectionAnchor: SelectionAnchor;
 }): DragState | null {
   if (!args.previewMode && args.e.button === 0 && !useUiStore.getState().spaceDown) {
+    const guide = beginGuideDrag({ ...args, canvas: args.ref.current });
+    if (guide !== null) return guide;
     if (args.toolMode.kind === 'trace-parts') return beginTracePartDrag(args);
     const tool = beginToolDrag(args);
     if (tool.kind === 'handled') return tool.drag;
@@ -384,12 +388,7 @@ function finishWorkspaceDrag(args: {
     finishLaserTabDrag(args.drag);
     return;
   }
-  if (
-    args.drag.kind === 'path-node' &&
-    joinPathNodeOnDrop(args.ref.current, args.project, args.viewState)
-  ) {
-    return;
-  }
+  if (finishEditDrag(args.drag, { ...args, canvas: args.ref.current })) return;
   args.endInteraction();
 }
 
