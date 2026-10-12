@@ -61,7 +61,13 @@ describe('desktop Preview download page', () => {
     expect(commercial).toContain('id="commercial-status" role="status"');
     expect(commercial).toMatch(/<a class="download" id="commercial-download" hidden>/);
     expect(commercial).not.toContain('data-preview-suffix');
-    expect(commercial).not.toMatch(/\shref=/);
+    // Only the verified script may give the installer link an href; static links
+    // in this section may open checkout or jump within the page, never download.
+    expect(commercial).not.toMatch(/<a class="download"[^>]*\shref=/);
+    const hrefs = [...commercial.matchAll(/\shref="([^"]*)"/g)].map((match) => match[1]);
+    expect(hrefs.every((href) => href === '/buy.html' || href.startsWith('#'))).toBe(true);
+    // Visitors on a phone cannot install Windows software, so the page must offer checkout.
+    expect(hrefs).toContain('/buy.html');
     expect(page).toContain('Free · unsigned · manual updates');
     expect(page.indexOf('commercial-heading')).toBeLessThan(page.indexOf('preview-heading'));
   });
