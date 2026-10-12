@@ -204,5 +204,8 @@
   }
   .lf-toolbar-utilities {
     margin-left: auto;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }
