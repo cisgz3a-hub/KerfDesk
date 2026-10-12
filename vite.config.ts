@@ -120,6 +120,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Runs before Workbox's fetch handler so every worker script it serves
+        // carries the workspace's isolation policy (see the file).
+        importScripts: ['sw-worker-embedder-policy.js'],
         globPatterns: [
           '**/*.{js,mjs,css,html,svg,ico,png,json,ttf,woff,woff2,bcmap,pfb,wasm}',
           'pdf-resources/**/LICENSE*',
@@ -272,6 +275,20 @@ export default defineConfig({
     // Trace worker imports the lazy trace pipeline, so production workers must
     // emit as ES modules. Vite's default iife worker format cannot code-split.
     format: 'es',
+    rollupOptions: {
+      output: {
+        // A cross-origin-isolated page only starts a worker whose script
+        // response carries COEP. Worker URLs are content-hashed and precached
+        // with revision null, so a script cached before /assets/* gained COEP
+        // stays headerless while its code is unchanged, and the worker fails
+        // to load ("Trace worker errored"). Renaming the entries forces
+        // every existing worker URL to be fetched again with the header, out
+        // of the browser's immutable HTTP cache too, which the service worker
+        // guard (public/sw-worker-embedder-policy.js) cannot reach for pages it
+        // does not control. Keep the marker while _headers sends COEP.
+        entryFileNames: 'assets/[name]-isolated-[hash].js',
+      },
+    },
   },
   server: {
     headers: {
