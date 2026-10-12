@@ -7,6 +7,7 @@ import {
   type VariableTemplate,
   type VariableTemplateToken,
 } from '../scene';
+import { formatDatePattern } from './date-pattern';
 import { effectiveObjectPowerPercent, effectiveOperationForObject } from '../effective-output';
 import { advanceVariableSequenceBy } from './sequence-offset';
 
@@ -117,7 +118,13 @@ function evaluateToken(
     case 'literal':
       return { ok: true, value: token.value };
     case 'date-time':
-      return { ok: true, value: formatDateTime(context.now, token.format) };
+      return {
+        ok: true,
+        value:
+          token.format === 'custom'
+            ? formatDatePattern(context.now, token.pattern ?? '')
+            : formatDateTime(context.now, token.format),
+      };
     case 'serial':
       return evaluateSerial(token, project, context);
     case 'csv':
@@ -139,7 +146,8 @@ function isTemplateToken(value: unknown): value is VariableTemplateToken {
     case 'date-time':
       return (
         typeof token['format'] === 'string' &&
-        ['date-iso', 'time-24h', 'datetime-iso'].includes(token['format'])
+        (['date-iso', 'time-24h', 'datetime-iso'].includes(token['format']) ||
+          (token['format'] === 'custom' && typeof token['pattern'] === 'string'))
       );
     case 'serial':
       return isSerialToken(token);

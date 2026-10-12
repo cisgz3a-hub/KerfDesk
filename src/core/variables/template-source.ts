@@ -1,4 +1,5 @@
 import type { VariableTemplate, VariableTemplateToken } from '../scene';
+import { MAX_DATE_PATTERN_LENGTH } from './date-pattern';
 
 export type VariableTemplateSourceResult =
   | { readonly ok: true; readonly template: VariableTemplate }
@@ -38,6 +39,7 @@ function parseTag(
   if (tag.startsWith('literal-json:')) return parseEncodedLiteral(tag.slice(13));
   if (tag.startsWith('csv-json:')) return parseEncodedCsv(tag.slice(9));
   if (tag.startsWith('serial-json:')) return parseEncodedSerial(tag.slice(12));
+  if (tag.startsWith('date:')) return parseDatePattern(tag.slice(5));
   if (tag.startsWith('csv:')) {
     const column = tag.slice(4).trim();
     return column === ''
@@ -51,6 +53,18 @@ function parseTag(
       : { ok: false, message: 'Serial width must be an integer from 1 to 20.' };
   }
   return { ok: false, message: `Unknown variable field "${tag}".` };
+}
+
+function parseDatePattern(
+  pattern: string,
+):
+  | { readonly ok: true; readonly token: VariableTemplateToken }
+  | { readonly ok: false; readonly message: string } {
+  if (pattern.trim() === '')
+    return { ok: false, message: 'Type a date format after date:, such as %d/%m/%Y.' };
+  if (pattern.length > MAX_DATE_PATTERN_LENGTH)
+    return { ok: false, message: 'That date format is too long.' };
+  return { ok: true, token: { kind: 'date-time', format: 'custom', pattern } };
 }
 
 function parseEncodedLiteral(
@@ -126,6 +140,7 @@ const SIMPLE_TAGS: Readonly<Record<string, VariableTemplateToken>> = {
 function tokenToSource(token: VariableTemplateToken): string {
   if (token.kind === 'literal') return literalToSource(token.value);
   if (token.kind === 'date-time') {
+    if (token.format === 'custom') return `{{date:${token.pattern ?? ''}}}`;
     const tag =
       token.format === 'date-iso' ? 'date' : token.format === 'time-24h' ? 'time' : 'datetime';
     return `{{${tag}}}`;

@@ -1,9 +1,14 @@
-export type VariableDateTimeFormat = 'date-iso' | 'time-24h' | 'datetime-iso';
+export type VariableDateTimeFormat = 'date-iso' | 'time-24h' | 'datetime-iso' | 'custom';
 export type VariableCutSettingField = 'power-percent' | 'speed-mm-min' | 'passes' | 'air-assist';
 
 export type VariableTemplateToken =
   | { readonly kind: 'literal'; readonly value: string }
-  | { readonly kind: 'date-time'; readonly format: VariableDateTimeFormat }
+  | {
+      readonly kind: 'date-time';
+      readonly format: VariableDateTimeFormat;
+      /** strftime-style codes for format 'custom' (%Y-%m-%d, %H:%M, %B ...). */
+      readonly pattern?: string;
+    }
   | {
       readonly kind: 'serial';
       readonly prefix: string;
