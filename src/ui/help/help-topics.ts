@@ -121,7 +121,7 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   polyline: {
     label: 'Draw polyline',
     tooltip:
-      'Draw connected line segments. Press Enter or double-click to finish. Each click snaps to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
+      'Draw connected line segments; click and drag to place a smooth curve node with Bezier handles. Start on the open end of existing artwork to continue it, and click its other end to close it. Press Enter or double-click to finish. Each click snaps to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
   },
 };
 

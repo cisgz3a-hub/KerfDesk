@@ -99,6 +99,17 @@ export type ToolMode =
 export type PenDraft = {
   readonly vertices: ReadonlyArray<Vec2>;
   readonly cursor: Vec2 | null;
+  /** Outgoing Bezier handle per vertex (click-and-drag); null for a corner. */
+  readonly handles?: ReadonlyArray<Vec2 | null>;
+  /** The open endpoint this drawing continues, when it started on one. */
+  readonly continueFrom?: PenContinuation;
+};
+
+export type PenContinuation = {
+  readonly objectId: string;
+  readonly pathIndex: number;
+  readonly curveIndex: number;
+  readonly node: number;
 };
 
 export type SelectionMarquee = {

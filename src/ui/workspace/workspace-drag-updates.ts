@@ -101,7 +101,7 @@ function handleLiveToolUpdate(args: NonTransformDragUpdateArgs): boolean {
     return true;
   }
   if (args.toolMode.kind !== 'draw' || args.toolMode.shape !== 'polyline') return false;
-  updatePenCursor(args.point, args.e.shiftKey);
+  updatePenCursor(args.point, args.e.shiftKey, (args.e.buttons & 1) === 1);
   return true;
 }
 

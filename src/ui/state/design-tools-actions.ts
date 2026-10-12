@@ -23,6 +23,7 @@ import { pathSegmentActions, type PathSegmentActions } from './path-segment-acti
 import { pathFilletActions, type PathFilletActions } from './path-fillet-actions';
 import { shearActions, type ShearActions } from './shear-actions';
 import { guideActions, type GuideActions } from './guide-actions';
+import { penContinueActions, type PenContinueActions } from './pen-continue-actions';
 import {
   pathNodeDragJoinActions,
   type PathNodeDragJoinActions,
@@ -48,6 +49,7 @@ export type DesignToolsActions = ShapeQueryActions &
   PathFilletActions &
   ShearActions &
   GuideActions &
+  PenContinueActions &
   PathNodeDragJoinActions &
   MirrorLineActions;
 
@@ -81,6 +83,7 @@ export function designToolsActions(
     ...pathFilletActions(set),
     ...shearActions(set),
     ...guideActions(set),
+    ...penContinueActions(set),
     ...pathNodeDragJoinActions(set),
     ...mirrorLineActions(set),
   };
