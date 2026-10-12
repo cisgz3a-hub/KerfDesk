@@ -88,7 +88,7 @@ export async function prepareVariableArray(
   };
 }
 
-function copyStride(offsets: readonly number[]): number {
+export function copyStride(offsets: readonly number[]): number {
   let minimum = offsets[0] ?? 0;
   let maximum = minimum;
   for (const offset of offsets) {
@@ -98,7 +98,7 @@ function copyStride(offsets: readonly number[]): number {
   return maximum - minimum + 1;
 }
 
-function assignCopyOffset(object: SceneObject, delta: number): SceneObject {
+export function assignCopyOffset(object: SceneObject, delta: number): SceneObject {
   return withVariableSequenceOffset(object, (variableCopyOffset(object) ?? 0) + delta);
 }
 

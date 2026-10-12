@@ -25,6 +25,8 @@ export type CopyAlongPathSpec = {
   readonly endOffsetMm: number;
   /** Turn each copy by the direction of the guide where it sits. */
   readonly rotateCopies: boolean;
+  /** The last copy's size as a percentage of the original's; copies between grow or shrink evenly. */
+  readonly endScalePercent?: number;
 };
 
 export type CopyAlongPathGuidePath = {
@@ -94,7 +96,11 @@ export function copyAlongPathLayout(
   return {
     kind: 'placed',
     placements: Array.from({ length: resolved.count }, (_, index) =>
-      placementAt(guide, resolved.along.wrap(resolved.at(index)), centre, spec.rotateCopies),
+      withScale(
+        placementAt(guide, resolved.along.wrap(resolved.at(index)), centre, spec.rotateCopies),
+        scaleFactor(spec, index, resolved.count),
+        centre,
+      ),
     ),
     stepMm: uniformStep(resolved, spec),
   };
@@ -276,6 +282,17 @@ function uniformStep(distances: Resolved, spec: CopyAlongPathSpec): number | nul
   if (distances.count < 2) return null;
   if (spec.mode === 'gap' && !spec.rotateCopies) return null;
   return distances.at(1) - distances.at(0);
+}
+
+// Copy `index` of `count` steps evenly from the original's size to the end size.
+function scaleFactor(spec: CopyAlongPathSpec, index: number, count: number): number {
+  const end = spec.endScalePercent;
+  if (end === undefined || !Number.isFinite(end) || end <= 0 || count < 2) return 1;
+  return 1 + (end / 100 - 1) * (index / (count - 1));
+}
+
+function withScale(placement: ArrayPlacement, factor: number, center: Vec2): ArrayPlacement {
+  return factor === 1 ? placement : { ...placement, scale: { factor, center } };
 }
 
 function normalizeDegrees(value: number): number {

@@ -82,4 +82,9 @@ export type ArrayPlacement = {
   readonly pivot?: { readonly x: number; readonly y: number };
   /** Mirror the source before it moves. Present only when the copy is mirrored. */
   readonly mirror?: ArrayPlacementMirror;
+  /** Scale the source uniformly about `center` (the source's centre) before it moves. */
+  readonly scale?: {
+    readonly factor: number;
+    readonly center: { readonly x: number; readonly y: number };
+  };
 };
