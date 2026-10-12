@@ -3,6 +3,8 @@ import { expect, test, type Page } from './fixtures/kerfdesk-test';
 for (const viewport of [
   { width: 1280, height: 800 },
   { width: 640, height: 450 },
+  { width: 600, height: 450 },
+  { width: 420, height: 600 },
 ]) {
   test(`controller recovery floats without shifting the connection bar at ${viewport.width}px`, async ({
     page,
@@ -10,6 +12,9 @@ for (const viewport of [
     await page.setViewportSize(viewport);
     await page.goto('/');
     await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 20_000 });
+    // A longer profile at the row's tight boundary exposes the same wrapping
+    // that wider system fonts produced in the 640 px Linux CI run.
+    if (viewport.width === 600) await setMachineName(page, 'Creality Falcon A1 Pro');
     const setupHint = page.getByRole('button', { name: 'Not now', exact: true });
     if (await setupHint.isVisible()) await setupHint.click();
     const machineTab = page.getByRole('tab', { name: 'Machine', exact: true });
@@ -52,6 +57,22 @@ for (const viewport of [
     await setQualification(page, 'qualified');
     await expect(trigger).toHaveCount(0);
   });
+}
+
+async function setMachineName(page: Page, name: string) {
+  await page.evaluate(async (machineName) => {
+    const modulePath = '/src/ui/state/store.ts';
+    const { useStore } = (await import(/* @vite-ignore */ modulePath)) as {
+      useStore: {
+        getState: () => { project: { device: Record<string, unknown> } };
+        setState: (state: Record<string, unknown>) => void;
+      };
+    };
+    const { project } = useStore.getState();
+    useStore.setState({
+      project: { ...project, device: { ...project.device, name: machineName } },
+    });
+  }, name);
 }
 
 async function setQualification(page: Page, kind: 'qualified' | 'qualifying' | 'failed') {
