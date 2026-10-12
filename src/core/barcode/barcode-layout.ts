@@ -5,6 +5,7 @@
 // and quiet zone instead, for stock that marks light (anodised aluminium,
 // slate); the marks then sit inside the box as holes under even-odd fill.
 
+import { decodeBarcodeEscapes } from './barcode-escapes';
 import type { Bounds, Polyline } from '../scene';
 import type { BarcodeShape } from '../scene/scene-object';
 import {
@@ -61,7 +62,8 @@ export function layoutBarcode(
   data: string,
   use: BarcodeUse = 'edit',
 ): BarcodeLayoutResult {
-  const encoded = encodeBarcodeSymbol(spec.symbology, data, spec.errorCorrection, use);
+  const payload = spec.processEscapes === true ? decodeBarcodeEscapes(data) : data;
+  const encoded = encodeBarcodeSymbol(spec.symbology, payload, spec.errorCorrection, use);
   if (!encoded.ok) return encoded;
   const symbol = encoded.symbol;
   const across =

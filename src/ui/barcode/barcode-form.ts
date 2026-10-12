@@ -28,6 +28,7 @@ export type BarcodeDraft = {
   readonly quietZoneModules: string;
   readonly invert: boolean;
   readonly showText: boolean;
+  readonly processEscapes?: boolean;
   /** An edited array copy keeps its place in the serial/record sequence. */
   readonly sequenceOffset?: number;
 };
@@ -84,6 +85,7 @@ export function draftFromSpec(spec: BarcodeShape): BarcodeDraft {
     quietZoneModules: String(spec.quietZoneModules),
     invert: spec.invert,
     showText: spec.showText,
+    ...(spec.processEscapes === true ? { processEscapes: true } : {}),
     ...(offset === undefined ? {} : { sequenceOffset: offset }),
   };
 }
@@ -135,6 +137,7 @@ export function specFromDraft(draft: BarcodeDraft): BarcodeFormResult {
       ...numbers.values,
       invert: draft.invert,
       showText: draft.showText,
+      ...(draft.processEscapes === true ? { processEscapes: true } : {}),
     },
   };
 }

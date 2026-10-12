@@ -532,6 +532,8 @@ export type BarcodeShape = {
   readonly invert: boolean;
   // Human-readable text under 1D symbols.
   readonly showText: boolean;
+  // Turn \n \t \xHH ... in the data into control characters before encoding.
+  readonly processEscapes?: boolean;
 };
 
 // The parametric block.

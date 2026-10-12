@@ -176,6 +176,15 @@ function OptionFields(props: { readonly form: BarcodeForm }): JSX.Element {
         />
         Invert (engrave the light modules)
       </label>
+      <label style={checkStyle}>
+        <input
+          type="checkbox"
+          checked={draft.processEscapes === true}
+          title="Turn \n, \t, \\ and \xHH in the data into the control characters they name, such as a tab or a GS separator (\x1D)."
+          onChange={(event) => setField('processEscapes', event.currentTarget.checked)}
+        />
+        Process escape sequences
+      </label>
       {isMatrixSymbology(draft.symbology) ? null : (
         <label style={checkStyle}>
           <input

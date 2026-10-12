@@ -6,6 +6,7 @@ import { BARCODE_LIMITS } from '../../core/barcode';
 import { validateVariableTemplate } from './project-variable-validator';
 import {
   firstError,
+  optionalBoolean,
   requireBoolean,
   requireIntegerInRange,
   requireLiteral,
@@ -50,6 +51,7 @@ export function validateBarcodeSpec(value: Record<string, unknown>, path: string
     ),
     requireBoolean(value, `${path}.invert`),
     requireBoolean(value, `${path}.showText`),
+    optionalBoolean(value, `${path}.processEscapes`),
   ]);
 }
 
