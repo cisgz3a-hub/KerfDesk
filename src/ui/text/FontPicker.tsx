@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { FONT_REGISTRY } from '../../core/text';
 import type { EmbeddedFont } from '../../core/scene';
 import { AnchoredPopover } from '../common/AnchoredPopover';
+import { Icon } from '../kit/icons';
 import { cssFamilyForFont, ensureFontCss } from './font-loader';
 import { FontPickerOptions, type PickerFont } from './FontPickerOptions';
 import './font-picker.css';
@@ -58,7 +59,7 @@ export function FontPicker(props: Props): JSX.Element {
         <span className="lf-font-picker-name">
           {selected?.name ?? `Missing font: ${props.value}`}
         </span>
-        <span aria-hidden="true">▾</span>
+        <Icon name="chevron-down" size={14} />
       </button>
       {open && !props.disabled ? (
         <FontChooser

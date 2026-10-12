@@ -44,7 +44,7 @@ const IDLE_STATUS = {
 
 function jogArrows(host: HTMLElement): HTMLButtonElement[] {
   return [...host.querySelectorAll('button')].filter((b) =>
-    ['↑', '↓', '←', '→'].includes(b.textContent ?? ''),
+    /^Jog [+-][XY] \d/.test(b.getAttribute('aria-label') ?? ''),
   );
 }
 

@@ -50,6 +50,9 @@ extraMetadata:
     schema: 0
 fileAssociations: []
 nsis:
+  installerIcon: public/app-icon.ico
+  uninstallerIcon: public/app-icon.ico
+  installerHeaderIcon: public/app-icon.ico
   include: scripts/nsis-sandbox.nsh
   oneClick: false
   perMachine: false
@@ -58,7 +61,7 @@ nsis:
   license: build/installer-terms.txt
   differentialPackage: false
 win:
-  icon: public/favicon.svg
+  icon: public/app-icon.ico
   verifyUpdateCodeSignature: true
   target:
     - target: nsis

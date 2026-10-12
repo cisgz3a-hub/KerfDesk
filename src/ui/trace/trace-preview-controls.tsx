@@ -1,3 +1,4 @@
+import { Icon } from '../kit/icons';
 import {
   formatPreviewZoom,
   isAtZoomLimit,
@@ -123,7 +124,7 @@ function ZoomControls(props: {
         disabled={zoom <= range.min || isAtZoomLimit(zoom, range.min)}
         onClick={() => props.onChange(stepPreviewZoom(zoom, -1))}
       >
-        −
+        <Icon name="minus" size={16} />
       </button>
       <span
         aria-label="Preview magnification"
@@ -139,7 +140,7 @@ function ZoomControls(props: {
         disabled={zoom >= range.max || isAtZoomLimit(zoom, range.max)}
         onClick={() => props.onChange(stepPreviewZoom(zoom, 1))}
       >
-        +
+        <Icon name="plus" size={16} />
       </button>
       <button
         type="button"

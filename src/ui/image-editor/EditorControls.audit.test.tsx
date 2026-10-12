@@ -101,14 +101,14 @@ describe('Image Studio control-by-control audit', () => {
   it('disables empty crop actions, cancels the box, and commits actual pixel dimensions', async () => {
     editor.getState().setTool({ kind: 'crop' });
     const host = await mountControl(<EditorOptionsBar />);
-    expect(control(host, '✓ Crop').disabled).toBe(true);
-    expect(control(host, '✕').disabled).toBe(true);
+    expect(control(host, 'Crop').disabled).toBe(true);
+    expect(control(host, 'Discard crop').disabled).toBe(true);
     await act(async () => editor.getState().setPendingCrop({ x: 1, y: 1, width: 4, height: 3 }));
-    await clickControl(host, '✕');
+    await clickControl(host, 'Discard crop');
     expect(editor.getState().pendingCrop).toBeNull();
     expect(editor.getState().session?.doc.width).toBe(8);
     await act(async () => editor.getState().setPendingCrop({ x: 1, y: 1, width: 4, height: 3 }));
-    await clickControl(host, '✓ Crop');
+    await clickControl(host, 'Crop');
     expect(editor.getState().session?.doc).toMatchObject({ width: 4, height: 3 });
     expect(editor.getState().pendingCrop).toBeNull();
   });

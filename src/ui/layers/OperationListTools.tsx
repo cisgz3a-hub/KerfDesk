@@ -3,6 +3,7 @@
 import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import type { LayerFlagValue } from '../state/operation-list-actions';
+import { Icon } from '../kit/icons';
 
 type BulkTool = {
   readonly label: string;
@@ -67,7 +68,7 @@ function OperationListTools(): JSX.Element {
           if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
         }}
       >
-        <span aria-hidden="true">•••</span>
+        <Icon name="more" size={18} />
       </summary>
       <div className="lf-operation-card__management-body">
         <ToolGroup label="Output" tools={OUTPUT_TOOLS} onPick={setAllLayersOutput} />

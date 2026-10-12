@@ -44,7 +44,7 @@ export function ZoomControls(): JSX.Element {
         aria-pressed={snapEnabled}
         style={snapEnabled ? activeZoomBtnStyle : zoomBtnStyle}
       >
-        #
+        <Icon name="snap" size={17} />
       </button>
       <SnapSettingsButton style={snapSettingsBtnStyle} />
       <StartMarkersToggle />
@@ -55,7 +55,7 @@ export function ZoomControls(): JSX.Element {
         aria-label="Zoom out"
         style={zoomBtnStyle}
       >
-        −
+        <Icon name="minus" size={17} />
       </button>
       <span
         style={zoomReadoutStyle}
@@ -79,7 +79,7 @@ export function ZoomControls(): JSX.Element {
         aria-label="Zoom in"
         style={zoomBtnStyle}
       >
-        +
+        <Icon name="plus" size={17} />
       </button>
       <button
         type="button"
@@ -88,7 +88,7 @@ export function ZoomControls(): JSX.Element {
         aria-label="Fit to selection"
         style={zoomBtnStyle}
       >
-        ⊙
+        <Icon name="fit-selection" size={17} />
       </button>
       <button
         type="button"
@@ -97,7 +97,7 @@ export function ZoomControls(): JSX.Element {
         aria-label="Fit to bed"
         style={zoomBtnStyle}
       >
-        ⊡
+        <Icon name="fit-bed" size={17} />
       </button>
     </div>
   );
@@ -296,6 +296,9 @@ const zoomControlsStyle: React.CSSProperties = {
   fontFamily: 'system-ui, sans-serif',
 };
 const zoomBtnStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
   width: 28,
   height: 28,
   border: 'none',

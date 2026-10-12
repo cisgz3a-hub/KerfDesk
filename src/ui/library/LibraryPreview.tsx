@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { IconFrame } from '../kit/icon-frame';
 import type { LibraryEntry } from './design-library-types';
 
 const previewUrlCache = new Map<string, string>();
@@ -25,7 +26,11 @@ export function LibraryPreview(props: {
     >
       {state === 'error' ? (
         <span className="lf-library-preview__fallback" role="img" aria-label="Preview unavailable">
-          <span aria-hidden="true">◇</span>
+          <IconFrame size={22}>
+            <rect x="4" y="5" width="16" height="14" rx="2" />
+            <path d="m5 16 5-5 4 4 3-3 3 3" />
+            <path className="lf-icon-accent" d="M3 3l18 18" />
+          </IconFrame>
           Preview unavailable
         </span>
       ) : (

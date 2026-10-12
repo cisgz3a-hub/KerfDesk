@@ -1,3 +1,5 @@
+import { Icon } from '../kit/icons';
+
 export function Cnc3DPaneToggle({
   collapsed,
   onToggle,
@@ -21,11 +23,11 @@ export function Cnc3DPaneToggle({
     >
       {collapsed ? (
         <>
-          <span aria-hidden="true">◂</span>
+          <Icon name="chevron-left" size={18} />
           <span style={verticalLabelStyle}>3D result</span>
         </>
       ) : (
-        '▸'
+        <Icon name="chevron-right" size={18} />
       )}
     </button>
   );

@@ -4,6 +4,7 @@
 // dialog (or commits instantly for parameterless ones like Invert).
 
 import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { Icon } from '../kit/icons';
 import { movePopoverFocus } from '../common/AnchoredPopover';
 import { useAdjustDialogStore } from './adjust-dialog-store';
 import { ADJUSTMENTS, type AdjustmentSpec } from './editor-adjustments';
@@ -106,13 +107,14 @@ function MenuButton(props: {
           menu.openAt(event.key === 'ArrowUp' ? 'last' : 'first');
         }}
         aria-haspopup="menu"
+        aria-label={props.label}
         aria-expanded={menu.isOpen}
         aria-controls={menu.isOpen ? menuId : undefined}
         title={
           props.disabledReason ?? `${props.label} menu — image operations for the Studio document`
         }
       >
-        {props.label} ▾
+        {props.label} <Icon name="chevron-down" size={13} />
       </button>
       {menu.isOpen ? (
         <>

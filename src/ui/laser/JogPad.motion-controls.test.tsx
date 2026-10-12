@@ -71,30 +71,30 @@ describe('JogPad motion controls', () => {
     useJogControlPreferences.setState({ stepMm: 10, requestedFeedMmPerMin: 1000 });
     const { host, rerender, unmount } = await renderJogPad();
     const cases = [
-      ['↖', { dx: -10, dy: 10, feed: 1000 }],
-      ['↑', { dy: 10, feed: 1000 }],
-      ['↗', { dx: 10, dy: 10, feed: 1000 }],
-      ['←', { dx: -10, feed: 1000 }],
-      ['→', { dx: 10, feed: 1000 }],
-      ['↙', { dx: -10, dy: -10, feed: 1000 }],
-      ['↓', { dy: -10, feed: 1000 }],
-      ['↘', { dx: 10, dy: -10, feed: 1000 }],
+      ['Jog -X +Y 10 mm', { dx: -10, dy: 10, feed: 1000 }],
+      ['Jog +Y 10 mm', { dy: 10, feed: 1000 }],
+      ['Jog +X +Y 10 mm', { dx: 10, dy: 10, feed: 1000 }],
+      ['Jog -X 10 mm', { dx: -10, feed: 1000 }],
+      ['Jog +X 10 mm', { dx: 10, feed: 1000 }],
+      ['Jog -X -Y 10 mm', { dx: -10, dy: -10, feed: 1000 }],
+      ['Jog -Y 10 mm', { dy: -10, feed: 1000 }],
+      ['Jog +X -Y 10 mm', { dx: 10, dy: -10, feed: 1000 }],
     ] as const;
     try {
-      for (const [glyph, vector] of cases) {
+      for (const [label, vector] of cases) {
         const button = [...host.querySelectorAll('button')].find(
-          (item) => item.textContent === glyph,
+          (item) => item.getAttribute('aria-label') === label,
         );
-        expect(button, glyph).toBeDefined();
+        expect(button, label).toBeDefined();
         jog.mockClear();
         await act(async () => button!.click());
         expect(jog).toHaveBeenCalledExactlyOnceWith(vector);
       }
       jog.mockClear();
       await rerender(true);
-      for (const [glyph] of cases) {
+      for (const [label] of cases) {
         const button = [...host.querySelectorAll('button')].find(
-          (item) => item.textContent === glyph,
+          (item) => item.getAttribute('aria-label') === label,
         )!;
         expect(button.disabled).toBe(true);
         await act(async () => button.click());

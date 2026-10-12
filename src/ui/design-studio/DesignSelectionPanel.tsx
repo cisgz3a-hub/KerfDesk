@@ -1,5 +1,6 @@
 import type { DesignSession } from './design-session';
 import type { Bounds } from '../../core/scene';
+import { Icon } from '../kit/icons';
 import { useDesignStudioStore } from './design-studio-store';
 import { selectionBounds } from './design-handles';
 import { ShapeInspector } from './ShapeInspector';
@@ -83,14 +84,14 @@ function TransformSelection(): JSX.Element {
           title="Rotate selection 90° anticlockwise"
           onClick={() => transform('rotate-left')}
         >
-          ↶ 90° left
+          <Icon name="rotate-left" size={15} /> 90° left
         </button>
         <button
           type="button"
           title="Rotate selection 90° clockwise"
           onClick={() => transform('rotate-right')}
         >
-          ↷ 90° right
+          <Icon name="rotate-right" size={15} /> 90° right
         </button>
         <button
           type="button"

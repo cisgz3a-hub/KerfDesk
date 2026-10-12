@@ -1,5 +1,6 @@
 // Saving confirms the software draft, never the physical machine's readiness.
 import { useEffect, useState } from 'react';
+import { Icon } from '../../kit/icons';
 import { useLaserStore } from '../../state/laser-store';
 import type { CncStartupOperationDraft } from '../../state/cnc-startup-setup';
 import type { DeviceSetupStepProps } from './device-setup-flow';
@@ -63,7 +64,7 @@ function SoftwareStatus({ issues }: { readonly issues: ReadonlyArray<string> }):
   return (
     <div className={`lf-setup-review-status ${ready ? 'is-ready' : 'has-issues'}`} role="status">
       <span className="lf-setup-review-status-mark" aria-hidden="true">
-        {ready ? '✓' : '!'}
+        <Icon name={ready ? 'check' : 'warning'} size={20} />
       </span>
       <div>
         <strong>{ready ? 'Ready to save' : 'A few settings need attention'}</strong>
@@ -132,7 +133,7 @@ function HardwareHandoff({
         <ul className="lf-setup-review-checklist">
           {hardwareChecklist(machineKinds).map((item) => (
             <li key={item}>
-              <span aria-hidden="true">☐</span> {item}
+              <Icon name="square" size={15} /> {item}
             </li>
           ))}
         </ul>

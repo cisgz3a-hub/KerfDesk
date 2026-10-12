@@ -1,4 +1,5 @@
 import { Fragment } from 'react';
+import { Icon } from '../kit/icons';
 import type { MachineKind } from '../../core/scene';
 import { machineDisplayName } from '../machine/machine-labels';
 import {
@@ -156,7 +157,7 @@ function MenuItem(props: {
       }}
     >
       <span style={checkmarkStyle} aria-hidden="true">
-        {command.active === true ? '✓' : ''}
+        {command.active === true ? <Icon name="check" size={15} /> : null}
       </span>
       <span style={menuLabelStyle}>{command.label}</span>
       {command.shortcut !== undefined ? (

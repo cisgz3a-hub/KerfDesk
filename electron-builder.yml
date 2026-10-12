@@ -53,7 +53,7 @@ electronFuses:
   grantFileProtocolExtraPrivileges: false
 
 win:
-  icon: public/favicon.svg
+  icon: public/app-icon.ico
   # electron-updater verifies downloaded NSIS updates against the publisher
   # identity from the installed signed build. Keep this explicit in config.
   verifyUpdateCodeSignature: true
@@ -73,6 +73,9 @@ win:
   artifactName: KerfDesk-${version}-windows-${arch}-setup.${ext}
 
 nsis:
+  installerIcon: public/app-icon.ico
+  uninstallerIcon: public/app-icon.ico
+  installerHeaderIcon: public/app-icon.ico
   include: scripts/nsis-file-associations.nsh
   oneClick: false
   perMachine: false

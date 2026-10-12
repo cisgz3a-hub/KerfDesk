@@ -5,6 +5,7 @@
 // outline is a trust leak.
 
 import { useMemo } from 'react';
+import { IconFrame } from '../kit/icon-frame';
 import { summarizeToolpathDistances, type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 // Deep type import: core/sim's public barrel is hard-capped at 20 exports by
@@ -323,7 +324,10 @@ function PassStepButtons(props: {
           if (prev !== undefined) props.onJump(prev);
         }}
       >
-        ⏮ Pass
+        <IconFrame size={15}>
+          <path d="M5 5v14m14-14-10 7 10 7V5Z" />
+        </IconFrame>{' '}
+        Pass
       </button>
       <button
         type="button"
@@ -336,7 +340,10 @@ function PassStepButtons(props: {
           if (next !== undefined) props.onJump(next);
         }}
       >
-        Pass ⏭
+        Pass{' '}
+        <IconFrame size={15}>
+          <path d="M19 5v14M5 5l10 7-10 7V5Z" />
+        </IconFrame>
       </button>
     </>
   );
