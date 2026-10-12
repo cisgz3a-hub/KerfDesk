@@ -1,3 +1,4 @@
+import { CalibrationPresetButtons } from './CalibrationPresetButtons';
 import { useState, type ChangeEvent } from 'react';
 import type { IntervalTestGridOptions } from '../../core/job';
 import { CalibrationNumberField } from './CalibrationNumberField';
@@ -86,6 +87,15 @@ export function IntervalTestDialog(props: {
         maxFeedMmPerMin={props.maxFeedMmPerMin}
       />
       <DialogActions>
+        <CalibrationPresetButtons
+          kind="kerfdesk-interval-test"
+          extension=".lftest"
+          suggestedName="interval-test.lftest"
+          draft={draft}
+          fallback={DEFAULT_DRAFT}
+          fields={INTERVAL_TEST_DRAFT_FIELDS}
+          load={setDraft}
+        />
         <Button onClick={props.onCancel}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={issues.length > 0}>
           Generate
