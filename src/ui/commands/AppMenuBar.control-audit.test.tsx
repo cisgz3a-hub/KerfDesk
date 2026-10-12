@@ -168,6 +168,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'arrange.dock-options': { callback: 'dockOptions' },
   'tools.tangent-circle': { callback: 'tangentCircle' },
   'tools.close-paths-with-tolerance': { callback: 'closePathsWithTolerance' },
+  'tools.radius-fillet': { callback: 'radiusFillet' },
   'arrange.rotate-90-cw': { callback: 'rotateSelectionQuarterTurn', args: [1] },
   'arrange.rotate-90-ccw': { callback: 'rotateSelectionQuarterTurn', args: [-1] },
   'arrange.move-to-bed-center': { callback: 'moveSelectionToBed', args: ['c'] },

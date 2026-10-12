@@ -3,6 +3,7 @@
 
 import { ClosePathsToleranceDialogHost } from './ClosePathsToleranceDialog';
 import { DockOptionsDialogHost } from './DockOptionsDialog';
+import { RadiusFilletDialogHost } from './RadiusFilletDialog';
 import { SaveOriginalImageDialogHost } from './SaveOriginalImageDialog';
 import { SelectCirclesDialogHost } from './SelectCirclesDialog';
 import { TangentCircleDialogHost } from './TangentCircleDialog';
@@ -15,6 +16,7 @@ export function ParityDialogHosts(): JSX.Element {
       <DockOptionsDialogHost />
       <TangentCircleDialogHost />
       <ClosePathsToleranceDialogHost />
+      <RadiusFilletDialogHost />
     </>
   );
 }

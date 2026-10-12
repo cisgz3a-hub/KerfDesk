@@ -193,6 +193,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     hasThreeCircles: false,
     tangentCircle: vi.fn(),
     closePathsWithTolerance: vi.fn(),
+    radiusFillet: vi.fn(),
     ...overrides,
   };
 }

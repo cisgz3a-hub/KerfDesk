@@ -153,6 +153,7 @@ export const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupL
         'tools.close-open-fill-contours',
         'tools.close-fill-contours-with-tolerance',
         'tools.close-paths-with-tolerance',
+        'tools.radius-fillet',
       ],
     },
     { label: 'Bitmap', ids: ['tools.convert-to-bitmap'] },

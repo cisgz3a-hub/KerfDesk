@@ -33,6 +33,7 @@ type Spec = {
   readonly label: string;
   readonly title: string;
   readonly invoke: (ctx: AppCommandContext) => void;
+  readonly family?: 'arrange' | 'tools';
 };
 
 const DRAW_ORDER: ReadonlyArray<Spec> = [
@@ -129,6 +130,30 @@ const TWO_POINT: Spec = {
   invoke: (ctx) => ctx.startTwoPointTransform(),
 };
 
+const TANGENT_CIRCLE: Spec = {
+  id: 'tools.tangent-circle',
+  family: 'tools',
+  label: 'Tangent Circle...',
+  title: 'Add a circle that touches all three selected circles',
+  invoke: (ctx) => ctx.tangentCircle(),
+};
+
+const CLOSE_WITH_TOLERANCE: Spec = {
+  id: 'tools.close-paths-with-tolerance',
+  family: 'tools',
+  label: 'Close Paths With Tolerance...',
+  title: 'Close the open paths whose ends lie within a chosen gap',
+  invoke: (ctx) => ctx.closePathsWithTolerance(),
+};
+
+const RADIUS_FILLET: Spec = {
+  id: 'tools.radius-fillet',
+  family: 'tools',
+  label: 'Radius / Fillet...',
+  title: 'Round, bite or sharpen the corners of the selection',
+  invoke: (ctx) => ctx.radiusFillet(),
+};
+
 export function layoutCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
     ...DRAW_ORDER.map((spec) =>
@@ -145,36 +170,15 @@ export function layoutCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
       'Set the docking padding, Move as group and Lock inner objects',
       ctx.dockOptions,
     ),
-    ctx.hasThreeCircles
-      ? enabled(
-          'tools.tangent-circle',
-          'tools',
-          'Tangent Circle...',
-          'Add a circle that touches all three selected circles',
-          ctx.tangentCircle,
-        )
-      : disabled(
-          'tools.tangent-circle',
-          'tools',
-          'Tangent Circle...',
-          'Select exactly three circles first.',
-          ctx.tangentCircle,
-        ),
-    ctx.canEditSelectedPaths
-      ? enabled(
-          'tools.close-paths-with-tolerance',
-          'tools',
-          'Close Paths With Tolerance...',
-          'Close the open paths whose ends lie within a chosen gap',
-          ctx.closePathsWithTolerance,
-        )
-      : disabled(
-          'tools.close-paths-with-tolerance',
-          'tools',
-          'Close Paths With Tolerance...',
-          'Select imported, traced or drawn-line artwork first.',
-          ctx.closePathsWithTolerance,
-        ),
+    command(ctx, TANGENT_CIRCLE, ctx.hasThreeCircles, 'Select exactly three circles first.'),
+    ...[CLOSE_WITH_TOLERANCE, RADIUS_FILLET].map((spec) =>
+      command(
+        ctx,
+        spec,
+        ctx.canEditSelectedPaths,
+        'Select imported, traced or drawn-line artwork first.',
+      ),
+    ),
     ...REFERENCED.map((spec) =>
       command(
         ctx,
@@ -188,7 +192,8 @@ export function layoutCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
 
 function command(ctx: AppCommandContext, spec: Spec, on: boolean, reason: string): AppCommand {
   const invoke = () => spec.invoke(ctx);
+  const family = spec.family ?? 'arrange';
   return on
-    ? enabled(spec.id, 'arrange', spec.label, spec.title, invoke)
-    : disabled(spec.id, 'arrange', spec.label, reason, invoke);
+    ? enabled(spec.id, family, spec.label, spec.title, invoke)
+    : disabled(spec.id, family, spec.label, reason, invoke);
 }

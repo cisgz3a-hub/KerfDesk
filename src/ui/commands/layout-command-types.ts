@@ -17,6 +17,7 @@ export type LayoutCommandContext = {
   readonly hasThreeCircles: boolean;
   readonly tangentCircle: () => void;
   readonly closePathsWithTolerance: () => void;
+  readonly radiusFillet: () => void;
 };
 
 export type LayoutCommandId =
@@ -38,4 +39,5 @@ export type LayoutCommandId =
   | 'arrange.dock-down'
   | 'arrange.dock-options'
   | 'tools.tangent-circle'
-  | 'tools.close-paths-with-tolerance';
+  | 'tools.close-paths-with-tolerance'
+  | 'tools.radius-fillet';

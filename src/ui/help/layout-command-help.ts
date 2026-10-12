@@ -77,6 +77,11 @@ export const LAYOUT_COMMAND_HELP: Readonly<Record<LayoutCommandId, CommandHelpTo
     tooltip:
       'Close every selected open path whose ends lie within the tolerance, on any operation. Bridge adds a closing line and keeps every point; Move ends together meets both ends at their midpoint without a new segment. The dialog counts what will close and what stays open. One undo step.',
   },
+  'tools.radius-fillet': {
+    family: 'tools',
+    tooltip:
+      'Round the corners between straight sides with an arc of the given radius, bite them out with a reverse (concave) radius centred on the corner, or remove tangent fillets to restore sharp corners. Nodes picked with the node tool limit it to those corners. A corner whose sides are too short is left sharp. One undo step.',
+  },
   'tools.tangent-circle': {
     family: 'tools',
     tooltip:
