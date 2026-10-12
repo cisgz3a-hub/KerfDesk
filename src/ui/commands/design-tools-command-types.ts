@@ -25,6 +25,8 @@ export type DesignToolsCommandContext = VectorCutCommandContext &
     readonly flattenImageMask: () => void;
     // LBG-T09: opens the Copy Along Path dialog, or explains why it cannot.
     readonly copyAlongPath: () => void;
+    readonly canBakeVariableText: boolean;
+    readonly bakeVariableText: () => void;
   };
 
 export type DesignToolsCommandId =
@@ -39,4 +41,5 @@ export type DesignToolsCommandId =
   | 'tools.reverse-paths'
   | 'tools.rubber-band-outline'
   | 'tools.flatten-image-mask'
+  | 'tools.bake-variable-text'
   | 'arrange.copy-along-path';

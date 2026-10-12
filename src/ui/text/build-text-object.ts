@@ -83,10 +83,16 @@ function fieldsVariableTemplate(
   | { readonly ok: false; readonly message: string } {
   if (values.variableTemplate === undefined) return { ok: true };
   const parsed = parseVariableTemplateSource(values.content);
-  const sequenceOffset = values.variableTemplate.sequenceOffset;
-  return parsed.ok && sequenceOffset !== undefined
-    ? { ...parsed, template: { ...parsed.template, sequenceOffset } }
-    : parsed;
+  if (!parsed.ok) return parsed;
+  const { sequenceOffset, ignoreEmptyLines } = values.variableTemplate;
+  return {
+    ...parsed,
+    template: {
+      ...parsed.template,
+      ...(sequenceOffset === undefined ? {} : { sequenceOffset }),
+      ...(ignoreEmptyLines === true ? { ignoreEmptyLines } : {}),
+    },
+  };
 }
 
 function placeRenderedText(

@@ -39,6 +39,8 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     pasteInPlace: vi.fn(),
     invertSelection: vi.fn(),
     selectOpenShapes: vi.fn(),
+    selectOpenFillShapes: vi.fn(),
+    openSelectCircles: vi.fn(),
     canOffsetShapes: false,
     offsetShapes: vi.fn(),
     rotateSelectionQuarterTurn: vi.fn(),
@@ -72,6 +74,8 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     // LBG-T22 Optimize Shapes.
     optimizeShapes: vi.fn(),
     // LightBurn parity layout commands.
+    canBakeVariableText: false,
+    bakeVariableText: vi.fn(),
     moveSelectionInDrawOrder: vi.fn(),
     matchSelectionSize: vi.fn(),
     moveSelectionTogether: vi.fn(),

@@ -106,8 +106,7 @@ function useStableTextValues(values: DialogValues): DialogValues {
     embeddedFonts,
     pathGuide,
   } = values;
-  const variableEnabled = values.variableTemplate !== undefined;
-  const sequenceOffset = values.variableTemplate?.sequenceOffset;
+  const variableTemplate = useStableVariableTemplate(values.variableTemplate);
   const guideObjectId = values.pathText?.guideObjectId;
   const offsetMm = values.pathText?.offsetMm ?? 0;
   const reverse = values.pathText?.reverse ?? false;
@@ -139,14 +138,7 @@ function useStableTextValues(values: DialogValues): DialogValues {
               ...(acrossAlign === undefined ? {} : { acrossAlign }),
             },
           }),
-      ...(variableEnabled
-        ? {
-            variableTemplate: {
-              tokens: [],
-              ...(sequenceOffset === undefined ? {} : { sequenceOffset }),
-            },
-          }
-        : {}),
+      ...(variableTemplate === undefined ? {} : { variableTemplate }),
     }),
     [
       content,
@@ -166,9 +158,29 @@ function useStableTextValues(values: DialogValues): DialogValues {
       reverse,
       alongAlign,
       acrossAlign,
-      variableEnabled,
-      sequenceOffset,
+      variableTemplate,
       values.textBox,
     ],
+  );
+}
+
+// The template's tokens come from the typed source at build time; only the
+// options travel with the draft, so a stable object avoids needless re-renders.
+function useStableVariableTemplate(
+  template: DialogValues['variableTemplate'],
+): DialogValues['variableTemplate'] {
+  const enabled = template !== undefined;
+  const sequenceOffset = template?.sequenceOffset;
+  const ignoreEmptyLines = template?.ignoreEmptyLines === true;
+  return useMemo(
+    () =>
+      enabled
+        ? {
+            tokens: [],
+            ...(sequenceOffset === undefined ? {} : { sequenceOffset }),
+            ...(ignoreEmptyLines ? { ignoreEmptyLines } : {}),
+          }
+        : undefined,
+    [enabled, sequenceOffset, ignoreEmptyLines],
   );
 }

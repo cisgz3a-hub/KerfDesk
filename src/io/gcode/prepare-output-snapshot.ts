@@ -121,7 +121,7 @@ export async function materializeVariableText(
 ): Promise<MaterializedProject> {
   const objects: MaterializedObject[] = [];
   for (const object of project.scene.objects) {
-    objects.push(await materializeObject(object, project, context, renderer));
+    objects.push(await materializeVariableObject(object, project, context, renderer));
   }
   const failed = objects.find((result) => !result.ok);
   if (failed !== undefined && !failed.ok) return variableFailure(failed.message);
@@ -137,7 +137,7 @@ export async function materializeVariableText(
   };
 }
 
-type MaterializedObject =
+export type MaterializedObject =
   | { readonly ok: true; readonly object: Project['scene']['objects'][number] }
   | {
       readonly ok: false;
@@ -145,7 +145,8 @@ type MaterializedObject =
       readonly fallback: Project['scene']['objects'][number];
     };
 
-async function materializeObject(
+/** One object with its variable text or barcode data evaluated into plain content. */
+export async function materializeVariableObject(
   object: Project['scene']['objects'][number],
   project: Project,
   context: VariableEvaluationContext,

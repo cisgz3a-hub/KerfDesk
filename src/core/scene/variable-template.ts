@@ -17,6 +17,8 @@ export type VariableTemplate = {
   readonly tokens: readonly VariableTemplateToken[];
   /** Ordered copy slot relative to the project's current record/serial. */
   readonly sequenceOffset?: number;
+  /** LightBurn "Ignore Empty Vars": drop a line that holds a field and evaluates to nothing. */
+  readonly ignoreEmptyLines?: boolean;
 };
 
 export type VariableCsvDataset = {

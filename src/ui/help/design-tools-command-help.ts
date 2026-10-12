@@ -46,6 +46,11 @@ export const DESIGN_TOOLS_COMMAND_HELP: Readonly<Record<DesignToolsCommandId, Co
     tooltip:
       'Copy the selected artwork along a guide path: a number of copies, a set spacing between centres or a set gap between edges, turned to follow the path. The top-most (last added) single path in the selection is the guide; the dialog can pick another. Reverse Direction on the guide flips which way turned copies face.',
   },
+  'tools.bake-variable-text': {
+    family: 'tools',
+    tooltip:
+      'Replace the fields of the selected variable text and variable barcodes with the value they would engrave now: the current CSV record, serial, date and cut settings. The result is ordinary text or a fixed code that no longer advances. Undo restores the fields.',
+  },
   'tools.flatten-image-mask': {
     family: 'tools',
     tooltip:
