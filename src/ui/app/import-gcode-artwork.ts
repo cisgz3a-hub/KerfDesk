@@ -40,6 +40,8 @@ export function gcodeArtworkObject(
       source: name,
       bounds: boundsOfPolylines(polylines),
       transform: IDENTITY_TRANSFORM,
+      // Scene data, not chrome: new artwork starts on the black operation colour.
+      // eslint-disable-next-line no-restricted-syntax
       paths: [{ color: '#000000', polylines }],
     },
   };
