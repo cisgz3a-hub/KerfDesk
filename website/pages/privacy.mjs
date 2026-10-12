@@ -239,8 +239,8 @@ function licensing(site, appPrivacy) {
     </p>
     <p>
       The licensing service retains trial installation and firmware digests to recognise repeat
-      trials, including after customer license records are deleted. The firmware UUID itself is
-      never stored.
+      trials, including after customer license records are deleted. These service-keyed digests have
+      no automatic expiry. The firmware UUID itself is never stored.
     </p>
     <p>
       The licensing service records verified Paddle refund and chargeback references and their
@@ -378,7 +378,7 @@ export const page = {
     'KerfDesk needs no account for ordinary use. Read about updates, licensing, downloads, optional AI, remote access and machine connections.',
   render: ({ site, appPrivacy = false }) =>
     html`${pageHero({
-      eyebrow: html`Last updated <time datetime="2026-10-10">October 10, 2026</time>`,
+      eyebrow: html`Last updated <time datetime="2026-10-12">October 12, 2026</time>`,
       title: 'Privacy',
       lead: appPrivacy
         ? 'KerfDesk doesn’t track you. This notice covers this privacy page and the KerfDesk app: what each one sends over the network, and what stays on your computer.'

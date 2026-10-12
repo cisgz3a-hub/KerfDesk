@@ -42,14 +42,14 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
   const document = expected.get('index.html').toString('utf8');
   const text = textContent(document);
   assert.match(document, /href="https:\/\/kerfdesk.com\/privacy\/"/);
-  assert.match(document, /datetime="2026-10-10"/);
+  assert.match(document, /datetime="2026-10-12"/);
   assert.match(text, /Johannes Stephanus Stolk/);
   assert.match(text, /responsible for the personal information KerfDesk handles/);
   assert.match(text, /No cookies on this page/);
   assert.doesNotMatch(text, /This website sets no cookies/);
   assert.match(text, /grouped by date, app version, platform and request country/);
   assert.match(text, /do not identify people or prove an installation/);
-  assert.match(text, /quiet weekly license confirmation is due/);
+  assert.match(text, /quiet daily trial or weekly paid license confirmation is due/);
   assert.match(text, /The Free browser workspace has no license and does not contact this service/);
   assert.match(text, /You open the separate Buy Pro page or check a saved purchase/);
   assert.match(text, /Requests use no cookies/);
