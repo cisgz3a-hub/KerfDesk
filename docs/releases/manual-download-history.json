@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "expectedLatestSha256": "ad66ffa4127286010a0cdc9029ae4c808d810636547d30d91b3460f9b88ae1fb",
+  "entries": [
+    {
+      "version": "1.0.0",
+      "manifestSha256": "c18180317b4177deaa3530d782e74889e049438c086ca40ae6de8778f9770f3a",
+      "status": "published",
+      "evidence": "docs/audits/2026-10-12-manual-download-history-review.md#initial-local-publications ; retained D:/LaserForge/pro-release-evidence-20260930/publication.log SHA-256 bd6b507c37cc1a665a3716673c93c2bd486ba4fe34b66e8747ee321751508d4e reports published version 1.0.0 and latest SHA-256 c18180317b4177deaa3530d782e74889e049438c086ca40ae6de8778f9770f3a."
+    },
+    {
+      "version": "1.0.1",
+      "manifestSha256": "195c17f6ce75e29bf449beefab76c2b01ff4336392d631bdd8cee4971c561278",
+      "status": "published",
+      "evidence": "docs/audits/2026-10-12-manual-download-history-review.md#initial-local-publications ; retained D:/LaserForge/pro-release-evidence-20260930/publication-1.0.1.log SHA-256 53af8ad0391836cb1a56f0447bd2a5c75dab2a03bb4daa9ae3ad093a0843a5b5 reports published version 1.0.1 and latest SHA-256 195c17f6ce75e29bf449beefab76c2b01ff4336392d631bdd8cee4971c561278."
+    },
+    {
+      "version": "1.0.2",
+      "manifestSha256": "39632a9e40fa5a36df09717bffb4e95fd6b75a0afda3a70ea9037f37d9edc1bd",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/36715829238/attempts/1 ; publish job reported \"Manual commercial release 1.0.2: published. Latest SHA-256: 39632a9e40fa5a36df09717bffb4e95fd6b75a0afda3a70ea9037f37d9edc1bd.\""
+    },
+    {
+      "version": "1.0.3",
+      "manifestSha256": "2f6e571c6808d7b53bab24ea54b7ecd464e18488544b4991dbcdda83ab1cda78",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/36759085173/attempts/1 ; publish job reported \"Manual commercial release 1.0.3: published. Latest SHA-256: 2f6e571c6808d7b53bab24ea54b7ecd464e18488544b4991dbcdda83ab1cda78.\""
+    },
+    {
+      "version": "1.0.4",
+      "manifestSha256": "45d1fca0f9b56b9d446e9fa7352dba913c477c5e2191b357c61d71fa04683abc",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/36862750528/attempts/1 ; publish job reported \"Manual commercial release 1.0.4: published. Latest SHA-256: 45d1fca0f9b56b9d446e9fa7352dba913c477c5e2191b357c61d71fa04683abc.\""
+    },
+    {
+      "version": "1.0.6",
+      "manifestSha256": "66bbc96e45d6dd7bcb701b55e17dd30f7bcb759113c3091360ad88042a64e8ee",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/36893702385/attempts/2 ; publish job reported \"Manual commercial release 1.0.6: published. Latest SHA-256: 66bbc96e45d6dd7bcb701b55e17dd30f7bcb759113c3091360ad88042a64e8ee.\""
+    },
+    {
+      "version": "1.0.7",
+      "manifestSha256": "b0ded11e4509c30779f556615d5637370d6ff066c162f640df76734b29170f7a",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/36938681174/attempts/1 ; publish job reported \"Manual commercial release 1.0.7: published. Latest SHA-256: b0ded11e4509c30779f556615d5637370d6ff066c162f640df76734b29170f7a.\""
+    },
+    {
+      "version": "1.0.8",
+      "manifestSha256": "a600b118eb217602bb05d700e3a1e1caa366bef32384a5feb8c4d5ad76b7c7df",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/37032976208/attempts/1 ; publish job reported \"Manual commercial release 1.0.8: published. Latest SHA-256: a600b118eb217602bb05d700e3a1e1caa366bef32384a5feb8c4d5ad76b7c7df.\""
+    },
+    {
+      "version": "1.0.9",
+      "manifestSha256": "a3586bd6cf088875821bf33debf2daa91b8b818db8cd7a67c6e1a15db4ee59fd",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/37216671743/attempts/1 ; publish job reported \"Manual commercial release 1.0.9: published. Latest SHA-256: a3586bd6cf088875821bf33debf2daa91b8b818db8cd7a67c6e1a15db4ee59fd.\""
+    },
+    {
+      "version": "1.0.10",
+      "manifestSha256": "8ea5cd43d66a08434f98eac18723e3d79eb0685a4312e07543b43ef7d18393f9",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/37320459300/attempts/1 ; publish job reported \"Manual commercial release 1.0.10: published. Latest SHA-256: 8ea5cd43d66a08434f98eac18723e3d79eb0685a4312e07543b43ef7d18393f9.\""
+    },
+    {
+      "version": "1.0.11",
+      "manifestSha256": "ad90d18640535e157e0f5f0a4aae13153e4bc3788029568537565bfdbd638b12",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/37636998586/attempts/2 ; publish job reported \"Manual commercial release 1.0.11: published. Latest SHA-256: ad90d18640535e157e0f5f0a4aae13153e4bc3788029568537565bfdbd638b12.\""
+    },
+    {
+      "version": "1.0.12",
+      "manifestSha256": "504921efc8275cac62cd1eef03b859b1d4313432c702f2abee3dd12f8afb5101",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/37810505264/attempts/1 ; publish job reported \"Manual commercial release 1.0.12: published. Latest SHA-256: 504921efc8275cac62cd1eef03b859b1d4313432c702f2abee3dd12f8afb5101.\""
+    },
+    {
+      "version": "1.0.13",
+      "manifestSha256": "90e17a35b9c26d216c6f1b46a0dd24b5c8fe2a78ff8e493fe7f56d041eb124a6",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/37834306969/attempts/1 ; publish job reported \"Manual commercial release 1.0.13: published. Latest SHA-256: 90e17a35b9c26d216c6f1b46a0dd24b5c8fe2a78ff8e493fe7f56d041eb124a6.\""
+    },
+    {
+      "version": "1.0.14",
+      "manifestSha256": "386f46ee5a3e77c1bbc49d2b2eec82bed3fe39a80dccf67488b0659bb4f58aea",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/37888241075/attempts/1 ; publish job reported \"Manual commercial release 1.0.14: published. Latest SHA-256: 386f46ee5a3e77c1bbc49d2b2eec82bed3fe39a80dccf67488b0659bb4f58aea.\""
+    },
+    {
+      "version": "1.0.15",
+      "manifestSha256": "004fc24da31be35f273b3e54b28a06f72d467faa51dae9be3e7984f014a9fc56",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38067513945/attempts/1 ; publish job reported \"Manual commercial release 1.0.15: published. Latest SHA-256: 004fc24da31be35f273b3e54b28a06f72d467faa51dae9be3e7984f014a9fc56.\""
+    },
+    {
+      "version": "1.0.16",
+      "manifestSha256": "ad66ffa4127286010a0cdc9029ae4c808d810636547d30d91b3460f9b88ae1fb",
+      "status": "published",
+      "evidence": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148244827/attempts/1 ; publish job reported \"Manual commercial release 1.0.16: published. Latest SHA-256: ad66ffa4127286010a0cdc9029ae4c808d810636547d30d91b3460f9b88ae1fb.\""
+    }
+  ]
+}
