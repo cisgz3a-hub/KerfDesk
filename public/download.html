@@ -10,356 +10,1377 @@
     />
     <script type="module" src="/desktop-downloads.mjs"></script>
     <meta name="theme-color" content="#111827" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Download KerfDesk for Windows 10 and 11. KerfDesk Free has no time limit, and the Pro tools unlock with a licence key or a free 30-day trial."
+    />
     <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <title>Download KerfDesk</title>
     <style>
-      * {
+      /* Tokens mirror website/assets/site.css so this page matches /pricing/. */
+      :root {
+        --bg: #faf9f7;
+        --bg-alt: #f1efec;
+        --surface: #ffffff;
+        --text: #2b2823;
+        --muted: #6b655c;
+        --border: #ddd9d3;
+        --border-strong: #aaa59d;
+        --accent: #a85a2a;
+        --accent-hover: #924b22;
+        --accent-fg: #8f4418;
+        --tint-accent: #f9efe6;
+        --info: #3d4f66;
+        --info-bg: #eaeff5;
+        --warn: #805117;
+        --warn-bg: #faf2e4;
+        --neutral: #5f5a52;
+        --neutral-bg: #efece8;
+        --radius: 10px;
+        --radius-sm: 6px;
+        --shadow: 0 1px 2px rgba(28, 25, 21, 0.06), 0 12px 32px rgba(28, 25, 21, 0.1);
+        --font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        --mono: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+        --gutter: 16px;
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1c1a17;
+          --bg-alt: #232019;
+          --surface: #2a2723;
+          --text: #f1ede7;
+          --muted: #b8afa4;
+          --border: #413c36;
+          --border-strong: #6b645b;
+          --accent-fg: #e9a877;
+          --tint-accent: #3a2a1f;
+          --info: #b7c8de;
+          --info-bg: #243040;
+          --warn: #e8c07f;
+          --warn-bg: #3a2e1b;
+          --neutral: #cbc3b8;
+          --neutral-bg: #34302b;
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.4);
+          color-scheme: dark;
+        }
+      }
+      @media (min-width: 640px) {
+        :root {
+          --gutter: 24px;
+        }
+      }
+      *,
+      *::before,
+      *::after {
         box-sizing: border-box;
-      }
-      body {
-        min-height: 100vh;
-        margin: 0;
-        background: #f8fafc;
-        color: #111827;
-        font-family: system-ui, sans-serif;
-      }
-      main {
-        width: min(64rem, 100%);
-        margin: 0 auto;
-        padding: 3rem 1.25rem;
-      }
-      h1,
-      h2,
-      h3 {
-        line-height: 1.2;
-      }
-      h1 {
-        margin: 0 0 0.5rem;
-        font-size: clamp(1.8rem, 5vw, 2.5rem);
-      }
-      h2 {
-        margin: 2rem 0 0.75rem;
-        font-size: 1.35rem;
-      }
-      h3 {
-        margin: 0;
-        font-size: 1.1rem;
-      }
-      p,
-      li {
-        line-height: 1.55;
-      }
-      .intro {
-        max-width: 48rem;
-        margin: 0;
-        color: #4b5563;
-        font-size: 1.05rem;
-      }
-      .notice {
-        margin-top: 1.5rem;
-        padding: 1rem 1.1rem;
-        background: #fff7ed;
-        border: 1px solid #fed7aa;
-        border-radius: 10px;
-      }
-      .notice strong {
-        display: block;
-        margin-bottom: 0.25rem;
-      }
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-        gap: 1rem;
-      }
-      .card {
-        display: flex;
-        flex-direction: column;
-        padding: 1.1rem;
-        background: #ffffff;
-        border: 1px solid #dbe3ec;
-        border-radius: 10px;
-      }
-      .requirements {
-        margin: 0.35rem 0 0;
-        color: #6b7280;
-        font-size: 0.92rem;
-      }
-      code {
-        overflow-wrap: anywhere;
-        padding: 0.1rem 0.25rem;
-        background: #f1f5f9;
-        border-radius: 4px;
-        font-size: 0.85rem;
-      }
-      .asset-name {
-        display: block;
-        margin-top: 0.9rem;
-        padding: 0.55rem;
-        border-radius: 6px;
       }
       [hidden] {
         display: none !important;
       }
-      .artifact-hash {
-        overflow-wrap: anywhere;
-        font-size: 0.8rem;
+      html {
+        -webkit-text-size-adjust: 100%;
+        scroll-padding-top: 5rem;
       }
-      .download {
-        display: inline-block;
-        align-self: flex-start;
-        margin-top: auto;
-        padding: 0.7rem 1rem;
-        color: #ffffff;
-        background: #1976d2;
-        border-radius: 8px;
-        font-weight: 650;
-        text-decoration: none;
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 1.0625rem;
+        line-height: 1.6;
+        overflow-wrap: break-word;
       }
-      .download:hover,
-      .download:focus-visible {
-        background: #1565c0;
+      h1,
+      h2,
+      h3 {
+        margin: 0 0 0.5em;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        text-wrap: balance;
       }
-      .instructions {
-        padding-left: 1.25rem;
+      h1 {
+        font-size: clamp(2.1rem, 5.5vw, 3.4rem);
+        font-weight: 800;
+      }
+      h2 {
+        font-size: clamp(1.6rem, 3.4vw, 2.2rem);
+        font-weight: 780;
+      }
+      h3,
+      .h3 {
+        font-size: 1.12rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      p {
+        margin: 0 0 1em;
       }
       a {
-        color: #1565c0;
+        color: var(--accent-fg);
+        text-underline-offset: 0.18em;
       }
-      footer {
-        margin-top: 2rem;
-        padding-top: 1.25rem;
-        border-top: 1px solid #dbe3ec;
-        color: #4b5563;
+      a:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid var(--accent-fg);
+        outline-offset: 2px;
+        border-radius: var(--radius-sm);
       }
-      .edition {
-        margin-top: 2rem;
-        padding: 1.25rem;
-        background: #ffffff;
-        border: 1px solid #dbe3ec;
-        border-radius: 12px;
+      code {
+        padding: 0.1rem 0.35rem;
+        background: var(--bg-alt);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        font-family: var(--mono);
+        font-size: 0.84em;
+        overflow-wrap: anywhere;
       }
-      .edition > h2 {
-        margin-top: 0;
+      .icon {
+        width: 1.25em;
+        height: 1.25em;
+        flex: none;
+      }
+      .wrap {
+        width: 100%;
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 0 var(--gutter);
+      }
+      .skip-link {
+        position: absolute;
+        left: var(--gutter);
+        top: -4rem;
+        z-index: 100;
+        padding: 0.6rem 1rem;
+        background: var(--accent);
+        color: #fff;
+        border-radius: var(--radius-sm);
+      }
+      .skip-link:focus {
+        top: 0.75rem;
+      }
+      .eyebrow {
+        margin: 0 0 0.75rem;
+        color: var(--accent-fg);
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .lead {
+        max-width: 38rem;
+        color: var(--muted);
+        font-size: clamp(1.08rem, 2vw, 1.22rem);
+        line-height: 1.55;
+      }
+      .lead strong {
+        color: var(--text);
+      }
+      .muted {
+        color: var(--muted);
+      }
+
+      /* Header */
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: color-mix(in srgb, var(--bg) 94%, transparent);
+        border-bottom: 1px solid var(--border);
+        backdrop-filter: blur(8px);
+      }
+      .site-header__inner {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        min-height: 4rem;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        color: var(--text);
+        font-size: 1.15rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        text-decoration: none;
+      }
+      .brand img {
+        border-radius: 7px;
+      }
+      .brand__accent {
+        color: var(--accent-fg);
+      }
+      .site-nav {
+        margin-left: auto;
+      }
+      .site-nav ul,
+      .menu ul {
+        display: flex;
+        gap: 0.25rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .site-nav a {
+        display: block;
+        padding: 0.45rem 0.7rem;
+        border-radius: var(--radius-sm);
+        color: var(--text);
+        font-size: 0.95rem;
+        font-weight: 560;
+        text-decoration: none;
+      }
+      .site-nav a:hover {
+        background: var(--bg-alt);
+      }
+      .site-nav a[aria-current='page'] {
+        color: var(--accent-fg);
+        background: var(--tint-accent);
+      }
+      .menu {
+        display: none;
+        margin-left: auto;
+      }
+      .menu summary {
+        padding: 0.45rem 0.9rem;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sm);
+        font-weight: 650;
+        list-style: none;
+        cursor: pointer;
+      }
+      .menu summary::-webkit-details-marker {
+        display: none;
+      }
+      .menu[open] summary {
+        background: var(--bg-alt);
+      }
+      .menu nav {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 100%;
+        padding: 0.5rem var(--gutter) 1rem;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+      .menu ul {
+        flex-direction: column;
+      }
+      .menu a {
+        display: block;
+        padding: 0.75rem 0.25rem;
+        border-bottom: 1px solid var(--border);
+        color: var(--text);
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .menu a[aria-current='page'] {
+        color: var(--accent-fg);
+      }
+      @media (max-width: 720px) {
+        .site-nav,
+        .site-header .site-header__cta {
+          display: none;
+        }
+        .menu {
+          display: block;
+        }
+      }
+
+      /* Buttons. a.download is reserved for verified installer links. */
+      .btn,
+      .download {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.55rem;
+        min-height: 2.9rem;
+        padding: 0.7rem 1.25rem;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+        font-size: 1rem;
+        font-weight: 680;
+        line-height: 1.2;
+        text-decoration: none;
+        transition:
+          background-color 80ms,
+          border-color 80ms;
+      }
+      .btn--sm {
+        min-height: 2.35rem;
+        padding: 0.45rem 0.9rem;
+        font-size: 0.92rem;
+      }
+      .btn--primary,
+      .download {
+        background: var(--accent);
+        color: #fff;
+      }
+      .btn--primary:hover,
+      .download:hover,
+      .download:focus-visible {
+        background: var(--accent-hover);
+      }
+      .btn--secondary {
+        border-color: var(--border-strong);
+        color: var(--text);
+        background: var(--surface);
+      }
+      .btn--secondary:hover {
+        border-color: var(--text);
+      }
+
+      /* Hero with the Windows download */
+      .hero {
+        padding: clamp(2.75rem, 7vw, 5rem) 0;
+        background: linear-gradient(180deg, var(--bg-alt), var(--bg));
+        border-bottom: 1px solid var(--border);
+      }
+      .hero__grid {
+        display: grid;
+        gap: 2.5rem;
+        align-items: center;
+      }
+      @media (min-width: 900px) {
+        .hero__grid {
+          grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+          gap: 4rem;
+        }
+      }
+      .hero .lead {
+        margin-bottom: 1.75rem;
+      }
+      .ticks {
+        display: grid;
+        gap: 0.6rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .ticks li {
+        display: flex;
+        gap: 0.65rem;
+        align-items: flex-start;
+      }
+      .ticks .icon {
+        margin-top: 0.2rem;
+        color: var(--accent-fg);
+      }
+      .panel {
+        padding: clamp(1.5rem, 4vw, 2rem);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+      }
+      .panel__head {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        margin-bottom: 1.5rem;
+      }
+      .panel__head img {
+        border-radius: 11px;
+      }
+      .panel__head h2 {
+        margin: 0;
+        font-size: 1.4rem;
       }
       .edition-kind {
-        margin: -0.4rem 0 0.75rem;
-        color: #4b5563;
+        margin: 0.2rem 0 0;
+        color: var(--muted);
+        font-size: 0.95rem;
         font-weight: 600;
       }
-      .edition .card {
-        background: #f8fafc;
+      .panel .download {
+        width: 100%;
+        min-height: 3.4rem;
+        font-size: 1.08rem;
       }
-      .edition .single {
-        max-width: 26rem;
-        margin: 1rem 0;
+      .status {
+        margin: 0.9rem 0 0;
+        color: var(--muted);
+        font-size: 0.88rem;
+        line-height: 1.5;
+      }
+      .hero__shot {
+        margin: clamp(2.5rem, 6vw, 4rem) 0 0;
+        overflow: hidden;
+        max-height: 30rem;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent);
+        mask-image: linear-gradient(180deg, #000 70%, transparent);
+      }
+      .hero__shot img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .facts {
+        display: grid;
+        gap: 0.7rem;
+        margin: 1.5rem 0 0;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--border);
+        font-size: 0.92rem;
+      }
+      .facts > div {
+        display: grid;
+        grid-template-columns: 4.5rem minmax(0, 1fr);
+        gap: 0.75rem;
+        align-items: baseline;
+      }
+      .facts dt {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .facts dd {
+        margin: 0;
+      }
+
+      /* Sections */
+      .section {
+        padding: clamp(3rem, 8vw, 5rem) 0;
+      }
+      .section--alt {
+        background: var(--bg-alt);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+      .section__head {
+        max-width: 44rem;
+        margin-bottom: 2rem;
+      }
+      .section__head > :last-child {
+        margin-bottom: 0;
+      }
+      .pill {
+        display: inline-block;
+        margin-top: 0.25rem;
+        padding: 0.2rem 0.7rem;
+        border-radius: 999px;
+        background: var(--neutral-bg);
+        color: var(--neutral);
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+      .steps {
+        display: grid;
+        gap: 1rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: step;
+      }
+      @media (min-width: 900px) {
+        .steps {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      .step {
+        position: relative;
+        padding: 1.35rem 1.35rem 1.35rem 4rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        counter-increment: step;
+      }
+      .step::before,
+      .numbered > li::before {
+        position: absolute;
+        left: 1.25rem;
+        top: 1.3rem;
+        display: grid;
+        place-items: center;
+        width: 1.9rem;
+        height: 1.9rem;
+        border-radius: 50%;
+        background: var(--tint-accent);
+        color: var(--accent-fg);
+        font-size: 0.92rem;
+        font-weight: 800;
+      }
+      .step::before {
+        content: counter(step);
+      }
+      .step h3 {
+        margin: 0.2rem 0 0.4rem;
+      }
+      .step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.98rem;
+      }
+      .step strong,
+      .step code {
+        color: var(--text);
+      }
+      .step code {
+        display: inline-block;
+        font-size: 0.78em;
+      }
+      .numbered {
+        display: grid;
+        gap: 1rem;
+        margin: 1.25rem 0 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: n;
+      }
+      .numbered > li {
+        position: relative;
+        padding-left: 2.85rem;
+        counter-increment: n;
+      }
+      .numbered > li::before {
+        content: counter(n);
+        left: 0;
+        top: -0.05rem;
+      }
+      .split {
+        display: grid;
+        gap: 2rem;
+        align-items: start;
+        margin-top: clamp(3rem, 7vw, 4.5rem);
+      }
+      @media (min-width: 900px) {
+        .split {
+          grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+          gap: 4rem;
+        }
+      }
+      .price-card {
+        padding: 1.75rem;
+        background: var(--surface);
+        border: 2px solid var(--accent);
+        border-radius: var(--radius);
+      }
+      .price-card .eyebrow {
+        margin-bottom: 0.4rem;
+      }
+      .price {
+        margin: 0 0 1.25rem;
+        font-size: 2.4rem;
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+      }
+      .price small {
+        display: block;
+        margin-top: 0.3rem;
+        color: var(--muted);
+        font-size: 0.95rem;
+        font-weight: 600;
+        letter-spacing: 0;
+      }
+      .price-card .ticks {
+        font-size: 0.97rem;
+      }
+      .price-card .btn {
+        width: 100%;
+        margin-top: 1.5rem;
+      }
+      .price-card__fine {
+        margin: 0.75rem 0 0;
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+      .hero__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1.5rem;
+        align-items: center;
+        margin-top: 1.75rem;
+      }
+      .hero__actions a:not(.btn) {
+        font-weight: 600;
+      }
+
+      /* Disclosures and callouts */
+      .disclosures {
+        display: grid;
+        gap: 0.75rem;
+        margin-top: clamp(2.5rem, 6vw, 3.5rem);
+      }
+      .disclosure {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+      .disclosure > summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+        font-weight: 700;
+        list-style: none;
+        cursor: pointer;
+      }
+      .disclosure > summary::-webkit-details-marker {
+        display: none;
+      }
+      .disclosure > summary::after {
+        content: '';
+        flex: none;
+        width: 0.55rem;
+        height: 0.55rem;
+        margin-right: 0.3rem;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: translateY(-25%) rotate(45deg);
+        transition: transform 120ms;
+      }
+      .disclosure[open] > summary::after {
+        transform: translateY(25%) rotate(-135deg);
+      }
+      .disclosure > summary:hover {
+        color: var(--accent-fg);
+      }
+      .disclosure__body {
+        padding: 1.1rem 1.25rem 1.25rem;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+      .disclosure__body > :last-child {
+        margin-bottom: 0;
+      }
+      .disclosure--large > summary {
+        padding: 1.15rem 1.5rem;
+        font-size: 1.05rem;
+      }
+      .disclosure--large > .disclosure__body {
+        padding: 1.5rem;
+        color: var(--text);
+        font-size: 1rem;
+      }
+      .artifact-hash {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        overflow-wrap: anywhere;
+      }
+      #commercial-history-list {
+        padding-left: 1.2rem;
+      }
+      #commercial-history-list li {
+        margin-bottom: 0.4rem;
+      }
+      .callout {
+        display: flex;
+        gap: 0.9rem;
+        margin: 0 0 1.25rem;
+        padding: 1rem 1.25rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--info);
+        border-radius: var(--radius-sm);
+      }
+      .callout--warn {
+        background: var(--warn-bg);
+        border-left-color: var(--warn);
+      }
+      .callout__icon {
+        padding-top: 0.12rem;
+        color: var(--info);
+      }
+      .callout--warn .callout__icon {
+        color: var(--warn);
+      }
+      .callout__title {
+        margin: 0 0 0.25rem;
+        font-weight: 750;
+      }
+      .callout p:last-child {
+        margin-bottom: 0;
+      }
+      .callout .status {
+        margin-top: 0.75rem;
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      /* Preview platforms */
+      .grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+        margin: 1.25rem 0;
+      }
+      .card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+        padding: 1.25rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+      .card__icon {
+        color: var(--accent-fg);
+      }
+      .card h3 {
+        margin: 0;
+      }
+      .requirements {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .asset-name {
+        display: block;
+        padding: 0.5rem 0.6rem;
+        font-size: 0.78rem;
+      }
+      .card .artifact-hash {
+        margin: 0;
+        color: var(--muted);
+      }
+      .card .download {
+        margin-top: auto;
+        font-size: 0.95rem;
+      }
+      .os-steps {
+        display: grid;
+        gap: 2rem;
+        margin-top: 1rem;
+      }
+      @media (min-width: 800px) {
+        .os-steps {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      .os-steps h4 {
+        margin: 0 0 0.25rem;
+        font-size: 1rem;
+      }
+      .os-steps .numbered {
+        font-size: 0.97rem;
+      }
+      .os-steps .numbered + p {
+        margin: 1rem 0 0;
+      }
+      .subhead {
+        margin-top: 2.25rem;
+        padding-top: 1.75rem;
+        border-top: 1px solid var(--border);
+      }
+
+      /* Footer */
+      .site-footer {
+        padding: 1.75rem 0;
+        background: var(--bg-alt);
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+      .site-footer p {
+        margin: 0;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
       }
     </style>
   </head>
   <body>
-    <main>
-      <h1>Download KerfDesk</h1>
-      <nav aria-label="Pricing and policies">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="wrap site-header__inner">
+        <a class="brand" href="https://kerfdesk.com">
+          <img src="/favicon.svg" alt="" width="28" height="28" />
+          <span>Kerf<span class="brand__accent">Desk</span></span>
+        </a>
+        <nav class="site-nav" aria-label="Main">
+          <ul>
+            <li><a href="/download.html" aria-current="page">Download</a></li>
+            <li><a href="/pricing/">Pricing</a></li>
+            <li><a href="/buy.html">Buy Pro</a></li>
+            <li><a href="/support.html">Support</a></li>
+          </ul>
+        </nav>
+        <a class="btn btn--primary btn--sm site-header__cta" href="https://kerfdesk.com"
+          >Open the app</a
+        >
+        <details class="menu">
+          <summary>Menu</summary>
+          <nav aria-label="Main menu">
+            <ul>
+              <li><a href="/download.html" aria-current="page">Download</a></li>
+              <li><a href="/pricing/">Pricing</a></li>
+              <li><a href="/buy.html">Buy Pro</a></li>
+              <li><a href="/support.html">Support</a></li>
+              <li><a href="https://kerfdesk.com">Open the app</a></li>
+            </ul>
+          </nav>
+        </details>
+      </div>
+    </header>
+
+    <main id="main">
+      <section aria-labelledby="commercial-heading">
+        <div class="hero">
+          <div class="wrap hero__grid">
+            <div>
+              <p class="eyebrow">Download</p>
+              <h1>Download KerfDesk</h1>
+              <p class="lead">
+                Download <strong>KerfDesk for Windows</strong>. Everything in KerfDesk Free works
+                with no time limit, and the Pro tools unlock with a licence key or a free 30-day
+                trial started in the app.
+              </p>
+              <ul class="ticks">
+                <li>
+                  <svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M20 6 9 17l-5-5" /></svg
+                  ><span>KerfDesk Free with no time limit</span>
+                </li>
+                <li>
+                  <svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M20 6 9 17l-5-5" /></svg
+                  ><span>Free 30-day Pro trial, started in the app</span>
+                </li>
+                <li>
+                  <svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M20 6 9 17l-5-5" /></svg
+                  ><span>Installs for your Windows account, with no administrator password</span>
+                </li>
+              </ul>
+              <div class="hero__actions">
+                <a class="btn btn--secondary" href="/buy.html">Buy Pro</a>
+                <a href="#preview-heading">On a Mac?</a>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel__head">
+                <img src="/favicon.svg" alt="" width="48" height="48" />
+                <div>
+                  <h2 id="commercial-heading">KerfDesk for Windows</h2>
+                  <p class="edition-kind">Free, with a 30-day Pro trial</p>
+                </div>
+              </div>
+              <a class="download" id="commercial-download" hidden>
+                <svg
+                  class="icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M12 15V3" />
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <path d="m7 10 5 5 5-5" />
+                </svg>
+                Download KerfDesk for Windows
+              </a>
+              <p class="status" id="commercial-status" role="status">
+                Checking for the licensed Windows edition…
+              </p>
+              <dl class="facts">
+                <div>
+                  <dt>Requires</dt>
+                  <dd>Windows 10 or 11, 64-bit (x64)</dd>
+                </div>
+                <div>
+                  <dt>File</dt>
+                  <dd>
+                    <code id="commercial-asset"
+                      >KerfDesk-&lt;version&gt;-windows-x64-setup.exe</code
+                    >
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+          <div class="wrap">
+            <figure class="hero__shot">
+              <img
+                src="/kerfdesk-workspace.webp"
+                alt="KerfDesk design view: a round Cabin 1972 coaster with mountains and pines on the canvas, four laser operations listed at right"
+                width="1920"
+                height="1200"
+                loading="lazy"
+                decoding="async"
+              />
+            </figure>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="wrap">
+            <div class="section__head">
+              <p class="eyebrow">Install</p>
+              <h2>Install in three steps</h2>
+            </div>
+            <ol class="steps" id="commercial-steps">
+              <li class="step">
+                <h3>Open the installer</h3>
+                <p>Open the downloaded <code>KerfDesk-…-windows-x64-setup.exe</code>.</p>
+              </li>
+              <li class="step">
+                <h3>Allow it in SmartScreen</h3>
+                <p>
+                  The installer isn't code-signed yet, so Windows may warn you. Select
+                  <strong>More info</strong>, check the name starts with <strong>KerfDesk-</strong>,
+                  then <strong>Run anyway</strong>.
+                </p>
+              </li>
+              <li class="step">
+                <h3>Start using KerfDesk</h3>
+                <p>
+                  KerfDesk installs for your Windows account only and needs no administrator
+                  password.
+                </p>
+              </li>
+            </ol>
+
+            <div class="split">
+              <div>
+                <p class="eyebrow">Pro tools</p>
+                <h2>Unlock Pro</h2>
+                <p class="muted">
+                  KerfDesk Free has no time limit. The Pro tools are included for 30 days from the
+                  day KerfDesk first registers your trial online; after that only they lock.
+                </p>
+                <ol class="numbered">
+                  <li>
+                    Open KerfDesk and click <strong>Free · Try Pro</strong> in the status bar, or
+                    choose <strong>Help &gt; Licence</strong>.
+                  </li>
+                  <li>
+                    Choose <strong>Start free 30-day Pro trial</strong>, or
+                    <strong>Paste key</strong> and <strong>Activate licence</strong> if you have
+                    bought Pro. After buying on this site,
+                    <strong>Copy key &amp; open KerfDesk</strong> does both steps for you.
+                  </li>
+                </ol>
+              </div>
+              <aside class="price-card" aria-label="Pro licence">
+                <p class="eyebrow">Pro licence</p>
+                <p class="price">US$49.50 <small>one-time, plus any applicable tax</small></p>
+                <ul class="ticks">
+                  <li>
+                    <svg
+                      class="icon"
+                      aria-hidden="true"
+                      focusable="false"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M20 6 9 17l-5-5" /></svg
+                    ><span>Works on three computers at a time</span>
+                  </li>
+                  <li>
+                    <svg
+                      class="icon"
+                      aria-hidden="true"
+                      focusable="false"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M20 6 9 17l-5-5" /></svg
+                    ><span>Includes one year of updates</span>
+                  </li>
+                  <li>
+                    <svg
+                      class="icon"
+                      aria-hidden="true"
+                      focusable="false"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M20 6 9 17l-5-5" /></svg
+                    ><span
+                      >Keeps working with every version released while your updates are
+                      covered</span
+                    >
+                  </li>
+                  <li>
+                    <svg
+                      class="icon"
+                      aria-hidden="true"
+                      focusable="false"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M20 6 9 17l-5-5" /></svg
+                    ><span>Another year of updates costs US$20 and never renews automatically</span>
+                  </li>
+                  <li>
+                    <svg
+                      class="icon"
+                      aria-hidden="true"
+                      focusable="false"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M20 6 9 17l-5-5" /></svg
+                    ><span>A licence never stops a running job</span>
+                  </li>
+                </ul>
+                <a class="btn btn--primary" href="/buy.html">Buy Pro</a>
+                <p class="price-card__fine">
+                  Buy in this browser or from Help &gt; Licence in the Windows app. You can buy on a
+                  phone and activate the key later on your Windows PC.
+                </p>
+              </aside>
+            </div>
+
+            <div class="disclosures">
+              <details class="disclosure">
+                <summary>Updates and download verification</summary>
+                <div class="disclosure__body">
+                  <p id="commercial-verification"></p>
+                  <p id="commercial-installation">
+                    Installer signing and update details appear with the verified download.
+                  </p>
+                  <p class="artifact-hash" id="commercial-hash"></p>
+                  <p><a id="commercial-manifest" hidden>Publisher-signed download manifest</a></p>
+                  <p>
+                    Downloads are served from <strong>dl.kerfdesk.com</strong>. This page checks the
+                    publisher's signature on the download details before it shows a link; that
+                    signature is separate from Windows code signing.
+                  </p>
+                </div>
+              </details>
+              <details class="disclosure" id="commercial-history" hidden>
+                <summary>Earlier versions</summary>
+                <div class="disclosure__body">
+                  <p>
+                    A licence keeps working with every version released while its updates were
+                    covered. If your updates have ended, install the newest version released on or
+                    before the <strong>Updates through</strong> date shown in
+                    <strong>Help &gt; Licence</strong>.
+                  </p>
+                  <p id="commercial-history-status" role="status"></p>
+                  <ul id="commercial-history-list"></ul>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--alt" aria-labelledby="preview-heading">
+        <div class="wrap">
+          <div class="section__head">
+            <p class="eyebrow">Mac and early builds</p>
+            <h2 id="preview-heading">KerfDesk Preview</h2>
+            <p class="pill">Free · unsigned · manual updates</p>
+          </div>
+          <aside class="callout">
+            <span class="callout__icon"
+              ><svg
+                class="icon"
+                aria-hidden="true"
+                focusable="false"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z"
+                />
+                <path d="M20.054 15.987H3.946" /></svg
+            ></span>
+            <div>
+              <p class="callout__title">Using a Mac or Linux?</p>
+              <p>
+                Preview is the only desktop build for Mac. It is for trying early features and
+                cannot use a Pro licence or the trial: Pro is only in KerfDesk for Windows. On any
+                Mac you can also use the <a href="https://kerfdesk.com">KerfDesk web app</a> in
+                Chrome or Edge.
+              </p>
+              <p>
+                <strong>Linux:</strong> there is no Linux desktop Preview yet. Use the web app in
+                Chrome or Edge; it has the same CAM features and can be installed from the browser.
+              </p>
+              <p class="status" id="release-status" role="status">
+                Checking for verified downloads…
+              </p>
+            </div>
+          </aside>
+
+          <details class="disclosure disclosure--large" id="preview-downloads">
+            <summary>Show Preview downloads</summary>
+            <div class="disclosure__body">
+              <p>
+                KerfDesk Preview is free and offline-capable. These early desktop builds are
+                unsigned.
+              </p>
+              <aside class="callout callout--warn">
+                <span class="callout__icon"
+                  ><svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                    <path d="M21 3v5h-5" />
+                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                    <path d="M8 16H3v5" /></svg
+                ></span>
+                <div>
+                  <p class="callout__title">Preview updates are manual.</p>
+                  <p>
+                    It never downloads or installs an unsigned update, though it may say a newer
+                    Preview exists. Finish any machine work, close KerfDesk, return to this page,
+                    and install the newer exact-version asset yourself.
+                  </p>
+                </div>
+              </aside>
+
+              <noscript>Enable JavaScript to verify and show the desktop download links.</noscript>
+              <div class="grid">
+                <section class="card">
+                  <span class="card__icon"
+                    ><svg
+                      class="icon"
+                      aria-hidden="true"
+                      focusable="false"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <rect width="20" height="14" x="2" y="3" rx="2" />
+                      <line x1="8" x2="16" y1="21" y2="21" />
+                      <line x1="12" x2="12" y1="17" y2="21" /></svg
+                  ></span>
+                  <h3>Windows</h3>
+                  <p class="requirements">Windows 10 or 11, 64-bit (x64)</p>
+                  <code class="asset-name">KerfDesk-&lt;version&gt;-windows-x64-setup.exe</code>
+                  <p class="artifact-hash"></p>
+                  <a class="download" data-preview-suffix="windows-x64-setup.exe" hidden>
+                    Download Windows Preview
+                  </a>
+                </section>
+
+                <section class="card">
+                  <span class="card__icon"
+                    ><svg
+                      class="icon"
+                      aria-hidden="true"
+                      focusable="false"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z"
+                      />
+                      <path d="M20.054 15.987H3.946" /></svg
+                  ></span>
+                  <h3>Mac with Intel</h3>
+                  <p class="requirements">macOS 13 or newer, Intel x64</p>
+                  <code class="asset-name">KerfDesk-&lt;version&gt;-macos-x64.dmg</code>
+                  <p class="artifact-hash"></p>
+                  <a class="download" data-preview-suffix="macos-x64.dmg" hidden>
+                    Download Intel Mac Preview
+                  </a>
+                </section>
+
+                <section class="card">
+                  <span class="card__icon"
+                    ><svg
+                      class="icon"
+                      aria-hidden="true"
+                      focusable="false"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z"
+                      />
+                      <path d="M20.054 15.987H3.946" /></svg
+                  ></span>
+                  <h3>Mac with Apple Silicon</h3>
+                  <p class="requirements">macOS 13 or newer, Apple Silicon (arm64)</p>
+                  <code class="asset-name">KerfDesk-&lt;version&gt;-macos-arm64.dmg</code>
+                  <p class="artifact-hash"></p>
+                  <a class="download" data-preview-suffix="macos-arm64.dmg" hidden>
+                    Download Apple Silicon Preview
+                  </a>
+                </section>
+              </div>
+
+              <p class="muted">
+                In each filename, <code>&lt;version&gt;</code> is the prerelease tag without its
+                leading <code>v</code> (for example, tag <code>v0.2.0-preview.1</code> uses version
+                <code>0.2.0-preview.1</code>).
+              </p>
+
+              <p id="preview-links" hidden>
+                <a id="signed-manifest" hidden>Signed release manifest</a> ·
+                <a data-preview-suffix="release-notes.md" hidden>Release notes</a> ·
+                <a data-preview-suffix="SHA256SUMS.txt" hidden>Checksums</a> ·
+                <a data-preview-suffix="sbom.cdx.json" hidden>Software bill of materials</a>
+              </p>
+              <p class="muted">
+                Each signed manifest binds filenames, sizes and SHA-256 digests to a version and
+                source revision. It proves the publisher approved these bytes; it is not an
+                operating-system code signature, notarization, or an independent GitHub build
+                attestation for private source. Verification keys are published in
+                <a href="/desktop-release-keys.json">desktop-release-keys.json</a>.
+              </p>
+
+              <div class="subhead">
+                <h3>Install an unsigned Preview</h3>
+                <p class="muted">
+                  These steps are for Preview. KerfDesk for Windows has its own steps above.
+                </p>
+                <div class="os-steps">
+                  <div>
+                    <h4>Windows SmartScreen</h4>
+                    <ol class="numbered">
+                      <li>Run the downloaded setup file.</li>
+                      <li>
+                        Only continue if it came from the verified Preview links above and its
+                        filename contains <code>-preview.</code> followed by a number.
+                      </li>
+                      <li>
+                        If SmartScreen shows <strong>Windows protected your PC</strong>, select
+                        <strong>More info</strong>.
+                      </li>
+                      <li>
+                        Confirm the publisher is shown as unknown, then select
+                        <strong>Run anyway</strong>.
+                      </li>
+                    </ol>
+                  </div>
+                  <div>
+                    <h4>macOS Gatekeeper</h4>
+                    <ol class="numbered">
+                      <li>Open the DMG and drag <strong>KerfDesk.app</strong> to Applications.</li>
+                      <li>
+                        Control-click KerfDesk.app in Applications, choose <strong>Open</strong>,
+                        then choose <strong>Open</strong> again.
+                      </li>
+                      <li>
+                        If macOS still blocks it, open
+                        <strong>System Settings &gt; Privacy &amp; Security</strong> and choose
+                        <strong>Open Anyway</strong>.
+                      </li>
+                    </ol>
+                    <p class="muted">
+                      Mac Preview builds are both <strong>unsigned and unnotarized</strong>.
+                      KerfDesk does not disable or silently bypass Gatekeeper.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
         <p>
           <a href="/pricing/">Pricing</a> · <a href="/terms/">Software and Supplier Terms</a> ·
-          <a href="/privacy/">Privacy Notice</a> · <a href="/refunds/">Refund Policy</a>
+          <a href="/privacy/">Privacy Notice</a> · <a href="/refunds/">Refund Policy</a> ·
+          <a href="/eula.txt">Free app licence</a> ·
+          <a href="/third-party-notices.txt">Third-party notices</a> ·
+          <a href="/privacy/lucide-license.txt">Icon licence</a>
         </p>
-      </nav>
-      <p class="intro">
-        Download <strong>KerfDesk for Windows</strong>. Everything in KerfDesk Free works with no
-        time limit, and the Pro tools unlock with a licence key or a free 30-day trial started in
-        the app.
-      </p>
-
-      <section class="edition" aria-labelledby="commercial-heading">
-        <h2 id="commercial-heading">KerfDesk for Windows</h2>
-        <p class="edition-kind">Free, with a 30-day Pro trial</p>
-        <p>
-          KerfDesk Free has no time limit. The Pro tools are included for 30 days from the day
-          KerfDesk first registers your trial online; after that only they lock.
-        </p>
-        <p id="commercial-status" role="status">Checking for the licensed Windows edition…</p>
-        <div class="card single">
-          <h3>Windows</h3>
-          <p class="requirements">Windows 10 or 11, 64-bit (x64)</p>
-          <a class="download" id="commercial-download" hidden>Download KerfDesk for Windows</a>
-          <code class="asset-name" id="commercial-asset"
-            >KerfDesk-&lt;version&gt;-windows-x64-setup.exe</code
-          >
-        </div>
-
-        <h3>Install</h3>
-        <ol class="instructions" id="commercial-steps">
-          <li>Open the downloaded <code>KerfDesk-…-windows-x64-setup.exe</code>.</li>
-          <li>
-            The installer is not yet Windows code-signed, so Windows may show
-            <strong>Windows protected your PC</strong>. Select <strong>More info</strong>, check the
-            app is <strong>KerfDesk-…-windows-x64-setup.exe</strong>, then select
-            <strong>Run anyway</strong>.
-          </li>
-          <li>
-            KerfDesk installs for your Windows account only and needs no administrator password.
-          </li>
-        </ol>
-
-        <h3>Unlock Pro</h3>
-        <ol class="instructions">
-          <li>
-            Open KerfDesk and click <strong>Free · Try Pro</strong> in the status bar, or choose
-            <strong>Help &gt; Licence</strong>.
-          </li>
-          <li>
-            Choose <strong>Start free 30-day Pro trial</strong>, or <strong>Paste key</strong> and
-            <strong>Activate licence</strong> if you have bought Pro. After buying on this site,
-            <strong>Copy key &amp; open KerfDesk</strong> does both steps for you.
-          </li>
-        </ol>
-        <p>
-          A Pro licence costs US$49.50 plus any applicable tax, works on three computers at a time,
-          includes one year of updates, and keeps working with every version released while your
-          updates are covered. Another year of updates costs US$20 and never renews automatically. A
-          licence never stops a running job.
-        </p>
-        <details>
-          <summary>Updates and download verification</summary>
-          <p id="commercial-installation">
-            Installer signing and update details appear with the verified download.
-          </p>
-          <p class="artifact-hash" id="commercial-hash"></p>
-          <p><a id="commercial-manifest" hidden>Publisher-signed download manifest</a></p>
-          <p>
-            Downloads are served from <strong>dl.kerfdesk.com</strong>. This page checks the
-            publisher's signature on the download details before it shows a link; that signature is
-            separate from Windows code signing.
-          </p>
-        </details>
-        <details id="commercial-history" hidden>
-          <summary>Earlier versions</summary>
-          <p>
-            A licence keeps working with every version released while its updates were covered. If
-            your updates have ended, install the newest version released on or before the
-            <strong>Updates through</strong> date shown in <strong>Help &gt; Licence</strong>.
-          </p>
-          <p id="commercial-history-status" role="status"></p>
-          <ul id="commercial-history-list"></ul>
-        </details>
-      </section>
-
-      <section class="edition" aria-labelledby="preview-heading">
-        <h2 id="preview-heading">KerfDesk Preview</h2>
-        <p class="edition-kind">Free · unsigned · manual updates</p>
-        <div class="notice">
-          <strong>Preview cannot use a Pro licence or the trial.</strong>
-          If you bought Pro or want to try it, install KerfDesk for Windows above. Preview is for
-          trying early features, and is the only desktop build for Mac.
-        </div>
-        <details id="preview-downloads">
-          <summary>Show Preview downloads</summary>
-          <p>
-            KerfDesk Preview is free and offline-capable. These early desktop builds are unsigned.
-          </p>
-
-          <div class="notice">
-            <strong>Preview updates are manual.</strong>
-            It never downloads or installs an unsigned update, though it may say a newer Preview
-            exists. Finish any machine work, close KerfDesk, return to this page, and install the
-            newer exact-version asset yourself.
-          </div>
-
-          <p id="release-status" role="status">Checking for verified downloads…</p>
-          <noscript>Enable JavaScript to verify and show the desktop download links.</noscript>
-          <div class="grid">
-            <section class="card">
-              <h3>Windows</h3>
-              <p class="requirements">Windows 10 or 11, 64-bit (x64)</p>
-              <code class="asset-name">KerfDesk-&lt;version&gt;-windows-x64-setup.exe</code>
-              <p class="artifact-hash"></p>
-              <a class="download" data-preview-suffix="windows-x64-setup.exe" hidden>
-                Download Windows Preview
-              </a>
-            </section>
-
-            <section class="card">
-              <h3>Mac with Intel</h3>
-              <p class="requirements">macOS 13 or newer, Intel x64</p>
-              <code class="asset-name">KerfDesk-&lt;version&gt;-macos-x64.dmg</code>
-              <p class="artifact-hash"></p>
-              <a class="download" data-preview-suffix="macos-x64.dmg" hidden>
-                Download Intel Mac Preview
-              </a>
-            </section>
-
-            <section class="card">
-              <h3>Mac with Apple Silicon</h3>
-              <p class="requirements">macOS 13 or newer, Apple Silicon (arm64)</p>
-              <code class="asset-name">KerfDesk-&lt;version&gt;-macos-arm64.dmg</code>
-              <p class="artifact-hash"></p>
-              <a class="download" data-preview-suffix="macos-arm64.dmg" hidden>
-                Download Apple Silicon Preview
-              </a>
-            </section>
-          </div>
-
-          <p>
-            In each filename, <code>&lt;version&gt;</code> is the prerelease tag without its leading
-            <code>v</code> (for example, tag <code>v0.2.0-preview.1</code> uses version
-            <code>0.2.0-preview.1</code>).
-          </p>
-
-          <p id="preview-links" hidden>
-            <a id="signed-manifest" hidden>Signed release manifest</a> ·
-            <a data-preview-suffix="release-notes.md" hidden>Release notes</a> ·
-            <a data-preview-suffix="SHA256SUMS.txt" hidden>Checksums</a> ·
-            <a data-preview-suffix="sbom.cdx.json" hidden>Software bill of materials</a>
-          </p>
-        </details>
-      </section>
-      <p>
-        Each signed manifest binds filenames, sizes and SHA-256 digests to a version and source
-        revision. It proves the publisher approved these bytes; it is not an operating-system code
-        signature, notarization, or an independent GitHub build attestation for private source.
-        Verification keys are available <a href="/desktop-release-keys.json">here</a>.
-      </p>
-      <h2>Install an unsigned Preview</h2>
-      <p>These steps are for Preview. KerfDesk for Windows has its own steps above.</p>
-      <h3>Windows SmartScreen</h3>
-      <ol class="instructions">
-        <li>Run the downloaded setup file.</li>
-        <li>
-          Only continue if it came from the verified Preview links above and its filename contains
-          <code>-preview.</code> followed by a number.
-        </li>
-        <li>
-          If SmartScreen shows <strong>Windows protected your PC</strong>, select
-          <strong>More info</strong>.
-        </li>
-        <li>Confirm the publisher is shown as unknown, then select <strong>Run anyway</strong>.</li>
-      </ol>
-
-      <h3>macOS Gatekeeper</h3>
-      <ol class="instructions">
-        <li>Open the DMG and drag <strong>KerfDesk.app</strong> to Applications.</li>
-        <li>
-          Control-click KerfDesk.app in Applications, choose <strong>Open</strong>, then choose
-          <strong>Open</strong> again.
-        </li>
-        <li>
-          If macOS still blocks it, open
-          <strong>System Settings &gt; Privacy &amp; Security</strong> and choose
-          <strong>Open Anyway</strong>.
-        </li>
-      </ol>
-      <p>
-        Mac Preview builds are both <strong>unsigned and unnotarized</strong>. KerfDesk does not
-        disable or silently bypass Gatekeeper.
-      </p>
-
-      <footer>
-        <strong>Linux:</strong> there is no Linux desktop Preview yet. Use the
-        <a href="https://kerfdesk.com">KerfDesk web app</a> in Chrome or Edge; it has the same CAM
-        features and can be installed from the browser.
-      </footer>
-    </main>
+      </div>
+    </footer>
   </body>
 </html>

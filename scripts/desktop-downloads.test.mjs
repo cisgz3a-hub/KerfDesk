@@ -127,7 +127,11 @@ test('manual commercial download is labelled unsigned and manual, separate from 
   assert.ok(manifest.href.endsWith('/download-manifest.json'));
   assert.match(
     document.querySelector('#commercial-status').textContent,
-    /Unsigned installer · Manual updates/u,
+    /^KerfDesk .+ · \d+ MB · /u,
+  );
+  assert.match(
+    document.querySelector('#commercial-verification').textContent,
+    /^Unsigned installer · Manual updates · Download metadata signature verified\.$/u,
   );
   assert.match(
     document.querySelector('#commercial-installation').textContent,
@@ -143,6 +147,7 @@ test('manual commercial download is labelled unsigned and manual, separate from 
   const tampered = commercialServer('{"schemaVersion":1,"releases":[{}]}', manual);
   await populateCommercialDownload(document, tampered.fetchRequest);
   assert.equal(download.hasAttribute('href'), false);
+  assert.equal(document.querySelector('#commercial-verification').textContent, '');
   assert.equal(
     tampered.requests.some(({ url }) => url === MANUAL_DOWNLOAD_LATEST_URL),
     false,
@@ -262,7 +267,11 @@ test('a publisher-built catalogue offers the newest signed installer and keeps o
   );
   assert.match(
     document.querySelector('#commercial-status').textContent,
-    /^KerfDesk 1\.10\.0 · Released 2026-01-01 · Publisher signature verified\.$/u,
+    /^KerfDesk 1\.10\.0 · Released 2026-01-01$/u,
+  );
+  assert.equal(
+    document.querySelector('#commercial-verification').textContent,
+    'Code-signed installer · Publisher signature verified.',
   );
   // Customers whose update year ended can still reach the versions their licence covers.
   const history = [...document.querySelectorAll('#commercial-history-list a')];
