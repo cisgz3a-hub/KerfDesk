@@ -18,6 +18,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { breakOpenCurveAtNode } from '../../core/geometry/curve-segment-edit';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { boundsForPaths } from './path-node-edit-geometry';
@@ -54,7 +55,12 @@ export function pathNodeCurveCommandActions(set: Setter): PathNodeCurveCommandAc
     setSelectedCurveStart: () =>
       set((state) => mutateSelected(state, setCurveStartNode, withRestartedTabs)),
     breakSelectedCurve: () =>
-      set((state) => mutateSelected(state, breakCurveAtNode, withBrokenTabs)),
+      set((state) => {
+        const ref = state.selectedPathNode;
+        if (!isAnchorRef(ref)) return state;
+        const opened = mutateSelected(state, breakCurveAtNode, withBrokenTabs);
+        return opened !== state ? opened : breakOpenSelectedCurve(state, ref);
+      }),
     joinSelectedCurveNodes: () => {
       let outcome: CurveJoinCommandOutcome = { kind: 'unchanged' };
       const notification = { present: false, text: '', success: false };
@@ -93,7 +99,7 @@ export function pathNodeCurveCommandActions(set: Setter): PathNodeCurveCommandAc
 
 // Keeps an edited object's tabs placed by hand in place, given the edited
 // path's curves before the edit.
-type TabFollow = (
+export type TabFollow = (
   edited: SceneObject,
   ref: PathNodeRef,
   curvesBefore: ReadonlyArray<CurveSubpath>,
@@ -171,7 +177,44 @@ function withFollowedTabs(
   };
 }
 
-function mutateObjectCurve(
+// An open contour breaks into two at an interior node (LightBurn Break). The
+// later contours of the path move up one index, so tabs follow them.
+function breakOpenSelectedCurve(state: AppState, ref: PathNodeRef): AppState | Partial<AppState> {
+  return mutateObjectCurve(
+    state,
+    ref,
+    (curves) => {
+      const curve = curves[ref.polylineIndex];
+      const pieces = curve === undefined ? null : breakOpenCurveAtNode(curve, ref.pointIndex);
+      if (pieces === null) return null;
+      return [
+        ...curves.slice(0, ref.polylineIndex),
+        ...pieces,
+        ...curves.slice(ref.polylineIndex + 1),
+      ];
+    },
+    (edited) => withShiftedContourTabs(edited, ref.pathIndex, ref.polylineIndex, 1),
+  );
+}
+
+/** Moves hand-placed tabs on contours after `curveIndex` by `by` contour indices. */
+export function withShiftedContourTabs(
+  edited: SceneObject,
+  pathIndex: number,
+  curveIndex: number,
+  by: number,
+): SceneObject {
+  if (by === 0) return edited;
+  return withFollowedTabs(edited, (anchors) =>
+    anchors.map((anchor) =>
+      anchor.pathIndex === pathIndex && anchor.polylineIndex > curveIndex
+        ? { ...anchor, polylineIndex: anchor.polylineIndex + by }
+        : anchor,
+    ),
+  );
+}
+
+export function mutateObjectCurve(
   state: AppState,
   ref: PathNodeRef,
   mutate: (curves: ReadonlyArray<CurveSubpath>) => ReadonlyArray<CurveSubpath> | null,

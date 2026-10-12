@@ -159,6 +159,8 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'arrange.same-height-proportional': { callback: 'matchSelectionSize', args: ['height', true] },
   'arrange.move-together-horizontal': { callback: 'moveSelectionTogether', args: ['horizontal'] },
   'arrange.move-together-vertical': { callback: 'moveSelectionTogether', args: ['vertical'] },
+  'arrange.mirror-across-line': { callback: 'mirrorSelectionAcrossLine' },
+  'arrange.two-point-rotate-scale': { callback: 'startTwoPointTransform' },
   'arrange.rotate-90-cw': { callback: 'rotateSelectionQuarterTurn', args: [1] },
   'arrange.rotate-90-ccw': { callback: 'rotateSelectionQuarterTurn', args: [-1] },
   'arrange.move-to-bed-center': { callback: 'moveSelectionToBed', args: ['c'] },

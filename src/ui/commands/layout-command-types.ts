@@ -9,6 +9,8 @@ export type LayoutCommandContext = {
   readonly moveSelectionInDrawOrder: (move: DrawOrderMove) => void;
   readonly matchSelectionSize: (kind: SelectionMatchSizeKind, proportional: boolean) => void;
   readonly moveSelectionTogether: (axis: SelectionMoveTogetherAxis) => void;
+  readonly mirrorSelectionAcrossLine: () => void;
+  readonly startTwoPointTransform: () => void;
 };
 
 export type LayoutCommandId =
@@ -21,4 +23,6 @@ export type LayoutCommandId =
   | 'arrange.same-width-proportional'
   | 'arrange.same-height-proportional'
   | 'arrange.move-together-horizontal'
-  | 'arrange.move-together-vertical';
+  | 'arrange.move-together-vertical'
+  | 'arrange.mirror-across-line'
+  | 'arrange.two-point-rotate-scale';

@@ -23,6 +23,11 @@ export const MOVE_TOGETHER_IDS: ReadonlyArray<LayoutCommandId> = [
   'arrange.move-together-vertical',
 ];
 
+export const FREE_TRANSFORM_IDS: ReadonlyArray<LayoutCommandId> = [
+  'arrange.mirror-across-line',
+  'arrange.two-point-rotate-scale',
+];
+
 type Spec = {
   readonly id: LayoutCommandId;
   readonly label: string;
@@ -94,13 +99,27 @@ const REFERENCED: ReadonlyArray<Spec> = [
     title: 'Close the gaps so the selection stacks edge to edge',
     invoke: (ctx) => ctx.moveSelectionTogether('vertical'),
   },
+  {
+    id: 'arrange.mirror-across-line',
+    label: 'Mirror Across Line',
+    title: 'Add a mirrored copy of the selection across the last selected straight line',
+    invoke: (ctx) => ctx.mirrorSelectionAcrossLine(),
+  },
 ];
+
+const TWO_POINT: Spec = {
+  id: 'arrange.two-point-rotate-scale',
+  label: 'Two-Point Rotate / Scale',
+  title: 'Click a pivot, a reference point and its new place to turn the selection',
+  invoke: (ctx) => ctx.startTwoPointTransform(),
+};
 
 export function layoutCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
     ...DRAW_ORDER.map((spec) =>
       command(ctx, spec, ctx.hasSelection, 'Select the artwork to restack first.'),
     ),
+    command(ctx, TWO_POINT, ctx.hasSelection, 'Select the artwork to rotate or scale first.'),
     ...REFERENCED.map((spec) =>
       command(
         ctx,

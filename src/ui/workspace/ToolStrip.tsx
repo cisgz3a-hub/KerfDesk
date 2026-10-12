@@ -16,6 +16,8 @@ import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { useStore } from '../state/store';
 import { curveCommandNode } from '../state/path-node-command-geometry';
+import type { PathNodeRef } from '../state/path-node-edit-actions';
+import type { PathSegmentRef } from '../state/path-segment-actions';
 import { openArtworkCreation } from '../layers/artwork-creation-store';
 import { BooleanCompoundControls } from './BooleanCompoundControls';
 import { NodeCoordinateControls } from './NodeCoordinateControls';
@@ -125,7 +127,6 @@ function NodeCommandBar(props: {
   const corner = useStore((state) => state.cornerSelectedCurveNode);
   const convert = useStore((state) => state.convertSelectedCurveSegment);
   const setStart = useStore((state) => state.setSelectedCurveStart);
-  const breakCurve = useStore((state) => state.breakSelectedCurve);
   const join = useStore((state) => state.joinSelectedCurveNodes);
   if (selected === null || selected.handle !== undefined) return null;
   const object = project.scene.objects.find((candidate) => candidate.id === selected.objectId);
@@ -161,12 +162,7 @@ function NodeCommandBar(props: {
         disabled={!node.closed || selected.pointIndex === 0}
         onClick={setStart}
       />
-      <NodeAction
-        label="Break"
-        title="Break the closed path open at this node"
-        disabled={!node.closed}
-        onClick={breakCurve}
-      />
+      <NodeSegmentActions selected={selected} node={node} />
       <NodeAction
         label="Join"
         title="Join two selected open curve endpoints"
@@ -178,6 +174,55 @@ function NodeCommandBar(props: {
       />
     </div>
   );
+}
+
+// Break, Insert and Delete segment act on the selected node's outgoing segment,
+// the same edits the B, M and D hover keys make.
+function NodeSegmentActions(props: {
+  readonly selected: PathNodeRef;
+  readonly node: NonNullable<ReturnType<typeof curveCommandNode>>;
+}): JSX.Element {
+  const breakCurve = useStore((state) => state.breakSelectedCurve);
+  const insertNode = useStore((state) => state.insertPathNode);
+  const deleteSegment = useStore((state) => state.deletePathSegment);
+  const { selected, node } = props;
+  const noOutgoing = node.outgoingKind === null;
+  return (
+    <>
+      <NodeAction
+        label="Break"
+        title={
+          node.closed
+            ? 'Break the closed path open at this node'
+            : 'Split the open path in two at this node'
+        }
+        disabled={!node.closed && (selected.pointIndex === 0 || noOutgoing)}
+        onClick={breakCurve}
+      />
+      <NodeAction
+        label="Insert"
+        title="Insert a node halfway along the outgoing segment (M over any segment)"
+        disabled={noOutgoing}
+        onClick={() => insertNode(outgoingSegment(selected), 'midpoint')}
+      />
+      <NodeAction
+        label="Delete segment"
+        title="Delete the outgoing segment, opening or splitting the path (D over any segment)"
+        disabled={noOutgoing}
+        onClick={() => deleteSegment(outgoingSegment(selected))}
+      />
+    </>
+  );
+}
+
+function outgoingSegment(node: PathNodeRef): PathSegmentRef {
+  return {
+    objectId: node.objectId,
+    pathIndex: node.pathIndex,
+    curveIndex: node.polylineIndex,
+    segmentIndex: node.pointIndex,
+    t: 0.5,
+  };
 }
 
 function NodeAction(props: {

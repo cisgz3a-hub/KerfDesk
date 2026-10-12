@@ -186,6 +186,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     moveSelectionInDrawOrder: vi.fn(),
     matchSelectionSize: vi.fn(),
     moveSelectionTogether: vi.fn(),
+    mirrorSelectionAcrossLine: vi.fn(),
+    startTwoPointTransform: vi.fn(),
     ...overrides,
   };
 }

@@ -13,6 +13,7 @@ import { useUiStore } from '../state/ui-store';
 import { HoverSizeReadout } from './HoverSizeReadout';
 import { RulerCursorOverlay } from './RulerCursorOverlay';
 import { ExtendShapesOverlay } from './ExtendShapesOverlay';
+import { NodeEditOverlay } from './NodeEditOverlay';
 import { TrimShapesOverlay } from './TrimShapesOverlay';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import type { ViewState } from './view-transform';
@@ -43,6 +44,12 @@ export function WorkspacePointerOverlays(props: {
         enabled={!previewMode && !props.dragging}
       />
       <TrimShapesOverlay
+        project={project}
+        canvasSize={props.canvasSize}
+        viewState={viewState}
+        enabled={!previewMode && !props.dragging}
+      />
+      <NodeEditOverlay
         project={project}
         canvasSize={props.canvasSize}
         viewState={viewState}

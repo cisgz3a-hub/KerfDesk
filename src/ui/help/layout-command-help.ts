@@ -46,6 +46,16 @@ export const LAYOUT_COMMAND_HELP: Readonly<Record<LayoutCommandId, CommandHelpTo
     tooltip:
       'Slide the selected objects or groups left or right until their edges touch, in their current order. The reference (the last one clicked) stays put; heights and vertical positions do not change.',
   },
+  'arrange.mirror-across-line': {
+    family: 'arrange',
+    tooltip:
+      'Select the artwork to mirror, then add a straight two-point line to the selection last. A mirrored copy of the artwork appears on the other side of the line; the original and the line stay. Text, images and barcodes stay editable.',
+  },
+  'arrange.two-point-rotate-scale': {
+    family: 'arrange',
+    tooltip:
+      'Turn the selection about any point: click the pivot, click a reference point, then click where that point should go. Hold Shift on the last click to scale as well. Esc cancels.',
+  },
   'arrange.move-together-vertical': {
     family: 'arrange',
     tooltip:
