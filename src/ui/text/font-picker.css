@@ -108,3 +108,32 @@
   color: var(--lf-text-muted);
   font-size: 13px;
 }
+
+.lf-font-picker-views {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+}
+
+.lf-font-picker-views input[type='range'] {
+  flex: 1;
+  min-width: 80px;
+}
+
+.lf-font-picker-list li[role='option'] {
+  display: flex;
+  align-items: center;
+}
+
+.lf-font-picker-toggles {
+  display: inline-flex;
+  gap: 2px;
+  padding: 0 4px;
+}
+
+.lf-font-picker-list li[role='option'] > .lf-font-picker-option {
+  flex: 1;
+  min-width: 0;
+}

@@ -4,6 +4,7 @@ import type { EmbeddedFont } from '../../core/scene';
 import { AnchoredPopover } from '../common/AnchoredPopover';
 import { cssFamilyForFont, ensureFontCss } from './font-loader';
 import { FontPickerOptions, type PickerFont } from './FontPickerOptions';
+import { SPECIMEN_SIZE_RANGE, useFontPreferences } from './font-preferences-store';
 import './font-picker.css';
 
 type Props = {
@@ -29,6 +30,7 @@ export function FontPicker(props: Props): JSX.Element {
   const select = (key: string): void => {
     if (props.disabled) return;
     props.onChange(key);
+    useFontPreferences.getState().markUsed(key);
     close();
     trigger.current?.focus();
   };
@@ -85,13 +87,15 @@ function FontChooser(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   const [query, setQuery] = useState('');
+  const [view, setView] = useState<FontView>('all');
+  const prefs = useFontPreferences();
   const term = query.trim().toLocaleLowerCase();
   const fonts = useMemo(
     () =>
-      props.fonts.filter((font) =>
+      viewFonts(props.fonts, view, prefs).filter((font) =>
         `${font.name} ${font.category}`.toLocaleLowerCase().includes(term),
       ),
-    [props.fonts, term],
+    [props.fonts, term, view, prefs],
   );
   return (
     <AnchoredPopover
@@ -118,13 +122,71 @@ function FontChooser(props: {
         />
         <span>Arrow keys to browse · Enter to choose</span>
       </div>
+      <FontViewBar view={view} setView={setView} />
       <FontPickerOptions
         fonts={fonts}
         value={props.value}
         sample={props.sample}
         select={props.onSelect}
+        preferences={prefs}
       />
     </AnchoredPopover>
+  );
+}
+
+type FontView = 'all' | 'favourites' | 'recent' | 'hidden';
+
+const VIEWS: ReadonlyArray<readonly [FontView, string]> = [
+  ['all', 'All'],
+  ['favourites', 'Favourites'],
+  ['recent', 'Recent'],
+  ['hidden', 'Hidden'],
+];
+
+// All leaves hidden fonts out; Recent keeps the order they were last used in.
+function viewFonts(
+  fonts: ReadonlyArray<PickerFont>,
+  view: FontView,
+  prefs: ReturnType<typeof useFontPreferences.getState>,
+): ReadonlyArray<PickerFont> {
+  if (view === 'recent') {
+    return prefs.recent.flatMap((key) => fonts.filter((font) => font.key === key));
+  }
+  if (view === 'favourites') return fonts.filter((font) => prefs.favourites.includes(font.key));
+  if (view === 'hidden') return fonts.filter((font) => prefs.hidden.includes(font.key));
+  return fonts.filter((font) => !prefs.hidden.includes(font.key));
+}
+
+function FontViewBar(props: {
+  readonly view: FontView;
+  readonly setView: (view: FontView) => void;
+}): JSX.Element {
+  const specimenPx = useFontPreferences((state) => state.specimenPx);
+  const setSpecimenPx = useFontPreferences((state) => state.setSpecimenPx);
+  return (
+    <div className="lf-font-picker-views">
+      {VIEWS.map(([view, label]) => (
+        <button
+          key={view}
+          type="button"
+          className="lf-btn"
+          aria-pressed={props.view === view}
+          title={`Show ${label.toLocaleLowerCase()} fonts.`}
+          onClick={() => props.setView(view)}
+        >
+          {label}
+        </button>
+      ))}
+      <input
+        type="range"
+        min={SPECIMEN_SIZE_RANGE.min}
+        max={SPECIMEN_SIZE_RANGE.max}
+        value={specimenPx}
+        aria-label="Preview size"
+        title="Make the font previews larger or smaller."
+        onChange={(event) => setSpecimenPx(Number(event.currentTarget.value))}
+      />
+    </div>
   );
 }
 
@@ -146,7 +208,9 @@ function fontChooserKeyBoundary(
 
 function browseFonts(event: React.KeyboardEvent<HTMLDivElement>, selected: string): void {
   const buttons = [
-    ...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"] button'),
+    ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
+      '[role="option"] button[data-font-key]',
+    ),
   ];
   const search = event.target instanceof HTMLInputElement;
   if (search && event.key === 'Enter') {

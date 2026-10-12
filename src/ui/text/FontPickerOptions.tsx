@@ -3,6 +3,14 @@ import type { FontEntry } from '../../core/text';
 import { cssFamilyForFont } from './font-loader';
 import { SingleLineFontPreview } from './SingleLineFontPreview';
 
+export type FontRowPreferences = {
+  readonly favourites: ReadonlyArray<string>;
+  readonly hidden: ReadonlyArray<string>;
+  readonly specimenPx: number;
+  readonly toggleFavourite: (key: string) => void;
+  readonly toggleHidden: (key: string) => void;
+};
+
 export type PickerFont = {
   readonly key: string;
   readonly name: string;
@@ -16,6 +24,7 @@ export function FontPickerOptions(props: {
   readonly value: string;
   readonly sample: string;
   readonly select: (key: string) => void;
+  readonly preferences?: FontRowPreferences;
 }): JSX.Element {
   const list = useRef<HTMLUListElement>(null);
   useLayoutEffect(() => {
@@ -63,6 +72,9 @@ export function FontPickerOptions(props: {
                 aria-hidden="true"
                 className="lf-font-picker-specimen"
                 style={{
+                  ...(props.preferences === undefined
+                    ? {}
+                    : { fontSize: props.preferences.specimenPx }),
                   fontFamily: `'${cssFamilyForFont(font.key)}', ${font.category === 'serif' ? 'serif' : font.category === 'mono' ? 'monospace' : 'system-ui, sans-serif'}`,
                 }}
               >
@@ -70,6 +82,9 @@ export function FontPickerOptions(props: {
               </span>
             )}
           </button>
+          {props.preferences === undefined ? null : (
+            <FontRowToggles fontKey={font.key} name={font.name} preferences={props.preferences} />
+          )}
         </li>
       ))}
     </ul>
@@ -85,4 +100,42 @@ function revealSelectedFont(list: HTMLUListElement): void {
   else if (selected.bottom > bounds.bottom) {
     list.scrollTop += Math.ceil(selected.bottom - bounds.bottom);
   }
+}
+
+// Favourite and hide, beside the font's own button so the row keeps one choice.
+function FontRowToggles(props: {
+  readonly fontKey: string;
+  readonly name: string;
+  readonly preferences: FontRowPreferences;
+}): JSX.Element {
+  const favourite = props.preferences.favourites.includes(props.fontKey);
+  const hidden = props.preferences.hidden.includes(props.fontKey);
+  return (
+    <span className="lf-font-picker-toggles">
+      <button
+        type="button"
+        className="lf-btn"
+        tabIndex={-1}
+        aria-pressed={favourite}
+        aria-label={
+          favourite ? `Remove ${props.name} from favourites` : `Add ${props.name} to favourites`
+        }
+        title={favourite ? 'Remove from favourites.' : 'Add to favourites.'}
+        onClick={() => props.preferences.toggleFavourite(props.fontKey)}
+      >
+        {favourite ? '?' : '?'}
+      </button>
+      <button
+        type="button"
+        className="lf-btn"
+        tabIndex={-1}
+        aria-pressed={hidden}
+        aria-label={hidden ? `Show ${props.name} in the list` : `Hide ${props.name} from the list`}
+        title={hidden ? 'Show this font in the list again.' : 'Hide this font from the list.'}
+        onClick={() => props.preferences.toggleHidden(props.fontKey)}
+      >
+        {hidden ? 'Show' : 'Hide'}
+      </button>
+    </span>
+  );
 }
