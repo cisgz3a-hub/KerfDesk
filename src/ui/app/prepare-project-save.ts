@@ -9,6 +9,7 @@ import {
   type SaveProjectOutcome,
 } from './project-save-completion';
 import { projectSaveNeedsWorker } from './project-save-size';
+import { projectSealReady, sealProjectText } from '../licensing/project-seal';
 
 type ProjectSavePreparationResult =
   | {
@@ -21,6 +22,18 @@ type ProjectSavePreparationResult =
   | { readonly kind: 'stopped'; readonly outcome: SaveProjectOutcome };
 
 export async function prepareProjectSave(
+  ctx: SaveProjectCtx,
+  owner: ProjectSaveOwner,
+  forceDialog: boolean,
+): Promise<ProjectSavePreparationResult> {
+  const result = await prepareUnsealedProjectSave(ctx, owner, forceDialog);
+  if (result.kind !== 'ready') return result;
+  // Sealed after the picker has used the click (ADR-592).
+  await projectSealReady();
+  return { ...result, json: sealProjectText(result.json) };
+}
+
+async function prepareUnsealedProjectSave(
   ctx: SaveProjectCtx,
   owner: ProjectSaveOwner,
   forceDialog: boolean,

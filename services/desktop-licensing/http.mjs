@@ -6,6 +6,7 @@ import { adminCredential } from './crypto.mjs';
 import { createCheckout } from './checkout.mjs';
 import { reconcileCheckout } from './checkout-reconciliation.mjs';
 import { paddleVerifier } from './paddle.mjs';
+import { receiveAdjustment } from './payment-adjustments.mjs';
 import { receivePayment } from './payment-rejections.mjs';
 import { emailLicenceKey } from './licence-email.mjs';
 import { claimOrder, prepareOrder } from './payments.mjs';
@@ -64,6 +65,7 @@ async function paymentWebhook(request, env, authority, options) {
   const event = await verifier(request.headers, raw, authority.now());
   requireValue(event, 401, 'invalid_payment_signature');
   if (event.ignored) return { received: true, ignored: true };
+  if (event.adjustment) return receiveAdjustment(authority, event.adjustment);
   const result = await receivePayment(authority, event);
   // Paddle needs its answer within five seconds; the key email follows the answer.
   const email = emailLicenceKey(authority, env, event, result, options.fetcher).catch(

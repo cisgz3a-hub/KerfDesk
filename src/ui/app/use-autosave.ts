@@ -26,7 +26,7 @@ import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapsho
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
-import { preserveBrowserProProject } from '../state/pending-pro-project';
+import { preserveUnadmittedProProject } from '../state/pending-pro-project';
 import { isAutosaveDiscardPending } from './autosave-file-cleanup';
 
 export const AUTOSAVE_FAILURE_MESSAGE =
@@ -132,9 +132,10 @@ export async function runAutosaveRecovery(
   // is mid-workflow and recovery would clobber it. Leave the slot alone
   // (M15: clearing here silently destroyed the only backup).
   if (!isUntouched()) return;
-  // A browser cannot admit Pro operations. Offer a portable copy before any
+  // A browser cannot admit Pro operations, and desktop Free admits only an
+  // autosave sealed on this computer (ADR-592). Offer a portable copy before any
   // Restore/Discard choice; this source must not be rewritten or cleared here.
-  if (preserveBrowserProProject(record.project, { source: 'autosave', name: null }) !== null) {
+  if (preserveUnadmittedProProject(record.project, { source: 'autosave', name: null }) !== null) {
     await service.retainRecovered(record);
     return;
   }

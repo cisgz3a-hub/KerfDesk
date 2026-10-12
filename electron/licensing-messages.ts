@@ -31,6 +31,10 @@ const PROTOCOL_CODES = [
 export const ERRORS: ReadonlyMap<string, string> = new Map([
   ['device_limit_reached', DEVICE_LIMIT],
   ['trial_expired', 'The Pro trial on this device has ended. KerfDesk Free keeps working.'],
+  [
+    'trial_already_used',
+    'A Pro trial has already been used on this computer, so another cannot start. KerfDesk Free keeps working. Buy Pro or enter your licence key, or email support@kerfdesk.com if you have never tried Pro here.',
+  ],
   ['invalid_credentials', KEY_REFUSED],
   ['invalid_license_tier', KEY_REFUSED],
   ['license_not_found', KEY_REFUSED],

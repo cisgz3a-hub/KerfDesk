@@ -124,7 +124,7 @@ describe('commercial edition (ADR-540)', () => {
   });
   it('keeps Pro in a covered version offline even after updates expire', async () => {
     const h = harness(saved(claims({ updatesUntil: NOW / 1000 - 10 })));
-    h.clock(NOW + 500 * 86_400_000);
+    h.clock(NOW + 29 * 86_400_000);
     expect(await h.runtime.status()).toMatchObject({ state: 'ready', edition: 'pro' });
     expect(h.fetch).not.toHaveBeenCalled();
     expect(
@@ -196,10 +196,10 @@ describe('commercial edition (ADR-540)', () => {
     expect(await paid.runtime.status()).toMatchObject({ edition: 'pro', state: 'unavailable' });
     expect(paid.runtime.proUnlocked()).toBe(true);
   });
-  it('holds only a trial to the clock, and locks Pro in a version newer than the licence covers', async () => {
+  it('holds only a trial to its clock marks, and locks Pro in a version newer than the licence covers', async () => {
     const covered = release('update-manifest', '2026-09-28T00:00:00.000Z', '1.1.0');
-    const paid = harness({ ...saved(), lastSeenAt: NOW / 1000 + 30 * 86_400 });
-    paid.clock(NOW - 600_000);
+    const paid = harness({ ...saved(), lastSeenAt: NOW / 1000 + 20 * 86_400 });
+    paid.clock(NOW - 200_000);
     expect(await paid.runtime.status()).toMatchObject({ state: 'ready', edition: 'pro' });
     expect(await paid.runtime.isReleaseEligible(covered, '1.1.0')).toBe(true);
     const developer = harness({

@@ -4,7 +4,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { mockPlatform } from '../../__fixtures__/file-actions';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import { useLaserStore } from '../state/laser-store';
-import { preserveBrowserProProject, usePendingProProjectStore } from '../state/pending-pro-project';
+import {
+  preserveUnadmittedProProject,
+  usePendingProProjectStore,
+} from '../state/pending-pro-project';
 import { PlatformProvider } from './platform-context';
 import { ProProjectDesktopDialog } from './ProProjectDesktopDialog';
 import { proProject } from './pro-project-test-fixtures';
@@ -31,7 +34,10 @@ afterEach(async () => {
 });
 
 it('summarises preserved features, offers desktop and keeps a cancelled copy available', async () => {
-  const pending = preserveBrowserProProject(proProject(), { source: 'file', name: 'carving.lf2' });
+  const pending = preserveUnadmittedProProject(proProject(), {
+    source: 'file',
+    name: 'carving.lf2',
+  });
   const pickFileForSave = vi.fn(async () => null);
   await act(async () =>
     root.render(
@@ -59,7 +65,7 @@ it('summarises preserved features, offers desktop and keeps a cancelled copy ava
 });
 
 it('never covers active-job controls and presents the preserved project after the job ends', async () => {
-  preserveBrowserProProject(proProject(), { source: 'autosave', name: null });
+  preserveUnadmittedProProject(proProject(), { source: 'autosave', name: null });
   const streamer = step(createStreamer('G1 X1')).state;
   useLaserStore.setState({ streamer });
   await act(async () =>

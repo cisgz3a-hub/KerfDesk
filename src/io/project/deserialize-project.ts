@@ -127,7 +127,8 @@ function normalizeProject(
   const layers = Array.isArray(scene['layers']) ? scene['layers'] : [];
   const groups = Array.isArray(scene['groups']) ? scene['groups'] : [];
   const normalized: Record<string, unknown> = {
-    ...raw,
+    // The device seal belongs to saved text, never the project (ADR-592, project-device-seal.ts).
+    ...Object.fromEntries(Object.entries(raw).filter(([key]) => key !== 'kerfdeskDeviceSeal')),
     device: normalizeDevice(dev),
     optimization: normalizeOptimization(raw['optimization']),
     jobSetup: normalizeProjectJobSetup(raw['jobSetup']),

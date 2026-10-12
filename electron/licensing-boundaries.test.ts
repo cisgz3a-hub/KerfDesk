@@ -8,7 +8,13 @@ import {
   validLicenceKey,
   type LicenceRecord,
 } from './licensing-store';
-import { licensingDeviceId, rememberDeviceId } from './licensing-device';
+import {
+  licensingDeviceId,
+  licensingHardwareId,
+  rememberDeviceId,
+  usableHardwareUuid,
+} from './licensing-device';
+import { grantRequest } from './licensing-grant';
 import { withLicensingRoutes } from './licensing-routes';
 import { createLicensingRuntime } from './licensing-runtime';
 import { licensingRequest } from './licensing-http';
@@ -155,6 +161,52 @@ describe('stable private device binding', () => {
         execute: vi.fn(),
       }),
     ).rejects.toThrow('stable device identity');
+  });
+  it('hashes a real firmware UUID for trials and ignores missing or shared placeholders', async () => {
+    const uuid = 'C4871A6C-372A-D948-A2DE-0F0E3E68BF1F';
+    const execute = vi.fn(async (_file: string, _args: ReadonlyArray<string>) => `${uuid}\r\n`);
+    const digest = await licensingHardwareId({ platform: 'win32', execute, read: vi.fn() });
+    expect(digest).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(digest).not.toContain(uuid);
+    expect(execute.mock.calls[0]?.[0]).toBe('powershell.exe');
+    for (const placeholder of [
+      '03000200-0400-0500-0006-000700080009',
+      '00000000-0000-0000-0000-000000000000',
+      'FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF',
+      '',
+      'Not a UUID',
+    ]) {
+      execute.mockResolvedValue(placeholder);
+      expect(await licensingHardwareId({ platform: 'win32', execute, read: vi.fn() })).toBeNull();
+    }
+    execute.mockRejectedValue(new Error('PowerShell blocked by policy'));
+    expect(await licensingHardwareId({ platform: 'win32', execute, read: vi.fn() })).toBeNull();
+    expect(await licensingHardwareId({ platform: 'darwin', execute, read: vi.fn() })).toBeNull();
+    expect(usableHardwareUuid(uuid)).toBe(uuid.toLowerCase());
+  });
+  it('sends the firmware digest only when starting a trial', () => {
+    const config = {
+      channel: 'commercial',
+      apiOrigin: 'https://licensing.example',
+      entitlementKeys: { k: 'a' },
+      releaseKeys: { k: 'a' },
+      release: null,
+    } as const;
+    const request = {
+      saved: { schemaVersion: 1, lastSeenAt: 0 },
+      device: 'd'.repeat(43),
+      deviceName: 'Test device',
+      hardwareId: 'h'.repeat(43),
+    } as const;
+    expect(grantRequest(config, { ...request, action: 'trial' })?.body).toMatchObject({
+      hardwareId: 'h'.repeat(43),
+    });
+    expect(
+      grantRequest(config, { ...request, action: 'activate', licenseKey: 'KD1.x' })?.body,
+    ).not.toHaveProperty('hardwareId');
+    expect(
+      grantRequest(config, { ...request, action: 'trial', hardwareId: null })?.body,
+    ).not.toHaveProperty('hardwareId');
   });
   it('reads the identity once per process, but tries a failed read again', async () => {
     const read = vi

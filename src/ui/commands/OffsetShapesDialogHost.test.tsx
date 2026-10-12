@@ -149,7 +149,7 @@ describe('Offset Shapes dialog', () => {
     expect(useStore.getState().project.scene.layers[1]?.cnc?.cutType).toBe('v-carve');
   });
 
-  it('applies a single replacement of existing Pro artwork and closes in Free', async () => {
+  it('asks for Pro before replacing existing Pro artwork in Free (ADR-592)', async () => {
     load(10, true);
     const requestPro = vi.fn();
     setActiveEdition({
@@ -159,7 +159,7 @@ describe('Offset Shapes dialog', () => {
       requestPro,
       openLicence: vi.fn(),
     });
-    const onClose = await render();
+    await render();
     const checkbox = [...host.ownerDocument.querySelectorAll('label')]
       .find((label) => label.textContent?.includes('Delete original objects'))
       ?.querySelector<HTMLInputElement>('input');
@@ -168,12 +168,10 @@ describe('Offset Shapes dialog', () => {
       checkbox.checked = true;
       Simulate.change(checkbox);
     });
+    const before = useStore.getState().project;
     await act(async () => button('Offset').click());
-    expect(requestPro).not.toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalledOnce();
-    expect(useStore.getState().project.scene.objects).toHaveLength(1);
-    expect(useStore.getState().project.scene.objects[0]?.id).not.toBe('sq');
-    expect(useStore.getState().project.scene.layers[0]?.cnc?.cutType).toBe('v-carve');
+    expect(requestPro).toHaveBeenCalledWith('vcarve', expect.any(Function));
+    expect(useStore.getState().project).toBe(before);
   });
 
   it('previews the result size and adds both offsets on submit', async () => {

@@ -13,7 +13,7 @@ describe('edit individual trace parts', () => {
   beforeEach(resetStore);
   afterEach(() => setActiveEdition(null));
 
-  it('edits an existing V-carve trace in Free without introducing an operation or a licence prompt', () => {
+  it('asks for Pro before splitting an existing V-carve trace in Free (ADR-592)', () => {
     load(trace());
     useStore.setState((state) => ({
       project: {
@@ -30,15 +30,9 @@ describe('edit individual trace parts', () => {
     const requestPro = vi.fn(() => false);
     setActiveEdition({ ...UNRESTRICTED_EDITION, pro: false, requestPro });
     const before = useStore.getState().project;
-    const id = useStore.getState().detachTracePart('trace', 0, 1);
-    expect(id).toBe('trace__part_1');
-    useStore.getState().selectTracePart(id);
-    expect(useStore.getState().selectedObjectId).toBe(id);
-    expect(useStore.getState().project.scene.layers).toBe(before.scene.layers);
-    expect(pieces()).toHaveLength(2);
-    expect(requestPro).not.toHaveBeenCalled();
-    useStore.getState().undo();
+    useStore.getState().detachTracePart('trace', 0, 1);
     expect(useStore.getState().project).toBe(before);
+    expect(requestPro).toHaveBeenCalledWith('vcarve', expect.any(Function));
   });
 
   it('picks an outer with its hole, preserving exact curves, chords, nesting, metadata and tabs', () => {

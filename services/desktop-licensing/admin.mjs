@@ -178,6 +178,8 @@ const ORDER_RECORDS = [
   'payment:',
   'payment-event:',
   'payment-rejected:',
+  'payment-adjustment:',
+  'adjustment-event:',
 ];
 
 /**
@@ -215,6 +217,10 @@ export function deleteCustomer(authority, body, admin) {
       const orderId = order.slice('order:'.length);
       for (const prefix of ORDER_RECORDS)
         for (const key of tx.keysWhere(prefix, 'orderId', orderId)) doomed.add(key);
+      const transactionId = tx.get(order).providerOrderId;
+      if (transactionId)
+        for (const prefix of ['payment-adjustment:', 'adjustment-event:'])
+          for (const key of tx.keysWhere(prefix, 'transactionId', transactionId)) doomed.add(key);
     }
     for (const key of doomed) tx.delete(key);
     writeAudit(tx, authority, admin, {

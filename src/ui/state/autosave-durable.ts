@@ -4,6 +4,7 @@ import type { AutosaveWriteFailure } from './autosave-record';
 import type { AutosaveWriteResult } from './autosave-record';
 import { UnsupportedAutosaveVersionError } from './autosave-record';
 import { prepareAutosaveRecordOffThread } from './autosave-preparation-client';
+import { projectSealReady } from '../licensing/project-seal';
 import {
   autosaveStorageKeyForSession,
   captureLocalAutosaveWriteRevision,
@@ -241,6 +242,7 @@ export class AutosaveDurableService {
       }
       // A blocked localStorage read need not prevent a durable IndexedDB write.
     }
+    await projectSealReady();
     const prepared = await prepareAutosaveRecordOffThread(
       project,
       savedAt,

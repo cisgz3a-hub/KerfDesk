@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "997b22f63cabf5ef0b0bdce712a27af3b8286ccc",
+  "sinceSourceSha": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
   "highlights": [
-    "Portrait photo engraving adds an output-grid preview. Autosave recovery now sits in a compact status-bar control, keeping recovery choices close without covering the workspace.",
-    "Extend open artwork to the next boundary with a hover preview and Undo. Workspace curve ends extend along their tangent; Design Studio supports straight source ends and curved boundaries.",
-    "KerfDesk Remote brings phone and MCP access into one interface, with artwork editing, layer controls, remembered phones and machine status. Remote controls handle held-jog release and connection ownership more reliably.",
-    "SVG imports preserve child opacity overrides, raster outlines survive pixel rounding, and closed contours join at the correct corner. Node drags and snapping follow the node you grab.",
-    "Presets retain their identity and process settings. Camera addresses and restored board sizes survive preview updates. Imported G-code keeps its playback timing, including dwells, and variable counters stay within saved-project limits.",
-    "CNC manual tabs survive explicit operation bindings. Manual Zero Z evidence stays with the tool and reference that initiated it, and helical pocket checks test the complete ring inside concave boundaries."
+    "Approved full purchase refunds and chargebacks revoke Pro at the next online refresh. New Pro choices require confirmation within 30 days for paid licences or three days for trials. Existing work and output remain available.",
+    "Desktop Free reopens this computer's saved Pro work for settings edits. Imported Pro work and artwork changes ask for Pro; older unsealed projects need Pro once. Trials use a one-way firmware code to recognise repeat use.",
+    "KerfDesk Design Studio brings photo and vector work into one workspace. Individual traced lines and shapes can be selected and edited directly, with better Trim tangencies and curve-preserving Close Path.",
+    "Offline multilingual text shaping, Photoshop composite import and advanced nesting add more design options. Phone & MCP controls are now in the main toolbar with a live status panel.",
+    "Licence purchases recover saved Paddle orders more reliably and work on www and older browsers. Console coordinate changes refresh machine evidence, and exported G-code comments exclude realtime control bytes.",
+    "Saved material recipes retain linked settings. Imports handle cancellation and overlapping file opens more reliably. Controller recovery uses a floating toast that keeps the toolbar in place."
   ]
 }

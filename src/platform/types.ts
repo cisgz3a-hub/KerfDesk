@@ -21,7 +21,8 @@ export type LicenceStatus = {
     | 'updates-expired'
     | 'invalid-licence'
     | 'unavailable'
-    | 'clock-error';
+    | 'clock-error'
+    | 'checkin-required';
   readonly tier: 'trial' | 'paid' | 'developer' | null;
   readonly accessExpiresAt: number | null;
   /** Native remaining trial budget, including retained time; older statuses omit it. */
@@ -64,6 +65,8 @@ export type LicenceAdapter = {
   readonly devices?: (licenseKey?: string) => Promise<LicenceDevices>;
   /** Frees another computer's seat with the key; never touches this device's saved licence. */
   readonly releaseDevice?: (activationId: string, licenseKey?: string) => Promise<LicenceDevices>;
+  /** This computer's project seal key (ADR-592); null in a build without one. */
+  readonly projectSealKey?: () => Promise<string | null>;
   readonly startTrial: () => Promise<LicenceStatus>;
   readonly refresh: () => Promise<LicenceStatus>;
   readonly deactivate: () => Promise<LicenceStatus>;

@@ -1,5 +1,6 @@
 import type { AutosaveRecord, AutosaveRecordReadResult, AutosaveSnapshot } from './autosave-record';
 import { readAutosaveRecord } from './autosave-record';
+import { projectSealReady } from '../licensing/project-seal';
 import { autosaveSessionIdForStorageKey, readLocalAutosaveState } from './autosave-local-storage';
 import type { AutosaveIndexedDbSlot } from './autosave-indexeddb';
 import type { AutosaveDurableRepository } from './autosave-durable-repository';
@@ -40,6 +41,9 @@ export async function readLatestDurableAutosave(
   locks: AutosaveSessionLocks,
   currentSessionId: string,
 ): Promise<AutosaveDurableReadResult> {
+  // Startup recovery must verify this computer's seal after its protected key
+  // has loaded, otherwise valid Pro work would be refused as shared work.
+  await projectSealReady();
   const warnings: AutosaveDurableWarning[] = [];
   const unreadable: AutosaveUnreadableSlot[] = [];
   const candidates = await readCandidates(repository, warnings, unreadable);

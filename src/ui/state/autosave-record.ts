@@ -2,6 +2,8 @@ import type { Project } from '../../core/scene';
 import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { deserializeProject, deserializeProjectValue } from '../../io/project/deserialize-project';
 import { prepareProjectForAutosave } from '../../io/project/prepare-project-autosave';
+import { sealProjectText, trustIfSealedHere } from '../licensing/project-seal';
+import { unadmittedProFeatures } from './pending-pro-project';
 
 export const AUTOSAVE_SCHEMA_VERSION = 1 as const;
 
@@ -48,7 +50,7 @@ export function prepareAutosaveRecord(
   if (prepared.kind !== 'ok') {
     return { kind: 'failed', reason: 'invalid-project', error: new Error(prepared.reason) };
   }
-  return {
+  return sealAutosavePreparation({
     kind: 'ok',
     storageKey,
     record: {
@@ -57,7 +59,19 @@ export function prepareAutosaveRecord(
       projectJson: prepared.json,
       sessionId,
     },
-  };
+  });
+}
+
+/**
+ * Seals a prepared record with this computer's key (ADR-592). A worker has no
+ * key, so the window seals what the worker returns; sealing twice is a no-op.
+ */
+export function sealAutosavePreparation(prepared: AutosavePreparation): AutosavePreparation {
+  if (prepared.kind !== 'ok') return prepared;
+  const projectJson = sealProjectText(prepared.record.projectJson);
+  return projectJson === prepared.record.projectJson
+    ? prepared
+    : { ...prepared, record: { ...prepared.record, projectJson } };
 }
 
 export type AutosaveRecordReadResult =
@@ -72,6 +86,9 @@ export function readAutosaveRecord(
   if (result.kind !== 'ok') {
     return { kind: result.kind === 'invalid' ? 'invalid' : 'unsupported-version' };
   }
+  // Desktop Free restores Pro work only from an autosave sealed here (ADR-592).
+  if (unadmittedProFeatures(result.project).length > 0)
+    trustIfSealedHere(result.project, record.projectJson);
   return {
     kind: 'ok',
     snapshot: {

@@ -58,11 +58,27 @@ export function useEdition(): EditionValue {
   return useContext(EditionContext);
 }
 
+let fallback: EditionValue = DEFAULT_EDITION;
 let active: EditionValue = DEFAULT_EDITION;
 
 /** EditionProvider publishes itself here for callers outside React. */
 export function setActiveEdition(value: EditionValue | null): void {
-  active = value ?? DEFAULT_EDITION;
+  active = value ?? fallback;
+}
+
+/**
+ * A licensed desktop window starts without Pro until its EditionProvider
+ * reports, so nothing opened during startup is admitted as Pro (ADR-592).
+ */
+export function startLicensedEditionLocked(): void {
+  fallback = {
+    status: null,
+    licensed: true,
+    pro: false,
+    requestPro: () => false,
+    openLicence: () => undefined,
+  };
+  active = fallback;
 }
 
 /** The edition this window runs as right now, for callers outside React. */

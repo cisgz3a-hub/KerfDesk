@@ -3,9 +3,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL, URL } from 'node:url';
-import { webcrypto } from 'node:crypto';
+import { createHmac, webcrypto } from 'node:crypto';
 import { decode64 } from './crypto.mjs';
-import { claims, credentials, deviceId, fixture } from './test-support.mjs';
+import { claims, credentials, deviceId, fixture, paddleTransaction } from './test-support.mjs';
 
 // Reuse the repository's pinned Wrangler runtime: no additional service packages.
 const requireWrangler = createRequire(import.meta.resolve('wrangler'));
@@ -212,6 +212,96 @@ test(
       assert.equal((await post('/v1/activations/refresh', credentials(kept.seat))).status, 200);
       const lookup = await post('/v1/admin/licenses/lookup', { licenseId: kept.licenseId }, true);
       assert.equal(lookup.body.activeDevices, 1);
+    } finally {
+      await worker.dispose();
+      f.database.close();
+    }
+  },
+);
+
+test(
+  'real workerd verifies an adjustment and atomically refuses refunded activation, refresh and claim',
+  { timeout: 30_000 },
+  async () => {
+    const f = await fixture();
+    const worker = start(f.env);
+    const post = poster(worker, f.env);
+    const transactionId = `txn_${'c'.repeat(26)}`;
+    const notify = async (event) => {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const raw = JSON.stringify(event);
+      const signature = createHmac('sha256', f.env.PADDLE_WEBHOOK_SECRET)
+        .update(`${timestamp}:${raw}`)
+        .digest('hex');
+      const response = await worker.dispatchFetch('https://licensing.example/v1/payments/webhook', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'cf-connecting-ip': ADDRESS,
+          'paddle-signature': `ts=${timestamp};h1=${signature}`,
+        },
+        body: raw,
+      });
+      return { status: response.status, body: await response.json() };
+    };
+    try {
+      const order = await post(
+        '/v1/admin/orders',
+        {
+          orderId: 'workerd-refund',
+          provider: 'paddle',
+          providerOrderId: transactionId,
+          operation: 'purchase',
+        },
+        true,
+      );
+      assert.equal(order.status, 200);
+      const payment = await notify({
+        event_id: 'evt_paid',
+        event_type: 'transaction.completed',
+        data: paddleTransaction(f.env, { orderId: order.body.orderId, operation: 'purchase' }),
+      });
+      assert.equal(payment.status, 200);
+      const claimed = await post('/v1/orders/claim', order.body);
+      assert.equal(claimed.status, 200);
+      const activate = {
+        licenseKey: claimed.body.licenseKey,
+        deviceId: deviceId(80),
+        deviceName: 'PC',
+      };
+      const seat = await post('/v1/licenses/activate', activate);
+      assert.equal(seat.status, 200);
+      const time = new Date().toISOString();
+      const refund = {
+        event_id: 'evt_refund',
+        event_type: 'adjustment.created',
+        occurred_at: time,
+        data: {
+          id: `adj_${'a'.repeat(26)}`,
+          action: 'refund',
+          status: 'approved',
+          type: 'full',
+          transaction_id: transactionId,
+          created_at: time,
+        },
+      };
+      assert.deepEqual(await notify(refund), {
+        status: 200,
+        body: { received: true, adjustment: 'revoked' },
+      });
+      assert.deepEqual(await notify(refund), {
+        status: 200,
+        body: { received: true, duplicate: true },
+      });
+      for (const [route, body] of [
+        ['/v1/licenses/activate', activate],
+        ['/v1/activations/refresh', credentials(seat.body)],
+        ['/v1/orders/claim', order.body],
+      ])
+        assert.deepEqual(await post(route, body), {
+          status: 403,
+          body: { error: { code: 'license_revoked' } },
+        });
     } finally {
       await worker.dispose();
       f.database.close();

@@ -68,7 +68,7 @@ function connections(site) {
     [
       'The desktop app confirms a saved trial or license',
       site.licensingHost,
-      'At startup and every 30 minutes while open, the app checks whether a quiet weekly license confirmation is due. When due, it sends the installation digest and saved credential. No project, design, machine or job details.',
+      'At startup and every 30 minutes while open, the app checks whether a quiet daily trial or weekly paid license confirmation is due. When due, it sends the installation digest and saved credential. No project, design, machine or job details.',
     ],
     [
       'You open the separate Buy Pro page or check a saved purchase',
@@ -215,6 +215,11 @@ function licensing(site, appPrivacy) {
         an installation digest: a one-way hash of your operating system’s installation ID, worked
         out on your computer, so the ID itself never leaves it
       </li>
+      <li>
+        when starting a trial, a one-way hash of the firmware UUID, if available, to recognise a
+        computer that has already had a trial after Windows is reinstalled. The UUID itself and
+        known placeholder values never leave your computer
+      </li>
       <li>a generic device label, such as “win32 computer”, not your computer’s name</li>
       <li>your license key or credential</li>
       <li>the order details that match a license to its purchase</li>
@@ -225,10 +230,23 @@ function licensing(site, appPrivacy) {
       connection details, such as your IP address and the time.
     </p>
     <p>
-      The desktop app also quietly confirms saved trial or license rights about once a week. It
-      checks whether that confirmation is due at startup and every 30 minutes while open, using the
-      same installation digest and saved credential. A failed connection does not interrupt your
-      work; the app continues to enforce the signed trial expiry on your computer.
+      The desktop app also quietly confirms saved trial rights daily and paid license rights about
+      once a week. It checks whether that confirmation is due at startup and every 30 minutes while
+      open, using the same installation digest and saved credential. A failed connection does not
+      interrupt your work. New Pro choices require a confirmation within three days for trials or 30
+      days for paid licenses. Developer licenses are exempt. Existing work, Frame, Start and Save
+      G-code remain available, and the signed trial expiry still applies on your computer.
+    </p>
+    <p>
+      The licensing service retains trial installation and firmware digests to recognise repeat
+      trials, including after customer license records are deleted. These service-keyed digests have
+      no automatic expiry. The firmware UUID itself is never stored.
+    </p>
+    <p>
+      The licensing service records verified Paddle refund and chargeback references and their
+      effect on a license. Approved full purchase refunds and chargebacks revoke the license;
+      partial and renewal refunds go to support for review. Your next online confirmation picks up a
+      revocation.
     </p>
     <h3>Buying Pro</h3>
     <p>
@@ -360,7 +378,7 @@ export const page = {
     'KerfDesk needs no account for ordinary use. Read about updates, licensing, downloads, optional AI, remote access and machine connections.',
   render: ({ site, appPrivacy = false }) =>
     html`${pageHero({
-      eyebrow: html`Last updated <time datetime="2026-10-10">October 10, 2026</time>`,
+      eyebrow: html`Last updated <time datetime="2026-10-12">October 12, 2026</time>`,
       title: 'Privacy',
       lead: appPrivacy
         ? 'KerfDesk doesn’t track you. This notice covers this privacy page and the KerfDesk app: what each one sends over the network, and what stays on your computer.'

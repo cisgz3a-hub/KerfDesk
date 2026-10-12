@@ -81,11 +81,12 @@ The following remains local unless you send it or approve sharing described in s
 
 ### 3.4 Pro trials and licences
 
-The licensed Windows app contacts our licensing service at license.kerfdesk.com when you start a trial, activate a licence, deactivate a computer, start a purchase or renewal, or confirm a payment. It also confirms your licence in the background about once a week, when you are online. The ordinary browser workspace does not activate a device. The separate purchase page checks availability, creates an order and claims the fulfilled key through documented browser endpoints. Browser renewal and activation are not supported.
+The licensed Windows app contacts our licensing service at license.kerfdesk.com when you start a trial, activate a licence, deactivate a computer, start a purchase or renewal, or confirm a payment. It also confirms your licence in the background when you are online: about once a day during a trial and about once a week for a paid licence. A trial that has not been confirmed for 3 days, or a paid licence for 30 days, pauses new Pro tools until it is confirmed again; your projects and machine control keep working. The ordinary browser workspace does not activate a device. The separate purchase page checks availability, creates an order and claims the fulfilled key through documented browser endpoints. Browser renewal and activation are not supported.
 
 The app sends only:
 
 - **An installation code.** The app reads your Windows installation ID (the “MachineGuid” that Windows creates when it is installed) and turns it, on your computer, into a one-way code (a hash) that only KerfDesk uses. The ID itself never leaves your computer. The app works out this code when it starts, but sends it only for the licence actions listed above. We treat this code as personal information and use it only for licensing. We never match it with information from other companies.
+- **A hardware code, only when you start a trial.** The app reads your computer's firmware (SMBIOS) UUID and turns it, on your computer, into a one-way code that only KerfDesk uses, so a computer gets one trial even if Windows is reinstalled. The UUID itself never leaves your computer, and placeholder values that many computers share are never sent. We use this code only to allow one trial per computer.
 - **A generic device label:** “Windows computer”. Your computer's real name is never sent.
 - **Your licence key**, when you activate it or use it to renew. When the app checks, renews through or deactivates this computer, it sends the licence number, activation number and activation code the service gave this computer.
 - **Order codes**, when you buy or renew: a random checkout code the app makes, and later the order number and one-time claim code that the service gave it.
@@ -93,7 +94,8 @@ The app sends only:
 The licensing service keeps:
 
 - **Your licence:** its number, type (trial or paid), status, key version, issue date, and trial end date or update end date, plus a keyed one-way hash of your licence key, never the key.
-- **Each computer that has used it:** an activation number, a keyed hash of its installation code, the device label, the date it was activated, whether it is still active, and the dates you moved the licence between computers.
+- **Each computer that has used it:** an activation number, a keyed hash of its installation code, the device label, the date it was activated, whether it is still active, and the dates you moved the licence between computers. For a trial, a keyed hash of the hardware code, linked to that trial.
+- **Refunds and chargebacks** that Paddle reports for a licence: Paddle's adjustment number, its type and status, and whether the licence was cancelled or restored as a result.
 - **Your orders:** the order number, Paddle's transaction number and the IDs of Paddle's payment messages, what you bought (with Paddle's price code), the price and currency, and the order's status and dates. If Paddle refuses to create a checkout, it keeps Paddle's error code. If the service refuses a payment, it also keeps Paddle's amounts (price, tax, total and any discount) and the reason. Checkout and claim codes are kept only as keyed hashes.
 - **Records of our own administrative actions**, such as looking up, cancelling or deleting a licence: which licence or order, what was done, and when. They hold no keys, names or email addresses. A trial's licence number is made from the keyed hash of its installation code, so our record of deleting a trial keeps that hash.
 

@@ -1,4 +1,4 @@
-import { clockRolledBack } from './licensing-clock.js';
+import { CHECK_IN_LIMIT, checkInOverdue, clockRolledBack } from './licensing-clock.js';
 import type { LicensingConfig } from './licensing-config.js';
 import type { LicenceRecord } from './licensing-store.js';
 import {
@@ -6,6 +6,7 @@ import {
   verifyEntitlement,
   verifyLicenceRelease,
   type LicenceClaims,
+  type VerifiedRelease,
 } from './licensing-verification.js';
 
 /**
@@ -23,7 +24,8 @@ export type LicenceStatus = {
     | 'updates-expired'
     | 'invalid-licence'
     | 'unavailable'
-    | 'clock-error';
+    | 'clock-error'
+    | 'checkin-required';
   readonly tier: 'trial' | 'paid' | 'developer' | null;
   readonly accessExpiresAt: number | null;
   /** Current main-process trial budget; the signed original deadline is unchanged. */
@@ -152,9 +154,26 @@ export function evaluateLicence(
       claims,
       'Your 30-day Pro trial has ended. KerfDesk Free keeps working. Buy a licence or enter your key to use the Pro tools again.',
     );
+  return summary(...currentRights(claims, release, saved.lastSeenAt, now));
+}
+
+/** Rights that verified and have not ended: due a check-in, beyond their updates, or ready. */
+function currentRights(
+  claims: LicenceClaims,
+  release: VerifiedRelease,
+  lastSeenAt: number,
+  now: number,
+): [LicenceStatus['state'], LicenceClaims, string | null] {
+  if (checkInOverdue(claims, lastSeenAt, now))
+    return ['checkin-required', claims, checkInMessage(claims)];
   if (!licenceCoversRelease(claims, release))
-    return summary('updates-expired', claims, updatesExpiredMessage(claims));
-  return summary('ready', claims);
+    return ['updates-expired', claims, updatesExpiredMessage(claims)];
+  return ['ready', claims, null];
+}
+
+function checkInMessage(claims: LicenceClaims): string {
+  const days = Math.round((CHECK_IN_LIMIT[claims.tier] ?? 0) / 86_400);
+  return `KerfDesk has not confirmed this ${claims.tier === 'trial' ? 'trial' : 'licence'} with the licence service for more than ${days} days, so new Pro tools are paused. Your projects, Frame and Start keep working. Connect to the internet and choose Refresh licence. If this computer’s clock is wrong, turn on Set time automatically in Windows’ Date & time settings first.`;
 }
 
 function updatesExpiredMessage(claims: LicenceClaims): string {

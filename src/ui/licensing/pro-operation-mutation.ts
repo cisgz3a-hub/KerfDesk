@@ -1,6 +1,6 @@
 import type { Project } from '../../core/scene';
 import { proFeaturesUnlocked, requestProFeature } from './edition';
-import { newlyIntroducedProFeature } from './pro-operation-policy';
+import { changedProArtworkFeature, newlyIntroducedProFeature } from './pro-operation-policy';
 import { saveUndoStepName } from '../state/undo-step-names';
 
 type ProjectEditState = {
@@ -8,6 +8,32 @@ type ProjectEditState = {
   readonly projectDocumentEpoch?: number;
 };
 type Mutation<State> = State | Partial<State> | ((state: State) => State | Partial<State>);
+
+/**
+ * Free keeps the store's other edits (text, node and image edits) from changing
+ * existing Pro artwork (ADR-592). A refused patch is not applied and the Pro
+ * prompt explains why. History, document replacement and output never pass here.
+ */
+export function freeProArtworkSetter<State extends ProjectEditState>(
+  set: (update: Mutation<State>) => void,
+): (update: Mutation<State>) => void {
+  return (update) =>
+    set((state: State) => {
+      const patch = typeof update === 'function' ? update(state) : update;
+      if (
+        patch.project === undefined ||
+        patch.project === state.project ||
+        (patch.projectDocumentEpoch !== undefined &&
+          patch.projectDocumentEpoch !== state.projectDocumentEpoch) ||
+        proFeaturesUnlocked()
+      )
+        return patch;
+      const feature = changedProArtworkFeature(state.project, patch.project);
+      if (feature === null) return patch;
+      queueMicrotask(() => requestProFeature(feature));
+      return {};
+    });
+}
 
 /**
  * Guard authoring actions at their shared store mutation boundary. The patch is

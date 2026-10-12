@@ -1,6 +1,24 @@
 /** How often an open KerfDesk repeats its quiet licence check (ADR-523 Amendment 2). */
 export const LICENCE_CHECK_INTERVAL_MS = 30 * 60_000;
 
+/**
+ * Whether a quiet check should ask the licence service now. Paid rights are
+ * confirmed about weekly and a trial daily, so its three-day check-in rarely
+ * shows; an overdue device asks at once (ADR-592).
+ */
+export function licenceRefreshDue(
+  current: { readonly state: string; readonly tier: string | null },
+  refreshedAt: number | undefined,
+  now: number,
+): boolean {
+  if (current.state === 'checkin-required') return true;
+  const interval = current.tier === 'trial' ? 86_400 : 7 * 86_400;
+  return (
+    ['ready', 'updates-expired', 'clock-error'].includes(current.state) &&
+    now - (refreshedAt ?? 0) >= interval
+  );
+}
+
 export type RepeatingTimer = {
   /** Lets the process exit while the timer is still set. */
   readonly unref: () => void;

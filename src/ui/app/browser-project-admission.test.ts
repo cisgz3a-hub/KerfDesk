@@ -4,6 +4,7 @@ import { serializeProjectTemplate } from '../../io/project/project-template';
 import { serializeProject } from '../../io/project';
 import type { FileHandle } from '../../platform/types';
 import { artworkProject } from '../library/personal-artwork-test-fixtures';
+import { setActiveEdition, UNRESTRICTED_EDITION } from '../licensing/edition';
 import { usePendingProProjectStore } from '../state/pending-pro-project';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
@@ -24,6 +25,7 @@ vi.mock('./autosave-file-cleanup', () => ({ clearAutosaveAfterFileHandoff: vi.fn
 
 beforeEach(() => {
   build.browser = true;
+  setActiveEdition(null);
   resetStore();
   usePendingProProjectStore.setState({ pending: null });
   vi.clearAllMocks();
@@ -81,6 +83,7 @@ it('loads ordinary artwork and trace vectors in browser Free', () => {
 
 it('keeps existing desktop Pro project admission unchanged', () => {
   build.browser = false;
+  setActiveEdition(UNRESTRICTED_EDITION);
   const incoming = proProject();
   expect(useStore.getState().setProject(incoming).kind).toBe('loaded');
   expect(useStore.getState().project.scene).toEqual(incoming.scene);
@@ -103,6 +106,7 @@ it('retains the whole multi-sheet file when only inactive artwork needs the exis
   expect(useStore.getState()).toBe(current);
   expect(usePendingProProjectStore.getState().pending?.project).toBe(incoming);
   build.browser = false;
+  setActiveEdition(UNRESTRICTED_EDITION);
   expect(current.setProject(incoming).kind).toBe('loaded');
   expect(useStore.getState().project.sheetBook).toBe(incoming.sheetBook);
 });

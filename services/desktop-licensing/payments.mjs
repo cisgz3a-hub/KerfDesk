@@ -1,6 +1,7 @@
 import { nextUpdateYear } from './authority.mjs';
 import { writeAudit } from './audit.mjs';
 import { ROUTE } from './routes.mjs';
+import { applyPurchaseAdjustments } from './payment-adjustments.mjs';
 import { identifier, requireValue, secret } from './validation.mjs';
 
 export const CATALOG = Object.freeze({ purchase: 4950, renewal: 2000 });
@@ -135,6 +136,15 @@ export async function fulfilVerifiedPayment(authority, event) {
       return { received: true, duplicate: true };
     }
     applyEntitlement(tx, current, now, keyHash);
+    if (
+      event.provider === 'paddle' &&
+      applyPurchaseAdjustments(tx, authority, current, event.providerOrderId) === 'revoked'
+    )
+      writeAudit(tx, authority, null, {
+        route: ROUTE.webhook,
+        target: current.licenseId,
+        outcome: 'adjustment-revoked-before-fulfilment',
+      });
     tx.put(paymentKey, { orderId: event.orderId });
     tx.put(eventKey, identity);
     tx.put(`provider-order:${event.provider}:${event.providerOrderId}`, { orderId: event.orderId });
@@ -192,8 +202,16 @@ export async function claimOrder(authority, body) {
   requireValue(order.status !== 'rejected', 409, 'payment_rejected');
   requireValue(order.status === 'fulfilled', 409, 'payment_pending');
   const license = authority.records.get(`license:${order.licenseId}`);
+  authority.usable(license, authority.now());
+  const licenseKey = await authority.licenseKey(order.licenseId, license.keyVersion);
+  // Key derivation yields. A refund, deletion or rekey must win before disclosure.
+  authority.records.transaction((tx) => {
+    const current = tx.get(`license:${order.licenseId}`);
+    authority.usable(current, authority.now());
+    requireValue(current.keyHash === license.keyHash, 409, 'idempotency_conflict');
+  });
   return {
     licenseId: order.licenseId,
-    licenseKey: await authority.licenseKey(order.licenseId, license?.keyVersion),
+    licenseKey,
   };
 }

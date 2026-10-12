@@ -43,7 +43,6 @@ type OffsetShapesSet = (
 ) => unknown;
 
 export function offsetShapesActions(
-  set: OffsetShapesSet,
   copySet: OffsetShapesSet,
   get: () => OffsetShapesState,
 ): OffsetShapesActions {
@@ -58,13 +57,9 @@ export function offsetShapesActions(
         notifications.forEach((notify) => notify());
         return false;
       }
-      // A single replacement edits existing work, even when Both was requested
-      // and its inward half collapsed. Retained originals or multiple results
-      // create copies. Decide from actual geometry before committing anything.
-      const previousIds = new Set(state.project.scene.objects.map((object) => object.id));
-      const created = next.project.scene.objects.filter((object) => !previousIds.has(object.id));
-      const commit = request.deleteOriginals && created.length === 1 ? set : copySet;
-      const committed = commit(() => next);
+      // Copies and replacements share the Pro admission: without Pro, replacing
+      // existing Pro artwork changes that artwork and asks first (ADR-592).
+      const committed = copySet(() => next);
       if (committed === false) return false;
       notifications.forEach((notify) => notify());
       return true;

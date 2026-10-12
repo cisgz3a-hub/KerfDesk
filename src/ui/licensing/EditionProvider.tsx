@@ -212,6 +212,19 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
   }, [accept, client]);
   useEffect(() => {
     void load();
+    // Reads the main process's local status, not the network. Its quiet checks
+    // can revoke rights or pause a trial between panel visits (ADR-592).
+    const timer = window.setInterval(() => void load(), 30_000);
+    const checkVisible = (): void => {
+      if (document.visibilityState !== 'hidden') void load();
+    };
+    window.addEventListener('focus', checkVisible);
+    document.addEventListener('visibilitychange', checkVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', checkVisible);
+      document.removeEventListener('visibilitychange', checkVisible);
+    };
   }, [load]);
   useTrialExpiry(status, accept, trialClock);
   const isPro = useCallback(
