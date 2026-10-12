@@ -117,6 +117,13 @@ function artworkExportCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
       ctx.exportGeoJson,
     ),
     enabled(
+      'file.print-artwork',
+      'file',
+      'Print artwork...',
+      'Print the selection, or all artwork, at true size in colour or black',
+      ctx.printArtwork,
+    ),
+    enabled(
       'file.import-gcode-artwork',
       'file',
       'Import G-code as artwork...',

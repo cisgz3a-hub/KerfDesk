@@ -50,6 +50,7 @@ export type CommandId =
   | 'file.export-ai'
   | 'file.export-palette'
   | 'file.import-gcode-artwork'
+  | 'file.print-artwork'
   | 'file.open-gcode'
   | 'file.inspect-gcode'
   | 'file.exit'
@@ -242,6 +243,7 @@ export type AppCommandContext = CommandContextSlices & {
   readonly exportAi: () => void;
   readonly exportPalette: () => void;
   readonly importGcodeArtwork: () => void;
+  readonly printArtwork: () => void;
   readonly undo: () => void;
   readonly redo: () => void;
   readonly selectAll: () => void;

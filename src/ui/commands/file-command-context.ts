@@ -1,3 +1,4 @@
+import { usePrintArtworkStore } from './PrintArtworkDialog';
 import { handleImportGcodeArtwork } from '../app/import-gcode-artwork';
 import { handleExportPalette } from '../app/export-palette';
 import { confirmDiscardAsync } from '../app/confirm-discard';
@@ -48,6 +49,7 @@ type FileCommandContext = Pick<
   | 'exportAi'
   | 'exportPalette'
   | 'importGcodeArtwork'
+  | 'printArtwork'
   | 'openGcodePreview'
   | 'inspectCurrentGcode'
   | 'exitApp'
@@ -138,12 +140,19 @@ function artworkFormatExports(
   pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
 ): Pick<
   AppCommandContext,
-  'exportPdf' | 'exportAi' | 'exportPalette' | 'exportEps' | 'exportGeoJson' | 'importGcodeArtwork'
+  | 'exportPdf'
+  | 'exportAi'
+  | 'exportPalette'
+  | 'exportEps'
+  | 'exportGeoJson'
+  | 'importGcodeArtwork'
+  | 'printArtwork'
 > {
   return {
     exportPdf: () => exportArtworkFormat(platform, pushToast, 'pdf'),
     exportAi: () => exportArtworkFormat(platform, pushToast, 'ai'),
     exportPalette: () => void handleExportPalette({ platform, pushToast }),
+    printArtwork: () => usePrintArtworkStore.getState().show(),
     importGcodeArtwork: () =>
       void handleImportGcodeArtwork({
         platform,

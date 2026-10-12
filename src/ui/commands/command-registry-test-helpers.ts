@@ -31,6 +31,7 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     exportAi: vi.fn(),
     exportPalette: vi.fn(),
     importGcodeArtwork: vi.fn(),
+    printArtwork: vi.fn(),
     ...baseCtxAppearance(),
     ...overrides,
   } as AppCommandContext;

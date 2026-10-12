@@ -108,6 +108,11 @@ export const FILE_COMMAND_HELP: Readonly<
     tooltip:
       'Bring the cutting moves of a G-code file in as one editable vector object, placed where the program cuts on this bed (travel moves and laser-off moves are left out; arcs come in as short lines). Only the shapes come across, not speeds, powers or passes. To check or run a program as it is, open it in the G-code Inspector instead.',
   },
+  'file.print-artwork': {
+    family: 'file',
+    tooltip:
+      'Print the selected artwork, or all of it, at true size through the system print dialog: in its own colours or all black, with every line at the width you choose. Text is outlined and variable fields show their current values; the project and the job are not changed. Turn off scaling in the print dialog so sizes stay exact.',
+  },
   'file.exit': {
     family: 'file',
     tooltip:

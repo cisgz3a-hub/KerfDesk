@@ -72,6 +72,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     exportAi: vi.fn(),
     exportPalette: vi.fn(),
     importGcodeArtwork: vi.fn(),
+    printArtwork: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
     selectAll: vi.fn(),
