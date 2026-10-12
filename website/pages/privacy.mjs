@@ -232,20 +232,21 @@ function licensing(site, appPrivacy) {
     </p>
     <h3>Buying Pro</h3>
     <p>
-      Purchase isn’t open yet, and ${appPrivacy ? 'this privacy page' : 'this website'} has no
-      checkout. When purchase opens, payments will be handled by Paddle, the payment provider, as
-      merchant of record and authorised reseller: you purchase from Paddle, while KerfDesk provides
-      the software and licence. Paddle processes the payment and your customer record under
+      ${appPrivacy ? 'This privacy page' : 'This website'} has no checkout. The separate
+      <a href="${site.appUrl}/buy.html">Buy Pro page</a> shows current purchase availability.
+      Payments are handled by Paddle, the payment provider, as merchant of record and authorised
+      reseller: you purchase from Paddle, while KerfDesk provides the software and licence. Paddle
+      processes the payment and your customer record under
       <a href="https://www.paddle.com/legal/privacy">its own privacy notice</a>.
     </p>
     <p>
       The separate Buy Pro page contacts ${site.licensingHost} to check whether purchases are
       available. Checking a saved purchase sends its order reference and secret claim credential,
-      kept in this browser's local storage. When purchase opens, creating an order sends a random
-      request identifier so a retry can recover the same order. These requests send no installation
-      digest, projects, designs, machine details or jobs, and do not activate a phone or use a
-      computer seat. Requests use no cookies. Clearing browser storage can remove the information
-      needed to recover an unfinished purchase.
+      kept in this browser's local storage. Creating an order sends a random request identifier so a
+      retry can recover the same order. These requests send no installation digest, projects,
+      designs, machine details or jobs, and do not activate a phone or use a computer seat. Requests
+      use no cookies. Clearing browser storage can remove the information needed to recover an
+      unfinished purchase.
     </p>
     <h3>Your licence key by email</h3>
     <p>
