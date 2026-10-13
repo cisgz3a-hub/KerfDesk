@@ -1,0 +1,75 @@
+{
+  "scope": "Existing software correctness and isolated performance cohorts. Separate large-path stress results are recorded in large-paths-summary.json.",
+  "baseCommit": "c700863a14dfbed71a49e32182ec3b75b989ebb1",
+  "runtime": {
+    "node": "v24.15.0",
+    "platform": "win32",
+    "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+    "logicalProcessors": 20,
+    "totalMemoryBytes": 33965383680
+  },
+  "uniqueTestFiles": 107,
+  "statuses": {
+    "passed": 937
+  },
+  "cohorts": [
+    {
+      "file": "laser-results.json",
+      "success": true,
+      "files": 18,
+      "passed": 132,
+      "failed": 0,
+      "pending": 0
+    },
+    {
+      "file": "ruida-results.json",
+      "success": true,
+      "files": 3,
+      "passed": 20,
+      "failed": 0,
+      "pending": 0
+    },
+    {
+      "file": "cnc-correctness-results.json",
+      "success": true,
+      "files": 25,
+      "passed": 232,
+      "failed": 0,
+      "pending": 0
+    },
+    {
+      "file": "transport-results.json",
+      "success": true,
+      "files": 50,
+      "passed": 475,
+      "failed": 0,
+      "pending": 0
+    },
+    {
+      "file": "transport-ruida-results.json",
+      "success": true,
+      "files": 5,
+      "passed": 51,
+      "failed": 0,
+      "pending": 0
+    },
+    {
+      "file": "performance-results.json",
+      "success": true,
+      "files": 6,
+      "passed": 26,
+      "failed": 0,
+      "pending": 1
+    },
+    {
+      "file": "dense-coverage-results.json",
+      "success": true,
+      "files": 1,
+      "passed": 1,
+      "failed": 0,
+      "pending": 12
+    }
+  ],
+  "note": "Opt-in dense coverage ran separately. Filtered skips already passed in the main performance cohort. Deduplication includes declaration index because some parameterized cases share titles; failures take precedence over passes, and passes over filtered skips.",
+  "uniqueTests": 937
+}

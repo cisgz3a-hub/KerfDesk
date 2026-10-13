@@ -8,24 +8,15 @@
 //     island-fill group entries both through segment-entry-index, containment
 //     depth through containment-depth — so there is no size ceiling anywhere
 //     in this module.
-//   * Full 2-opt with proper delta-computation is O(n²) per pass and
-//     several passes — adds several hundred lines of edge-case logic
-//     (slice reversal, segment-direction flipping, convergence loop).
-//   * NN gets ~75% of the optimal-tour reduction in TSP literature;
-//     2-opt closes most of the remaining gap.
-//
-// For typical SVG designs (< 50 segments per layer) the NN result is
-// indistinguishable from optimal. A future refinement can layer 2-opt
-// on top of the NN seed without changing this module's signature.
-//
-// Known NN limit: ignores postamble travel. NN can end the last
-// segment far from origin, paying a long park-back trip the original
-// order might have avoided. On 2-segment pathological inputs (one
-// tiny near-origin cut + one long cut ending at origin), NN can
-// pessimize by exactly the length of the tiny cut. Real-world impact:
-// fractions of a millimeter, well under the noise floor for any
-// design with > 2 segments. Full 2-opt with slice-reversal closes
-// this gap when it lands.
+//   * Greedy distance ordering does not guarantee the shortest route,
+//     even for a small group. It does not score controller cycle time.
+//   * Groups/scopes use their selected planning seed, rather than carrying
+//     the previous group's emitted endpoint. Postamble travel is not scored.
+//     These limits can add substantial travel; see the reproducible probes in
+//     scripts/audit-quality-first-laser-paths.mjs.
+//   * A future route refinement must preserve containment, process/pass
+//     dependencies, requested direction and start policies. A shorter route
+//     alone does not establish a faster or equally good physical cut.
 //
 // Per-layer optimization: layer ORDER is user-controlled (color stack)
 // and not reordered here. We only choose the visit order of segments

@@ -1,0 +1,14 @@
+Baseline commit: c700863a14dfbed71a49e32182ec3b75b989ebb1
+Baseline source: segment-entry-index-baseline.ts, exact raw git-show bytes
+Baseline source SHA256: 59DC2633AE8FF105BCF1BD959EF0F15CE6720BAD390009E0098A46E6A0A9A5B0
+Loader: coincident-baseline-vitest.config.mjs
+Loader SHA256: 7B572C7C62C88EBD19A8469616D405F6BD7CD48CA04BC27F371DE0664047EEE6
+Regression file: src/core/job/segment-entry-index-coincident.test.ts
+Regression SHA256: 1DC4F5C2913BD99DBC844559A8FA1239EB1527FF7865726CFA74B650BF338012
+Command from repository root: pnpm exec vitest run --config docs/audits/2026-10-13-machining-stress/fix/coincident-baseline-vitest.config.mjs
+Outcome: exit 1, expected 2 failures / 8 passes. One-location 4,096-path case checked 8,394,752 availability predicates against a 32,768 upper bound. Two-location case checked 8,398,848 against a 65,536 upper bound.
+The loader reads git show HEAD:src/core/job/segment-entry-index.ts and intercepted only that module. HEAD was the baseline commit above for this run. It did not replace or edit shared production source. Reproducing after HEAD changes requires using the recorded baseline commit or archived source in that loader.
+Green command: pnpm exec vitest run src/core/job/segment-entry-index-coincident.test.ts
+Green outcome earlier in this session: 10 passed. Parent's broader laser cohort supplies durable fixed-source results; no redundant green run here.
+File checks: pnpm exec eslint src/core/job/segment-entry-index-coincident.test.ts and pnpm exec prettier --check src/core/job/segment-entry-index-coincident.test.ts passed.
+Independent review: oracle fully enumerates/ranks surviving entry objects, with original ordinal as last tie key; it reuses no implementation helper. Exact source-object identity, forward/reverse/vertex and zero/absent ties, non-consuming repeated queries, monotone segment retirement across locations, one-ULP distinct coordinates, no source mutation, and three fixed duplicate-heavy seeds are asserted. Work bounds count predicate evaluations rather than noisy execution times.

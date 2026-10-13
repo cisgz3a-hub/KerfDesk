@@ -1,0 +1,487 @@
+Already up to date
+Done in 461ms using pnpm v11.3.0
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0
+
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > hands the port over by transferring both streams 5ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > resolves a write only once the worker has queued the bytes 1ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > rejects the write the worker could not send, by its own id 2ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > delivers lines to every subscriber and survives one that throws 1ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > keeps the refill on this side until the worker establishes the snapshot barrier 1ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > leaves the refill with the worker until it confirms the release 0ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > closes the transport rather than resuming refill after a release timeout 3ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > reports a failed refill to whoever owns the containment 0ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > closes the port only after the worker has let go of the streams 1ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > does not let a silent worker hang Disconnect 1ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > cannot re-arm a closing connection through late stop and handover replies 1ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > treats an unsolicited close as a dropped cable 1ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > still stops the worker and closes the port once when Disconnect follows a drop 0ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection (ADR-334) > revokes the pairing through Forget after letting go of the refill 0ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection: line errors (audit connect-1) > hands the fresh port readable to the worker and keeps the session 0ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection: line errors (audit connect-1) > passes on a line error a native worker read on after by itself 0ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection: line errors (audit connect-1) > ends the session like a dropped cable when the port has no readable to give 0ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection: line errors (audit connect-1) > does not hand over a readable once Disconnect has begun 0ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection: port drain before close (audit transport-4) > waits for the port writable to finish before closing the port 71ms
+ ✓ src/platform/web/worker-serial-connection.test.ts > worker serial connection: port drain before close (audit transport-4) > closes the port anyway once the drain deadline passes 3ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > createStreamer > strips blank lines and comments, terminates each line with \n 2ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > createStreamer > returns done state for empty input 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > createStreamer > uses the default 127-byte buffer unless overridden 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > createStreamer > can be configured for ping-pong streaming 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > step — buffer filling > sends as many lines as fit in the rx buffer 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > step — buffer filling > stops at the buffer boundary 1ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > step — buffer filling > sends exactly one queued line per step in ping-pong mode 1ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > step — buffer filling > returns toSend="" when paused 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > pops the head of in-flight on ok 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > makes an error ack terminal (errored) and refuses to send more (P0-1) 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > does not send the next queued line after an error (no laser-on after reject, P0-1) 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > cancels the stream on alarm 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > returns acked=null if an ack arrives with empty in-flight 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > cancels a paused stream on alarm even with nothing in flight 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > marks a drained streaming state errored on an error ack with nothing in flight 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > transitions to done when last line is acked 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > stays paused while the held tail acks out (no done promotion during hold) 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > resume of a fully-drained paused stream completes to done 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > keeps errored terminal when trailing oks drain the in-flight tail (H5) 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > keeps cancelled terminal when trailing oks drain the in-flight tail 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > an alarm ack wipes ALL in-flight accounting, not just the head line 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > wipeInFlight clears in-flight accounting without changing status 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > markErrored is terminal, clears the queue, and keeps step() silent 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > onAck — consuming acks > advances through a long queue without copying its backing array 19ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > pause / resume / cancel > pause halts further sends until resume 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > pause / resume / cancel > pauses an acknowledged tail that is still executing and returns to done on resume 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > pause / resume / cancel > rewinds a paused stream to replay from an acknowledged line on the same program 1ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > pause / resume / cancel > cancel empties the queue and sets status 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > progress > reports completed / total 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > progress > reports 1 for an empty job 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > disconnect > marks the streamer disconnected and clears the queue (terminal state) 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > disconnect > is distinct from cancel — status differs even though queue handling is the same 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > findOversizedLine (M13) > reports the first line that can never fit the RX buffer 0ms
+ ✓ src/core/controllers/grbl/streamer.test.ts > findOversizedLine (M13) > returns null for normal G-code 0ms
+ ✓ src/platform/web/worker-refill-handover.test.ts > worker refill handover: the program crosses once per run > posts the program once as transferred buffers and an arm that carries only the position 7ms
+ ✓ src/platform/web/worker-refill-handover.test.ts > worker refill handover: the program crosses once per run > sends an arm whose size does not grow with the job 60ms
+ ✓ src/platform/web/worker-refill-handover.test.ts > worker refill handover: the program crosses once per run > cannot miss its deadline however slowly a large program is copied 70ms
+ ✓ src/platform/web/worker-refill-handover.test.ts > worker refill handover: the program crosses once per run > does not count the time spent encoding the program against the worker 2ms
+ ✓ src/platform/web/worker-refill-handover.test.ts > worker refill handover: the program crosses once per run > still fails a silent worker at the plain deadline, whatever the program size 96ms
+ ✓ src/platform/web/worker-refill-handover.test.ts > worker refill handover: the program crosses once per run > re-arms a Resume from the program the worker holds, without sending it again 3ms
+ ✓ src/platform/web/worker-refill-handover.test.ts > worker refill handover: the program crosses once per run > sends a new run its own program, even when the lines are the same 1ms
+ ✓ src/platform/web/worker-refill-handover.test.ts > worker refill handover: the program crosses once per run > sends the program again after the worker retires it with an ended stream 1ms
+ ✓ src/platform/web/worker-refill-handover.test.ts > worker refill handover: the program crosses once per run > sends the program again after a stopped refill, which retires it on both sides 1ms
+ ✓ src/platform/web/worker-refill-handover.test.ts > worker refill handover: an arm the worker cannot honour > returns the refill to this thread when the worker refuses the arm 1ms
+ ✓ src/platform/web/worker-refill-handover.test.ts > worker refill handover: an arm the worker cannot honour > keeps the refill on this thread when the program cannot be encoded 1ms
+ ✓ src/ui/state/laser-stream-ack-stall.test.ts > acknowledgement stall containment > resets and recovers on the responsive connection instead of only claiming the sender stopped 61ms
+ ✓ src/ui/state/laser-stream-ack-stall.test.ts > acknowledgement stall containment > allows a healthy 120-second programmed dwell beyond the hold deadline and contains only after its margin expires 20ms
+ ✓ src/ui/state/laser-stream-ack-stall.test.ts > acknowledgement stall containment > freezes late acknowledgements and joins one reset when Disconnect overlaps recovery 16ms
+ ✓ src/ui/state/laser-stream-ack-stall.test.ts > acknowledgement stall containment > retains a stalled sender after an unconfirmed accepted reset and recovers only at a late boot 14ms
+ ✓ src/ui/state/laser-stream-ack-stall.test.ts > acknowledgement stall containment > retains a stalled sender after an unconfirmed rejected reset and recovers only at a late boot 14ms
+ ✓ src/ui/state/laser-stream-ack-stall.test.ts > acknowledgement stall containment > retains a stalled sender after an unconfirmed hung reset and recovers only at a late boot 14ms
+ ✓ src/ui/state/laser-stream-ack-stall.test.ts > acknowledgement stall containment > freezes a non-resettable sender before beam-off acknowledgements can refill it 8ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > replays all three planner moves after twenty real ACKs: acknowledged Jog first 5ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > replays all three planner moves after twenty real ACKs: Idle first 1ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > keeps planner capacity unknown after an acknowledged Run report 1ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > keeps planner capacity unknown after an acknowledged Jog report 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > keeps planner capacity unknown after an acknowledged Hold:0 report 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > keeps planner capacity unknown after an acknowledged Door:0 report 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > keeps planner capacity unknown after an acknowledged Home report 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > keeps planner capacity unknown after an acknowledged Alarm report 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > keeps planner capacity unknown after an acknowledged Check report 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > keeps planner capacity unknown after an acknowledged Sleep report 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > keeps planner capacity unknown after an acknowledged Tool report 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > learns Idle planner capacity independently of RX high-water 128 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > learns Idle planner capacity independently of RX high-water 120 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > refreshes planner capacity at the next qualified Idle without changing RX evidence 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > uses newly qualified Idle capacity for the snapshot in that same report 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > does not replace qualified planner evidence with a larger RX report during motion 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > requires settled host ACK ownership even when the controller reports Idle 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > never guesses planner size when Bf or current-session evidence is missing 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > does not reuse a previous stream snapshot for a new stream owner 0ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > accepts new-session Idle evidence while the disconnected stream awaits recovery 1ms
+ ✓ src/ui/state/laser-planner-capacity-recovery.test.ts > qualified planner capacity and recovery frontier > bounds a reboot without a backlog report by the planner, never by later motion 5ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > arms M4 dynamic power before the fill body, after the M3 preamble 5ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > restores constant power (M3) when a cut group follows a fill group 1ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > emits a single M4 flip for consecutive fill groups (no redundant re-arm) 1ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > leaves a constant-cut-dialect cut-only job byte-identical — never emits M4 0ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > keeps cut and fill on M3 for the M4-incompatible dialect 1ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > cuts under M4 on the default dialect and never emits M3 (ADR-257) 0ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > needs no mode flip between cut and fill on the default dialect (ADR-257) 1ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > keeps the GROUP effective mode on every pass, not the dialect default 1ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > does not re-arm a constant-power multi-pass cut between passes (OR-1) 0ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > emits no motion for a degenerate single-point segment 0ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > drops a vector segment that collapses at emit precision 0ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > puts feed and power on the first real move after a collapsed prefix 0ms
+ ✓ src/core/output/grbl-strategy.fill-power-mode.test.ts > grblStrategy fill dynamic-power mode (ADR-036) > honors explicit vector overrides and switches before each affected group 0ms
+ ✓ src/ui/state/laser-store-streaming-options.test.ts > laser-store profile streaming options > uses the configured RX buffer limit before starting the stream 526ms
+ ✓ src/ui/state/laser-store-streaming-options.test.ts > laser-store profile streaming options > honors ping-pong streaming mode for the initial send window 517ms
+ ✓ src/ui/state/laser-store-streaming-options.test.ts > laser-store grblHAL receive-capacity evidence (ADR-331) > sends only one FluidNC line until its acknowledgement, even with a buffered saved request 521ms
+ ✓ src/ui/state/laser-store-streaming-options.test.ts > laser-store grblHAL receive-capacity evidence (ADR-331) > streams the default-ring window an oversized Bf report proves, not the stock fallback 519ms
+ ✓ src/ui/state/laser-store-streaming-options.test.ts > laser-store grblHAL receive-capacity evidence (ADR-331) > falls back to the stock window when no Bf report arrived this session 514ms
+ ✓ src/ui/state/laser-hosted-refill-abort.test.ts > Abort with the worker-hosted refill armed > puts the soft reset on the wire without waiting for the renderer backlog 95ms
+ ✓ src/ui/state/laser-hosted-refill-abort.test.ts > Abort with the worker-hosted refill armed > still bounds a silent worker and reports that the Abort was not written 72ms
+ ✓ src/ui/state/laser-hosted-refill-tool-change.test.ts > hosted refill after tool-change Continue > arms after the first continued window and takes the fresh ACK ledger at ready 7ms
+ ✓ src/ui/state/laser-hosted-refill-tool-change.test.ts > hosted refill after tool-change Continue > re-arms from the program the worker already holds after the run reaches its M0 3ms
+ ✓ src/ui/state/laser-hosted-refill-tool-change.test.ts > hosted refill after tool-change Continue > does not host a section that enters the next M0 hold within its first window 1ms
+ ✓ src/ui/state/laser-hosted-refill-tool-change.test.ts > hosted refill after tool-change Continue > waits for an outstanding worker release before continuing and re-arming 1ms
+ ✓ src/ui/state/laser-hosted-refill-tool-change.test.ts > hosted refill after tool-change Continue > consumes a held M0 once when two Continue requests cross the release await 1ms
+ ✓ src/ui/state/laser-hosted-refill-tool-change.test.ts > hosted refill after tool-change Continue > does not hand over a replacement session after an old Continue write settles 0ms
+ ✓ src/ui/state/laser-hosted-refill-tool-change.test.ts > hosted refill after tool-change Continue > does not hand over a replacement stream after an old Continue write settles 0ms
+ ✓ src/ui/state/laser-hosted-refill-tool-change.test.ts > hosted refill after tool-change Continue > does not hand over a replacement run after an old Continue write settles 0ms
+ ✓ src/ui/state/laser-hosted-refill-tool-change.test.ts > hosted refill after tool-change Continue > does not hand over a replacement connection after an old Continue write settles 0ms
+ ✓ src/ui/state/laser-hosted-refill-tool-change.test.ts > hosted refill after tool-change Continue > does not hand over a replacement write epoch after an old Continue write settles 0ms
+ ✓ src/ui/state/laser-hosted-refill-tool-change.test.ts > hosted refill after tool-change Continue > rejects a replacement run introduced while Continue waits at ready 0ms
+ ✓ src/core/output/grbl-strategy-per-layer-settings.property.test.ts > grblStrategy per-layer settings (non-negotiable #7, per layer) > emits group sections in job order across 100 fuzzed multi-layer jobs 37ms
+ ✓ src/core/output/grbl-strategy-per-layer-settings.property.test.ts > grblStrategy per-layer settings (non-negotiable #7, per layer) > every section's G1 S values are S0 or that group's own expected S, which appears 31ms
+ ✓ src/core/output/grbl-strategy-per-layer-settings.property.test.ts > grblStrategy per-layer settings (non-negotiable #7, per layer) > every section's G1 F values equal that group's own speed, and each group feeds at least once 26ms
+ ✓ src/core/output/grbl-strategy-per-layer-settings.property.test.ts > grblStrategy per-layer settings (non-negotiable #7, per layer) > two cut layers with different settings each burn at their own S and F (swap detector) 2ms
+ ✓ src/core/gcode-time/program-transport-time.test.ts > emitted serial timing > retains native spindle power-off classification with separate calibration 7ms
+ ✓ src/core/gcode-time/program-transport-time.test.ts > emitted serial timing > retains native fan power-off classification with separate calibration 1ms
+ ✓ src/core/gcode-time/program-transport-time.test.ts > emitted serial timing > cannot pre-transmit the next tool section during motion before M0 31ms
+ ✓ src/core/gcode-time/program-transport-time.test.ts > emitted serial timing > counts the actual trimmed sender bytes and overlaps delivery with earlier execution 0ms
+ ✓ src/core/gcode-time/program-transport-time.test.ts > emitted serial timing > does not transmit host-managed tool changes or invent operator waiting time 2ms
+ ✓ src/core/gcode-time/program-transport-time.test.ts > emitted serial timing > keeps a 20,000-segment vector above its actual serial floor in both clocks 220ms
+ ✓ src/core/gcode-time/program-transport-time.test.ts > emitted serial timing > keeps an alternating-power raster above its actual serial floor in both clocks 55ms
+ ✓ src/core/gcode-time/program-transport-time.test.ts > emitted serial timing > counts fan-off G1 motion as travel with independent calibration 1ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings buffered motion (ADR-331) > warns that a 120-byte window holds only milliseconds of dense raster motion 6ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings buffered motion (ADR-331) > stays silent once a controller-proven 1024-byte window buffers enough motion 3ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings buffered motion (ADR-331) > names a reported ring that narrowed the profile request 1ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings buffered motion (ADR-331) > points a proven-but-unused window at the Machine Setup field 1ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings buffered motion (ADR-331) > never asks to raise the window on the strength of an oversized Bf report 1ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings buffered motion (ADR-331) > tells a stock GRBL operator that the firmware cannot hold more 0ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings buffered motion (ADR-331) > treats ping-pong streaming as one line in flight 0ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings buffered motion (ADR-331) > does not nag about small programs or ones without a motion estimate 0ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings serial delivery (ADR-331) > warns when estimated delivery cannot hide under the planned motion 1ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings serial delivery (ADR-331) > reports long overhead in minutes 0ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings serial delivery (ADR-331) > ignores delivery overhead that is brief or a small share of the job 0ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings unsendable lines (ADR-331) > warns before Frame that Start cannot send a line wider than the window 0ms
+ ✓ src/ui/laser/job-review/stream-throughput-warnings.test.ts > detectStreamThroughputWarnings unsendable lines (ADR-331) > stays silent when the resolved window fits the widest line 0ms
+ ✓ src/core/controllers/grbl/streamer-planner-backpressure.test.ts > grbl streamer under planner back-pressure > never overruns the controller RX buffer while acks are stalled 15ms
+ ✓ src/core/controllers/grbl/streamer-planner-backpressure.test.ts > grbl streamer under planner back-pressure > makes no progress while the controller is silent, then resumes cleanly 5ms
+ ✓ src/core/controllers/grbl/streamer-planner-backpressure.test.ts > grbl streamer under planner back-pressure > survives a long stall without deadlocking or dropping a line 2ms
+ ✓ src/core/controllers/grbl/streamer-planner-backpressure.test.ts > grbl streamer under planner back-pressure > a sender without character counting overruns the very same controller 2ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > narrows the requested receive window to current-session controller evidence 2ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > never raises the requested receive window and treats stale evidence as absent 0ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > uses the conservative stock-GRBL window when live buffer evidence is absent 0ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > uses fluidnc protocol at the final boundary 0ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > uses marlin protocol at the final boundary 0ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > uses smoothieware protocol at the final boundary 0ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > counts a Bf report above any usable ring as grblHAL default 1024-byte ring 0ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > trusts a Bf report up to the streamer cap plus its margin 0ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > narrows a grblHAL request to a smaller reported ring, margin included 0ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > falls back to the stock window on grblHAL when the controller never reported its ring 0ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > bounds a stock GRBL controller by its Bf report exactly like the historical default 0ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > takes the smaller of build-info and reported evidence 0ms
+ ✓ src/ui/state/laser-job-effective-stream-options.test.ts > effectiveStartStreamOptions > retains a FluidNC window as metadata but never treats it as permission to buffer lines 0ms
+ ✓ src/core/controllers/grbl-family-drivers.test.ts > GRBL-family variant drivers > exposes strict build-info proof only on the stock GRBL driver 1ms
+ ✓ src/core/controllers/grbl-family-drivers.test.ts > GRBL-family variant drivers > grblHAL shares GRBL operations except the stock-only build-info proof 1ms
+ ✓ src/core/controllers/grbl-family-drivers.test.ts > GRBL-family variant drivers > FluidNC omits stock-only build proof and downgrades settings writes 0ms
+ ✓ src/core/controllers/grbl-family-drivers.test.ts > GRBL-family variant drivers > marks only grblHAL 0x85 as discarding lines it has not parsed yet 0ms
+ ✓ src/core/controllers/grbl-family-drivers.test.ts > GRBL-family variant drivers > selectControllerDriver resolves every ControllerKind 0ms
+ ✓ src/core/controllers/grbl-family-drivers.test.ts > GRBL-family variant drivers > exposes G38.2 probing only on GRBL-grammar firmwares 0ms
+ ✓ src/core/controllers/grbl-family-drivers.test.ts > GRBL-family variant drivers > allows CNC spindle jobs only on GRBL-dialect firmwares (ADR-098) 0ms
+ ✓ src/core/controllers/grbl-family-drivers.test.ts > GRBL-family variant drivers > exposes realtime overrides only on GRBL-family firmwares 0ms
+ ✓ src/core/controllers/grbl-family-drivers.test.ts > GRBL-family variant drivers > exposes low-power Fire only on the GRBL-family protocol 0ms
+ ✓ src/core/motion-planner/motion-planner.test.ts > junctionVelocity > returns Infinity for a perfectly straight transition (0° turn) 3ms
+ ✓ src/core/motion-planner/motion-planner.test.ts > junctionVelocity > returns 0 for a full reversal (180° turn) 0ms
+ ✓ src/core/motion-planner/motion-planner.test.ts > junctionVelocity > returns a finite, positive velocity for a 90° turn 1ms
+ ✓ src/core/motion-planner/motion-planner.test.ts > junctionVelocity > stops at rapid/feed boundaries but keeps laser-off feed motion continuous 0ms
+ ✓ src/core/motion-planner/motion-planner.test.ts > junctionVelocity > carries feed only through tagged, feed-matched full-runway laser transitions 0ms
+ ✓ src/core/motion-planner/motion-planner.test.ts > junctionVelocity > rises monotonically as the turn opens from a reversal toward straight 0ms
+ ✓ src/core/motion-planner/motion-planner.test.ts > blockTime > rest-to-rest trapezoid (long block, hits target) 0ms
+ ✓ src/core/motion-planner/motion-planner.test.ts > blockTime > rest-to-rest triangle (short block, never hits target) 0ms
+ ✓ src/core/motion-planner/motion-planner.test.ts > blockTime > cruising-to-cruising (entry = exit = target) is just d/v 0ms
+ ✓ src/core/motion-planner/motion-planner.test.ts > blockTime > zero-distance returns zero 0ms
+ ✓ src/core/motion-planner/motion-planner.test.ts > planVelocities — GCO-06 junction clamp to both target speeds > never plans an entry or exit above the block’s own target speed 1ms
+ ✓ src/core/motion-planner/motion-planner.test.ts > planVelocities — GCO-06 junction clamp to both target speeds > keeps every block time non-negative across mixed-speed junctions 0ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > times a long cut close to distance / feed, plus accel and decel 5ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > accumulates monotonically and totals the segments 2ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > adds G4 dwell to the total but not to motion time 1ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > restarts lookahead from rest across the G4 P2.5 synchronization boundary 1ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > restarts lookahead from rest across the M0 synchronization boundary 1ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > restarts lookahead from rest across the M1 synchronization boundary 1ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > restarts lookahead from rest across the M400 synchronization boundary 0ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > restarts lookahead from rest across the M2 synchronization boundary 0ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > restarts lookahead from rest across the M30 synchronization boundary 0ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > restarts lookahead for real spindle and coolant changes but not redundant re-arms 2ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > applies a same-block spindle change before that block motion 1ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > keeps app-style laser power changes on their planned motion span 0ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > flags moves that never sustain their programmed feed 1ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > is empty and finite for a program with no motion 0ms
+ ✓ src/core/gcode-time/program-time.test.ts > buildProgramTime > never produces NaN or Infinity from degenerate limits 0ms
+ ✓ src/core/gcode-time/gcode-timing-plan.test.ts > buildGcodeTimingPlan — timeline totals > times the exact program including a spindle spin-up dwell 10ms
+ ✓ src/core/gcode-time/gcode-timing-plan.test.ts > buildGcodeTimingPlan — emitted command boundaries > includes every dwell emitted for CNC spindle start and RPM changes 5ms
+ ✓ src/core/gcode-time/gcode-timing-plan.test.ts > buildGcodeTimingPlan — emitted command boundaries > stops lookahead across emitted laser shutdown and air-assist transitions 3ms
+ ✓ src/core/gcode-time/gcode-timing-plan.test.ts > buildGcodeTimingPlan — position and route projection > uses the real controller start position for the first emitted move 0ms
+ ✓ src/core/gcode-time/gcode-timing-plan.test.ts > buildGcodeTimingPlan — position and route projection > maps partial route through the planned acceleration profile 0ms
+ ✓ src/core/controllers/grbl/streamer-planner-starvation.test.ts > grbl streamer planner starvation (ADR-331) > drains a 512-block planner through the stock 120-byte window at a 16 ms ack round trip 37ms
+ ✓ src/core/controllers/grbl/streamer-planner-starvation.test.ts > grbl streamer planner starvation (ADR-331) > keeps the planner fed through the grblHAL 1024-byte window at the same latency 34ms
+ ✓ src/core/controllers/grbl/streamer-planner-starvation.test.ts > grbl streamer planner starvation (ADR-331) > still starves the stock window at faster raster segments and a shorter round trip 50ms
+ ✓ src/ui/state/laser-hosted-refill-resume.test.ts > hosted refill after confirmed Pause and Resume > re-arms only after the owned resume window settles, retaining immediate ACK accounting 12ms
+ ✓ src/ui/state/laser-hosted-refill-resume.test.ts > hosted refill after confirmed Pause and Resume > re-arms from the program the worker already holds, sending only the position 2ms
+ ✓ src/ui/state/laser-hosted-refill-resume.test.ts > hosted refill after confirmed Pause and Resume > captures an ACK crossing prepare/ready and suppresses duplicate refills after arm 1ms
+ ✓ src/ui/state/laser-hosted-refill-resume.test.ts > hosted refill after confirmed Pause and Resume > never re-arms a transition cancelled while its resume write is pending 2ms
+ ✓ src/ui/state/laser-hosted-refill-resume.test.ts > hosted refill after confirmed Pause and Resume > does not adopt a cancelled stream when ready arrives after Abort 4ms
+ ✓ src/ui/state/laser-hosted-refill-resume.test.ts > hosted refill after confirmed Pause and Resume > does not hand over a replacement session when its ready barrier arrives late 1ms
+ ✓ src/ui/state/laser-hosted-refill-resume.test.ts > hosted refill after confirmed Pause and Resume > does not hand over a replacement stream when its ready barrier arrives late 1ms
+ ✓ src/ui/state/laser-hosted-refill-resume.test.ts > hosted refill after confirmed Pause and Resume > does not hand over a replacement run when its ready barrier arrives late 1ms
+ ✓ src/ui/state/laser-hosted-refill-resume.test.ts > hosted refill after confirmed Pause and Resume > does not hand over a replacement connection when its ready barrier arrives late 1ms
+ ✓ src/ui/state/laser-hosted-refill-resume.test.ts > hosted refill after confirmed Pause and Resume > does not hand over a replacement write epoch when its ready barrier arrives late 1ms
+ ✓ src/ui/state/laser-stream-ack-batch.test.ts > stream acknowledgements applied per chunk (ADR-352) > writes the same bytes and reaches the same stream state as one ack at a time 142ms
+ ✓ src/ui/state/laser-stream-ack-batch.test.ts > stream acknowledgements applied per chunk (ADR-352) > holds a chunk of acks for one store write, then applies them all 1ms
+ ✓ src/ui/state/laser-stream-ack-batch.test.ts > stream acknowledgements applied per chunk (ADR-352) > applies held acks before any other line in the chunk is handled 3ms
+ ✓ src/ui/state/laser-stream-ack-batch.test.ts > stream acknowledgements applied per chunk (ADR-352) > does not hold an ack while an untracked acknowledgement is owed 1ms
+ ✓ src/ui/state/laser-stream-ack-batch.test.ts > stream acknowledgements applied per chunk (ADR-352) > finishes a job inside one chunk exactly as one ack at a time does 1ms
+ ✓ src/ui/state/laser-hosted-refill.test.ts > hosted refill helpers (ADR-334) > treats a transport without hosting as this side writing refills 2ms
+ ✓ src/ui/state/laser-hosted-refill.test.ts > hosted refill helpers (ADR-334) > hands over only a stream that is actually streaming 1ms
+ ✓ src/ui/state/laser-hosted-refill.test.ts > advanceStream with the refill handed over (ADR-334) > advances its own accounting without writing the refill twice 2ms
+ ✓ src/ui/state/laser-hosted-refill.test.ts > advanceStream with the refill handed over (ADR-334) > writes the refill itself when the transport cannot host it 1ms
+ ✓ src/ui/state/laser-hosted-refill.test.ts > advanceStream with the refill handed over (ADR-334) > takes the refill back the moment the stream stops simply streaming 1ms
+ ✓ src/ui/state/laser-hosted-refill.test.ts > advanceStream with the refill handed over (ADR-334) > takes it back when an error makes the stream terminal 0ms
+ ✓ src/core/output/grbl-strategy.property.test.ts > grblStrategy property tests > is deterministic across 100 fuzz seeds 121ms
+ ✓ src/core/output/grbl-strategy.property.test.ts > grblStrategy property tests > emits zero laser-on-travel issues across 100 random jobs 14ms
+ ✓ src/core/output/grbl-strategy.property.test.ts > grblStrategy property tests > emits zero out-of-bed coords across 100 in-bounds random jobs 16ms
+ ✓ src/core/output/grbl-strategy.property.test.ts > grblStrategy property tests > power-scale: 50% × $30 ∈ {100, 255, 1000} produces the correct S 2ms
+ ✓ src/core/output/grbl-strategy.property.test.ts > grblStrategy property tests > keeps fill overscan runway laser-off 3ms
+ ✓ src/core/output/grbl-strategy.property.test.ts > grblStrategy property tests > is deterministic across 100 fuzz seeds INCLUDING fill groups (continuous-sweep path) 17ms
+ ✓ src/core/output/grbl-strategy.property.test.ts > grblStrategy property tests > emits zero laser-on-travel issues across 100 random jobs WITH fill groups 13ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > public output keeps 25 percent on stored and streamed images 15ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > public output keeps 50 percent on stored and streamed images 2ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > public output keeps 100 percent on stored and streamed images 1ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > threshold preserves fractional full-burn pixels in both compilation paths 1ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > ordered preserves fractional full-burn pixels in both compilation paths 1ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > grayscale preserves fractional full-burn pixels in both compilation paths 1ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > floyd-steinberg preserves fractional full-burn pixels in both compilation paths 1ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > jarvis preserves fractional full-burn pixels in both compilation paths 0ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > stucki preserves fractional full-burn pixels in both compilation paths 0ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > atkinson preserves fractional full-burn pixels in both compilation paths 0ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > burkes preserves fractional full-burn pixels in both compilation paths 0ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > sierra3 preserves fractional full-burn pixels in both compilation paths 0ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > sierra2 preserves fractional full-burn pixels in both compilation paths 0ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > sierra-lite preserves fractional full-burn pixels in both compilation paths 0ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > grayscale keeps tones and minimum power at S max 0.1 3ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > grayscale keeps tones and minimum power at S max 1 2ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > grayscale keeps tones and minimum power at S max 100 1ms
+ ✓ src/core/output/smoothieware-raster-power.test.ts > Smoothieware original-unit raster power > rescales original-unit rows once without mutating or eagerly consuming them 1ms
+ ✓ src/core/gcode-time/program-timeline.test.ts > buildProgramTimeline > places every spindle dwell on its exact raw and sendable line 7ms
+ ✓ src/core/gcode-time/program-timeline.test.ts > buildProgramTimeline > returns Float64 cumulative clocks and route-addressable timed segments 1ms
+ ✓ src/core/gcode-time/program-timeline.test.ts > buildProgramTimeline > uses the supplied controller position before the first emitted line 0ms
+ ✓ src/core/gcode-time/program-timeline.test.ts > buildProgramTimeline > times modal-inch rapid and feed Z moves like their millimetre equivalents 2ms
+ ✓ src/core/gcode-time/program-timeline.test.ts > buildProgramTimeline > exposes an indefinite pause without inventing elapsed seconds 1ms
+ ✓ src/core/gcode-time/program-timeline.test.ts > buildProgramTimeline > does not invent a feed rate from machine limits when emitted F state is unknown 0ms
+ ✓ src/core/gcode-time/program-timeline.test.ts > buildProgramTimeline > returns unavailable before allocating sidecar clocks beyond the segment budget 0ms
+ ✓ src/core/gcode-time/program-timeline.test.ts > buildProgramTimeline > returns unavailable for timing-unknown programs 1ms
+ ✓ src/core/gcode-time/program-timeline.test.ts > buildProgramTimeline > returns unavailable for timing-unknown programs 1ms
+ ✓ src/core/gcode-time/program-timeline.test.ts > buildProgramTimeline > returns unavailable for timing-unknown programs 1ms
+ ✓ src/core/gcode-time/gcode-timing-calibration.test.ts > emitted-program motion calibration > calibrates every laser route and line clock with {"cutTimeScale":2,"travelTimeScale":3} 11ms
+ ✓ src/core/gcode-time/gcode-timing-calibration.test.ts > emitted-program motion calibration > calibrates every laser route and line clock with {"cutTimeScale":0.25,"travelTimeScale":0.5} 2ms
+ ✓ src/core/gcode-time/gcode-timing-calibration.test.ts > emitted-program motion calibration > applies cut calibration to CNC plunge and travel calibration to rapid retract 2ms
+ ✓ src/core/gcode-time/gcode-timing-calibration.test.ts > emitted-program motion calibration > preserves the baseline for invalid calibration {"cutTimeScale":null,"travelTimeScale":-2} 2ms
+ ✓ src/core/gcode-time/gcode-timing-calibration.test.ts > emitted-program motion calibration > preserves the baseline for invalid calibration {"cutTimeScale":null,"travelTimeScale":6} 2ms
+ ✓ src/core/controllers/grbl/stream-pump.test.ts > terminalAckKind (ADR-334) > recognizes the three terminal acknowledgements and nothing else 3ms
+ ✓ src/core/controllers/grbl/stream-pump.test.ts > pumpInboundLine (ADR-334) > leaves the stream untouched for a line that is not an acknowledgement 1ms
+ ✓ src/core/controllers/grbl/stream-pump.test.ts > pumpInboundLine (ADR-334) > advances the stream and refills on an ok 0ms
+ ✓ src/core/controllers/grbl/stream-pump.test.ts > pumpInboundLine (ADR-334) > matches the loop it replaces, line for line 1ms
+ ✓ src/core/controllers/grbl/stream-pump.test.ts > pumpInboundLine (ADR-334) > stops sending once an error makes the stream terminal 0ms
+ ✓ src/core/controllers/grbl/stream-pump.test.ts > pumpInboundLine (ADR-334) > stops sending once an alarm cancels the stream 0ms
+ ✓ src/core/controllers/grbl/stream-pump.test.ts > pumpInboundLine against the firmware simulator (ADR-334) > streams a whole job to completion and the machine executes every line 8ms
+ ✓ src/core/output/marlin-raster-power.test.ts > Marlin fan compiled raster scale > public image output preserves 50 percent at S max 1 13ms
+ ✓ src/core/output/marlin-raster-power.test.ts > Marlin fan compiled raster scale > public image output preserves 50 percent at S max 255 1ms
+ ✓ src/core/output/marlin-raster-power.test.ts > Marlin fan compiled raster scale > public image output preserves 50 percent at S max 1000 1ms
+ ✓ src/core/output/marlin-raster-power.test.ts > Marlin fan compiled raster scale > public image output preserves 50 percent at S max 100 1ms
+ ✓ src/core/output/marlin-raster-power.test.ts > Marlin fan compiled raster scale > preserves zero, partial and full raster power at S max 255 2ms
+ ✓ src/core/output/marlin-raster-power.test.ts > Marlin fan compiled raster scale > preserves zero, partial and full raster power at S max 1000 1ms
+ ✓ src/core/output/marlin-raster-power.test.ts > Marlin fan compiled raster scale > preserves zero, partial and full raster power at S max 100 1ms
+ ✓ src/core/output/marlin-raster-power.test.ts > Marlin fan compiled raster scale > keeps vector percent precision at S max 1 2ms
+ ✓ src/core/output/marlin-raster-power.test.ts > Marlin fan compiled raster scale > keeps vector percent precision at S max 255 1ms
+ ✓ src/core/output/marlin-raster-power.test.ts > Marlin fan compiled raster scale > keeps vector percent precision at S max 1000 1ms
+ ✓ src/core/output/marlin-raster-power.test.ts > Marlin fan compiled raster scale > keeps vector percent precision at S max 100 0ms
+ ✓ src/core/gcode-time/program-time-arc-length.test.ts > true arc length in program timing > retains an R1 circle after a long route despite display-route rounding 8ms
+ ✓ src/core/gcode-time/program-time-arc-length.test.ts > true arc length in program timing > retains an R0.1 circle after a long route despite display-route rounding 1ms
+ ✓ src/core/gcode-time/program-time-arc-length.test.ts > true arc length in program timing > keeps small later motion addressable on the execution route 1ms
+ ✓ src/core/gcode-time/program-time-arc-length.test.ts > true arc length in program timing > keeps precise-length storage optional for rendering-only models 1ms
+ ✓ src/core/gcode-time/program-time-arc-length.test.ts > true arc length in program timing > prices a full circle ending at Z0 using its true 3D length 1ms
+ ✓ src/core/gcode-time/program-time-arc-length.test.ts > true arc length in program timing > prices a full circle ending at Z-5 using its true 3D length 1ms
+ ✓ src/core/motion-planner/plan-velocities.test.ts > planVelocities with a finite planner (ADR-525) > matches a model of a streaming GRBL planner ring of any size 12ms
+ ✓ src/core/motion-planner/plan-velocities.test.ts > planVelocities with a finite planner (ADR-525) > caps a fine raster row at the speed that can still stop within the ring 1ms
+ ✓ src/core/motion-planner/plan-velocities.test.ts > planVelocities with a finite planner (ADR-525) > plans a span the ring can hold whole exactly as unlimited lookahead 1ms
+ ✓ src/core/motion-planner/plan-velocities.test.ts > planVelocities with a finite planner (ADR-525) > ignores a planner size that is not a whole number of blocks 1ms
+ ✓ src/core/controllers/grbl/streamer-tool-change.test.ts > streamer tool-change pause (CNC-01) > sends everything up to the M0 but not the M0, and holds at tool-change 2ms
+ ✓ src/core/controllers/grbl/streamer-tool-change.test.ts > streamer tool-change pause (CNC-01) > step() sends nothing while held at a tool change (non-sending, non-terminal) 0ms
+ ✓ src/core/controllers/grbl/streamer-tool-change.test.ts > streamer tool-change pause (CNC-01) > continueToolChange drops the M0, counts it, and resumes from the spin-up 0ms
+ ✓ src/core/controllers/grbl/streamer-tool-change.test.ts > streamer tool-change pause (CNC-01) > stops even when the M0 is the first line of the batch (char-counted trap) 0ms
+ ✓ src/core/controllers/grbl/streamer-tool-change.test.ts > streamer tool-change pause (CNC-01) > an ack draining the pre-M0 tail does NOT promote tool-change to done 0ms
+ ✓ src/core/controllers/grbl/streamer-tool-change.test.ts > streamer tool-change pause (CNC-01) > does NOT swallow M0 when toolChangePause is off (imported .nc / laser) 0ms
+ ✓ src/core/controllers/grbl/streamer-tool-change.test.ts > streamer tool-change pause (CNC-01) > continueToolChange is a no-op when not held at a tool change 0ms
+ ✓ src/core/gcode-time/gcode-timing-dwell-progress.test.ts > route-confirmed dwell progress > counts the completed same-block dwell for first raw line 7ms
+ ✓ src/core/gcode-time/gcode-timing-dwell-progress.test.ts > route-confirmed dwell progress > counts the completed same-block dwell for motion word first 1ms
+ ✓ src/core/gcode-time/gcode-timing-dwell-progress.test.ts > route-confirmed dwell progress > counts the completed same-block dwell for after earlier motion and dwell 1ms
+ ✓ src/core/gcode-time/gcode-timing-dwell-progress.test.ts > route-confirmed dwell progress > counts the completed same-block dwell for pure Z 1ms
+ ✓ src/core/gcode-time/gcode-timing-dwell-progress.test.ts > route-confirmed dwell progress > counts the completed same-block dwell for arc chords 2ms
+ ✓ src/core/gcode-time/gcode-timing-dwell-progress.test.ts > route-confirmed dwell progress > does not infer a leading, future or trailing dwell from a stationary route boundary 1ms
+ ✓ src/core/gcode-time/gcode-timing-dwell-progress.test.ts > route-confirmed dwell progress > keeps standalone dwells and dwell-only programs dependent on later physical movement 1ms
+ ✓ src/core/gcode-time/gcode-timing-dwell-progress.test.ts > route-confirmed dwell progress > keeps same-block dwell separate from motion calibration and serial delivery 1ms
+ ✓ src/core/gcode-time/gcode-timing-dwell-progress.test.ts > route-confirmed dwell progress > does not admit after-plunge canned-cycle dwells into the strict route timeline 1ms
+ ✓ src/core/gcode-time/estimator-parity.test.ts > parity with estimateJobDuration > square at 1500 mm/min agrees within tolerance 17ms
+ ✓ src/core/gcode-time/estimator-parity.test.ts > parity with estimateJobDuration > square at 600 mm/min agrees within tolerance 2ms
+ ✓ src/core/gcode-time/estimator-parity.test.ts > parity with estimateJobDuration > corner-dense zigzag agrees within tolerance 4ms
+ ✓ src/core/gcode-time/estimator-parity.test.ts > parity with estimateJobDuration > preserves ordering: a slower feed takes longer on the same geometry 2ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > advanceStream MPG completion ownership > starts post-job settlement when the final ack arrives during MPG takeover 6ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > advanceStream write-failure ownership > does not contain a replacement stream when an old refill rejects late 1ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with none and 0 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with none and 0 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with none and 1 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with none and 1 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with none and 2 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with none and 2 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with streaming and 0 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with streaming and 0 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with streaming and 1 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with streaming and 1 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with streaming and 2 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with streaming and 2 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with paused and 0 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with paused and 0 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with paused and 1 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with paused and 1 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with paused and 2 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with paused and 2 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with drained and 0 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with drained and 0 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with drained and 1 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with drained and 1 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with drained and 2 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with drained and 2 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with disconnected and 0 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with disconnected and 0 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with disconnected and 1 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with disconnected and 1 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a ok with disconnected and 2 owed acks 0ms
+ ✓ src/ui/state/laser-stream-ack.test.ts > streamOwnsTerminalAck agrees with the settled owner > matches for a error with disconnected and 2 owed acks 0ms
+ ✓ src/core/gcode-time/program-planner-window.test.ts > program time with a finite planner (ADR-525) > times a fine raster row at the speed a 15-block GRBL planner allows 15ms
+ ✓ src/core/gcode-time/program-planner-window.test.ts > program time with a finite planner (ADR-525) > keeps unlimited lookahead when no planner size is given 5ms
+ ✓ src/core/gcode-time/program-planner-window.test.ts > program time with a finite planner (ADR-525) > gives a undefined device its planner size: 15 blocks 1ms
+ ✓ src/core/gcode-time/program-planner-window.test.ts > program time with a finite planner (ADR-525) > gives a grbl-v1.1 device its planner size: 15 blocks 0ms
+ ✓ src/core/gcode-time/program-planner-window.test.ts > program time with a finite planner (ADR-525) > gives a grblhal device its planner size: 100 blocks 0ms
+ ✓ src/core/gcode-time/program-planner-window.test.ts > program time with a finite planner (ADR-525) > gives a fluidnc device its planner size: 15 blocks 0ms
+ ✓ src/core/gcode-time/program-planner-window.test.ts > program time with a finite planner (ADR-525) > gives a smoothieware device its planner size: 32 blocks 0ms
+ ✓ src/core/gcode-time/program-planner-window.test.ts > program time with a finite planner (ADR-525) > gives a marlin device its planner size: 15 blocks 0ms
+ ✓ src/core/gcode-time/program-planner-window.test.ts > program time with a finite planner (ADR-525) > gives a ruida device its planner size: undefined blocks 0ms
+ ✓ src/core/gcode-time/program-planner-window.test.ts > program time with a finite planner (ADR-525) > plans the timeline of a GRBL device with its planner 6ms
+ ✓ src/core/gcode-time/program-time-3d.test.ts > XYZ program timing > uses the full XYZ length to normalize oblique and vertical block directions 6ms
+ ✓ src/core/gcode-time/program-time-3d.test.ts > XYZ program timing > keeps successive same-direction Z moves continuous 2ms
+ ✓ src/core/gcode-time/program-time-3d.test.ts > XYZ program timing > stops at all 100 pure-Z reversals and matches their analytic triangular time 4ms
+ ✓ src/core/gcode-time/program-time-3d.test.ts > XYZ program timing > limits an oblique corner whose XY projection is straight 1ms
+ ✓ src/core/gcode-time/program-time-3d.test.ts > XYZ program timing > gives the same corner timing after rotating a planar path into the YZ plane 1ms
+ ✓ src/core/gcode-time/program-time-3d.test.ts > XYZ program timing > preserves legacy planar block directions when Z is omitted 0ms
+ ✓ src/core/gcode-time/program-time-coordinate-representation.test.ts > controller-represented CNC timing coordinates > retains the exact GRBL parsed boundary while keeping the emitted F word 7ms
+ ✓ src/core/gcode-time/program-time-coordinate-representation.test.ts > controller-represented CNC timing coordinates > keeps precise arc length in the same represented XYZ/IJ coordinate frame 5ms
+ ✓ src/core/gcode-time/program-time-coordinate-representation.test.ts > controller-represented CNC timing coordinates > preserves an observed initial position without reformatting it as an emitted word 1ms
+ ✓ src/core/gcode-time/program-time-coordinate-representation.test.ts > controller-represented CNC timing coordinates > leaves generic parsing at its existing decimal representation 0ms
+ ✓ src/core/gcode-time/program-time-coordinate-representation.test.ts > controller-represented CNC timing coordinates > opts in only CNC timing on grbl-v1.1 0ms
+ ✓ src/core/gcode-time/program-time-coordinate-representation.test.ts > controller-represented CNC timing coordinates > opts in only CNC timing on grblhal 0ms
+ ✓ src/core/gcode-time/program-time-coordinate-representation.test.ts > controller-represented CNC timing coordinates > opts in only CNC timing on fluidnc 0ms
+ ✓ src/core/gcode-time/program-time-coordinate-representation.test.ts > controller-represented CNC timing coordinates > preserves native marlin coordinate parsing 0ms
+ ✓ src/core/gcode-time/program-time-coordinate-representation.test.ts > controller-represented CNC timing coordinates > preserves native smoothieware coordinate parsing 0ms
+ ✓ src/core/gcode-time/program-time-coordinate-representation.test.ts > controller-represented CNC timing coordinates > preserves native ruida coordinate parsing 0ms
+ ✓ src/core/output/marlin-strategy.property.test.ts > marlinStrategy property tests > is deterministic for inline and fan power across mixed jobs 68ms
+ ✓ src/core/output/marlin-strategy.property.test.ts > marlinStrategy property tests > keeps every travel laser-off for inline and fan power 47ms
+ ✓ src/core/output/marlin-strategy.property.test.ts > marlinStrategy property tests > keeps in-bed cut jobs inside the configured work area 33ms
+ ✓ src/core/output/marlin-strategy.property.test.ts > marlinStrategy property tests > maps percentage power to documented inline and fan PWM scales 8ms
+ ✓ src/core/output/marlin-strategy.property.test.ts > marlinStrategy property tests > pins the configured maximums used by the property contracts 1ms
+ ✓ src/platform/web/web-serial-background-stream.test.ts > background Web Serial refill > reads and refills an image-like stream while hidden without running timers or animation frames 19ms
+ ✓ src/platform/web/serial-wire.test.ts > bounded serial record framing > matches whole-record parsing for different chunk partitions at the length boundary 55ms
+ ✓ src/platform/web/serial-wire.test.ts > bounded serial record framing > discards any number of suffix reads until the same record actually ends 1ms
+ ✓ src/platform/web/serial-wire.test.ts > bounded serial record framing > accepts exactly one terminal CR without changing the record-length limit 1ms
+ ✓ src/platform/web/serial-wire.test.ts > bounded serial record framing > does not share discard mode with a new connection 0ms
+ ✓ src/core/gcode-time/program-native-controller-timing.test.ts > native controller timing context > calibrates 'Smoothieware proportional power and f…' from the artifact device 12ms
+ ✓ src/core/gcode-time/program-native-controller-timing.test.ts > native controller timing context > calibrates 'Marlin fan power independent of inlin…' from the artifact device 2ms
+ ✓ src/core/gcode-time/program-native-controller-timing.test.ts > native controller timing context > calibrates 'default Marlin inline power independe…' from the artifact device 2ms
+ ✓ src/core/gcode-time/gcode-fractional-feed-time.test.ts > emitted positive fractional feed timing > times a long emitted F0.5 cut at half the speed of F1 10ms
+ ✓ src/core/gcode-time/gcode-fractional-feed-time.test.ts > emitted positive fractional feed timing > retains fractional feed kinematics under independent motion-time calibration 2ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 24 to reset-event 2ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 63 to status-report-direct 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 126 to cycle-start-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 33 to feed-hold-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 132 to safety-door-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 133 to motion-cancel-event-if-jogging 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 134 to debug-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 135 to macro-0-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 136 to macro-1-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 137 to macro-2-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 138 to macro-3-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 144 to feed-override-reset-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 145 to feed-override-coarse-plus-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 146 to feed-override-coarse-minus-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 147 to feed-override-fine-plus-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 148 to feed-override-fine-minus-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 149 to rapid-override-reset-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 150 to rapid-override-medium-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 151 to rapid-override-low-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 152 to rapid-override-extra-low-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 153 to spindle-override-reset-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 154 to spindle-override-coarse-plus-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 155 to spindle-override-coarse-minus-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 156 to spindle-override-fine-plus-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 157 to spindle-override-fine-minus-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 158 to spindle-override-stop-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 160 to coolant-flood-toggle-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 161 to coolant-mist-toggle-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 178 to pin-ack-channel-control 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 179 to pin-nak-channel-control 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps command 180 to pin-reset-channel-control 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > distinguishes undefined intercepted byte 128 from defined handlers 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > distinguishes undefined intercepted byte 139 from defined handlers 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > distinguishes undefined intercepted byte 159 from defined handlers 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > distinguishes undefined intercepted byte 190 from defined handlers 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps decoded pin command 256 to pin-low-channel-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps decoded pin command 318 to pin-low-channel-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps decoded pin command 320 to pin-high-channel-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > maps decoded pin command 382 to pin-high-channel-event 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > applies the pinned uint8 command cast only after decoded pin handling 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > leaves ordinary byte 0 for Lineedit 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > leaves ordinary byte 32 for Lineedit 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts > pinned FluidNC v4.0.3 realtime dispatch identity > leaves ordinary byte 127 for Lineedit 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'LF completes one payload record' 2ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'CR completes one payload record' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'CRLF completes a payload then an empt…' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'an empty completed record is separate…' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'a high-byte safety-door command is re…' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'routed realtime bytes retain their co…' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'decoded pin ranges stop before the pi…' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'non-reset ASCII realtime controls ret…' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'Ctrl-X asserts reset dispatch identit…' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'an invalid high byte is removed witho…' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'BE passes through the decoder while B…' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'F8 removal preserves a pending UTF-8 …' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > '0x7F remains ordinary data in fresh n…' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > '0x7F deletes the preceding byte only …' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'Ctrl-L leaves interactive editing bef…' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > 'fragmented C2 A0 dispatches A0 withou…' 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > keeps direct Lineedit CRLF completion separate from base Channel coalescing 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > asserts routed high-byte removal separately from safety-door event identity 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > asserts fragmented UTF-8 realtime decoding separately from ordinary-line removal 0ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > retains only the first 254 ordinary bytes from a 255-byte direct record 1ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > rejects unsupported editor control 1 instead of modeling it 1ms
+ ✓ src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts > pinned FluidNC v4.0.3 direct UartChannel source model > rejects unsupported editor control 27 instead of modeling it 0ms
+ ✓ src/core/output/smoothieware-strategy.property.test.ts > smoothiewareStrategy property tests > is deterministic across mixed cut and fill jobs 50ms
+ ✓ src/core/output/smoothieware-strategy.property.test.ts > smoothiewareStrategy property tests > keeps every travel laser-off across mixed jobs 38ms
+ ✓ src/core/output/smoothieware-strategy.property.test.ts > smoothiewareStrategy property tests > keeps in-bed cut jobs inside the configured work area 30ms
+ ✓ src/core/output/smoothieware-strategy.property.test.ts > smoothiewareStrategy property tests > maps percentage power to the documented fractional S scale 5ms
+ ✓ src/core/output/smoothieware-strategy.property.test.ts > smoothiewareStrategy property tests > pins the profile maximum used by the fractional-scale contract 1ms
+ ✓ src/core/grbl-streaming.test.ts > rxWindowFromReportedCapacity > keeps the 8-byte margin below a plausible report 3ms
+ ✓ src/core/grbl-streaming.test.ts > rxWindowFromReportedCapacity > counts a report above any usable ring as the grblHAL default ring 1ms
+ ✓ src/core/grbl-streaming.test.ts > rxWindowFromReportedCapacity > returns null for a value that cannot bound a window 0ms
+ ✓ src/core/gcode-time/program-dwell-order.test.ts > G4 block execution order > stops before the same-block motion and preserves blending into the next motion 9ms
+ ✓ src/core/gcode-time/program-dwell-order.test.ts > G4 block execution order > preserves both before-motion dwell and after-motion pause on the same block 1ms
+ ✓ src/core/devices/controller-streaming-mode.test.ts > controller streaming-mode compatibility > fluidnc requires ping-pong streaming 2ms
+ ✓ src/core/devices/controller-streaming-mode.test.ts > controller streaming-mode compatibility > marlin requires ping-pong streaming 0ms
+ ✓ src/core/devices/controller-streaming-mode.test.ts > controller streaming-mode compatibility > smoothieware requires ping-pong streaming 0ms
+ ✓ src/core/devices/controller-streaming-mode.test.ts > controller streaming-mode compatibility > preserves supported GRBL-family choices 0ms
+ ✓ src/core/devices/controller-streaming-mode.test.ts > controller streaming-mode compatibility > defines a deterministic answer for every controller kind 1ms
+ ✓ src/core/motion-planner/junction-3d.test.ts > junctionVelocity in XYZ > treats a horizontal-to-vertical transition as a 90 degree corner 2ms
+ ✓ src/core/motion-planner/junction-3d.test.ts > junctionVelocity in XYZ > keeps consecutive vertical moves straight 0ms
+ ✓ src/core/output/grbl-power-modes.test.ts > grblPowerModeWordsForJob > records mixed effective modes within one operation family in emitted order 3ms
+
+ Test Files  50 passed (50)
+      Tests  475 passed (475)
+   Start at  19:37:31
+   Duration  109.50s (transform 12.39s, setup 9.10s, import 49.40s, tests 5.06s, environment 34.26s)
+
+JSON report written to C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/docs/audits/2026-10-13-machining-stress/transport-results.json

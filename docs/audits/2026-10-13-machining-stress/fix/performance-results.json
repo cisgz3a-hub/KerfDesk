@@ -1,0 +1,354 @@
+{
+  "numTotalTestSuites": 12,
+  "numPassedTestSuites": 12,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 27,
+  "numPassedTests": 26,
+  "numFailedTests": 0,
+  "numPendingTests": 1,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 1,
+    "total": 1,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791892935588,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["strict contour nesting work reuse"],
+          "fullName": "strict contour nesting work reuse preserves the original source layout for 600 disconnected dense contours",
+          "status": "passed",
+          "title": "preserves the original source layout for 600 disconnected dense contours",
+          "duration": 908.2703999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["strict contour nesting work reuse"],
+          "fullName": "strict contour nesting work reuse preserves the original source layout for 64 concentric dense contours",
+          "status": "passed",
+          "title": "preserves the original source layout for 64 concentric dense contours",
+          "duration": 294.7475999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["strict contour nesting work reuse"],
+          "fullName": "strict contour nesting work reuse preserves the original source layout for 240 overlapping dense contours",
+          "status": "passed",
+          "title": "preserves the original source layout for 240 overlapping dense contours",
+          "duration": 159.06619999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892959445,
+      "endTime": 1791892960808.0662,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/strict-contour-nesting-performance.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["indexed V-carve source ranking and ring assignment"],
+          "fullName": "indexed V-carve source ranking and ring assignment retains source ranks and first-layout ties for overlapping and nested roots",
+          "status": "passed",
+          "title": "retains source ranks and first-layout ties for overlapping and nested roots",
+          "duration": 6.63980000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed V-carve source ranking and ring assignment"],
+          "fullName": "indexed V-carve source ranking and ring assignment matches vertex, edge, near-boundary and nonfinite witness semantics",
+          "status": "passed",
+          "title": "matches vertex, edge, near-boundary and nonfinite witness semantics",
+          "duration": 1.085800000000063,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed V-carve source ranking and ring assignment"],
+          "fullName": "indexed V-carve source ranking and ring assignment keeps the original ray predicate for extreme coordinates and malformed direct layouts",
+          "status": "passed",
+          "title": "keeps the original ray predicate for extreme coordinates and malformed direct layouts",
+          "duration": 0.5502999999998792,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed V-carve source ranking and ring assignment"],
+          "fullName": "indexed V-carve source ranking and ring assignment matches the old rank and ring oracle for arbitrary roots and witness order",
+          "status": "passed",
+          "title": "matches the old rank and ring oracle for arbitrary roots and witness order",
+          "duration": 46.78279999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed V-carve source ranking and ring assignment"],
+          "fullName": "indexed V-carve source ranking and ring assignment ranks and assigns 600 dense disconnected witnesses with local polygon tests",
+          "status": "passed",
+          "title": "ranks and assigns 600 dense disconnected witnesses with local polygon tests",
+          "duration": 709.0603000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892962020,
+      "endTime": 1791892962785.0603,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/vcarve-region-order-performance.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation prepares radii and chord geometry once per unique cutting chord",
+          "status": "passed",
+          "title": "prepares radii and chord geometry once per unique cutting chord",
+          "duration": 9.067400000000134,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 0 chords",
+          "status": "passed",
+          "title": "matches the original dense measurement with 0 chords",
+          "duration": 1.3542999999999665,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 1 chords",
+          "status": "passed",
+          "title": "matches the original dense measurement with 1 chords",
+          "duration": 4.8822999999999865,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 64 chords",
+          "status": "passed",
+          "title": "matches the original dense measurement with 64 chords",
+          "duration": 11.941499999999905,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 4096 chords",
+          "status": "passed",
+          "title": "matches the original dense measurement with 4096 chords",
+          "duration": 116.17939999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 5000 chords",
+          "status": "passed",
+          "title": "matches the original dense measurement with 5000 chords",
+          "duration": 100.38249999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation rejects distant sweeps before the scalar distance without changing the result",
+          "status": "passed",
+          "title": "rejects distant sweeps before the scalar distance without changing the result",
+          "duration": 71.67420000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation retains duplicate-chord replacement order, zero-depth rounding and vertical sweeps",
+          "status": "passed",
+          "title": "retains duplicate-chord replacement order, zero-depth rounding and vertical sweeps",
+          "duration": 2.7369999999998527,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation retains degenerate, empty and non-finite input results",
+          "status": "passed",
+          "title": "retains degenerate, empty and non-finite input results",
+          "duration": 2.5768000000000484,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation preserves boundary equality and rounding-scale separation with a preceding close sweep",
+          "status": "passed",
+          "title": "preserves boundary equality and rounding-scale separation with a preceding close sweep",
+          "duration": 6.289700000000039,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation keeps scalar overflow evidence after a preceding ordinary sweep",
+          "status": "passed",
+          "title": "keeps scalar overflow evidence after a preceding ordinary sweep",
+          "duration": 0.6253999999998996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the scalar oracle across deterministic varied source boundaries and depths",
+          "status": "passed",
+          "title": "matches the scalar oracle across deterministic varied source boundaries and depths",
+          "duration": 35.77369999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "reports matched dense coverage timing",
+          "status": "skipped",
+          "title": "reports matched dense coverage timing",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892976503,
+      "endTime": 1791892976866.7737,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/vcarve-source-boundary-coverage-performance.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["optimizePaths above the former segment cap"],
+          "fullName": "optimizePaths above the former segment cap optimizes a group far larger than the old 2,000-segment limit",
+          "status": "passed",
+          "title": "optimizes a group far larger than the old 2,000-segment limit",
+          "duration": 59.43340000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths above the former segment cap"],
+          "fullName": "optimizePaths above the former segment cap is deterministic - the same oversized input yields the same order twice",
+          "status": "passed",
+          "title": "is deterministic - the same oversized input yields the same order twice",
+          "duration": 28.368199999999888,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892978072,
+      "endTime": 1791892978159.3682,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/optimize-paths-large-groups.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["multi-artwork connected-script compilation"],
+          "fullName": "multi-artwork connected-script compilation stays byte-exact and measurable",
+          "status": "passed",
+          "title": "stays byte-exact and measurable",
+          "duration": 13728.219299999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892944567,
+      "endTime": 1791892958295.2192,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/io/gcode/connected-script-compile-performance.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["laser workflow performance budgets"],
+          "fullName": "laser workflow performance budgets keeps the small fixture inside every phase budget",
+          "status": "passed",
+          "title": "keeps the small fixture inside every phase budget",
+          "duration": 321.85599999999977,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["laser workflow performance budgets"],
+          "fullName": "laser workflow performance budgets keeps the medium fixture inside every phase budget",
+          "status": "passed",
+          "title": "keeps the medium fixture inside every phase budget",
+          "duration": 411.7743999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["laser workflow performance budgets"],
+          "fullName": "laser workflow performance budgets keeps the large fixture inside every phase budget",
+          "status": "passed",
+          "title": "keeps the large fixture inside every phase budget",
+          "duration": 1343.6725000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892973142,
+      "endTime": 1791892975219.6726,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/__fixtures__/performance/laser-workflow-budgets.test.ts"
+    }
+  ]
+}

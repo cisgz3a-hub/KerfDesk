@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0
+
+ ✓ src/io/rd/emit-rd.test.ts > emitRdFile > emits a non-empty byte stream for a line job 40ms
+ ✓ src/io/rd/emit-rd.test.ts > emitRdFile > refuses a project with no output geometry with a message 1ms
+ ✓ src/io/rd/emit-rd.test.ts > emitRdFile > is deterministic across calls 9ms
+ ✓ src/io/rd/emit-rd.test.ts > emitRdFile > does not make configured bed bounds an export refusal 4ms
+ ✓ src/io/rd/emit-rd.test.ts > emitRdFile > does not make a pre-emit policy finding an export refusal 3ms
+ ✓ src/io/rd/emit-rd.test.ts > emitRdFile > carries the policy finding out as an advisory 4ms
+ ✓ src/io/rd/emit-rd.test.ts > emitRdFile > reports no advisories for a clean project 3ms
+ ✓ src/io/rd/emit-rd.test.ts > emitRdFile reference point > no placement writes {}, then Set Absolute ... Start Process 4ms
+ ✓ src/io/rd/emit-rd.test.ts > emitRdFile reference point > Absolute writes { jobOrigin: { startFrom: 'absolute', anchor: 'front-left' } }, then Set Absolute ... Start Process 6ms
+ ✓ src/io/rd/emit-rd.test.ts > emitRdFile reference point > User Origin writes { jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' } }, then Set Absolute ... Start Process 8ms
+ ✓ src/io/rd/emit-rd.test.ts > emitRdFile reference point > Verified Origin writes { jobOrigin: { startFrom: 'verified-origin', anchor: 'center' } }, then Set Absolute ... Start Process 6ms
+ ✓ src/io/rd/emit-rd.test.ts > emitRdFile reference point > Current Position writes { jobOrigin: { startFrom: 'current-position', anchor: 'front-left', currentPosition: { x: +0, y: +0 } } }, then Set Absolute ... Start Process 4ms
+ ✓ src/io/rd/rd-preflight.test.ts > .rd export post-compile checks > reports a cut through an enabled no-go zone, by layer 15ms
+ ✓ src/io/rd/rd-preflight.test.ts > .rd export post-compile checks > says a zone cannot be checked when the placement has no known bed offset 4ms
+ ✓ src/io/rd/rd-preflight.test.ts > .rd export post-compile checks > warns about the same zone Save G-code warns about, in the same frame 5ms
+ ✓ src/io/rd/rd-preflight.test.ts > .rd export post-compile checks > reports a move past the bed edge without refusing the export 1ms
+ ✓ src/io/rd/rd-preflight.test.ts > .rd export post-compile checks > reports nothing for a job inside the bed and clear of every zone 1ms
+ ✓ src/io/rd/rd-preflight.test.ts > .rd export post-compile checks > gives no G-code line numbers, which the .rd file does not have 1ms
+ ✓ src/io/rd/emit-rd-cnc-refusal.test.ts > CN: CNC project saved on a Ruida profile > refuses to produce an .rd file 26ms
+ ✓ src/io/rd/emit-rd-cnc-refusal.test.ts > CN: CNC project saved on a Ruida profile > names the CNC/router reason, not raster 3ms
+
+ Test Files  3 passed (3)
+      Tests  20 passed (20)
+   Start at  19:58:39
+   Duration  26.70s (transform 16.67s, setup 53ms, import 23.85s, tests 160ms, environment 1.81s)
+
+JSON report written to C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/docs/audits/2026-10-13-machining-stress/fix/ruida-results.json

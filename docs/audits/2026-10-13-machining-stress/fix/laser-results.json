@@ -1,0 +1,1929 @@
+{
+  "numTotalTestSuites": 41,
+  "numPassedTestSuites": 41,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 168,
+  "numPassedTests": 168,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791892440203,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["closed-shape start in emitted G-code (LBG-C04)"],
+          "fullName": "closed-shape start in emitted G-code (LBG-C04) emits byte-identical G-code for drawn, an absent setting and an older file",
+          "status": "passed",
+          "title": "emits byte-identical G-code for drawn, an absent setting and an older file",
+          "duration": 46.31829999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["closed-shape start in emitted G-code (LBG-C04)"],
+          "fullName": "closed-shape start in emitted G-code (LBG-C04) moves the start of a closed shape onto its nearest corner and keeps its arcs",
+          "status": "passed",
+          "title": "moves the start of a closed shape onto its nearest corner and keeps its arcs",
+          "duration": 3.0495999999998276,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892478093,
+      "endTime": 1791892478143.0496,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/io/gcode/closed-shape-start-output.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "new topology metadata across worker, saved Job and exact archive boundaries"
+          ],
+          "fullName": "new topology metadata across worker, saved Job and exact archive boundaries the actual Start preparation worker payload clones parents and preserves emitted bytes after canvas unpacking",
+          "status": "passed",
+          "title": "the actual Start preparation worker payload clones parents and preserves emitted bytes after canvas unpacking",
+          "duration": 102.0643,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "new topology metadata across worker, saved Job and exact archive boundaries"
+          ],
+          "fullName": "new topology metadata across worker, saved Job and exact archive boundaries plain parent/scope records survive the strict export codec and exact replay never reoptimizes them",
+          "status": "passed",
+          "title": "plain parent/scope records survive the strict export codec and exact replay never reoptimizes them",
+          "duration": 46.078599999999824,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "new topology metadata across worker, saved Job and exact archive boundaries"
+          ],
+          "fullName": "new topology metadata across worker, saved Job and exact archive boundaries mixed vector/raster provider hydration retains the original vector parent records and exact program",
+          "status": "passed",
+          "title": "mixed vector/raster provider hydration retains the original vector parent records and exact program",
+          "duration": 55.22980000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "new topology metadata across worker, saved Job and exact archive boundaries"
+          ],
+          "fullName": "new topology metadata across worker, saved Job and exact archive boundaries a v16 sealed heterogeneous-pass Job without new markers still reproduces fixed old bytes under the new emitter revision",
+          "status": "passed",
+          "title": "a v16 sealed heterogeneous-pass Job without new markers still reproduces fixed old bytes under the new emitter revision",
+          "duration": 11.680999999999585,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892465727,
+      "endTime": 1791892465941.681,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/io/gcode/prepared-output-topology-archive.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["registration jig placement — alignment invariance"],
+          "fullName": "registration jig placement — alignment invariance anchors both burn runs to the box, preserving artwork position relative to the box",
+          "status": "passed",
+          "title": "anchors both burn runs to the box, preserving artwork position relative to the box",
+          "duration": 86.86190000000033,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["registration jig placement — alignment invariance"],
+          "fullName": "registration jig placement — alignment invariance places artwork off-origin when it sits away from the box corner",
+          "status": "passed",
+          "title": "places artwork off-origin when it sits away from the box corner",
+          "duration": 1.1222999999999956,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["registration jig placement — alignment invariance"],
+          "fullName": "registration jig placement — alignment invariance emits the artwork toolpath INSIDE the box outline when the art sits inside the box",
+          "status": "passed",
+          "title": "emits the artwork toolpath INSIDE the box outline when the art sits inside the box",
+          "duration": 1.1419000000000779,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["registration jig placement — alignment invariance"],
+          "fullName": "registration jig placement — alignment invariance anchors both runs to the combined bounds of a five-outline fixture set",
+          "status": "passed",
+          "title": "anchors both runs to the combined bounds of a five-outline fixture set",
+          "duration": 2.457300000000032,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892474348,
+      "endTime": 1791892474439.4573,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/io/gcode/registration-placement.property.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "randomized painted passes over real emitter output and every machine origin"
+          ],
+          "fullName": "randomized painted passes over real emitter output and every machine origin 'Falcon grayscale image, 2 passes, air': exposure, containment, beam safety and air assist hold for 60 random selections",
+          "status": "passed",
+          "title": "'Falcon grayscale image, 2 passes, air': exposure, containment, beam safety and air assist hold for 60 random selections",
+          "duration": 2588.5487999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "randomized painted passes over real emitter output and every machine origin"
+          ],
+          "fullName": "randomized painted passes over real emitter output and every machine origin 'GRBL cross-hatched fill with air and …': exposure, containment, beam safety and air assist hold for 60 random selections",
+          "status": "passed",
+          "title": "'GRBL cross-hatched fill with air and …': exposure, containment, beam safety and air assist hold for 60 random selections",
+          "duration": 861.8670999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "randomized painted passes over real emitter output and every machine origin"
+          ],
+          "fullName": "randomized painted passes over real emitter output and every machine origin 'GRBL dithered one-way image': exposure, containment, beam safety and air assist hold for 60 random selections",
+          "status": "passed",
+          "title": "'GRBL dithered one-way image': exposure, containment, beam safety and air assist hold for 60 random selections",
+          "duration": 329.27640000000065,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "randomized painted passes over real emitter output and every machine origin"
+          ],
+          "fullName": "randomized painted passes over real emitter output and every machine origin 'Falcon grayscale image, 2 passes, air': an interrupted painted pass resumes with the same burn geometry from any line",
+          "status": "passed",
+          "title": "'Falcon grayscale image, 2 passes, air': an interrupted painted pass resumes with the same burn geometry from any line",
+          "duration": 48.08419999999933,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "randomized painted passes over real emitter output and every machine origin"
+          ],
+          "fullName": "randomized painted passes over real emitter output and every machine origin 'GRBL cross-hatched fill with air and …': an interrupted painted pass resumes with the same burn geometry from any line",
+          "status": "passed",
+          "title": "'GRBL cross-hatched fill with air and …': an interrupted painted pass resumes with the same burn geometry from any line",
+          "duration": 33.03739999999925,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "randomized painted passes over real emitter output and every machine origin"
+          ],
+          "fullName": "randomized painted passes over real emitter output and every machine origin 'GRBL dithered one-way image': an interrupted painted pass resumes with the same burn geometry from any line",
+          "status": "passed",
+          "title": "'GRBL dithered one-way image': an interrupted painted pass resumes with the same burn geometry from any line",
+          "duration": 17.346700000000055,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892450004,
+      "endTime": 1791892453883.3467,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/laser-second-pass/second-pass.property.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "compensated topology survives splitting, dropping and process partition"
+          ],
+          "fullName": "compensated topology survives splitting, dropping and process partition control: a split dumbbell and vanished slot have four correctly offset closed survivors",
+          "status": "passed",
+          "title": "control: a split dumbbell and vanished slot have four correctly offset closed survivors",
+          "duration": 31.73570000000018,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "compensated topology survives splitting, dropping and process partition"
+          ],
+          "fullName": "compensated topology survives splitting, dropping and process partition finishes every compensated inner survivor before the outer with 'tabs at nonzero power'",
+          "status": "passed",
+          "title": "finishes every compensated inner survivor before the outer with 'tabs at nonzero power'",
+          "duration": 7.3047999999998865,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "compensated topology survives splitting, dropping and process partition"
+          ],
+          "fullName": "compensated topology survives splitting, dropping and process partition finishes every compensated inner survivor before the outer with 'perforation'",
+          "status": "passed",
+          "title": "finishes every compensated inner survivor before the outer with 'perforation'",
+          "duration": 9.485999999999876,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "compensated topology survives splitting, dropping and process partition"
+          ],
+          "fullName": "compensated topology survives splitting, dropping and process partition finishes every compensated inner survivor before the outer with 'tabs and perforation'",
+          "status": "passed",
+          "title": "finishes every compensated inner survivor before the outer with 'tabs and perforation'",
+          "duration": 7.622299999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "compensated topology survives splitting, dropping and process partition"
+          ],
+          "fullName": "compensated topology survives splitting, dropping and process partition interleaves depth 2/1/0 settings while preserving unequal passes and final-pass-only overcut",
+          "status": "passed",
+          "title": "interleaves depth 2/1/0 settings while preserving unequal passes and final-pass-only overcut",
+          "duration": 3.3410999999998694,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "compensated topology survives splitting, dropping and process partition"
+          ],
+          "fullName": "compensated topology survives splitting, dropping and process partition keeps each depth 2/1/0 contour and its low-power 'tabs' paired across unequal passes",
+          "status": "passed",
+          "title": "keeps each depth 2/1/0 contour and its low-power 'tabs' paired across unequal passes",
+          "duration": 3.4220000000000255,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "compensated topology survives splitting, dropping and process partition"
+          ],
+          "fullName": "compensated topology survives splitting, dropping and process partition keeps each depth 2/1/0 contour and its low-power 'tabs and perforation' paired across unequal passes",
+          "status": "passed",
+          "title": "keeps each depth 2/1/0 contour and its low-power 'tabs and perforation' paired across unequal passes",
+          "duration": 11.384000000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "compensated topology survives splitting, dropping and process partition"
+          ],
+          "fullName": "compensated topology survives splitting, dropping and process partition control: source-order keeps the exact compiled compound tab/perforation output",
+          "status": "passed",
+          "title": "control: source-order keeps the exact compiled compound tab/perforation output",
+          "duration": 4.148099999999886,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "compensated topology survives splitting, dropping and process partition"
+          ],
+          "fullName": "compensated topology survives splitting, dropping and process partition control: disabling inside-first preserves the nearest outer-first plan",
+          "status": "passed",
+          "title": "control: disabling inside-first preserves the nearest outer-first plan",
+          "duration": 2.0471000000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892471556,
+      "endTime": 1791892471637.047,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/compile-job-compensated-topology.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["K1 operation topology survives process settings"],
+          "fullName": "K1 operation topology survives process settings keeps a separate hole inward with a 'power scale'",
+          "status": "passed",
+          "title": "keeps a separate hole inward with a 'power scale'",
+          "duration": 14.126299999999901,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 operation topology survives process settings"],
+          "fullName": "K1 operation topology survives process settings keeps a separate hole inward with a 'speed override'",
+          "status": "passed",
+          "title": "keeps a separate hole inward with a 'speed override'",
+          "duration": 2.2735000000000127,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 operation topology survives process settings"],
+          "fullName": "K1 operation topology survives process settings counts a kerf-zero plate as the container of a separately compensated hole",
+          "status": "passed",
+          "title": "counts a kerf-zero plate as the container of a separately compensated hole",
+          "duration": 1.3287000000000262,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 operation topology survives process settings"],
+          "fullName": "K1 operation topology survives process settings interleaves a depth-two island, a differently fed hole, and their outer plate",
+          "status": "passed",
+          "title": "interleaves a depth-two island, a differently fed hole, and their outer plate",
+          "duration": 2.7312000000001717,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 operation topology survives process settings"],
+          "fullName": "K1 operation topology survives process settings control: source order retains the user-selected process-group traversal",
+          "status": "passed",
+          "title": "control: source order retains the user-selected process-group traversal",
+          "duration": 0.8154000000001815,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 operation topology survives process settings"],
+          "fullName": "K1 operation topology survives process settings does not engrave a hole when its object has another power setting",
+          "status": "passed",
+          "title": "does not engrave a hole when its object has another power setting",
+          "duration": 5.164700000000039,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 operation topology survives process settings"],
+          "fullName": "K1 operation topology survives process settings engraves an island once with its own power while retaining the surrounding hole",
+          "status": "passed",
+          "title": "engraves an island once with its own power while retaining the surrounding hole",
+          "duration": 2.399400000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 operation topology survives process settings"],
+          "fullName": "K1 operation topology survives process settings control: a uniform Fill already retains both the void and its material island",
+          "status": "passed",
+          "title": "control: a uniform Fill already retains both the void and its material island",
+          "duration": 2.0424000000000433,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 operation topology survives process settings"],
+          "fullName": "K1 operation topology survives process settings control: contours assigned to separate operations do not change each other's kerf side",
+          "status": "passed",
+          "title": "control: contours assigned to separate operations do not change each other's kerf side",
+          "duration": 1.4385999999999513,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 operation topology survives process settings"],
+          "fullName": "K1 operation topology survives process settings control: a Fill override contributes no container to the Line topology",
+          "status": "passed",
+          "title": "control: a Fill override contributes no container to the Line topology",
+          "duration": 1.1596000000001823,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 operation topology survives process settings"],
+          "fullName": "K1 operation topology survives process settings control: coincident contours with different power stay separate outer cuts",
+          "status": "passed",
+          "title": "control: coincident contours with different power stay separate outer cuts",
+          "duration": 1.4326000000000931,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892482088,
+      "endTime": 1791892482122.4326,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/compile-job-process-topology.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["rotated image burn fidelity"],
+          "fullName": "rotated image burn fidelity keeps thin Threshold strokes at every quarter turn, as the unrotated burn does",
+          "status": "passed",
+          "title": "keeps thin Threshold strokes at every quarter turn, as the unrotated burn does",
+          "duration": 28.25369999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["rotated image burn fidelity"],
+          "fullName": "rotated image burn fidelity never averages a Threshold image, which would erase every sub-half-cell stroke",
+          "status": "passed",
+          "title": "never averages a Threshold image, which would erase every sub-half-cell stroke",
+          "duration": 40.31680000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["rotated image burn fidelity"],
+          "fullName": "rotated image burn fidelity keeps every sub-cell white line on a quarter turn at non-integer densities",
+          "status": "passed",
+          "title": "keeps every sub-cell white line on a quarter turn at non-integer densities",
+          "duration": 79.46010000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["rotated image burn fidelity"],
+          "fullName": "rotated image burn fidelity keeps sub-cell white lines on a quarter turn of a non-uniformly scaled image",
+          "status": "passed",
+          "title": "keeps sub-cell white lines on a quarter turn of a non-uniformly scaled image",
+          "duration": 4.162700000000086,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["rotated image burn fidelity"],
+          "fullName": "rotated image burn fidelity reads the source untouched when it is no denser than the grid, or burns as Pass-Through",
+          "status": "passed",
+          "title": "reads the source untouched when it is no denser than the grid, or burns as Pass-Through",
+          "duration": 19.288099999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["rotated image burn fidelity"],
+          "fullName": "rotated image burn fidelity reduces a dense source to the burn-cell pitch before sampling it",
+          "status": "passed",
+          "title": "reduces a dense source to the burn-cell pitch before sampling it",
+          "duration": 6.205799999999954,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["rotated image burn fidelity"],
+          "fullName": "rotated image burn fidelity keeps a flat tone flat inside a rotated footprint",
+          "status": "passed",
+          "title": "keeps a flat tone flat inside a rotated footprint",
+          "duration": 16.196100000000115,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892459184,
+      "endTime": 1791892459378.196,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/compile-job-raster-rotated-fidelity.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["K2 inside-first order uses parent contours before segmentation"],
+          "fullName": "K2 inside-first order uses parent contours before segmentation cuts every hole segment before its outer fragments with 'tabs'",
+          "status": "passed",
+          "title": "cuts every hole segment before its outer fragments with 'tabs'",
+          "duration": 8.155899999999974,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K2 inside-first order uses parent contours before segmentation"],
+          "fullName": "K2 inside-first order uses parent contours before segmentation cuts every hole segment before its outer fragments with 'perforation'",
+          "status": "passed",
+          "title": "cuts every hole segment before its outer fragments with 'perforation'",
+          "duration": 2.5676999999998316,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K2 inside-first order uses parent contours before segmentation"],
+          "fullName": "K2 inside-first order uses parent contours before segmentation cuts every hole segment before its outer fragments with 'kerf and tabs'",
+          "status": "passed",
+          "title": "cuts every hole segment before its outer fragments with 'kerf and tabs'",
+          "duration": 7.645000000000209,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K2 inside-first order uses parent contours before segmentation"],
+          "fullName": "K2 inside-first order uses parent contours before segmentation cuts every hole segment before its outer fragments with 'kerf, tabs and perforation'",
+          "status": "passed",
+          "title": "cuts every hole segment before its outer fragments with 'kerf, tabs and perforation'",
+          "duration": 3.2473999999999705,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K2 inside-first order uses parent contours before segmentation"],
+          "fullName": "K2 inside-first order uses parent contours before segmentation control: source order retains outer-fragment-first traversal when requested",
+          "status": "passed",
+          "title": "control: source order retains outer-fragment-first traversal when requested",
+          "duration": 1.2222999999999047,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892483266,
+      "endTime": 1791892483288.2224,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/compile-job-segmented-topology.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification control: detects both hole strips when the unsplit edge midpoint is material",
+          "status": "passed",
+          "title": "control: detects both hole strips when the unsplit edge midpoint is material",
+          "duration": 2.7592999999999392,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification control: qualifies the implicit closing edge through both open void strips",
+          "status": "passed",
+          "title": "control: qualifies the implicit closing edge through both open void strips",
+          "duration": 0.45019999999999527,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification control: rectangle boundary motion is not an open void interior",
+          "status": "passed",
+          "title": "control: rectangle boundary motion is not an open void interior",
+          "duration": 0.22049999999990177,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification scanline: deepest island owns its process after canvas order island,hole,plate",
+          "status": "passed",
+          "title": "scanline: deepest island owns its process after canvas order island,hole,plate",
+          "duration": 27.10660000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification island: deepest island owns its process after canvas order island,hole,plate",
+          "status": "passed",
+          "title": "island: deepest island owns its process after canvas order island,hole,plate",
+          "duration": 8.658299999999826,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification offset: deepest island owns its process after canvas order island,hole,plate",
+          "status": "passed",
+          "title": "offset: deepest island owns its process after canvas order island,hole,plate",
+          "duration": 28.44710000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification scanline: deepest island owns its process after canvas order island,plate,hole",
+          "status": "passed",
+          "title": "scanline: deepest island owns its process after canvas order island,plate,hole",
+          "duration": 6.179000000000087,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification island: deepest island owns its process after canvas order island,plate,hole",
+          "status": "passed",
+          "title": "island: deepest island owns its process after canvas order island,plate,hole",
+          "duration": 7.544799999999896,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification offset: deepest island owns its process after canvas order island,plate,hole",
+          "status": "passed",
+          "title": "offset: deepest island owns its process after canvas order island,plate,hole",
+          "duration": 12.841400000000021,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification scanline: deepest island owns its process after canvas order hole,island,plate",
+          "status": "passed",
+          "title": "scanline: deepest island owns its process after canvas order hole,island,plate",
+          "duration": 5.926100000000133,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification island: deepest island owns its process after canvas order hole,island,plate",
+          "status": "passed",
+          "title": "island: deepest island owns its process after canvas order hole,island,plate",
+          "duration": 4.152399999999943,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification offset: deepest island owns its process after canvas order hole,island,plate",
+          "status": "passed",
+          "title": "offset: deepest island owns its process after canvas order hole,island,plate",
+          "duration": 12.082700000000159,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification scanline: heterogeneous overlapping jig runs retain independent owners and holes",
+          "status": "passed",
+          "title": "scanline: heterogeneous overlapping jig runs retain independent owners and holes",
+          "duration": 8.978200000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification island: heterogeneous overlapping jig runs retain independent owners and holes",
+          "status": "passed",
+          "title": "island: heterogeneous overlapping jig runs retain independent owners and holes",
+          "duration": 6.283999999999878,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification offset: heterogeneous overlapping jig runs retain independent owners and holes",
+          "status": "passed",
+          "title": "offset: heterogeneous overlapping jig runs retain independent owners and holes",
+          "duration": 15.76929999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification scanline: a child Line override changes only its materialized Fill topology",
+          "status": "passed",
+          "title": "scanline: a child Line override changes only its materialized Fill topology",
+          "duration": 6.07549999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification island: a child Line override changes only its materialized Fill topology",
+          "status": "passed",
+          "title": "island: a child Line override changes only its materialized Fill topology",
+          "duration": 1.8080999999999676,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification offset: a child Line override changes only its materialized Fill topology",
+          "status": "passed",
+          "title": "offset: a child Line override changes only its materialized Fill topology",
+          "duration": 4.9809999999999945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification scanline: differing angle/spacing respects crossing material ('C frontmost')",
+          "status": "passed",
+          "title": "scanline: differing angle/spacing respects crossing material ('C frontmost')",
+          "duration": 3.6614999999999327,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification scanline: differing angle/spacing respects crossing material ('A frontmost')",
+          "status": "passed",
+          "title": "scanline: differing angle/spacing respects crossing material ('A frontmost')",
+          "duration": 1.8186000000000604,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification scanline: prospective frontmost crossing has one explicit settings owner ('C frontmost')",
+          "status": "passed",
+          "title": "scanline: prospective frontmost crossing has one explicit settings owner ('C frontmost')",
+          "duration": 16.50630000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification scanline: prospective frontmost crossing has one explicit settings owner ('A frontmost')",
+          "status": "passed",
+          "title": "scanline: prospective frontmost crossing has one explicit settings owner ('A frontmost')",
+          "duration": 11.973099999999931,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification island: differing angle/spacing respects crossing material ('C frontmost')",
+          "status": "passed",
+          "title": "island: differing angle/spacing respects crossing material ('C frontmost')",
+          "duration": 1.3829000000000633,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification island: differing angle/spacing respects crossing material ('A frontmost')",
+          "status": "passed",
+          "title": "island: differing angle/spacing respects crossing material ('A frontmost')",
+          "duration": 1.3858999999999924,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification island: prospective frontmost crossing has one explicit settings owner ('C frontmost')",
+          "status": "passed",
+          "title": "island: prospective frontmost crossing has one explicit settings owner ('C frontmost')",
+          "duration": 13.378300000000081,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["K1 analytic topology boundary qualification"],
+          "fullName": "K1 analytic topology boundary qualification island: prospective frontmost crossing has one explicit settings owner ('A frontmost')",
+          "status": "passed",
+          "title": "island: prospective frontmost crossing has one explicit settings owner ('A frontmost')",
+          "duration": 10.054000000000087,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892457866,
+      "endTime": 1791892458088.054,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/compile-job-topology-boundaries.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["compiled whole-run contour context"],
+          "fullName": "compiled whole-run contour context automatic skip-inner tabs use the actual hole depth across process settings",
+          "status": "passed",
+          "title": "automatic skip-inner tabs use the actual hole depth across process settings",
+          "duration": 13.41359999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled whole-run contour context"],
+          "fullName": "compiled whole-run contour context a placed hole tab still overrides automatic skip-inner eligibility",
+          "status": "passed",
+          "title": "a placed hole tab still overrides automatic skip-inner eligibility",
+          "duration": 1.4679000000000997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled whole-run contour context"],
+          "fullName": "compiled whole-run contour context shared-edge cleanup still compares same-process parent contours with tolerance 0",
+          "status": "passed",
+          "title": "shared-edge cleanup still compares same-process parent contours with tolerance 0",
+          "duration": 4.1784000000000106,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled whole-run contour context"],
+          "fullName": "compiled whole-run contour context shared-edge cleanup still compares same-process parent contours with tolerance 0.02",
+          "status": "passed",
+          "title": "shared-edge cleanup still compares same-process parent contours with tolerance 0.02",
+          "duration": 3.324899999999843,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled whole-run contour context"],
+          "fullName": "compiled whole-run contour context identical multi-pass loops are cleaned once across parent IDs while cleanup-off keeps both",
+          "status": "passed",
+          "title": "identical multi-pass loops are cleaned once across parent IDs while cleanup-off keeps both",
+          "duration": 3.133100000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled whole-run contour context"],
+          "fullName": "compiled whole-run contour context shared-edge winner follows the globally planned parent route across settings",
+          "status": "passed",
+          "title": "shared-edge winner follows the globally planned parent route across settings",
+          "duration": 2.353599999999915,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled whole-run contour context"],
+          "fullName": "compiled whole-run contour context single-pass shared-edge winner retains the original pre-cleanup drawn traversal",
+          "status": "passed",
+          "title": "single-pass shared-edge winner retains the original pre-cleanup drawn traversal",
+          "duration": 1.64650000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled whole-run contour context"],
+          "fullName": "compiled whole-run contour context original-open depth retains interior-stroke order with marked hole false",
+          "status": "passed",
+          "title": "original-open depth retains interior-stroke order with marked hole false",
+          "duration": 2.3445999999999003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled whole-run contour context"],
+          "fullName": "compiled whole-run contour context original-open depth retains interior-stroke order with marked hole true",
+          "status": "passed",
+          "title": "original-open depth retains interior-stroke order with marked hole true",
+          "duration": 2.7129999999999654,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled whole-run contour context"],
+          "fullName": "compiled whole-run contour context cleanup redistributes original opens at different depths once without leaking runtime identities",
+          "status": "passed",
+          "title": "cleanup redistributes original opens at different depths once without leaking runtime identities",
+          "duration": 2.6409000000001015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892480881,
+      "endTime": 1791892480918.6409,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/compile-job-topology-context.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["containmentDepths"],
+          "fullName": "containmentDepths counts nested rings",
+          "status": "passed",
+          "title": "counts nested rings",
+          "duration": 2.571199999999976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["containmentDepths"],
+          "fullName": "containmentDepths ignores open segments as containers",
+          "status": "passed",
+          "title": "ignores open segments as containers",
+          "duration": 0.3403999999999314,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["containmentDepths"],
+          "fullName": "containmentDepths matches the exhaustive comparison on fuzzed layouts",
+          "status": "passed",
+          "title": "matches the exhaustive comparison on fuzzed layouts",
+          "duration": 11.7971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["containmentDepths"],
+          "fullName": "containmentDepths handles empty input, empty polylines and identical bounds",
+          "status": "passed",
+          "title": "handles empty input, empty polylines and identical bounds",
+          "duration": 0.5603999999999587,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["containmentDepths"],
+          "fullName": "containmentDepths falls back to an exhaustive check when a coordinate is not finite",
+          "status": "passed",
+          "title": "falls back to an exhaustive check when a coordinate is not finite",
+          "duration": 0.310799999999972,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["containmentDepths with a concave container"],
+          "fullName": "containmentDepths with a concave container counts a shape that is inside the material though its bounds centre is not",
+          "status": "passed",
+          "title": "counts a shape that is inside the material though its bounds centre is not",
+          "duration": 0.4296000000000504,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["containmentDepths with a concave container"],
+          "fullName": "containmentDepths with a concave container does not count a shape that sits in the notch",
+          "status": "passed",
+          "title": "does not count a shape that sits in the notch",
+          "duration": 0.27710000000001855,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["containmentDepths with a concave container"],
+          "fullName": "containmentDepths with a concave container does not count a shape that wraps a tooth of the container",
+          "status": "passed",
+          "title": "does not count a shape that wraps a tooth of the container",
+          "duration": 0.20640000000003056,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["containmentDepths with a concave container"],
+          "fullName": "containmentDepths with a concave container probes past a vertex that lies on the container outline",
+          "status": "passed",
+          "title": "probes past a vertex that lies on the container outline",
+          "duration": 0.17690000000004602,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892485413,
+      "endTime": 1791892485431.177,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/containment-depth.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["raster split-runway duration"],
+          "fullName": "raster split-runway duration prices the emitted bounded path instead of the former reversing runways",
+          "status": "passed",
+          "title": "prices the emitted bounded path instead of the former reversing runways",
+          "duration": 13.604000000000042,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892484462,
+      "endTime": 1791892484475.604,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/estimate-duration-raster-bounded-split.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths returns the empty job unchanged",
+          "status": "passed",
+          "title": "returns the empty job unchanged",
+          "duration": 2.1534999999998945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths retains compile diagnostics while reordering job geometry",
+          "status": "passed",
+          "title": "retains compile diagnostics while reordering job geometry",
+          "duration": 1.3435000000001764,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths returns single-segment groups unchanged (no choice to make)",
+          "status": "passed",
+          "title": "returns single-segment groups unchanged (no choice to make)",
+          "duration": 0.33199999999987995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths reorders two segments so the closer one is visited first",
+          "status": "passed",
+          "title": "reorders two segments so the closer one is visited first",
+          "duration": 0.3548000000000684,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths preserves source order when that travel policy is selected",
+          "status": "passed",
+          "title": "preserves source order when that travel policy is selected",
+          "duration": 0.26680000000010295,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths preserves open-path direction when reversal is disabled",
+          "status": "passed",
+          "title": "preserves open-path direction when reversal is disabled",
+          "duration": 0.22860000000014224,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths can reverse layer priority without changing order inside each layer",
+          "status": "passed",
+          "title": "can reverse layer priority without changing order inside each layer",
+          "duration": 0.39400000000000546,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths never reverses artwork priority when reversing operations",
+          "status": "passed",
+          "title": "never reverses artwork priority when reversing operations",
+          "duration": 0.3483000000001084,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths uses the selected planning start point as the nearest-neighbor seed",
+          "status": "passed",
+          "title": "uses the selected planning start point as the nearest-neighbor seed",
+          "duration": 0.3655999999998585,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths can disable inside-first ordering",
+          "status": "passed",
+          "title": "can disable inside-first ordering",
+          "duration": 0.31570000000010623,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths leaves scanline fill groups in source order",
+          "status": "passed",
+          "title": "leaves scanline fill groups in source order",
+          "duration": 0.27959999999984575,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths reorders offset fill contours to enter the closest contour first",
+          "status": "passed",
+          "title": "reorders offset fill contours to enter the closest contour first",
+          "duration": 0.24490000000014334,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths reorders compatible island fill groups to reduce travel",
+          "status": "passed",
+          "title": "reorders compatible island fill groups to reduce travel",
+          "duration": 9.213899999999967,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths does not reorder island fill groups across incompatible layer settings",
+          "status": "passed",
+          "title": "does not reorder island fill groups across incompatible layer settings",
+          "duration": 0.2220999999999549,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths does not reorder island fill groups across different motion policies",
+          "status": "passed",
+          "title": "does not reorder island fill groups across different motion policies",
+          "duration": 0.13570000000004256,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths flips an open segment to enter from the nearer endpoint",
+          "status": "passed",
+          "title": "flips an open segment to enter from the nearer endpoint",
+          "duration": 0.15049999999996544,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths does NOT flip a closed segment (start == end, no win)",
+          "status": "passed",
+          "title": "does NOT flip a closed segment (start == end, no win)",
+          "duration": 0.5336000000002059,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths cuts contained closed contours before their containing outer contour",
+          "status": "passed",
+          "title": "cuts contained closed contours before their containing outer contour",
+          "duration": 0.5100999999999658,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths property: optimization preserves every cut segment",
+          "status": "passed",
+          "title": "property: optimization preserves every cut segment",
+          "duration": 11.989500000000135,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths reflects connected-cut continuity after path optimization",
+          "status": "passed",
+          "title": "reflects connected-cut continuity after path optimization",
+          "duration": 2.043100000000095,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths improves travel on a deliberately bad ordering (concrete fixture)",
+          "status": "passed",
+          "title": "improves travel on a deliberately bad ordering (concrete fixture)",
+          "duration": 1.371499999999969,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths honest about NN limits — may pessimize tiny amounts on pathological 2-segment inputs",
+          "status": "passed",
+          "title": "honest about NN limits — may pessimize tiny amounts on pathological 2-segment inputs",
+          "duration": 1.2455999999999676,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths property: optimization is idempotent — running it twice == running once",
+          "status": "passed",
+          "title": "property: optimization is idempotent — running it twice == running once",
+          "duration": 7.813499999999976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths property: determinism — same input produces same output across calls",
+          "status": "passed",
+          "title": "property: determinism — same input produces same output across calls",
+          "duration": 3.452400000000125,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths preserves group metadata (color, power, speed, passes, layerId)",
+          "status": "passed",
+          "title": "preserves group metadata (color, power, speed, passes, layerId)",
+          "duration": 0.2697000000000571,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths preserves cut content (same set of polylines, possibly reordered/reversed)",
+          "status": "passed",
+          "title": "preserves cut content (same set of polylines, possibly reordered/reversed)",
+          "duration": 0.13730000000009568,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892479579,
+      "endTime": 1791892479625.1372,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/optimize-paths.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["properContourAncestors"],
+          "fullName": "properContourAncestors matches the all-pairs reference on nested topographic rings",
+          "status": "passed",
+          "title": "matches the all-pairs reference on nested topographic rings",
+          "duration": 265.16280000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["properContourAncestors"],
+          "fullName": "properContourAncestors matches the reference where outlines touch, share edges, cross or coincide",
+          "status": "passed",
+          "title": "matches the reference where outlines touch, share edges, cross or coincide",
+          "duration": 53.47769999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["properContourAncestors"],
+          "fullName": "properContourAncestors matches the reference across randomised nested and overlapping rings",
+          "status": "passed",
+          "title": "matches the reference across randomised nested and overlapping rings",
+          "duration": 112.48339999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["properContourAncestors"],
+          "fullName": "properContourAncestors keeps contours of one nesting forest out of each other",
+          "status": "passed",
+          "title": "keeps contours of one nesting forest out of each other",
+          "duration": 19.097200000000157,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["properContourAncestors"],
+          "fullName": "properContourAncestors keeps the exact path for non-finite coordinates",
+          "status": "passed",
+          "title": "keeps the exact path for non-finite coordinates",
+          "duration": 0.4780000000000655,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["properContourAncestors"],
+          "fullName": "properContourAncestors classifies a 60-ring topographic design in near-linear time",
+          "status": "passed",
+          "title": "classifies a 60-ring topographic design in near-linear time",
+          "duration": 53.47360000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892454751,
+      "endTime": 1791892455255.4736,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/proper-contour-containment.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["coincident segment entry lookup"],
+          "fullName": "coincident segment entry lookup keeps shuffled coordinate duplicates, semantic tie order and original object identity",
+          "status": "passed",
+          "title": "keeps shuffled coordinate duplicates, semantic tie order and original object identity",
+          "duration": 2.911399999999958,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["coincident segment entry lookup"],
+          "fullName": "coincident segment entry lookup does not consume a selected entry until availability retires its segment",
+          "status": "passed",
+          "title": "does not consume a selected entry until availability retires its segment",
+          "duration": 1.046100000000024,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["coincident segment entry lookup"],
+          "fullName": "coincident segment entry lookup retires every entry of a segment across coordinate buckets without losing its peers",
+          "status": "passed",
+          "title": "retires every entry of a segment across coordinate buckets without losing its peers",
+          "duration": 0.43229999999994106,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["coincident segment entry lookup"],
+          "fullName": "coincident segment entry lookup never rounds nearby distinct coordinates into one location",
+          "status": "passed",
+          "title": "never rounds nearby distinct coordinates into one location",
+          "duration": 0.2738000000001648,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["coincident segment entry lookup"],
+          "fullName": "coincident segment entry lookup keeps first-object identity on signed-zero and missing-versus-zero vertex ties",
+          "status": "passed",
+          "title": "keeps first-object identity on signed-zero and missing-versus-zero vertex ties",
+          "duration": 0.23710000000005493,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["coincident segment entry lookup"],
+          "fullName": "coincident segment entry lookup uses linear availability work for 4096 paths at 1 exact coordinate locations",
+          "status": "passed",
+          "title": "uses linear availability work for 4096 paths at 1 exact coordinate locations",
+          "duration": 48.01789999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["coincident segment entry lookup"],
+          "fullName": "coincident segment entry lookup uses linear availability work for 4096 paths at 2 exact coordinate locations",
+          "status": "passed",
+          "title": "uses linear availability work for 4096 paths at 2 exact coordinate locations",
+          "duration": 56.82979999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["coincident segment entry lookup"],
+          "fullName": "coincident segment entry lookup matches a brute-force oracle through duplicate-heavy queries, seed 17",
+          "status": "passed",
+          "title": "matches a brute-force oracle through duplicate-heavy queries, seed 17",
+          "duration": 29.178300000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["coincident segment entry lookup"],
+          "fullName": "coincident segment entry lookup matches a brute-force oracle through duplicate-heavy queries, seed 491",
+          "status": "passed",
+          "title": "matches a brute-force oracle through duplicate-heavy queries, seed 491",
+          "duration": 26.32770000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["coincident segment entry lookup"],
+          "fullName": "coincident segment entry lookup matches a brute-force oracle through duplicate-heavy queries, seed 20261013",
+          "status": "passed",
+          "title": "matches a brute-force oracle through duplicate-heavy queries, seed 20261013",
+          "duration": 26.070199999999886,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892442064,
+      "endTime": 1791892442256.0703,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/segment-entry-index-coincident.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery returns the identical pick to an exhaustive scan across fuzzed inputs",
+          "status": "passed",
+          "title": "returns the identical pick to an exhaustive scan across fuzzed inputs",
+          "duration": 57.35289999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery breaks exact distance ties by lowest segment index, then forward before reversed",
+          "status": "passed",
+          "title": "breaks exact distance ties by lowest segment index, then forward before reversed",
+          "duration": 0.3563000000000329,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery returns the exhaustive pick with many start vertices per segment",
+          "status": "passed",
+          "title": "returns the exhaustive pick with many start vertices per segment",
+          "duration": 15.236599999999953,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery breaks remaining ties by start vertex, so the drawn start wins",
+          "status": "passed",
+          "title": "breaks remaining ties by start vertex, so the drawn start wins",
+          "duration": 0.4511999999999716,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery checks each retired entry at most once more, however often it is passed",
+          "status": "passed",
+          "title": "checks each retired entry at most once more, however often it is passed",
+          "duration": 81.28000000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery skips unavailable segments entirely",
+          "status": "passed",
+          "title": "skips unavailable segments entirely",
+          "duration": 0.34390000000007603,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery checks equal-distance entries across cell boundaries (direction tie: false)",
+          "status": "passed",
+          "title": "checks equal-distance entries across cell boundaries (direction tie: false)",
+          "duration": 0.8624999999999545,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery checks equal-distance entries across cell boundaries (direction tie: true)",
+          "status": "passed",
+          "title": "checks equal-distance entries across cell boundaries (direction tie: true)",
+          "duration": 0.1775000000000091,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery keeps candidate work local for exact and tied horizontal queries",
+          "status": "passed",
+          "title": "keeps candidate work local for exact and tied horizontal queries",
+          "duration": 1.9359000000000606,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery keeps candidate work local for exact and tied vertical queries",
+          "status": "passed",
+          "title": "keeps candidate work local for exact and tied vertical queries",
+          "duration": 1.67450000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery matches an exhaustive scan for horizontal ties and shrinking availability",
+          "status": "passed",
+          "title": "matches an exhaustive scan for horizontal ties and shrinking availability",
+          "duration": 29.4615,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery matches an exhaustive scan for vertical ties and shrinking availability",
+          "status": "passed",
+          "title": "matches an exhaustive scan for vertical ties and shrinking availability",
+          "duration": 26.717399999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery matches an exhaustive scan for coincident ties and shrinking availability",
+          "status": "passed",
+          "title": "matches an exhaustive scan for coincident ties and shrinking availability",
+          "duration": 22.150700000000143,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery returns null when nothing is available and when there are no entries",
+          "status": "passed",
+          "title": "returns null when nothing is available and when there are no entries",
+          "duration": 0.36159999999995307,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery handles degenerate extents that would divide by a zero-sized cell",
+          "status": "passed",
+          "title": "handles degenerate extents that would divide by a zero-sized cell",
+          "duration": 0.29409999999984393,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery agrees with the exhaustive scan for cursors far outside the populated area",
+          "status": "passed",
+          "title": "agrees with the exhaustive scan for cursors far outside the populated area",
+          "duration": 0.43400000000019645,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["createNearestEntryQuery"],
+          "fullName": "createNearestEntryQuery falls back to an exhaustive scan when a coordinate is not finite",
+          "status": "passed",
+          "title": "falls back to an exhaustive scan when a coordinate is not finite",
+          "duration": 0.1289000000001579,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892456097,
+      "endTime": 1791892456337.434,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/segment-entry-index.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["raster toolpath bounded split runways"],
+          "fullName": "raster toolpath bounded split runways keeps forward and reverse preview motion monotonic through split gaps",
+          "status": "passed",
+          "title": "keeps forward and reverse preview motion monotonic through split gaps",
+          "duration": 8.072499999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892487762,
+      "endTime": 1791892487770.0725,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/toolpath-raster-bounded-split.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["pre-K1 ordinary output and historical Job bytes"],
+          "fullName": "pre-K1 ordinary output and historical Job bytes repeated-source preserves A80/B40/C80 traversal and pass boundaries",
+          "status": "passed",
+          "title": "repeated-source preserves A80/B40/C80 traversal and pass boundaries",
+          "duration": 15.319099999999708,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["pre-K1 ordinary output and historical Job bytes"],
+          "fullName": "pre-K1 ordinary output and historical Job bytes repeated-no-inside preserves A80/B40/C80 traversal and pass boundaries",
+          "status": "passed",
+          "title": "repeated-no-inside preserves A80/B40/C80 traversal and pass boundaries",
+          "duration": 3.5009000000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["pre-K1 ordinary output and historical Job bytes"],
+          "fullName": "pre-K1 ordinary output and historical Job bytes native-arc preserves uniform geometry and one-pass original opens",
+          "status": "passed",
+          "title": "native-arc preserves uniform geometry and one-pass original opens",
+          "duration": 36.83159999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["pre-K1 ordinary output and historical Job bytes"],
+          "fullName": "pre-K1 ordinary output and historical Job bytes mixed-open preserves uniform geometry and one-pass original opens",
+          "status": "passed",
+          "title": "mixed-open preserves uniform geometry and one-pass original opens",
+          "duration": 2.573899999999867,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["pre-K1 ordinary output and historical Job bytes"],
+          "fullName": "pre-K1 ordinary output and historical Job bytes uniform-fill preserves uniform geometry and one-pass original opens",
+          "status": "passed",
+          "title": "uniform-fill preserves uniform geometry and one-pass original opens",
+          "duration": 9.515100000000075,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["pre-K1 ordinary output and historical Job bytes"],
+          "fullName": "pre-K1 ordinary output and historical Job bytes uniform-line-passes preserves uniform geometry and one-pass original opens",
+          "status": "passed",
+          "title": "uniform-line-passes preserves uniform geometry and one-pass original opens",
+          "duration": 1.8689000000003944,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["pre-K1 ordinary output and historical Job bytes"],
+          "fullName": "pre-K1 ordinary output and historical Job bytes one-pass-cleanup preserves uniform geometry and one-pass original opens",
+          "status": "passed",
+          "title": "one-pass-cleanup preserves uniform geometry and one-pass original opens",
+          "duration": 2.1214999999997417,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["pre-K1 ordinary output and historical Job bytes"],
+          "fullName": "pre-K1 ordinary output and historical Job bytes old nesting/process/source metadata does not opt a stored Job into new cross-group ordering",
+          "status": "passed",
+          "title": "old nesting/process/source metadata does not opt a stored Job into new cross-group ordering",
+          "duration": 1.2901999999999134,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892468515,
+      "endTime": 1791892468588.2903,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/topology-legacy-output.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["raster serial-density evidence fixture"],
+          "fullName": "raster serial-density evidence fixture quantifies narrow headroom at 0.05 mm and a wire-budget breach at 0.04 mm",
+          "status": "passed",
+          "title": "quantifies narrow headroom at 0.05 mm and a wire-budget breach at 0.04 mm",
+          "duration": 14.435200000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892486390,
+      "endTime": 1791892486404.4353,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/raster/emit-raster-serial-density.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["emitRasterGroup property tests"],
+          "fullName": "emitRasterGroup property tests PROJECT non-negotiable #3 — every G0 carries S0 (laser-off on travel)",
+          "status": "passed",
+          "title": "PROJECT non-negotiable #3 — every G0 carries S0 (laser-off on travel)",
+          "duration": 44.069999999999936,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRasterGroup property tests"],
+          "fullName": "emitRasterGroup property tests PROJECT non-negotiable #5 — deterministic across repeated calls",
+          "status": "passed",
+          "title": "PROJECT non-negotiable #5 — deterministic across repeated calls",
+          "duration": 35.86380000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRasterGroup property tests"],
+          "fullName": "emitRasterGroup property tests all X coordinates fall within [bounds.minX - overscan, bounds.maxX + overscan]",
+          "status": "passed",
+          "title": "all X coordinates fall within [bounds.minX - overscan, bounds.maxX + overscan]",
+          "duration": 23.415300000000116,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRasterGroup property tests"],
+          "fullName": "emitRasterGroup property tests all Y coordinates fall within [bounds.minY, bounds.maxY]",
+          "status": "passed",
+          "title": "all Y coordinates fall within [bounds.minY, bounds.maxY]",
+          "duration": 17.224300000000085,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRasterGroup property tests"],
+          "fullName": "emitRasterGroup property tests emits G0 rows only for rows with content (distinct G0 Y per content row)",
+          "status": "passed",
+          "title": "emits G0 rows only for rows with content (distinct G0 Y per content row)",
+          "duration": 15.977499999999964,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892469953,
+      "endTime": 1791892470089.9775,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/raster/emit-raster.property.test.ts"
+    }
+  ]
+}

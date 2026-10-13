@@ -41,9 +41,9 @@ export type NearestEntryQuery = (
   isAvailable: (segmentIndex: number) => boolean,
 ) => SegmentEntry | null;
 
-// Keeps each cell near a handful of entries without letting the grid itself
+// Keeps each cell near a handful of distinct points without letting the grid itself
 // dominate memory on large inputs.
-const TARGET_ENTRIES_PER_CELL = 2;
+const TARGET_POINTS_PER_CELL = 2;
 const MAX_GRID_SIDE = 512;
 
 export function createNearestEntryQuery(entries: ReadonlyArray<SegmentEntry>): NearestEntryQuery {
@@ -52,9 +52,15 @@ export function createNearestEntryQuery(entries: ReadonlyArray<SegmentEntry>): N
   return (cursor, isAvailable) => gridNearest(grid, cursor, isAvailable);
 }
 
+type EntryPoint = {
+  readonly point: Vec2;
+  readonly entries: SegmentEntry[];
+  next: number;
+};
+
 type Grid = {
-  readonly entries: ReadonlyArray<SegmentEntry>;
-  // Mutable: retired entries are compacted out as queries meet them.
+  readonly points: ReadonlyArray<EntryPoint>;
+  // Mutable: exhausted point queues are compacted out as queries meet them.
   readonly cells: ReadonlyArray<number[]>;
   readonly minX: number;
   readonly minY: number;
@@ -73,6 +79,8 @@ function buildGrid(entries: ReadonlyArray<SegmentEntry>): Grid | null {
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
+  const byX = new Map<number, Map<number, EntryPoint>>();
+  const points: EntryPoint[] = [];
   for (const entry of entries) {
     const { x, y } = entry.point;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
@@ -80,10 +88,28 @@ function buildGrid(entries: ReadonlyArray<SegmentEntry>): Grid | null {
     minY = Math.min(minY, y);
     maxX = Math.max(maxX, x);
     maxY = Math.max(maxY, y);
+    let byY = byX.get(x);
+    if (byY === undefined) {
+      byY = new Map();
+      byX.set(x, byY);
+    }
+    let point = byY.get(y);
+    if (point === undefined) {
+      point = { point: entry.point, entries: [], next: 0 };
+      byY.set(y, point);
+      points.push(point);
+    }
+    point.entries.push(entry);
   }
+  // Exact coordinates only: no rounding, merging geometry or removing cuts.
+  // Every entry at a point has the same distance from any cursor, so only its
+  // first available tie winner can win a query. Stable sorting retains the
+  // original entry identity when every tie key is equal. Retirement advances
+  // each queue entry at most once instead of rescanning all coincident cuts.
+  for (const point of points) point.entries.sort(compareEntryTies);
   const side = Math.min(
     MAX_GRID_SIDE,
-    Math.max(1, Math.ceil(Math.sqrt(entries.length / TARGET_ENTRIES_PER_CELL))),
+    Math.max(1, Math.ceil(Math.sqrt(points.length / TARGET_POINTS_PER_CELL))),
   );
   // A collapsed axis has one occupied cell, not a row of empty cells whose
   // subnormal boundaries would keep the search radius at zero. Retain a
@@ -93,14 +119,12 @@ function buildGrid(entries: ReadonlyArray<SegmentEntry>): Grid | null {
   const cellWidth = Math.max((maxX - minX) / cols, Number.MIN_VALUE);
   const cellHeight = Math.max((maxY - minY) / rows, Number.MIN_VALUE);
   const cells: number[][] = Array.from({ length: cols * rows }, () => []);
-  for (let i = 0; i < entries.length; i += 1) {
-    const entry = entries[i];
-    if (entry === undefined) continue;
+  for (const [i, entry] of points.entries()) {
     const cx = clampIndex(Math.floor((entry.point.x - minX) / cellWidth), cols);
     const cy = clampIndex(Math.floor((entry.point.y - minY) / cellHeight), rows);
     cells[cy * cols + cx]?.push(i);
   }
-  return { entries, cells, minX, minY, cellWidth, cellHeight, cols, rows };
+  return { points, cells, minX, minY, cellWidth, cellHeight, cols, rows };
 }
 
 function clampIndex(value: number, side: number): number {
@@ -147,11 +171,25 @@ function isBetter(
   if (!Number.isFinite(distSq)) return false;
   if (best === null) return true;
   if (distSq !== bestDistSq) return distSq < bestDistSq;
-  if (candidate.segmentIndex !== best.segmentIndex) {
-    return candidate.segmentIndex < best.segmentIndex;
+  return compareEntryTies(candidate, best) < 0;
+}
+
+function compareEntryTies(a: SegmentEntry, b: SegmentEntry): number {
+  if (a.segmentIndex !== b.segmentIndex) return a.segmentIndex - b.segmentIndex;
+  if (a.reverse !== b.reverse) return a.reverse ? 1 : -1;
+  return (a.vertexIndex ?? 0) - (b.vertexIndex ?? 0);
+}
+
+function firstAvailable(
+  point: EntryPoint,
+  isAvailable: (segmentIndex: number) => boolean,
+): SegmentEntry | undefined {
+  while (point.next < point.entries.length) {
+    const entry = point.entries[point.next];
+    if (entry !== undefined && isAvailable(entry.segmentIndex)) return entry;
+    point.next += 1;
   }
-  if (candidate.reverse !== best.reverse) return !candidate.reverse;
-  return (candidate.vertexIndex ?? 0) < (best.vertexIndex ?? 0);
+  return undefined;
 }
 
 function gridNearest(
@@ -169,10 +207,12 @@ function gridNearest(
       const cell = grid.cells[cellIndex];
       if (cell === undefined) continue;
       let kept = 0;
-      for (const entryIndex of cell) {
-        const entry = grid.entries[entryIndex];
-        if (entry === undefined || !isAvailable(entry.segmentIndex)) continue;
-        cell[kept] = entryIndex;
+      for (const pointIndex of cell) {
+        const point = grid.points[pointIndex];
+        if (point === undefined) continue;
+        const entry = firstAvailable(point, isAvailable);
+        if (entry === undefined) continue;
+        cell[kept] = pointIndex;
         kept += 1;
         const distSq = distanceSquared(cursor, entry.point);
         if (isBetter(distSq, entry, bestDistSq, best)) {

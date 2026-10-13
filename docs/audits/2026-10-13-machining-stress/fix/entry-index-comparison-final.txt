@@ -1,0 +1,17 @@
+{
+  "baselineCommit": "c700863a14dfbed71a49e32182ec3b75b989ebb1",
+  "sourceHead": "c700863a14dfbed71a49e32182ec3b75b989ebb1",
+  "baselineSourceSha256": "59dc2633ae8ff105bcf1bd959ef0f15ce6720bad390009e0098a46e6a0a9a5b0",
+  "changedSourceSha256": "1df529d90f94efc0373a24237ef6a86d9731bd206dce79ca09e738c6bfc6bd06",
+  "sourceOverridesLoaded": {
+    "baseline": 1,
+    "changed": 1
+  },
+  "directQueriesPerVersion": 3660,
+  "directSelectionDigest": "e53f51be6454b91aabdb976ae18db70028f59a40ef756ac576c26b7257d7a825",
+  "comparedOrderedJobs": 192,
+  "comparedPrograms": 1152,
+  "programSetSha256": "69a555308de94eb4928b9533ca4a519363f638107560000b4e1fad41f0b6104c",
+  "result": "Exact ordered-job, G-code and Ruida binary equality; direct queries match independent exhaustive oracle.",
+  "assumptions": "Monotonically retired segments. Exact-coordinate duplicates, shuffled ties, signed zero, subnormal, underflow, huge finite coordinates. Software-only; no hardware or wall-time claim."
+}

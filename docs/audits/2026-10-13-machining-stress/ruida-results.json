@@ -1,0 +1,258 @@
+{
+  "numTotalTestSuites": 7,
+  "numPassedTestSuites": 7,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 20,
+  "numPassedTests": 20,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791891475054,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CN: CNC project saved on a Ruida profile"],
+          "fullName": "CN: CNC project saved on a Ruida profile refuses to produce an .rd file",
+          "status": "passed",
+          "title": "refuses to produce an .rd file",
+          "duration": 10.212799999999788,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CN: CNC project saved on a Ruida profile"],
+          "fullName": "CN: CNC project saved on a Ruida profile names the CNC/router reason, not raster",
+          "status": "passed",
+          "title": "names the CNC/router reason, not raster",
+          "duration": 0.979200000000219,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891486909,
+      "endTime": 1791891486920.9792,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/io/rd/emit-rd-cnc-refusal.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["emitRdFile"],
+          "fullName": "emitRdFile emits a non-empty byte stream for a line job",
+          "status": "passed",
+          "title": "emits a non-empty byte stream for a line job",
+          "duration": 11.754100000000108,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRdFile"],
+          "fullName": "emitRdFile refuses a project with no output geometry with a message",
+          "status": "passed",
+          "title": "refuses a project with no output geometry with a message",
+          "duration": 0.38509999999951106,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRdFile"],
+          "fullName": "emitRdFile is deterministic across calls",
+          "status": "passed",
+          "title": "is deterministic across calls",
+          "duration": 2.717299999999341,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRdFile"],
+          "fullName": "emitRdFile does not make configured bed bounds an export refusal",
+          "status": "passed",
+          "title": "does not make configured bed bounds an export refusal",
+          "duration": 1.1284999999998035,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRdFile"],
+          "fullName": "emitRdFile does not make a pre-emit policy finding an export refusal",
+          "status": "passed",
+          "title": "does not make a pre-emit policy finding an export refusal",
+          "duration": 0.9526999999998225,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRdFile"],
+          "fullName": "emitRdFile carries the policy finding out as an advisory",
+          "status": "passed",
+          "title": "carries the policy finding out as an advisory",
+          "duration": 1.1012000000000626,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRdFile"],
+          "fullName": "emitRdFile reports no advisories for a clean project",
+          "status": "passed",
+          "title": "reports no advisories for a clean project",
+          "duration": 0.7269999999998618,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRdFile reference point"],
+          "fullName": "emitRdFile reference point no placement writes {}, then Set Absolute ... Start Process",
+          "status": "passed",
+          "title": "no placement writes {}, then Set Absolute ... Start Process",
+          "duration": 1.2758999999996377,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRdFile reference point"],
+          "fullName": "emitRdFile reference point Absolute writes { jobOrigin: { startFrom: 'absolute', anchor: 'front-left' } }, then Set Absolute ... Start Process",
+          "status": "passed",
+          "title": "Absolute writes { jobOrigin: { startFrom: 'absolute', anchor: 'front-left' } }, then Set Absolute ... Start Process",
+          "duration": 1.321999999999207,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRdFile reference point"],
+          "fullName": "emitRdFile reference point User Origin writes { jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' } }, then Set Absolute ... Start Process",
+          "status": "passed",
+          "title": "User Origin writes { jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' } }, then Set Absolute ... Start Process",
+          "duration": 1.6799999999993815,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRdFile reference point"],
+          "fullName": "emitRdFile reference point Verified Origin writes { jobOrigin: { startFrom: 'verified-origin', anchor: 'center' } }, then Set Absolute ... Start Process",
+          "status": "passed",
+          "title": "Verified Origin writes { jobOrigin: { startFrom: 'verified-origin', anchor: 'center' } }, then Set Absolute ... Start Process",
+          "duration": 0.7703999999994267,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitRdFile reference point"],
+          "fullName": "emitRdFile reference point Current Position writes { jobOrigin: { startFrom: 'current-position', anchor: 'front-left', currentPosition: { x: +0, y: +0 } } }, then Set Absolute ... Start Process",
+          "status": "passed",
+          "title": "Current Position writes { jobOrigin: { startFrom: 'current-position', anchor: 'front-left', currentPosition: { x: +0, y: +0 } } }, then Set Absolute ... Start Process",
+          "duration": 0.6841000000003987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891482165,
+      "endTime": 1791891482190.684,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/io/rd/emit-rd.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [".rd export post-compile checks"],
+          "fullName": ".rd export post-compile checks reports a cut through an enabled no-go zone, by layer",
+          "status": "passed",
+          "title": "reports a cut through an enabled no-go zone, by layer",
+          "duration": 16.811099999999897,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [".rd export post-compile checks"],
+          "fullName": ".rd export post-compile checks says a zone cannot be checked when the placement has no known bed offset",
+          "status": "passed",
+          "title": "says a zone cannot be checked when the placement has no known bed offset",
+          "duration": 6.815300000000207,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [".rd export post-compile checks"],
+          "fullName": ".rd export post-compile checks warns about the same zone Save G-code warns about, in the same frame",
+          "status": "passed",
+          "title": "warns about the same zone Save G-code warns about, in the same frame",
+          "duration": 8.704399999999623,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [".rd export post-compile checks"],
+          "fullName": ".rd export post-compile checks reports a move past the bed edge without refusing the export",
+          "status": "passed",
+          "title": "reports a move past the bed edge without refusing the export",
+          "duration": 2.18100000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [".rd export post-compile checks"],
+          "fullName": ".rd export post-compile checks reports nothing for a job inside the bed and clear of every zone",
+          "status": "passed",
+          "title": "reports nothing for a job inside the bed and clear of every zone",
+          "duration": 1.8884000000002743,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [".rd export post-compile checks"],
+          "fullName": ".rd export post-compile checks gives no G-code line numbers, which the .rd file does not have",
+          "status": "passed",
+          "title": "gives no G-code line numbers, which the .rd file does not have",
+          "duration": 2.651100000000042,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891484341,
+      "endTime": 1791891484380.6511,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/io/rd/rd-preflight.test.ts"
+    }
+  ]
+}

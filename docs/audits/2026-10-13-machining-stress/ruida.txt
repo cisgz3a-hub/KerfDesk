@@ -1,0 +1,13 @@
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0
+
+ ✓ src/io/rd/emit-rd.test.ts (12 tests) 26ms
+ ✓ src/io/rd/rd-preflight.test.ts (6 tests) 41ms
+ ✓ src/io/rd/emit-rd-cnc-refusal.test.ts (2 tests) 13ms
+
+ Test Files  3 passed (3)
+      Tests  20 passed (20)
+   Start at  19:37:55
+   Duration  11.79s (transform 5.04s, setup 47ms, import 9.12s, tests 80ms, environment 1.88s)
+
+JSON report written to C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/docs/audits/2026-10-13-machining-stress/ruida-results.json

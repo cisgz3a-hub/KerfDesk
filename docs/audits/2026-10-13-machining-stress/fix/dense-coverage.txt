@@ -1,0 +1,13 @@
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0
+
+{"fixture":"4096 chords, 128 witnesses","baseline":[55.90080000000012,57.722099999999955,53.840799999999945,59.859500000000025,70.48849999999993],"candidate":[24.530500000000075,21.15319999999997,19.043300000000272,27.506599999999708,20.459100000000035]}
+ ✓ src/core/cnc/vcarve-source-boundary-coverage-performance.test.ts (13 tests | 12 skipped) 620ms
+   ✓ reports matched dense coverage timing  618ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 12 skipped (13)
+   Start at  20:03:16
+   Duration  2.34s (transform 686ms, setup 35ms, import 865ms, tests 620ms, environment 604ms)
+
+JSON report written to C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/docs/audits/2026-10-13-machining-stress/fix/dense-coverage-results.json
