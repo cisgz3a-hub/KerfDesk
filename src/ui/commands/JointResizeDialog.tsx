@@ -23,6 +23,12 @@ const FIELDS: ReadonlyArray<readonly [keyof JointResizeForm, string, string]> = 
     'How far a measured design width can differ from Current opening width.',
   ],
 ];
+const JOINT_KIND_LABELS = {
+  'inward-slot': 'inward U-slot',
+  'enclosed-rectangle': 'enclosed rectangle',
+  'outward-tab': 'outward tab (depth)',
+} as const;
+
 export function JointResizeDialog({ review }: { readonly review: JointResizeReview }): JSX.Element {
   const { analysis, preview, current } = review;
   return (
@@ -50,8 +56,9 @@ export function JointResizeDialog({ review }: { readonly review: JointResizeRevi
       />
       <p style={{ fontSize: 12 }}>
         Detects orthogonal inward U-slots and enclosed rectangular contours with one matching
-        dimension. Excludes square ambiguity, curved/open artwork and unsupported geometry. Tabs,
-        finger-joint depth, rounded slots and general thickness conversion require explicit design
+        dimension, and outward tabs whose depth matches; a tab's depth becomes the material
+        thickness, growing from its root. Excludes square ambiguity, curved/open artwork and
+        unsupported geometry. Rounded slots and general thickness conversion require explicit design
         edits. Tool/kerf settings remain separate. Test a fit coupon for your material and process.
       </p>
       <p role="status" aria-live="polite">
@@ -121,8 +128,7 @@ function JointResizeCandidates({ review }: { readonly review: JointResizeReview 
               title="Choose this feature only after checking its location in the preview and its intended use."
               onChange={(event) => review.choose(candidate.id, event.currentTarget.checked)}
             />
-            {index + 1}. {candidate.objectId}:{' '}
-            {candidate.kind === 'inward-slot' ? 'inward U-slot' : 'enclosed rectangle'} · width{' '}
+            {index + 1}. {candidate.objectId}: {JOINT_KIND_LABELS[candidate.kind]} · width{' '}
             {candidate.widthMm.toFixed(3)} mm · depth {candidate.depthMm.toFixed(3)} mm
           </label>
         ))}

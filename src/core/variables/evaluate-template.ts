@@ -7,6 +7,7 @@ import {
   type VariableTemplate,
   type VariableTemplateToken,
 } from '../scene';
+import { formatDatePattern } from './date-pattern';
 import { effectiveObjectPowerPercent, effectiveOperationForObject } from '../effective-output';
 import { advanceVariableSequenceBy } from './sequence-offset';
 
@@ -117,7 +118,13 @@ function evaluateToken(
     case 'literal':
       return { ok: true, value: token.value };
     case 'date-time':
-      return { ok: true, value: formatDateTime(context.now, token.format) };
+      return {
+        ok: true,
+        value:
+          token.format === 'custom'
+            ? formatDatePattern(context.now, token.pattern ?? '')
+            : formatDateTime(context.now, token.format),
+      };
     case 'serial':
       return evaluateSerial(token, project, context);
     case 'csv':
@@ -137,10 +144,7 @@ function isTemplateToken(value: unknown): value is VariableTemplateToken {
     case 'literal':
       return typeof token['value'] === 'string';
     case 'date-time':
-      return (
-        typeof token['format'] === 'string' &&
-        ['date-iso', 'time-24h', 'datetime-iso'].includes(token['format'])
-      );
+      return isDateTimeToken(token);
     case 'serial':
       return isSerialToken(token);
     case 'csv':
@@ -153,6 +157,12 @@ function isTemplateToken(value: unknown): value is VariableTemplateToken {
     default:
       return false;
   }
+}
+
+function isDateTimeToken(token: Record<string, unknown>): boolean {
+  const format = token['format'];
+  if (format === 'custom') return typeof token['pattern'] === 'string';
+  return typeof format === 'string' && ['date-iso', 'time-24h', 'datetime-iso'].includes(format);
 }
 
 function isSerialToken(token: Record<string, unknown>): boolean {

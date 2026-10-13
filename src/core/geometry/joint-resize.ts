@@ -89,7 +89,9 @@ export function previewJointResize(
       message: 'The feature selection no longer matches this detection. Review it again.',
     });
   if (
-    selected.every((candidate) => Math.abs(analysis.value.targetWidthMm - candidate.widthMm) <= EPS)
+    selected.every(
+      (candidate) => Math.abs(targetFor(candidate, request) - candidate.widthMm) <= EPS,
+    )
   )
     return err({ message: 'The selected widths already match the requested width.' });
   const extracted = extract(objects);
@@ -97,11 +99,18 @@ export function previewJointResize(
   for (const geometry of extracted.geometries) {
     const features = selected.filter((candidate) => candidate.objectId === geometry.object.id);
     if (features.length === 0) continue;
-    const result = resizeGeometry(geometry, features, analysis.value.targetWidthMm);
+    const result = resizeGeometry(geometry, features, request);
     if (result.kind === 'error') return result;
     changed.push(result.value);
   }
   return ok({ objects: changed, changedFeatures: selected.length });
+}
+
+/** Openings take the thickness plus the fit allowance; a tab's depth is the bare thickness. */
+function targetFor(feature: JointCandidate, request: JointResizeRequest): number {
+  return feature.kind === 'outward-tab'
+    ? request.materialThicknessMm
+    : request.materialThicknessMm + request.fitAllowanceMm;
 }
 
 function validateRequest(request: JointResizeRequest): string | null {
@@ -211,7 +220,7 @@ function safeRelations(contours: ReadonlyArray<Contour>): boolean {
 function resizeGeometry(
   geometry: Geometry,
   features: ReadonlyArray<JointCandidate>,
-  target: number,
+  request: JointResizeRequest,
 ): Result<JointResizeObject, Failure> {
   const updated = geometry.contours.map((contour) => {
     const matching = features.filter(
@@ -222,7 +231,9 @@ function resizeGeometry(
       matching.reduce((current, feature) => {
         const shift = feature.shifts.find((item) => item.vertex === index);
         if (shift === undefined) return current;
-        const amount = (shift.sign * (target - feature.widthMm)) / 2;
+        // An opening widens about its centre; a tab grows from its root.
+        const share = feature.kind === 'outward-tab' ? 1 : 0.5;
+        const amount = shift.sign * (targetFor(feature, request) - feature.widthMm) * share;
         return {
           x: current.x + feature.direction.x * amount,
           y: current.y + feature.direction.y * amount,

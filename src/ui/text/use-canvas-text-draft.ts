@@ -139,6 +139,7 @@ function useStableTextValues(values: DialogValues): DialogValues {
             },
           }),
       ...(variableTemplate === undefined ? {} : { variableTemplate }),
+      ...(values.textStyle === undefined ? {} : { textStyle: values.textStyle }),
     }),
     [
       content,
@@ -160,6 +161,7 @@ function useStableTextValues(values: DialogValues): DialogValues {
       acrossAlign,
       variableTemplate,
       values.textBox,
+      values.textStyle,
     ],
   );
 }

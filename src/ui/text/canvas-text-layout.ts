@@ -20,7 +20,10 @@ export function canvasTextInputStyle(
 ): { readonly style: CSSProperties; readonly companion: boolean } {
   const font = findFontEntry(values.fontKey);
   const companion =
-    values.pathText !== undefined || values.bendDeg !== 0 || font?.geometry === 'single-line';
+    values.pathText !== undefined ||
+    values.bendDeg !== 0 ||
+    values.textStyle !== undefined ||
+    font?.geometry === 'single-line';
   const transform = object?.transform ??
     session.original?.transform ?? {
       ...IDENTITY_TRANSFORM,

@@ -9,6 +9,9 @@ import type { Scene, SceneGroup } from '../../core/scene/scene';
 import type { SceneObject } from '../../core/scene/scene-object';
 import { cloneSelectedGroups } from './array-actions';
 import { copyObjectsAtArrayPlacement } from './array-selection-copies';
+import { assignCopyOffset, copyStride } from './prepare-variable-array';
+import { variableCopyOffset } from '../../core/variables';
+import { objectVariableTemplate } from '../../core/variables/object-variable-template';
 import {
   planCopyAlongPath,
   type CopyAlongPathRequest,
@@ -70,7 +73,13 @@ export function copyAlongPathMutation(
     return state;
   }
   const scene0 = state.project.scene;
-  const copies = copiesAlongPath(scene0, plan.selection, plan.placements, idFactory);
+  const copies = copiesAlongPath(
+    scene0,
+    plan.selection,
+    plan.placements,
+    idFactory,
+    variableStart(request),
+  );
   const placed: Scene = {
     ...scene0,
     objects: [...scene0.objects, ...copies.objects],
@@ -98,6 +107,12 @@ export function copyAlongPathMutation(
   };
 }
 
+// A kept original holds the current value, so the copies start at the next.
+function variableStart(request: CopyAlongPathRequest): number | null {
+  if (request.incrementVariables !== true) return null;
+  return request.keepOriginal ? 1 : 0;
+}
+
 // Each copy takes what the artwork needs with it (an image's mask, a path
 // text's guide), and a group copied whole becomes a group of its own.
 function copiesAlongPath(
@@ -105,6 +120,7 @@ function copiesAlongPath(
   selection: ReadyCopyAlongPathSelection,
   placements: ReadonlyArray<ArrayPlacement>,
   idFactory: () => string,
+  variableStart: number | null = null,
 ): {
   readonly objects: ReadonlyArray<SceneObject>;
   readonly groups: ReadonlyArray<SceneGroup>;
@@ -121,15 +137,25 @@ function copiesAlongPath(
   const objects: SceneObject[] = [];
   const groups: SceneGroup[] = [];
   const selectedIds: string[] = [];
-  for (const placement of placements) {
+  const stride = copyStride(
+    sources.flatMap((object) => {
+      const offset = variableCopyOffset(object);
+      return objectVariableTemplate(object) === undefined ? [] : [offset ?? 0];
+    }),
+  );
+  placements.forEach((placement, index) => {
     const copied = copyObjectsAtArrayPlacement(sources, placement, idFactory);
-    objects.push(...copied.objects);
+    objects.push(
+      ...(variableStart !== null
+        ? copied.objects.map((object) => assignCopyOffset(object, (variableStart + index) * stride))
+        : copied.objects),
+    );
     groups.push(...cloneSelectedGroups(travelling, sourceIds, copied.ids, idFactory));
     for (const object of selection.artwork) {
       const id = copied.ids.get(object.id);
       if (id !== undefined) selectedIds.push(id);
     }
-  }
+  });
   return { objects, groups, selectedIds };
 }
 

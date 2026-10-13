@@ -115,6 +115,7 @@ function anchorKey(text: TextObject, content: string): string {
     text.lineHeight,
     text.letterSpacing,
     text.bendDeg ?? 0,
+    text.textStyle ?? null,
     text.weldOverlaps === true,
     text.color,
   ]);

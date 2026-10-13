@@ -1,3 +1,4 @@
+import { MAX_DATE_PATTERN_LENGTH } from '../../core/variables/date-pattern';
 import { isObject } from './project-shape-primitives';
 
 const MAX_VARIABLE_TOKENS = 1_000;
@@ -80,7 +81,10 @@ const TOKEN_VALIDATORS: Readonly<Record<string, TokenValidator>> = {
   literal: (value, path) => (typeof value['value'] === 'string' ? null : invalid(`${path}.value`)),
   'date-time': (value, path) =>
     typeof value['format'] === 'string' &&
-    ['date-iso', 'time-24h', 'datetime-iso'].includes(value['format'])
+    (['date-iso', 'time-24h', 'datetime-iso'].includes(value['format']) ||
+      (value['format'] === 'custom' &&
+        typeof value['pattern'] === 'string' &&
+        value['pattern'].length <= MAX_DATE_PATTERN_LENGTH))
       ? null
       : invalid(`${path}.format`),
   serial: validateSerialToken,

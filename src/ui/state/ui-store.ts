@@ -18,6 +18,7 @@ import type {
 import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import type { WarpDeformGrid } from '../../core/geometry/warp-deform-map';
 import type { TextAlignment } from '../../core/text';
+import type { TextStyle } from '../../core/scene/scene-object';
 import type { MeasureDraft } from '../workspace/measure-tool';
 import {
   readCanvasStartMarkersVisible,
@@ -48,6 +49,7 @@ export type TextDialogState =
       readonly lineHeight: number;
       readonly letterSpacing: number;
       readonly bendDeg?: number;
+      readonly textStyle?: TextStyle;
       readonly weldOverlaps?: boolean;
       readonly pathText?: PathTextSettings;
       readonly textBox?: TextBoxSettings;

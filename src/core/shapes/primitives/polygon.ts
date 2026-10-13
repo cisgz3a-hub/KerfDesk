@@ -9,6 +9,7 @@ import type { Polyline, Vec2 } from '../../scene';
 export type PolygonSpec = {
   readonly sides: number; // clamped to [3, 64]
   readonly radiusMm: number; // circumradius
+  readonly bulge?: number; // -1..1, see bulge-outline
 };
 
 const MIN_SIDES = 3;

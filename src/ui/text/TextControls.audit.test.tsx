@@ -204,6 +204,7 @@ it('canvas text Done and Cancel invoke separate owners and variable field insert
   for (const [label, token] of [
     ['Date', '{{date}}'],
     ['Time', '{{time}}'],
+    ['Custom date', '{{date:%d %b %Y}}'],
     ['Serial', '{{serial:4}}'],
     ['Power', '{{power}}'],
     ['Speed', '{{speed}}'],

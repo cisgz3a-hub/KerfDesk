@@ -27,6 +27,12 @@ export type GridArraySpec = {
   readonly mirrorColumns?: ArrayMirrorAxes;
   /** Mirror every other row (the 2nd, 4th, ...). A copy in both is mirrored by each. */
   readonly mirrorRows?: ArrayMirrorAxes;
+  /**
+   * Turn every copy but the original about its own centre by a repeatable random
+   * angle: a multiple of `stepDeg` (90 for quarter turns), or any angle at 0.
+   * The seed fixes the pattern, so reopening the array regenerates it exactly.
+   */
+  readonly randomRotation?: { readonly seed: number; readonly stepDeg: number };
 };
 
 /** Part of a circle: up to an end angle, or a set angle between neighbouring copies. */
@@ -76,4 +82,9 @@ export type ArrayPlacement = {
   readonly pivot?: { readonly x: number; readonly y: number };
   /** Mirror the source before it moves. Present only when the copy is mirrored. */
   readonly mirror?: ArrayPlacementMirror;
+  /** Scale the source uniformly about `center` (the source's centre) before it moves. */
+  readonly scale?: {
+    readonly factor: number;
+    readonly center: { readonly x: number; readonly y: number };
+  };
 };

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as CoreText from '../../core/text';
+import type * as TextStyleModule from '../../core/text/text-style';
 import { IDENTITY_TRANSFORM, type EmbeddedFont, type TextObject } from '../../core/scene';
 
 const mocks = vi.hoisted(() => ({
@@ -8,7 +9,7 @@ const mocks = vi.hoisted(() => ({
     bounds: { minX: 0, minY: 0, maxX: 10, maxY: 5 },
     paths: [{ color: '#000000', polylines: [] }],
   })),
-  bendTextRender: vi.fn((rendered: unknown) => rendered),
+  styledBentRender: vi.fn((rendered: unknown) => rendered),
 }));
 
 vi.mock('./font-loader', () => ({
@@ -17,7 +18,11 @@ vi.mock('./font-loader', () => ({
 vi.mock('../../core/text', async (importOriginal) => ({
   ...(await importOriginal<typeof CoreText>()),
   textToPolylines: mocks.textToPolylines,
-  bendTextRender: mocks.bendTextRender,
+}));
+
+vi.mock('../../core/text/text-style', async (importOriginal) => ({
+  ...(await importOriginal<typeof TextStyleModule>()),
+  styledBentRender: mocks.styledBentRender,
 }));
 
 import { useStore } from '../state';
@@ -51,7 +56,7 @@ describe('renderVariableText', () => {
     resetStore();
     mocks.loadFont.mockClear();
     mocks.textToPolylines.mockClear();
-    mocks.bendTextRender.mockClear();
+    mocks.styledBentRender.mockClear();
   });
 
   it('uses embedded project fonts and reapplies bend to evaluated content', async () => {
@@ -63,6 +68,9 @@ describe('renderVariableText', () => {
     expect(mocks.textToPolylines).toHaveBeenCalledWith(
       expect.objectContaining({ content: '0042' }),
     );
-    expect(mocks.bendTextRender).toHaveBeenCalledWith(expect.anything(), -45);
+    expect(mocks.styledBentRender).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ bendDeg: -45 }),
+    );
   });
 });

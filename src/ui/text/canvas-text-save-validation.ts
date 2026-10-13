@@ -29,7 +29,7 @@ export function canvasTextUnchanged(original: TextObject | null, next: TextObjec
     keys.every((key) => original[key] === next[key]) &&
     (original.bendDeg ?? 0) === (next.bendDeg ?? 0) &&
     (original.weldOverlaps ?? false) === (next.weldOverlaps ?? false) &&
-    (['textBox', 'pathText', 'variableTemplate'] as const).every((key) =>
+    (['textBox', 'pathText', 'variableTemplate', 'textStyle'] as const).every((key) =>
       sameValue(original[key], next[key]),
     ) &&
     // Reopening linked text rebuilds its geometry against the current guide,

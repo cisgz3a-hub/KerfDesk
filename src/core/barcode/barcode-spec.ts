@@ -21,6 +21,11 @@ const DEFAULT_QUIET_ZONE: Readonly<Record<BarcodeSymbology, number>> = {
   ean13: 11,
   upca: 9,
   ean8: 7,
+  code93: 10,
+  upce: 9,
+  codabar: 10,
+  itf: 10,
+  isbn: 11,
 };
 
 /** The standard's minimum; smaller settings draw but earn a warning. */
@@ -37,6 +42,11 @@ const SAMPLE_DATA: Readonly<Record<BarcodeSymbology, string>> = {
   ean13: '5901234123457',
   upca: '036000291452',
   ean8: '96385074',
+  code93: 'KERF-0001',
+  upce: '04252614',
+  codabar: 'A40156B',
+  itf: '1234567890',
+  isbn: '978-3-16-148410-0',
 };
 
 export function isMatrixSymbology(symbology: BarcodeSymbology): boolean {

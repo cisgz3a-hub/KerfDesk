@@ -8,6 +8,7 @@ import {
 import {
   capturePersonalArtwork,
   insertPersonalArtwork,
+  nonemptyName,
   type PersonalArtwork,
 } from './personal-artwork-model';
 import type { PersonalArtworkRepository } from './personal-artwork-storage';
@@ -39,6 +40,21 @@ export function personalArtworkActions(
         }
       }),
     remove: (id: string) => void run(async () => storage.remove(id)),
+    rename: (entry: PersonalArtwork, name: string, category: string) =>
+      void run(async () =>
+        storage.put({ ...entry, name: nonemptyName(name), category: category.trim() }),
+      ),
+    replace: (entry: PersonalArtwork) =>
+      void run(async (isCurrent) => {
+        const captured = await capturePersonalArtwork(
+          useStore.getState(),
+          entry.name,
+          entry.category,
+        );
+        if (!isCurrent()) return;
+        await storage.put({ ...captured, id: entry.id });
+        useToastStore.getState().pushToast(`Replaced ${entry.name} with the selection.`, 'success');
+      }),
     importLibrary: () => void run((isCurrent) => importLibrary(platform, storage, isCurrent)),
     exportLibrary: () => void run((isCurrent) => exportLibrary(platform, storage, isCurrent)),
     insert: (entry: PersonalArtwork) => {

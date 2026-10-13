@@ -182,7 +182,27 @@ function PolygonFields(props: {
         step={0.1}
         commit={(radiusMm) => props.setSpec({ ...props.spec, radiusMm })}
       />
+      <BulgeField spec={props.spec} setSpec={props.setSpec} />
     </>
+  );
+}
+
+// Sides bowed into arcs: +100% a half circle outward, -100% inward.
+function BulgeField(props: {
+  readonly spec: Extract<ParametricShapeSpec, { readonly kind: 'polygon' | 'star' }>;
+  readonly setSpec: SetSpec;
+}): JSX.Element {
+  return (
+    <ShapeNumberField
+      label="Bulge"
+      ariaLabel="Side bulge"
+      unit="%"
+      value={(props.spec.bulge ?? 0) * 100}
+      min={-100}
+      max={100}
+      step={5}
+      commit={(percent) => props.setSpec({ ...props.spec, bulge: percent / 100 })}
+    />
   );
 }
 
@@ -223,6 +243,17 @@ function StarFields(props: {
         step={1}
         commit={(percent) => props.setSpec({ ...props.spec, innerRadiusRatio: percent / 100 })}
       />
+      <ShapeNumberField
+        label="Alternate tips"
+        ariaLabel="Star alternate tip radius"
+        unit="%"
+        value={(props.spec.alternateRadiusRatio ?? 1) * 100}
+        min={5}
+        max={100}
+        step={1}
+        commit={(percent) => props.setSpec({ ...props.spec, alternateRadiusRatio: percent / 100 })}
+      />
+      <BulgeField spec={props.spec} setSpec={props.setSpec} />
     </>
   );
 }

@@ -20,7 +20,7 @@ it('browses with arrows, Home and End, then returns focus without cancelling the
   await clickControl(host, 'Font');
   const menu = fontMenu(host);
   const search = menu.querySelector('input')!;
-  const buttons = [...menu.querySelectorAll('[role="option"] button')];
+  const buttons = [...menu.querySelectorAll('[role="option"] button[data-font-key]')];
   expect(document.activeElement).toBe(search);
   await key(search, 'ArrowDown');
   expect(document.activeElement).toBe(buttons[0]);
