@@ -9,6 +9,7 @@ import { materializeVariableText } from '../../io/gcode/prepare-output-snapshot'
 import { exportSceneSvg } from '../../io/svg/export-scene-svg';
 import { renderVariableText } from '../text/render-variable-text';
 import { exportProjectSelection } from './export-artwork-svg';
+import { embedSvgRasterImages } from './svg-artwork-images';
 
 export type PrintOptions = {
   readonly blackOnly: boolean;
@@ -57,15 +58,17 @@ export async function printableArtworkSvg(
       message: resolved.preflight.issues.map((issue) => issue.message).join(' '),
     };
   }
-  const objects = resolved.project.scene.objects.filter(
-    (object) => object.kind !== 'raster-image' || object.dataUrl !== undefined,
-  );
-  const exported = exportSceneSvg(
-    { ...resolved.project, scene: { ...resolved.project.scene, objects } },
-    ids,
-  );
-  if (exported.kind === 'error') return { ok: false, message: exported.error };
-  return { ok: true, svg: styledPrintSvg(exported.value.svg, options) };
+  try {
+    const objects = await embedSvgRasterImages(resolved.project.scene.objects);
+    const exported = exportSceneSvg(
+      { ...resolved.project, scene: { ...resolved.project.scene, objects } },
+      ids,
+    );
+    if (exported.kind === 'error') return { ok: false, message: exported.error };
+    return { ok: true, svg: styledPrintSvg(exported.value.svg, options) };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 /** Print an SVG at its own millimetre size from a hidden frame. */

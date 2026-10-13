@@ -1,6 +1,14 @@
-import { describe, expect, it } from 'vitest';
-import { IDENTITY_TRANSFORM, createProject, type ImportedSvg } from '../../core/scene';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  IDENTITY_TRANSFORM,
+  createProject,
+  type ImportedSvg,
+  type RasterImage,
+} from '../../core/scene';
 import { printableArtworkSvg, styledPrintSvg } from './print-artwork';
+import { readRasterSourceFile } from '../import/paged-raster-source';
+
+vi.mock('../import/paged-raster-source', () => ({ readRasterSourceFile: vi.fn() }));
 
 const SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="10mm"><path stroke="#ff0000" fill="none"/></svg>';
@@ -60,3 +68,56 @@ describe('print artwork', () => {
     });
   });
 });
+
+it.each([false, true])(
+  'prints original paged raster pixels even with thumbnail=%s',
+  async (thumbnail) => {
+    const image: RasterImage = {
+      kind: 'raster-image',
+      id: 'photo',
+      source: 'photo.png',
+      pixelWidth: 1,
+      pixelHeight: 1,
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+      color: '#808080',
+      dither: 'threshold',
+      linesPerMm: 5,
+      ...(thumbnail ? { dataUrl: 'data:image/bmp;base64,VEhVTUI=' } : {}),
+      imageAsset: {
+        schemaVersion: 1,
+        repository: 'curvedesk-import-assets-v1',
+        sourceAssetId: 'original',
+        lumaAssetId: 'luma',
+        sourceMimeType: 'image/png',
+        sourceByteLength: 8,
+        lumaByteLength: 1,
+        naturalWidth: 1,
+        naturalHeight: 1,
+        sampledWidth: 1,
+        sampledHeight: 1,
+        thumbnail: {
+          mimeType: 'image/bmp',
+          dataUrl: 'data:image/bmp;base64,VEhVTUI=',
+          width: 1,
+          height: 1,
+        },
+      },
+    };
+    vi.mocked(readRasterSourceFile).mockResolvedValue(
+      new File(['ORIGINAL'], 'photo.png', { type: 'image/png' }),
+    );
+    const project = createProject();
+    const result = await printableArtworkSvg(
+      { ...project, scene: { ...project.scene, objects: [image] } },
+      [],
+      { blackOnly: false, lineWidthMm: 0.2 },
+      new Date(0),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.message);
+    expect(result.svg).toContain('data:image/png;base64,T1JJR0lOQUw=');
+    expect(result.svg).not.toContain('VEhVTUI=');
+    expect(readRasterSourceFile).toHaveBeenCalledWith(image, 'photo.png');
+  },
+);
