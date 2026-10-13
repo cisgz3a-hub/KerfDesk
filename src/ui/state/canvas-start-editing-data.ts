@@ -19,13 +19,13 @@ export type CanvasStartEditingData = {
 export function buildCanvasStartEditingData(
   prepared: Extract<PreparedOutput, { readonly ok: true }>,
 ): CanvasStartEditingData {
-  const selection = resolveJobStartPoint(
-    prepared.job,
-    { x: 0, y: 0 },
-    jobStartPointOptions(prepared.project.optimization),
+  const options = jobStartPointOptions(
+    prepared.project.optimization,
+    prepared.project.device.scanningOffsets,
   );
+  const selection = resolveJobStartPoint(prepared.job, { x: 0, y: 0 }, options);
   return {
-    job: jobStartEditingJob(prepared.job),
+    job: jobStartEditingJob(prepared.job, options),
     jobOriginOffset: prepared.jobOriginOffset,
     bounds: computeJobBounds(prepared.job, prepared.project.device),
     jobReason:

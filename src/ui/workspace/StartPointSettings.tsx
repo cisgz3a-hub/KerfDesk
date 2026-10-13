@@ -13,7 +13,7 @@ export function StartPointSettings(props: {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
   const settings = props.project.startPoints ?? {};
-  const sideB = props.project.cncSetup?.twoSided?.activeSide === 'B';
+  const sideB = isCncSideB(props.project);
   const defaultsReason = defaultSaveReason(props.context);
   return (
     <div className="lf-start-settings lf-chip">
@@ -86,7 +86,7 @@ function clearDefaultsMessage(): string {
 function resetStartPoint(project: Project, kind: 'frame' | 'job'): void {
   const state = useStore.getState();
   if (startEditingBusy() || state.project !== project || state.pendingUndo !== null) return;
-  if (kind === 'job' && project.cncSetup?.twoSided?.activeSide === 'B') return;
+  if (kind === 'job' && isCncSideB(project)) return;
   const next = { ...project.startPoints };
   if (kind === 'frame') delete next.frame;
   else delete next.job;
@@ -95,9 +95,13 @@ function resetStartPoint(project: Project, kind: 'frame' | 'job'): void {
 
 function defaultSaveReason(context: StartEditingContext | undefined): string | undefined {
   if (context?.registered) return 'Clear Print and Cut registration before saving defaults.';
-  if (context?.sourceProject.cncSetup?.twoSided?.activeSide === 'B')
+  if (context !== undefined && isCncSideB(context.sourceProject))
     return 'Switch to Side A before saving defaults.';
   return undefined;
+}
+
+function isCncSideB(project: Project): boolean {
+  return project.machine?.kind === 'cnc' && project.cncSetup?.twoSided?.activeSide === 'B';
 }
 
 function saveDefaultsMessage(context: StartEditingContext | undefined): string {

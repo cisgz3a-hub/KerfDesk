@@ -1827,7 +1827,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    cutting point without moving the artwork. It stays within the first executable operation and
    respects inside-first cutting and the configured direction policy. Closed polylines allow an
    edge position; native arcs snap to existing move boundaries, and open paths use permitted
-   endpoints. Focus a handle and use arrow keys for 1 mm steps, or Shift for 10 mm steps.
+   endpoints. With **Keep source order**, selection stays on the first executable contour and
+   preserves its drawn direction. Focus a handle and use arrow keys for 1 mm steps, or Shift for
+   10 mm steps.
 5. Each completed drag is one Undo step and is saved with the project. Escape, pointer cancellation,
    lost capture, a newly opened document or a machine becoming busy discards the draft. Start
    points cannot be edited while the machine is busy.
@@ -1838,7 +1840,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    confirms saving or reports a storage failure.
 7. Raster, fill and complex CNC entries retain generated scan/depth order. Only identical closed
    CNC contour passes without special entry sequences support a movable cutting start. Registered
-   Print and Cut and rotary views disable both handles. Side B retains its source-artwork cutting
+   Print and Cut and rotary views disable both handles. In CNC mode, Side B retains its source-artwork cutting
    selection and disables its job handle and default saving.
 8. Changing either selection requires another Frame because selected starts are spatial inputs.
    ADR-565 otherwise remains unchanged: ordinary power and speed edits preserve Frame evidence

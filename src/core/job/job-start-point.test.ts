@@ -269,6 +269,7 @@ describe('job start selection', () => {
         {
           ...cut([square()]),
           kind: 'fill',
+          fillStyle: 'offset',
           overscanMm: 2,
           segments: [{ ...square(), reverse: false }],
         },

@@ -266,7 +266,10 @@ export function completePreparedOutput(
         : applyJobStartPoint(
             optimized,
             target,
-            jobStartPointOptions(input.sourceProject.optimization),
+            jobStartPointOptions(
+              input.sourceProject.optimization,
+              input.sourceProject.device.scanningOffsets,
+            ),
           ),
     jobOriginOffset: offset,
     advisories: input.advisories,

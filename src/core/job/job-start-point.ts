@@ -1,26 +1,39 @@
 import type { ProjectOptimizationSettings, Vec2 } from '../scene';
+import { offsetForEmittedFeed, type ScanOffsetPoint } from './scan-offset';
 import { containmentDepths } from './containment-depth';
 import { nearestClosedStart } from './closed-shape-start';
 import { reverseCutSegment, rotateClosedCutSegment, validCutArcMoves } from './cut-arc-moves';
 import { firstToolpathProcessPoint } from './first-process-point';
 import { isEmittableCutSegment } from './cut-emission-resolution';
-import { type CncGroup, type CutSegment, type Group, type Job, type RasterGroup } from './job';
+import {
+  type CncGroup,
+  type CutSegment,
+  type FillGroup,
+  type Group,
+  type Job,
+  type RasterGroup,
+} from './job';
 
 export type JobStartPointOptions = {
   readonly allowReverse?: boolean;
   readonly insideFirst?: boolean;
+  readonly preserveOrder?: boolean;
+  readonly scanningOffsets?: ReadonlyArray<ScanOffsetPoint>;
 };
 
 /** Source order preserves drawn direction even if a former planner setting
  * still allows reversal. Output and canvas snapping must use the same policy. */
 export function jobStartPointOptions(
   optimization: Pick<ProjectOptimizationSettings, 'travelPolicy' | 'pathDirection' | 'insideFirst'>,
+  scanningOffsets?: ReadonlyArray<ScanOffsetPoint>,
 ): JobStartPointOptions {
   return {
     allowReverse:
       optimization.travelPolicy !== 'source-order' &&
       optimization.pathDirection === 'allow-reverse',
-    insideFirst: optimization.insideFirst,
+    insideFirst: optimization.travelPolicy !== 'source-order' && optimization.insideFirst,
+    preserveOrder: optimization.travelPolicy === 'source-order',
+    ...(scanningOffsets === undefined ? {} : { scanningOffsets }),
   };
 }
 
@@ -43,7 +56,10 @@ type ContainmentEligibility = {
 // Prepared jobs and their segment arrays are immutable. Pointer movement only
 // changes the target, so keep containment work once per prepared geometry.
 const containmentCache = new WeakMap<ReadonlyArray<CutSegment>, ContainmentEligibility>();
-const processStartCache = new WeakMap<RasterGroup | CncGroup, Vec2 | null>();
+const processStartCache = new WeakMap<
+  RasterGroup | CncGroup | FillGroup,
+  Map<number, Vec2 | null>
+>();
 
 function containmentEligibility(segments: ReadonlyArray<CutSegment>): ContainmentEligibility {
   const cached = containmentCache.get(segments);
@@ -72,8 +88,8 @@ export function resolveJobStartPoint(
 }
 
 /** Compact, cloneable editing geometry; never carries raster pixels/providers or later operations. */
-export function jobStartEditingJob(job: Job): Job {
-  const selection = selectStart(job, { x: 0, y: 0 }, {});
+export function jobStartEditingJob(job: Job, options: JobStartPointOptions = {}): Job {
+  const selection = selectStart(job, { x: 0, y: 0 }, options);
   const group = selection?.supported === true ? job.groups[selection.groupIndex] : undefined;
   return { groups: group === undefined ? [] : [group] };
 }
@@ -93,10 +109,15 @@ export function applyJobStartPoint(
     if (segment === undefined) return job;
     replacement = {
       ...group,
-      segments: [
-        selection.segment,
-        ...group.segments.filter((_, index) => index !== selection.segmentIndex),
-      ],
+      segments:
+        options.preserveOrder === true
+          ? group.segments.map((item, index) =>
+              index === selection.segmentIndex ? selection.segment : item,
+            )
+          : [
+              selection.segment,
+              ...group.segments.filter((_, index) => index !== selection.segmentIndex),
+            ],
     };
   } else if (group?.kind === 'cnc') {
     // Selection only accepts identical constant-depth contours. Rotate every
@@ -119,7 +140,7 @@ function selectStart(job: Job, target: Vec2, options: JobStartPointOptions): Sel
   for (let groupIndex = 0; groupIndex < job.groups.length; groupIndex += 1) {
     const group = job.groups[groupIndex];
     if (group === undefined) continue;
-    const point = firstPoint(group);
+    const point = firstPoint(group, options);
     if (point === undefined) continue;
     if (group.kind === 'cut') return selectCut(group.segments, groupIndex, target, options);
     if (group.kind === 'cnc') {
@@ -156,21 +177,32 @@ function canRotateCnc(group: CncGroup): boolean {
   );
 }
 
-function firstPoint(group: Group): Vec2 | undefined {
+function firstPoint(group: Group, options: JobStartPointOptions): Vec2 | undefined {
   if (group.kind !== 'cnc' && (group.power <= 0 || group.passes <= 0)) return undefined;
-  if (group.kind === 'raster' || group.kind === 'cnc') {
-    // Dimensions/vertex counts do not guarantee executable motion. Reuse the
-    // raster sweep and CNC controller-precision rules from the canonical marker.
-    // Cache by immutable group so dragging does not rescan rows or precision.
-    const cached = processStartCache.get(group);
-    if (cached !== undefined) return cached ?? undefined;
-    const point = firstToolpathProcessPoint({ groups: [group] });
-    processStartCache.set(group, point);
-    return point ?? undefined;
-  }
-  return group.segments.find((segment) =>
-    group.kind === 'cut' ? isEmittableCutSegment(segment) : segment.polyline.length >= 2,
-  )?.polyline[0];
+  if (group.kind === 'cut') return group.segments.find(isEmittableCutSegment)?.polyline[0];
+  return cachedProcessPoint(group, options) ?? undefined;
+}
+
+function cachedProcessPoint(
+  group: RasterGroup | CncGroup | FillGroup,
+  options: JobStartPointOptions,
+): Vec2 | null {
+  // Dimensions/vertex counts do not guarantee executable motion. Reuse the
+  // fill/raster sweep and CNC controller-precision rules from the canonical marker.
+  // Cache by immutable group and effective offset: calibration can change
+  // whether a reverse span survives output rounding.
+  const offset =
+    group.kind === 'cnc'
+      ? 0
+      : (group.bidirectionalScanOffsetMm ??
+        offsetForEmittedFeed(options.scanningOffsets ?? [], group.speed));
+  const cached = processStartCache.get(group);
+  if (cached?.has(offset)) return cached.get(offset) ?? null;
+  const point = firstToolpathProcessPoint({ groups: [group] }, options);
+  const entries = cached ?? new Map<number, Vec2 | null>();
+  entries.set(offset, point);
+  processStartCache.set(group, entries);
+  return point;
 }
 
 function selectCut(
@@ -180,13 +212,13 @@ function selectCut(
   options: JobStartPointOptions,
   acceptSegment: (segment: CutSegment) => boolean = isEmittableCutSegment,
 ): Selection | null {
+  if (options.preserveOrder === true)
+    return selectFirstCut(segments, groupIndex, target, acceptSegment);
   const eligibility = options.insideFirst === true ? containmentEligibility(segments) : null;
   let best: Selection | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
-  for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex += 1) {
-    const segment = segments[segmentIndex];
+  for (const [segmentIndex, segment] of segments.entries()) {
     if (
-      segment === undefined ||
       !acceptSegment(segment) ||
       (eligibility !== null && eligibility.depths[segmentIndex] !== eligibility.maxDepth)
     )
@@ -200,6 +232,22 @@ function selectCut(
     best = { point, supported: true, groupIndex, segmentIndex, segment: selected };
   }
   return best;
+}
+
+function selectFirstCut(
+  segments: ReadonlyArray<CutSegment>,
+  groupIndex: number,
+  target: Vec2,
+  acceptSegment: (segment: CutSegment) => boolean,
+): Selection | null {
+  const segmentIndex = segments.findIndex(acceptSegment);
+  const first = segments[segmentIndex];
+  if (first === undefined) return null;
+  const segment = selectedSegment(first, target, false);
+  const point = segment?.polyline[0];
+  return segment === null || point === undefined
+    ? null
+    : { point, supported: true, groupIndex, segmentIndex, segment };
 }
 
 function selectedSegment(

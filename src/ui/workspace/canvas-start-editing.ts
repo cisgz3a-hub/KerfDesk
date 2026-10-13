@@ -53,7 +53,7 @@ export function startEditReason(kind: StartKind, context: StartEditingContext): 
     return 'Start editing is unavailable in the rotary surface view.';
   }
   if (kind === 'frame') return null;
-  if (sourceProject.cncSetup?.twoSided?.activeSide === 'B') {
+  if (isSideBJobSelection(kind, sourceProject)) {
     return 'Side B keeps the cutting start selected on the source artwork.';
   }
   return jobEditReason(context);
@@ -66,7 +66,7 @@ function jobEditReason(context: StartEditingContext): string | null {
   const first = resolveJobStartPoint(
     prepared.job,
     { x: 0, y: 0 },
-    jobStartPointOptions(sourceProject.optimization),
+    jobStartPointOptions(sourceProject.optimization, sourceProject.device.scanningOffsets),
   );
   const reason =
     first?.supported === true
@@ -84,7 +84,7 @@ export function selectCanvasStart(
 ): StartSelection | null {
   if (
     startEditReason('frame', context) !== null ||
-    (kind === 'job' && context.sourceProject.cncSetup?.twoSided?.activeSide === 'B')
+    isSideBJobSelection(kind, context.sourceProject)
   )
     return null;
   const target = sceneToController(point, plan);
@@ -104,7 +104,10 @@ export function selectCanvasStart(
   const selected = resolveJobStartPoint(
     context.prepared.job,
     target,
-    jobStartPointOptions(context.sourceProject.optimization),
+    jobStartPointOptions(
+      context.sourceProject.optimization,
+      context.sourceProject.device.scanningOffsets,
+    ),
   );
   if (selected?.supported !== true) return null;
   const offset = context.prepared.jobOriginOffset;
@@ -116,6 +119,14 @@ export function selectCanvasStart(
     point: mapControllerPointToScene({ ...selected.point, z: 0 }, plan),
     settings: { ...settings, job },
   };
+}
+
+function isSideBJobSelection(kind: StartKind, project: Project): boolean {
+  return (
+    kind === 'job' &&
+    project.machine?.kind === 'cnc' &&
+    project.cncSetup?.twoSided?.activeSide === 'B'
+  );
 }
 
 function sceneToController(point: Vec2, plan: CanvasMotionPlan): Vec2 {

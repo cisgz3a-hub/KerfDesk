@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { toMachineCoords } from '../../core/devices';
-import type { JobOriginPlacement } from '../../core/job';
+import type { FillGroup, JobOriginPlacement } from '../../core/job';
+import { buildCanvasStartEditingData } from './canvas-start-editing-data';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import {
   createLayer,
@@ -118,6 +119,50 @@ function expectMappedFrame(plan: CanvasMotionPlan, relative: boolean): void {
 }
 
 describe('idle marker editing metadata crossing the worker boundary', () => {
+  it('uses device scan calibration when deciding whether a preceding fill locks job-start editing', () => {
+    const project = twoOperations();
+    const prepared = prepareOutput(project);
+    if (!prepared.ok) throw new Error('Expected prepared operations');
+    const fill: FillGroup = {
+      kind: 'fill',
+      layerId: 'fill',
+      color: '#000',
+      power: 50,
+      passes: 1,
+      speed: 1000,
+      airAssist: false,
+      overscanMm: 2,
+      fillRunwayPolicy: 'feed-matched-every-sweep',
+      segments: [
+        {
+          closed: false,
+          reverse: true,
+          polyline: [
+            { x: 10.0002, y: 20 },
+            { x: 10.0001, y: 20 },
+          ],
+        },
+      ],
+    };
+    const job = { groups: [fill, ...prepared.job.groups] };
+    const blank = buildCanvasStartEditingData({ ...prepared, job });
+    expect(blank.jobReason).toBeNull();
+    expect(blank.job.groups[0]?.kind).toBe('cut');
+    const calibrated = buildCanvasStartEditingData({
+      ...prepared,
+      job,
+      project: {
+        ...project,
+        device: {
+          ...project.device,
+          scanningOffsets: [{ speedMmPerMin: 1000, offsetMm: 0.00065 }],
+        },
+      },
+    });
+    expect(calibrated.jobReason).toContain('generated scan order');
+    expect(calibrated.job.groups).toEqual([]);
+  });
+
   it.each([false, true])(
     'restores edits, executable start and full-job defaults after structuredClone (relative=%s)',
     (relative) => {
