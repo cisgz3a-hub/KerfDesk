@@ -20,3 +20,7 @@
 .lf-trace-parts-hint > span {
   flex-basis: 100%;
 }
+
+.lf-trace-parts-hint > strong {
+  margin-right: auto;
+}

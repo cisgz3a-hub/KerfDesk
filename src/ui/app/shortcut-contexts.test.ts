@@ -1,8 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
-import { TOOL_SHORTCUT_CONTEXT } from './shortcut-contexts';
+import {
+  editShortcutContext,
+  TOOL_SHORTCUT_CONTEXT,
+  transformShortcutContext,
+} from './shortcut-contexts';
+import { handleEditShortcut, handleTransformShortcut } from './shortcuts';
 
 const initialApp = useStore.getState();
 const initialUi = useUiStore.getState();
@@ -29,6 +34,51 @@ describe('Alt+T Trace Image shortcut context', () => {
 
     expect(useUiStore.getState().imageDialog).toBeNull();
   });
+});
+
+describe('leaving node editing', () => {
+  it.each(['select', 'trace-parts', 'measure'] as const)(
+    'makes Arrow and Delete act on the object after switching to %s',
+    (kind) => {
+      const nudgeSelectedPathNode = vi.fn();
+      const nudgeSelection = vi.fn();
+      const deleteSelectedPathNodes = vi.fn();
+      const removeSceneObjects = vi.fn();
+      useStore.setState({
+        selectedObjectId: 'P1',
+        selectedPathNode: { objectId: 'P1', pathIndex: 0, polylineIndex: 0, pointIndex: 0 },
+        nudgeSelectedPathNode,
+        nudgeSelection,
+        deleteSelectedPathNodes,
+        removeSceneObjects,
+      });
+      useUiStore.getState().setToolMode({ kind: 'node' });
+      const nudge = (): boolean =>
+        handleTransformShortcut(
+          new KeyboardEvent('keydown', { key: 'ArrowRight' }),
+          transformShortcutContext(),
+        );
+      const remove = (): boolean =>
+        handleEditShortcut(new KeyboardEvent('keydown', { key: 'Delete' }), editShortcutContext());
+
+      expect(nudge()).toBe(true);
+      expect(remove()).toBe(true);
+      expect(nudgeSelectedPathNode).toHaveBeenCalledTimes(1);
+      expect(deleteSelectedPathNodes).toHaveBeenCalledTimes(1);
+      expect(nudgeSelection).not.toHaveBeenCalled();
+      expect(removeSceneObjects).not.toHaveBeenCalled();
+
+      if (kind === 'select') useUiStore.getState().resetToolMode();
+      else useUiStore.getState().setToolMode({ kind });
+
+      expect(nudge()).toBe(true);
+      expect(remove()).toBe(true);
+      expect(nudgeSelection).toHaveBeenCalledTimes(1);
+      expect(removeSceneObjects).toHaveBeenCalledWith(['P1']);
+      expect(nudgeSelectedPathNode).toHaveBeenCalledTimes(1);
+      expect(deleteSelectedPathNodes).toHaveBeenCalledTimes(1);
+    },
+  );
 });
 
 function projectWithRasterAndPath(): Project {

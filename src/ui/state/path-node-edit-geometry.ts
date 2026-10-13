@@ -21,9 +21,10 @@ export function editPathsNodesByDelta(
   dx: number,
   dy: number,
 ): { readonly paths: ReadonlyArray<ColoredPath> } | null {
+  if (dx === 0 && dy === 0) return null;
   let changed = false;
   const curveRefs = refs.filter((ref) => ref.geometry === 'curve');
-  const legacyRefs = refs.filter((ref) => ref.geometry !== 'curve');
+  const legacyRefs = groupPathNodeRefsByPolyline(refs.filter((ref) => ref.geometry !== 'curve'));
   const nextPaths = paths.map((originalPath, pathIndex) => {
     const curveEdit = editCurvePathByDelta(originalPath, pathIndex, curveRefs, dx, dy);
     if (curveEdit !== null) {
@@ -32,24 +33,15 @@ export function editPathsNodesByDelta(
     }
     const path = originalPath;
     let pathChanged = false;
-    const polylines = path.polylines.map((polyline, polylineIndex) => ({
-      ...polyline,
-      points: polyline.points.map((point, pointIndex) => {
-        if (
-          !legacyRefs.some(
-            (ref) =>
-              ref.pathIndex === pathIndex &&
-              ref.polylineIndex === polylineIndex &&
-              samePolylineNode(polyline, ref.pointIndex, pointIndex),
-          )
-        ) {
-          return point;
-        }
-        changed = true;
-        pathChanged = true;
-        return { x: point.x + dx, y: point.y + dy };
-      }),
-    }));
+    const polylines = path.polylines.map((polyline, polylineIndex) => {
+      const polylineRefs = legacyRefs.get(pathNodePolylineKey({ pathIndex, polylineIndex }));
+      if (polylineRefs === undefined) return polyline;
+      const moved = movePolylineNodes(polyline, polylineRefs, dx, dy);
+      if (moved === polyline) return polyline;
+      changed = true;
+      pathChanged = true;
+      return moved;
+    });
     // The legacy node editor addresses compatibility-polyline indices. Until
     // handle-aware curve editing lands, discard stale canonical geometry so
     // preview and machine output use the points the user actually changed.
@@ -58,12 +50,30 @@ export function editPathsNodesByDelta(
   return changed ? { paths: nextPaths } : null;
 }
 
-function samePolylineNode(polyline: Polyline, a: number, b: number): boolean {
+function movePolylineNodes(
+  polyline: Polyline,
+  refs: ReadonlyArray<PathNodeRef>,
+  dx: number,
+  dy: number,
+): Polyline {
+  const indices = new Set(refs.map((ref) => ref.pointIndex));
   const last = polyline.points.length - 1;
-  const closurePair = (a === 0 && b === last) || (a === last && b === 0);
-  // A repeated closing point is the same anchor as the start. Move either
-  // selection once at both indices without coupling coincident interior nodes.
-  return a === b || (polyline.closed && closurePair && hasDuplicateClosingPoint(polyline.points));
+  if (
+    polyline.closed &&
+    (indices.has(0) || indices.has(last)) &&
+    hasDuplicateClosingPoint(polyline.points)
+  ) {
+    indices.add(0);
+    indices.add(last);
+  }
+  let points: Vec2[] | undefined;
+  for (const index of indices) {
+    const point = polyline.points[index];
+    if (point === undefined) continue;
+    points ??= [...polyline.points];
+    points[index] = { x: point.x + dx, y: point.y + dy };
+  }
+  return points === undefined ? polyline : { ...polyline, points };
 }
 
 export function deletePathsNodes(
@@ -205,7 +215,12 @@ function materializeCurvePath(
   curves: ReadonlyArray<CurveSubpath>,
 ): ColoredPath | null {
   const polylines: Polyline[] = [];
-  for (const curve of curves) {
+  for (const [index, curve] of curves.entries()) {
+    const existing = path.polylines[index];
+    if (curve === path.curves?.[index] && existing !== undefined) {
+      polylines.push(existing);
+      continue;
+    }
     const flattened = flattenCurveSubpath(curve, { toleranceMm: 0.05 });
     if (flattened.kind !== 'ok') return null;
     polylines.push(flattened.polyline);
@@ -221,26 +236,46 @@ export function materializedPolylineToSpecPoints(
   return points.slice(0, -1);
 }
 
+const curveBounds = new WeakMap<CurveSubpath, Bounds>();
+const polylineBounds = new WeakMap<Polyline, Bounds | null>();
+
 export function boundsForPaths(paths: ReadonlyArray<ColoredPath>): Bounds {
-  const bounds = paths.flatMap((path) =>
-    path.curves === undefined
-      ? path.polylines.flatMap((polyline) => {
-          const bounds = boundsForPolyline(polyline);
-          return bounds === null ? [] : [bounds];
-        })
-      : path.curves.map((curve) => curveSubpathBounds(curve)),
-  );
-  const first = bounds[0];
-  if (first === undefined) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  return bounds.slice(1).reduce(
-    (combined, next) => ({
-      minX: Math.min(combined.minX, next.minX),
-      minY: Math.min(combined.minY, next.minY),
-      maxX: Math.max(combined.maxX, next.maxX),
-      maxY: Math.max(combined.maxY, next.maxY),
-    }),
-    first,
-  );
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const path of paths) {
+    const bounds =
+      path.curves === undefined
+        ? path.polylines.map(cachedPolylineBounds)
+        : path.curves.map(cachedCurveBounds);
+    for (const next of bounds) {
+      if (next === null) continue;
+      minX = Math.min(minX, next.minX);
+      minY = Math.min(minY, next.minY);
+      maxX = Math.max(maxX, next.maxX);
+      maxY = Math.max(maxY, next.maxY);
+    }
+  }
+  return minX === Number.POSITIVE_INFINITY
+    ? { minX: 0, minY: 0, maxX: 0, maxY: 0 }
+    : { minX, minY, maxX, maxY };
+}
+
+function cachedCurveBounds(curve: CurveSubpath): Bounds {
+  const existing = curveBounds.get(curve);
+  if (existing !== undefined) return existing;
+  const bounds = curveSubpathBounds(curve);
+  curveBounds.set(curve, bounds);
+  return bounds;
+}
+
+function cachedPolylineBounds(polyline: Polyline): Bounds | null {
+  const existing = polylineBounds.get(polyline);
+  if (existing !== undefined) return existing;
+  const bounds = boundsForPolyline(polyline);
+  polylineBounds.set(polyline, bounds);
+  return bounds;
 }
 
 function boundsForPolyline(polyline: Polyline): Bounds | null {

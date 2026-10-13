@@ -76,7 +76,7 @@ describe('NodeEditHint', () => {
     expect(after.undoStack).toHaveLength(1);
     expect(hitPathNode(after.project.scene, point!, 0.01)?.objectId).toBe(primitive.id);
     expect(useUiStore.getState().toolMode.kind).toBe('node');
-    expect(host.textContent).toBe('');
+    expect(host.textContent).toContain('Drag nodes or curve handles');
 
     await act(async () => useStore.getState().undo());
     expect(useStore.getState().project).toBe(before);
@@ -102,12 +102,12 @@ describe('NodeEditHint', () => {
     expect(useStore.getState().project.scene.objects[0]).toBe(path);
     expect(useStore.getState().undoStack).toHaveLength(0);
     await act(async () => useStore.setState({ additionalSelectedIds: new Set() }));
-    expect(host.textContent).toBe('');
+    expect(host.textContent).toContain('Drag nodes or curve handles');
   });
 
   it('does not offer conversion for locked primitives or outside node mode', async () => {
     await render([{ ...rectangle(), locked: true }]);
-    expect(host.textContent).toBe('');
+    expect(host.querySelector('button')).toBeNull();
     await act(async () => {
       useStore.setState((state) => ({
         project: { ...state.project, scene: { ...state.project.scene, objects: [rectangle()] } },

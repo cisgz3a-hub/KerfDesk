@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IDENTITY_TRANSFORM, type CurveSubpath } from '../scene';
+import { applyTransform, IDENTITY_TRANSFORM, type CurveSubpath } from '../scene';
 import {
   breakOpenCurveAtNode,
   curveSegmentCount,
@@ -128,5 +128,71 @@ describe('nearestCurveSegment', () => {
     expect(hit?.segmentIndex).toBe(1);
     expect(hit?.t).toBeCloseTo(0.3, 6);
     expect(hit?.distance).toBeCloseTo(1, 6);
+  });
+
+  it('projects straight segments exactly, including endpoints and collapsed segments', () => {
+    const line: CurveSubpath = {
+      start: { x: 1, y: 2 },
+      segments: [{ kind: 'line', to: { x: 11, y: 2 } }],
+      closed: false,
+    };
+    const transform = {
+      ...IDENTITY_TRANSFORM,
+      rotationDeg: 37,
+      scaleX: 2,
+      scaleY: 3,
+      mirrorX: true,
+    };
+    const middle = applyTransform({ x: 6, y: 2 }, transform);
+    expect(nearestCurveSegment(line, transform, middle)?.t).toBeCloseTo(0.5, 14);
+    expect(nearestCurveSegment(line, IDENTITY_TRANSFORM, { x: 100, y: 2 })).toMatchObject({
+      t: 1,
+      point: { x: 11, y: 2 },
+      distance: 89,
+    });
+    expect(
+      nearestCurveSegment(line, { ...IDENTITY_TRANSFORM, scaleX: 0 }, { x: 0, y: 2 }),
+    ).toMatchObject({
+      t: 0,
+      distance: 0,
+    });
+  });
+
+  it('retains transformed cubic bulges inside the hit radius and rejects distant segments', () => {
+    const transform = { ...IDENTITY_TRANSFORM, rotationDeg: 31, scaleX: 2, mirrorY: true };
+    const point = applyTransform({ x: 5, y: 7.5 }, transform);
+    expect(nearestCurveSegment(WAVE, transform, point, 0.01)?.segmentIndex).toBe(0);
+    expect(nearestCurveSegment(WAVE, transform, { x: 500, y: 500 }, 8)).toBeNull();
+  });
+
+  it('reuses distant segment bounds across pointer moves and invalidates on a new transform', () => {
+    let reads = 0;
+    const curve: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      closed: false,
+      segments: [
+        {
+          kind: 'cubic',
+          get control1() {
+            reads += 1;
+            return { x: 3, y: 10 };
+          },
+          control2: { x: 7, y: 10 },
+          to: { x: 10, y: 0 },
+        },
+      ],
+    };
+    expect(nearestCurveSegment(curve, IDENTITY_TRANSFORM, { x: 1000, y: 1000 }, 8)).toBeNull();
+    const firstReads = reads;
+    expect(firstReads).toBeGreaterThan(0);
+    expect(nearestCurveSegment(curve, IDENTITY_TRANSFORM, { x: 1001, y: 1001 }, 8)).toBeNull();
+    expect(reads).toBe(firstReads);
+    expect(
+      nearestCurveSegment(curve, { ...IDENTITY_TRANSFORM, x: 1000 }, { x: 1005, y: 7.5 }, 1)
+        ?.segmentIndex,
+    ).toBe(0);
+    const copiedReads = reads;
+    expect(nearestCurveSegment(curve, IDENTITY_TRANSFORM, { x: 1002, y: 1002 }, 8)).toBeNull();
+    expect(reads).toBe(copiedReads);
   });
 });

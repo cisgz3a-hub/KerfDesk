@@ -33,7 +33,6 @@ import { CanvasMotionBadge } from './canvas-motion-badge';
 import { ArtworkNumberingPrompt } from './ArtworkNumberingPrompt';
 import { WorkspacePointerOverlays } from './WorkspacePointerOverlays';
 import { WorkspacePreviewDock } from './WorkspacePreviewDock';
-import { NodeEditHint } from './NodeEditHint';
 import { TracePartsHint } from './TracePartsHint';
 import { LaserTabHint } from './LaserTabHint';
 import { ExtendShapesHint } from './ExtendShapesHint';
@@ -144,7 +143,6 @@ function WorkspaceDesignChrome(props: {
     <>
       <CanvasMotionBadge overlay={props.overlay} />
       <ArtworkNumberingPrompt />
-      <NodeEditHint />
       <TracePartsHint />
       <LaserTabHint />
       <TrimShapesHint />

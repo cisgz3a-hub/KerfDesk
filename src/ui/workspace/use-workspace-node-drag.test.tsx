@@ -170,7 +170,7 @@ describe('selected-node dragging through the workspace pointer pipeline', () => 
     },
   );
 
-  it.each(['Escape', 'pointercancel', 'lostpointercapture'] as const)(
+  it.each(['Escape', 'pointercancel', 'lostpointercapture', 'Done', 'switch tool'] as const)(
     'restores geometry and selection on %s, with no Undo entry',
     async (cancel) => {
       loadPaths();
@@ -184,6 +184,10 @@ describe('selected-node dragging through the workspace pointer pipeline', () => 
         await act(async () =>
           window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
         );
+      } else if (cancel === 'Done') {
+        await act(async () => useUiStore.getState().resetToolMode());
+      } else if (cancel === 'switch tool') {
+        await act(async () => useUiStore.getState().setToolMode({ kind: 'trace-parts' }));
       } else {
         await pointer(canvas, cancel, { x: 44.75, y: 37.5 });
       }
@@ -193,6 +197,9 @@ describe('selected-node dragging through the workspace pointer pipeline', () => 
       expect(useStore.getState().undoStack).toHaveLength(0);
       expect(useStore.getState().pendingUndo).toBeNull();
       expect(useStore.getState().dirty).toBe(false);
+      if (cancel === 'Done' || cancel === 'switch tool') {
+        expect(canvas.releasePointerCapture).toHaveBeenCalled();
+      }
       await pointer(canvas, 'pointermove', { x: 60, y: 60 });
       await pointer(canvas, 'pointerup', { x: 60, y: 60 });
       expect(useStore.getState().project).toBe(original);
@@ -340,4 +347,6 @@ async function pointer(
   });
   Object.defineProperty(event, 'pointerId', { value: 3 });
   await act(async () => canvas.dispatchEvent(event));
+  if (type === 'pointermove')
+    await act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
 }

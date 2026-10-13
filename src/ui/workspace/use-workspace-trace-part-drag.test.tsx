@@ -31,6 +31,21 @@ beforeEach(() => {
 afterEach(cleanupTracePartHarness);
 
 describe('trace-part dragging through the workspace pointer pipeline', () => {
+  it('retires the captured drag when a new document reuses its object IDs', async () => {
+    loadTrace();
+    const canvas = await renderHarness();
+    await pointer(canvas, 'pointerdown', { x: 30, y: 55 });
+    const replacement = { ...useStore.getState().project, name: 'Replacement document' };
+    await act(async () => useStore.getState().setProject(replacement));
+    const expected = useStore.getState().project;
+    await pointer(canvas, 'pointermove', { x: 90, y: 110 });
+    await pointer(canvas, 'pointerup', { x: 90, y: 110 });
+    expect(useStore.getState().project).toBe(expected);
+    expect(useStore.getState().pendingUndo).toBeNull();
+    expect(useStore.getState().undoStack).toHaveLength(0);
+    expect(canvas.releasePointerCapture).toHaveBeenCalledWith(3);
+  });
+
   it('separates and moves the picked contour while keeping every other contour unchanged, in one Undo', async () => {
     loadTrace();
     const original = useStore.getState().project;
@@ -78,7 +93,7 @@ describe('trace-part dragging through the workspace pointer pipeline', () => {
     await pointer(canvas, 'pointerup', destination);
   });
 
-  it.each(['Escape', 'pointercancel', 'lostpointercapture'] as const)(
+  it.each(['Escape', 'pointercancel', 'lostpointercapture', 'Done', 'switch tool'] as const)(
     'fully restores the original compound trace and prior selection on %s',
     async (cancel) => {
       loadTrace();
@@ -92,6 +107,10 @@ describe('trace-part dragging through the workspace pointer pipeline', () => {
         await act(async () =>
           window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
         );
+      } else if (cancel === 'Done') {
+        await act(async () => useUiStore.getState().resetToolMode());
+      } else if (cancel === 'switch tool') {
+        await act(async () => useUiStore.getState().setToolMode({ kind: 'node' }));
       } else {
         await pointer(canvas, cancel, { x: 37, y: 51 });
       }

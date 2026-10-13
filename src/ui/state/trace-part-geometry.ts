@@ -1,6 +1,6 @@
 import type { CncTabAnchor, ColoredPath, Layer, TracedImage } from '../../core/scene';
 import { subpathCount } from '../../core/geometry/outer-shape-groups';
-import { boundsFromColoredPaths } from '../../core/trace/trace-bounds';
+import { boundsFromTracePartPaths } from '../../core/trace/trace-part-bounds';
 import { tracePartGroups } from '../../core/trace/trace-part-groups';
 import { tracePathSubset } from './trace-break-apart';
 export { tracePartGroups, isSingleTracePart } from '../../core/trace/trace-part-groups';
@@ -75,7 +75,7 @@ function objectSubset(
     id,
     source,
     paths,
-    bounds: boundsFromColoredPaths(paths),
+    bounds: boundsFromTracePartPaths(paths),
     ...(object.cncTabAnchors === undefined
       ? {}
       : { cncTabAnchors: subsetAnchors(object.cncTabAnchors, subsets) }),

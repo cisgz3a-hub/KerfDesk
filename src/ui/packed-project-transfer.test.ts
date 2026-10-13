@@ -18,6 +18,8 @@ import {
   isPackedProjectMessage,
   PACK_MIN_POINTS,
   packProjectMessage,
+  packColoredPathMessage,
+  unpackColoredPath,
   unpackProjectMessage,
 } from './packed-project-transfer';
 
@@ -116,6 +118,21 @@ const dense = vectorObject('dense', [
 ]);
 
 describe('packed project transfer', () => {
+  it('round-trips individual path geometry through fresh transferable buffers without detaching the source', () => {
+    fc.assert(
+      fc.property(coloredPath, (path) => {
+        const original = structuredClone(path);
+        const first = packColoredPathMessage(path);
+        const next = packColoredPathMessage(path);
+        expect(first.transfer.some((buffer) => next.transfer.includes(buffer))).toBe(false);
+        const received = structuredClone(first.path, { transfer: first.transfer });
+        expect(unpackColoredPath(received)).toEqual(original);
+        expect(unpackColoredPath(next.path)).toEqual(original);
+        expect(path).toEqual(original);
+      }),
+      { numRuns: 60 },
+    );
+  });
   it('round-trips random vector geometry exactly through a transferred message', () => {
     fc.assert(
       fc.property(fc.array(coloredPath, { maxLength: 3 }), (paths) => {

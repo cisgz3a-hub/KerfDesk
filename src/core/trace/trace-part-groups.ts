@@ -10,7 +10,8 @@ import { effectiveOperationForObject } from '../scene/effective-operation';
 import { pathUsesOperation } from '../scene/operation-binding';
 import { isHybridStrokePath } from './hybrid/hybrid-paths';
 
-type PartGroups = ReadonlyArray<ReadonlyArray<number>>;
+export type PartGroups = ReadonlyArray<ReadonlyArray<number>>;
+export type TracePartGroupMode = 'fill' | 'stroke';
 const fillGroupCache = new WeakMap<ColoredPath, PartGroups>();
 const strokeGroupCache = new WeakMap<ColoredPath, PartGroups>();
 
@@ -37,18 +38,84 @@ export function tracePartGroups(
 ): PartGroups {
   const path = object.paths[pathIndex];
   if (path === undefined) return [];
+  const mode = tracePartGroupMode(object, path, layers);
+  const cached = cachedTracePartGroups(path, mode);
+  if (cached !== undefined) return cached;
+  const groups = computeTracePartGroups(path, mode);
+  cacheTracePartGroups(path, mode, groups);
+  return groups;
+}
+
+export function tracePartGroupMode(
+  object: TracedImage,
+  path: ColoredPath,
+  layers: ReadonlyArray<Layer>,
+): TracePartGroupMode {
   const strokes =
     (object.traceMode === 'centerline' ||
       (object.traceMode === 'hybrid' && isHybridStrokePath(path))) &&
     !hasFillOperation(object, path, layers);
-  const cache = strokes ? strokeGroupCache : fillGroupCache;
-  const cached = cache.get(path);
-  if (cached !== undefined) return cached;
-  const groups = strokes
+  return strokes ? 'stroke' : 'fill';
+}
+
+export function computeTracePartGroups(path: ColoredPath, mode: TracePartGroupMode): PartGroups {
+  return mode === 'stroke'
     ? Array.from({ length: subpathCount(path) }, (_, index) => [index])
     : groupSubpathsByOuterShape(path);
-  cache.set(path, groups);
-  return groups;
+}
+
+export function cachedTracePartGroups(
+  path: ColoredPath,
+  mode: TracePartGroupMode,
+): PartGroups | undefined {
+  return (mode === 'stroke' ? strokeGroupCache : fillGroupCache).get(path);
+}
+
+/** Install worker results only against the immutable path that requested them. */
+export function cacheTracePartGroups(
+  path: ColoredPath,
+  mode: TracePartGroupMode,
+  groups: PartGroups,
+): void {
+  (mode === 'stroke' ? strokeGroupCache : fillGroupCache).set(path, groups);
+}
+
+/** Whole groups survive extraction; partial groups must be recomputed. */
+export function carryTracePartGroups(
+  path: ColoredPath,
+  indices: ReadonlyArray<number>,
+  subset: ColoredPath,
+): void {
+  if (
+    indices.length !== subpathCount(subset) ||
+    !indices.every(
+      (index, at) =>
+        index >= 0 &&
+        index < subpathCount(path) &&
+        (at === 0 || index > (indices[at - 1] as number)),
+    )
+  )
+    return;
+  const position = new Map(indices.map((original, index) => [original, index]));
+  for (const mode of ['fill', 'stroke'] as const) {
+    const groups = cachedTracePartGroups(path, mode);
+    if (groups === undefined) continue;
+    const kept: number[][] = [];
+    let complete = true;
+    for (const group of groups) {
+      const mapped = group.flatMap((index) => {
+        const next = position.get(index);
+        return next === undefined ? [] : [next];
+      });
+      if (mapped.length === 0) continue;
+      if (mapped.length !== group.length) {
+        complete = false;
+        break;
+      }
+      kept.push(mapped);
+    }
+    if (complete) cacheTracePartGroups(subset, mode, kept);
+  }
 }
 
 /** A compact remainder must not become a part through Select All or restored selection. */

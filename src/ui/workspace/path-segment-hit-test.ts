@@ -19,6 +19,7 @@ import { PATH_NODE_HIT_RADIUS_PX } from './path-node-hit-test';
 export type PathSegmentHit = PathSegmentRef & { readonly point: Vec2 };
 
 type EditablePathObject = Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>;
+const polylineCurves = new WeakMap<ColoredPath, ReadonlyArray<CurveSubpath>>();
 
 export function hitPathSegment(
   scene: Scene,
@@ -50,7 +51,7 @@ function hitObjectSegment(
   for (const [pathIndex, path] of object.paths.entries()) {
     if (!sceneLayerVisibility.resolvePath(object, path, layers).visible) continue;
     for (const [curveIndex, curve] of pathCurves(path).entries()) {
-      const hit = nearestCurveSegment(curve, object.transform, point);
+      const hit = nearestCurveSegment(curve, object.transform, point, bestDistance);
       if (hit === null || hit.distance > bestDistance) continue;
       bestDistance = hit.distance;
       best = {
@@ -67,7 +68,12 @@ function hitObjectSegment(
 }
 
 function pathCurves(path: ColoredPath): ReadonlyArray<CurveSubpath> {
-  return path.curves ?? path.polylines.map(polylineToCurveSubpath);
+  if (path.curves !== undefined) return path.curves;
+  const existing = polylineCurves.get(path);
+  if (existing !== undefined) return existing;
+  const curves = path.polylines.map(polylineToCurveSubpath);
+  polylineCurves.set(path, curves);
+  return curves;
 }
 
 function isEditablePathObject(object: SceneObject): object is EditablePathObject {

@@ -119,6 +119,21 @@ describe('ToolStrip', () => {
     expect(measure?.getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('finishes node editing when its active toolbar button is clicked again', async () => {
+    useUiStore.getState().setToolMode({ kind: 'node' });
+    const h = await render(<ToolStrip />);
+    const node = h.querySelector<HTMLButtonElement>('button[aria-label="Edit nodes"]');
+    const project = useStore.getState().project;
+    const history = useStore.getState().undoStack;
+
+    await act(async () => node?.click());
+
+    expect(useUiStore.getState().toolMode.kind).toBe('select');
+    expect(node?.getAttribute('aria-pressed')).toBe('false');
+    expect(useStore.getState().project).toBe(project);
+    expect(useStore.getState().undoStack).toBe(history);
+  });
+
   it('shows curve-node actions and converts the selected segment', async () => {
     const object: ImportedSvg = {
       kind: 'imported-svg',

@@ -3,7 +3,7 @@
 // tool is active (node-edit-keys.ts). Pointer-transparent, like Trim's layer.
 
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { curveSegmentPoint } from '../../core/geometry/curve-segment-edit';
+import { contourSegments, segmentPoint, segmentStart } from '../../core/geometry/trim-curve-split';
 import { applyTransform, polylineToCurveSubpath, type Project, type Vec2 } from '../../core/scene';
 import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { useStore } from '../state';
@@ -91,10 +91,14 @@ function segmentWorldPoints(project: Project, segment: PathSegmentHit): Readonly
     path?.curves?.[segment.curveIndex] ??
     (polyline === undefined ? undefined : polylineToCurveSubpath(polyline));
   if (curve === undefined) return null;
+  const contour = contourSegments(curve, curve.closed);
+  const selectedSegment = contour.segments[segment.segmentIndex];
+  if (selectedSegment === undefined) return null;
+  const from = segmentStart(contour, segment.segmentIndex);
   const points: Vec2[] = [];
   for (let index = 0; index <= HIGHLIGHT_SAMPLES; index += 1) {
-    const point = curveSegmentPoint(curve, segment.segmentIndex, index / HIGHLIGHT_SAMPLES);
-    if (point !== null) points.push(applyTransform(point, object.transform));
+    const point = segmentPoint(from, selectedSegment, index / HIGHLIGHT_SAMPLES);
+    points.push(applyTransform(point, object.transform));
   }
   return points;
 }

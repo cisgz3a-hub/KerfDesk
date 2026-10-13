@@ -38,6 +38,50 @@ const SOURCE_PATH: ColoredPath = {
 };
 
 describe('compatibility-polyline node editing', () => {
+  it('moves only the addressed polyline and preserves untouched geometry identities', () => {
+    const untouched = {
+      closed: false,
+      points: [
+        { x: 40, y: 0 },
+        { x: 50, y: 0 },
+      ],
+    };
+    const path: ColoredPath = {
+      color: '#000000',
+      polylines: [SOURCE_PATH.polylines[0]!, untouched],
+    };
+    const edited = editPathsNodesByDelta([path, SOURCE_PATH], [nodeRef(1)], 2, 3);
+    expect(edited?.paths[0]?.polylines[0]?.points[1]).toEqual({ x: 7, y: 3 });
+    expect(edited?.paths[0]?.polylines[1]).toBe(untouched);
+    expect(edited?.paths[1]).toBe(SOURCE_PATH);
+    expect(path.polylines[0]?.points[1]).toEqual({ x: 5, y: 0 });
+    expect(editPathsNodesByDelta([path], [nodeRef(1)], 0, 0)).toBeNull();
+  });
+
+  it('preserves untouched canonical subpaths and their existing compatibility samples', () => {
+    const untouched = {
+      closed: false,
+      points: [
+        { x: 40, y: 0 },
+        { x: 45, y: 0 },
+        { x: 50, y: 0 },
+      ],
+    };
+    const untouchedCurve = polylineToCurveSubpath(untouched);
+    const path: ColoredPath = {
+      ...SOURCE_PATH,
+      curves: [...SOURCE_PATH.curves!, untouchedCurve],
+      polylines: [...SOURCE_PATH.polylines, untouched],
+    };
+    const edited = editPathsNodesByDelta([path], [{ ...nodeRef(1), geometry: 'curve' }], 2, 3)
+      ?.paths[0];
+    expect(edited?.curves?.[0]?.segments[0]?.to).toEqual({ x: 7, y: 3 });
+    expect(edited?.curves?.[1]).toBe(untouchedCurve);
+    expect(edited?.polylines[1]).toBe(untouched);
+    expect(boundsForPaths([path])).toEqual({ minX: 0, minY: 0, maxX: 50, maxY: 0 });
+    expect(boundsForPaths([edited!])).toEqual({ minX: 0, minY: 0, maxX: 50, maxY: 3 });
+  });
+
   it.each([
     ['move', () => editPathsNodesByDelta([SOURCE_PATH], [nodeRef(1)], 2, 3)],
     ['delete', () => deletePathsNodes([SOURCE_PATH], [nodeRef(1)])],

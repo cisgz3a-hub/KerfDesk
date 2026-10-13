@@ -1,4 +1,4 @@
-import { tracePartGroups } from '../../core/trace/trace-part-groups';
+import { carryTracePartGroups, tracePartGroups } from '../../core/trace/trace-part-groups';
 import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   flattenCurveSubpath,
@@ -72,7 +72,9 @@ function pieceGeometries(
 
 // Each piece keeps the part of a traced forest (ADR-531) that its subpaths span.
 export function tracePathSubset(path: ColoredPath, indices: ReadonlyArray<number>): ColoredPath {
-  return subsetSubpathNesting(path, indices, subsetGeometry(path, indices));
+  const subset = subsetSubpathNesting(path, indices, subsetGeometry(path, indices));
+  carryTracePartGroups(path, indices, subset);
+  return subset;
 }
 
 function subsetGeometry(path: ColoredPath, indices: ReadonlyArray<number>): ColoredPath {

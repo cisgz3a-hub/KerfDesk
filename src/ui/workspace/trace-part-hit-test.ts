@@ -1,6 +1,5 @@
 import {
   applyTransform,
-  curveSubpathBounds,
   flattenCurveSubpath,
   sceneLayerVisibility,
   type Bounds,
@@ -13,6 +12,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
+import { traceContourBounds } from '../../core/trace/trace-part-bounds';
 import { hitTestObject } from '../../core/scene/hit-test';
 import { tracePartGroups } from '../state/trace-part-geometry';
 import { displayCurveToleranceMm } from './display-polylines';
@@ -182,21 +182,8 @@ function indexedLines(path: ColoredPath): ReadonlyArray<IndexedLine> {
     path.curves?.map((curve, index) => ({
       curve,
       line: path.polylines[index] ?? { points: [], closed: curve.closed },
-      bounds: curveSubpathBounds(curve),
-    })) ??
-    path.polylines.map((line) => {
-      let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity;
-      for (const point of line.points) {
-        minX = Math.min(minX, point.x);
-        minY = Math.min(minY, point.y);
-        maxX = Math.max(maxX, point.x);
-        maxY = Math.max(maxY, point.y);
-      }
-      return { line, bounds: { minX, minY, maxX, maxY } };
-    });
+      bounds: traceContourBounds(curve),
+    })) ?? path.polylines.map((line) => ({ line, bounds: traceContourBounds(line) }));
   pathIndexCache.set(path, entries);
   return entries;
 }
