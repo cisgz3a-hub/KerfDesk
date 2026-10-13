@@ -1,4 +1,7 @@
-import { normalizeProjectStartPoints, type ProjectStartPoints } from '../../core/scene';
+import {
+  normalizeProjectStartPoints,
+  type ProjectStartPoints,
+} from '../../core/scene/start-points';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 

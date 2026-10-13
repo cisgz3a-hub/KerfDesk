@@ -1,4 +1,4 @@
-## ADR-593 - Draggable frame and cutting starts
+## ADR-594 - Draggable frame and cutting starts
 
 **Status:** Accepted by the maintainer's explicit instruction on 2026-10-13. Software verification does not establish hardware qualification.
 

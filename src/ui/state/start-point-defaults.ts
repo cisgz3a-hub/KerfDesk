@@ -1,8 +1,8 @@
+import { type Project } from '../../core/scene';
 import {
   normalizeProjectStartPoints,
-  type Project,
   type ProjectStartPoints,
-} from '../../core/scene';
+} from '../../core/scene/start-points';
 
 const STORAGE_KEY = 'kerfdesk:start-point-defaults:v1';
 type StartPointStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;

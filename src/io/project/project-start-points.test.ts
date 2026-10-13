@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createProject, type Project, type ProjectStartPoints } from '../../core/scene';
+import { createProject, type Project } from '../../core/scene';
+import { type ProjectStartPoints } from '../../core/scene/start-points';
 import { deserializeProject, deserializeProjectValue } from './deserialize-project';
 import { prepareProjectForPersistence } from './prepare-project-persistence';
 import { serializeProject } from './serialize-project';

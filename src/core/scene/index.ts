@@ -191,8 +191,6 @@ export {
 export type { Project, ProjectOptimizationSettings, Workspace } from './project';
 export { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION, createProject } from './project';
 export type { EmbeddedFont } from './project';
-export type { FrameStartPoint, JobStartPoint, ProjectStartPoints } from './start-points';
-export { normalizeProjectStartPoints } from './start-points';
 export type {
   ProjectVariableData,
   VariableAdvancementPolicy,

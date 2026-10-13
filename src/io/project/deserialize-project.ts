@@ -27,9 +27,9 @@ import {
   type CncCoolantMode,
   type CncTiling,
   isCncCoolantMode,
-  normalizeProjectStartPoints,
   type Project,
 } from '../../core/scene';
+import { normalizeProjectStartPoints } from '../../core/scene/start-points';
 import {
   clampOverlapMergeTolerance,
   DEFAULT_PROJECT_OPTIMIZATION,

@@ -6,10 +6,10 @@ import {
   createLayer,
   createProject,
   IDENTITY_TRANSFORM,
-  type FrameStartPoint,
   type Project,
   type Vec2,
 } from '../../core/scene';
+import { type FrameStartPoint } from '../../core/scene/start-points';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
 import { buildCanvasMarkerPlan, mapControllerPointToScene } from '../state/canvas-motion-plan';
 import { stockNativeEvidence } from '../state/native-bed-frame.test-support';

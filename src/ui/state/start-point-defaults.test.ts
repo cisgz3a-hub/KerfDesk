@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createProject, type ProjectStartPoints } from '../../core/scene';
+import { createProject } from '../../core/scene';
+import { type ProjectStartPoints } from '../../core/scene/start-points';
 import {
   applyStartPointDefaults,
   readStartPointDefaults,

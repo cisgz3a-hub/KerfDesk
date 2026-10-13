@@ -1816,7 +1816,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 #### Canvas start markers
 1. The canvas shows small **Frame start** diamond and **Job start** triangle handles by default
-   (ADR-593). Labels appear on hover, keyboard focus or dragging. Nearby handles separate visually
+   (ADR-594). Labels appear on hover, keyboard focus or dragging. Nearby handles separate visually
    while retaining their actual start positions. Handles hide while artwork is being dragged.
 2. The eye toggle immediately after **Snap** in the bottom-right canvas controls hides or restores
    both handles. The preference survives reloads.
