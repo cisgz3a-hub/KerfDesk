@@ -95,7 +95,7 @@ function TraceActions({
         <button
           type="button"
           className="lf-btn"
-          title="Try preparing the trace parts again."
+          title="Try preparing trace parts again so you can pick and move them."
           onClick={retryTracePartPreparation}
         >
           Retry
