@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Project, Vec2 } from '../../core/scene';
 import { useFramePreparationStore } from '../state/frame-preparation-store';
 import { useLaserStore } from '../state/laser-store';
@@ -17,6 +17,7 @@ import { computeView, type ViewState } from './view-transform';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { layoutStartHandles, layoutStartLabel, type StartLayoutRect } from './canvas-start-layout';
 import { useStartChromeRects } from './use-start-chrome-rects';
+import { canvasStartLabelObstacles } from './canvas-motion-label-obstacles';
 import './canvas-start-points.css';
 
 type Props = {
@@ -79,6 +80,19 @@ function StartPoints(
     props.view,
   );
   const points = displayedStartPoints(plan, interaction);
+  const textObstacles = useMemo(
+    () =>
+      canvasStartLabelObstacles(
+        {
+          ...props.project.scene,
+          objects: props.project.scene.objects.filter((object) => object.kind === 'text'),
+        },
+        { scale: view.scale, offsetX: view.offsetX, offsetY: view.offsetY },
+        null,
+        new Set(),
+      ),
+    [props.project.scene, view.scale, view.offsetX, view.offsetY],
+  );
   const screenPoint = (point: Vec2) => ({
     x: view.offsetX + point.x * view.scale,
     y: view.offsetY + point.y * view.scale,
@@ -90,6 +104,7 @@ function StartPoints(
     },
     props.size,
     chrome,
+    textObstacles,
   );
   const current = context?.sourceProject === props.project;
   return (

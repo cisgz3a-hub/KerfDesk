@@ -26,6 +26,7 @@ function placeBox(
   size: Size,
   viewport: Size,
   obstacles: ReadonlyArray<StartLayoutRect>,
+  artwork: ReadonlyArray<StartLayoutRect> = [],
 ): StartLayoutRect {
   const clampX = (x: number) => Math.max(GAP, Math.min(viewport.width - size.width - GAP, x));
   const clampY = (y: number) => Math.max(GAP, Math.min(viewport.height - size.height - GAP, y));
@@ -44,25 +45,36 @@ function placeBox(
       clampY(rect.y + rect.height + GAP),
     ]),
   ];
-  let best = initial;
-  let distance = Number.POSITIVE_INFINITY;
-  for (const x of xs)
-    for (const y of ys) {
-      const candidate = { x, y, ...size };
-      if (obstacles.some((rect) => overlaps(candidate, rect))) continue;
-      const nextDistance = (x - preferred.x) ** 2 + (y - preferred.y) ** 2;
-      if (nextDistance < distance) {
-        best = candidate;
-        distance = nextDistance;
-      }
-    }
-  return best;
+  const candidates = xs.flatMap((x) => ys.map((y) => ({ x, y, ...size })));
+  // Add a linear number of text-edge candidates, not a Cartesian product of
+  // every text object's edges. Large text scenes must remain cheap to drag.
+  for (const rect of artwork) {
+    const left = clampX(rect.x - size.width - GAP);
+    const right = clampX(rect.x + rect.width + GAP);
+    const top = clampY(rect.y - size.height - GAP);
+    const bottom = clampY(rect.y + rect.height + GAP);
+    for (const x of [left, right])
+      for (const y of [initial.y, top, bottom]) candidates.push({ x, y, ...size });
+    for (const y of [top, bottom]) candidates.push({ x: initial.x, y, ...size });
+  }
+  const distance = (point: Vec2) => (point.x - preferred.x) ** 2 + (point.y - preferred.y) ** 2;
+  candidates.sort((a, b) => distance(a) - distance(b));
+  let fallback: StartLayoutRect | undefined;
+  for (const candidate of candidates) {
+    if (obstacles.some((rect) => overlaps(candidate, rect))) continue;
+    fallback ??= candidate;
+    if (!artwork.some((rect) => overlaps(candidate, rect))) return candidate;
+  }
+  // At extreme zoom text can cover the viewport; keep the control accessible
+  // without moving it over toolbar chrome or another start handle.
+  return fallback ?? initial;
 }
 
 export function layoutStartHandles(
   points: Partial<Record<StartKind, Vec2>>,
   viewport: Size,
   chrome: ReadonlyArray<StartLayoutRect>,
+  artwork: ReadonlyArray<StartLayoutRect> = [],
 ): Partial<Record<StartKind, StartLayoutRect>> {
   const near =
     points.frame !== undefined &&
@@ -82,6 +94,7 @@ export function layoutStartHandles(
       { width: START_HANDLE_SIZE, height: START_HANDLE_SIZE },
       viewport,
       occupied,
+      artwork,
     );
     result[kind] = box;
     occupied.push(box);

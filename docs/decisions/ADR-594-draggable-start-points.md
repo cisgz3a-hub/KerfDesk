@@ -6,6 +6,8 @@
 
 **Decision.** The canvas uses small frame and cutting handles, with labels on hover, focus and dragging. A frame selection snaps to the prepared motion envelope's perimeter; the displayed and dispatched frame share the same closed route and chosen entry. A cutting selection snaps to supported geometry in the first executable operation, preserving operation order, inside-first dependencies and the configured direction policy. Closed polylines can start along an edge; native arcs snap to existing move boundaries to preserve their exact geometry. Open paths offer their permitted endpoints.
 
+Handles avoid visible text footprints so they do not block double-click text editing; a connector retains the exact start location. At extreme zoom, when text fills the viewport, controls remain accessible and clear of toolbar chrome.
+
 With **Keep source order**, cutting selection stays on the first executable contour and preserves its drawn direction; a closed contour can still change its entry point. Other travel policies retain their inside-first constraints. Operations that emit no powered motion do not prevent selection in a later executable operation.
 
 Raster and fill retain generated scan order. CNC selection supports identical closed contour depth passes; ramps, entry plunges, stay-down entries and other generated sequences retain their existing entry. Both handles are unavailable for registered Print and Cut and rotary views. In CNC mode, Side B retains the cutting start chosen on source artwork; its job handle and default saving are unavailable. Parked CNC settings do not restrict Laser mode. Busy-machine or document changes cancel a drag before it can commit. Escape, pointer cancellation and lost capture discard it.

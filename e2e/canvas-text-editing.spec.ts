@@ -92,6 +92,12 @@ test('double-click edits the text, Escape cancels, and native keyboard editing s
   const input = await addText(page, 'Original');
   await input.press('Control+Enter');
   await expect(input).toHaveCount(0);
+  // Wait for the start controls too: text remains editable after the worker
+  // finishes preparing the cutting preview, not only before it appears.
+  await expect(page.getByRole('button', { name: 'Job start', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'false',
+  );
   const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
   await canvas.dblclick({ position: { x: 194, y: 226 } });
   await expect(input).toHaveValue('Original');

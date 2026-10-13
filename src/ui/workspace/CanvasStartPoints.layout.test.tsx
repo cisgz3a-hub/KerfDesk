@@ -7,7 +7,7 @@ import { resetStore } from '../state/test-helpers';
 import { useStore } from '../state/store';
 import { CanvasStartPoints } from './CanvasStartPoints';
 import { computeView } from './view-transform';
-import type { StartLayoutRect } from './canvas-start-layout';
+import { layoutStartHandles, type StartLayoutRect } from './canvas-start-layout';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -127,6 +127,40 @@ function expectSeparate(a: StartLayoutRect, b: StartLayoutRect): void {
 }
 
 describe('start marker DOM layout', () => {
+  it('keeps both draggable controls outside text hit regions without covering chrome', () => {
+    const text = { x: 160, y: 200, width: 130, height: 35 };
+    const handles = layoutStartHandles(
+      { frame: { x: 180, y: 220 }, job: { x: 194, y: 226 } },
+      SIZE,
+      [ZOOM, SETTINGS],
+      [text],
+    );
+    expect(Object.values(handles)).toHaveLength(2);
+    for (const handle of Object.values(handles)) {
+      expectInside(handle);
+      expectSeparate(handle, text);
+      expectSeparate(handle, ZOOM);
+      expectSeparate(handle, SETTINGS);
+    }
+    expectSeparate(handles.frame!, handles.job!);
+  });
+
+  it('keeps handles accessible when zoomed text fills the entire viewport', () => {
+    const handles = layoutStartHandles(
+      { frame: { x: 180, y: 220 }, job: { x: 194, y: 226 } },
+      SIZE,
+      [ZOOM, SETTINGS],
+      [{ x: -500, y: -500, width: 2000, height: 2000 }],
+    );
+    expect(Object.values(handles)).toHaveLength(2);
+    for (const handle of Object.values(handles)) {
+      expectInside(handle);
+      expectSeparate(handle, ZOOM);
+      expectSeparate(handle, SETTINGS);
+    }
+    expectSeparate(handles.frame!, handles.job!);
+  });
+
   it('omits markers whose true point is outside the visible viewport', async () => {
     await act(async () => root.render(<Harness screenPoint={{ x: -50, y: 100 }} />));
     expect(host.querySelectorAll('.lf-start-handle')).toHaveLength(0);
