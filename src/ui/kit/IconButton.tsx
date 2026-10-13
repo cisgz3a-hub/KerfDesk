@@ -13,7 +13,7 @@ const SIZE_CLASS: Readonly<Record<IconButtonSize, string>> = {
   lg: 'lf-btn lf-iconbtn lf-iconbtn--lg',
 };
 
-const ICON_PX: Readonly<Record<IconButtonSize, number>> = { sm: 12, md: 16, lg: 18 };
+const ICON_PX: Readonly<Record<IconButtonSize, number>> = { sm: 14, md: 18, lg: 20 };
 
 export function IconButton(props: {
   readonly icon: IconName;

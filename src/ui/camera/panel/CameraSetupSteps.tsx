@@ -4,6 +4,7 @@
 // already done, driven by real state (active source, saved camera model).
 
 import { useCameraStore } from '../../state/camera-store';
+import { Icon } from '../../kit/icons';
 import { BROWSER_FREE_BUILD } from '../../../platform/build-capabilities';
 import { useOwnCameraModel } from '../active-camera-model';
 import { noteStyle } from './panel-styles';
@@ -33,7 +34,7 @@ export function CameraSetupSteps(): JSX.Element {
       <ol style={listStyle}>
         {steps.map((step, index) => (
           <li key={step.label} style={stepStyle(stateOf(step.done, index, nextIndex))}>
-            {step.done ? '✓' : `${index + 1}.`} {step.label}
+            {step.done ? <Icon name="check" size={14} /> : `${index + 1}.`} {step.label}
           </li>
         ))}
       </ol>

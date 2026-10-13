@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { ProjectSheetBook } from '../../core/scene/project-sheets';
-import { Button, Dialog, DialogActions } from '../kit';
+import { Button, Dialog, DialogActions, Icon } from '../kit';
 import { useStore } from '../state';
 import { ProductionManifestButton } from './ProductionManifestButton';
 import { RetainedArraysButton } from './RetainedArraysButton';
@@ -57,7 +57,7 @@ export function ProjectSheetsBar(): JSX.Element {
             )
           }
         >
-          +
+          <Icon name="plus" size={18} />
         </button>
         <Button
           aria-label="Manage project sheets"

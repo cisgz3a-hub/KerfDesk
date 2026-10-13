@@ -6,10 +6,7 @@ import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 // lf-btn pressed fill); the active name lives on each IconButton.
 
 import { Fragment, useRef } from 'react';
-import libraryIcon from 'lucide-static/icons/library.svg?raw';
-import studioIcon from 'lucide-static/icons/shapes.svg?raw';
-
-import { IconButton, type IconName } from '../kit';
+import { Icon, IconButton, type IconName } from '../kit';
 import { useDesignStudioStore } from '../design-studio';
 import { requestProFeature } from '../licensing/edition';
 import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
@@ -99,8 +96,7 @@ export function ToolStrip(): JSX.Element {
         onClick={() => setLibraryDialogOpen(true)}
         className="lf-btn lf-iconbtn lf-toolstrip__launcher"
       >
-        {/* Icons are pinned build assets, never user-supplied SVG. */}
-        <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: libraryIcon }} />
+        <Icon name="library" size={20} />
       </button>
       <button
         type="button"
@@ -111,7 +107,7 @@ export function ToolStrip(): JSX.Element {
         }
         className="lf-btn lf-iconbtn lf-toolstrip__launcher"
       >
-        <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: studioIcon }} />
+        <Icon name="shapes" size={20} />
       </button>
     </aside>
   );

@@ -9,7 +9,8 @@
 // lands on it and one between lines is left alone. A snapped grid axis shows a
 // guide across the bed; both axes together show the grid marker.
 
-import { nearestGuidePosition, type Project, type Vec2 } from '../../../core/scene';
+import type { Project, Vec2 } from '../../../core/scene';
+import { nearestGuidePosition } from '../../../core/scene/guides';
 import type { SnapSettings } from '../snap-settings';
 import type { SnapGuide } from '../snapping';
 import type { SnapExclusion } from './snap-exclusion';

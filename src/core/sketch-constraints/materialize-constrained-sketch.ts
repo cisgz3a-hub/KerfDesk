@@ -1,5 +1,6 @@
 import type { Bounds, ColoredPath, ImportedSvg } from '../scene/scene-object';
 import { polylineToCurveSubpath } from '../scene/curve-path';
+import { withClosedPathEdges } from '../scene/polyline-closure';
 import { sameRecipeValue } from '../material-library/process-recipe';
 import type { ConstrainedSketch2d, SketchSolveResult } from './constrained-sketch';
 import { solveConstrainedSketch } from './solve-constrained-sketch';
@@ -67,7 +68,8 @@ export function sketchGeometryMatches(object: ImportedSvg): boolean {
   );
   if (built.paths === undefined || built.paths.length !== object.paths.length) return false;
   return built.paths.every((path, index) => {
-    const old = object.paths[index];
+    const saved = object.paths[index];
+    const old = saved === undefined ? undefined : withClosedPathEdges(saved);
     return (
       old !== undefined &&
       sameRecipeValue(path.curves, old.curves ?? old.polylines.map(polylineToCurveSubpath))

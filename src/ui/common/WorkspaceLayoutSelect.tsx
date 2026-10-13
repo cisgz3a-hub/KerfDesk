@@ -1,4 +1,3 @@
-import panels from 'lucide-static/icons/panels-top-left.svg?raw';
 import { useCallback, useId, useRef, useState } from 'react';
 import { Icon } from '../kit/icons';
 import {
@@ -59,11 +58,7 @@ export function WorkspaceLayoutSelect(): JSX.Element {
           setOpen(true);
         }}
       >
-        <span
-          className="lf-toolbar-icon"
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: panels }}
-        />
+        <Icon name="panels" size={18} />
         <span id={valueId}>
           {LAYOUT_OPTIONS.find((option) => option.value === preference)?.label}
         </span>
@@ -107,7 +102,7 @@ function LayoutOptions(props: {
         >
           <span>{option.label}</span>
           <span className="lf-workspace-layout-check" aria-hidden="true">
-            ✓
+            <Icon name="check" size={15} />
           </span>
         </button>
       ))}

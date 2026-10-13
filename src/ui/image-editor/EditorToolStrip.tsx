@@ -4,6 +4,7 @@
 // swaps (X), the mini reset restores black/white (D).
 
 import { useState } from 'react';
+import { IconFrame } from '../kit/icon-frame';
 import type { PaintColor } from '../../core/image-edit';
 import { ColorPickerDialog } from './ColorPickerDialog';
 import { EditorToolIcon } from './editor-icons';
@@ -142,17 +143,24 @@ function ColorChips(): JSX.Element {
           type="button"
           onClick={swapColors}
           title="Swap foreground and background colors (X)"
+          aria-label="Swap foreground and background colors (X)"
           style={miniButtonStyle}
         >
-          ⇄
+          <IconFrame size={14}>
+            <path d="M4 8h16m-4-4 4 4-4 4M20 16H4m4-4-4 4 4 4" />
+          </IconFrame>
         </button>
         <button
           type="button"
           onClick={resetColors}
           title="Reset to black foreground / white background (D)"
+          aria-label="Reset to black foreground / white background (D)"
           style={miniButtonStyle}
         >
-          ▨
+          <IconFrame size={14}>
+            <rect x="9" y="9" width="11" height="11" rx="1.5" />
+            <rect x="4" y="4" width="11" height="11" rx="1.5" fill="currentColor" />
+          </IconFrame>
         </button>
       </span>
       {picking !== null ? (

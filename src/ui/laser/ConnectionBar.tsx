@@ -15,6 +15,7 @@
 
 import { useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { assertNever } from '../../core/scene';
+import { Icon } from '../kit/icons';
 import { AnchoredPopover, movePopoverFocus } from '../common/AnchoredPopover';
 import type { ControllerQualification } from '../state/laser-controller-qualification';
 import type { ConnectionState } from '../state/laser-store';
@@ -169,7 +170,7 @@ function ConnectionMenu(props: Props & { readonly notice: ControllerNotice }): J
         title="Show controller info, choose another port, connect automatically, or forget this controller"
         onClick={() => setOpen((value) => !value)}
       >
-        <span aria-hidden="true">⋯</span>
+        <Icon name="more" size={18} />
       </button>
       {open ? (
         <AnchoredPopover
@@ -240,7 +241,7 @@ function MenuItem(props: {
       <span>{props.label}</span>
       {checkable ? (
         <span className="lf-connection-menu-check" aria-hidden="true">
-          ✓
+          <Icon name="check" size={15} />
         </span>
       ) : null}
     </button>

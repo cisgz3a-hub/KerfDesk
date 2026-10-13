@@ -2,7 +2,7 @@
 // edits the guides live inside the drag's interaction snapshot, so creating,
 // moving or deleting one guide is a single undo step. Guides never reach output.
 
-import type { ProjectGuide } from '../../core/scene';
+import type { ProjectGuide } from '../../core/scene/guides';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 

@@ -13,7 +13,7 @@ export type {
   VariableTextRenderInput,
   VariableTextRenderResult,
 } from './prepare-output-snapshot';
-export { materializeVariableObject, prepareOutputSnapshot } from './prepare-output-snapshot';
+export { prepareOutputSnapshot } from './prepare-output-snapshot';
 export type { GcodeProgramSummary, ParseGcodeProgramResult } from './parse-gcode-program';
 export { createGcodeProgramLineParser } from './gcode-program-line-parser';
 export { parseGcodeProgram } from './parse-gcode-program';

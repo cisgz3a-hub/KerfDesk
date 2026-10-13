@@ -52,14 +52,20 @@ test('real workerd: KerfDesk Remote shell is served with its own CSP, manifest a
       '/app/app.css',
       '/app/sw.js',
       '/app/manifest.webmanifest',
+      '/app/icon.svg',
+      '/app/icon-maskable.svg',
       '/app/icon-192.png',
       '/app/icon-512.png',
+      '/app/icon-maskable-512.png',
     ])
       assert.equal((await worker.dispatchFetch(`${ORIGIN}${path}`)).status, 200, path);
     const manifest = await (
       await worker.dispatchFetch(`${ORIGIN}/app/manifest.webmanifest`)
     ).json();
     assert.equal(manifest.scope, '/app/');
+    assert.ok(manifest.icons.some((icon) => icon.purpose === 'maskable'));
+    for (const icon of manifest.icons)
+      assert.equal((await worker.dispatchFetch(`${ORIGIN}${icon.src}`)).status, 200, icon.src);
     assert.equal((await worker.dispatchFetch(`${ORIGIN}/app/index.html.map`)).status, 404);
     assert.equal((await worker.dispatchFetch(`${ORIGIN}/app/../wrangler.jsonc`)).status, 404);
     // The legacy page keeps working for already-printed links.

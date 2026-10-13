@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState } from 'react';
 import { DesktopDownloadContext, type DesktopDownloadResult } from './desktop-download-context';
-import { Dialog } from '../kit';
+import { Dialog, Icon } from '../kit';
 import './desktop-welcome.css';
 
 type DownloadState = DesktopDownloadResult | { readonly status: 'loading' };
@@ -49,7 +49,7 @@ export function DesktopWelcomeDialog({ onClose }: { readonly onClose: () => void
           aria-label="Close and continue with Free"
           title="Close this window and continue using the Free browser workspace"
         >
-          ×
+          <Icon name="close" size={20} />
         </button>
         <span className="lf-desktop-welcome__eyebrow">YOUR NEXT PROJECT STARTS HERE</span>
         <h2>Choose your workspace.</h2>
@@ -72,7 +72,7 @@ export function DesktopWelcomeDialog({ onClose }: { readonly onClose: () => void
             onClick={onClose}
             title="Continue using Free browser tools without an account or installation"
           >
-            Continue with Free <span aria-hidden="true">→</span>
+            Continue with Free <Icon name="arrow-right" size={18} />
           </button>
           <p>No account. No time limit. No installation.</p>
         </section>
@@ -95,10 +95,7 @@ function DesktopDownloadCard({ download, onClose, retry }: DesktopDownloadCardPr
     <section className="lf-desktop-welcome__desktop" aria-label="Windows desktop edition">
       <div className="lf-desktop-welcome__card-title">
         <span className="lf-desktop-welcome__monitor" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="3" y="3" width="18" height="13" rx="2" />
-            <path d="M8 21h8M12 16v5" />
-          </svg>
+          <Icon name="monitor" size={28} />
         </span>
         <div>
           <h3>KerfDesk for Windows</h3>
@@ -122,7 +119,7 @@ function DesktopDownloadCard({ download, onClose, retry }: DesktopDownloadCardPr
           onClick={onClose}
           title="Download the Windows app, which starts in Free until you unlock Pro"
         >
-          <DownloadIcon /> Download for Windows <span aria-hidden="true">↗</span>
+          <DownloadIcon /> Download for Windows <Icon name="arrow-up-right" size={18} />
         </a>
       ) : (
         <button
@@ -172,9 +169,5 @@ function DesktopDownloadCard({ download, onClose, retry }: DesktopDownloadCardPr
 }
 
 function DownloadIcon(): JSX.Element {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-      <path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" />
-    </svg>
-  );
+  return <Icon name="download" size={20} />;
 }
