@@ -136,7 +136,7 @@
 .lf-run-order-list {
   flex: 1;
   min-width: 0;
-  min-height: 224px;
+  min-height: 176px;
   overflow-y: auto;
   padding-right: 3px;
   scrollbar-gutter: stable;
@@ -144,10 +144,10 @@
 
 .lf-run-order-card {
   display: grid;
-  grid-template-rows: 42px minmax(0, 1fr) 32px 34px;
-  gap: 8px;
+  grid-template-rows: 38px minmax(0, 1fr) 24px 32px;
+  gap: 6px;
   box-sizing: border-box;
-  height: 216px;
+  height: 168px;
   min-width: 0;
   padding: 10px;
   border: 1px solid var(--lf-border);
@@ -307,6 +307,44 @@
 }
 
 .lf-run-order :is(button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--lf-accent);
+  outline-offset: 2px;
+}
+
+.lf-run-order-card--detailed {
+  height: 216px;
+  grid-template-rows: 38px minmax(0, 1fr) 24px 32px;
+}
+
+.lf-run-order-navigation {
+  min-width: 0;
+  color: var(--lf-text-muted);
+  font-size: 12px;
+}
+
+.lf-run-order-navigation > summary {
+  padding: 6px 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.lf-run-order-navigation[open] > .lf-run-order-search {
+  margin: 6px 0 10px;
+}
+
+.lf-run-order-detail-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--lf-text-muted);
+  font-size: 12px;
+}
+
+.lf-run-order-detail-toggle input {
+  margin: 0;
+}
+
+.lf-run-order-navigation > summary:focus-visible {
   outline: 2px solid var(--lf-accent);
   outline-offset: 2px;
 }

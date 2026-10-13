@@ -41,6 +41,25 @@ afterEach(async () => {
 });
 
 describe('Artwork panel navigation', () => {
+  it('opens object organisation separately and restores focus without changing the job', async () => {
+    seedIndependentArtwork();
+    const before = useStore.getState().project;
+    const host = await renderPanel();
+    expect(host.querySelector('[aria-label="Design hierarchy"]')).toBeNull();
+    const launcher = buttonByText(host, 'Objects');
+    launcher.focus();
+    await act(async () => launcher.click());
+    const dialog = required<HTMLElement>(document.body, '[role="dialog"]');
+    expect(dialog.textContent).toContain('Organise artwork');
+    expect(dialog.querySelector('[aria-label="Design object tree"]')).not.toBeNull();
+    expect(dialog.querySelector('[data-design-root-drop]')).toBeNull();
+    await act(async () => buttonByText(dialog, 'Done').click());
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(launcher);
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
   it.each(['laser', 'cnc'] as const)(
     'supports outer tab arrow, Home and End keys with the available %s views',
     async (machineKind) => {

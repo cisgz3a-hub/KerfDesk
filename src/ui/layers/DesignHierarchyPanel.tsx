@@ -5,8 +5,12 @@ import { currentHierarchyFocus, useDesignHierarchyStore } from '../state/design-
 import { designTreeRows } from './design-tree-rows';
 import { DesignTree } from './DesignTree';
 
-export function DesignHierarchyPanel(): JSX.Element | null {
-  const [open, setOpen] = useState(false);
+export function DesignHierarchyPanel({
+  expanded = false,
+}: {
+  readonly expanded?: boolean;
+}): JSX.Element | null {
+  const [open, setOpen] = useState(expanded);
   const scene = useStore((state) => state.project.scene);
   const epoch = useStore((state) => state.projectDocumentEpoch);
   useDesignHierarchyStore((state) => state.focusId);
@@ -18,10 +22,10 @@ export function DesignHierarchyPanel(): JSX.Element | null {
       aria-label="Design hierarchy"
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
-      className="lf-artwork-disclosure"
+      className={`lf-artwork-disclosure lf-design-organiser${expanded ? ' lf-design-organiser--expanded' : ''}`}
     >
       <summary title="Show named artwork and nested groups so you can inspect the design hierarchy and enter a group for editing.">
-        Design objects{group === undefined ? '' : ` · ${group.name}`}
+        Objects and groups{group === undefined ? '' : ` · ${group.name}`}
       </summary>
       {open ? (
         <div className="lf-artwork-disclosure__body">
@@ -45,7 +49,8 @@ export function DesignHierarchyPanel(): JSX.Element | null {
             )}
           </div>
           <p className="lf-artwork-hint">
-            Enter a group to edit its children. Names and group structure guide design selection.
+            Find and rename artwork, or enter a group to edit its contents. Set cutting order in Run
+            order.
           </p>
           <DesignTree rows={designTreeRows(scene, focus)} scene={scene} />
         </div>

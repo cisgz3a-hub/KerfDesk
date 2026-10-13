@@ -1,0 +1,91 @@
+.material-library-panel {
+  min-width: 0;
+  color: var(--lf-text);
+}
+
+.material-library-panel__intro {
+  color: var(--lf-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.material-library-panel__card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--lf-border);
+  border-radius: 12px;
+  background: var(--lf-bg-input);
+}
+
+.material-library-panel__disclosure {
+  min-width: 0;
+  border: 1px solid var(--lf-border);
+  border-radius: 8px;
+}
+
+.material-library-panel__disclosure > summary {
+  padding: 11px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.material-library-panel__disclosure > summary:hover {
+  background: var(--lf-bg-2);
+}
+
+.material-library-panel__disclosure > summary:focus-visible {
+  outline: 2px solid var(--lf-accent);
+  outline-offset: 2px;
+}
+
+.material-library-panel__details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 12px 12px;
+}
+
+.material-library-panel__tools {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.material-library-panel :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.material-library-panel .lf-btn {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.material-library-panel section[aria-label='Selected material recipe preview'] {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.material-library-panel section[aria-label='Selected material recipe preview'] h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.material-library-panel section[aria-label='Selected material recipe preview'] p {
+  margin: 6px 0;
+}
+
+.material-library-panel section[aria-label='Selected material recipe preview'] table {
+  width: 100%;
+  table-layout: fixed;
+}

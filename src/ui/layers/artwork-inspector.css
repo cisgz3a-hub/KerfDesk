@@ -12,7 +12,10 @@
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
-  padding: 2px 2px 0;
+  padding: 10px;
+  background: var(--lf-bg-0);
+  border: 1px solid var(--lf-border);
+  border-radius: 10px;
 }
 
 .lf-artwork-editor-tabs {
@@ -226,6 +229,63 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  padding: 12px 10px;
+  border: 1px solid var(--lf-border);
+  border-radius: 10px;
+  background: var(--lf-bg-1);
+}
+
+[data-artwork-organise].lf-btn {
+  font-size: 12px;
+  min-height: 28px;
+  padding: 4px 8px;
+}
+
+.lf-design-organiser--expanded > summary {
+  display: none;
+}
+
+.lf-design-organiser--expanded {
+  border: 0;
+}
+
+.lf-design-organiser--expanded > .lf-artwork-disclosure__body {
+  border: 0;
+  padding: 0;
+}
+
+.lf-design-tree {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.lf-design-tree-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--lf-border);
+}
+
+.lf-design-tree-row .lf-btn {
+  font-size: 12px;
+  min-height: 30px;
+  padding: 4px 8px;
+}
+
+[data-design-tree-name].lf-btn {
+  flex: 1 1 140px;
+  min-width: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.lf-design-status:empty {
+  display: none;
 }
 
 .lf-operation-scope {

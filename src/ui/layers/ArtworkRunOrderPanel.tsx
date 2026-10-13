@@ -83,36 +83,14 @@ function ArtworkRunOrderContent(props: {
   readonly controller: ReturnType<typeof useRunOrderController>;
 }): JSX.Element {
   const controller = props.controller;
+  const [showSettings, setShowSettings] = useState(false);
   return (
     <div className="lf-run-order">
       <div className="lf-run-order-intro">
         <strong>Choose what runs first</strong>
-        <p>Change a run number, or use Number on canvas to click your preferred order.</p>
+        <p>Change a run number to move artwork earlier or later.</p>
       </div>
-      <ArtworkRunOrderToolbar
-        search={controller.search}
-        total={controller.rows.length}
-        jumpPosition={controller.jumpPosition}
-        numbering={
-          controller.numbering.kind === 'idle'
-            ? controller.numbering
-            : {
-                kind: 'active',
-                nextPosition: controller.numbering.nextPosition,
-                canUndo: controller.numbering.assignedUnitKeys.length > 0,
-              }
-        }
-        onSearch={controller.setSearch}
-        onJumpPosition={controller.setJumpPosition}
-        onJump={controller.jumpToRow}
-        onStartNumbering={() => {
-          controller.setSearch('');
-          controller.startCanvasNumbering();
-        }}
-        onUndoNumbering={controller.undoCanvasNumbering}
-        onDoneNumbering={controller.finishCanvasNumbering}
-        onCancelNumbering={controller.cancelCanvasNumbering}
-      />
+      <RunOrderControllerToolbar controller={controller} />
       {controller.machineKind === 'cnc' ? (
         <p className="lf-run-order-note">
           <strong>CNC follows cutting stages.</strong> Clearing runs before profiles, with cuts
@@ -127,11 +105,20 @@ function ArtworkRunOrderContent(props: {
             : `${controller.rows.length} ${controller.rows.length === 1 ? 'run' : 'runs'}`}
         </span>
       </div>
+      <label className="lf-run-order-detail-toggle">
+        <input
+          type="checkbox"
+          checked={showSettings}
+          onChange={(event) => setShowSettings(event.currentTarget.checked)}
+        />
+        Show cutting settings
+      </label>
       {controller.filteredRows.length === 0 ? (
         <NoMatchingRuns onClear={() => controller.setSearch('')} />
       ) : (
         <ArtworkRunOrderList
           rows={controller.filteredRows}
+          showSettings={showSettings}
           total={controller.rows.length}
           activeKey={controller.activeRow?.key ?? null}
           machineKind={controller.machineKind}
@@ -149,6 +136,38 @@ function ArtworkRunOrderContent(props: {
         />
       )}
     </div>
+  );
+}
+
+function RunOrderControllerToolbar(props: {
+  readonly controller: ReturnType<typeof useRunOrderController>;
+}): JSX.Element {
+  const controller = props.controller;
+  return (
+    <ArtworkRunOrderToolbar
+      search={controller.search}
+      total={controller.rows.length}
+      jumpPosition={controller.jumpPosition}
+      numbering={
+        controller.numbering.kind === 'idle'
+          ? controller.numbering
+          : {
+              kind: 'active',
+              nextPosition: controller.numbering.nextPosition,
+              canUndo: controller.numbering.assignedUnitKeys.length > 0,
+            }
+      }
+      onSearch={controller.setSearch}
+      onJumpPosition={controller.setJumpPosition}
+      onJump={controller.jumpToRow}
+      onStartNumbering={() => {
+        controller.setSearch('');
+        controller.startCanvasNumbering();
+      }}
+      onUndoNumbering={controller.undoCanvasNumbering}
+      onDoneNumbering={controller.finishCanvasNumbering}
+      onCancelNumbering={controller.cancelCanvasNumbering}
+    />
   );
 }
 

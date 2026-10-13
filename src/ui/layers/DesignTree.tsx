@@ -35,22 +35,21 @@ export function DesignTree({ rows, scene }: DesignTreeProps): JSX.Element {
         className="lf-input"
         aria-label="Find design objects"
         title="Find artwork or groups by their design names."
+        placeholder="Find artwork or groups…"
         value={query}
         onChange={(event) => setQuery(event.currentTarget.value)}
       />
-      <p className="lf-artwork-hint">
-        Drag the handle into a group or between rows. Move offers the same destination and position
-        choices from the keyboard. Manufacturing order stays separate.
-      </p>
-      <div
-        data-design-root-drop
-        title="Drop a design item here to make it the last child of All artwork."
-        style={{ padding: 6, border: '1px dashed var(--lf-border)' }}
-        onDragOver={transfer.dragOver}
-        onDrop={(event) => transfer.drop(event, { parentId: null })}
-      >
-        All artwork · root drop target
-      </div>
+      {transfer.transfer?.mode === 'drag' ? (
+        <div
+          data-design-root-drop
+          title="Drop a design item here to make it the last child of All artwork."
+          style={{ padding: 6, border: '1px dashed var(--lf-border)' }}
+          onDragOver={transfer.dragOver}
+          onDrop={(event) => transfer.drop(event, { parentId: null })}
+        >
+          Move to All artwork
+        </div>
+      ) : null}
       {transfer.transfer?.mode === 'choose' ? (
         <DesignHierarchyMoveControls
           key={nodeOrderKey(transfer.transfer.node)}
@@ -66,13 +65,10 @@ export function DesignTree({ rows, scene }: DesignTreeProps): JSX.Element {
           Cancel move
         </Button>
       ) : null}
-      <p role="status" aria-live="polite">
+      <p className="lf-design-status" role="status" aria-live="polite">
         {transfer.message}
       </p>
-      <ul
-        aria-label="Design object tree"
-        style={{ listStyle: 'none', padding: 0, maxHeight: 280, overflow: 'auto' }}
-      >
+      <ul aria-label="Design object tree" className="lf-design-tree">
         {visible.map((row) => (
           <DesignTreeItem
             key={nodeOrderKey(designRowRef(row))}
@@ -90,6 +86,9 @@ export function DesignTree({ rows, scene }: DesignTreeProps): JSX.Element {
           />
         ))}
       </ul>
+      {visible.length === 0 ? (
+        <p className="lf-artwork-hint">No matching artwork or groups.</p>
+      ) : null}
     </>
   );
 }
