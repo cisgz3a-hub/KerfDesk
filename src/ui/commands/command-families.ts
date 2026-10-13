@@ -348,6 +348,21 @@ export function windowCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
   };
   return [
     previewCommand,
+    ctx.previewActive
+      ? enabled(
+          'window.save-preview-image',
+          'window',
+          'Save Preview Image...',
+          'Save the preview as shown, toolpath included, as a PNG',
+          ctx.savePreviewImage,
+        )
+      : disabled(
+          'window.save-preview-image',
+          'window',
+          'Save Preview Image...',
+          'Open Preview first.',
+          ctx.savePreviewImage,
+        ),
     wireframeCommand(ctx),
     ...windowPanelCommands(ctx),
     enabled(

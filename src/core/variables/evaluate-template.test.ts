@@ -50,6 +50,30 @@ function variableProject(): Project {
 }
 
 describe('evaluateVariableTemplate', () => {
+  it('drops a line whose fields evaluate empty only when asked, keeping typed blank lines', () => {
+    const project: Project = {
+      ...variableProject(),
+      variables: {
+        ...DEFAULT_PROJECT_VARIABLE_DATA,
+        csv: { sourceName: 'a.csv', headers: ['name', 'company'], records: [['Ada', '']] },
+      },
+    };
+    const tokens: VariableTemplate['tokens'] = [
+      { kind: 'csv', column: 'name' },
+      { kind: 'literal', value: '\n' },
+      { kind: 'csv', column: 'company' },
+      { kind: 'literal', value: '\n\nEnd' },
+    ];
+    const now = new globalThis.Date(0);
+    expect(evaluateVariableTemplate({ tokens }, text, project, { now })).toEqual({
+      ok: true,
+      value: 'Ada\n\n\nEnd',
+    });
+    expect(
+      evaluateVariableTemplate({ tokens, ignoreEmptyLines: true }, text, project, { now }),
+    ).toEqual({ ok: true, value: 'Ada\n\nEnd' });
+  });
+
   it('applies a copy slot to an injected cursor before a field-relative serial offset', () => {
     const template: VariableTemplate = {
       sequenceOffset: 3,

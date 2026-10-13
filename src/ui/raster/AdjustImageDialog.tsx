@@ -16,9 +16,12 @@ import {
 import { drawAdjustImagePreview } from './AdjustImageDialog.preview';
 import * as styles from './AdjustImageDialog.styles';
 import type { AdjustImageDraft } from './AdjustImageDialog.types';
+import { usePlatformOptional } from '../app/platform-context';
 import {
   deleteUserImagePreset,
+  exportUserImagePresetsFile,
   findUserImagePreset,
+  importUserImagePresetsFile,
   readUserImagePresets,
   saveUserImagePreset,
   type UserImagePreset,
@@ -56,6 +59,10 @@ export function AdjustImageDialog(props: {
     initialDraft(props.image, props.layer),
   );
   const presetControls = useImagePresetControls(draft, setDraft, normalize);
+  const presetFiles = useImagePresetFiles(
+    presetControls.userPresets,
+    presetControls.setUserPresets,
+  );
   usePreviewEffects(sourceRef, processedRef, props.image, draft, props.layer.power);
   const update = (patch: Partial<AdjustImageDraft>): void =>
     setDraft((prev) => normalize({ ...prev, ...patch }));
@@ -77,6 +84,7 @@ export function AdjustImageDialog(props: {
         userPresets={presetControls.userPresets}
         savePreset={presetControls.savePreset}
         deletePreset={presetControls.deletePreset}
+        {...presetFiles}
       />
       <FormActions onCancel={props.onCancel} />
     </Dialog>
@@ -92,6 +100,7 @@ function useImagePresetControls(
   readonly applyPreset: (presetId: ImagePresetId) => void;
   readonly savePreset: () => void;
   readonly deletePreset: () => void;
+  readonly setUserPresets: (presets: readonly UserImagePreset[]) => void;
 } {
   const [userPresets, setUserPresets] = useState<readonly UserImagePreset[]>(() =>
     readUserImagePresets(),
@@ -133,7 +142,44 @@ function useImagePresetControls(
     setUserPresets(nextPresets);
     setDraft((prev) => normalize({ ...prev, presetId: 'custom' }));
   };
-  return { userPresets, applyPreset, savePreset, deletePreset };
+  return { userPresets, applyPreset, savePreset, deletePreset, setUserPresets };
+}
+
+// Preset file Import/Export, offered wherever a platform can pick files.
+function useImagePresetFiles(
+  userPresets: readonly UserImagePreset[],
+  setUserPresets: (presets: readonly UserImagePreset[]) => void,
+): { readonly exportPresets?: () => void; readonly importPresets?: () => void } {
+  const platform = usePlatformOptional();
+  if (platform === null) return {};
+  return {
+    exportPresets: () =>
+      void (async () => {
+        const target = await platform.pickFileForSave({
+          suggestedName: 'image-presets.json',
+          extensions: ['.json'],
+        });
+        await target?.write(exportUserImagePresetsFile(userPresets));
+      })().catch((error: unknown) => jobAwareAlert(`Could not export presets: ${String(error)}`)),
+    importPresets: () =>
+      void (async () => {
+        const [file] = await platform.pickFilesForOpen({ accept: ['.json'], multiple: false });
+        if (file === undefined) return;
+        const result = importUserImagePresetsFile(readUserImagePresets(), await file.text());
+        if (result.kind !== 'ok') {
+          jobAwareAlert(result.message);
+          return;
+        }
+        if (writeUserImagePresets(result.presets).kind !== 'ok') {
+          jobAwareAlert('Could not import presets. Browser storage is unavailable.');
+          return;
+        }
+        setUserPresets(result.presets);
+        jobAwareAlert(
+          `Imported ${result.count} image ${result.count === 1 ? 'preset' : 'presets'}.`,
+        );
+      })().catch((error: unknown) => jobAwareAlert(`Could not import presets: ${String(error)}`)),
+  };
 }
 
 function usePreviewEffects(

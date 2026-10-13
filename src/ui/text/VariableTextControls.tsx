@@ -19,6 +19,8 @@ type ControlsProps = {
   readonly source?: string;
   readonly onSourceChange?: (source: string) => void;
   readonly textValues?: DialogValues;
+  readonly ignoreEmptyLines?: boolean;
+  readonly onIgnoreEmptyLinesChange?: (ignore: boolean) => void;
   readonly onInsert: (source: string) => void;
   readonly setCsv: (csv: VariableCsvDataset | undefined) => void;
   readonly setSettings: ReturnType<typeof useStore.getState>['setVariableSettings'];
@@ -42,6 +44,17 @@ export function VariableTextControls(props: ControlsProps): JSX.Element {
         {...(props.source === undefined ? {} : { source: props.source })}
         {...(props.onSourceChange === undefined ? {} : { onSourceChange: props.onSourceChange })}
       />
+      {props.onIgnoreEmptyLinesChange === undefined ? null : (
+        <label style={toggleStyle}>
+          <input
+            type="checkbox"
+            checked={props.ignoreEmptyLines === true}
+            title="Leave out a line, and its line break, when the fields on it come out empty — for example a blank CSV address line."
+            onChange={(event) => props.onIgnoreEmptyLinesChange?.(event.currentTarget.checked)}
+          />
+          Skip lines whose fields are empty
+        </label>
+      )}
       <div style={settingsStyle}>
         <VariableCsvImport setCsv={props.setCsv} pushToast={props.pushToast} />
         <Counter
@@ -145,6 +158,7 @@ const FIELD_BUTTONS = [
   { label: 'Passes', source: '{{passes}}' },
 ] as const;
 const buttonStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 4 };
+const toggleStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
 const settingsStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',

@@ -13,6 +13,8 @@ export function VariableTextFields(props: {
   readonly onInsert: (source: string) => void;
   /** Barcodes reuse these controls for their variable data (ADR-386). */
   readonly label?: string;
+  readonly ignoreEmptyLines?: boolean;
+  readonly onIgnoreEmptyLinesChange?: (ignore: boolean) => void;
 }): JSX.Element {
   const variables = useStore((state) => state.project.variables) ?? DEFAULT_PROJECT_VARIABLE_DATA;
   const setCsv = useStore((state) => state.setVariableCsv);
@@ -39,6 +41,12 @@ export function VariableTextFields(props: {
           {...(props.source === undefined ? {} : { source: props.source })}
           {...(props.onSourceChange === undefined ? {} : { onSourceChange: props.onSourceChange })}
           {...(props.textValues === undefined ? {} : { textValues: props.textValues })}
+          {...(props.onIgnoreEmptyLinesChange === undefined
+            ? {}
+            : {
+                ignoreEmptyLines: props.ignoreEmptyLines === true,
+                onIgnoreEmptyLinesChange: props.onIgnoreEmptyLinesChange,
+              })}
           firstColumn={firstColumn}
           onInsert={props.onInsert}
           setCsv={setCsv}
