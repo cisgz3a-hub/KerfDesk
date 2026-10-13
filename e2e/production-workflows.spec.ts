@@ -2,6 +2,7 @@ import {
   connectMachineAndDismissFirstSetup,
   connectMachineThroughToolbar,
   machineJogAction,
+  openMachineToolDropdown,
   selectWorkspacePanel,
   toolbarCommand,
 } from './fixtures/workspace-ui';
@@ -1023,6 +1024,7 @@ test('prepares a large image restart preview and starts only the selected remain
     alerts.push(dialog.message());
     void dialog.accept();
   });
+  await openMachineToolDropdown(page, 'Console');
   await page.getByText('History & recovery', { exact: true }).click();
   await page.getByText('Start from line…', { exact: true }).click();
   const beforePreview = serialWrites(await kerfdesk.events());
@@ -1041,6 +1043,7 @@ test('prepares a large image restart preview and starts only the selected remain
   await preview.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect(serialWrites(await kerfdesk.events())).not.toContain('resume preamble');
 
+  await openMachineToolDropdown(page, 'Console');
   await page.getByRole('button', { name: 'Choose restart point…', exact: true }).click();
   await expect(preview).toBeVisible({ timeout: 30_000 });
   await selectRecoveryMovement(preview.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
@@ -1263,9 +1266,10 @@ test('uses jog speed for XY buttons and return to work zero without hijacking ca
   expect(jogWriteCount(await kerfdesk.events())).toBe(jogWritesBeforeArrow);
   await kerfdesk.emitSerialLine('<Idle|MPos:50.000,30.000,0.000|WCO:10.000,10.000,0.000|FS:0,0>');
 
-  const goToWorkZero = page.getByRole('button', { name: 'Go to work zero' });
-  await expect(goToWorkZero).toBeEnabled();
   await dismissNotifications(page);
+  await openMachineToolDropdown(page, 'Origin');
+  const goToWorkZero = page.getByRole('button', { name: 'Go to work zero', exact: true });
+  await expect(goToWorkZero).toBeEnabled();
   await goToWorkZero.click();
   await expect
     .poll(async () =>

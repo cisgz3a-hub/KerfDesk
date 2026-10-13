@@ -1,7 +1,6 @@
 // LaserWindow — status, jog and job controls on the machine rail. Connection
 // and machine-profile settings live in the workspace's compact top bar.
 
-import { useState } from 'react';
 import type { GrblState } from '../../core/controllers/grbl';
 import type { MachineKind } from '../../core/scene';
 import { CollapsedRail, RailPanelHeading } from '../common';
@@ -14,7 +13,6 @@ import {
 import { useMachineRailVisibility } from '../state/use-machine-rail-visibility';
 import { machineControlsLabel, machineDisplayName } from '../machine/machine-labels';
 import { CncUtilitiesPanel } from '../machine/CncUtilitiesPanel';
-import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { ConsolePanel } from './ConsolePanel';
 import { SuperConsoleLauncher } from './super-console/SuperConsoleLauncher';
 import { AlarmBanner } from './AlarmBanner';
@@ -28,6 +26,8 @@ import { OriginRow } from './OriginRow';
 import { jobControlsBusy } from './job-controls-busy';
 import { MachineHoursSection } from './MachineHoursSection';
 import { ProbePanel } from './ProbePanel';
+import { ProbePlateRemovalNotice } from './ProbePlateRemovalNotice';
+import { WorkZRecoveryControl } from './WorkZRecoveryControl';
 import { runStartJobFlow } from './start-job-flow';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import './LaserWindow.css';
@@ -108,22 +108,49 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
         />
       </section>
       <section className="lf-machine-details" aria-label="Machine tools">
-        <StatusDisplay />
-        <MoveToPositionSection disabled={jogPadDisabled} />
-        <ProbePanel />
-        <JobControls
-          setupExtras={machineKind === 'cnc' ? <CncUtilitiesPanel /> : undefined}
-          dockedJobActions={dockedJobActions}
-          machineActionsInJogPad
+        <MachineUtilityControls
+          machineKind={machineKind}
           disabled={setupDisabled}
-          onConfigureAutofocus={openAutofocusSetup}
-          onConfigureHoming={openHomingSetup}
-          onStartJob={() => void runStartJobFlow()}
+          jogDisabled={jogPadDisabled}
+          dockedJobActions={dockedJobActions}
         />
-        <MachineHoursSection />
-        <MachineConsoleSection />
       </section>
     </aside>
+  );
+}
+
+function MachineUtilityControls(props: {
+  readonly machineKind: MachineKind;
+  readonly disabled: boolean;
+  readonly jogDisabled: boolean;
+  readonly dockedJobActions: boolean;
+}): JSX.Element {
+  return (
+    <>
+      <JobControls
+        setupExtras={props.machineKind === 'cnc' ? <CncUtilitiesPanel /> : undefined}
+        dockedJobActions={props.dockedJobActions}
+        machineActionsInJogPad
+        originExtras={
+          <>
+            <StatusDisplay variant="details" />
+            <MoveToPositionSection disabled={props.jogDisabled} />
+            <ProbePanel showNotices={false} />
+          </>
+        }
+        machineConsole={renderMachineConsole}
+        disabled={props.disabled}
+        onConfigureAutofocus={openAutofocusSetup}
+        onConfigureHoming={openHomingSetup}
+        onStartJob={() => void runStartJobFlow()}
+      />
+      {props.machineKind === 'cnc' && (
+        <>
+          <ProbePlateRemovalNotice />
+          <WorkZRecoveryControl />
+        </>
+      )}
+    </>
   );
 }
 
@@ -220,25 +247,29 @@ function MachineRailHeading(props: {
   readonly onCollapse: () => void;
 }): JSX.Element {
   return (
-    <RailPanelHeading title={machineDisplayName(props.machineKind)} onCollapse={props.onCollapse} />
+    <div className="lf-machine-heading">
+      <RailPanelHeading
+        title={machineDisplayName(props.machineKind)}
+        onCollapse={props.onCollapse}
+      />
+      <span className="lf-machine-heading-state">
+        <StatusDisplay variant="state" />
+      </span>
+    </div>
   );
 }
 
 // The docked console follows the transcript, which publishes several times a
-// second during a job; behind a closed summary it re-rendered at that rate for
+// second during a job; behind a closed dropdown it re-rendered at that rate for
 // nobody. While the section is closed it holds its last transcript instead,
 // and it stays mounted so its filters and unsent draft survive a close.
-function MachineConsoleSection(): JSX.Element {
-  const [open, setOpen] = useState(false);
+function renderMachineConsole(active: boolean): JSX.Element {
   return (
-    <CollapsibleRailSection
-      label="Console"
-      title="Show advanced controller commands and communication history."
-      onOpenChange={setOpen}
-    >
-      <ConsolePanel active={open} />
+    <>
+      <ConsolePanel active={active} />
       <SuperConsoleLauncher />
-    </CollapsibleRailSection>
+      <MachineHoursSection />
+    </>
   );
 }
 

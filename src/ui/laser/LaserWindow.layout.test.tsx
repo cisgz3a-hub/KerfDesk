@@ -94,25 +94,20 @@ describe('LaserWindow anchored controls', () => {
           [...view.host.querySelectorAll('button')].filter((node) => node.textContent === label),
         ).toHaveLength(1);
       }
-      expect(tools.textContent).toContain('Reset origin');
-      expect(tools.textContent).toContain('Go to work zero');
-      expect(tools.textContent).toContain('Advanced origin');
-      expect(tools.textContent).toContain('MPos: X 12.000 Y 34.000 Z 5.000');
+      const origin = toolPanel(view.host, 'Origin');
+      expect(origin.textContent).toContain('Reset origin');
+      expect(origin.textContent).toContain('Go to work zero');
+      expect(origin.textContent).toContain('Advanced origin');
+      expect(origin.textContent).toContain('MPos: X 12.000 Y 34.000 Z 5.000');
       expect(primary.textContent).not.toContain('MPos:');
       expect(primary.textContent).not.toContain('Move to position');
       expect(tools.querySelector('.lf-jog-panel')).toBeNull();
       expect(view.host.querySelector('.lf-connection-card')).toBeNull();
       expect(view.host.querySelector('select[aria-label="Laser module"]')).toBeNull();
 
-      const consoleSection = [...tools.querySelectorAll('details')].find(
-        (section) => section.querySelector('summary')?.textContent === 'Console',
-      );
-      if (consoleSection === undefined) throw new Error('Console disclosure missing');
+      const consoleSection = toolPanel(view.host, 'Console');
       await act(async () => {
-        consoleSection.open = true;
-        consoleSection.dispatchEvent(new Event('toggle'));
-        tools.scrollTop = 1000;
-        tools.dispatchEvent(new Event('scroll'));
+        view.host.querySelector<HTMLButtonElement>('button[aria-label="Console"]')?.click();
         useLaserStore.setState({
           statusReport: { ...idleStatus, mPos: { x: 13, y: 34, z: 5 } },
         });
@@ -120,14 +115,14 @@ describe('LaserWindow anchored controls', () => {
 
       expect(primary.querySelector('.lf-jog-panel')).toBe(jog);
       expect(focusButton(primary)).toBe(focus);
-      expect(tools.textContent).toContain('MPos: X 13.000 Y 34.000 Z 5.000');
-      expect(consoleSection.open).toBe(true);
+      expect(origin.textContent).toContain('MPos: X 13.000 Y 34.000 Z 5.000');
+      expect(consoleSection.hidden).toBe(false);
     } finally {
       await view.unmount();
     }
   });
 
-  it('keeps CNC Z controls in the jog group and probe/maintenance in the tools scroller', async () => {
+  it('keeps CNC Z controls in the jog group and probe/maintenance in the utility dropdowns', async () => {
     useStore.setState({
       project: {
         ...createProject({ ...DEFAULT_DEVICE_PROFILE, airAssistCommand: 'M8' }),
@@ -142,9 +137,12 @@ describe('LaserWindow anchored controls', () => {
         primary.querySelector('button[aria-label="Zero work Z at current bit height"]'),
       ).toBeInstanceOf(HTMLButtonElement);
       expect(primary.textContent).not.toContain('Probe (touch plate)');
-      expect(tools.textContent).toContain('Probe (touch plate)');
-      expect(tools.textContent).toContain('Machine maintenance');
-      expect(tools.textContent).toContain('Machine hours');
+      expect(tools.querySelectorAll('.lf-machine-tool-tab')).toHaveLength(3);
+      expect(toolPanel(view.host, 'Origin').textContent).toContain('Probe (touch plate)');
+      expect(toolPanel(view.host, 'Placement & output').textContent).toContain(
+        'Surface spoilboard',
+      );
+      expect(toolPanel(view.host, 'Console').textContent).toContain('Machine hours');
       expect(primary.textContent).not.toContain('Manual Air');
       expect(action(primary, 'Set up homing')).toBeInstanceOf(HTMLButtonElement);
       expect(action(primary, 'Set origin here')).toBeInstanceOf(HTMLButtonElement);
@@ -353,6 +351,13 @@ function blockMachineActions(reason: (typeof blockedCases)[number]): void {
         toolChangePause: false,
       },
     });
+}
+
+function toolPanel(host: HTMLElement, label: string): HTMLDivElement {
+  const trigger = host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+  const panel = document.getElementById(trigger?.getAttribute('aria-controls') ?? '');
+  if (!(panel instanceof HTMLDivElement)) throw new Error(`Missing utility dropdown: ${label}`);
+  return panel;
 }
 
 function action(host: HTMLElement, label: string): HTMLButtonElement {

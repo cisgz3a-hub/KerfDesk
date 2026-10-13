@@ -1,0 +1,106 @@
+.lf-machine-tool-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  padding: 4px 0;
+}
+
+.lf-btn.lf-machine-tool-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 9px 3px 5px;
+  border-radius: 8px;
+  font-size: var(--lf-text-sm);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--lf-accent) 9%, transparent);
+  transition:
+    background-color 140ms,
+    border-color 140ms,
+    box-shadow 140ms;
+}
+
+.lf-btn.lf-machine-tool-tab[aria-expanded='true'] {
+  color: var(--lf-accent-fg);
+  background: var(--lf-tint-accent);
+  border-color: color-mix(in srgb, var(--lf-accent) 60%, var(--lf-border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--lf-accent) 12%, transparent),
+    0 0 16px color-mix(in srgb, var(--lf-accent) 20%, transparent);
+}
+
+.lf-machine-tool-chevron {
+  line-height: 1;
+}
+
+.lf-machine-tool-tab[aria-expanded='true'] .lf-machine-tool-chevron {
+  transform: rotate(180deg);
+}
+
+.lf-anchored-popover.lf-machine-tool-dropdown {
+  width: 350px;
+  padding: 12px;
+  border-radius: 11px;
+  border-color: color-mix(in srgb, var(--lf-accent) 35%, var(--lf-border));
+  box-shadow:
+    var(--lf-shadow-menu, 0 8px 24px var(--lf-border)),
+    0 0 18px color-mix(in srgb, var(--lf-accent) 10%, transparent);
+}
+
+.lf-machine-tool-dropdown[hidden] {
+  display: none;
+}
+
+.lf-machine-tool-dropdown > :not(:last-child) {
+  margin-bottom: 10px;
+}
+
+.lf-machine-tool-dropdown-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lf-machine-tool-dropdown-heading > button {
+  padding: 2px 8px;
+}
+
+.lf-machine-tool-dropdown .lf-btn {
+  min-width: 0;
+  white-space: normal;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lf-btn.lf-machine-tool-tab {
+    transition: none;
+  }
+}
+
+/* Keep every existing jog/Z action pinned on ordinary laptop windows. */
+@container machine-rail-body (max-height: 500px) {
+  .lf-machine-rail {
+    gap: 8px;
+    padding-block: 8px;
+  }
+
+  .lf-machine-tool-tabs {
+    padding: 0;
+  }
+
+  .lf-btn.lf-machine-tool-tab {
+    flex-direction: row;
+    gap: 4px;
+    padding: 6px 3px;
+  }
+}
+
+/* Compact rails have room for labels, not three horizontal icon/label groups. */
+@container machine-rail-body (max-height: 500px) and (max-width: 360px) {
+  .lf-machine-tool-tab > svg,
+  .lf-machine-tool-chevron {
+    display: none;
+  }
+}

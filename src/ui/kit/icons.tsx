@@ -5,6 +5,7 @@
 import { IconFrame } from './icon-frame';
 
 export type IconName =
+  | 'terminal'
   | 'arrow-up'
   | 'arrow-down'
   | 'arrow-left'
@@ -67,6 +68,12 @@ export type IconName =
   | 'cnc';
 
 const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
+  terminal: (
+    <>
+      <path d="m5 6 6 6-6 6" />
+      <path className="lf-icon-accent" d="M13 18h6" />
+    </>
+  ),
   sliders: (
     <>
       <path d="M3 6h5m4 0h9M3 12h11m4 0h3M3 18h3m4 0h11" />

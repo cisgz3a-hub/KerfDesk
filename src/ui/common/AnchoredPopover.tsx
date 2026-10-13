@@ -7,8 +7,14 @@ type PopoverProps = {
   readonly label: string;
   readonly role: 'menu' | 'dialog';
   readonly anchorRef: RefObject<HTMLElement>;
+  /** Use spare space beside this group when a tall form would cover its controls. */
+  readonly sideAnchorRef?: RefObject<HTMLElement>;
+  /** Observe sibling sections whose resizing can move the opener. */
+  readonly layoutRootSelector?: string;
   readonly className?: string;
   readonly children: ReactNode;
+  /** Retain form state while the popover is closed, without focus or listeners. */
+  readonly open?: boolean;
   readonly initialFocus?: string;
   /** Stable opener for a modal whose control disappears with this popover. */
   readonly focusFallbackId?: string;
@@ -22,16 +28,24 @@ type PopoverProps = {
 };
 
 /** A nonmodal control popover, kept outside clipping toolbar/scroll containers. */
-export function AnchoredPopover(props: PopoverProps): JSX.Element {
-  const panelRef = useRef<HTMLDivElement>(null);
+function usePopoverPosition(
+  props: PopoverProps,
+  panelRef: RefObject<HTMLDivElement>,
+): {
+  readonly left: number;
+  readonly top: number;
+  readonly maxHeight: number;
+} {
   const [position, setPosition] = useState({ left: 8, top: 8, maxHeight: 320 });
-  const { anchorRef, onClose, initialFocus } = props;
+  const { anchorRef, sideAnchorRef, layoutRootSelector, onClose, initialFocus } = props;
+  const open = props.open !== false;
   useLayoutEffect(() => {
+    if (!open) return;
     const panel = panelRef.current;
     const anchor = anchorRef.current;
     if (panel === null || anchor === null) return;
     const reposition = (): void => {
-      const next = popoverPosition(anchor, panel);
+      const next = popoverPosition(anchor, panel, sideAnchorRef?.current);
       setPosition((previous) =>
         previous.left === next.left &&
         previous.top === next.top &&
@@ -50,8 +64,7 @@ export function AnchoredPopover(props: PopoverProps): JSX.Element {
         ? [...panel.querySelectorAll<HTMLElement>('button:not(:disabled)')].at(-1)
         : panel.querySelector<HTMLElement>(initialFocus ?? 'button:not(:disabled)');
     (firstFocus ?? panel).focus();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reposition);
-    observer?.observe(panel);
+    const observer = observePopoverLayout(panel, anchor, layoutRootSelector, reposition);
     window.addEventListener('resize', reposition);
     window.addEventListener('scroll', reposition, true);
     window.visualViewport?.addEventListener('resize', reposition);
@@ -65,12 +78,40 @@ export function AnchoredPopover(props: PopoverProps): JSX.Element {
       window.visualViewport?.removeEventListener('scroll', reposition);
       document.removeEventListener('pointerdown', dismissOutside);
     };
-  }, [anchorRef, onClose, initialFocus]);
+  }, [anchorRef, sideAnchorRef, layoutRootSelector, onClose, initialFocus, open, panelRef]);
+  return position;
+}
+
+function observePopoverLayout(
+  panel: HTMLElement,
+  anchor: HTMLElement,
+  layoutRootSelector: string | undefined,
+  reposition: () => void,
+): ResizeObserver | null {
+  if (typeof ResizeObserver === 'undefined') return null;
+  const observer = new ResizeObserver(reposition);
+  observer.observe(panel);
+  observer.observe(anchor);
+  const layoutRoot = layoutRootSelector ? anchor.closest(layoutRootSelector) : null;
+  if (layoutRoot) {
+    observer.observe(layoutRoot);
+    for (const section of layoutRoot.children) observer.observe(section);
+  }
+  return observer;
+}
+
+/** A nonmodal control popover, kept outside clipping toolbar/scroll containers. */
+export function AnchoredPopover(props: PopoverProps): JSX.Element {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const position = usePopoverPosition(props, panelRef);
+  const { anchorRef, onClose } = props;
+  const open = props.open !== false;
   return createPortal(
     <div
       ref={panelRef}
       id={props.id}
       role={props.role}
+      hidden={!open}
       tabIndex={-1}
       aria-label={props.label}
       className={`lf-anchored-popover ${props.className ?? ''}`}
@@ -82,10 +123,14 @@ export function AnchoredPopover(props: PopoverProps): JSX.Element {
         }
       }}
       onBlur={(event) => {
-        if (props.closeOnTab === false && focusLeftPopover(event, anchorRef.current))
+        if (open && props.closeOnTab === false && focusLeftPopover(event, anchorRef.current))
           props.onClose();
       }}
       onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
+          event.stopPropagation();
+          return;
+        }
         if (event.key === 'Escape' || (event.key === 'Tab' && props.closeOnTab !== false)) {
           if (event.key === 'Escape') event.preventDefault();
           event.stopPropagation();
@@ -107,14 +152,18 @@ function focusLeftPopover(
   anchor: HTMLElement | null,
 ): boolean {
   const next = event.relatedTarget;
-  return (
-    !(next instanceof Node) || (!event.currentTarget.contains(next) && !anchor?.contains(next))
-  );
+  // Disabling an async action's focused button blurs it with no next target.
+  // Keep its dropdown mounted and visible for the dialog it is preparing.
+  if (!(next instanceof Node)) {
+    return !(event.target instanceof HTMLElement && event.target.matches(':disabled'));
+  }
+  return !event.currentTarget.contains(next) && !anchor?.contains(next);
 }
 
 function popoverPosition(
   anchor: HTMLElement,
   panel: HTMLElement,
+  sideAnchor?: HTMLElement | null,
 ): {
   left: number;
   top: number;
@@ -123,15 +172,27 @@ function popoverPosition(
   const margin = 8;
   const gap = 5;
   const bounds = anchor.getBoundingClientRect();
-  const viewport = window.visualViewport;
-  const width = viewport?.width ?? window.innerWidth;
-  const height = viewport?.height ?? window.innerHeight;
-  const leftEdge = viewport?.offsetLeft ?? 0;
-  const topEdge = viewport?.offsetTop ?? 0;
+  const { width, height, left: leftEdge, top: topEdge } = viewportBounds();
   const below = Math.max(0, topEdge + height - bounds.bottom - gap - margin);
   const above = Math.max(0, bounds.top - topEdge - gap - margin);
+  const sideBounds = sideAnchor?.getBoundingClientRect();
+  if (
+    sideBounds &&
+    panel.scrollHeight > below &&
+    sideBounds.left - leftEdge >= panel.offsetWidth + margin + gap
+  ) {
+    const maxHeight = Math.max(0, height - 2 * margin);
+    return {
+      left: sideBounds.left - panel.offsetWidth - gap,
+      top: Math.max(
+        topEdge + margin,
+        Math.min(bounds.top, topEdge + height - Math.min(panel.scrollHeight, maxHeight) - margin),
+      ),
+      maxHeight,
+    };
+  }
   const openAbove = panel.scrollHeight > below && above > below;
-  const maxHeight = Math.max(0, openAbove ? above : below);
+  const maxHeight = Math.max(0, Math.min(height - 2 * margin, openAbove ? above : below));
   const top = openAbove
     ? bounds.top - Math.min(panel.scrollHeight, maxHeight) - gap
     : bounds.bottom + gap;
@@ -140,8 +201,26 @@ function popoverPosition(
       leftEdge + margin,
       Math.min(bounds.left, leftEdge + width - panel.offsetWidth - margin),
     ),
-    top: Math.max(topEdge + margin, top),
+    top: Math.max(
+      topEdge + margin,
+      Math.min(top, topEdge + height - Math.min(panel.scrollHeight, maxHeight) - margin),
+    ),
     maxHeight,
+  };
+}
+
+function viewportBounds(): {
+  readonly width: number;
+  readonly height: number;
+  readonly left: number;
+  readonly top: number;
+} {
+  const viewport = window.visualViewport;
+  return {
+    width: viewport?.width ?? window.innerWidth,
+    height: viewport?.height ?? window.innerHeight,
+    left: viewport?.offsetLeft ?? 0,
+    top: viewport?.offsetTop ?? 0,
   };
 }
 

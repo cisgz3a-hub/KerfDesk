@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { grayscaleTracePngBase64, writeQualifiedPngFixture } from './fixtures/png-fixture';
 import {
   connectMachineAndDismissFirstSetup,
-  expandMachineMaintenance,
+  openMachineToolDropdown,
   machineJogAction,
   toolbarCommand,
 } from './fixtures/workspace-ui';
@@ -121,7 +121,7 @@ baseTest(
     // needs a set origin (with a known work offset) before it can export. This
     // fixture is file-only, so deliberately choose Absolute before Save.
     await page.getByRole('tab', { name: 'Machine' }).click();
-    await page.locator('summary').filter({ hasText: 'Placement & output' }).click();
+    await page.getByRole('button', { name: 'Placement & output', exact: true }).click();
     const startFrom = page.getByLabel('Start from');
     await expect(startFrom).toHaveValue('user-origin');
     await startFrom.selectOption('absolute');
@@ -204,13 +204,13 @@ baseTest(
 
     const router = page.getByLabel('Router controls', { exact: true });
     await expect(router).toBeVisible();
-    await expandMachineMaintenance(page);
-    await router
+    const maintenance = await openMachineToolDropdown(page, 'Placement & output');
+    await maintenance
       .locator('summary')
       .filter({ hasText: /^Surface spoilboard$/ })
       .click();
     await expect(
-      router.getByRole('button', { name: 'Save surfacing G-code…', exact: true }),
+      maintenance.getByRole('button', { name: 'Save surfacing G-code…', exact: true }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
     const reopened = page.getByRole('dialog', { name: 'CNC Machine Setup' });
