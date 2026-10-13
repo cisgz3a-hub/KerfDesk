@@ -1,5 +1,14 @@
+.lf-machine-tools {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  gap: 8px;
+}
+
 .lf-machine-tool-tabs {
   display: grid;
+  flex: 0 0 auto;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
   padding: 4px 0;
@@ -39,29 +48,34 @@
   transform: rotate(180deg);
 }
 
-.lf-anchored-popover.lf-machine-tool-dropdown {
-  width: 350px;
-  padding: 12px;
-  border-radius: 11px;
-  border-color: color-mix(in srgb, var(--lf-accent) 35%, var(--lf-border));
-  box-shadow:
-    var(--lf-shadow-menu, 0 8px 24px var(--lf-border)),
-    0 0 18px color-mix(in srgb, var(--lf-accent) 10%, transparent);
+.lf-machine-tool-dropdown {
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 80px;
+  padding: 8px 10px 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--lf-text);
+  background: var(--lf-bg-1);
+  border: 1px solid color-mix(in srgb, var(--lf-accent) 25%, var(--lf-border));
+  border-radius: 9px;
 }
 
 .lf-machine-tool-dropdown[hidden] {
   display: none;
 }
 
-.lf-machine-tool-dropdown > :not(:last-child) {
+.lf-machine-tool-dropdown > :not(:last-child):not(.lf-dialog-backdrop) {
   margin-bottom: 10px;
 }
 
 .lf-machine-tool-dropdown-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-end;
 }
 
 .lf-machine-tool-dropdown-heading > button {
@@ -79,8 +93,8 @@
   }
 }
 
-/* Keep every existing jog/Z action pinned on ordinary laptop windows. */
-@container machine-rail-body (max-height: 500px) {
+/* Leave more space for the open utility on shorter machine panels. */
+@container machine-rail-body (max-height: 620px) {
   .lf-machine-rail {
     gap: 8px;
     padding-block: 8px;
@@ -98,7 +112,7 @@
 }
 
 /* Compact rails have room for labels, not three horizontal icon/label groups. */
-@container machine-rail-body (max-height: 500px) and (max-width: 360px) {
+@container machine-rail-body (max-height: 620px) and (max-width: 360px) {
   .lf-machine-tool-tab > svg,
   .lf-machine-tool-chevron {
     display: none;

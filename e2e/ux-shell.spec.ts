@@ -51,7 +51,7 @@ test.describe('workspace shell acceptance', () => {
     await expect(consoleTab).toHaveAttribute('aria-expanded', 'false');
     await consoleTab.focus();
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('dialog', { name: 'Console', exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Console', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(consoleTab).toBeFocused();
 

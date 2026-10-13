@@ -2,6 +2,9 @@
 
 **Status:** Accepted by the maintainer on 2026-10-13 after reviewing the C design.
 
+**Amended:** [Amendment 1](ADR-593-amendment-1-inline-utility-panels.md) replaces
+the floating presentation with inline panels after a reported overlap with Artwork.
+
 **Decision.** The integrated machine rail keeps its existing jog, centre Home,
 manual air, Set origin and autofocus cluster. The lower utility scroller is
 replaced with Origin, Placement and Console buttons with a subtle static glow.
