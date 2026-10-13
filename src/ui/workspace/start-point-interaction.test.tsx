@@ -1,13 +1,15 @@
 import { act, useMemo, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
+import { createLayer, createProject, type Project } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
 import { buildCanvasMarkerPlan } from '../state/canvas-motion-plan';
 import { startMotionOperation } from '../state/laser-motion-operation';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
-import { resetStore } from '../state/test-helpers';
+import { usePrintCutSessionStore } from '../state/print-cut-session-store';
+import { useFramePreparationStore } from '../state/frame-preparation-store';
+import { resetStore, svgObj } from '../state/test-helpers';
 import { useStartPointInteraction } from './start-point-interaction';
 import { CanvasStartPoints } from './CanvasStartPoints';
 import { computeView } from './view-transform';
@@ -22,6 +24,13 @@ let host: HTMLDivElement;
 
 function projectFixture(): Project {
   const base = createProject();
+  const points = [
+    { x: 10, y: 20 },
+    { x: 50, y: 20 },
+    { x: 50, y: 60 },
+    { x: 10, y: 60 },
+    { x: 10, y: 20 },
+  ];
   return {
     ...base,
     device: { ...base.device, bedWidth: 300, bedHeight: 300, origin: 'rear-left' },
@@ -29,38 +38,25 @@ function projectFixture(): Project {
       layers: [createLayer({ id: 'line', color: '#000000' })],
       objects: [
         {
-          kind: 'imported-svg',
-          id: 'box',
-          source: 'box.svg',
-          transform: IDENTITY_TRANSFORM,
+          ...svgObj('box', ['#000000']),
           bounds: { minX: 10, minY: 20, maxX: 50, maxY: 60 },
-          paths: [
-            {
-              color: '#000000',
-              polylines: [
-                {
-                  closed: true,
-                  points: [
-                    { x: 10, y: 20 },
-                    { x: 50, y: 20 },
-                    { x: 50, y: 60 },
-                    { x: 10, y: 60 },
-                    { x: 10, y: 20 },
-                  ],
-                },
-              ],
-            },
-          ],
+          paths: [{ color: '#000000', polylines: [{ closed: true, points }] }],
         },
       ],
     },
   };
 }
 
-function Harness(props: { readonly planRevision?: number; readonly showHandles?: boolean }) {
+function Harness(props: {
+  readonly planRevision?: number;
+  readonly showHandles?: boolean;
+  readonly retainPlan?: boolean;
+}) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const project = useStore((state) => state.project);
-  const prepared = useMemo(() => prepareOutput(project), [project]);
+  const originalProject = useRef(project);
+  const sourceProject = props.retainPlan ? originalProject.current : project;
+  const prepared = useMemo(() => prepareOutput(sourceProject), [sourceProject]);
   const plan = useMemo(() => {
     if (!prepared.ok) throw new Error('expected prepared fixture');
     return buildCanvasMarkerPlan({
@@ -79,7 +75,10 @@ function Harness(props: { readonly planRevision?: number; readonly showHandles?:
     canvas,
     project,
     plan,
-    context: { prepared, sourceProject: project, registered: false },
+    context:
+      sourceProject === project
+        ? { prepared, sourceProject: project, registered: false }
+        : undefined,
     view: { zoomFactor: 1, panX: 0, panY: 0 },
   });
   return (
@@ -91,7 +90,7 @@ function Harness(props: { readonly planRevision?: number; readonly showHandles?:
           project={project}
           view={{ zoomFactor: 1, panX: 0, panY: 0 }}
           size={{ width: 348, height: 348 }}
-          overlay={{ plan, run: null }}
+          overlay={{ plan, run: null, planIsCurrent: sourceProject === project }}
         />
       ) : (
         <button
@@ -101,7 +100,9 @@ function Harness(props: { readonly planRevision?: number; readonly showHandles?:
           onPointerUp={handlers.up}
           onPointerCancel={handlers.cancel}
           onLostPointerCapture={handlers.cancel}
-          onKeyDown={(event) => handlers.key('job', { x: 10, y: 20 }, event)}
+          onKeyDown={(event) =>
+            handlers.key('job', { x: 10, y: 20 }, event, sourceProject !== project)
+          }
         >
           Job start
         </button>
@@ -124,6 +125,8 @@ beforeEach(async () => {
     controllerOperation: null,
     framedRunStartClaim: null,
   });
+  usePrintCutSessionStore.getState().clear();
+  useFramePreparationStore.setState({ pending: false });
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -155,6 +158,8 @@ afterEach(async () => {
   host.remove();
   resetStore();
   useLaserStore.setState(originalLaserState);
+  usePrintCutSessionStore.getState().clear();
+  useFramePreparationStore.setState({ pending: false });
   vi.restoreAllMocks();
 });
 
@@ -195,6 +200,107 @@ function expectDiscarded() {
 }
 
 describe('start point drag transactions', () => {
+  it('accumulates rapid arrow presses while the new start-only plan is pending', async () => {
+    await act(async () => {
+      root?.render(<Harness retainPlan />);
+    });
+    await pressKey('ArrowRight');
+    await pressKey('ArrowRight');
+    await act(async () => {
+      const button = host.querySelector('button');
+      button?.dispatchEvent(keyEvent('ArrowRight'));
+      button?.dispatchEvent(keyEvent('ArrowRight', true));
+    });
+    await pressKey('ArrowLeft');
+    expect(useStore.getState().project.startPoints?.job).toEqual({ x: 22, y: 20 });
+    expect(useStore.getState().undoStack).toHaveLength(5);
+  });
+
+  it.each([
+    'project',
+    'placement',
+    'registration',
+    'coordinates',
+    'busy',
+    'preparation',
+    'epoch',
+    'plan',
+  ] as const)('invalidates retained keyboard geometry after %s changes', async (change) => {
+    await act(async () => {
+      root?.render(<Harness retainPlan />);
+    });
+    await pressKey('ArrowRight');
+    const first = useStore.getState().project.startPoints;
+    await act(async () => {
+      switch (change) {
+        case 'project':
+          useStore.getState().setProjectNotes('changed');
+          break;
+        case 'placement':
+          useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'center' } });
+          break;
+        case 'registration':
+          usePrintCutSessionStore.getState().capture('first', { x: 1, y: 2 }, 0);
+          break;
+        case 'coordinates':
+          useLaserStore.setState({ wcoCache: { x: 5, y: 0, z: 0 } });
+          break;
+        case 'busy':
+          useLaserStore.setState({ motionOperation: startMotionOperation('frame') });
+          useLaserStore.setState({ motionOperation: null });
+          break;
+        case 'preparation':
+          useFramePreparationStore.setState({ pending: true });
+          useFramePreparationStore.setState({ pending: false });
+          break;
+        case 'epoch':
+          useStore.setState({ projectDocumentEpoch: 5 });
+          break;
+        case 'plan':
+          root?.render(<Harness retainPlan planRevision={1} />);
+          break;
+      }
+    });
+    const undoCount = useStore.getState().undoStack.length;
+    await pressKey('ArrowRight');
+    expect(useStore.getState().project.startPoints).toEqual(first);
+    expect(useStore.getState().undoStack).toHaveLength(undoCount);
+  });
+
+  it('ignores stationary and sub-three-screen-pixel pointer jitter', async () => {
+    await pointer('pointerdown', 10, 20);
+    await pointer('pointermove', 10, 20);
+    await pointer('pointermove', 11, 20);
+    await pointer('pointerup', 11, 20);
+    expectDiscarded();
+  });
+
+  it('allows idle focused-handle Escape to reach global dismissal', async () => {
+    const dismissal = vi.fn();
+    window.addEventListener('keydown', dismissal);
+    try {
+      const event = await pressKey('Escape');
+      expect(event.defaultPrevented).toBe(false);
+      expect(dismissal).toHaveBeenCalledOnce();
+    } finally {
+      window.removeEventListener('keydown', dismissal);
+    }
+  });
+
+  it('consumes Escape while a drag owns a draft', async () => {
+    await beginDrag();
+    const dismissal = vi.fn();
+    window.addEventListener('keydown', dismissal);
+    try {
+      const event = await pressKey('Escape');
+      expect(event.defaultPrevented).toBe(true);
+      expect(dismissal).not.toHaveBeenCalled();
+      await pointer('pointerup');
+      expectDiscarded();
+    } finally {
+      window.removeEventListener('keydown', dismissal);
+    }
+  });
   it('keeps arrow keys on busy focusable handles from reaching artwork shortcuts', async () => {
     await act(async () => {
       useLaserStore.setState({ motionOperation: startMotionOperation('frame') });
@@ -240,11 +346,9 @@ describe('start point drag transactions', () => {
 
   it('discards a draft when a new coordinate plan replaces it for the same project', async () => {
     await beginDrag();
-    const project = useStore.getState().project;
     await act(async () => {
       root?.render(<Harness planRevision={1} />);
     });
-    expect(useStore.getState().project).toBe(project);
     await pointer('pointerup');
     expectDiscarded();
   });
@@ -298,25 +402,7 @@ describe('start point drag transactions', () => {
     },
   );
 
-  it('Escape cancels a draft and the later pointer release cannot commit it', async () => {
-    await beginDrag();
-    await act(async () => {
-      host.querySelector('button')?.dispatchEvent(
-        new KeyboardEvent('keydown', {
-          key: 'Escape',
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
-    });
-    await pointer('pointerup');
-    expectDiscarded();
-  });
-
-  it('ignores release from another pointer and a click with no dragged selection', async () => {
-    await pointer('pointerdown', 10, 20);
-    await pointer('pointerup', 10, 20);
-    expectDiscarded();
+  it('ignores release from another pointer', async () => {
     await beginDrag();
     await pointer('pointerup', 20, 20, 2);
     expect(useStore.getState().project.startPoints).toBeUndefined();
@@ -325,3 +411,15 @@ describe('start point drag transactions', () => {
     expect(useStore.getState().undoStack).toHaveLength(1);
   });
 });
+
+function keyEvent(key: string, shiftKey = false): KeyboardEvent {
+  return new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true });
+}
+
+async function pressKey(key: string, shiftKey = false): Promise<KeyboardEvent> {
+  const event = keyEvent(key, shiftKey);
+  await act(async () => {
+    host.querySelector('button')?.dispatchEvent(event);
+  });
+  return event;
+}

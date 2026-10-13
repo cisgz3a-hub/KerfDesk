@@ -116,6 +116,7 @@ function globalInputs(
       operationOrder: project.scene.layers.map((l) => l.id),
       artworkOrder: project.scene.artworkOrder,
       optimization: project.optimization,
+      jobStart: project.startPoints?.job,
       variables: project.variables,
     }),
     review: reviewStamp(project),

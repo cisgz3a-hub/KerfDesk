@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { Project, Vec2 } from '../../core/scene';
 import { useFramePreparationStore } from '../state/frame-preparation-store';
 import { useLaserStore } from '../state/laser-store';
@@ -9,6 +10,8 @@ import { startEditingBusy, useStartPointInteraction } from './start-point-intera
 import { StartPointSettings } from './StartPointSettings';
 import { computeView, type ViewState } from './view-transform';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
+import { layoutStartHandles, layoutStartLabel, type StartLayoutRect } from './canvas-start-layout';
+import { useStartChromeRects } from './use-start-chrome-rects';
 import './canvas-start-points.css';
 
 type Props = {
@@ -38,6 +41,7 @@ function StartPoints(props: Props & { readonly overlay: CanvasMotionOverlay }): 
   const busy = laserBusy || preparingFrame;
   const interacting = useStore((state) => state.pendingUndo !== null);
   const interaction = useStartPointInteraction({ ...props, plan, context });
+  const chrome = useStartChromeRects(props.canvas, props.size);
   const view = computeView(
     props.size.width,
     props.size.height,
@@ -45,11 +49,19 @@ function StartPoints(props: Props & { readonly overlay: CanvasMotionOverlay }): 
     props.project.device.bedHeight,
     props.view,
   );
-  const points = {
-    frame: interaction.draft?.kind === 'frame' ? interaction.draft.point : plan.framePerimeter[0],
-    job: interaction.draft?.kind === 'job' ? interaction.draft.point : plan.jobStart,
-  };
-  const near = nearbyStarts(points.frame, points.job, view.scale);
+  const points = displayedStartPoints(plan, interaction);
+  const screenPoint = (point: Vec2) => ({
+    x: view.offsetX + point.x * view.scale,
+    y: view.offsetY + point.y * view.scale,
+  });
+  const handles = layoutStartHandles(
+    {
+      ...(points.frame === undefined ? {} : { frame: screenPoint(points.frame) }),
+      ...(points.job === null ? {} : { job: screenPoint(points.job) }),
+    },
+    props.size,
+    chrome,
+  );
   const current = context?.sourceProject === props.project;
   return (
     <>
@@ -57,7 +69,8 @@ function StartPoints(props: Props & { readonly overlay: CanvasMotionOverlay }): 
         !interacting &&
         (['frame', 'job'] as const).map((kind) => {
           const point = points[kind];
-          if (point === null || point === undefined) return null;
+          const handle = handles[kind];
+          if (point === null || point === undefined || handle === undefined) return null;
           const reason =
             context === undefined ? 'Preparing start points…' : startEditReason(kind, context);
           const disabled = busy || !current || reason !== null;
@@ -66,9 +79,11 @@ function StartPoints(props: Props & { readonly overlay: CanvasMotionOverlay }): 
               key={kind}
               kind={kind}
               point={point}
-              x={view.offsetX + point.x * view.scale}
-              y={view.offsetY + point.y * view.scale}
-              offset={near ? (kind === 'frame' ? -14 : 14) : 0}
+              x={screenPoint(point).x}
+              y={screenPoint(point).y}
+              handle={handle}
+              viewport={props.size}
+              chrome={[...chrome, ...Object.values(handles)]}
               reason={busy ? 'Start points cannot change while the machine is busy.' : reason}
               disabled={disabled}
               interaction={interaction}
@@ -78,10 +93,49 @@ function StartPoints(props: Props & { readonly overlay: CanvasMotionOverlay }): 
       <StartPointSettings
         project={props.project}
         context={current ? context : undefined}
-        disabled={busy}
+        disabled={busy || interacting}
       />
     </>
   );
+}
+
+function displayedStartPoints(
+  plan: CanvasMotionOverlay['plan'],
+  interaction: ReturnType<typeof useStartPointInteraction>,
+) {
+  return {
+    frame:
+      interaction.draft?.kind === 'frame'
+        ? interaction.draft.point
+        : (interaction.keyboardPoint('frame') ?? plan.framePerimeter[0]),
+    job:
+      interaction.draft?.kind === 'job'
+        ? interaction.draft.point
+        : (interaction.keyboardPoint('job') ?? plan.jobStart),
+  };
+}
+
+function useStartLabelSize() {
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const [labelSize, setLabelSize] = useState({ width: 0, height: 0 });
+  useLayoutEffect(() => {
+    const node = labelRef.current;
+    if (node === null) return;
+    const measure = () => {
+      const rect = node.getBoundingClientRect();
+      setLabelSize((old) =>
+        old.width === rect.width && old.height === rect.height
+          ? old
+          : { width: rect.width, height: rect.height },
+      );
+    };
+    measure();
+    const observer =
+      typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure);
+    observer?.observe(node);
+    return () => observer?.disconnect();
+  }, []);
+  return { labelRef, labelSize };
 }
 
 function StartHandle(props: {
@@ -89,12 +143,24 @@ function StartHandle(props: {
   readonly point: Vec2;
   readonly x: number;
   readonly y: number;
-  readonly offset: number;
+  readonly handle: StartLayoutRect;
+  readonly viewport: CanvasBitmapSize;
+  readonly chrome: ReadonlyArray<StartLayoutRect>;
   readonly reason: string | null;
   readonly disabled: boolean;
   readonly interaction: ReturnType<typeof useStartPointInteraction>;
 }): JSX.Element {
   const label = props.kind === 'frame' ? 'Frame start' : 'Job start';
+  const { labelRef, labelSize } = useStartLabelSize();
+  const labelBox = layoutStartLabel(
+    props.kind,
+    props.handle,
+    labelSize,
+    props.viewport,
+    props.chrome,
+  );
+  const dx = props.handle.x + props.handle.width / 2 - props.x;
+  const dy = props.handle.y + props.handle.height / 2 - props.y;
   const hint =
     props.reason ?? `${label}: drag to choose a start; arrow keys move 1 mm, Shift moves 10 mm.`;
   const handlers = props.interaction;
@@ -107,19 +173,19 @@ function StartHandle(props: {
         color: props.kind === 'frame' ? canvasTheme.frameStart : canvasTheme.jobStart,
       }}
     >
-      {props.offset !== 0 && (
+      {(dx !== 0 || dy !== 0) && (
         <span
           className="lf-start-connector"
-          style={{ left: Math.min(0, props.offset), width: Math.abs(props.offset) }}
+          style={{ width: Math.hypot(dx, dy), transform: `rotate(${Math.atan2(dy, dx)}rad)` }}
         />
       )}
       <button
         type="button"
         className="lf-start-handle"
         aria-label={label}
-        aria-disabled={props.disabled}
+        aria-disabled={props.disabled && !props.interaction.keyboardReady(props.kind)}
         title={hint}
-        style={{ left: props.offset }}
+        style={{ left: dx, top: dy }}
         onPointerDown={(event) => {
           if (!props.disabled) handlers.down(props.kind, props.point, event);
         }}
@@ -132,14 +198,18 @@ function StartHandle(props: {
         }}
       >
         <span aria-hidden="true">{props.kind === 'frame' ? '◇' : '▶'}</span>
-        <span className="lf-start-label">{label}</span>
+        <span
+          ref={labelRef}
+          className="lf-start-label"
+          style={{
+            left: labelBox.x - props.handle.x,
+            top: labelBox.y - props.handle.y,
+            maxWidth: Math.max(0, props.viewport.width - 8),
+          }}
+        >
+          {label}
+        </span>
       </button>
     </div>
-  );
-}
-
-function nearbyStarts(frame: Vec2 | undefined, job: Vec2 | null, scale: number): boolean {
-  return (
-    frame !== undefined && job !== null && Math.hypot(frame.x - job.x, frame.y - job.y) * scale < 25
   );
 }

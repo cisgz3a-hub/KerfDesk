@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as containment from './containment-depth';
 import type { Vec2 } from '../scene';
-import type { CncGroup, CutGroup, CutSegment, Job } from './job';
+import type { CncGroup, CutGroup, CutSegment, Job, RasterGroup } from './job';
 import { applyJobStartPoint, jobStartEditingJob, resolveJobStartPoint } from './job-start-point';
 import { validCutArcMoves, withCutArcMoves } from './cut-arc-moves';
 
@@ -47,6 +47,51 @@ function firstPolyline(job: Job): ReadonlyArray<Vec2> {
 }
 
 describe('job start selection', () => {
+  it.each(['buffered', 'streamed'] as const)(
+    'skips an empty %s raster before the first vector cut',
+    (storage) => {
+      const rows = vi.fn(() => new Uint16Array([0, 0]));
+      const raster: RasterGroup = {
+        ...cut([]),
+        kind: 'raster',
+        pixelWidth: 2,
+        pixelHeight: 2,
+        bounds: { minX: 0, minY: 0, maxX: 2, maxY: 2 },
+        sValues: new Uint16Array(storage === 'buffered' ? 4 : 0),
+        overscanMm: 1,
+        dotWidthCorrectionMm: 0,
+        ...(storage === 'streamed' ? { rowProvider: rows } : {}),
+      };
+      const vector = cut([square(20)]);
+      const job: Job = { groups: [raster, vector] };
+      const target = { x: 25, y: 0 };
+      expect(resolveJobStartPoint(job, target)).toEqual({ point: target, supported: true });
+      expect(jobStartEditingJob(job)).toEqual({ groups: [vector] });
+      const changed = applyJobStartPoint(job, target);
+      expect(changed.groups[0]).toBe(raster);
+      const selected = changed.groups[1];
+      expect(selected?.kind === 'cut' && selected.segments[0]?.polyline[0]).toEqual(target);
+      if (storage === 'streamed') expect(rows).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('retains a raster with actual burn before a later vector operation', () => {
+    const raster: RasterGroup = {
+      ...cut([]),
+      kind: 'raster',
+      pixelWidth: 2,
+      pixelHeight: 2,
+      bounds: { minX: 0, minY: 0, maxX: 2, maxY: 2 },
+      sValues: new Uint16Array([0, 0, 0, 500]),
+      overscanMm: 1,
+      dotWidthCorrectionMm: 0,
+    };
+    const job: Job = { groups: [raster, cut([square(20)])] };
+    expect(resolveJobStartPoint(job, { x: 25, y: 0 })?.supported).toBe(false);
+    expect(jobStartEditingJob(job)).toEqual({ groups: [] });
+    expect(applyJobStartPoint(job, { x: 25, y: 0 })).toBe(job);
+  });
+
   it('keeps native arc geometry and only snaps to valid native move boundaries', () => {
     const points = [
       { x: 10, y: 0 },

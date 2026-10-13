@@ -13,19 +13,8 @@ export function StartPointSettings(props: {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
   const settings = props.project.startPoints ?? {};
+  const sideB = props.project.cncSetup?.twoSided?.activeSide === 'B';
   const defaultsReason = defaultSaveReason(props.context);
-  const save = (): void => {
-    if (
-      props.context === undefined ||
-      defaultsReason !== undefined ||
-      props.context.sourceProject !== useStore.getState().project
-    )
-      return;
-    const success = writeStartPointDefaults(reusableStartPoints(props.context));
-    setMessage(
-      success ? 'Saved for new jobs on this device.' : 'Could not save defaults on this device.',
-    );
-  };
   return (
     <div className="lf-start-settings lf-chip">
       <button
@@ -53,9 +42,13 @@ export function StartPointSettings(props: {
           <button
             type="button"
             className="lf-btn"
-            disabled={props.disabled || settings.job === undefined}
+            disabled={props.disabled || sideB || settings.job === undefined}
             onClick={() => resetStartPoint(props.project, 'job')}
-            title="Reset this project to its automatic first cutting point."
+            title={
+              sideB
+                ? 'Switch to Side A before resetting the cutting start.'
+                : 'Reset this project to its automatic first cutting point.'
+            }
           >
             Automatic job start
           </button>
@@ -64,7 +57,7 @@ export function StartPointSettings(props: {
             className="lf-btn"
             disabled={props.disabled || props.context === undefined || defaultsReason !== undefined}
             title={defaultsReason ?? 'Remember these relative starts for new jobs on this device.'}
-            onClick={save}
+            onClick={() => setMessage(saveDefaultsMessage(props.context))}
           >
             Use as defaults for new jobs
           </button>
@@ -91,7 +84,9 @@ function clearDefaultsMessage(): string {
 }
 
 function resetStartPoint(project: Project, kind: 'frame' | 'job'): void {
-  if (startEditingBusy() || useStore.getState().project !== project) return;
+  const state = useStore.getState();
+  if (startEditingBusy() || state.project !== project || state.pendingUndo !== null) return;
+  if (kind === 'job' && project.cncSetup?.twoSided?.activeSide === 'B') return;
   const next = { ...project.startPoints };
   if (kind === 'frame') delete next.frame;
   else delete next.job;
@@ -103,4 +98,19 @@ function defaultSaveReason(context: StartEditingContext | undefined): string | u
   if (context?.sourceProject.cncSetup?.twoSided?.activeSide === 'B')
     return 'Switch to Side A before saving defaults.';
   return undefined;
+}
+
+function saveDefaultsMessage(context: StartEditingContext | undefined): string {
+  const state = useStore.getState();
+  if (
+    startEditingBusy() ||
+    state.pendingUndo !== null ||
+    context === undefined ||
+    defaultSaveReason(context) !== undefined ||
+    context.sourceProject !== state.project
+  )
+    return '';
+  return writeStartPointDefaults(reusableStartPoints(context))
+    ? 'Saved for new jobs on this device.'
+    : 'Could not save defaults on this device.';
 }
