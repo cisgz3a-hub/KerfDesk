@@ -1,5 +1,5 @@
 import { canvasTheme } from '../theme/canvas-theme';
-import type { ProjectGuide } from '../../core/scene';
+import type { ProjectGuide } from '../../core/scene/guides';
 import type { SnapGuide } from './snapping';
 import type { ViewTransform } from './view-transform';
 

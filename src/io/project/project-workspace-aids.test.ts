@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createProject, MAX_GUIDES, type Project } from '../../core/scene';
+import { createProject, type Project } from '../../core/scene';
+import { MAX_GUIDES } from '../../core/scene/guides';
 import { deserializeProject } from './deserialize-project';
 import { serializeProject } from './serialize-project';
 
