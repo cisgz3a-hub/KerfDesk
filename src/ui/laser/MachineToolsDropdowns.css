@@ -79,7 +79,18 @@
 }
 
 .lf-machine-tool-dropdown-heading > button {
+  margin-left: auto;
   padding: 2px 8px;
+}
+
+.lf-machine-tool-caption {
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-sm);
+  font-weight: 600;
+}
+
+.lf-machine-tool-dropdown .lf-origin-heading {
+  display: none !important;
 }
 
 .lf-machine-tool-dropdown .lf-btn {
