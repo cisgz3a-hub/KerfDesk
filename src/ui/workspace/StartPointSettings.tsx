@@ -32,6 +32,7 @@ export function StartPointSettings(props: {
         type="button"
         className="lf-btn lf-btn--ghost"
         aria-expanded={open}
+        title="Choose automatic starts or save defaults for new jobs."
         onClick={() => setOpen(!open)}
       >
         Start points
@@ -45,6 +46,7 @@ export function StartPointSettings(props: {
             className="lf-btn"
             disabled={props.disabled || settings.frame === undefined}
             onClick={() => resetStartPoint(props.project, 'frame')}
+            title="Reset this project to its automatic frame entry."
           >
             Automatic frame start
           </button>
@@ -53,6 +55,7 @@ export function StartPointSettings(props: {
             className="lf-btn"
             disabled={props.disabled || settings.job === undefined}
             onClick={() => resetStartPoint(props.project, 'job')}
+            title="Reset this project to its automatic first cutting point."
           >
             Automatic job start
           </button>
@@ -60,7 +63,7 @@ export function StartPointSettings(props: {
             type="button"
             className="lf-btn"
             disabled={props.disabled || props.context === undefined || defaultsReason !== undefined}
-            title={defaultsReason}
+            title={defaultsReason ?? 'Remember these relative starts for new jobs on this device.'}
             onClick={save}
           >
             Use as defaults for new jobs
@@ -69,6 +72,7 @@ export function StartPointSettings(props: {
             type="button"
             className="lf-btn lf-btn--ghost"
             onClick={() => setMessage(clearDefaultsMessage())}
+            title="Use automatic starts for future jobs without changing this project."
           >
             Clear saved defaults
           </button>

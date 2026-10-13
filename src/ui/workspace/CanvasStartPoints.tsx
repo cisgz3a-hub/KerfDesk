@@ -128,7 +128,7 @@ function StartHandle(props: {
         onPointerCancel={handlers.cancel}
         onLostPointerCapture={handlers.cancel}
         onKeyDown={(event) => {
-          if (!props.disabled) handlers.key(props.kind, props.point, event);
+          handlers.key(props.kind, props.point, event, props.disabled);
         }}
       >
         <span aria-hidden="true">{props.kind === 'frame' ? '◇' : '▶'}</span>

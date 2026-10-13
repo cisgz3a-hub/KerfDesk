@@ -104,14 +104,10 @@ export function useStartPointInteraction(input: StartInteractionInput) {
     kind: StartKind,
     anchor: Vec2,
     event: React.KeyboardEvent<HTMLButtonElement>,
+    disabled = false,
   ): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      cancel();
-      return;
-    }
-    if (valid()) moveWithKeyboard(kind, anchor, event, input);
+    if (startKeyAllowsEdit(event, cancel) && !disabled && valid())
+      moveWithKeyboard(kind, anchor, event, input);
   };
   return {
     draft: drag.current?.project === input.project ? draft : null,
@@ -121,6 +117,27 @@ export function useStartPointInteraction(input: StartInteractionInput) {
     cancel,
     key,
   };
+}
+
+function startKeyAllowsEdit(
+  event: React.KeyboardEvent<HTMLButtonElement>,
+  cancel: () => void,
+): boolean {
+  if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
+    event.stopPropagation();
+    return false;
+  }
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopPropagation();
+    cancel();
+    return false;
+  }
+  if (arrowDelta(event.key, 1) === null) return false;
+  // Focusable unavailable handles must not hand arrow keys to artwork nudging.
+  event.preventDefault();
+  event.stopPropagation();
+  return true;
 }
 
 function moveWithKeyboard(

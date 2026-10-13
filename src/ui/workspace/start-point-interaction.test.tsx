@@ -9,6 +9,7 @@ import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
 import { useStartPointInteraction } from './start-point-interaction';
+import { CanvasStartPoints } from './CanvasStartPoints';
 import { computeView } from './view-transform';
 
 (
@@ -56,7 +57,7 @@ function projectFixture(): Project {
   };
 }
 
-function Harness(props: { readonly planRevision?: number }) {
+function Harness(props: { readonly planRevision?: number; readonly showHandles?: boolean }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const project = useStore((state) => state.project);
   const prepared = useMemo(() => prepareOutput(project), [project]);
@@ -84,17 +85,27 @@ function Harness(props: { readonly planRevision?: number }) {
   return (
     <>
       <canvas ref={canvas} width={348} height={348} />
-      <button
-        type="button"
-        onPointerDown={(event) => handlers.down('job', { x: 10, y: 20 }, event)}
-        onPointerMove={handlers.move}
-        onPointerUp={handlers.up}
-        onPointerCancel={handlers.cancel}
-        onLostPointerCapture={handlers.cancel}
-        onKeyDown={(event) => handlers.key('job', { x: 10, y: 20 }, event)}
-      >
-        Job start
-      </button>
+      {props.showHandles ? (
+        <CanvasStartPoints
+          canvas={canvas}
+          project={project}
+          view={{ zoomFactor: 1, panX: 0, panY: 0 }}
+          size={{ width: 348, height: 348 }}
+          overlay={{ plan, run: null }}
+        />
+      ) : (
+        <button
+          type="button"
+          onPointerDown={(event) => handlers.down('job', { x: 10, y: 20 }, event)}
+          onPointerMove={handlers.move}
+          onPointerUp={handlers.up}
+          onPointerCancel={handlers.cancel}
+          onLostPointerCapture={handlers.cancel}
+          onKeyDown={(event) => handlers.key('job', { x: 10, y: 20 }, event)}
+        >
+          Job start
+        </button>
+      )}
       <output>
         {handlers.draft === null
           ? 'no draft'
@@ -184,6 +195,49 @@ function expectDiscarded() {
 }
 
 describe('start point drag transactions', () => {
+  it('keeps arrow keys on busy focusable handles from reaching artwork shortcuts', async () => {
+    await act(async () => {
+      useLaserStore.setState({ motionOperation: startMotionOperation('frame') });
+      root?.render(<Harness showHandles />);
+    });
+    const shortcut = vi.fn();
+    window.addEventListener('keydown', shortcut);
+    try {
+      const handle = host.querySelector<HTMLButtonElement>('[aria-label="Job start"]');
+      expect(handle?.getAttribute('aria-disabled')).toBe('true');
+      await act(async () =>
+        handle?.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'ArrowRight',
+            bubbles: true,
+            cancelable: true,
+          }),
+        ),
+      );
+      expect(shortcut).not.toHaveBeenCalled();
+      expectDiscarded();
+    } finally {
+      window.removeEventListener('keydown', shortcut);
+    }
+  });
+
+  it.each([{ isComposing: true }, { keyCode: 229 }])(
+    'ignores IME arrow events %j',
+    async (composition) => {
+      await act(async () =>
+        host.querySelector('button')?.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'ArrowRight',
+            bubbles: true,
+            cancelable: true,
+            ...composition,
+          }),
+        ),
+      );
+      expectDiscarded();
+    },
+  );
+
   it('discards a draft when a new coordinate plan replaces it for the same project', async () => {
     await beginDrag();
     const project = useStore.getState().project;
