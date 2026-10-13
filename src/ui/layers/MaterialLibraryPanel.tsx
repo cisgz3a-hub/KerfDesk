@@ -69,6 +69,7 @@ function EmptyMaterialLibraryPanel(): JSX.Element {
       <p style={hintStyle}>Create a library below, or open one from Saved Libraries.</p>
       <div style={buttonRowStyle}>
         <SavedLibrariesButton />
+        <MaterialExperimentsButton />
         <Button
           aria-label="Create new material library"
           title="Create a new, empty material library for the current device profile."
@@ -166,19 +167,25 @@ function MaterialLibraryExtras(props: {
   return (
     <>
       <details className="material-library-panel__disclosure">
-        <summary>Job material &amp; automatic presets</summary>
+        <summary title="Expand job material and automatic preset controls.">
+          Job material &amp; automatic presets
+        </summary>
         <div className="material-library-panel__details">
           <JobMaterialControls library={props.library} />
         </div>
       </details>
       <details className="material-library-panel__disclosure">
-        <summary>Multi-step process recipes</summary>
+        <summary title="Expand controls for multi-step process recipes.">
+          Multi-step process recipes
+        </summary>
         <div className="material-library-panel__details">
           <ProcessRecipePanel />
         </div>
       </details>
       <details className="material-library-panel__disclosure">
-        <summary>Create &amp; edit presets</summary>
+        <summary title="Expand tools for creating and editing material presets.">
+          Create &amp; edit presets
+        </summary>
         <div className="material-library-panel__details">
           <MaterialPresetWizardLauncher
             selectedPreset={activePresetOption?.preset ?? null}
@@ -360,7 +367,9 @@ function Header(): JSX.Element {
 function LibraryTools(): JSX.Element {
   return (
     <details className="material-library-panel__disclosure">
-      <summary>Libraries &amp; experiments</summary>
+      <summary title="Expand saved libraries and recorded material experiments.">
+        Libraries &amp; experiments
+      </summary>
       <div className="material-library-panel__details material-library-panel__tools">
         <SavedLibrariesButton />
         <MaterialExperimentsButton />

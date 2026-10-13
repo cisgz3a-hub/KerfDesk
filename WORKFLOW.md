@@ -822,7 +822,7 @@ the linked artwork.
   process summary, visibility, output, and order controls. Operation row order decides the processes
   inside an artwork; artwork run priority is the top-level machine sequence. Jobs with more than
   four operations also offer a name filter; filtering never changes operation order.
-- **Objects** in the Artwork rail header opens the separate artwork organiser (ADR-593).
+- **Objects** in the Artwork rail header opens the separate artwork organiser (ADR-595).
   Find, rename, enter groups or use Move there. This organisation does not set cutting order.
   Drag destinations appear during a drag; Done or Escape returns to the panel.
 - **Materials** leads with preset search, a named target operation, preview and Apply. Library
@@ -832,7 +832,7 @@ the linked artwork.
   jump-to-number, and a virtualized list for large jobs. This order is independent of canvas
   stacking.
 - Find/jump controls expand on demand. **Show cutting settings** expands the run cards' parameter
-  summaries; output status and effective steps remain visible with compact cards (ADR-593).
+  summaries; output status and effective steps remain visible with compact cards (ADR-595).
 - Each run row shows its automatic operation colour, artwork name/type, combined dimensions,
   operations, core laser/CNC settings, output state, and effective machine step(s). **Edit settings**
   returns to Settings with that run selected.

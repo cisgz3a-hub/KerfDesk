@@ -108,6 +108,7 @@ function ArtworkRunOrderContent(props: {
       <label className="lf-run-order-detail-toggle">
         <input
           type="checkbox"
+          title="Show the cutting settings on each run card."
           checked={showSettings}
           onChange={(event) => setShowSettings(event.currentTarget.checked)}
         />

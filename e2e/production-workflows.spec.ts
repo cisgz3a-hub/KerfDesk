@@ -303,6 +303,7 @@ test('imports a CLB library and links its preset to a cut layer', async ({ page,
   await expect(page.getByRole('combobox', { name: 'Material library preset' })).toContainText(
     'Birch',
   );
+  await page.getByText('Link or delete this preset', { exact: true }).click();
   await page.getByRole('button', { name: 'Link selected material preset to layer' }).click();
   await expect(page.getByText('Linked preset to layer.', { exact: true })).toBeVisible();
   await expect(

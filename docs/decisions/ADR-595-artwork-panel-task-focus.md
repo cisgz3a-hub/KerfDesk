@@ -1,4 +1,4 @@
-## ADR-593 - Give artwork panels distinct tasks
+## ADR-595 - Give artwork panels distinct tasks
 
 Date: 2026-10-13. Status: accepted for local implementation.
 

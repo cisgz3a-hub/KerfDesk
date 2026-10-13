@@ -37,7 +37,9 @@ export function MaterialLibraryRecipeControls(props: {
       </div>
       <PresetMatchSummary option={props.activePresetOption} />
       <details className="material-library-panel__disclosure" hidden={deleteDisabled}>
-        <summary>Link or delete this preset</summary>
+        <summary title="Expand controls for linking or deleting the selected preset.">
+          Link or delete this preset
+        </summary>
         <div className="material-library-panel__details">
           <p style={calibrationTextStyle}>
             Link to track changes to this preset and refresh the operation when you choose.

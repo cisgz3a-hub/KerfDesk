@@ -114,7 +114,9 @@ function RunOrderNavigation(
   const canJump = Number.isInteger(jump) && jump >= 1 && jump <= props.total;
   return (
     <details className="lf-run-order-navigation" open={props.search.length > 0 ? true : undefined}>
-      <summary>Find or jump to a run</summary>
+      <summary title="Expand search and navigation controls for the run sequence.">
+        Find or jump to a run
+      </summary>
       <label className="lf-run-order-search">
         <span>Find artwork</span>
         <input
