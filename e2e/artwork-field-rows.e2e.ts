@@ -69,7 +69,7 @@ test('laser settings keep Power, Speed and Passes level and even at every panel 
     panel.getByRole('spinbutton', { name }),
   );
 
-  for (const width of [240, 300, 400]) {
+  for (const width of [240, 260, 280, 300, 320, 360, 400]) {
     await setPanelWidth(page, panel, width);
     const essentialBoxes = await Promise.all(essentials.map(boxOf));
     expectLevel(essentialBoxes);

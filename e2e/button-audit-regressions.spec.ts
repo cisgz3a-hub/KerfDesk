@@ -17,6 +17,7 @@ test('material wizard Back preserves changed settings and details through final 
   await selectWorkspacePanel(page, 'Artwork');
   await page.getByRole('tab', { name: 'Materials', exact: true }).click();
   await page.getByRole('button', { name: 'Create new material library', exact: true }).click();
+  await page.getByText('Create & edit presets', { exact: true }).click();
   await page.getByRole('button', { name: 'New material preset', exact: true }).click();
   const wizard = page.getByRole('dialog', { name: 'New material preset', exact: true });
   await wizard.getByLabel('Material name', { exact: true }).fill('Audit birch');
