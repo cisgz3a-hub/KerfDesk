@@ -1,6 +1,7 @@
 import type { ConsoleSettingWrite, ControllerDriver, FrameBounds } from './controller-driver';
 import { buildJogCommand, CMD_SPINDLE_OFF, type JogParams } from './grbl/commands';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
+import { buildFramePerimeter } from '../job/frame-perimeter';
 
 /** Creality's official Falcon A1 Pro LightBurn device disables $J and settings
  * fetch and uses $HX followed by $HY for Home. These are device defaults, not
@@ -83,17 +84,11 @@ function buildFalconFrame(bounds: FrameBounds, feed: number): ReadonlyArray<stri
   if (![bounds.minX, bounds.minY, bounds.maxX, bounds.maxY, feed].every(Number.isFinite)) {
     throw new Error('Falcon frame coordinates and feed must be finite.');
   }
-  const corners = [
-    [bounds.minX, bounds.minY],
-    [bounds.maxX, bounds.minY],
-    [bounds.maxX, bounds.maxY],
-    [bounds.minX, bounds.maxY],
-    [bounds.minX, bounds.minY],
-  ] as const;
+  const corners = buildFramePerimeter(bounds, bounds.startPoint);
   return [
     'G21 G90\n',
     ...corners.map(
-      ([x, y]) => `G1 X${x.toFixed(3)} Y${y.toFixed(3)} F${formatGcodeFeedMmPerMin(feed)} S0\n`,
+      ({ x, y }) => `G1 X${x.toFixed(3)} Y${y.toFixed(3)} F${formatGcodeFeedMmPerMin(feed)} S0\n`,
     ),
   ];
 }

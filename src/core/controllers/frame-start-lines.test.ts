@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildGrblFrameJogLines } from './grbl/frame-lines';
 import { buildAbsoluteFrameLines } from './relative-jog-commands';
+import { selectControllerDriver } from './select-controller-driver';
 
 describe('chosen Frame start controller bytes', () => {
-  it('starts and closes at the selected point on both controller protocols', () => {
+  it('starts and closes at the selected point on generic and Falcon controller protocols', () => {
     const bounds = {
       minX: 0,
       minY: 0,
@@ -26,6 +27,12 @@ describe('chosen Frame start controller bytes', () => {
       'G21\n',
       'G90\n',
       ...coordinates.map((xy) => `G0 ${xy} F6000\n`),
+    ]);
+    const falcon = selectControllerDriver('grblhal', 'creality-falcon-a1-pro');
+    expect(falcon.commands.frameToolOffLines).toEqual(['M5']);
+    expect(falcon.commands.buildFrameLines(bounds, 6000)).toEqual([
+      'G21 G90\n',
+      ...coordinates.map((xy) => `G1 ${xy} F6000 S0\n`),
     ]);
   });
 });
