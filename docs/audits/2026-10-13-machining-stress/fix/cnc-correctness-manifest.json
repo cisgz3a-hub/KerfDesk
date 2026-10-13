@@ -1,0 +1,19 @@
+{
+  "command": "node node_modules/vitest/vitest.mjs run src/core/invariants/cnc-motion-emitter.property.test.ts src/core/relief/heightmap-tool-offset-property.test.ts src/core/relief/heightmap-surface-contact.test.ts src/core/relief/heightmap-surface-contact-point.test.ts src/core/relief/heightmap-mesh-contact.test.ts src/core/relief/relief-finishing-contact.test.ts src/core/relief/relief-finishing-mask-safety.test.ts src/core/relief/relief-mask-stock-path.test.ts src/core/relief/relief-roughing-motion.test.ts src/core/relief/relief-air-floor-proof.test.ts src/core/relief/relief-air-floor-emission.test.ts src/core/cnc/compile-cnc-relief-roughing-coverage.test.ts src/core/cnc/cnc-relief-link-dependencies.test.ts src/core/cnc/adaptive-pocket-islands.test.ts src/core/cnc/adaptive-pocket-islands-emission.test.ts src/core/cnc/adaptive-pocket-contact.test.ts src/core/cnc/contour-ramp-entry.test.ts src/core/cnc/contour-ramp-emission.test.ts src/core/cnc/contour-ramp-feed-angle.test.ts src/core/cnc/contour-ramp-stage-integration.test.ts src/core/cnc/cnc-tab-ramp.test.ts src/core/cnc/compile-cnc-tabs.test.ts src/core/cnc/tabbed-ramp-entry.test.ts src/core/cnc/vcarve-emission-containment.test.ts src/core/cnc/pocket-stay-down-links.test.ts --maxWorkers=1 --reporter=verbose --reporter=json --outputFile.json=docs/audits/2026-10-13-machining-stress/fix/cnc-correctness-results.json",
+  "startedAtUtc": "2026-10-13T11:54:17.4274973Z",
+  "seedNotes": "Original property counts and timeouts retained. relief-finishing-contact: seed 421, 12 cases. relief-mask-stock-path: seed 451, 2000 dense-sampling comparisons plus 150 stock-clearance cases. cnc-motion-emitter: 2 x 100 generated cases. heightmap-tool-offset-property: 28 x 12 generated cases. relief-roughing-motion: 26 cases including one pinned example. Unseeded fast-check properties report seed/path/counterexample upon failure in full log and JSON. No failures occurred.",
+  "sourceHead": "c700863a14dfbed71a49e32182ec3b75b989ebb1",
+  "sourceHashes": [
+    {
+      "Path": "C:\\Users\\Asus\\.codex\\worktrees\\de9a\\LaserForge-2.0\\src\\core\\job\\segment-entry-index.ts",
+      "Hash": "C589F8D6B9BA595F877F4061B9B41CECAD90F0A4E5FA5398001AB893B85163EB"
+    },
+    {
+      "Path": "C:\\Users\\Asus\\.codex\\worktrees\\de9a\\LaserForge-2.0\\src\\core\\job\\optimize-paths.ts",
+      "Hash": "F866755330013B2E2101EA9E069D53E50B6B45B8E3CE862BFBF2B560957CB3FE"
+    }
+  ],
+  "scope": "Post-fix software correctness rerun. Existing assertions, counts, seeds and limits unchanged. Prior reports preserved. One worker, sequential cohorts; no performance claim.",
+  "finishedAtUtc": "2026-10-13T11:55:50.7882807Z",
+  "exitCode": 0
+}

@@ -1,0 +1,117 @@
+{
+  "configuration": {
+    "event": "configuration",
+    "sizes": [1000, 10000, 50000],
+    "seeds": [17, 491, 20261013],
+    "patterns": ["grid", "cluster", "coincident", "nested"],
+    "directions": ["preserve", "allow-reverse"],
+    "timeoutMs": 30000,
+    "timeoutScope": "Whole fixture worker: Vite setup, generation, both directions and repeats, all checks, and cleanup.",
+    "elapsedScope": "elapsedMs and repeatMs each measure only one optimizePaths call.",
+    "heapScope": "Worker heap snapshots immediately before and after first call; not peak memory, no forced GC.",
+    "memoryLimitScope": "768 MiB worker V8 old generation; not a total process RSS limit.",
+    "qualification": "Software geometry invariants only. Elapsed time, heap and travel are observations, not machine runtime or quality proof."
+  },
+  "summary": {
+    "event": "summary",
+    "fixtures": 36,
+    "passedFixtures": 33,
+    "failedFixtures": 0,
+    "timedOutFixtures": 3,
+    "passedRouteCases": 66
+  },
+  "timeouts": [
+    {
+      "count": 50000,
+      "seed": 17,
+      "pattern": "coincident",
+      "limitMs": 30000,
+      "limitScope": "Whole fixture worker, including setup, both directions and verification.",
+      "incompleteDirections": ["preserve", "allow-reverse"]
+    },
+    {
+      "count": 50000,
+      "seed": 491,
+      "pattern": "coincident",
+      "limitMs": 30000,
+      "limitScope": "Whole fixture worker, including setup, both directions and verification.",
+      "incompleteDirections": ["preserve", "allow-reverse"]
+    },
+    {
+      "count": 50000,
+      "seed": 20261013,
+      "pattern": "coincident",
+      "limitMs": 30000,
+      "limitScope": "Whole fixture worker, including setup, both directions and verification.",
+      "incompleteDirections": ["preserve", "allow-reverse"]
+    }
+  ],
+  "firstCallTiming": [
+    {
+      "fixture": "1000/grid",
+      "calls": 6,
+      "minMs": 3.6991000000016356,
+      "maxMs": 7.83179999999993
+    },
+    {
+      "fixture": "1000/cluster",
+      "calls": 6,
+      "minMs": 5.449400000001333,
+      "maxMs": 8.28480000000036
+    },
+    {
+      "fixture": "1000/coincident",
+      "calls": 6,
+      "minMs": 14.271199999999226,
+      "maxMs": 18.077000000000226
+    },
+    {
+      "fixture": "1000/nested",
+      "calls": 6,
+      "minMs": 6.822099999999409,
+      "maxMs": 17.66240000000107
+    },
+    {
+      "fixture": "10000/grid",
+      "calls": 6,
+      "minMs": 29.136599999997998,
+      "maxMs": 75.10809999999765
+    },
+    {
+      "fixture": "10000/cluster",
+      "calls": 6,
+      "minMs": 88.80910000000222,
+      "maxMs": 289.39190000000235
+    },
+    {
+      "fixture": "10000/coincident",
+      "calls": 6,
+      "minMs": 769.4625999999989,
+      "maxMs": 3268.9734000000026
+    },
+    {
+      "fixture": "10000/nested",
+      "calls": 6,
+      "minMs": 65.35050000000047,
+      "maxMs": 157.92280000000028
+    },
+    {
+      "fixture": "50000/grid",
+      "calls": 6,
+      "minMs": 213.13060000000405,
+      "maxMs": 435.21160000000236
+    },
+    {
+      "fixture": "50000/cluster",
+      "calls": 6,
+      "minMs": 1136.4992999999959,
+      "maxMs": 3954.069199999998
+    },
+    {
+      "fixture": "50000/nested",
+      "calls": 6,
+      "minMs": 352.31059999999707,
+      "maxMs": 1504.9516000000003
+    }
+  ]
+}

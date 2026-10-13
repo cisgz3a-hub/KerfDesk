@@ -1,0 +1,8 @@
+src/core/job\closed-shape-start.test.ts
+src/core/job\optimize-paths-cnc-order.test.ts
+src/core/job\optimize-paths-closed-start.test.ts
+src/core/job\optimize-paths-source-order.test.ts
+src/core/job\optimize-paths-scan-offset.test.ts
+src/core/job\optimize-paths-line-start.test.ts
+src/core/job\optimize-paths-island-order.test.ts
+src/core/job\segment-order.test.ts

@@ -1,0 +1,19 @@
+{
+  "command": "node node_modules/vitest/vitest.mjs run src/io/rd/emit-rd.test.ts src/io/rd/rd-preflight.test.ts src/io/rd/emit-rd-cnc-refusal.test.ts --maxWorkers=1 --reporter=verbose --reporter=json --outputFile.json=docs/audits/2026-10-13-machining-stress/fix/ruida-results.json",
+  "startedAtUtc": "2026-10-13T11:58:37.9002727Z",
+  "seedNotes": "Original three-file RD emission/preflight cohort; original counts/timeouts.",
+  "sourceHead": "c700863a14dfbed71a49e32182ec3b75b989ebb1",
+  "sourceHashes": [
+    {
+      "Path": "C:\\Users\\Asus\\.codex\\worktrees\\de9a\\LaserForge-2.0\\src\\core\\job\\segment-entry-index.ts",
+      "Hash": "1DF529D90F94EFC0373A24237EF6A86D9731BD206DCE79CA09E738C6BFC6BD06"
+    },
+    {
+      "Path": "C:\\Users\\Asus\\.codex\\worktrees\\de9a\\LaserForge-2.0\\src\\core\\job\\optimize-paths.ts",
+      "Hash": "F866755330013B2E2101EA9E069D53E50B6B45B8E3CE862BFBF2B560957CB3FE"
+    }
+  ],
+  "scope": "Post-fix software correctness rerun. Existing assertions, counts, seeds and limits unchanged. Prior reports preserved. One worker, sequential cohorts; no performance claim.",
+  "finishedAtUtc": "2026-10-13T11:59:06.1364062Z",
+  "exitCode": 0
+}

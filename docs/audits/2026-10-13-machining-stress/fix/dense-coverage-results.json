@@ -1,0 +1,158 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 13,
+  "numPassedTests": 1,
+  "numFailedTests": 0,
+  "numPendingTests": 12,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791892996579,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation prepares radii and chord geometry once per unique cutting chord",
+          "status": "skipped",
+          "title": "prepares radii and chord geometry once per unique cutting chord",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 0 chords",
+          "status": "skipped",
+          "title": "matches the original dense measurement with 0 chords",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 1 chords",
+          "status": "skipped",
+          "title": "matches the original dense measurement with 1 chords",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 64 chords",
+          "status": "skipped",
+          "title": "matches the original dense measurement with 64 chords",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 4096 chords",
+          "status": "skipped",
+          "title": "matches the original dense measurement with 4096 chords",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 5000 chords",
+          "status": "skipped",
+          "title": "matches the original dense measurement with 5000 chords",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation rejects distant sweeps before the scalar distance without changing the result",
+          "status": "skipped",
+          "title": "rejects distant sweeps before the scalar distance without changing the result",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation retains duplicate-chord replacement order, zero-depth rounding and vertical sweeps",
+          "status": "skipped",
+          "title": "retains duplicate-chord replacement order, zero-depth rounding and vertical sweeps",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation retains degenerate, empty and non-finite input results",
+          "status": "skipped",
+          "title": "retains degenerate, empty and non-finite input results",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation preserves boundary equality and rounding-scale separation with a preceding close sweep",
+          "status": "skipped",
+          "title": "preserves boundary equality and rounding-scale separation with a preceding close sweep",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation keeps scalar overflow evidence after a preceding ordinary sweep",
+          "status": "skipped",
+          "title": "keeps scalar overflow evidence after a preceding ordinary sweep",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the scalar oracle across deterministic varied source boundaries and depths",
+          "status": "skipped",
+          "title": "matches the scalar oracle across deterministic varied source boundaries and depths",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "reports matched dense coverage timing",
+          "status": "passed",
+          "title": "reports matched dense coverage timing",
+          "duration": 618.2160999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892998389,
+      "endTime": 1791892999007.216,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/vcarve-source-boundary-coverage-performance.test.ts"
+    }
+  ]
+}

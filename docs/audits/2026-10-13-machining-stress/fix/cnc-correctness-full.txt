@@ -1,0 +1,242 @@
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0
+
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > admits exact link-region boundaries without admitting adjacent excluded points 3ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > cuts a square level inside out in one chain, every loop closed 18ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > cuts the deepest cleanup before the rings while retaining linked motion 5ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > keeps the stock right of travel for climb and left for conventional 3ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > circles an island the other way round, so it climbs there too 5ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > stays down from a piece outline to its island however far 5ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > lifts rather than link across the gap between two pieces 1ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > links a band across deeper cells its depth also reaches (ADR-422) 2ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > never leaves the link region between loops, on random reliefs 1845ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > ramps down along the first loop from the level above 1ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > plunges into a loop too short to ramp round 2ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > marks each chain the ramp leaves to plunge, and only those (ADR-424 Amendment 1) 1ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > marks no plunge where the level leaves no stock to ramp through 1ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > emits each straight run of a traced ring as one move (ADR-488) 60ms
+ ✓ src/core/relief/relief-roughing-motion.test.ts > reliefRoughingMotion > keeps a cleanup trace round its stock on the climb side 1ms
+ ✓ src/core/cnc/compile-cnc-relief-roughing-coverage.test.ts > relief roughing rings > end every ring where it starts, for any bit 131ms
+ ✓ src/core/cnc/compile-cnc-relief-roughing-coverage.test.ts > relief roughing rings > leave no stock at the ring seams with an end mill 907ms
+ ✓ src/core/cnc/compile-cnc-relief-roughing-coverage.test.ts > relief roughing rings > leave no stock at the ring seams with a tapered ball nose 2733ms
+ ✓ src/core/cnc/compile-cnc-relief-roughing-coverage.test.ts > relief roughing core cleanup > clears the centre an end mill leaves above 50% stepover 1033ms
+ ✓ src/core/cnc/compile-cnc-relief-roughing-coverage.test.ts > relief roughing core cleanup > clears the centre a tapered ball nose leaves above 50% stepover 381ms
+ ✓ src/core/cnc/compile-cnc-relief-roughing-coverage.test.ts > relief roughing core cleanup > adds no pass where the rings already reach the centre 462ms
+ ✓ src/core/cnc/compile-cnc-relief-roughing-coverage.test.ts > relief roughing motion (ADR-424) > joins each level of a flat relief into one pass at depth 20ms
+ ✓ src/core/cnc/compile-cnc-relief-roughing-coverage.test.ts > relief roughing motion (ADR-424) > clears the floor with ramped entries as it does with plunges 915ms
+ ✓ src/core/cnc/compile-cnc-relief-roughing-coverage.test.ts > relief roughing motion (ADR-424) > climbs round an island as it does round the outside 87ms
+ ✓ src/core/cnc/compile-cnc-relief-roughing-coverage.test.ts > relief roughing fine steps (ADR-422 Amendment 1) > cuts the terraces on a slope down to one fine step 2987ms
+ ✓ src/core/relief/relief-finishing-mask-safety.test.ts > relief finishing mask sweep safety > ends a flat-tool scanline before its interpolated chord enters excluded stock 6ms
+ ✓ src/core/relief/relief-finishing-mask-safety.test.ts > relief finishing mask sweep safety > rides a ball-nose row up to the mask and leaves the excluded stock whole 12ms
+ ✓ src/core/relief/relief-finishing-mask-safety.test.ts > relief finishing mask sweep safety > links the rows inside a round mask into one stay-down pass 383ms
+ ✓ src/core/relief/relief-finishing-mask-safety.test.ts > relief finishing mask sweep safety > keeps every move out of concave, diagonal, and island masks 73ms
+ ✓ src/core/cnc/compile-cnc-tabs.test.ts > compileCncJob holding tabs (ADR-258) > keeps waste-side leads and tab-wall Z moves on every deep pass through emitted G-code 19ms
+ ✓ src/core/cnc/compile-cnc-tabs.test.ts > compileCncJob holding tabs (ADR-258) > keeps translated default arc leads on every deep tab pass (reversed=false) 10ms
+ ✓ src/core/cnc/compile-cnc-tabs.test.ts > compileCncJob holding tabs (ADR-258) > keeps translated default arc leads on every deep tab pass (reversed=true) 7ms
+ ✓ src/core/cnc/compile-cnc-tabs.test.ts > compileCncJob holding tabs (ADR-258) > rides deep profile passes over the tabs in one continuous path 2ms
+ ✓ src/core/cnc/compile-cnc-tabs.test.ts > compileCncJob holding tabs (ADR-258) > inserts a full-loop pass at the exact tab top so tabs are the requested height 2ms
+ ✓ src/core/cnc/compile-cnc-tabs.test.ts > compileCncJob holding tabs (ADR-258) > keeps holding tabs on the finishing pass so the part is not fully severed 4ms
+ ✓ src/core/cnc/contour-ramp-entry.test.ts > applyRampEntry on paths shorter than their ramp (ADR-471) > laps a closed loop at the angle, then cuts one whole lap at depth 3ms
+ ✓ src/core/cnc/contour-ramp-entry.test.ts > applyRampEntry on paths shorter than their ramp (ADR-471) > zig-zags an open path back to its start at depth, then cuts it end to end 1ms
+ ✓ src/core/cnc/contour-ramp-entry.test.ts > applyRampEntry on paths shorter than their ramp (ADR-471) > keeps the plunge, marked, on a path under one cut width 0ms
+ ✓ src/core/cnc/contour-ramp-entry.test.ts > applyRampEntry on paths shorter than their ramp (ADR-471) > ramps each ring of a pocket ladder from the level above 0ms
+ ✓ src/core/cnc/contour-ramp-entry.test.ts > the reported 6 mm pocket (ADR-471) > laps the outer ring from the level above and plunges only the marked inner ring 1ms
+ ✓ src/core/cnc/contour-ramp-entry.test.ts > the reported 6 mm pocket (ADR-471) > never finishes a ramp straight down, and says which passes plunge 2ms
+ ✓ src/core/cnc/contour-ramp-entry.test.ts > the reported 6 mm pocket (ADR-471) > reports the plunges as a Job Review advisory, never a refusal 4ms
+ ✓ src/core/cnc/contour-ramp-entry.test.ts > applyRampEntry before a stay-down link (ADR-491) > ends a 30 mm ring's lap on its start, where the link leaves from 0ms
+ ✓ src/core/cnc/contour-ramp-entry.test.ts > applyRampEntry before a stay-down link (ADR-491) > ends a 3 mm ring's lap on its start, where the link leaves from 0ms
+ ✓ src/core/cnc/contour-ramp-entry.test.ts > applyRampEntry before a stay-down link (ADR-491) > leaves a ring with no link after it ending where its descent ended 0ms
+ ✓ src/core/cnc/contour-ramp-entry.test.ts > applyRampEntry before a stay-down link (ADR-491) > leaves a ring the link already enters alone 0ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > lifts a flat end mill by slope x radius (slope 0) 6ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > lifts a flat end mill by slope x radius (slope 0.3) 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > lifts a flat end mill by slope x radius (slope 1) 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > lifts a flat end mill by slope x radius (slope 2.5) 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > seats a ball on its tangent point (slope 0) 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > seats a ball on its tangent point (slope 0.3) 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > seats a ball on its tangent point (slope 1) 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > seats a ball on its tangent point (slope 2.5) 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > seats a ball on its tangent point (slope 6) 2ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > keeps a v-bit on its tip below the flank slope (slope 0.5) 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > keeps a v-bit on its tip below the flank slope (slope 1.5) 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > moves a v-bit contact to the rim above the flank slope (slope 2) 0ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > moves a v-bit contact to the rim above the flank slope (slope 4) 0ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > seats an engraving bit on its flat land edge (slope 0.5) 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > seats an engraving bit on its flat land edge (slope 2) 0ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > moves an engraving contact to the rim above the flank slope 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > seats a tapered ball on its ball below the flank (slope 0.3) 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > seats a tapered ball on its ball below the flank (slope 1) 0ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answers on a plane > moves a tapered ball contact to the rim above the flank slope 0ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answer on a ridge edge > finds a ball contact on a ridge sloping 0.5 between samples 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — known answer on a ridge edge > finds a ball contact on a ridge sloping 0 between samples 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — level edges > finds a v-bit contact at the nearest approach of a level edge 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — field bounds > has no field for a single sample or a zero-radius cutter 0ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — field bounds > keeps a lower bound that the surface does not exceed 1ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — field bounds > never builds surface from mask-excluded samples 0ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — independent oracle > matches the oracle for 'end-mill' grown by +0 mm 146ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — independent oracle > matches the oracle for 'end-mill' grown by 0.3 mm 243ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — independent oracle > matches the oracle for 'ball-nose' grown by +0 mm 175ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — independent oracle > matches the oracle for 'ball-nose' grown by 0.3 mm 195ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — independent oracle > matches the oracle for 'v-bit' grown by +0 mm 134ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — independent oracle > matches the oracle for 'v-bit' grown by 0.3 mm 179ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — independent oracle > matches the oracle for 'engraving' grown by +0 mm 269ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — independent oracle > matches the oracle for 'engraving' grown by 0.3 mm 493ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — independent oracle > matches the oracle for 'tapered-ball-nose' grown by +0 mm 185ms
+ ✓ src/core/relief/heightmap-surface-contact.test.ts > surface contact — independent oracle > matches the oracle for 'tapered-ball-nose' grown by 0.3 mm 293ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > agrees with the sample query on every sample ('end-mill') 67ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > agrees with the sample query on every sample ('ball-nose') 42ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > agrees with the sample query on every sample ('v-bit') 33ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > agrees with the sample query on every sample ('tapered-ball-nose') 34ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > matches the oracle between samples and beyond the map ('end-mill') 44ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > matches the oracle between samples and beyond the map ('ball-nose') 54ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > matches the oracle between samples and beyond the map ('v-bit') 30ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > matches the oracle between samples and beyond the map ('tapered-ball-nose') 28ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > answers "does it clear z" exactly as the height does ('end-mill') 15ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > answers "does it clear z" exactly as the height does ('ball-nose') 10ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > answers "does it clear z" exactly as the height does ('v-bit') 7ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > answers "does it clear z" exactly as the height does ('tapered-ball-nose') 9ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > keeps every element that can rise above a move ('end-mill') 19ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > keeps every element that can rise above a move ('ball-nose') 25ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > keeps every element that can rise above a move ('v-bit') 19ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > keeps every element that can rise above a move ('tapered-ball-nose') 25ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > keeps the far side of a ridge a short move crosses ('end-mill') 117ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > keeps the far side of a ridge a short move crosses ('ball-nose') 246ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > keeps the far side of a ridge a short move crosses ('v-bit') 218ms
+ ✓ src/core/relief/heightmap-surface-contact-point.test.ts > surface contact at any point (ADR-423) > keeps the far side of a ridge a short move crosses ('tapered-ball-nose') 238ms
+ ✓ src/core/relief/relief-finishing-contact.test.ts > finishing moves against the exact contact (ADR-421 Amendment 1) > leaves no move of any strategy cutting into the part 2942ms
+ ✓ src/core/relief/relief-finishing-contact.test.ts > finishing moves against the exact contact (ADR-421 Amendment 1) > lifts a link down the edge column over a wall parallel to the rows 500ms
+ ✓ src/core/relief/relief-finishing-contact.test.ts > checkedPath > keeps a move that stays on or above the contact 1ms
+ ✓ src/core/relief/relief-finishing-contact.test.ts > checkedPath > adds points on the contact where a move would cut under it 5ms
+ ✓ src/core/relief/relief-finishing-contact.test.ts > checkedPath > never lowers a point 1ms
+ ✓ src/core/relief/relief-finishing-contact.test.ts > checkedPath > follows a flat end mill up a sampled wall 2ms
+ ✓ src/core/relief/relief-finishing-contact.test.ts > checkedPath > holds the tolerance normal to the move 1ms
+ ✓ src/core/cnc/vcarve-emission-containment.test.ts > final ordinary and tiled V-carve containment > contains complete final chords after half-grid placement and tile splits at 1 degrees 8305ms
+ ✓ src/core/cnc/vcarve-emission-containment.test.ts > final ordinary and tiled V-carve containment > contains complete final chords after half-grid placement and tile splits at 30 degrees 2128ms
+ ✓ src/core/cnc/vcarve-emission-containment.test.ts > final ordinary and tiled V-carve containment > contains complete final chords after half-grid placement and tile splits at 90 degrees 1664ms
+ ✓ src/core/cnc/vcarve-emission-containment.test.ts > final ordinary and tiled V-carve containment > contains complete final chords after half-grid placement and tile splits at 150 degrees 1574ms
+ ✓ src/core/cnc/vcarve-emission-containment.test.ts > final ordinary and tiled V-carve containment > contains complete final chords after half-grid placement and tile splits at 179 degrees 1623ms
+ ✓ src/core/cnc/vcarve-emission-containment.test.ts > final ordinary and tiled V-carve containment > keeps represented rest-finishing fragments conservative after placement 55ms
+ ✓ src/core/cnc/vcarve-emission-containment.test.ts > final ordinary and tiled V-carve containment > emits no negative exterior material for the audited microscopic triangle 5ms
+ ✓ src/core/relief/heightmap-mesh-contact.test.ts > mesh contact matches the independent oracle > end-mill 64ms
+ ✓ src/core/relief/heightmap-mesh-contact.test.ts > mesh contact matches the independent oracle > ball-nose 56ms
+ ✓ src/core/relief/heightmap-mesh-contact.test.ts > mesh contact matches the independent oracle > v-bit 38ms
+ ✓ src/core/relief/heightmap-mesh-contact.test.ts > mesh contact matches the independent oracle > engraving 31ms
+ ✓ src/core/relief/heightmap-mesh-contact.test.ts > mesh contact matches the independent oracle > tapered-ball-nose 24ms
+ ✓ src/core/relief/heightmap-mesh-contact.test.ts > mesh contact matches the independent oracle > solves a roughing envelope widened by the allowance 52ms
+ ✓ src/core/relief/heightmap-mesh-contact.test.ts > mesh contact known answers > a ball on a plane rides r (sec - 1) above it, with no grid error 1ms
+ ✓ src/core/relief/heightmap-mesh-contact.test.ts > mesh contact known answers > a vertical wall stops a flat end mill at the wall top within its radius 1ms
+ ✓ src/core/relief/heightmap-mesh-contact.test.ts > mesh contact known answers > a stock-top background holds the cutter at its nearest uncovered cell 1ms
+ ✓ src/core/relief/heightmap-mesh-contact.test.ts > mesh contact along a move > keeps every triangle that can rise above the move, and answers as the full field 54ms
+ ✓ src/core/cnc/contour-ramp-stage-integration.test.ts > compiled short contour ramps with independent finishing recipes > laps both depth ladders and keeps the finishing feed, plunge and spindle 30ms
+ ✓ src/core/cnc/contour-ramp-stage-integration.test.ts > compiled short contour ramps with independent finishing recipes > retains finishing provenance and emitted disclosure for sub-width plunges 6ms
+ ✓ src/core/cnc/contour-ramp-stage-integration.test.ts > compiled short contour ramps with independent finishing recipes > uses the V-bit width at depth for real wall layout and the ramp threshold 5ms
+ ✓ src/core/cnc/contour-ramp-emission.test.ts > contour ramp guarantees in emitted, placed XYZ/F words > bounds angle and Z rate while preserving full-feed cleanup: 64-vertex 2.8 mm circle 61ms
+ ✓ src/core/cnc/contour-ramp-emission.test.ts > contour ramp guarantees in emitted, placed XYZ/F words > bounds angle and Z rate while preserving full-feed cleanup: 30 mm open line 4ms
+ ✓ src/core/cnc/contour-ramp-emission.test.ts > contour ramp guarantees in emitted, placed XYZ/F words > bounds angle and Z rate while preserving full-feed cleanup: 5 mm open line requiring repeated legs 2ms
+ ✓ src/core/cnc/contour-ramp-emission.test.ts > contour ramp guarantees in emitted, placed XYZ/F words > bounds a ramp ending at the original ring seam before a stay-down link 40ms
+ ✓ src/core/cnc/contour-ramp-emission.test.ts > contour ramp guarantees in emitted, placed XYZ/F words > keeps bends and zero-capacity spans on an open path, then cuts every vertex at depth 3ms
+ ✓ src/core/cnc/contour-ramp-emission.test.ts > contour ramp guarantees in emitted, placed XYZ/F words > keeps a sub-quantum depth change without claiming an emitted ramp 0ms
+ ✓ src/core/cnc/contour-ramp-emission.test.ts > contour ramp guarantees in emitted, placed XYZ/F words > honours a positive angle below the old half-degree minimum 4ms
+ ✓ src/core/cnc/contour-ramp-emission.test.ts > contour ramp guarantees in emitted, placed XYZ/F words > discloses a precision fallback without removing any densely spaced source vertices 1ms
+ ✓ src/core/cnc/contour-ramp-emission.test.ts > contour ramp guarantees in emitted, placed XYZ/F words > preserves raised tab walls and a complete final ring while capping entry motion 4ms
+ ✓ src/core/cnc/pocket-stay-down-links.test.ts > stayDownPocketPasses > links nested rings at the same depth and re-starts each at its point nearest the bit 7ms
+ ✓ src/core/cnc/pocket-stay-down-links.test.ts > stayDownPocketPasses > keeps the lift when the step is longer than one bit diameter 1ms
+ ✓ src/core/cnc/pocket-stay-down-links.test.ts > stayDownPocketPasses > keeps the lift between depths, so every level still enters on its own 0ms
+ ✓ src/core/cnc/pocket-stay-down-links.test.ts > stayDownPocketPasses > never links across an island the step would pass within a radius of 0ms
+ ✓ src/core/cnc/pocket-stay-down-links.test.ts > stayDownPocketPasses > runs an open row from its nearer end when only that end is in reach 0ms
+ ✓ src/core/cnc/pocket-stay-down-links.test.ts > stayDownPocketPasses > pulls a pass forward past one that shares no stock with it 0ms
+ ✓ src/core/cnc/pocket-stay-down-links.test.ts > stayDownPocketPasses > never pulls a pass forward past one within a bit diameter of it 0ms
+ ✓ src/core/cnc/pocket-stay-down-links.test.ts > stayDownPocketPasses > turns a linked helical-entry ring into a plain ring at depth 0ms
+ ✓ src/core/cnc/pocket-stay-down-links.test.ts > stayDownPocketPasses > keeps every cut exactly once 1ms
+ ✓ src/core/cnc/pocket-stay-down-links.test.ts > pocketPassLinks > leaves the passes alone when the layer asks for the lift between rings 1ms
+ ✓ src/core/cnc/pocket-stay-down-links.test.ts > nearestRingStart > re-starts a ring on the nearest point of its nearest side, keeping its direction 0ms
+ ✓ src/core/cnc/pocket-stay-down-links.test.ts > nearestRingStart > snaps a start within a hundredth of a millimetre onto the corner 0ms
+ ✓ src/core/cnc/contour-ramp-feed-angle.test.ts > ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit) > keeps every move of a 2 degree hole ramp within the angle 92ms
+ ✓ src/core/cnc/contour-ramp-feed-angle.test.ts > ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit) > keeps every move of a 5 degree hole ramp within the angle 34ms
+ ✓ src/core/cnc/contour-ramp-feed-angle.test.ts > ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit) > keeps every move of a 30 degree hole ramp within the angle 14ms
+ ✓ src/core/cnc/contour-ramp-feed-angle.test.ts > ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit) > keeps every move of a 45 degree hole ramp within the angle 15ms
+ ✓ src/core/cnc/contour-ramp-feed-angle.test.ts > ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit) > keeps every move of a tabbed ramp within the angle 155ms
+ ✓ src/core/cnc/contour-ramp-feed-angle.test.ts > ramp Z rate (ADR-471 emitted-output audit) > holds a 45 degree hole ramp to the plunge rate 10ms
+ ✓ src/core/cnc/contour-ramp-feed-angle.test.ts > ramp Z rate (ADR-471 emitted-output audit) > holds a 45 degree tabbed disc ramp to the plunge rate 38ms
+ ✓ src/core/cnc/contour-ramp-feed-angle.test.ts > a ramp on moves too short for whole 0.001 mm steps (ADR-471 emitted-output audit) > retains the source path and explicitly discloses an unrepresentable ramp 9ms
+ ✓ src/core/cnc/contour-ramp-feed-angle.test.ts > a ramp on moves too short for whole 0.001 mm steps (ADR-471 emitted-output audit) > adds no such advisory where whole steps hold the angle 5ms
+ ✓ src/core/cnc/cnc-relief-link-dependencies.test.ts > linked relief preparation dependency evidence > marks a missing linked source dirty even while the canonical field stays available for repair 19ms
+ ✓ src/core/cnc/cnc-relief-link-dependencies.test.ts > linked relief preparation dependency evidence > tracks invalid mask geometry that cannot replace the retained canonical field 4ms
+ ✓ src/core/cnc/cnc-relief-link-dependencies.test.ts > linked relief preparation dependency evidence > tracks links of an unselected target used by a selected projected vector 6ms
+ ✓ src/core/cnc/cnc-relief-link-dependencies.test.ts > linked relief preparation dependency evidence > keeps linked source labels, colours and output bindings ready 3ms
+ ✓ src/core/cnc/cnc-relief-link-dependencies.test.ts > linked relief preparation dependency evidence > includes clip, level, sculpt, component and both rail links in the same live source contract 1ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'x' / 'end-mill' / masked=false 47ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'x' / 'end-mill' / masked=true 38ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'x' / 'ball-nose' / masked=false 37ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'x' / 'ball-nose' / masked=true 37ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'x' / 'v-bit' / masked=false 41ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'x' / 'v-bit' / masked=true 22ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'x' / 'engraving' / masked=false 36ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'x' / 'engraving' / masked=true 21ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'y' / 'end-mill' / masked=false 21ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'y' / 'end-mill' / masked=true 18ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'y' / 'ball-nose' / masked=false 22ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'y' / 'ball-nose' / masked=true 15ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'y' / 'v-bit' / masked=false 23ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'y' / 'v-bit' / masked=true 16ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'y' / 'engraving' / masked=false 24ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'y' / 'engraving' / masked=true 17ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'both' / 'end-mill' / masked=false 14ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'both' / 'end-mill' / masked=true 13ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'both' / 'ball-nose' / masked=false 16ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'both' / 'ball-nose' / masked=true 16ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'both' / 'v-bit' / masked=false 17ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'both' / 'v-bit' / masked=true 17ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'both' / 'engraving' / masked=false 35ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > matches a physical brute-force oracle for 'both' / 'engraving' / masked=true 19ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > preserves exact-divisible Uint32 output for 'end-mill' tools 10ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > preserves exact-divisible Uint32 output for 'ball-nose' tools 7ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > preserves exact-divisible Uint32 output for 'v-bit' tools 10ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > preserves exact-divisible Uint32 output for 'engraving' tools 8ms
+ ✓ src/core/relief/heightmap-tool-offset-property.test.ts > partial-edge dilation equivalence > keeps a max-finite flat terminal shift finite and reaches a boundary sample 1ms
+ ✓ src/core/cnc/adaptive-pocket-contact.test.ts > AdaptiveCutterContact > measures a side cut beside an earlier pass by its leading arc 3ms
+ ✓ src/core/cnc/adaptive-pocket-contact.test.ts > AdaptiveCutterContact > measures a straight step into a flat wall as its depth 0ms
+ ✓ src/core/cnc/adaptive-pocket-contact.test.ts > AdaptiveCutterContact > measures a slot as the cutter radius 0ms
+ ✓ src/core/cnc/adaptive-pocket-contact.test.ts > AdaptiveCutterContact > finds no stock inside the entry helix and a concave wall at its edge 1ms
+ ✓ src/core/cnc/adaptive-pocket-contact.test.ts > AdaptiveCutterContact > leaves the core of a helix wider than the cutter in stock 0ms
+ ✓ src/core/cnc/adaptive-pocket-contact.test.ts > AdaptiveCutterContact > agrees with a finely sampled rim for arbitrary earlier moves 226ms
+ ✓ src/core/relief/relief-mask-stock-path.test.ts > blockExcess (ADR-484) > never finds a move higher above a block than dense sampling does 1048ms
+ ✓ src/core/relief/relief-mask-stock-path.test.ts > stockCheckedPath (ADR-484) > keeps every point of every move clear of the real blocks 692ms
+ ✓ src/core/cnc/cnc-tab-ramp.test.ts > tabRampedPoints (ADR-258) > rides the cut depth and rises to the tab top, never above it 2ms
+ ✓ src/core/cnc/cnc-tab-ramp.test.ts > tabRampedPoints (ADR-258) > makes every tab wall a same-XY vertical move 1ms
+ ✓ src/core/cnc/cnc-tab-ramp.test.ts > tabRampedPoints (ADR-258) > produces one rise and one fall per tab 0ms
+ ✓ src/core/cnc/cnc-tab-ramp.test.ts > tabRampedPoints (ADR-258) > keeps a small contour cutting instead of dropping its deep pass 0ms
+ ✓ src/core/cnc/cnc-tab-ramp.test.ts > tabRampedPoints (ADR-258) > honors persisted manual anchor positions (ADR-156) 1ms
+ ✓ src/core/cnc/cnc-tab-ramp.test.ts > tabRampedPoints (ADR-258) > declines an open path, a non-rise, and a zero window 0ms
+ ✓ src/core/relief/relief-air-floor-proof.test.ts > keepProvenAirFloors (ADR-489 Amendment 1) > does not count a thin strip of tall stock as cleared 5ms
+ ✓ src/core/relief/relief-air-floor-proof.test.ts > keepProvenAirFloors (ADR-489 Amendment 1) > keeps a floor on a path an earlier cut at the ceiling followed exactly 1ms
+ ✓ src/core/relief/relief-air-floor-proof.test.ts > keepProvenAirFloors (ADR-489 Amendment 1) > drops a floor whose sweep reaches past every earlier cut 1ms
+ ✓ src/core/relief/relief-air-floor-proof.test.ts > keepProvenAirFloors (ADR-489 Amendment 1) > declines area-based coverage until final placed geometry is available 1ms
+ ✓ src/core/relief/relief-air-floor-proof.test.ts > keepProvenAirFloors (ADR-489 Amendment 1) > ignores earlier cuts above the ceiling and the risen parts of a 3D path 0ms
+ ✓ src/core/relief/relief-air-floor-proof.test.ts > keepProvenAirFloors (ADR-489 Amendment 1) > keeps no floor without a ceiling or a cutter radius, and leaves other passes alone 1ms
+ ✓ src/core/cnc/adaptive-pocket-islands-emission.test.ts > emits island entry helices, plunge-feed seed slotting and cutters wholly clear of protected stock 467ms
+ ✓ src/core/cnc/tabbed-ramp-entry.test.ts > ramp composition with rectangular tabs > starts a lateral descent after a tab covering the entry seam 3ms
+ ✓ src/core/cnc/tabbed-ramp-entry.test.ts > ramp composition with rectangular tabs > continues around a small ring until the requested angle reaches depth 4ms
+ ✓ src/core/cnc/tabbed-ramp-entry.test.ts > ramp composition with rectangular tabs > carries tabbed depth history into the next pass 1ms
+ ✓ src/core/cnc/tabbed-ramp-entry.test.ts > ramp composition with rectangular tabs > requires explicit tab ownership before transforming a path3d 0ms
+ ✓ src/core/cnc/tabbed-ramp-entry.test.ts > ramp composition with rectangular tabs > does not remove an all-tab ring or invent a deeper pass 0ms
+ ✓ src/core/cnc/tabbed-ramp-entry.test.ts > ramp composition with rectangular tabs > reports an unmaterializable array instead of iterating an unrepresentable ramp 1ms
+ ✓ src/core/cnc/tabbed-ramp-entry.test.ts > ramp composition with rectangular tabs > keeps every tab wall and discloses a ramp with no representable low-span descent 0ms
+ ✓ src/core/relief/relief-air-floor-emission.test.ts > relief floors survive final placement and output rounding > declines a subdivided path after mirror 1 and offset 0 5ms
+ ✓ src/core/relief/relief-air-floor-emission.test.ts > relief floors survive final placement and output rounding > declines a subdivided path after mirror 1 and offset 10.0005 1ms
+ ✓ src/core/relief/relief-air-floor-emission.test.ts > relief floors survive final placement and output rounding > declines a subdivided path after mirror -1 and offset 10.0005 1ms
+ ✓ src/core/relief/relief-air-floor-emission.test.ts > relief floors survive final placement and output rounding > retains an identical path after mirror 1 and offset 0 1ms
+ ✓ src/core/relief/relief-air-floor-emission.test.ts > relief floors survive final placement and output rounding > retains an identical path after mirror 1 and offset 10.0005 1ms
+ ✓ src/core/relief/relief-air-floor-emission.test.ts > relief floors survive final placement and output rounding > retains an identical path after mirror -1 and offset 10.0005 0ms
+ ✓ src/core/relief/relief-air-floor-emission.test.ts > relief floors survive final placement and output rounding > keeps dense repeated paths without geometry-offset allocation or argument spreads 683ms
+ ✓ src/core/invariants/cnc-motion-emitter.property.test.ts > cnc emitter × motion invariant (property) > emitted G-code never travels plunged (100 seeds) 88ms
+ ✓ src/core/invariants/cnc-motion-emitter.property.test.ts > cnc emitter × motion invariant (property) > is deterministic: same job emits byte-identical G-code (100 seeds) 74ms
+ ✓ src/core/cnc/adaptive-pocket-islands.test.ts > island-aware adaptive partition certification > certifies original island boundaries, coverage and radial engagement for {"closed":true,"points":[{"x":0,"y":0},{"x":30,"y":0},{"x":30,"y":30},{"x":0,"y":30}]} 322ms
+ ✓ src/core/cnc/adaptive-pocket-islands.test.ts > island-aware adaptive partition certification > certifies original island boundaries, coverage and radial engagement for {"closed":true,"points":[{"x":0,"y":0},{"x":40,"y":0},{"x":40,"y":40},{"x":0,"y":40}]} 426ms
+ ✓ src/core/cnc/adaptive-pocket-islands.test.ts > island-aware adaptive partition certification > certifies original island boundaries, coverage and radial engagement for {"closed":true,"points":[{"x":0,"y":0},{"x":40,"y":0},{"x":40,"y":40},{"x":0,"y":40}]} 272ms
+
+ Test Files  25 passed (25)
+      Tests  232 passed (232)
+   Start at  19:54:19
+   Duration  91.41s (transform 6.69s, setup 208ms, import 23.75s, tests 40.49s, environment 20.45s)
+
+JSON report written to C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/docs/audits/2026-10-13-machining-stress/fix/cnc-correctness-results.json

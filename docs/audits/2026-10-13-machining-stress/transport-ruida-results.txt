@@ -1,0 +1,63 @@
+Already up to date
+Done in 480ms using pnpm v11.3.0
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0
+
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > .rd writer order (meerk40t write_header → write_settings → write_tail) > writes the two-layer job in meerk40t order 5ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > .rd writer order (meerk40t write_header → write_settings → write_tail) > decodes every command it writes 2ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > .rd writer order (meerk40t write_header → write_settings → write_tail) > records the job and part bounds with meerk40t corners 1ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-1: each layer body activates its own speed and power > sets C9 02 speed and C6 01/C6 02 power after CA 02 for every layer 1ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-1: each layer body activates its own speed and power > keeps the header part table in step with the bodies 1ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-5: layer air assist reaches the .rd file > writes Air Assist On / Off in each layer body 1ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-5: layer air assist reaches the .rd file > encodes airAssist:true differently from airAssist:false 1ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-2: the reference point follows the export placement > no placement declares the undefined reference point 1ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-2: the reference point follows the export placement > Absolute declares the { startFrom: 'absolute', anchor: 'front-left' } reference point 0ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-2: the reference point follows the export placement > User Origin declares the { startFrom: 'user-origin', anchor: 'front-left' } reference point 0ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-2: the reference point follows the export placement > Verified Origin declares the { startFrom: 'verified-origin', anchor: 'center' } reference point 0ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-2: the reference point follows the export placement > Current Position declares the { startFrom: 'current-position', anchor: 'front-left', currentPosition: { x: 1, y: 2 } } reference point 0ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-2: the reference point follows the export placement > writes the meerk40t preamble with Start Process before any move 1ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-3: .rd block structure > writes one Array Start in the header and never an Array End 4ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-3: .rd block structure > closes every layer with Block End, End Layer and EnLaser2Offset 0 0ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-3: .rd block structure > ends with the meerk40t file sum and End Of File 1ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-4: no stationary travel or cut > never moves or cuts to the position the head already holds 1ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-4: no stationary travel or cut > skips a layer-start travel to where the previous layer ended 0ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-4: no stationary travel or cut > drops a segment that collapses to one micrometre point, travel included 0ms
+ ✓ src/core/controllers/ruida/rd-encoder.test.ts > RU-4: no stationary travel or cut > refuses a job whose every segment collapses as empty 0ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida part color wire order > packs #ff0000 (red) with red in the low byte 3ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida part color wire order > packs #0000ff (blue) with blue in the high byte 1ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida part color wire order > leaves greys unchanged (symmetric channels) 0ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida swizzle > round-trips every byte value 5ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida swizzle > is not the identity (bytes really are scrambled) 1ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida number encodings > round-trips 35-bit coordinates including negatives 0ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida number encodings > keeps all encoded bytes below 0x80 0ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida number encodings > round-trips power percentages within scale resolution 0ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > encodeRdJob > is deterministic (non-negotiable #5) 3ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > encodeRdJob > round-trips through the decoder: structure, power, speed, geometry 4ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > encodeRdJob > refuses raster groups and empty jobs with typed errors 0ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > encodeRdJob > round-trips exact signed 35-bit boundary coordinates in the emitted stream 1ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > encodeRdJob > returns typed range failures and no byte array beyond either signed 35-bit boundary 1ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida UDP session state machine > frames datagrams with a 16-bit checksum over the payload 0ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida UDP session state machine > sends one packet per ACK and finishes 1ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida UDP session state machine > reads the swizzled wire ACK (0xC6 with magic 0x88) as an ACK 0ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida UDP session state machine > uses the session magic for its replies 0ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida UDP session state machine > ignores ENQ keepalives instead of retransmitting 0ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruida UDP session state machine > retries on NAK then goes terminal when the budget is spent 0ms
+ ✓ src/core/controllers/ruida/ruida.test.ts > ruidaDriver > is file-only with every live capability off 0ms
+ ✓ src/core/controllers/ruida/ruida-udp-session.test.ts > RU-8: Ruida datagrams split between commands > never splits a command and keeps every payload within 1470 bytes 7ms
+ ✓ src/core/controllers/ruida/ruida-udp-session.test.ts > RU-8: Ruida datagrams split between commands > ends a datagram at the last command boundary that fits 2ms
+ ✓ src/core/controllers/ruida/ruida-udp-session.test.ts > RU-8: Ruida datagrams split between commands > frames one datagram per chunk and sends them in order 18ms
+ ✓ src/core/controllers/ruida/ruida-udp-session.test.ts > RU-8: Ruida datagrams split between commands > fails instead of splitting a command longer than a datagram 1ms
+ ✓ src/core/controllers/ruida/ruida-udp-session.test.ts > RU-8: a missing reply ends the session > fails on an ACK timeout without resending the datagram 2ms
+ ✓ src/core/controllers/ruida/ruida-udp-session.test.ts > RU-8: a missing reply ends the session > ignores a timeout when no verdict is owed 2ms
+ ✓ src/core/controllers/ruida/ruida-udp-session.test.ts > Ruida UDP ports > sends to the controller on 50200 and listens for replies on 40200 0ms
+ ✓ src/core/controllers/ruida/rd-encoder-golden.test.ts > rd-encoder golden bytes (internal consistency, NOT hardware-verified) > emits byte-stable .rd output for the canonical job 6ms
+ ✓ src/core/controllers/ruida/swizzle-meerk40t.test.ts > RU: Ruida swizzle matches meerk40t for all 256 magics x 256 bytes > swizzle table digest equals meerk40t swizzle_byte 3ms
+ ✓ src/core/controllers/ruida/swizzle-meerk40t.test.ts > RU: Ruida swizzle matches meerk40t for all 256 magics x 256 bytes > unswizzle table digest equals meerk40t unswizzle_byte 2ms
+ ✓ src/core/controllers/ruida/swizzle-meerk40t.test.ts > RU: Ruida swizzle matches meerk40t for all 256 magics x 256 bytes > the default 0x88 table is byte-identical 0ms
+
+ Test Files  5 passed (5)
+      Tests  51 passed (51)
+   Start at  19:39:31
+   Duration  6.75s (transform 815ms, setup 67ms, import 1.74s, tests 94ms, environment 3.60s)
+
+JSON report written to C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/docs/audits/2026-10-13-machining-stress/transport-ruida-results.json

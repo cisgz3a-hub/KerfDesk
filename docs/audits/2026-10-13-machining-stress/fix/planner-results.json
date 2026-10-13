@@ -1,0 +1,623 @@
+{
+  "numTotalTestSuites": 20,
+  "numPassedTestSuites": 20,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 52,
+  "numPassedTests": 52,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791892533651,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["closedPolylineCorners"],
+          "fullName": "closedPolylineCorners finds the four corners of a rectangle and not a mid-edge start",
+          "status": "passed",
+          "title": "finds the four corners of a rectangle and not a mid-edge start",
+          "duration": 2.303100000000086,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["closedPolylineCorners"],
+          "fullName": "closedPolylineCorners finds no corner on a circle, however densely it is sampled",
+          "status": "passed",
+          "title": "finds no corner on a circle, however densely it is sampled",
+          "duration": 7.694299999999885,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["closedPolylineCorners"],
+          "fullName": "closedPolylineCorners finds no corner on a smoothly rounded rectangle",
+          "status": "passed",
+          "title": "finds no corner on a smoothly rounded rectangle",
+          "duration": 1.9708000000000538,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["closedPolylineCorners"],
+          "fullName": "closedPolylineCorners reads a fillet far below the window as the corner it rounds",
+          "status": "passed",
+          "title": "reads a fillet far below the window as the corner it rounds",
+          "duration": 0.3832999999999629,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["closedPolylineCorners"],
+          "fullName": "closedPolylineCorners finds where the straight edge of a D meets its arc",
+          "status": "passed",
+          "title": "finds where the straight edge of a D meets its arc",
+          "duration": 0.47679999999991196,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["closedPolylineCorners"],
+          "fullName": "closedPolylineCorners is empty for a degenerate loop",
+          "status": "passed",
+          "title": "is empty for a degenerate loop",
+          "duration": 0.2034000000001015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["closedStartCandidates"],
+          "fullName": "closedStartCandidates offers only the drawn start for drawn, for open paths and for tiny loops",
+          "status": "passed",
+          "title": "offers only the drawn start for drawn, for open paths and for tiny loops",
+          "duration": 0.4864000000000033,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["closedStartCandidates"],
+          "fullName": "closedStartCandidates offers every vertex for nearest and only corners for nearest-corner",
+          "status": "passed",
+          "title": "offers every vertex for nearest and only corners for nearest-corner",
+          "duration": 0.3714999999999691,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["closedStartCandidates"],
+          "fullName": "closedStartCandidates falls back to every vertex when a shape has no corner",
+          "status": "passed",
+          "title": "falls back to every vertex when a shape has no corner",
+          "duration": 0.9563000000000557,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["closedStartCandidates"],
+          "fullName": "closedStartCandidates never offers a vertex with a non-finite coordinate",
+          "status": "passed",
+          "title": "never offers a vertex with a non-finite coordinate",
+          "duration": 0.2557000000001608,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["closedStartCandidates"],
+          "fullName": "closedStartCandidates offers a segment with arc moves only the vertices its moves end on",
+          "status": "passed",
+          "title": "offers a segment with arc moves only the vertices its moves end on",
+          "duration": 0.9066999999997734,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["nearestClosedStart"],
+          "fullName": "nearestClosedStart picks the candidate nearest the cursor and the lowest index on a tie",
+          "status": "passed",
+          "title": "picks the candidate nearest the cursor and the lowest index on a tie",
+          "duration": 0.5021999999999025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892541321,
+      "endTime": 1791892541338.5022,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/closed-shape-start.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["optimizePaths closed-shape start (LBG-C04)"],
+          "fullName": "optimizePaths closed-shape start (LBG-C04) leaves every segment as drawn under 'drawn' and when the setting is absent",
+          "status": "passed",
+          "title": "leaves every segment as drawn under 'drawn' and when the setting is absent",
+          "duration": 7.364799999999832,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths closed-shape start (LBG-C04)"],
+          "fullName": "optimizePaths closed-shape start (LBG-C04) nearest enters a closed shape at the vertex nearest the head",
+          "status": "passed",
+          "title": "nearest enters a closed shape at the vertex nearest the head",
+          "duration": 1.7219999999997526,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths closed-shape start (LBG-C04)"],
+          "fullName": "optimizePaths closed-shape start (LBG-C04) nearest-corner skips a nearer mid-edge vertex for the nearest corner",
+          "status": "passed",
+          "title": "nearest-corner skips a nearer mid-edge vertex for the nearest corner",
+          "duration": 1.2161999999998443,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths closed-shape start (LBG-C04)"],
+          "fullName": "optimizePaths closed-shape start (LBG-C04) nearest-corner picks the corner of a rounded shape over a nearer point on its arc",
+          "status": "passed",
+          "title": "nearest-corner picks the corner of a rounded shape over a nearer point on its arc",
+          "duration": 1.059900000000198,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths closed-shape start (LBG-C04)"],
+          "fullName": "optimizePaths closed-shape start (LBG-C04) starts a shape without corners at its nearest vertex",
+          "status": "passed",
+          "title": "starts a shape without corners at its nearest vertex",
+          "duration": 2.4598000000000866,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths closed-shape start (LBG-C04)"],
+          "fullName": "optimizePaths closed-shape start (LBG-C04) breaks exact ties the same way every time, to the drawn start first",
+          "status": "passed",
+          "title": "breaks exact ties the same way every time, to the drawn start first",
+          "duration": 1.466200000000299,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths closed-shape start (LBG-C04)"],
+          "fullName": "optimizePaths closed-shape start (LBG-C04) still cuts inside shapes first",
+          "status": "passed",
+          "title": "still cuts inside shapes first",
+          "duration": 2.076100000000224,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths closed-shape start (LBG-C04)"],
+          "fullName": "optimizePaths closed-shape start (LBG-C04) plans open segments exactly as before",
+          "status": "passed",
+          "title": "plans open segments exactly as before",
+          "duration": 1.253700000000208,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths closed-shape start (LBG-C04)"],
+          "fullName": "optimizePaths closed-shape start (LBG-C04) under Keep source order keeps the order and starts each shape nearest the last end",
+          "status": "passed",
+          "title": "under Keep source order keeps the order and starts each shape nearest the last end",
+          "duration": 1.3364999999998872,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths closed-shape start (LBG-C04)"],
+          "fullName": "optimizePaths closed-shape start (LBG-C04) runs the final-pass overcut past the new start",
+          "status": "passed",
+          "title": "runs the final-pass overcut past the new start",
+          "duration": 1.8895000000002256,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths closed-shape start (LBG-C04)"],
+          "fullName": "optimizePaths closed-shape start (LBG-C04) starts Offset Fill rings the same way and leaves CNC groups untouched",
+          "status": "passed",
+          "title": "starts Offset Fill rings the same way and leaves CNC groups untouched",
+          "duration": 1.4113999999999578,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892536884,
+      "endTime": 1791892536908.4114,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/optimize-paths-closed-start.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["optimizePaths on CNC jobs"],
+          "fullName": "optimizePaths on CNC jobs keeps CNC clearing before profiles when laser layer priority is reversed",
+          "status": "passed",
+          "title": "keeps CNC clearing before profiles when laser layer priority is reversed",
+          "duration": 2.5204999999998563,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892546864,
+      "endTime": 1791892546866.5205,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/optimize-paths-cnc-order.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["island fill group ordering"],
+          "fullName": "island fill group ordering pins the endpoint model: a group is entered at its sweep start and left at its end",
+          "status": "passed",
+          "title": "pins the endpoint model: a group is entered at its sweep start and left at its end",
+          "duration": 3.900100000000066,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["island fill group ordering"],
+          "fullName": "island fill group ordering matches an independently written exhaustive scan across fuzzed inputs",
+          "status": "passed",
+          "title": "matches an independently written exhaustive scan across fuzzed inputs",
+          "duration": 31.136600000000044,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["island fill group ordering"],
+          "fullName": "island fill group ordering breaks an exact distance tie by the lower group index, as the scan did",
+          "status": "passed",
+          "title": "breaks an exact distance tie by the lower group index, as the scan did",
+          "duration": 0.2794000000001233,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["island fill group ordering"],
+          "fullName": "island fill group ordering orders island fill groups far above the former 2,000-group ceiling",
+          "status": "passed",
+          "title": "orders island fill groups far above the former 2,000-group ceiling",
+          "duration": 66.59899999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["island fill group ordering"],
+          "fullName": "island fill group ordering is deterministic — the same oversized input yields the same order twice",
+          "status": "passed",
+          "title": "is deterministic — the same oversized input yields the same order twice",
+          "duration": 27.4212,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["island fill group ordering"],
+          "fullName": "island fill group ordering leaves a run in source order when a group has no computable endpoints",
+          "status": "passed",
+          "title": "leaves a run in source order when a group has no computable endpoints",
+          "duration": 0.31290000000012697,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892539944,
+      "endTime": 1791892540074.4211,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/optimize-paths-island-order.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region activates back-left under source order and drawn starts",
+          "status": "passed",
+          "title": "activates back-left under source order and drawn starts",
+          "duration": 4.511899999999969,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region activates back-center under source order and drawn starts",
+          "status": "passed",
+          "title": "activates back-center under source order and drawn starts",
+          "duration": 0.5466999999998734,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region activates back-right under source order and drawn starts",
+          "status": "passed",
+          "title": "activates back-right under source order and drawn starts",
+          "duration": 0.46260000000006585,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region activates center-left under source order and drawn starts",
+          "status": "passed",
+          "title": "activates center-left under source order and drawn starts",
+          "duration": 0.3709999999998672,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region activates center under source order and drawn starts",
+          "status": "passed",
+          "title": "activates center under source order and drawn starts",
+          "duration": 0.3124000000000251,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region activates center-right under source order and drawn starts",
+          "status": "passed",
+          "title": "activates center-right under source order and drawn starts",
+          "duration": 0.2900999999999385,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region activates front-left under source order and drawn starts",
+          "status": "passed",
+          "title": "activates front-left under source order and drawn starts",
+          "duration": 0.2718999999999596,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region activates front-center under source order and drawn starts",
+          "status": "passed",
+          "title": "activates front-center under source order and drawn starts",
+          "duration": 0.22900000000004184,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region activates front-right under source order and drawn starts",
+          "status": "passed",
+          "title": "activates front-right under source order and drawn starts",
+          "duration": 0.2503999999998996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region chooses an existing contour entry when the literal centre is empty",
+          "status": "passed",
+          "title": "chooses an existing contour entry when the literal centre is empty",
+          "duration": 1.1552999999998974,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region does not let a repeated point move the artwork region away from actual contours",
+          "status": "passed",
+          "title": "does not let a repeated point move the artwork region away from actual contours",
+          "duration": 0.23829999999998108,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region keeps inside-first safety and layer priority ahead of region distance",
+          "status": "passed",
+          "title": "keeps inside-first safety and layer priority ahead of region distance",
+          "duration": 1.4450999999999112,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region preserves open direction restrictions and keeps a nearest-corner choice",
+          "status": "passed",
+          "title": "preserves open direction restrictions and keeps a nearest-corner choice",
+          "duration": 0.6002000000000862,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region keeps all non-Line plans unchanged with nearest-neighbor",
+          "status": "passed",
+          "title": "keeps all non-Line plans unchanged with nearest-neighbor",
+          "duration": 1.4235000000001037,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region keeps all non-Line plans unchanged with source-order",
+          "status": "passed",
+          "title": "keeps all non-Line plans unchanged with source-order",
+          "duration": 0.5489999999999782,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["opt-in physical Line burn start region"],
+          "fullName": "opt-in physical Line burn start region ignores zero-power or zero-pass contours when finding the burn region",
+          "status": "passed",
+          "title": "ignores zero-power or zero-pass contours when finding the burn region",
+          "duration": 0.2748999999998887,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892538341,
+      "endTime": 1791892538354.549,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/optimize-paths-line-start.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["optimizePaths scan-offset routing"],
+          "fullName": "optimizePaths scan-offset routing routes Island Fill from adjusted endpoints and lets an explicit override win",
+          "status": "passed",
+          "title": "routes Island Fill from adjusted endpoints and lets an explicit override win",
+          "duration": 4.681699999999864,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892545593,
+      "endTime": 1791892545597.6816,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/optimize-paths-scan-offset.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["optimizePaths source-order precedence"],
+          "fullName": "optimizePaths source-order precedence bypasses inside-first, path direction, and planning start",
+          "status": "passed",
+          "title": "bypasses inside-first, path direction, and planning start",
+          "duration": 3.3456999999998516,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths source-order precedence"],
+          "fullName": "optimizePaths source-order precedence applies layer priority independently while preserving order inside operations",
+          "status": "passed",
+          "title": "applies layer priority independently while preserving order inside operations",
+          "duration": 0.5072999999999865,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892543042,
+      "endTime": 1791892543045.5073,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/optimize-paths-source-order.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["inside-first order"],
+          "fullName": "inside-first order cuts a hole in a U-shaped plate before the plate, though the hole’s bounds centre is in the notch",
+          "status": "passed",
+          "title": "cuts a hole in a U-shaped plate before the plate, though the hole’s bounds centre is in the notch",
+          "duration": 3.8135000000002037,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["startCursorForSegments"],
+          "fullName": "startCursorForSegments reduces 125,000 usable bounds without spreading them into Math.min or Math.max",
+          "status": "passed",
+          "title": "reduces 125,000 usable bounds without spreading them into Math.min or Math.max",
+          "duration": 50.9357,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["bucketSegmentsByContainmentDepth"],
+          "fullName": "bucketSegmentsByContainmentDepth places 5,000 distinct depths in one bucket each without rescanning the segment list",
+          "status": "passed",
+          "title": "places 5,000 distinct depths in one bucket each without rescanning the segment list",
+          "duration": 1.581000000000131,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791892544313,
+      "endTime": 1791892544369.581,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/job/segment-order.test.ts"
+    }
+  ]
+}

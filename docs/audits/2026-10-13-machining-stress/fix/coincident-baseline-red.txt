@@ -1,0 +1,41 @@
+Already up to date
+Done in 726ms using pnpm v11.3.0
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0
+
+ ❯ src/core/job/segment-entry-index-coincident.test.ts (10 tests | 2 failed) 1163ms
+     × uses linear availability work for 4096 paths at 1 exact coordinate locations 534ms
+     × uses linear availability work for 4096 paths at 2 exact coordinate locations 473ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/job/segment-entry-index-coincident.test.ts > coincident segment entry lookup > uses linear availability work for 4096 paths at 1 exact coordinate locations
+AssertionError: expected 8394752 to be less than or equal to 32768
+ ❯ src/core/job/segment-entry-index-coincident.test.ts:158:23
+    156|       // Count algorithmic work, not wall clock: each queued entry may…
+    157|       // live and again when retired, with slack for two searched loca…
+    158|       expect(checked).toBeLessThanOrEqual(8 * entries.length);
+       |                       ^
+    159|     },
+    160|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/core/job/segment-entry-index-coincident.test.ts > coincident segment entry lookup > uses linear availability work for 4096 paths at 2 exact coordinate locations
+AssertionError: expected 8398848 to be less than or equal to 65536
+ ❯ src/core/job/segment-entry-index-coincident.test.ts:158:23
+    156|       // Count algorithmic work, not wall clock: each queued entry may…
+    157|       // live and again when retired, with slack for two searched loca…
+    158|       expect(checked).toBeLessThanOrEqual(8 * entries.length);
+       |                       ^
+    159|     },
+    160|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 8 passed (10)
+   Start at  19:55:01
+   Duration  1.76s (transform 97ms, setup 0ms, import 143ms, tests 1.16s, environment 0ms)
+

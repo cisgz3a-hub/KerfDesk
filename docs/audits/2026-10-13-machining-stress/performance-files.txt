@@ -1,0 +1,6 @@
+src/core/job/optimize-paths-large-groups.test.ts
+src/core/cnc/strict-contour-nesting-performance.test.ts
+src/core/cnc/vcarve-region-order-performance.test.ts
+src/core/cnc/vcarve-source-boundary-coverage-performance.test.ts
+src/io/gcode/connected-script-compile-performance.test.ts
+src/__fixtures__/performance/laser-workflow-budgets.test.ts
