@@ -29,14 +29,14 @@ export function machineJogAction(
     .getByRole('button', { name, exact: true });
 }
 
-/** Tool dropdowns live outside the rail so their forms are never clipped by it. */
+/** Tool sections expand below the shared navigation inside the machine rail. */
 export async function openMachineToolDropdown(
   page: Page,
   name: 'Origin' | 'Placement & output' | 'Console',
 ): Promise<Locator> {
   const button = page.getByRole('button', { name, exact: true });
   if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();
-  const panel = page.getByRole('dialog', { name, exact: true });
+  const panel = page.getByRole('region', { name, exact: true });
   await expect(panel).toBeVisible();
   return panel;
 }
