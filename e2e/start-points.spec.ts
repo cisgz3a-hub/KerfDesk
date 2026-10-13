@@ -90,6 +90,36 @@ test('cancelled drags do not edit the project, and one drag has one undo step', 
   await page.screenshot({ path: test.info().outputPath('compact-start-handles.png') });
 });
 
+test('zooming during either start drag cancels it without changing the project', async ({
+  page,
+}) => {
+  const before = await currentProject(page);
+  for (const name of ['Frame start', 'Job start']) {
+    const handle = page.getByRole('button', { name, exact: true });
+    await expect(handle).toHaveAttribute('aria-disabled', 'false');
+    const bounds = await handle.boundingBox();
+    if (bounds === null) throw new Error(`${name} must be visible`);
+    const zoom = () =>
+      page.evaluate(async () => {
+        const path = '/src/ui/state/ui-store.ts';
+        const { useUiStore } = (await import(/* @vite-ignore */ path)) as {
+          useUiStore: { getState: () => { zoomFactor: number } };
+        };
+        return useUiStore.getState().zoomFactor;
+      });
+    const previousZoom = await zoom();
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(bounds.x + 90, bounds.y + 40, { steps: 4 });
+    await page.keyboard.press('=');
+    await expect.poll(zoom).not.toBe(previousZoom);
+    await page.mouse.move(bounds.x + 110, bounds.y + 50);
+    await page.mouse.up();
+    expect(await currentProject(page)).toEqual(before);
+    await page.getByRole('button', { name: 'Fit to selection', exact: true }).click();
+  }
+});
+
 test('disabled rotary starts let canvas pointer input through and remain keyboard accessible', async ({
   page,
   kerfdesk,

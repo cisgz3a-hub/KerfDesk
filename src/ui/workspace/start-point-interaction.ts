@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Project, Vec2 } from '../../core/scene';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useStore } from '../state/store';
+import { useUiStore } from '../state/ui-store';
 import { useFramePreparationStore } from '../state/frame-preparation-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
@@ -15,6 +16,7 @@ import {
   type StartSelection,
 } from './canvas-start-editing';
 import { computeView, type ViewState } from './view-transform';
+import { pointerView, samePointerView } from './start-point-pointer-view';
 
 export function startEditingBusy(): boolean {
   const laser = useLaserStore.getState();
@@ -37,6 +39,7 @@ type Drag = {
   readonly plan: CanvasMotionPlan;
   readonly epoch: number;
   readonly environment: ReadonlyArray<unknown>;
+  readonly pointerView: ReadonlyArray<number>;
   selection: StartSelection | null;
 };
 type KeyboardSelection = {
@@ -82,9 +85,16 @@ export function useStartPointInteraction(input: StartInteractionInput) {
       useFramePreparationStore,
       usePrintCutSessionStore,
       useExperimentalLaserFeatures,
+      useUiStore,
     ].map((store) => store.subscribe(invalidate));
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, []);
+  useLayoutEffect(() => {
+    if (drag.current !== null && !samePointerView(drag.current, input)) {
+      drag.current = null;
+      setDraft(null);
+    }
+  }, [input]);
   const cancel = (): void => {
     drag.current = null;
     setDraft(null);
@@ -119,6 +129,7 @@ function currentDrag(active: Drag, input: StartInteractionInput): boolean {
     currentInput(input) &&
     active.project === input.project &&
     active.plan === input.plan &&
+    samePointerView(active, input) &&
     active.epoch === useStore.getState().projectDocumentEpoch
   );
 }
@@ -138,7 +149,7 @@ function startPointerDrag(
   event.stopPropagation();
   event.currentTarget.setPointerCapture(event.pointerId);
   keyboard.current = null;
-  drag.current = beginDrag(event.pointerId, kind, from, anchor, input.project, input.plan, {
+  drag.current = beginDrag(event.pointerId, kind, from, anchor, input, {
     x: event.clientX,
     y: event.clientY,
   });
@@ -278,8 +289,7 @@ function beginDrag(
   kind: StartKind,
   from: Vec2,
   anchor: Vec2,
-  project: Project,
-  plan: CanvasMotionPlan,
+  input: StartInteractionInput,
   screenFrom: Vec2,
 ): Drag {
   return {
@@ -288,10 +298,11 @@ function beginDrag(
     from,
     screenFrom,
     anchor,
-    project,
-    plan,
+    project: input.project,
+    plan: input.plan,
     epoch: useStore.getState().projectDocumentEpoch,
     environment: keyboardEnvironment(),
+    pointerView: pointerView(input),
     selection: null,
   };
 }
@@ -323,7 +334,11 @@ function selectionEnvironmentCurrent(
 function keyboardEnvironment(): ReadonlyArray<unknown> {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
+  const ui = useUiStore.getState();
   return [
+    ui.zoomFactor,
+    ui.panX,
+    ui.panY,
     app.projectDocumentEpoch,
     app.jobPlacement,
     app.outputScopeSettings,
