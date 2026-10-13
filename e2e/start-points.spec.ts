@@ -45,6 +45,14 @@ test('drags both starts, saves and reopens exact selections, and applies relativ
   const fresh = await currentProject(page);
   expect(fresh.startPoints?.frame).toEqual(selected.startPoints?.frame);
   expect(fresh.startPoints?.job?.relative).toBe(true);
+  await page.getByRole('button', { name: 'Start points', exact: true }).click();
+  await page.getByRole('button', { name: 'Clear saved defaults', exact: true }).click();
+  await expect(
+    page.getByText('New jobs will use automatic starts.', { exact: true }),
+  ).toBeVisible();
+  expect((await currentProject(page)).startPoints).toEqual(fresh.startPoints);
+  await page.keyboard.press('Control+n');
+  await expect.poll(async () => (await currentProject(page)).startPoints).toBeUndefined();
   await kerfdesk.setOpenFiles([{ name: 'chosen-starts.lf2', text: saved }]);
   await page.getByRole('button', { name: 'Open...' }).click();
   await expect

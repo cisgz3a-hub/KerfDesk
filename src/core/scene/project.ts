@@ -30,7 +30,9 @@ import type { ProductionNestDefinition } from '../nesting/production-nest';
 // v14 retains editable Boolean sources and independent design-tree ordering.
 // v15 retains editable relief composition and reviewed machining setup/template intent.
 // v16 embeds editable native studio documents; older readers must not drop them.
-export const PROJECT_SCHEMA_VERSION = 16 as const;
+// v17 preserves selected frame and cutting starts; older readers must not
+// silently replace their output semantics with automatic entry points.
+export const PROJECT_SCHEMA_VERSION = 17 as const;
 
 export type EmbeddedFont = {
   readonly key: string;

@@ -119,6 +119,46 @@ function expectMappedFrame(plan: CanvasMotionPlan, relative: boolean): void {
 }
 
 describe('idle marker editing metadata crossing the worker boundary', () => {
+  it.each([false, true])(
+    'saves and reapplies the right cutting edge without zero-power geometry (relative placement=%s)',
+    (relative) => {
+      const base = twoOperations();
+      const project: Project = {
+        ...base,
+        startPoints: { job: { x: 50, y: 40 } },
+        scene: {
+          ...base.scene,
+          layers: base.scene.layers.map((layer) =>
+            layer.id === 'later' ? { ...layer, power: 0 } : layer,
+          ),
+        },
+      };
+      const jobOrigin: JobOriginPlacement = relative
+        ? { startFrom: 'verified-origin', anchor: 'center' }
+        : { startFrom: 'absolute', anchor: 'front-left' };
+      const original = idlePlan(project, jobOrigin);
+      const context = startEditingContext(structuredClone(original.plan), project);
+      if (context === undefined) throw new Error('Expected cloned context');
+      const defaults = reusableStartPoints(context);
+      expect(defaults.job).toEqual({ x: 1, y: 0.5, relative: true });
+      // Both direct and worker-cloned saving use the same process bounds.
+      expect(
+        reusableStartPoints({
+          prepared: original.prepared,
+          sourceProject: project,
+          registered: false,
+        }),
+      ).toEqual(defaults);
+      const next = idlePlan({ ...project, startPoints: defaults }, jobOrigin);
+      expect(next.plan.jobStart).toEqual(original.plan.jobStart);
+      const output = emitPreparedGcode(next.prepared);
+      const first = buildMotionManifest(output.gcode, { machineKind: 'laser' }).firstProcessPoint;
+      if (first === null) throw new Error('Expected powered output');
+      expect(mapControllerPointToScene(first, next.plan)).toEqual(next.plan.jobStart);
+      expect(next.plan.startEditingData?.bounds).toBeNull();
+    },
+  );
+
   it('uses device scan calibration when deciding whether a preceding fill locks job-start editing', () => {
     const project = twoOperations();
     const prepared = prepareOutput(project);

@@ -1,7 +1,8 @@
 import { toMachineCoords, toSceneCoords } from '../../core/devices';
-import { computeJobBounds, rotaryAppliesTo, type JobBounds } from '../../core/job';
+import { rotaryAppliesTo, type JobBounds } from '../../core/job';
 import { buildFramePerimeter, nearestFrameStartPoint } from '../../core/job/frame-perimeter';
 import { jobStartPointOptions, resolveJobStartPoint } from '../../core/job/job-start-point';
+import { computeJobStartBounds } from '../../core/job/job-start-bounds';
 import type { Project, Vec2 } from '../../core/scene';
 import type { ProjectStartPoints } from '../../core/scene/start-points';
 import type { PreparedOutput } from '../../io/gcode';
@@ -158,7 +159,7 @@ export function reusableStartPoints(context: StartEditingContext): ProjectStartP
   if (job === undefined || job.relative === true) return settings;
   const bounds =
     context.bounds === undefined
-      ? computeJobBounds(context.prepared.job, context.prepared.project.device)
+      ? computeJobStartBounds(context.prepared.job, context.prepared.project.device)
       : context.bounds;
   if (bounds === null) return settings.frame === undefined ? {} : { frame: settings.frame };
   const offset = context.prepared.jobOriginOffset;

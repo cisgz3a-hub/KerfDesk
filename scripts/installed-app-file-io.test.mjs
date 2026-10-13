@@ -287,7 +287,7 @@ test('disk evidence rejects missing source, missing geometry and changed millime
 });
 
 test('disk evidence rejects stale, future and malformed project schemas', () => {
-  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 14, 15, 17, '15', '16', null, undefined]) {
+  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 14, 15, 16, 18, '16', '17', null, undefined]) {
     const stale = { ...projectFixture(), schemaVersion };
     assert.throws(
       () => validateProject(Buffer.from(JSON.stringify(stale))),
@@ -303,6 +303,7 @@ test('historical schemas require the explicit known-upgrade contract and retain 
     13,
     14,
     15,
+    16,
     CURRENT_QUALIFICATION_PROJECT_SCHEMA,
   ]) {
     const project = { ...projectFixture(), schemaVersion };
@@ -313,7 +314,7 @@ test('historical schemas require the explicit known-upgrade contract and retain 
     () => validateProject(Buffer.from(JSON.stringify(projectFixture())), { schemaMode: 'any' }),
     /Unknown qualification schema mode/,
   );
-  for (const schemaVersion of [11, 17, '12', '13', '14', '15', '16', null]) {
+  for (const schemaVersion of [11, 18, '12', '13', '14', '15', '16', '17', null]) {
     assert.throws(
       () =>
         validateProject(

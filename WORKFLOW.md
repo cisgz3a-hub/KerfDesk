@@ -1835,9 +1835,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    points cannot be edited while the machine is busy.
 6. Open **Start points** to reset either selection to automatic or choose **Use as defaults for new
    jobs**. Defaults are local to this device: frame edge/fraction and a relative cutting position
-   adapt to differently sized artwork. They apply on a fresh blank launch and New, never on Open
+   adapt to differently sized cutting or burning artwork, excluding zero-power geometry and white
+   raster padding. They apply on a fresh blank launch and New, never on Open
    or recovery. **Clear saved defaults** restores automatic starts for future jobs. A status message
-   confirms saving or reports a storage failure.
+   confirms saving or reports a storage failure. The settings remain available on blank projects;
+   only saving new relative defaults requires a prepared motion plan.
 7. Raster, fill and complex CNC entries retain generated scan/depth order. Only identical closed
    CNC contour passes without special entry sequences support a movable cutting start. Registered
    Print and Cut and rotary views disable both handles. In CNC mode, Side B retains its source-artwork cutting

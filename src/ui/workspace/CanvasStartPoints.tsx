@@ -5,7 +5,12 @@ import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { canvasTheme } from '../theme/canvas-theme';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
-import { startEditingContext, startEditReason, type StartKind } from './canvas-start-editing';
+import {
+  startEditingContext,
+  startEditReason,
+  type StartEditingContext,
+  type StartKind,
+} from './canvas-start-editing';
 import { startEditingBusy, useStartPointInteraction } from './start-point-interaction';
 import { StartPointSettings } from './StartPointSettings';
 import { computeView, type ViewState } from './view-transform';
@@ -22,24 +27,48 @@ type Props = {
   readonly overlay: CanvasMotionOverlay | null;
 };
 
-export function CanvasStartPoints(props: Props): JSX.Element | null {
+export function CanvasStartPoints(props: Props): JSX.Element {
   const epoch = useStore((state) => state.projectDocumentEpoch);
-  if (props.overlay === null) return null;
-  return (
-    <>
-      <StartPoints key={epoch} {...props} overlay={props.overlay} />
-    </>
-  );
-}
-
-function StartPoints(props: Props & { readonly overlay: CanvasMotionOverlay }): JSX.Element {
-  const { plan } = props.overlay;
   const context =
-    props.overlay.planIsCurrent === false ? undefined : startEditingContext(plan, props.project);
+    props.overlay === null || props.overlay.planIsCurrent === false
+      ? undefined
+      : startEditingContext(props.overlay.plan, props.project);
   const laserBusy = useLaserStore(() => startEditingBusy());
   const preparingFrame = useFramePreparationStore((state) => state.pending);
   const busy = laserBusy || preparingFrame;
   const interacting = useStore((state) => state.pendingUndo !== null);
+  return (
+    <>
+      {props.overlay !== null && (
+        <StartPoints
+          key={epoch}
+          {...props}
+          overlay={props.overlay}
+          context={context}
+          busy={busy}
+          interacting={interacting}
+        />
+      )}
+      <StartPointSettings
+        key={`settings-${epoch}`}
+        project={props.project}
+        context={context?.sourceProject === props.project ? context : undefined}
+        disabled={busy || interacting}
+      />
+    </>
+  );
+}
+
+function StartPoints(
+  props: Props & {
+    readonly overlay: CanvasMotionOverlay;
+    readonly context: StartEditingContext | undefined;
+    readonly busy: boolean;
+    readonly interacting: boolean;
+  },
+): JSX.Element {
+  const { plan } = props.overlay;
+  const { context, busy, interacting } = props;
   const interaction = useStartPointInteraction({ ...props, plan, context });
   const chrome = useStartChromeRects(props.canvas, props.size);
   const view = computeView(
@@ -90,11 +119,6 @@ function StartPoints(props: Props & { readonly overlay: CanvasMotionOverlay }): 
             />
           );
         })}
-      <StartPointSettings
-        project={props.project}
-        context={current ? context : undefined}
-        disabled={busy || interacting}
-      />
     </>
   );
 }

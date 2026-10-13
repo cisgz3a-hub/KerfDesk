@@ -1,4 +1,5 @@
-import { computeJobBounds, type Job, type JobBounds } from '../../core/job';
+import { type Job, type JobBounds } from '../../core/job';
+import { computeJobStartBounds } from '../../core/job/job-start-bounds';
 import {
   jobStartEditingJob,
   jobStartPointOptions,
@@ -27,7 +28,11 @@ export function buildCanvasStartEditingData(
   return {
     job: jobStartEditingJob(prepared.job, options),
     jobOriginOffset: prepared.jobOriginOffset,
-    bounds: computeJobBounds(prepared.job, prepared.project.device),
+    bounds:
+      prepared.project.startPoints?.job !== undefined &&
+      prepared.project.startPoints.job.relative !== true
+        ? computeJobStartBounds(prepared.job, prepared.project.device)
+        : null,
     jobReason:
       selection?.supported === true
         ? null

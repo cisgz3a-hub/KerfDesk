@@ -65,7 +65,7 @@ test('installed project qualification matches the canonical writer schema before
 });
 
 test('current project qualification refuses historical, future and malformed schema versions', () => {
-  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 14, 15, 17, '15', '16', null, undefined]) {
+  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 14, 15, 16, 18, '16', '17', null, undefined]) {
     assert.throws(
       () => validateUpgradeProject(encoded({ ...fixture, schemaVersion })),
       /Expected current project schema/,
@@ -129,7 +129,7 @@ test('the known upgrade contract accepts historical retention and current migrat
 });
 
 test('known upgrade qualification keeps schema, scene and machine evidence strict', () => {
-  for (const schemaVersion of [11, 17, '12', '13', '14', '15', '16', null, undefined]) {
+  for (const schemaVersion of [11, 18, '12', '13', '14', '15', '16', '17', null, undefined]) {
     assert.throws(
       () =>
         validateUpgradeProject(
@@ -155,8 +155,8 @@ test('known upgrade qualification keeps schema, scene and machine evidence stric
   );
 });
 
-test('known upgrade preserves schema 13/14/15 saves and verifies their migration to the current writer', () => {
-  for (const schemaVersion of [13, 14, 15]) {
+test('known upgrade preserves schema 13/14/15/16 saves and verifies their migration to the current writer', () => {
+  for (const schemaVersion of [13, 14, 15, 16]) {
     const previous = { ...historicalFixture, schemaVersion };
     assert.deepEqual(validateUpgradeProject(encoded(previous), previous, knownUpgrade), previous);
     assert.deepEqual(validateUpgradeProject(encoded(fixture), previous, knownUpgrade), fixture);

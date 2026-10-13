@@ -64,7 +64,8 @@ export function StartPointSettings(props: {
           <button
             type="button"
             className="lf-btn lf-btn--ghost"
-            onClick={() => setMessage(clearDefaultsMessage())}
+            disabled={props.disabled}
+            onClick={() => setMessage(clearDefaultsMessage(props.project))}
             title="Use automatic starts for future jobs without changing this project."
           >
             Clear saved defaults
@@ -77,7 +78,9 @@ export function StartPointSettings(props: {
   );
 }
 
-function clearDefaultsMessage(): string {
+function clearDefaultsMessage(project: Project): string {
+  const state = useStore.getState();
+  if (startEditingBusy() || state.project !== project || state.pendingUndo !== null) return '';
   return writeStartPointDefaults({})
     ? 'New jobs will use automatic starts.'
     : 'Could not clear defaults on this device.';

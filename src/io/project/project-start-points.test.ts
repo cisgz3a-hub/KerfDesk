@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { createProject, type Project } from '../../core/scene';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createProject, PROJECT_SCHEMA_VERSION, type Project } from '../../core/scene';
+import type * as ProjectModule from '../../core/scene/project';
 import { type ProjectStartPoints } from '../../core/scene/start-points';
 import { deserializeProject, deserializeProjectValue } from './deserialize-project';
 import { prepareProjectForPersistence } from './prepare-project-persistence';
 import { serializeProject } from './serialize-project';
+import { migrateToCurrent } from './migrations';
+
+afterEach(() => {
+  vi.doUnmock('../../core/scene/project');
+  vi.resetModules();
+});
 
 describe('project start point persistence', () => {
   it.each<ProjectStartPoints>([
@@ -14,15 +21,62 @@ describe('project start point persistence', () => {
     const original = { ...createProject(), startPoints };
     const prepared = prepareProjectForPersistence(original);
     expect(prepared.kind).toBe('ok');
+    if (prepared.kind === 'ok') expect(JSON.parse(prepared.json).schemaVersion).toBe(17);
     const result = deserializeProject(serializeProject(original));
     expect(result.kind).toBe('ok');
-    if (result.kind === 'ok') expect(result.project.startPoints).toEqual(startPoints);
+    if (result.kind === 'ok') {
+      expect(result.project.startPoints).toEqual(startPoints);
+      expect(result.migratedFrom).toBeUndefined();
+    }
   });
 
-  it('does not add a preference to a legacy project', () => {
-    const result = deserializeProject(serializeProject(createProject()));
-    expect(result.kind).toBe('ok');
-    if (result.kind === 'ok') expect(result.project).not.toHaveProperty('startPoints');
+  it('loads schema 16 without inventing selected starts or changing existing fields', () => {
+    const current = createProject();
+    const legacy = { ...current, schemaVersion: 16 };
+    const result = deserializeProject(JSON.stringify(legacy));
+    expect(result).toMatchObject({ kind: 'ok', migratedFrom: 16 });
+    if (result.kind === 'ok') {
+      expect(result.project).not.toHaveProperty('startPoints');
+      expect(result.project).toEqual(current);
+    }
+  });
+
+  it('promotes v16 without rewriting fields, including already stored selections', () => {
+    const raw = {
+      ...createProject(),
+      schemaVersion: 16,
+      startPoints: { frame: { edge: 2, fraction: 0.4 }, job: { x: -4.25, y: 18.7 } },
+    };
+    const before = JSON.stringify(raw);
+    expect(migrateToCurrent(raw, 16)).toEqual({
+      kind: 'ok',
+      raw: { ...raw, schemaVersion: PROJECT_SCHEMA_VERSION },
+      steps: [16],
+    });
+    expect(JSON.stringify(raw)).toBe(before);
+    expect(deserializeProject(before)).toMatchObject({
+      kind: 'ok',
+      migratedFrom: 16,
+      project: { startPoints: raw.startPoints },
+    });
+  });
+
+  it('makes a schema 16 reader reject selected starts instead of silently ignoring them', async () => {
+    const saved = serializeProject({
+      ...createProject(),
+      startPoints: { frame: { edge: 2, fraction: 0.4 }, job: { x: -4.25, y: 18.7 } },
+    });
+    // Re-run the existing version guard with the previous reader's schema cap.
+    vi.resetModules();
+    vi.doMock('../../core/scene/project', async (importOriginal) => ({
+      ...(await importOriginal<typeof ProjectModule>()),
+      PROJECT_SCHEMA_VERSION: 16,
+    }));
+    const oldReader = await import('./deserialize-project');
+    expect(oldReader.deserializeProject(saved)).toEqual({
+      kind: 'schema-too-new',
+      sawVersion: 17,
+    });
   });
 
   it.each([

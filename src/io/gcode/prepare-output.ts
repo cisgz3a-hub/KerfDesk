@@ -25,6 +25,7 @@ import {
 import { compileCncJobResult, type CncJobCompilationResult } from '../../core/cnc/compile-cnc-job';
 import { toMachineCoords, toSceneCoords } from '../../core/devices';
 import { applyJobStartPoint, jobStartPointOptions } from '../../core/job/job-start-point';
+import { computeJobStartBounds } from '../../core/job/job-start-bounds';
 import { registrationBoxScene } from '../../core/job/registration-placement';
 import {
   COMPILE_INTEGRITY_PREFLIGHT_CODES,
@@ -255,7 +256,7 @@ export function completePreparedOutput(
     input.sourceProject.device.scanningOffsets,
     input.sourceProject.device.origin,
   );
-  const target = jobStartTarget(input.project, compiled, offset);
+  const target = jobStartTarget(input.project, optimized, offset);
   return {
     ok: true,
     project: input.project,
@@ -276,15 +277,21 @@ export function completePreparedOutput(
   };
 }
 
-function jobStartTarget(project: Project, compiled: Job, offset: Vec2): Vec2 | null {
+function jobStartTarget(project: Project, placed: Job, offset: Vec2): Vec2 | null {
   const preference = project.startPoints?.job;
   if (preference === undefined) return null;
   let scenePoint: Vec2 = preference;
   if (preference.relative === true) {
-    const bounds = computeJobBounds(compiled, project.device);
+    const bounds = computeJobStartBounds(placed, project.device);
     if (bounds === null) return null;
-    const a = toSceneCoords({ x: bounds.minX, y: bounds.minY }, project.device);
-    const b = toSceneCoords({ x: bounds.maxX, y: bounds.maxY }, project.device);
+    const a = toSceneCoords(
+      { x: bounds.minX - offset.x, y: bounds.minY - offset.y },
+      project.device,
+    );
+    const b = toSceneCoords(
+      { x: bounds.maxX - offset.x, y: bounds.maxY - offset.y },
+      project.device,
+    );
     scenePoint = {
       x: Math.min(a.x, b.x) + Math.abs(b.x - a.x) * preference.x,
       y: Math.min(a.y, b.y) + Math.abs(b.y - a.y) * preference.y,

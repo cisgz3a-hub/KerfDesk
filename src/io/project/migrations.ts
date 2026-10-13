@@ -51,6 +51,8 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   14: (raw) => ({ ...raw, schemaVersion: 15 }),
   // Existing projects keep their artwork; no native editor document is invented.
   15: (raw) => ({ ...raw, schemaVersion: 16 }),
+  // Missing starts retain automatic entry; preserve any existing selections.
+  16: (raw) => ({ ...raw, schemaVersion: 17 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

@@ -48,7 +48,7 @@ describe('schema 9 owned image clip persistence', () => {
     expect(migrated).toEqual({
       kind: 'ok',
       raw: { ...legacy, schemaVersion: PROJECT_SCHEMA_VERSION },
-      steps: [8, 9, 10, 11, 12, 13, 14, 15],
+      steps: [8, 9, 10, 11, 12, 13, 14, 15, 16],
     });
     if (migrated.kind === 'ok') expect(migrated.raw['scene']).toBe(legacy.scene);
     expect(JSON.stringify(legacy)).toBe(before);
