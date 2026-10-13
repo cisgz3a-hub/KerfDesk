@@ -1,5 +1,6 @@
 import type { ColoredPath, Vec2 } from '../scene/scene-object';
 import { polylineToCurveSubpath } from '../scene/curve-path';
+import { withClosingPoint } from '../scene/polyline-closure';
 import type { ConstrainedSketch2d } from './constrained-sketch';
 import { sketchRequired } from './sketch-indexed';
 export function sketchUnprofiledLines(sketch: ConstrainedSketch2d): ConstrainedSketch2d['lines'] {
@@ -44,7 +45,9 @@ export function sketchPathGeometry(
   ];
 }
 function linePath(points: readonly Vec2[], closed: boolean, color: string): ColoredPath {
-  const polyline = { points, closed };
+  // The stroke renderer does not closePath; a closed profile needs its
+  // closing edge as an explicit final segment.
+  const polyline = { points: withClosingPoint(points, closed), closed };
   return { color, polylines: [polyline], curves: [polylineToCurveSubpath(polyline)] };
 }
 function circlePath(centre: Vec2, radius: number, color: string): ColoredPath {
@@ -63,10 +66,13 @@ function circlePath(centre: Vec2, radius: number, color: string): ColoredPath {
     polylines: [
       {
         closed: true,
-        points: Array.from({ length: 64 }, (_, i) => ({
-          x: centre.x + radius * Math.cos((i * Math.PI) / 32),
-          y: centre.y + radius * Math.sin((i * Math.PI) / 32),
-        })),
+        points: withClosingPoint(
+          Array.from({ length: 64 }, (_, i) => ({
+            x: centre.x + radius * Math.cos((i * Math.PI) / 32),
+            y: centre.y + radius * Math.sin((i * Math.PI) / 32),
+          })),
+          true,
+        ),
       },
     ],
     curves: [

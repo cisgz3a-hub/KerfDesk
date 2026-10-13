@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { Icon } from '../kit/icons';
 import { mapControllerPointToScene } from '../state/canvas-motion-plan';
 import {
   acknowledgedRecoveryMovement,
@@ -170,7 +171,7 @@ function PreviewZoomControls(props: {
         title="Magnify the saved route to choose a restart movement more precisely."
         onClick={() => props.setView(zoomRecoveryPreview(props.view, props.fit, 0.5))}
       >
-        +
+        <Icon name="plus" size={16} />
       </button>
       <button
         type="button"
@@ -179,7 +180,7 @@ function PreviewZoomControls(props: {
         title="Show more of the saved route around the restart point."
         onClick={() => props.setView(zoomRecoveryPreview(props.view, props.fit, 2))}
       >
-        −
+        <Icon name="minus" size={16} />
       </button>
       <button
         type="button"

@@ -46,6 +46,26 @@ describe('buildSelectionDockEdit', () => {
       ['inner', 10],
     ]);
   });
+
+  it('docks coincident selected objects together when inner objects are locked', () => {
+    const a = box('a', 100, 0, 50, 50);
+    const b = box('b', 100, 0, 50, 50);
+    const inner = box('inner', 110, 10, 10, 10);
+    for (const selected of [
+      [a, b, inner],
+      [inner, b, a],
+    ]) {
+      const edits = buildSelectionDockEdit(selected, [], { ...LEFT, lockInner: true }, BED);
+      expect(edits).toHaveLength(3);
+      expect(new Map(edits.map((edit) => [edit.id, edit.transform.x]))).toEqual(
+        new Map([
+          ['a', 0],
+          ['b', 0],
+          ['inner', 10],
+        ]),
+      );
+    }
+  });
 });
 
 function box(id: string, x: number, y: number, width: number, height: number): SceneObject {

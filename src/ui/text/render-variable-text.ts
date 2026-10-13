@@ -1,9 +1,5 @@
-import {
-  placeTextOnPath,
-  styledBentRender,
-  styledTextContent,
-  styleTextRender,
-} from '../../core/text';
+import { placeTextOnPath } from '../../core/text';
+import { styledBentRender, styledTextContent, styleTextRender } from '../../core/text/text-style';
 import { IDENTITY_TRANSFORM } from '../../core/scene';
 import type { VariableTextRenderer } from '../../io/gcode';
 import { renderTextGeometry } from './render-text-geometry';

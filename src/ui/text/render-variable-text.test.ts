@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as CoreText from '../../core/text';
+import type * as TextStyleModule from '../../core/text/text-style';
 import { IDENTITY_TRANSFORM, type EmbeddedFont, type TextObject } from '../../core/scene';
 
 const mocks = vi.hoisted(() => ({
@@ -17,6 +18,10 @@ vi.mock('./font-loader', () => ({
 vi.mock('../../core/text', async (importOriginal) => ({
   ...(await importOriginal<typeof CoreText>()),
   textToPolylines: mocks.textToPolylines,
+}));
+
+vi.mock('../../core/text/text-style', async (importOriginal) => ({
+  ...(await importOriginal<typeof TextStyleModule>()),
   styledBentRender: mocks.styledBentRender,
 }));
 

@@ -1,4 +1,5 @@
-import { normalizeGuides, type Project } from '../../core/scene';
+import type { Project } from '../../core/scene';
+import { normalizeGuides } from '../../core/scene/guides';
 
 // Project notes, notes-on-open and guidelines: text and layout aids, kept only
 // when well formed. A malformed flag or guide is dropped rather than refusing

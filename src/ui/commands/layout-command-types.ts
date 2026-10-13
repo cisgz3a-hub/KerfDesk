@@ -4,7 +4,8 @@
 
 import type { DrawOrderMove } from '../../core/draw-order';
 import type { DockDirection } from '../../core/scene/selection-dock';
-import type { SelectionMatchSizeKind, SelectionMoveTogetherAxis } from '../../core/scene';
+import type { SelectionMatchSizeKind } from '../../core/scene/selection-match-size';
+import type { SelectionMoveTogetherAxis } from '../../core/scene/selection-move-together';
 
 export type LayoutCommandContext = {
   readonly moveSelectionInDrawOrder: (move: DrawOrderMove) => void;

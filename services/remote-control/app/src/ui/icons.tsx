@@ -66,7 +66,7 @@ export function Icon({
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={name === 'more' ? 3 : 1.9}
+      strokeWidth={name === 'more' ? 3 : 1.65}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -77,17 +77,23 @@ export function Icon({
   );
 }
 
-export function BrandMark({ size = 18 }: { size?: number }) {
+export function BrandMark({ size = 30 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 512 512" aria-hidden="true">
+      <path d="M126 112h52v288h-52a6 6 0 0 1-6-6V118a6 6 0 0 1 6-6Z" fill="currentColor" />
       <path
-        d="M5 4v16M5 13l9-9M9.5 9.5L19 20"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.6"
-        strokeLinecap="round"
+        d="M314 112h78L255 248c-7 7-7 15 0 22l143 138h-81L194 288c-18-18-18-40 0-58Z"
+        fill="var(--brand-brass, #d6b48a)"
       />
-      <circle cx="19" cy="5" r="2" fill="currentColor" />
+      <g fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+        <path
+          d="m339 126-129 126c-4 4-4 10 0 14l132 128"
+          stroke="currentColor"
+          strokeOpacity=".48"
+        />
+        <path d="m360 126-129 126c-4 4-4 10 0 14l132 128" stroke="#533b26" strokeOpacity=".35" />
+        <path d="M127 126v260" stroke="currentColor" strokeOpacity=".5" />
+      </g>
     </svg>
   );
 }

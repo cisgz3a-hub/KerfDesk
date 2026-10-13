@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { SelectionAnchor } from '../../core/scene';
 import { AnchoredPopover, movePopoverFocus } from '../common/AnchoredPopover';
-import { Icon } from '../kit/icons';
+import { Icon, type IconName } from '../kit/icons';
 
 const ANCHORS: ReadonlyArray<SelectionAnchor> = ['nw', 'n', 'ne', 'w', 'c', 'e', 'sw', 's', 'se'];
 const ANCHOR_NAMES: Readonly<Record<SelectionAnchor, string>> = {
@@ -15,16 +15,16 @@ const ANCHOR_NAMES: Readonly<Record<SelectionAnchor, string>> = {
   s: 'bottom center',
   se: 'bottom right',
 };
-const ANCHOR_ARROWS: Readonly<Record<SelectionAnchor, string>> = {
-  nw: '↖',
-  n: '↑',
-  ne: '↗',
-  w: '←',
-  c: '·',
-  e: '→',
-  sw: '↙',
-  s: '↓',
-  se: '↘',
+const ANCHOR_ICONS: Readonly<Record<SelectionAnchor, IconName>> = {
+  nw: 'arrow-up-left',
+  n: 'arrow-up',
+  ne: 'arrow-up-right',
+  w: 'arrow-left',
+  c: 'crosshair',
+  e: 'arrow-right',
+  sw: 'arrow-down-left',
+  s: 'arrow-down',
+  se: 'arrow-down-right',
 };
 
 export function TransformAnchorPicker(props: {
@@ -92,7 +92,7 @@ export function TransformAnchorPicker(props: {
                   triggerRef.current?.focus();
                 }}
               >
-                <span aria-hidden="true">{ANCHOR_ARROWS[anchor]}</span>
+                <Icon name={ANCHOR_ICONS[anchor]} size={16} />
               </button>
             ))}
           </div>

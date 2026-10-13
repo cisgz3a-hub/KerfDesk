@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
 import {
   FIXTURE_NAME,
   CURRENT_QUALIFICATION_PROJECT_SCHEMA,
@@ -480,6 +481,47 @@ test('the actual CLI fences the saved schema against each installed source in lo
     const wrongBaselineWriter = cli('--expected-source', sourceCommits[14], currentPath, oldPath);
     assert.equal(wrongBaselineWriter.status, 1);
     assert.match(wrongBaselineWriter.stderr, /differs from the authenticated installed writer/);
+
+    const alias = join(temp, 'aliased scripts');
+    await symlink(join(temp, 'scripts'), alias, 'junction');
+    for (const nodeArgs of [[], ['--preserve-symlinks-main']]) {
+      for (const [projectPath, expectedStatus] of [
+        [currentPath, 0],
+        [oldPath, 1],
+      ]) {
+        const result = spawnSync(
+          process.execPath,
+          [
+            ...nodeArgs,
+            join(alias, 'verify-upgrade-project.mjs'),
+            '--expected-source',
+            sourceCommits[CURRENT_QUALIFICATION_PROJECT_SCHEMA],
+            projectPath,
+            oldPath,
+          ],
+          { encoding: 'utf8' },
+        );
+        assert.ifError(result.error);
+        assert.equal(result.status, expectedStatus, result.stderr);
+        if (expectedStatus === 1)
+          assert.match(result.stderr, /differs from the authenticated installed writer/);
+        else assert.match(result.stdout, /Saved artwork, geometry/);
+      }
+    }
+    for (const argvScript of [undefined, join(temp, 'missing-script.mjs')]) {
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '--eval',
+          `process.argv[1] = ${JSON.stringify(argvScript)}; await import(${JSON.stringify(pathToFileURL(script).href)});`,
+        ],
+        { encoding: 'utf8' },
+      );
+      assert.ifError(result.error);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.stdout, '');
+    }
   } finally {
     await rm(temp, { recursive: true, force: true });
   }

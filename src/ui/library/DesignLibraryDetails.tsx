@@ -1,4 +1,4 @@
-import { Button } from '../kit';
+import { Button, Icon } from '../kit';
 import { usePlatformOptional } from '../app/platform-context';
 import type { LibraryEntry, LibraryOperation } from './design-library-types';
 import { LibraryPreview } from './LibraryPreview';
@@ -125,7 +125,7 @@ function ReturnToResultsButton(props: {
       title="Return focus to the selected design card."
       onClick={() => props.onReturn(props.entry)}
     >
-      <span aria-hidden="true">←</span>
+      <Icon name="arrow-left" size={16} />
       Back to designs
     </button>
   );

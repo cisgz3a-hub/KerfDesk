@@ -2,6 +2,7 @@ import type { EditorSession } from './editor-session';
 import { EditorAdjustMenus } from './EditorAdjustMenus';
 import { TutorialButton } from '../tutorials/TutorialButton';
 import { useImageEditorStore } from './image-editor-store';
+import { Icon } from '../kit/icons';
 
 export type ImageEditorTopBarActions = {
   readonly undo: () => void;
@@ -143,7 +144,7 @@ function ActionButtons(props: {
         title="Close — the editing session is kept and resumes on reopen"
         aria-label={props.embedded ? 'Back to photos' : 'Close Image Studio'}
       >
-        {props.embedded ? 'Back to photos' : '✕'}
+        {props.embedded ? 'Back to photos' : <Icon name="close" size={18} />}
       </button>
     </>
   );

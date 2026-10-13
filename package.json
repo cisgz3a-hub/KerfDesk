@@ -18,6 +18,8 @@
     "kerfdesk-trace": "scripts/trace-cli.mjs"
   },
   "scripts": {
+    "generate:icons": "node scripts/generate-brand-icons.mjs",
+    "check:icons": "node scripts/generate-brand-icons.mjs --check",
     "downloads:dashboard": "node scripts/download-dashboard.mjs",
     "lint": "node scripts/run-eslint.mjs",
     "lint:electron": "eslint --config eslint.electron.config.mjs electron/**/*.ts",

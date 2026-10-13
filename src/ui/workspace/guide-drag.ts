@@ -1,16 +1,11 @@
+import type { GuideAxis, ProjectGuide } from '../../core/scene/guides';
 // Guideline drags (LightBurn: drag a guide out of a ruler). Pressing in the
 // top ruler pulls out a horizontal guide, in the left ruler a vertical one.
 // With the select tool, a press on a guide away from any artwork moves it;
 // releasing a guide back over a ruler deletes it. Each drag is one undo step,
 // and a click on a ruler that creates nothing leaves no history.
 
-import {
-  hitTest,
-  type GuideAxis,
-  type Project,
-  type ProjectGuide,
-  type Vec2,
-} from '../../core/scene';
+import { hitTest, type Project, type Vec2 } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { RULER_THICKNESS_PX } from './canvas-layout';

@@ -137,8 +137,12 @@ describe('ArtCraft native control transport', () => {
     const oversized = await endpoint((_request, socket) =>
       socket.end(Buffer.alloc(8 * 1024 * 1024 + 1, 32)),
     );
-    await expect(artcraftRequest(oversized, 'ui.inspect')).rejects.toThrow('size limit');
-  });
+    // Exercise the byte limit without racing a large loopback transfer against
+    // the fixture's short deadline. The timeout behaviour has its own test.
+    await expect(artcraftRequest({ ...oversized, timeoutMs: 5_000 }, 'ui.inspect')).rejects.toThrow(
+      'size limit',
+    );
+  }, 10_000);
 
   it('times out an incomplete response without replaying the edit', async () => {
     let requests = 0;

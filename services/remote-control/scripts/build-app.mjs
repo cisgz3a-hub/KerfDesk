@@ -2,9 +2,9 @@
 //   public/app/*                        installable phone app served by the Worker at /app/
 //   electron/mcp/workspace-app-ui.ts    single-file MCP Apps resource (ui://kerfdesk/workspace/v6.html)
 // `--check` rebuilds in memory and fails when a committed output is stale.
-import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
 import { build } from 'esbuild';
+import { appShellVersion } from './app-shell-version.mjs';
 
 const check = process.argv.includes('--check');
 if (process.argv.slice(2).some((value) => value !== '--check'))
@@ -39,8 +39,17 @@ async function bundle(entry, format) {
 
 const phone = await bundle('entry-phone.tsx', 'esm');
 const mcp = await bundle('entry-mcp.tsx', 'iife');
-const version = createHash('sha256').update(phone.js).update(phone.css).digest('hex').slice(0, 12);
-const sw = (await readFile(at('app/static/sw.js'), 'utf8')).replace('__APP_VERSION__', version);
+const copies = ['index.html', 'manifest.webmanifest', 'icon.svg', 'icon-maskable.svg'];
+const versionFiles = [
+  'app/static/sw.js',
+  ...copies.map((name) => `app/static/${name}`),
+  ...['icon-192.png', 'icon-512.png', 'icon-maskable-512.png'].map((name) => `public/app/${name}`),
+];
+const shellFiles = new Map(
+  await Promise.all(versionFiles.map(async (name) => [name, await readFile(at(name))])),
+);
+const version = appShellVersion(phone, shellFiles);
+const sw = shellFiles.get('app/static/sw.js').toString('utf8').replace('__APP_VERSION__', version);
 const script = mcp.js.replace(/<\/(script)/gi, '<\\/$1');
 const style = mcp.css.replace(/<\/(style)/gi, '<\\/$1');
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KerfDesk</title><style>${style}</style></head><body><div id="root"></div><script>${script}</script></body></html>`;
@@ -52,7 +61,6 @@ const outputs = [
   ['public/app/sw.js', sw],
   ['../../electron/mcp/workspace-app-ui.ts', module],
 ];
-const copies = ['index.html', 'manifest.webmanifest', 'icon.svg'];
 
 if (check) {
   const stale = [];

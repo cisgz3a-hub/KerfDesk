@@ -1,4 +1,5 @@
 import type { RgbaBuffer } from '../../core/image-edit';
+import { Icon } from '../kit/icons';
 import { applyThicken } from './editor-kerf-check';
 import { useKerfCheck } from './use-kerf-check';
 
@@ -14,7 +15,8 @@ export function KerfStatus(props: {
       <span
         title={`These compiled Image-mode output pixels are in exact-power runs that the current ${correction} dot-width correction would remove`}
       >
-        ⚠ {check.removedPixels} output px removed by {correction} dot correction
+        <Icon name="warning" size={15} /> {check.removedPixels} output px removed by {correction}{' '}
+        dot correction
       </span>
       {check.removedMask === null ? null : (
         <button

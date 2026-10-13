@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, symlink, realpath } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -46,7 +46,7 @@ describe('studio session file confinement', () => {
     await saveStudioSession(root, session);
     expect(await loadStudioSessions(root)).toEqual([session]);
     expect(await studioFile(directory, 'working.pcraft')).toBe(
-      path.join(directory, 'working.pcraft'),
+      await realpath(path.join(directory, 'working.pcraft')),
     );
   });
   it('rejects absolute paths, parent traversal and folders as sources', async () => {

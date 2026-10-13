@@ -1,3 +1,4 @@
+import type { TextStyle } from '../../core/scene/text-settings';
 import type { TextBoxSettings } from '../../core/scene/text-box';
 import { useMemo, useState } from 'react';
 import {
@@ -16,7 +17,6 @@ import type {
   Project,
   SceneObject,
   TextAlignment,
-  TextStyle,
   VariableTemplate,
 } from '../../core/scene';
 import type { PathTextAcrossAlign, PathTextAlongAlign } from '../../core/scene/scene-object';

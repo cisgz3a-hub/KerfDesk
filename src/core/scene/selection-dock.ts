@@ -71,9 +71,17 @@ function dockUnits(
   }
   const units = selectionUnits(selected, groups);
   if (!options.lockInner) return units;
-  // Fold each unit lying inside another into the outermost unit holding it.
-  const owner = units.map((unit) =>
-    units.find((other) => other !== unit && encloses(other.box, unit.box)),
+  // Owners must rank above children: larger boxes first, then selection order
+  // for equal sizes. Coincident boxes otherwise own each other and vanish.
+  const spans = units.map((unit) => unit.box.maxX - unit.box.minX + unit.box.maxY - unit.box.minY);
+  const owner = units.map((unit, index) =>
+    units.find(
+      (other, otherIndex) =>
+        other !== unit &&
+        encloses(other.box, unit.box) &&
+        ((spans[otherIndex] ?? 0) > (spans[index] ?? 0) ||
+          (spans[otherIndex] === spans[index] && otherIndex < index)),
+    ),
   );
   return units.flatMap((unit, index) => {
     if (owner[index] !== undefined) return [];

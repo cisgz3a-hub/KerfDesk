@@ -1,3 +1,4 @@
+import type { TextStyle } from '../scene/text-settings';
 // LightBurn text options on rendered text: Bold, Italic, Upper Case, force
 // right-to-left, Max Width (squeeze) and an undistorted Bend.
 //
@@ -19,7 +20,6 @@ import {
   type ColoredPath,
   type CurveSubpath,
   type Polyline,
-  type TextStyle,
   type Vec2,
 } from '../scene';
 import { bendTextRender, clampBend } from './text-bend';

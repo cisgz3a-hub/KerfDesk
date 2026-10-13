@@ -1,4 +1,5 @@
 import type { DeviceProfile } from '../../../core/devices';
+import { Icon } from '../../kit/icons';
 import type { LaserSecondPassSelection } from '../../../core/laser-second-pass';
 import type { SecondPassDrawing } from './second-pass-preview';
 import { useSecondPassViewport } from './second-pass-canvas-view';
@@ -32,7 +33,7 @@ export function SecondPassCanvas(props: SecondPassCanvasProps): JSX.Element {
           aria-label="Zoom in"
           title="Magnify the saved engraving for more precise painting."
         >
-          +
+          <Icon name="plus" size={16} />
         </button>
         <button
           className="lf-btn lf-btn--sm"
@@ -40,7 +41,7 @@ export function SecondPassCanvas(props: SecondPassCanvasProps): JSX.Element {
           aria-label="Zoom out"
           title="Show more of the saved engraving around the painted areas."
         >
-          −
+          <Icon name="minus" size={16} />
         </button>
         <button
           className="lf-btn lf-btn--sm"

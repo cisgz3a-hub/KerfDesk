@@ -2,7 +2,7 @@
 // (squeeze) and an undistorted bend. Unset options are left out of the saved
 // text, so plain text stays as it was.
 
-import type { TextStyle } from '../../core/scene';
+import type { TextStyle } from '../../core/scene/text-settings';
 
 type Flag = 'bold' | 'italic' | 'uppercase' | 'forceRtl' | 'bendUndistorted';
 

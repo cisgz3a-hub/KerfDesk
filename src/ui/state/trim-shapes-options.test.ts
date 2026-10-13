@@ -52,6 +52,29 @@ beforeEach(() => {
 const objects = () => useStore.getState().project.scene.objects;
 
 describe('Trim Shapes options', () => {
+  it('preserves a whole removed outline on the drawing layer and restores it with undo', () => {
+    const state = useStore.getState();
+    const original = art('only', square(0, 0, 20));
+    useStore.setState({
+      project: { ...state.project, scene: { ...state.project.scene, objects: [original] } },
+    });
+    expect(
+      useStore.getState().trimShapeAt({ x: 20, y: 10 }, 0.5, {
+        keepRemoved: { color: '#ff0000' },
+      }),
+    ).toBe(true);
+    expect(objects()).toHaveLength(1);
+    const kept = objects()[0] as ImportedSvg;
+    expect(kept.source).toBe('Trimmed segment');
+    expect(kept.operationIds).toEqual(['score']);
+    expect(kept.paths[0]?.curves?.[0]?.closed).toBe(true);
+    expect(useStore.getState().project.scene.layers.some((layer) => layer.id === 'score')).toBe(
+      true,
+    );
+    useStore.getState().undo();
+    expect(objects()).toEqual([original]);
+  });
+
   it('auto-joins the two outlines into one closed outline after both inner stretches go', () => {
     const trim = useStore.getState().trimShapeAt;
     // First A's corner inside B goes, then B's corner inside A; the open ends meet.

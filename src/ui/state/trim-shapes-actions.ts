@@ -81,7 +81,8 @@ function trimShapeMutation(
     selectedPathNodes: [],
   } as const;
   if (edit.paths.every((path) => path.polylines.length === 0)) {
-    return { ...removeTrimmedObject(state, object.id), ...history };
+    const kept = keptStretch(state, object, edit, options);
+    return { ...removeTrimmedObject(state, object.id, kept), ...history };
   }
   return { ...trimmedScenePatch(state, object, edit, options), ...history };
 }
@@ -160,11 +161,15 @@ function repairedScene(scene: Scene, before: ReadonlyArray<SceneObject>): Scene 
   return pruneOrphanLayers(repaired.scene);
 }
 
-function removeTrimmedObject(state: AppState, id: string): Partial<AppState> {
+function removeTrimmedObject(
+  state: AppState,
+  id: string,
+  kept: SceneObject | null,
+): Partial<AppState> {
   const ids = new Set([id]);
-  const repaired = repairDanglingObjectDependencies(
-    removeObjectIdsFromGroups(removeObject(state.project.scene, id), ids),
-  );
+  const removed = removeObject(state.project.scene, id);
+  const scene = kept === null ? removed : { ...removed, objects: [...removed.objects, kept] };
+  const repaired = repairDanglingObjectDependencies(removeObjectIdsFromGroups(scene, ids));
   reportDependencyRepairs(repaired);
   const additionalSelectedIds = new Set(state.additionalSelectedIds);
   additionalSelectedIds.delete(id);

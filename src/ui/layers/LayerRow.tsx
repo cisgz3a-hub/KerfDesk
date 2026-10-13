@@ -71,7 +71,7 @@ function OperationManagement(props: {
           if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
         }}
       >
-        <span aria-hidden="true">•••</span>
+        <Icon name="more" size={18} />
       </summary>
       <div className="lf-operation-card__management-body">
         <LayerOrderControls {...props} />

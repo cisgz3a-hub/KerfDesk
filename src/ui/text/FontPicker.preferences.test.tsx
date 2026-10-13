@@ -61,3 +61,17 @@ it('keeps favourites, hides fonts from the list and remembers recent choices', a
     'great-vibes-regular',
   ]);
 });
+
+it('leaves preview slider arrow keys to the native range control', async () => {
+  const host = await mountControl(<FontPicker value="roboto-regular" onChange={vi.fn()} />);
+  await clickControl(host, 'Font');
+  const slider = document.querySelector<HTMLInputElement>('input[aria-label="Preview size"]');
+  if (slider === null) throw new Error('Preview slider missing');
+  slider.focus();
+  const key = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true });
+  await act(async () => {
+    slider.dispatchEvent(key);
+  });
+  expect(key.defaultPrevented).toBe(false);
+  expect(document.activeElement).toBe(slider);
+});

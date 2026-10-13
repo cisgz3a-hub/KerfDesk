@@ -75,7 +75,6 @@ export type {
   ShapeSpec,
   TextAlignment,
   TextObject,
-  TextStyle,
   TracedImage,
   Transform,
   Vec2,
@@ -147,13 +146,6 @@ export type {
   SelectionDistributeResult,
 } from './selection-distribute';
 export { buildSelectionDistributeEdit } from './selection-distribute';
-export type { SelectionMatchSizeEdit, SelectionMatchSizeKind } from './selection-match-size';
-export { buildSelectionMatchSizeEdit } from './selection-match-size';
-export type {
-  SelectionMoveTogetherAxis,
-  SelectionMoveTogetherEdit,
-} from './selection-move-together';
-export { buildSelectionMoveTogetherEdit } from './selection-move-together';
 export { isClosedEnough, withClosingPoint } from './polyline-closure';
 export type { OutputScope, OutputScopeValidation } from './output-scope';
 export {
@@ -210,13 +202,6 @@ export type {
   VariableTemplateToken,
 } from './variable-template';
 export { DEFAULT_PROJECT_VARIABLE_DATA } from './variable-template';
-export {
-  MAX_GUIDES,
-  nearestGuidePosition,
-  normalizeGuides,
-  type GuideAxis,
-  type ProjectGuide,
-} from './guides';
 
 export type {
   CncCoolantMode,
