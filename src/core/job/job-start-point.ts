@@ -2,7 +2,15 @@ import type { Vec2 } from '../scene';
 import { containmentDepths } from './containment-depth';
 import { nearestClosedStart } from './closed-shape-start';
 import { reverseCutSegment, rotateClosedCutSegment, validCutArcMoves } from './cut-arc-moves';
-import { cncPassXyPoints, type CncGroup, type CutSegment, type Group, type Job } from './job';
+import { firstToolpathProcessPoint } from './first-process-point';
+import {
+  cncPassXyPoints,
+  type CncGroup,
+  type CutSegment,
+  type Group,
+  type Job,
+  type RasterGroup,
+} from './job';
 
 export type JobStartPointOptions = {
   readonly allowReverse?: boolean;
@@ -28,6 +36,7 @@ type ContainmentEligibility = {
 // Prepared jobs and their segment arrays are immutable. Pointer movement only
 // changes the target, so keep containment work once per prepared geometry.
 const containmentCache = new WeakMap<ReadonlyArray<CutSegment>, ContainmentEligibility>();
+const rasterStartCache = new WeakMap<RasterGroup, Vec2 | null>();
 
 function containmentEligibility(segments: ReadonlyArray<CutSegment>): ContainmentEligibility {
   const cached = containmentCache.get(segments);
@@ -138,9 +147,14 @@ function canRotateCnc(group: CncGroup): boolean {
 function firstPoint(group: Group): Vec2 | undefined {
   if (group.kind !== 'cnc' && (group.power <= 0 || group.passes <= 0)) return undefined;
   if (group.kind === 'raster') {
-    return group.pixelWidth > 0 && group.pixelHeight > 0
-      ? { x: group.bounds.minX, y: group.bounds.minY }
-      : undefined;
+    // White/transparent rasters can have dimensions without any burn. Match
+    // the canonical raster sweep planner before treating them as an operation.
+    // Cache by immutable group so pointer movement never rescans streamed rows.
+    const cached = rasterStartCache.get(group);
+    if (cached !== undefined) return cached ?? undefined;
+    const point = firstToolpathProcessPoint({ groups: [group] });
+    rasterStartCache.set(group, point);
+    return point ?? undefined;
   }
   if (group.kind === 'cnc') {
     const pass = group.passes.find((item) => cncPassXyPoints(item).length >= 2);

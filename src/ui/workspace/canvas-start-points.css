@@ -8,9 +8,11 @@
 }
 .lf-start-connector {
   position: absolute;
+  left: 0;
   top: 0;
   height: 1px;
   background: currentColor;
+  transform-origin: 0 50%;
 }
 .lf-start-handle {
   position: absolute;
@@ -40,10 +42,10 @@
   outline: 2px solid var(--lf-accent);
 }
 .lf-start-label {
-  display: none;
+  visibility: hidden;
   position: absolute;
-  top: 25px;
-  left: 12px;
+  width: max-content;
+  box-sizing: border-box;
   padding: 2px 5px;
   border-radius: 3px;
   background: var(--lf-bg-1);
@@ -51,18 +53,13 @@
   font:
     11px system-ui,
     sans-serif;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   pointer-events: none;
 }
 .lf-start-handle:hover .lf-start-label,
 .lf-start-handle:focus-visible .lf-start-label,
 .lf-start-handle:active .lf-start-label {
-  display: block;
-}
-.lf-start-anchor--frame .lf-start-label {
-  top: -22px;
-  left: auto;
-  right: 12px;
+  visibility: visible;
 }
 .lf-start-settings {
   position: absolute;
