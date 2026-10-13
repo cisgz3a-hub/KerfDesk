@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { projectWithLine } from '../../__fixtures__/file-actions';
-import { DEFAULT_CNC_MACHINE_CONFIG, applyTransform } from '../scene';
-import { toMachineCoords } from '../devices';
+import { DEFAULT_CNC_MACHINE_CONFIG, applyTransform, type Project } from '../scene';
+import { toMachineCoords, toSceneCoords } from '../devices';
 import { defaultCncMachiningSetup } from '../scene/cnc-machining-setup';
 import type { CncTwoSidedSetup } from '../scene/cnc-two-sided-setup';
 import {
@@ -47,6 +47,34 @@ function project() {
   };
 }
 describe('two-sided stock-local CNC coordinates', () => {
+  it.each(['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const)(
+    'flips an exact saved cutting start with its artwork for %s',
+    (origin) => {
+      const original = project();
+      const input: Project = {
+        ...original,
+        device: { ...original.device, origin },
+        startPoints: { job: { x: 23, y: 32 }, frame: { edge: 1, fraction: 0.25 } },
+      };
+      const output = cncSideOutputProject(input, input.scene);
+      const expected = toSceneCoords(
+        cncSideBPoint(toMachineCoords({ x: 23, y: 32 }, input.device), stock, side),
+        input.device,
+      );
+      expect(output.startPoints?.job).toEqual(expected);
+      expect(output.startPoints?.frame).toEqual(input.startPoints?.frame);
+      expect(input.startPoints?.job).toEqual({ x: 23, y: 32 });
+    },
+  );
+
+  it('keeps relative start defaults relative to the output of the active side', () => {
+    const input: Project = {
+      ...project(),
+      startPoints: { job: { x: 0.25, y: 0.75, relative: true } },
+    };
+    expect(cncSideOutputProject(input, input.scene).startPoints).toBe(input.startPoints);
+  });
+
   it('matches independently derived asymmetric points for both physical axes', () => {
     expect(cncSideBPoint({ x: 23, y: 28 }, stock, side)).toEqual({ x: 91, y: 15 });
     expect(cncSideBPoint({ x: 23, y: 28 }, stock, { ...side, flipAxis: 'x' })).toEqual({

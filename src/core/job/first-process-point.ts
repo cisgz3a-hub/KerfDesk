@@ -4,15 +4,17 @@ import {
   parseGrblCncCoordinate,
 } from '../cnc/cnc-contour-emission';
 import { circularArcGeometry, isCircularArcFullCircle } from '../geometry/arc-representation';
+import { hasGcodeXyMotionAtEmitPrecision } from '../gcode/coordinate-format';
 import { planRasterRowSweeps, type RasterRowSweepPlan } from '../raster/raster-sweep-plan';
-import { rasterScanFrame, scanToMachine } from '../raster/raster-scan-frame';
+import { rasterPoweredSpans } from '../raster/raster-powered-spans';
 import { assertNever, type Vec2 } from '../scene';
 import { cncHelicalContourCanEmit } from './cnc-helical-representation';
 import { isEmittableFillSegment } from './fill-emission-resolution';
+import { isEmittableCutSegment } from './cut-emission-resolution';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
 import { groupFillScanlines } from './fill-sweeps';
-import type { CncPass, FillGroup, FillSegment, Job, RasterGroup } from './job';
+import type { CncPass, CutSegment, FillGroup, FillSegment, Job, RasterGroup } from './job';
 import { rasterRowsInProviderOrder } from './raster-rows';
 import { offsetForEmittedFeed, shiftAlongTravel } from './scan-offset';
 import type { BuildToolpathOptions } from './toolpath-types';
@@ -33,7 +35,7 @@ export function firstToolpathProcessPoint(
         if (group.passes > 0) {
           point =
             group.fillStyle === 'offset'
-              ? firstContourPoint(group.segments)
+              ? firstEmittableContourPoint(group.segments)
               : firstFillProcessPoint(group, options);
         }
         break;
@@ -59,6 +61,10 @@ function firstContourPoint(
     if (point !== undefined) return point;
   }
   return null;
+}
+
+function firstEmittableContourPoint(segments: ReadonlyArray<CutSegment>): Vec2 | null {
+  return segments.find(isEmittableCutSegment)?.polyline[0] ?? null;
 }
 
 function firstFillProcessPoint(group: FillGroup, options: BuildToolpathOptions): Vec2 | null {
@@ -105,7 +111,10 @@ function firstPlannedFillPoint(group: FillGroup, segments: FillSegment[]): Vec2 
       last !== undefined &&
       expandFillHatchWithRunways([first.start, last.end], plan) !== null
     ) {
-      return first.start;
+      const moving = plan.sweep.spans.find((span) =>
+        hasGcodeXyMotionAtEmitPrecision(span.start, span.end),
+      );
+      if (moving !== undefined) return moving.start;
     }
   }
   return null;
@@ -133,8 +142,7 @@ function firstRasterProcessPoint(group: RasterGroup, options: BuildToolpathOptio
     const y = group.bounds.minY + (rowIndex + 0.5) * pixelHeightMm;
     for (const plan of plans) {
       const point = firstRasterSweepPoint(group, plan, pixelWidthMm, y, reverse, offset);
-      // ADR-492: the sweep is planned in the scan frame.
-      if (point !== null) return scanToMachine(rasterScanFrame(group.scanAngleDeg), point);
+      if (point !== null) return point;
     }
     emittedRows += 1;
   }
@@ -160,15 +168,14 @@ function firstRasterSweepPoint(
   reverse: boolean,
   offset: number,
 ): Vec2 | null {
-  const shift = reverse ? -offset : 0;
-  let x =
-    group.bounds.minX + (reverse ? plan.span.lastX + 1 : plan.span.firstX) * pixelWidthMm + shift;
-  for (const run of plan.runs) {
-    const target = run.endXWorldMm + shift;
-    if (target === x) continue;
-    if (run.s > 0) return { x, y };
-    x = target;
-  }
+  const spans = rasterPoweredSpans(plan, {
+    activeStartX:
+      group.bounds.minX + (reverse ? plan.span.lastX + 1 : plan.span.firstX) * pixelWidthMm,
+    y,
+    shiftX: reverse ? -offset : 0,
+    scanAngleDeg: group.scanAngleDeg,
+  });
+  for (const span of spans) return span.from;
   return null;
 }
 

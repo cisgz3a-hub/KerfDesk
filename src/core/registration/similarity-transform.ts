@@ -57,8 +57,17 @@ export function invertSimilarity(transform: SimilarityTransform): SimilarityTran
 }
 
 export function applySimilarityProject(project: Project, transform: SimilarityTransform): Project {
+  const jobStart = project.startPoints?.job;
   return {
     ...project,
+    ...(jobStart === undefined || jobStart.relative === true
+      ? {}
+      : {
+          startPoints: {
+            ...project.startPoints,
+            job: applySimilarityPoint(jobStart, transform),
+          },
+        }),
     scene: {
       ...project.scene,
       objects: project.scene.objects.map((object) => applySimilarityObject(object, transform)),

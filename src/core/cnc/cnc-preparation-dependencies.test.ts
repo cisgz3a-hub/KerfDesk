@@ -64,6 +64,34 @@ function statuses(current: Project, previous: Project) {
   return cncDependencyStatuses(cncPreparationInputs(current), cncPreparationInputs(previous));
 }
 describe('CNC preparation dependency evidence', () => {
+  it('marks execution preparation dirty when the selected cutting start is added, changed or reset', () => {
+    const base = project();
+    const selected: Project = { ...base, startPoints: { job: { x: 3, y: 4 } } };
+    const changed: Project = { ...base, startPoints: { job: { x: 7, y: 4 } } };
+    for (const [current, previous] of [
+      [selected, base],
+      [changed, selected],
+      [base, selected],
+    ] as const) {
+      const result = statuses(current, previous);
+      expect(result.map((item) => item.status)).toEqual(['dirty', 'dirty']);
+      expect(
+        result.every((item) =>
+          item.reasons.includes('Machine, output placement, scope or order changed'),
+        ),
+      ).toBe(true);
+      expect(cncPreparationInputs(current).signature).not.toBe(
+        cncPreparationInputs(previous).signature,
+      );
+    }
+  });
+
+  it('keeps execution preparation ready when only the separate frame trace start changes', () => {
+    const base = project();
+    const changed: Project = { ...base, startPoints: { frame: { edge: 2, fraction: 0.3 } } };
+    expect(statuses(changed, base).map((item) => item.status)).toEqual(['ready', 'ready']);
+  });
+
   it('keeps a label change ready without retaining an executable cache', () => {
     const base = project();
     const renamed = {

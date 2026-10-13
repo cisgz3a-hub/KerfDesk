@@ -9,7 +9,7 @@ export const OWNER_FILE = '.kerfdesk-installer-qualification-owner.json';
 
 // Explicit qualification contracts. The sentinel test keeps the current
 // contract aligned with the canonical writer; historical schema 12 stays 12.
-export const CURRENT_QUALIFICATION_PROJECT_SCHEMA = 16;
+export const CURRENT_QUALIFICATION_PROJECT_SCHEMA = 17;
 export const HISTORICAL_QUALIFICATION_PROJECT_SCHEMA = 12;
 
 export function parseArgs(argv) {
@@ -193,8 +193,9 @@ export function validateProject(bytes, { schemaMode = 'current' } = {}) {
         project.schemaVersion === 13 ||
         project.schemaVersion === 14 ||
         project.schemaVersion === 15 ||
+        project.schemaVersion === 16 ||
         project.schemaVersion === CURRENT_QUALIFICATION_PROJECT_SCHEMA,
-      'Expected known upgrade project schema (12, 13, 14, 15 or 16)',
+      'Expected known upgrade project schema (12, 13, 14, 15, 16 or 17)',
     );
   }
   assert.equal(
@@ -226,4 +227,21 @@ export function assertRoundtrip(before, after) {
   assert.deepEqual(after.scene, before.scene, 'Reopened artwork/operations changed during Save As');
   assert.deepEqual(after.workspace, before.workspace, 'Reopened workspace changed');
   assert.deepEqual(after.jobSetup, before.jobSetup, 'Reopened job setup changed');
+  assert.deepEqual(after.startPoints, before.startPoints, 'Reopened start points changed');
+}
+
+export function assertSelectedStarts(project) {
+  const { frame, job } = project.startPoints ?? {};
+  assert.ok(
+    frame && Number.isInteger(frame.edge) && frame.edge >= 0 && frame.edge <= 3,
+    'Qualification fixture must save a selected Frame start',
+  );
+  assert.ok(
+    Number.isFinite(frame.fraction) && frame.fraction >= 0 && frame.fraction <= 1,
+    'Qualification Frame start must retain its perimeter fraction',
+  );
+  assert.ok(
+    job && Number.isFinite(job.x) && Number.isFinite(job.y) && job.relative !== true,
+    'Qualification fixture must save a selected absolute Job start',
+  );
 }

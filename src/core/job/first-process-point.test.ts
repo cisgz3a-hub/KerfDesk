@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Vec2 } from '../scene';
+import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { grblStrategy } from '../output/grbl-strategy';
+import { buildMotionManifest } from './motion-manifest';
+import { formatGcodeCoordinateMm } from '../gcode/coordinate-format';
 import { firstToolpathProcessPoint } from './first-process-point';
 import type {
   CncGroup,
@@ -98,6 +102,25 @@ function expectParity(groups: ReadonlyArray<Group>, options = OPTIONS): void {
   expect(xy(firstToolpathProcessPoint(job, options))).toEqual(xy(expected));
 }
 
+// Full preview retains sub-precision legacy fill spans. The marker must instead
+// agree with the represented powered motion that the controller will receive.
+function expectFillEmissionParity(group: FillGroup): void {
+  const job = { groups: [group] };
+  const device = { ...DEFAULT_DEVICE_PROFILE, scanningOffsets: OPTIONS.scanningOffsets ?? [] };
+  const expected = buildMotionManifest(grblStrategy.emit(job, device), {
+    machineKind: 'laser',
+  }).firstProcessPoint;
+  const actual = firstToolpathProcessPoint(job, OPTIONS);
+  const represented =
+    actual === null
+      ? null
+      : {
+          x: Number(formatGcodeCoordinateMm(actual.x)),
+          y: Number(formatGcodeCoordinateMm(actual.y)),
+        };
+  expect(represented).toEqual(xy(expected));
+}
+
 describe('firstToolpathProcessPoint parity', () => {
   it('skips empty/no-pass groups and keeps contour entry and park travel out of the process marker', () => {
     expectParity([]);
@@ -130,13 +153,13 @@ describe('firstToolpathProcessPoint parity', () => {
             span(reverse ? 14 : 12, reverse ? 12 : 14, 5, reverse),
             span(7, 9, 6, reverse),
           ];
-          expectParity([
+          expectFillEmissionParity(
             fill({
               segments,
               ...(policy === undefined ? {} : { fillRunwayPolicy: policy }),
               ...(override === undefined ? {} : { bidirectionalScanOffsetMm: override }),
             }),
-          ]);
+          );
         }
       }
     },

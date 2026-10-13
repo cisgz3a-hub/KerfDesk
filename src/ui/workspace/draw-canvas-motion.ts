@@ -23,6 +23,7 @@ export type CanvasMotionOverlay = {
   readonly showStartMarkers?: boolean;
   /** False while retained starts belong to the previous idle preparation. */
   readonly planIsCurrent?: boolean;
+  readonly compactStartMarkers?: boolean;
 };
 
 const RED = '#dc2626';
@@ -55,7 +56,15 @@ export function drawCanvasMotionOverlay(
   }
   drawApproach(ctx, plan, run, view);
   if (overlay.showStartMarkers !== false) {
-    drawCanvasStartMarkers(ctx, plan, view, overlay.planIsCurrent === false, viewport, artwork);
+    drawCanvasStartMarkers(
+      ctx,
+      plan,
+      view,
+      overlay.planIsCurrent === false,
+      viewport,
+      artwork,
+      overlay.compactStartMarkers === true,
+    );
   }
   if (
     plan.capability === 'realtime' &&

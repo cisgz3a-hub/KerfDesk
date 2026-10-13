@@ -103,7 +103,8 @@ describe('idle canvas worker memory ownership', () => {
     expect(FakeWorker.instances).toHaveLength(0);
     preparation.release();
     const idle = worker();
-    expect(idle.requests[0]?.request).toBe(REQUEST);
+    expect(idle.requests[0]?.request).toMatchObject(REQUEST);
+    expect(idle.requests[0]?.request.project).toBe(REQUEST.project);
     const save = competingWorker('autosave');
     expect(save.started).toBe(false);
     idle.complete();
@@ -135,7 +136,8 @@ describe('idle canvas worker memory ownership', () => {
     expect(save.started).toBe(true);
     expect(FakeWorker.instances).toHaveLength(0);
     save.release();
-    expect(worker().requests[0]?.request).toBe(newest);
+    expect(worker().requests[0]?.request).toMatchObject(newest);
+    expect(worker().requests[0]?.request.project).toBe(newest.project);
     worker().complete();
     await expect(pending).resolves.toBeNull();
   });

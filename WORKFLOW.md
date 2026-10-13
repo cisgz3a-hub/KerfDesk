@@ -1827,13 +1827,38 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    own override policy (warnings, safe reductions allowed).
 
 #### Canvas start markers
-1. The canvas shows `FRAME START` and `JOB START` markers by default. Label text renders at 50%
-   opacity over a 20%-opaque white backdrop so artwork remains visible underneath. Marker dots and
-   the frame-direction arrow stay fully opaque for clear start-point positioning.
+1. The canvas shows small **Frame start** diamond and **Job start** triangle handles by default
+   (ADR-594). Labels appear on hover, keyboard focus or dragging. Nearby handles separate visually
+   while retaining their actual start positions. Handles hide while artwork is being dragged.
 2. The eye toggle immediately after **Snap** in the bottom-right canvas controls hides or restores
-   those two static markers. The preference survives reloads.
+   both handles. The preference survives reloads.
 3. The toggle never hides the approach route, live controller head, completed-route trail, or motion
    status badge.
+4. Drag **Frame start** to the frame boundary. The displayed perimeter and physical frame begin at
+   the selected point and complete the same closed route. Drag **Job start** to select the first
+   cutting point without moving the artwork. It stays within the first executable operation and
+   respects inside-first cutting and the configured direction policy. Closed polylines allow an
+   edge position; native arcs snap to existing move boundaries, and open paths use permitted
+   endpoints. With **Keep source order**, selection stays on the first executable contour and
+   preserves its drawn direction. Focus a handle and use arrow keys for 1 mm steps, or Shift for
+   10 mm steps.
+5. Each completed drag is one Undo step and is saved with the project. Escape, pointer cancellation,
+   lost capture, a newly opened document or a machine becoming busy discards the draft. Start
+   points cannot be edited while the machine is busy.
+6. Open **Start points** to reset either selection to automatic or choose **Use as defaults for new
+   jobs**. Defaults are local to this device: frame edge/fraction and a relative cutting position
+   adapt to differently sized cutting or burning artwork, excluding zero-power geometry and white
+   raster padding. They apply on a fresh blank launch and New, never on Open
+   or recovery. **Clear saved defaults** restores automatic starts for future jobs. A status message
+   confirms saving or reports a storage failure. The settings remain available on blank projects;
+   only saving new relative defaults requires a prepared motion plan.
+7. Raster, fill and complex CNC entries retain generated scan/depth order. Only identical closed
+   CNC contour passes without special entry sequences support a movable cutting start. Registered
+   Print and Cut and rotary views disable both handles. In CNC mode, Side B retains its source-artwork cutting
+   selection and disables its job handle and default saving.
+8. Changing either selection requires another Frame because selected starts are spatial inputs.
+   ADR-565 otherwise remains unchanged: ordinary power and speed edits preserve Frame evidence
+   when spatial inputs and the resolved footprint are unchanged; Start reviews the current program.
 
 Smoothieware reports positions in the current G20/G21 parser units. Before preparing a Frame,
 KerfDesk confirms Idle, selects G21 through an acknowledged command, then requires a fresh complete

@@ -8,8 +8,12 @@ import {
   resetIdleCanvasMotionWorkerForTests,
 } from './idle-canvas-motion-worker-client';
 import { isCanvasCompilationBridgeConnection } from './canvas-compilation-worker-protocol';
+import type { IdleCanvasMotionWorkerRequest } from './idle-canvas-motion-worker-protocol';
+import { buildCanvasMarkerPlan, type CanvasMotionPlan } from '../state/canvas-motion-plan';
+import { loadCanvasStartBounds } from '../state/canvas-start-bounds-loader';
+import { prepareOutput } from '../../io/gcode';
 
-type Posted = { readonly id: number };
+type Posted = IdleCanvasMotionWorkerRequest;
 
 class FakeWorker {
   static instances: FakeWorker[] = [];
@@ -36,8 +40,8 @@ class FakeWorker {
     this.terminated = true;
   }
 
-  reply(id: number): void {
-    this.onmessage?.({ data: { id, kind: 'ok', plan: null } } as MessageEvent);
+  reply(id: number, plan: CanvasMotionPlan | null = null): void {
+    this.onmessage?.({ data: { id, kind: 'ok', plan } } as MessageEvent);
   }
 
   failToCloneResponse(): void {
@@ -59,6 +63,18 @@ const REQUEST: IdleCanvasMotionPlanRequest = {
   reportInches: false,
 };
 
+function latestWorker(): FakeWorker {
+  const worker = FakeWorker.instances.at(-1);
+  if (worker === undefined) throw new Error('Expected worker');
+  return worker;
+}
+
+function firstRequest(worker: FakeWorker): Posted {
+  const request = worker.posted[0];
+  if (request === undefined) throw new Error('Expected request');
+  return request;
+}
+
 afterEach(() => {
   resetIdleCanvasMotionWorkerForTests();
   vi.unstubAllGlobals();
@@ -66,6 +82,43 @@ afterEach(() => {
 });
 
 describe('idle canvas motion worker client', () => {
+  it('loads defaults bounds only on demand with the exact frozen worker request', async () => {
+    vi.stubGlobal('Worker', FakeWorker as unknown as typeof Worker);
+    const project = { ...REQUEST.project, startPoints: { job: { x: 10, y: 20 } } };
+    const prepared = prepareOutput(project);
+    if (!prepared.ok) throw new Error('Expected prepared output');
+    const plan = buildCanvasMarkerPlan({ prepared, machine: REQUEST.machine });
+    const pending = prepareIdleCanvasMotionPlanOffThread({ ...REQUEST, project });
+    const initial = latestWorker();
+    const originalRequest = firstRequest(initial);
+    initial.reply(originalRequest.id, structuredClone(plan));
+    const cloned = await pending;
+    if (cloned === null || cloned === undefined) throw new Error('Expected worker plan');
+    expect(FakeWorker.instances).toHaveLength(1);
+    expect(originalRequest.request.evaluatedAtIso).toEqual(expect.any(String));
+    expect(cloned.startEditingData?.bounds).toBeUndefined();
+    const bounds = loadCanvasStartBounds(cloned);
+    const requested = latestWorker();
+    const boundsRequest = firstRequest(requested);
+    expect(boundsRequest.request).toEqual({
+      ...originalRequest.request,
+      includeStartPointBounds: true,
+    });
+    const value = { minX: 1, minY: 2, maxX: 30, maxY: 40 };
+    requested.reply(boundsRequest.id, {
+      ...plan,
+      startEditingData: {
+        job: { groups: [] },
+        jobReason: null,
+        jobOriginOffset: { x: 0, y: 0 },
+        bounds: value,
+      },
+    });
+    await expect(bounds).resolves.toEqual(value);
+    expect(initial.terminated).toBe(true);
+    expect(requested.terminated).toBe(true);
+  });
+
   it('returns null when Worker support is unavailable', () => {
     vi.stubGlobal('Worker', undefined);
     expect(prepareIdleCanvasMotionPlanOffThread(REQUEST)).toBeNull();

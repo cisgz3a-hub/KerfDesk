@@ -9,6 +9,20 @@
 
 import { withoutArcMoves } from './cut-arc-moves';
 import type { CutSegment, FillSegment, Job, RasterGroup } from './job';
+import type { Vec2 } from '../scene';
+
+/** Inverse of the emitted rotary mapping for truthful surface-relative markers. */
+export function restoreRotarySurfacePoint(
+  job: Job,
+  point: Vec2,
+  yScale: number,
+  reverse = false,
+): Vec2 {
+  const range = jobYRange(job);
+  if (range === null) return point;
+  const surfaceY = reverse ? range.max - point.y / yScale : range.min + point.y / yScale;
+  return { x: point.x, y: surfaceY };
+}
 
 // reverse (ADR-127): the rotary can spin the opposite way (chuck mounted
 // backwards, or roller/gearing that inverts direction), which mirrors the

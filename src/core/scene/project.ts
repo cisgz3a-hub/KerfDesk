@@ -7,6 +7,7 @@ import type { ProjectGuide } from './guides';
 import { EMPTY_SCENE, type Scene } from './scene';
 import type { ProjectVariableData } from './variable-template';
 import type { PrintAndCutDesignTargets } from './print-and-cut';
+import type { ProjectStartPoints } from './start-points';
 import type { ProjectSheetBook } from './project-sheets';
 import type { FixtureTemplate } from '../camera/fixtures/fixture-template';
 import type { ProductionManifest } from './production-manifest';
@@ -29,7 +30,9 @@ import type { ProductionNestDefinition } from '../nesting/production-nest';
 // v14 retains editable Boolean sources and independent design-tree ordering.
 // v15 retains editable relief composition and reviewed machining setup/template intent.
 // v16 embeds editable native studio documents; older readers must not drop them.
-export const PROJECT_SCHEMA_VERSION = 16 as const;
+// v17 preserves selected frame and cutting starts; older readers must not
+// silently replace their output semantics with automatic entry points.
+export const PROJECT_SCHEMA_VERSION = 17 as const;
 
 export type EmbeddedFont = {
   readonly key: string;
@@ -170,6 +173,7 @@ export type Project = {
   readonly device: DeviceProfile;
   readonly workspace: Workspace;
   readonly optimization: ProjectOptimizationSettings;
+  readonly startPoints?: ProjectStartPoints;
   readonly jobSetup: ProjectJobSetup;
   readonly variables?: ProjectVariableData;
   readonly printAndCutTargets?: PrintAndCutDesignTargets;

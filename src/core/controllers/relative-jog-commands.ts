@@ -5,6 +5,7 @@
 // byte-identical across the two drivers instead of drifting in copy-paste.
 
 import type { FrameBounds } from './controller-driver';
+import { buildFramePerimeter } from '../job/frame-perimeter';
 import { assertJogHasAxis, type JogParams } from './grbl/commands';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 
@@ -32,15 +33,9 @@ export function buildRelativeJogCommand(params: JogParams): string {
   return `G21\nG91\n${move}\nG90`;
 }
 
-/** Framing = absolute G0 perimeter (G21+G90 lead lines, then five legs). */
+/** Framing = G21+G90 followed by the complete absolute G0 perimeter. */
 export function buildAbsoluteFrameLines(bounds: FrameBounds, feed: number): ReadonlyArray<string> {
   const f = fmtFeed(feed);
-  const corners = [
-    { x: bounds.minX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.maxY },
-    { x: bounds.minX, y: bounds.maxY },
-    { x: bounds.minX, y: bounds.minY },
-  ];
+  const corners = buildFramePerimeter(bounds, bounds.startPoint);
   return ['G21\n', 'G90\n', ...corners.map((c) => `G0 X${fmt(c.x)} Y${fmt(c.y)} F${f}\n`)];
 }

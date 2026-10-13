@@ -7,6 +7,7 @@ import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { useCanvasMotionLayer } from './use-canvas-motion-layer';
 import type { ViewState } from './view-transform';
 import { CanvasTextEditor } from '../text/CanvasTextEditor';
+import { CanvasStartPoints } from './CanvasStartPoints';
 import {
   handleCanvasDoubleClick,
   workspaceTextPointerHandlers,
@@ -61,6 +62,13 @@ export function WorkspaceCanvasLayers(props: {
         style={canvasMotionLayerStyle}
         aria-hidden="true"
         data-testid="canvas-motion-layer"
+      />
+      <CanvasStartPoints
+        canvas={props.baseRef}
+        project={props.project}
+        view={props.viewState}
+        size={props.canvasSize}
+        overlay={props.canvasMotionOverlay}
       />
       <CanvasTextEditor
         canvasRef={props.baseRef}

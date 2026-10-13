@@ -25,6 +25,7 @@ export function drawCanvasStartMarkers(
   updating: boolean,
   viewport?: CanvasBitmapSize,
   artwork: ReadonlyArray<MarkerBox> = [],
+  compact = false,
 ): void {
   ctx.save();
   ctx.globalAlpha = 1;
@@ -32,6 +33,15 @@ export function drawCanvasStartMarkers(
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   ctx.setLineDash([]);
+  if (compact) {
+    drawFrameDirection(ctx, plan, view);
+    const frame = plan.framePerimeter[0];
+    if (frame !== undefined) drawStartGlyph(ctx, sceneToCanvas(frame, view), 'frame', true);
+    if (plan.jobStart !== null)
+      drawStartGlyph(ctx, sceneToCanvas(plan.jobStart, view), 'job', true);
+    ctx.restore();
+    return;
+  }
   const markers = startLabels(ctx, plan, view, updating);
   const bounds = labelBounds(plan, view, markers, viewport);
   const placed = layoutCanvasStartLabels(markers, bounds, artwork);

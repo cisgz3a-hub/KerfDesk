@@ -14,6 +14,10 @@ import type { MachineStartSnapshot } from '../laser/start-job-readiness';
 import { laserPowerPreparationOptions } from '../laser/connected-laser-power-scale';
 import { renderVariableText } from '../text/render-variable-text';
 import {
+  registerCanvasStartBoundsLoader,
+  requestedCanvasStartBounds,
+} from '../state/canvas-start-bounds-loader';
+import {
   buildCanvasMarkerPlan,
   canvasPlanRetentionKey,
   type CanvasMotionPlan,
@@ -28,12 +32,17 @@ export type IdleCanvasMotionPlanRequest = {
   readonly machine: MachineStartSnapshot;
   readonly statusQuery: StatusQueryCapability;
   readonly reportInches: boolean;
+  readonly evaluatedAtIso?: string;
+  readonly includeStartPointBounds?: boolean;
 };
 
 export async function buildIdleCanvasMotionPlanFromRequest(
   request: IdleCanvasMotionPlanRequest,
   prepare?: PrepareOutputSnapshotOptions['prepare'],
 ): Promise<CanvasMotionPlan | null> {
+  // A later defaults request must evaluate variable text at this same instant.
+  const evaluatedAtIso = request.evaluatedAtIso ?? new Date().toISOString();
+  request = { ...request, evaluatedAtIso };
   const jobOrigin: JobOriginPlacement | undefined = request.resolvedPlacement.ok
     ? request.resolvedPlacement.jobOrigin
     : undefined;
@@ -53,7 +62,7 @@ export async function buildIdleCanvasMotionPlanFromRequest(
           request.machine,
         )
       : { contourEntryBounds: null }),
-    clock: () => new Date(),
+    clock: () => new Date(evaluatedAtIso),
     renderVariableText,
     ...(request.registration === undefined ? {} : { registration: request.registration }),
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
@@ -61,7 +70,7 @@ export async function buildIdleCanvasMotionPlanFromRequest(
     ...(prepare === undefined ? {} : { prepare }),
   });
   if (!prepared.ok) return null;
-  return buildCanvasMarkerPlan({
+  const plan = buildCanvasMarkerPlan({
     prepared,
     machine: request.machine,
     statusQuery: request.statusQuery,
@@ -69,5 +78,15 @@ export async function buildIdleCanvasMotionPlanFromRequest(
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
     relativeView: !request.resolvedPlacement.ok,
     retentionKey,
+    includeStartPointBounds: request.includeStartPointBounds === true,
   });
+  registerCanvasStartBoundsLoader(plan, async () =>
+    requestedCanvasStartBounds(
+      await buildIdleCanvasMotionPlanFromRequest(
+        { ...request, includeStartPointBounds: true },
+        prepare,
+      ),
+    ),
+  );
+  return plan;
 }

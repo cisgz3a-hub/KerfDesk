@@ -8,6 +8,7 @@ import {
   assertInsideWindows,
   assertPreflight,
   assertRoundtrip,
+  assertSelectedStarts,
   evidenceParents,
   FIXTURE_NAME,
   FIXTURE_SVG,
@@ -280,6 +281,13 @@ async function createProject(context) {
   await context.page
     .getByRole('article', { name: 'Run 1: installed qualification artwork', exact: true })
     .waitFor({ state: 'visible' });
+  await context.page.getByRole('button', { name: 'Fit to selection', exact: true }).click();
+  for (const name of ['Frame start', 'Job start']) {
+    const handle = context.page.getByRole('button', { name, exact: true });
+    await handle.waitFor({ state: 'visible' });
+    await waitUntil(async () => (await handle.getAttribute('aria-disabled')) === 'false', name);
+    await handle.press('Shift+ArrowRight');
+  }
   await context.page.waitForFunction(() => globalThis.document.title.endsWith(' *'), null, {
     timeout: 30_000,
   });
@@ -294,11 +302,13 @@ async function createProject(context) {
   await waitCleanTitle(context, args.project);
   const bytes = await fs.readFile(args.project);
   const project = validateProject(bytes);
+  assertSelectedStarts(project);
   manifest.persisted = {
     bytes: bytes.length,
     sha256: sha256(bytes),
     schemaVersion: project.schemaVersion,
     scene: project.scene,
+    startPoints: project.startPoints,
   };
   await fs.writeFile(join(args['output-root'], 'saved-project.lf2'), bytes, { flag: 'wx' });
 }
@@ -338,6 +348,7 @@ async function reopenProject(context) {
     roundtrip,
     schemaVersion: project.schemaVersion,
     sceneEqual: true,
+    startPointsEqual: true,
   };
 }
 

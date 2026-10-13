@@ -45,6 +45,21 @@ export function cncSideOutputProject(project: Project, scene: Scene): Project {
   };
   return {
     ...project,
+    ...(project.startPoints?.job === undefined || project.startPoints.job.relative === true
+      ? {}
+      : {
+          startPoints: {
+            ...project.startPoints,
+            job: toSceneCoords(
+              cncSideBPoint(
+                toMachineCoords(project.startPoints.job, project.device),
+                machine.stock,
+                side,
+              ),
+              project.device,
+            ),
+          },
+        }),
     machine: { ...machine, stock: { ...machine.stock, originOffset: side.sideBStockOriginMm } },
     scene: {
       ...scene,

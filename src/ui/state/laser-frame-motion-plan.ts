@@ -4,6 +4,9 @@ import { currentWorkZMm } from './infer-machine-position';
 import { useStore } from './store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import type { LaserState, LiveRefs } from './laser-store';
+import type { FrameBounds } from '../../core/controllers/controller-driver';
+import { buildFramePerimeter } from '../../core/job/frame-perimeter';
+import type { Project } from '../../core/scene';
 
 const FRAME_RETURN_EPSILON_MM = 1e-3;
 
@@ -24,17 +27,19 @@ export function buildFrameDispatchPlan(
   const state = get();
   const feeds = frameMotionFeeds(feed, state.controllerSettings);
   const toolOffLines = refs.driver.commands.frameToolOffLines.map((line) => `${line}\n`);
-  const perimeter = refs.driver.commands.buildFrameLines(bounds, feeds.xyMmPerMin);
+  const project = candidate?.project ?? jobProject ?? useStore.getState().project;
+  const frameBounds = frameBoundsForProject(bounds, project);
+  const perimeter = refs.driver.commands.buildFrameLines(frameBounds, feeds.xyMmPerMin);
   const returnLine = frameReturnLine(
     refs,
-    bounds,
+    frameBounds,
     feeds.xyMmPerMin,
     candidate?.returnToWorkPosition,
   );
   // The framed job decides laser or CNC motion. A recovery or second-pass Frame
   // of a saved laser job must not pick up a CNC safe-Z wrap because the open
   // canvas has since been switched to CNC, or the reverse.
-  const machine = (candidate?.project ?? jobProject ?? useStore.getState().project).machine;
+  const machine = project.machine;
   if (machine?.kind !== 'cnc') {
     return {
       kind: 'ready',
@@ -66,16 +71,22 @@ export function buildFrameDispatchPlan(
   return { ...motion, lines: [...toolOffLines, ...motion.lines] };
 }
 
+function frameBoundsForProject(bounds: FrameBounds, project: Project): FrameBounds {
+  const startPoint = project.startPoints?.frame;
+  return { ...bounds, ...(startPoint === undefined ? {} : { startPoint }) };
+}
+
 function frameReturnLine(
   refs: LiveRefs,
-  bounds: Parameters<LaserState['frame']>[0],
+  bounds: FrameBounds,
   feed: number,
   target: { readonly x: number; readonly y: number } | undefined,
 ): string | undefined {
   if (target === undefined) return undefined;
+  const start = buildFramePerimeter(bounds, bounds.startPoint)[0];
   if (
-    Math.abs(target.x - bounds.minX) < FRAME_RETURN_EPSILON_MM &&
-    Math.abs(target.y - bounds.minY) < FRAME_RETURN_EPSILON_MM
+    Math.abs(target.x - start.x) < FRAME_RETURN_EPSILON_MM &&
+    Math.abs(target.y - start.y) < FRAME_RETURN_EPSILON_MM
   ) {
     return undefined;
   }

@@ -23,6 +23,14 @@ import {
   type JobOriginPlacement,
 } from '../../core/job';
 import { compileCncJobResult, type CncJobCompilationResult } from '../../core/cnc/compile-cnc-job';
+import { toMachineCoords, toSceneCoords } from '../../core/devices';
+import {
+  applyJobStartPoint,
+  jobStartPointOptions,
+  resolveJobStartPoint,
+  type JobStartPointOptions,
+} from '../../core/job/job-start-point';
+import { computeJobStartBounds } from '../../core/job/job-start-bounds';
 import { registrationBoxScene } from '../../core/job/registration-placement';
 import {
   COMPILE_INTEGRITY_PREFLIGHT_CODES,
@@ -247,19 +255,58 @@ export function completePreparedOutput(
   // reversing paths. Joining formerly separated paths can also change planner
   // junction timing, not only travel distance. Doing it HERE means the preview
   // and duration estimate use the exact order the machine will run.
+  const optimized = optimizePaths(
+    placed,
+    input.sourceProject.optimization,
+    input.sourceProject.device.scanningOffsets,
+    input.sourceProject.device.origin,
+  );
+  const startOptions = jobStartPointOptions(
+    input.sourceProject.optimization,
+    input.sourceProject.device.scanningOffsets,
+    input.project.device,
+  );
+  const target = jobStartTarget(input.project, optimized, offset, startOptions);
   return {
     ok: true,
     project: input.project,
     laserPowerScaleVersion: CURRENT_LASER_POWER_SCALE_VERSION,
-    job: optimizePaths(
-      placed,
-      input.sourceProject.optimization,
-      input.sourceProject.device.scanningOffsets,
-      input.sourceProject.device.origin,
-    ),
+    job: target === null ? optimized : applyJobStartPoint(optimized, target, startOptions),
     jobOriginOffset: offset,
     advisories: input.advisories,
   };
+}
+
+function jobStartTarget(
+  project: Project,
+  placed: Job,
+  offset: Vec2,
+  options: JobStartPointOptions,
+): Vec2 | null {
+  const preference = project.startPoints?.job;
+  if (preference === undefined) return null;
+  let scenePoint: Vec2 = preference;
+  if (preference.relative === true) {
+    // Generated starts cannot use this preference. Determine support from the
+    // first executable operation before traversing every raster row for bounds.
+    if (resolveJobStartPoint(placed, ZERO_OFFSET, options)?.supported !== true) return null;
+    const bounds = computeJobStartBounds(placed, project.device);
+    if (bounds === null) return null;
+    const a = toSceneCoords(
+      { x: bounds.minX - offset.x, y: bounds.minY - offset.y },
+      project.device,
+    );
+    const b = toSceneCoords(
+      { x: bounds.maxX - offset.x, y: bounds.maxY - offset.y },
+      project.device,
+    );
+    scenePoint = {
+      x: Math.min(a.x, b.x) + Math.abs(b.x - a.x) * preference.x,
+      y: Math.min(a.y, b.y) + Math.abs(b.y - a.y) * preference.y,
+    };
+  }
+  const machinePoint = toMachineCoords(scenePoint, project.device);
+  return { x: machinePoint.x + offset.x, y: machinePoint.y + offset.y };
 }
 
 // One compile entry per machine kind: the project's machine choice routes to

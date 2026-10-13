@@ -71,6 +71,19 @@ function markerPlan(frame: Vec2, job = frame): CanvasMotionPlan {
 }
 
 describe('planned start rendering', () => {
+  it('keeps compact anchors without permanent label plates', () => {
+    const recording = recordingContext();
+    drawCanvasMotionOverlay(
+      recording.ctx,
+      { plan: markerPlan({ x: 40, y: 25 }), run: null, compactStartMarkers: true },
+      { scale: 2, offsetX: 10, offsetY: 20 },
+      { width: 650, height: 570 },
+    );
+    expect(recording.plates).toHaveLength(0);
+    expect(recording.labels).toHaveLength(0);
+    expect(recording.strokes.some(({ color }) => color === canvasTheme.frameStart)).toBe(true);
+  });
+
   it.each([false, true])(
     'keeps rendered plates outside artwork while preserving exact start leaders (updating=%s)',
     (updating) => {

@@ -11,6 +11,7 @@ import {
   assertHostedWindows,
   assertPreflight,
   assertRoundtrip,
+  assertSelectedStarts,
   evidenceParents,
   FIXTURE_NAME,
   parseArgs,
@@ -236,6 +237,7 @@ function projectFixture() {
     schemaVersion: CURRENT_QUALIFICATION_PROJECT_SCHEMA,
     workspace: { width: 300, height: 300, units: 'mm' },
     jobSetup: { placement: 'fixture' },
+    startPoints: { frame: { edge: 2, fraction: 0.4 }, job: { x: 12, y: 3 } },
     scene: {
       objects: [
         {
@@ -287,7 +289,7 @@ test('disk evidence rejects missing source, missing geometry and changed millime
 });
 
 test('disk evidence rejects stale, future and malformed project schemas', () => {
-  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 14, 15, 17, '15', '16', null, undefined]) {
+  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 14, 15, 16, 18, '16', '17', null, undefined]) {
     const stale = { ...projectFixture(), schemaVersion };
     assert.throws(
       () => validateProject(Buffer.from(JSON.stringify(stale))),
@@ -303,6 +305,7 @@ test('historical schemas require the explicit known-upgrade contract and retain 
     13,
     14,
     15,
+    16,
     CURRENT_QUALIFICATION_PROJECT_SCHEMA,
   ]) {
     const project = { ...projectFixture(), schemaVersion };
@@ -313,7 +316,7 @@ test('historical schemas require the explicit known-upgrade contract and retain 
     () => validateProject(Buffer.from(JSON.stringify(projectFixture())), { schemaMode: 'any' }),
     /Unknown qualification schema mode/,
   );
-  for (const schemaVersion of [11, 17, '12', '13', '14', '15', '16', null]) {
+  for (const schemaVersion of [11, 18, '12', '13', '14', '15', '16', '17', null]) {
     assert.throws(
       () =>
         validateProject(
@@ -334,6 +337,39 @@ test('roundtrip comparison detects lost operations, changed geometry and changed
   const workspace = structuredClone(project);
   workspace.workspace.width = 500;
   assert.throws(() => assertRoundtrip(project, workspace), /workspace changed/);
+});
+
+test('qualification requires both selected starts and detects changed or dropped selections', () => {
+  const before = projectFixture();
+  assert.doesNotThrow(() => assertSelectedStarts(before));
+  for (const mutate of [
+    (project) => {
+      delete project.startPoints;
+    },
+    (project) => {
+      delete project.startPoints.frame;
+    },
+    (project) => {
+      delete project.startPoints.job;
+    },
+    (project) => {
+      project.startPoints.frame.fraction = 0.9;
+    },
+    (project) => {
+      project.startPoints.job.x = 18;
+    },
+    (project) => {
+      project.startPoints.job.relative = true;
+    },
+  ]) {
+    const changed = structuredClone(before);
+    mutate(changed);
+    assert.throws(() => assertRoundtrip(before, changed), /start points changed/);
+  }
+  const missing = structuredClone(before);
+  delete missing.startPoints;
+  assert.throws(() => assertSelectedStarts(missing), /selected Frame start/);
+  assert.doesNotThrow(() => assertRoundtrip(missing, structuredClone(missing)));
 });
 
 test(
