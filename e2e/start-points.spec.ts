@@ -82,6 +82,48 @@ test('cancelled drags do not edit the project, and one drag has one undo step', 
   await page.screenshot({ path: test.info().outputPath('compact-start-handles.png') });
 });
 
+test('disabled rotary starts let canvas pointer input through and remain keyboard accessible', async ({
+  page,
+  kerfdesk,
+}) => {
+  const project = await currentProject(page);
+  const rotaryProject: Project = {
+    ...project,
+    device: {
+      ...project.device,
+      rotary: { enabled: true, type: 'chuck', mmPerRotation: 100, objectDiameterMm: 40 },
+    },
+  };
+  await kerfdesk.setOpenFiles([{ name: 'rotary-starts.lf2', text: JSON.stringify(rotaryProject) }]);
+  await page.getByRole('button', { name: 'Open...' }).click();
+  await expect(page).toHaveTitle(/rotary-starts\.lf2/);
+  await page.getByRole('button', { name: 'Fit to selection', exact: true }).click();
+  for (const name of ['Frame start', 'Job start']) {
+    const handle = page.getByRole('button', { name, exact: true });
+    await expect(handle).toHaveAttribute('aria-disabled', 'true');
+    await expect(handle).toHaveAttribute('title', /rotary surface view/);
+    await handle.focus();
+    await expect(handle).toBeFocused();
+    const bounds = await handle.boundingBox();
+    if (bounds === null) throw new Error(`${name} must be visible`);
+    await page.evaluate(() => {
+      for (const canvas of document.querySelectorAll('canvas')) {
+        delete canvas.dataset['startPointerReceived'];
+        canvas.addEventListener(
+          'pointerdown',
+          () => {
+            canvas.dataset['startPointerReceived'] = 'true';
+          },
+          { once: true },
+        );
+      }
+    });
+    await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await expect(page.locator('canvas[data-start-pointer-received="true"]')).toHaveCount(1);
+  }
+  expect((await currentProject(page)).startPoints).toEqual(project.startPoints);
+});
+
 async function currentProject(page: Page): Promise<Project> {
   return page.evaluate(async () => {
     const path = '/src/ui/state/store.ts';

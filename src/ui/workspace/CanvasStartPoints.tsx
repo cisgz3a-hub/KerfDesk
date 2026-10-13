@@ -185,7 +185,7 @@ function StartHandle(props: {
         aria-label={label}
         aria-disabled={props.disabled && !props.interaction.keyboardReady(props.kind)}
         title={hint}
-        style={{ left: dx, top: dy }}
+        style={{ left: dx, top: dy, pointerEvents: props.disabled ? 'none' : undefined }}
         onPointerDown={(event) => {
           if (!props.disabled) handlers.down(props.kind, props.point, event);
         }}
