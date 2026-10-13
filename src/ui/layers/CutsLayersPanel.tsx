@@ -2,9 +2,10 @@
 // secondary management surface; it must never push the active settings away.
 import { CncPreparationStatus } from './CncPreparationStatus';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { machineKindOf, type Layer } from '../../core/scene';
 import { CollapsedRail } from '../common';
-import { Icon, IconButton } from '../kit';
+import { Button, Dialog, DialogActions, Icon, IconButton } from '../kit';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { ArtworkPanelTabs } from './ArtworkPanelTabs';
@@ -18,6 +19,8 @@ import './cuts-layers-panel.css';
 import './artwork-inspector.css';
 
 export function CutsLayersPanel(): JSX.Element {
+  const [objectsOpen, setObjectsOpen] = useState(false);
+  const hasObjects = useStore((s) => s.project.scene.objects.length > 0);
   const panelVisible = useUiStore((s) => s.railPanelVisibility.layers);
   const togglePanel = useUiStore((s) => s.toggleRailPanel);
   const requestedView = useUiStore((s) => s.cutsLayersView);
@@ -41,6 +44,14 @@ export function CutsLayersPanel(): JSX.Element {
     >
       <header className="lf-artwork-panel-heading">
         <h2>Artwork</h2>
+        <Button
+          data-artwork-organise
+          title="Find, rename and organise artwork and groups"
+          disabled={!hasObjects}
+          onClick={() => setObjectsOpen(true)}
+        >
+          Objects
+        </Button>
         <IconButton
           icon="chevron-right"
           size="sm"
@@ -70,6 +81,17 @@ export function CutsLayersPanel(): JSX.Element {
           <LayersView layers={layers} />
         )}
       </div>
+      {objectsOpen
+        ? createPortal(
+            <Dialog title="Organise artwork" onClose={() => setObjectsOpen(false)} size="md">
+              <DesignHierarchyPanel expanded />
+              <DialogActions>
+                <Button onClick={() => setObjectsOpen(false)}>Done</Button>
+              </DialogActions>
+            </Dialog>,
+            document.body,
+          )
+        : null}
     </aside>
   );
 }
@@ -80,7 +102,6 @@ function LayersView({ layers }: { readonly layers: ReadonlyArray<Layer> }): JSX.
       {layers.length === 0 ? <EmptyArtwork /> : null}
       <CncPreparationStatus />
       <SelectedObjectProperties />
-      <DesignHierarchyPanel />
       {layers.length > 0 ? <OperationList layers={layers} /> : null}
     </>
   );

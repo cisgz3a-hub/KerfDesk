@@ -81,8 +81,6 @@ function RunOrderTools(
     | 'onStartNumbering'
   >,
 ): JSX.Element {
-  const jump = Number(props.jumpPosition);
-  const canJump = Number.isInteger(jump) && jump >= 1 && jump <= props.total;
   return (
     <section aria-label="Artwork run order tools" className="lf-run-order-toolbar">
       <div className="lf-run-order-toolbar-actions">
@@ -95,6 +93,30 @@ function RunOrderTools(
           Number on canvas
         </button>
       </div>
+      <RunOrderNavigation {...props} />
+    </section>
+  );
+}
+
+function RunOrderNavigation(
+  props: Pick<
+    ArtworkRunOrderToolbarProps,
+    | 'search'
+    | 'total'
+    | 'jumpPosition'
+    | 'onSearch'
+    | 'onJumpPosition'
+    | 'onJump'
+    | 'onStartNumbering'
+  >,
+): JSX.Element {
+  const jump = Number(props.jumpPosition);
+  const canJump = Number.isInteger(jump) && jump >= 1 && jump <= props.total;
+  return (
+    <details className="lf-run-order-navigation" open={props.search.length > 0 ? true : undefined}>
+      <summary title="Expand search and navigation controls for the run sequence.">
+        Find or jump to a run
+      </summary>
       <label className="lf-run-order-search">
         <span>Find artwork</span>
         <input
@@ -142,6 +164,6 @@ function RunOrderTools(
           </button>
         ) : null}
       </div>
-    </section>
+    </details>
   );
 }

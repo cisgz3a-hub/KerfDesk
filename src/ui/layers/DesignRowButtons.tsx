@@ -26,6 +26,7 @@ export function DesignRowButtons({
     <>
       <DesignDragHandle row={row} locked={locked} transfer={transfer} />
       <Button
+        data-design-tree-name
         pressed={active}
         title={
           row.kind === 'group'
