@@ -8,7 +8,7 @@
 
 Handles avoid visible text footprints so they do not block double-click text editing; a connector retains the exact start location. At extreme zoom, when text fills the viewport, controls remain accessible and clear of toolbar chrome.
 
-With **Keep source order**, cutting selection stays on the first executable contour and preserves its drawn direction; a closed contour can still change its entry point. Other travel policies retain their inside-first constraints. Operations that emit no powered motion do not prevent selection in a later executable operation.
+With **Keep source order**, cutting selection stays on the first executable contour and preserves its drawn direction; a closed contour can still change its entry point. A directional sweep likewise retains the first executable contour, while its entry follows the configured path-direction policy. Line start region retains its existing precedence over directional sweeps. Other travel policies retain their inside-first constraints. Operations that emit no powered motion do not prevent selection in a later executable operation.
 
 Raster and fill retain generated scan order. CNC selection supports identical closed contour depth passes; ramps, entry plunges, stay-down entries and other generated sequences retain their existing entry. Both handles are unavailable for registered Print and Cut and rotary views. In CNC mode, Side B retains the cutting start chosen on source artwork; its job handle and default saving are unavailable. Parked CNC settings do not restrict Laser mode. Busy-machine or document changes cancel a drag before it can commit. Escape, pointer cancellation and lost capture discard it.
 

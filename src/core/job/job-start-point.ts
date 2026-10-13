@@ -24,10 +24,13 @@ export type JobStartPointOptions = {
   readonly device?: DeviceProfile;
 };
 
-/** Source order preserves drawn direction even if a former planner setting
- * still allows reversal. Output and canvas snapping must use the same policy. */
+/** Explicit contour order survives manual entry selection. Source order also
+ * preserves drawn direction; a Line start region overrides directional sweeps. */
 export function jobStartPointOptions(
-  optimization: Pick<ProjectOptimizationSettings, 'travelPolicy' | 'pathDirection' | 'insideFirst'>,
+  optimization: Pick<
+    ProjectOptimizationSettings,
+    'travelPolicy' | 'pathDirection' | 'insideFirst' | 'cutDirection' | 'lineStartRegion'
+  >,
   scanningOffsets?: ReadonlyArray<ScanOffsetPoint>,
   device?: DeviceProfile,
 ): JobStartPointOptions {
@@ -36,7 +39,9 @@ export function jobStartPointOptions(
       optimization.travelPolicy !== 'source-order' &&
       optimization.pathDirection === 'allow-reverse',
     insideFirst: optimization.travelPolicy !== 'source-order' && optimization.insideFirst,
-    preserveOrder: optimization.travelPolicy === 'source-order',
+    preserveOrder:
+      optimization.travelPolicy === 'source-order' ||
+      (optimization.cutDirection !== undefined && optimization.lineStartRegion === undefined),
     ...(scanningOffsets === undefined ? {} : { scanningOffsets }),
     ...(device === undefined ? {} : { device }),
   };
@@ -219,7 +224,13 @@ function selectCut(
   acceptSegment: (segment: CutSegment) => boolean = isEmittableCutSegment,
 ): Selection | null {
   if (options.preserveOrder === true)
-    return selectFirstCut(segments, groupIndex, target, acceptSegment);
+    return selectFirstCut(
+      segments,
+      groupIndex,
+      target,
+      acceptSegment,
+      options.allowReverse === true,
+    );
   const eligibility = options.insideFirst === true ? containmentEligibility(segments) : null;
   let best: Selection | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
@@ -245,11 +256,12 @@ function selectFirstCut(
   groupIndex: number,
   target: Vec2,
   acceptSegment: (segment: CutSegment) => boolean,
+  allowReverse: boolean,
 ): Selection | null {
   const segmentIndex = segments.findIndex(acceptSegment);
   const first = segments[segmentIndex];
   if (first === undefined) return null;
-  const segment = selectedSegment(first, target, false);
+  const segment = selectedSegment(first, target, allowReverse);
   const point = segment?.polyline[0];
   return segment === null || point === undefined
     ? null

@@ -24,7 +24,12 @@ import {
 } from '../../core/job';
 import { compileCncJobResult, type CncJobCompilationResult } from '../../core/cnc/compile-cnc-job';
 import { toMachineCoords, toSceneCoords } from '../../core/devices';
-import { applyJobStartPoint, jobStartPointOptions } from '../../core/job/job-start-point';
+import {
+  applyJobStartPoint,
+  jobStartPointOptions,
+  resolveJobStartPoint,
+  type JobStartPointOptions,
+} from '../../core/job/job-start-point';
 import { computeJobStartBounds } from '../../core/job/job-start-bounds';
 import { registrationBoxScene } from '../../core/job/registration-placement';
 import {
@@ -256,33 +261,35 @@ export function completePreparedOutput(
     input.sourceProject.device.scanningOffsets,
     input.sourceProject.device.origin,
   );
-  const target = jobStartTarget(input.project, optimized, offset);
+  const startOptions = jobStartPointOptions(
+    input.sourceProject.optimization,
+    input.sourceProject.device.scanningOffsets,
+    input.project.device,
+  );
+  const target = jobStartTarget(input.project, optimized, offset, startOptions);
   return {
     ok: true,
     project: input.project,
     laserPowerScaleVersion: CURRENT_LASER_POWER_SCALE_VERSION,
-    job:
-      target === null
-        ? optimized
-        : applyJobStartPoint(
-            optimized,
-            target,
-            jobStartPointOptions(
-              input.sourceProject.optimization,
-              input.sourceProject.device.scanningOffsets,
-              input.project.device,
-            ),
-          ),
+    job: target === null ? optimized : applyJobStartPoint(optimized, target, startOptions),
     jobOriginOffset: offset,
     advisories: input.advisories,
   };
 }
 
-function jobStartTarget(project: Project, placed: Job, offset: Vec2): Vec2 | null {
+function jobStartTarget(
+  project: Project,
+  placed: Job,
+  offset: Vec2,
+  options: JobStartPointOptions,
+): Vec2 | null {
   const preference = project.startPoints?.job;
   if (preference === undefined) return null;
   let scenePoint: Vec2 = preference;
   if (preference.relative === true) {
+    // Generated starts cannot use this preference. Determine support from the
+    // first executable operation before traversing every raster row for bounds.
+    if (resolveJobStartPoint(placed, ZERO_OFFSET, options)?.supported !== true) return null;
     const bounds = computeJobStartBounds(placed, project.device);
     if (bounds === null) return null;
     const a = toSceneCoords(
