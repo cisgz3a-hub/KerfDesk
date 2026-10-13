@@ -43,6 +43,7 @@ function RunPositionInput(props: {
 type ArtworkRunOrderRowProps = {
   readonly row: ArtworkRunOrderRowModel;
   readonly active: boolean;
+  readonly showSettings?: boolean;
   readonly machineKind: 'laser' | 'cnc';
   readonly total?: number;
   readonly numberingActive?: boolean;
@@ -58,7 +59,7 @@ export function ArtworkRunOrderRow(props: ArtworkRunOrderRowProps): JSX.Element 
     <article
       aria-label={`Run ${props.row.position}: ${props.row.name}`}
       aria-current={props.active ? 'true' : undefined}
-      className={`lf-run-order-card${props.active ? ' lf-run-order-card--active' : ''}`}
+      className={`lf-run-order-card${props.active ? ' lf-run-order-card--active' : ''}${props.showSettings ? ' lf-run-order-card--detailed' : ''}`}
       style={{ borderLeftColor: accent }}
       onClick={props.onFocus}
     >
@@ -90,7 +91,7 @@ export function ArtworkRunOrderRow(props: ArtworkRunOrderRowProps): JSX.Element 
         aria-label={`Settings summary for ${props.row.name}`}
       >
         <strong>{props.row.operationSummary}</strong>
-        <span>{props.row.settingsSummary}</span>
+        {props.showSettings ? <span>{props.row.settingsSummary}</span> : null}
         {props.row.shared ? <span>Shared by {props.row.objectIds.length} artworks</span> : null}
       </div>
       <div className="lf-run-order-effective" tabIndex={0}>

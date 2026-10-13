@@ -138,6 +138,14 @@
   }
 }
 
+/* The operation card has its own padding inside the rail. Leave enough text
+   width at the minimum rail size, including platforms with wider UI fonts. */
+@container (max-width: 260px) {
+  .lf-process-segment {
+    padding-inline: 2px;
+  }
+}
+
 .lf-inspector-help {
   margin-top: 4px;
   font-size: 12px;

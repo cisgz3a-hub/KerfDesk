@@ -117,6 +117,27 @@ function button(host: HTMLElement, label: string): HTMLButtonElement {
 }
 
 describe('MaterialLibraryPanel preset management', () => {
+  it('records selected artwork before a material library exists', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    expect(useStore.getState().materialLibrary).toBeNull();
+    const { host, root } = await renderPanel();
+    try {
+      const experiments = Array.from(host.querySelectorAll('button')).find(
+        (element) => element.textContent === 'Experiments…',
+      );
+      expect(experiments).toBeDefined();
+      await act(async () => experiments?.click());
+      const record = Array.from(document.querySelectorAll('button')).find(
+        (element) => element.textContent === 'Record selected artwork process',
+      );
+      expect(record?.disabled).toBe(false);
+      await act(async () => record?.click());
+      expect(useStore.getState().materialLibrary?.experiments).toHaveLength(1);
+    } finally {
+      await unmount(root, host);
+    }
+  });
+
   it('surfaces stale linked revision truth and refreshes it explicitly', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setMaterialLibrary(library([preset({ revision: 'rev-1' })]));

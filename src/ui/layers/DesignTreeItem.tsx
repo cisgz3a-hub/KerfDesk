@@ -39,7 +39,7 @@ export function DesignTreeItem({
     >
       <DesignDropEdge row={row} nextSibling={nextSibling} transfer={transfer} edge="before" />
       <div
-        style={{ display: 'flex', gap: 4, alignItems: 'center' }}
+        className="lf-design-tree-row"
         data-design-drop={key}
         title={
           row.kind === 'group'

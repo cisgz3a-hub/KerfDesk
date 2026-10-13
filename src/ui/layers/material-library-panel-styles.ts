@@ -1,21 +1,20 @@
 import type { CSSProperties } from 'react';
 
 export const sectionStyle: CSSProperties = {
-  borderTop: '1px solid var(--lf-border)',
-  borderBottom: '1px solid var(--lf-border)',
-  padding: '10px 0',
+  padding: '4px 0',
+  minWidth: 0,
   marginBottom: 10,
   display: 'flex',
   flexDirection: 'column',
-  gap: 8,
+  gap: 12,
 };
 
-export const headingStyle: CSSProperties = { fontSize: 14, margin: 0 };
+export const headingStyle: CSSProperties = { fontSize: 16, margin: 0 };
 
 export const hintStyle: CSSProperties = {
   color: 'var(--lf-text-muted)',
   fontSize: 12,
-  fontStyle: 'italic',
+  lineHeight: 1.5,
   margin: 0,
 };
 
@@ -25,15 +24,17 @@ export const libraryNameStyle: CSSProperties = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
+  margin: 0,
 };
 
 export const buttonRowStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 6 };
 
 export const fieldStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '64px minmax(0, 1fr)',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  minWidth: 0,
   alignItems: 'center',
-  gap: 8,
+  gap: 5,
 };
 
 export const labelStyle: CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 12 };

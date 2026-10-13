@@ -10,6 +10,7 @@ import {
 
 export function MaterialLibraryRecipeControls(props: {
   readonly activeLayerId: string;
+  readonly targetName?: string | undefined;
   readonly activePresetId: string;
   readonly activePresetOption: MaterialLibraryPresetOption | null;
   readonly onAssign: () => boolean;
@@ -23,6 +24,7 @@ export function MaterialLibraryRecipeControls(props: {
     <>
       <div style={buttonRowStyle}>
         <Button
+          variant="primary"
           aria-label="Apply selected material preset to layer"
           title="Apply the selected material preset to the selected layer."
           disabled={applyDisabled}
@@ -30,37 +32,51 @@ export function MaterialLibraryRecipeControls(props: {
             props.onStatus(props.onAssign() ? 'Applied to layer.' : 'Preset was not applied.');
           }}
         >
-          Apply to layer
-        </Button>
-        <Button
-          aria-label="Link selected material preset to layer"
-          title="Link this layer to the preset while keeping a last-known settings snapshot."
-          disabled={applyDisabled}
-          onClick={() =>
-            props.onStatus(props.onLink() ? 'Linked preset to layer.' : 'Preset was not linked.')
-          }
-        >
-          Link to layer
-        </Button>
-        <Button
-          aria-label="Delete selected material preset"
-          title="Delete the selected preset from this material library."
-          variant="danger"
-          disabled={deleteDisabled}
-          onClick={() => {
-            if (props.activePresetOption === null) return;
-            const label = presetDeleteLabel(props.activePresetOption);
-            if (!jobAwareConfirm(`Delete preset "${label}"?`)) {
-              props.onStatus('Delete cancelled.');
-              return;
-            }
-            props.onStatus(props.onDelete() ? 'Preset deleted.' : 'Preset was not deleted.');
-          }}
-        >
-          Delete
+          Apply to {props.targetName?.trim() || 'operation'}
         </Button>
       </div>
       <PresetMatchSummary option={props.activePresetOption} />
+      <details className="material-library-panel__disclosure" hidden={deleteDisabled}>
+        <summary title="Expand controls for linking or deleting the selected preset.">
+          Link or delete this preset
+        </summary>
+        <div className="material-library-panel__details">
+          <p style={calibrationTextStyle}>
+            Link to track changes to this preset and refresh the operation when you choose.
+          </p>
+          <div style={buttonRowStyle}>
+            <Button
+              aria-label="Link selected material preset to layer"
+              title="Link this layer to the preset while keeping a last-known settings snapshot."
+              disabled={applyDisabled}
+              onClick={() =>
+                props.onStatus(
+                  props.onLink() ? 'Linked preset to layer.' : 'Preset was not linked.',
+                )
+              }
+            >
+              Link to operation
+            </Button>
+            <Button
+              aria-label="Delete selected material preset"
+              title="Delete the selected preset from this material library."
+              variant="danger"
+              disabled={deleteDisabled}
+              onClick={() => {
+                if (props.activePresetOption === null) return;
+                const label = presetDeleteLabel(props.activePresetOption);
+                if (!jobAwareConfirm(`Delete preset "${label}"?`)) {
+                  props.onStatus('Delete cancelled.');
+                  return;
+                }
+                props.onStatus(props.onDelete() ? 'Preset deleted.' : 'Preset was not deleted.');
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      </details>
     </>
   );
 }

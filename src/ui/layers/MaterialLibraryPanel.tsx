@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import './material-library-panel.css';
 import { starterLibraryEntryForProfileId } from '../../core/material-library';
 import { machineKindOf, type Layer } from '../../core/scene';
 import type { MaterialLibraryDocument } from '../../io/material-library';
@@ -41,10 +42,11 @@ export function MaterialLibraryPanel(): JSX.Element {
   return library === null ? (
     <EmptyMaterialLibraryPanel />
   ) : kind === 'cnc' ? (
-    <section aria-label="Process Library" style={sectionStyle}>
+    <section className="material-library-panel" aria-label="Process Library" style={sectionStyle}>
       <Header />
       <p style={libraryNameStyle}>{library.name}</p>
       <ProcessRecipePanel />
+      <LibraryTools />
     </section>
   ) : (
     <LoadedMaterialLibraryPanel library={library} />
@@ -59,12 +61,15 @@ function EmptyMaterialLibraryPanel(): JSX.Element {
   const starterEntry = kind === 'laser' ? starterLibraryEntryForProfileId(device.profileId) : null;
   return (
     <section
+      className="material-library-panel"
       aria-label={kind === 'cnc' ? 'Process Library' : 'Material Library'}
       style={sectionStyle}
     >
       <Header />
-      <p style={hintStyle}>No library yet. Create one, or open one from Saved Libraries.</p>
+      <p style={hintStyle}>Create a library below, or open one from Saved Libraries.</p>
       <div style={buttonRowStyle}>
+        <SavedLibrariesButton />
+        <MaterialExperimentsButton />
         <Button
           aria-label="Create new material library"
           title="Create a new, empty material library for the current device profile."
@@ -105,42 +110,90 @@ function LoadedMaterialLibraryPanel(props: {
     setTargetLayerId,
   } = selection;
   return (
-    <section aria-label="Material Library" style={sectionStyle}>
+    <section className="material-library-panel" aria-label="Material Library" style={sectionStyle}>
       <Header />
       <p style={libraryNameStyle}>{props.library.name}</p>
-      <JobMaterialControls library={props.library} />
-      <ProcessRecipePanel />
-      <label style={fieldStyle}>
-        <span style={labelStyle}>Search</span>
-        <input
-          aria-label="Search material recipes"
-          title="Filter recipes by material, thickness, machine or notes before reviewing and choosing a preset."
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.currentTarget.value)}
-          placeholder="Material, thickness, machine or notes"
+      <div className="material-library-panel__intro">
+        Find a preset, review its settings and apply it to an operation.
+      </div>
+      <div className="material-library-panel__card">
+        <label style={fieldStyle}>
+          <span style={labelStyle}>Find a material preset</span>
+          <input
+            aria-label="Search material recipes"
+            title="Filter recipes by material, thickness, machine or notes before reviewing and choosing a preset."
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            placeholder="Material, thickness, machine or notes"
+          />
+        </label>
+        <MaterialLibrarySelectors
+          layers={layers}
+          presetOptions={presetOptions}
+          activeLayerId={activeLayerId}
+          activePresetId={activePresetId}
+          onLayerChange={setTargetLayerId}
+          onPresetChange={setPresetId}
         />
-      </label>
-      <MaterialLibrarySelectors
-        layers={layers}
-        presetOptions={presetOptions}
-        activeLayerId={activeLayerId}
-        activePresetId={activePresetId}
-        onLayerChange={setTargetLayerId}
-        onPresetChange={setPresetId}
-      />
-      <MaterialRecipePreview
-        library={props.library}
-        preset={activePresetOption?.preset ?? null}
-        layer={activeLayer}
-      />
-      <LinkedRecipeChangeReview library={props.library} layers={layers} />
-      <MaterialPresetWizardLauncher
-        selectedPreset={activePresetOption?.preset ?? null}
-        onSaved={setPresetId}
-      />
-      <MaterialRecipeActions library={props.library} selection={selection} />
+        {presetOptions.length === 0 ? (
+          <p role="status" style={hintStyle}>
+            {query.trim() === ''
+              ? 'This library has no material presets. Use Create & edit presets below to add one.'
+              : 'No matching presets. Try another material or clear the search.'}
+          </p>
+        ) : null}
+        <MaterialRecipePreview
+          library={props.library}
+          preset={activePresetOption?.preset ?? null}
+          layer={activeLayer}
+        />
+        {layers.some((layer) => layer.materialBinding !== undefined) ? (
+          <LinkedRecipeChangeReview library={props.library} layers={layers} />
+        ) : null}
+        <MaterialRecipeActions library={props.library} selection={selection} />
+      </div>
+      <MaterialLibraryExtras library={props.library} selection={selection} />
+      <LibraryTools />
     </section>
+  );
+}
+
+function MaterialLibraryExtras(props: {
+  readonly library: MaterialLibraryDocument;
+  readonly selection: ReturnType<typeof useMaterialLibrarySelection>;
+}): JSX.Element {
+  const { activePresetOption, setPresetId } = props.selection;
+  return (
+    <>
+      <details className="material-library-panel__disclosure">
+        <summary title="Expand job material and automatic preset controls.">
+          Job material &amp; automatic presets
+        </summary>
+        <div className="material-library-panel__details">
+          <JobMaterialControls library={props.library} />
+        </div>
+      </details>
+      <details className="material-library-panel__disclosure">
+        <summary title="Expand controls for multi-step process recipes.">
+          Multi-step process recipes
+        </summary>
+        <div className="material-library-panel__details">
+          <ProcessRecipePanel />
+        </div>
+      </details>
+      <details className="material-library-panel__disclosure">
+        <summary title="Expand tools for creating and editing material presets.">
+          Create &amp; edit presets
+        </summary>
+        <div className="material-library-panel__details">
+          <MaterialPresetWizardLauncher
+            selectedPreset={activePresetOption?.preset ?? null}
+            onSaved={setPresetId}
+          />
+        </div>
+      </details>
+    </>
   );
 }
 
@@ -196,6 +249,7 @@ function MaterialRecipeActions(props: {
     <>
       <MaterialLibraryRecipeControls
         activeLayerId={activeLayerId}
+        targetName={activeLayer?.name}
         activePresetId={activePresetId}
         activePresetOption={activePresetOption}
         onAssign={() => assignMaterialPresetToLayer(activeLayerId, activePresetId)}
@@ -220,9 +274,7 @@ function MaterialRecipeActions(props: {
         <p role="status" style={statusStyle}>
           {materialBindingStatusText(activeLayer.materialBinding, bindingStatus)}
         </p>
-      ) : activeLayer === null ? null : (
-        <p style={statusStyle}>Manual operation defaults · no linked recipe.</p>
-      )}
+      ) : null}
     </>
   );
 }
@@ -264,29 +316,6 @@ function MaterialLibrarySelectors(props: {
   return (
     <>
       <label style={fieldStyle}>
-        <span style={labelStyle}>Layer</span>
-        <span style={layerControlStyle}>
-          {/* Swatch background is scene data (the layer color), inline per ADR-047. */}
-          {activeLayer === null ? null : (
-            <span style={{ ...swatchStyle, background: activeLayer.color }} />
-          )}
-          <select
-            aria-label="Material library target layer"
-            value={props.activeLayerId}
-            disabled={props.layers.length === 0}
-            title="Choose which cut layer receives the selected material preset."
-            onChange={(event) => props.onLayerChange(event.currentTarget.value)}
-          >
-            {props.layers.length === 0 ? <option value="">No layers</option> : null}
-            {props.layers.map((layer, index) => (
-              <option key={layer.id} value={layer.id}>
-                {`Layer ${index + 1} (${layer.color})`}
-              </option>
-            ))}
-          </select>
-        </span>
-      </label>
-      <label style={fieldStyle}>
         <span style={labelStyle}>Preset</span>
         <select
           aria-label="Material library preset"
@@ -303,22 +332,49 @@ function MaterialLibrarySelectors(props: {
           ))}
         </select>
       </label>
+      <label style={fieldStyle}>
+        <span style={labelStyle}>Apply to operation</span>
+        <span style={layerControlStyle}>
+          {/* Swatch background is scene data (the layer color), inline per ADR-047. */}
+          {activeLayer === null ? null : (
+            <span style={{ ...swatchStyle, background: activeLayer.color }} />
+          )}
+          <select
+            aria-label="Material library target layer"
+            value={props.activeLayerId}
+            disabled={props.layers.length === 0}
+            title="Choose which operation receives the selected material preset."
+            onChange={(event) => props.onLayerChange(event.currentTarget.value)}
+          >
+            {props.layers.length === 0 ? <option value="">No operations</option> : null}
+            {props.layers.map((layer, index) => (
+              <option key={layer.id} value={layer.id}>
+                {layer.name.trim() || `Operation ${index + 1}`}
+              </option>
+            ))}
+          </select>
+        </span>
+      </label>
     </>
   );
 }
 
 function Header(): JSX.Element {
   const kind = useStore((state) => machineKindOf(state.project.machine));
+  return <h2 style={headingStyle}>{kind === 'cnc' ? 'Process Library' : 'Material Library'}</h2>;
+}
+
+function LibraryTools(): JSX.Element {
   return (
-    <div style={headerRowStyle}>
-      <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
-      >
-        <h2 style={headingStyle}>{kind === 'cnc' ? 'Process Library' : 'Material Library'}</h2>
+    <details className="material-library-panel__disclosure">
+      <summary title="Expand saved libraries and recorded material experiments.">
+        Libraries &amp; experiments
+      </summary>
+      <div className="material-library-panel__details material-library-panel__tools">
+        <SavedLibrariesButton />
+        <MaterialExperimentsButton />
       </div>
-      <SavedLibrariesButton />
-      <MaterialExperimentsButton />
-    </div>
+    </details>
   );
 }
 
@@ -327,17 +383,12 @@ function activeId(candidate: string, ids: ReadonlyArray<string>): string {
   return ids[0] ?? '';
 }
 
-const headerRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 8,
-};
 const layerControlStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
   flex: 1,
+  minWidth: 0,
 };
 const swatchStyle: React.CSSProperties = {
   width: 14,
