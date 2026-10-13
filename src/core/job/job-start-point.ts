@@ -1,4 +1,6 @@
 import type { ProjectOptimizationSettings, Vec2 } from '../scene';
+import type { DeviceProfile } from '../devices';
+import { hasJobStartPower } from './job-start-power';
 import { offsetForEmittedFeed, type ScanOffsetPoint } from './scan-offset';
 import { containmentDepths } from './containment-depth';
 import { nearestClosedStart } from './closed-shape-start';
@@ -19,6 +21,7 @@ export type JobStartPointOptions = {
   readonly insideFirst?: boolean;
   readonly preserveOrder?: boolean;
   readonly scanningOffsets?: ReadonlyArray<ScanOffsetPoint>;
+  readonly device?: DeviceProfile;
 };
 
 /** Source order preserves drawn direction even if a former planner setting
@@ -26,6 +29,7 @@ export type JobStartPointOptions = {
 export function jobStartPointOptions(
   optimization: Pick<ProjectOptimizationSettings, 'travelPolicy' | 'pathDirection' | 'insideFirst'>,
   scanningOffsets?: ReadonlyArray<ScanOffsetPoint>,
+  device?: DeviceProfile,
 ): JobStartPointOptions {
   return {
     allowReverse:
@@ -34,6 +38,7 @@ export function jobStartPointOptions(
     insideFirst: optimization.travelPolicy !== 'source-order' && optimization.insideFirst,
     preserveOrder: optimization.travelPolicy === 'source-order',
     ...(scanningOffsets === undefined ? {} : { scanningOffsets }),
+    ...(device === undefined ? {} : { device }),
   };
 }
 
@@ -178,7 +183,8 @@ function canRotateCnc(group: CncGroup): boolean {
 }
 
 function firstPoint(group: Group, options: JobStartPointOptions): Vec2 | undefined {
-  if (group.kind !== 'cnc' && (group.power <= 0 || group.passes <= 0)) return undefined;
+  if (!hasJobStartPower(group, options.device) || (group.kind !== 'cnc' && group.passes <= 0))
+    return undefined;
   if (group.kind === 'cut') return group.segments.find(isEmittableCutSegment)?.polyline[0];
   return cachedProcessPoint(group, options) ?? undefined;
 }

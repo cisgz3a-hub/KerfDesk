@@ -67,7 +67,11 @@ function jobEditReason(context: StartEditingContext): string | null {
   const first = resolveJobStartPoint(
     prepared.job,
     { x: 0, y: 0 },
-    jobStartPointOptions(sourceProject.optimization, sourceProject.device.scanningOffsets),
+    jobStartPointOptions(
+      sourceProject.optimization,
+      sourceProject.device.scanningOffsets,
+      prepared.project.device,
+    ),
   );
   const reason =
     first?.supported === true
@@ -108,6 +112,7 @@ export function selectCanvasStart(
     jobStartPointOptions(
       context.sourceProject.optimization,
       context.sourceProject.device.scanningOffsets,
+      plan.device,
     ),
   );
   if (selected?.supported !== true) return null;

@@ -6,7 +6,7 @@ import {
 import { circularArcGeometry, isCircularArcFullCircle } from '../geometry/arc-representation';
 import { hasGcodeXyMotionAtEmitPrecision } from '../gcode/coordinate-format';
 import { planRasterRowSweeps, type RasterRowSweepPlan } from '../raster/raster-sweep-plan';
-import { rasterScanFrame, scanToMachine } from '../raster/raster-scan-frame';
+import { rasterPoweredSpans } from '../raster/raster-powered-spans';
 import { assertNever, type Vec2 } from '../scene';
 import { cncHelicalContourCanEmit } from './cnc-helical-representation';
 import { isEmittableFillSegment } from './fill-emission-resolution';
@@ -142,8 +142,7 @@ function firstRasterProcessPoint(group: RasterGroup, options: BuildToolpathOptio
     const y = group.bounds.minY + (rowIndex + 0.5) * pixelHeightMm;
     for (const plan of plans) {
       const point = firstRasterSweepPoint(group, plan, pixelWidthMm, y, reverse, offset);
-      // ADR-492: the sweep is planned in the scan frame.
-      if (point !== null) return scanToMachine(rasterScanFrame(group.scanAngleDeg), point);
+      if (point !== null) return point;
     }
     emittedRows += 1;
   }
@@ -169,15 +168,14 @@ function firstRasterSweepPoint(
   reverse: boolean,
   offset: number,
 ): Vec2 | null {
-  const shift = reverse ? -offset : 0;
-  let x =
-    group.bounds.minX + (reverse ? plan.span.lastX + 1 : plan.span.firstX) * pixelWidthMm + shift;
-  for (const run of plan.runs) {
-    const target = run.endXWorldMm + shift;
-    if (target === x) continue;
-    if (run.s > 0) return { x, y };
-    x = target;
-  }
+  const spans = rasterPoweredSpans(plan, {
+    activeStartX:
+      group.bounds.minX + (reverse ? plan.span.lastX + 1 : plan.span.firstX) * pixelWidthMm,
+    y,
+    shiftX: reverse ? -offset : 0,
+    scanAngleDeg: group.scanAngleDeg,
+  });
+  for (const span of spans) return span.from;
   return null;
 }
 

@@ -96,6 +96,7 @@ function Harness(props: {
       ) : (
         <button
           type="button"
+          title="Drag or use arrow keys to choose the job start"
           onPointerDown={(event) => handlers.down('job', { x: 10, y: 20 }, event)}
           onPointerMove={handlers.move}
           onPointerUp={handlers.up}

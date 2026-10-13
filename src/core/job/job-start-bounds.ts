@@ -1,7 +1,7 @@
 import type { DeviceProfile } from '../devices';
 import { hasGcodeXyMotionAtEmitPrecision } from '../gcode/coordinate-format';
 import { planRasterRowSweeps, type RasterRowSweepPlan } from '../raster/raster-sweep-plan';
-import { rasterScanFrame, scanToMachine, type RasterScanFrame } from '../raster/raster-scan-frame';
+import { rasterPoweredSpans } from '../raster/raster-powered-spans';
 import type { Vec2 } from '../scene';
 import { isEmittableCutSegment } from './cut-emission-resolution';
 import { firstToolpathProcessPoint } from './first-process-point';
@@ -9,6 +9,7 @@ import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
 import type { FillGroup, Group, Job, RasterGroup } from './job';
 import { computeEmittedJobBounds, type JobBounds } from './job-bounds';
+import { hasJobStartPower } from './job-start-power';
 import { rasterRowsInProviderOrder } from './raster-rows';
 import { offsetForEmittedFeed } from './scan-offset';
 
@@ -40,7 +41,7 @@ function groupStartBounds(group: Group, device: DeviceProfile): JobBounds | null
     );
     return computeEmittedJobBounds({ groups: [{ ...group, passes }] }, device);
   }
-  if (!(group.power > 0) || !(group.passes > 0)) return null;
+  if (!hasJobStartPower(group, device) || !(group.passes > 0)) return null;
   if (group.kind === 'raster') return rasterStartBounds(group, device);
   if (group.kind === 'fill' && group.fillStyle !== 'offset') return fillStartBounds(group, device);
   // Narrow before filtering so offset-fill segments retain their required reverse flag.
@@ -99,7 +100,6 @@ function rasterStartBounds(group: RasterGroup, device: DeviceProfile): JobBounds
   const pixelHeightMm = (group.bounds.maxY - group.bounds.minY) / group.pixelHeight;
   const offset =
     group.bidirectionalScanOffsetMm ?? offsetForEmittedFeed(device.scanningOffsets, group.speed);
-  const frame = rasterScanFrame(group.scanAngleDeg);
   let emittedRows = 0;
   for (const { rowIndex, row } of rasterRowsInProviderOrder(group)) {
     const reverse = (group.bidirectional ?? true) && emittedRows % 2 === 1;
@@ -114,7 +114,7 @@ function rasterStartBounds(group: RasterGroup, device: DeviceProfile): JobBounds
     if (plans.length === 0) continue;
     const y = group.bounds.minY + (rowIndex + 0.5) * pixelHeightMm;
     for (const plan of plans) {
-      addRasterSweep(bounds, plan, { group, frame, pixelWidthMm, y, reverse, offset });
+      addRasterSweep(bounds, plan, { group, pixelWidthMm, y, reverse, offset });
     }
     emittedRows += 1;
   }
@@ -126,22 +126,21 @@ function addRasterSweep(
   plan: RasterRowSweepPlan,
   context: {
     group: RasterGroup;
-    frame: RasterScanFrame;
     pixelWidthMm: number;
     y: number;
     reverse: boolean;
     offset: number;
   },
 ) {
-  const { group, frame, pixelWidthMm, y, reverse, offset } = context;
-  const shift = reverse ? -offset : 0;
-  let x =
-    group.bounds.minX + (reverse ? plan.span.lastX + 1 : plan.span.firstX) * pixelWidthMm + shift;
-  for (const run of plan.runs) {
-    const next = run.endXWorldMm + shift;
-    if (run.s > 0) bounds.add(scanToMachine(frame, { x, y }), scanToMachine(frame, { x: next, y }));
-    x = next;
-  }
+  const { group, pixelWidthMm, y, reverse, offset } = context;
+  for (const span of rasterPoweredSpans(plan, {
+    activeStartX:
+      group.bounds.minX + (reverse ? plan.span.lastX + 1 : plan.span.firstX) * pixelWidthMm,
+    y,
+    shiftX: reverse ? -offset : 0,
+    scanAngleDeg: group.scanAngleDeg,
+  }))
+    bounds.add(span.from, span.to);
 }
 
 function hasUsableRasterGeometry(group: RasterGroup): boolean {

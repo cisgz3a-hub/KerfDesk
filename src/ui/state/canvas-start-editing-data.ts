@@ -23,6 +23,7 @@ export function buildCanvasStartEditingData(
   const options = jobStartPointOptions(
     prepared.project.optimization,
     prepared.project.device.scanningOffsets,
+    prepared.project.device,
   );
   const selection = resolveJobStartPoint(prepared.job, { x: 0, y: 0 }, options);
   return {
