@@ -3,7 +3,8 @@
 // batch 5 slice so command-types.ts stays as it is.
 
 import type { DrawOrderMove } from '../../core/draw-order';
-import type { SelectionMatchSizeKind, SelectionMoveTogetherAxis } from '../../core/scene';
+import type { SelectionMatchSizeKind } from '../../core/scene/selection-match-size';
+import type { SelectionMoveTogetherAxis } from '../../core/scene/selection-move-together';
 
 export type LayoutCommandContext = {
   readonly moveSelectionInDrawOrder: (move: DrawOrderMove) => void;

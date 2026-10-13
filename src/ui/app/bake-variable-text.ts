@@ -6,7 +6,8 @@
 
 import type { SceneObject } from '../../core/scene';
 import { objectVariableTemplate } from '../../core/variables/object-variable-template';
-import { materializeVariableObject, type VariableTextRenderer } from '../../io/gcode';
+import type { VariableTextRenderer } from '../../io/gcode';
+import { materializeVariableObject } from '../../io/gcode/prepare-output-snapshot';
 import { useStore } from '../state';
 import { selectedObjectIds } from '../state/scene-group-actions';
 import { useToastStore } from '../state/toast-store';

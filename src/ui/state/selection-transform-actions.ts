@@ -1,12 +1,18 @@
 import {
+  buildSelectionMatchSizeEdit,
+  type SelectionMatchSizeKind,
+} from '../../core/scene/selection-match-size';
+import {
+  buildSelectionMoveTogetherEdit,
+  type SelectionMoveTogetherAxis,
+} from '../../core/scene/selection-move-together';
+import {
   type BoardAnchor,
   boardFitRegion,
   buildBoxAnchorAlign,
   buildSelectionAlignEdit,
   buildSelectionDistributeEdit,
   buildSelectionFlipEdit,
-  buildSelectionMatchSizeEdit,
-  buildSelectionMoveTogetherEdit,
   buildSelectionNudgeEdit,
   findRegistrationBoxes,
   fitObjectToRegion,
@@ -17,8 +23,6 @@ import {
   type SelectionAlignKind,
   type SelectionDistributeKind,
   type SelectionFlipAxis,
-  type SelectionMatchSizeKind,
-  type SelectionMoveTogetherAxis,
   type Transform,
 } from '../../core/scene';
 import {
