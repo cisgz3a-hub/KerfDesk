@@ -92,7 +92,12 @@ function TraceActions({
   return (
     <>
       {mode === 'trace-parts' && preparationFailed ? (
-        <button type="button" className="lf-btn" onClick={retryTracePartPreparation}>
+        <button
+          type="button"
+          className="lf-btn"
+          title="Try preparing the trace parts again."
+          onClick={retryTracePartPreparation}
+        >
           Retry
         </button>
       ) : null}
