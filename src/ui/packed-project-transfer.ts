@@ -152,6 +152,27 @@ function packedPathsFor(paths: ReadonlyArray<ColoredPath>): ReadonlyArray<Packed
   return packed;
 }
 
+/** A fresh single-path payload: its buffers belong to this transfer only. */
+export function packColoredPathMessage(path: ColoredPath): {
+  readonly path: PackedColoredPath;
+  readonly transfer: ArrayBuffer[];
+} {
+  const packed = packColoredPath(path);
+  const arrays = [packed.polylines.xy, packed.polylines.starts, packed.polylines.closed];
+  const curves = packed.curves;
+  if (curves !== undefined && !curves.derived) {
+    arrays.push(
+      curves.start,
+      curves.closed,
+      curves.segmentStarts,
+      curves.kinds,
+      curves.flags,
+      curves.values,
+    );
+  }
+  return { path: packed, transfer: arrays.map((array) => array.buffer as ArrayBuffer) };
+}
+
 function packColoredPath(path: ColoredPath): PackedColoredPath {
   const { polylines, curves, ...rest } = path;
   return {
@@ -290,7 +311,7 @@ function curveDerivedFromPolyline(curve: CurveSubpath, polyline: Polyline): bool
   });
 }
 
-function unpackColoredPath(packed: PackedColoredPath): ColoredPath {
+export function unpackColoredPath(packed: PackedColoredPath): ColoredPath {
   const { polylines: packedPolylines, curves: packedCurves, ...rest } = packed;
   const polylines = unpackPolylines(packedPolylines);
   if (packedCurves === undefined) return { ...rest, polylines };

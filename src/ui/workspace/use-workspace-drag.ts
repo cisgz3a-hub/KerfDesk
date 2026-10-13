@@ -1,7 +1,4 @@
 import {
-  useCallback,
-  useRef,
-  useState,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
@@ -33,6 +30,9 @@ import { beginHandleToolDrag } from './handle-tool-drag';
 import { selectObjectsInMarquee } from './selection-marquee';
 import { runClickTool } from './workspace-click-tools';
 import { useEscCancelsDrag } from './use-esc-cancels-drag';
+import { useToolChangeCancelsDrag } from './use-tool-change-cancels-drag';
+import { useFramePointerHandlers } from './use-frame-pointer-handlers';
+import { useWorkspacePointerState } from './use-workspace-pointer-state';
 import type { SnapGuide, SnapSettings } from './snapping';
 import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
 import {
@@ -50,11 +50,7 @@ import {
   updateMeasureDraft,
 } from './workspace-drag-updates';
 import { handleArtworkNumberingPointerDown } from './artwork-numbering-click';
-import {
-  clearOwnedPointerDrag,
-  createOwnedPointerHandlers,
-  type OwnedPointerHandlers,
-} from './workspace-pointer-owner';
+import { createOwnedPointerHandlers, type OwnedPointerHandlers } from './workspace-pointer-owner';
 
 type CanvasMouseEvent = ReactMouseEvent<HTMLCanvasElement>;
 // The canvas binds POINTER events so an in-progress drag can be captured to the
@@ -82,12 +78,8 @@ export function useDragMove(
   viewState: WorkspaceViewState,
 ): DragMoveResult {
   const deps = useWorkspaceDragDeps();
-  const [drag, setDrag] = useState<DragState | null>(null);
-  const activePointerId = useRef<number | null>(null);
-  const clearDrag = useCallback(
-    () => clearOwnedPointerDrag({ canvas: ref.current, activePointerId, setDrag }),
-    [ref],
-  );
+  const { drag, setDrag, activePointerId, cancelPending, documentEpoch, clearDrag } =
+    useWorkspacePointerState(ref);
 
   const handlers = createOwnedPointerHandlers({
     getCanvas: () => ref.current,
@@ -145,7 +137,15 @@ export function useDragMove(
       }),
   });
   useEscCancelsDrag(drag, deps, clearDrag);
-  return { handlers, dragKind: visibleDragKind(drag) };
+  useToolChangeCancelsDrag(drag, deps, clearDrag);
+  const frameHandlers = useFramePointerHandlers(
+    handlers,
+    deps.toolMode.kind === 'node' || deps.toolMode.kind === 'trace-parts',
+    activePointerId,
+    cancelPending,
+    documentEpoch,
+  );
+  return { handlers: frameHandlers, dragKind: visibleDragKind(drag) };
 }
 
 // Pointer-move fan-out, lifted out of useDragMove so that hook stays under the

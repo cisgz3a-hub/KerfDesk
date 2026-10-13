@@ -78,7 +78,11 @@ export function ToolStrip(): JSX.Element {
             {...(tool.helpKey === 'node' ? { buttonRef: nodeToolButtonRef } : {})}
             onClick={() => {
               if (tool.mode.kind === 'trace-parts') activateTracePartTool();
-              else if (tool.mode.kind === 'draw' && isActive(toolMode, tool.mode)) resetToolMode();
+              else if (
+                (tool.mode.kind === 'draw' || tool.mode.kind === 'node') &&
+                isActive(toolMode, tool.mode)
+              )
+                resetToolMode();
               else setToolMode(tool.mode);
             }}
             pressed={isActive(toolMode, tool.mode)}

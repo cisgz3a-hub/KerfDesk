@@ -13,6 +13,7 @@ import { currentHierarchyFocus } from '../state/design-hierarchy-store';
 import { isSingleTracePart } from '../state/trace-part-geometry';
 import { pickHandleOrRotateDrag, type DragState } from './drag-state';
 import { hitTracePart } from './trace-part-hit-test';
+import { ensureTracePartSceneReady, isPreparedSingleTracePart } from './trace-part-preparation';
 import { canvasMouseToScene, pxToMmForCanvas, type ViewState } from './view-transform';
 
 export function activateTracePartTool(): void {
@@ -37,7 +38,7 @@ type TracePartDragArgs = {
 };
 
 export function beginTracePartDrag(args: TracePartDragArgs): DragState | null {
-  const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+  const point = preparedTracePartPoint(args);
   if (point === null) return null;
   const pxToMm = pxToMmForCanvas(args.ref.current, args.project, args.viewState);
   const state = useStore.getState();
@@ -90,10 +91,23 @@ export function beginTracePartDrag(args: TracePartDragArgs): DragState | null {
   };
 }
 
+function preparedTracePartPoint(args: TracePartDragArgs): Vec2 | null {
+  if (!currentTracePartSceneReady(args.project.scene)) return null;
+  return canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+}
+
+function currentTracePartSceneReady(scene: Scene): boolean {
+  const state = useStore.getState();
+  return (
+    scene === state.project.scene && ensureTracePartSceneReady(scene, state.projectDocumentEpoch)
+  );
+}
+
 export function selectTracePartForContextMenu(
   args: Pick<TracePartDragArgs, 'e' | 'ref' | 'project' | 'viewState'>,
 ): boolean {
   const state = useStore.getState();
+  if (!currentTracePartSceneReady(args.project.scene)) return false;
   const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
   const scene = focusedScene(args.project.scene, state.projectDocumentEpoch);
   const hit =
@@ -138,7 +152,7 @@ function selectedPartHandle(
     !selectedObjects.every(
       (object) =>
         object.locked !== true &&
-        isSingleTracePart(object, args.project.scene.layers) &&
+        isPreparedSingleTracePart(object, args.project.scene.layers) &&
         sceneObjectHasVisibleLayer(args.project.scene, object),
     )
   )
@@ -158,7 +172,7 @@ function retainSelectedParts(objects: ReadonlyArray<SceneObject>, scene: Scene):
   const parts = objects.filter(
     (object) =>
       object.locked !== true &&
-      isSingleTracePart(object, scene.layers) &&
+      isPreparedSingleTracePart(object, scene.layers) &&
       sceneObjectHasVisibleLayer(scene, object),
   );
   if (parts.length === objects.length) return;

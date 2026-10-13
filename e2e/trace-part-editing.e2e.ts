@@ -93,6 +93,10 @@ test('edits only picked trace parts, preserves holes, and saves the edited artwo
     path: info.outputPath('moved-trace-part.png'),
     contentType: 'image/png',
   });
+  await page.getByRole('button', { name: 'Done editing trace parts', exact: true }).click();
+  await expect(tool).toHaveAttribute('aria-pressed', 'false');
+  expect((await snapshot(page)).traces).toEqual(moved.traces);
+  await tool.click();
 
   await page.keyboard.press('Control+z');
   await expect.poll(async () => (await snapshot(page)).traces).toEqual(initial.traces);
@@ -149,6 +153,8 @@ test('edits only picked trace parts, preserves holes, and saves the edited artwo
   await nodeX.fill(String(oldX + 2));
   await nodeX.press('Enter');
   await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Done editing nodes', exact: true }).click();
+  await expect(page.getByTestId('node-edit-layer')).toBeHidden();
   const edited = await snapshot(page);
   expect(edited.traces.find((object) => object.id === ring.id)?.paths).not.toEqual(nodeRing.paths);
   for (const other of nudged.traces.filter((object) => object.id !== ring.id)) {
@@ -245,19 +251,46 @@ test('picks one part of a 4096-shape bitmap trace without expanding every shape'
     undefined,
   );
   if (point === undefined) throw new Error('Dense trace has no contour');
+  const preparationWorkers: string[] = [];
+  page.on('worker', (worker) => {
+    if (worker.url().includes('trace-part-worker')) preparationWorkers.push(worker.url());
+  });
   await page
     .getByRole('complementary', { name: 'Drawing tools' })
     .getByRole('button', { name: 'Edit trace parts', exact: true })
     .click();
+  await expect(page.getByRole('status').filter({ hasText: 'Editing trace parts' })).toHaveAttribute(
+    'aria-busy',
+    'false',
+    { timeout: 60_000 },
+  );
+  expect(preparationWorkers).toHaveLength(1);
   const from = await screenPoint(page, trace, point);
+  const profiler = await page.context().newCDPSession(page);
+  await profiler.send('Profiler.enable');
+  await profiler.send('Profiler.start');
   const pickStarted = performance.now();
   await page.mouse.move(from.x, from.y);
+  const hoverFinished = performance.now();
   await page.mouse.down();
+  const downFinished = performance.now();
   await page.mouse.move(from.x + 45, from.y + 38, { steps: 6 });
+  const dragFinished = performance.now();
   await page.mouse.up();
-  await expect.poll(async () => (await snapshot(page)).traces.length).toBe(2);
+  const upFinished = performance.now();
+  await expect.poll(async () => traceCount(page)).toBe(2);
   const firstPickAndDragElapsedMs = performance.now() - pickStarted;
+  const { profile } = await profiler.send('Profiler.stop');
+  await profiler.detach();
+  const profilePath = info.outputPath('dense-trace-editing.cpuprofile');
+  writeFileSync(profilePath, JSON.stringify(profile));
+  await info.attach('Dense trace editing CPU profile', {
+    path: profilePath,
+    contentType: 'application/json',
+  });
+  const snapshotStarted = performance.now();
   const moved = await snapshot(page);
+  const snapshotElapsedMs = performance.now() - snapshotStarted;
   const ring = moved.traces.find((object) => object.id === moved.selectedIds[0]);
   const remainder = moved.traces.find((object) => object.id !== ring?.id);
   if (ring === undefined || remainder === undefined) throw new Error('Dense extraction missing');
@@ -283,6 +316,14 @@ test('picks one part of a 4096-shape bitmap trace without expanding every shape'
         sceneObjectsAfterPick: moved.traces.length,
         traceElapsedMs,
         firstPickAndDragElapsedMs,
+        pointerPhasesMs: {
+          hover: hoverFinished - pickStarted,
+          down: downFinished - hoverFinished,
+          drag: dragFinished - downFinished,
+          up: upFinished - dragFinished,
+        },
+        snapshotElapsedMs,
+        preparationWorkers: preparationWorkers.length,
         note: 'Observed wall time on a busy development machine; no performance threshold or hardware claim.',
       },
       null,
@@ -299,6 +340,18 @@ test('picks one part of a 4096-shape bitmap trace without expanding every shape'
     contentType: 'image/png',
   });
 });
+
+async function traceCount(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const path = '/src/ui/state/store.ts';
+    const { useStore } = (await import(/* @vite-ignore */ path)) as {
+      useStore: { getState: () => { project: Project } };
+    };
+    return useStore
+      .getState()
+      .project.scene.objects.filter((object) => object.kind === 'traced-image').length;
+  });
+}
 
 async function snapshot(page: Page) {
   return page.evaluate(async () => {

@@ -68,7 +68,7 @@ export function editShortcutContext(): EditCtx {
     undo: app.undo,
     redo: app.redo,
     selectedObjectId: app.selectedObjectId,
-    selectedPathNode: app.selectedPathNode,
+    selectedPathNode: useUiStore.getState().toolMode.kind === 'node' ? app.selectedPathNode : null,
     additionalSelectedIds: app.additionalSelectedIds,
     removeSceneObjects: app.removeSceneObjects,
     deleteSelectedPathNodes: app.deleteSelectedPathNodes,
@@ -90,7 +90,7 @@ export function transformShortcutContext(): TransformCtx {
   return {
     project: app.project,
     selectedObjectId: app.selectedObjectId,
-    selectedPathNode: app.selectedPathNode,
+    selectedPathNode: useUiStore.getState().toolMode.kind === 'node' ? app.selectedPathNode : null,
     applyObjectTransform: app.applyObjectTransform,
     nudgeSelection: app.nudgeSelection,
     nudgeSelectedPathNode: app.nudgeSelectedPathNode,

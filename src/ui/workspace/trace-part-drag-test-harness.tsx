@@ -76,4 +76,6 @@ export async function pointer(
   });
   Object.defineProperty(event, 'pointerId', { value: 3 });
   await act(async () => canvas.dispatchEvent(event));
+  if (type === 'pointermove')
+    await act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
 }

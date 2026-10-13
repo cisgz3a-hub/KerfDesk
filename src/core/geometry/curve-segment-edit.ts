@@ -15,6 +15,11 @@ import {
   type Vec2,
 } from '../scene';
 import { contourSegments, segmentPoint, segmentStart, subSegment } from './trim-curve-split';
+import {
+  curveSegmentHitGeometry,
+  nearestOnLine,
+  segmentBoundsCanHit,
+} from './curve-segment-hit-geometry';
 
 const SAME_POINT_MM = 1e-9;
 const COARSE_SAMPLES = 32;
@@ -158,13 +163,18 @@ export function nearestCurveSegment(
   curve: CurveSubpath,
   transform: Transform,
   scenePoint: Vec2,
+  maxDistance = Number.POSITIVE_INFINITY,
 ): CurveSegmentHit | null {
-  const contour = contourSegments(curve, curve.closed);
   let best: CurveSegmentHit | null = null;
-  contour.segments.forEach((segment, segmentIndex) => {
-    const from = segmentStart(contour, segmentIndex);
+  curveSegmentHitGeometry(curve, transform).forEach((geometry, segmentIndex) => {
+    const { segment, from, sceneFrom, sceneTo, bounds } = geometry;
+    if (!segmentBoundsCanHit(bounds, scenePoint, best?.distance ?? maxDistance)) return;
     const at = (t: number) => applyTransform(segmentPoint(from, segment, t), transform);
-    const hit = nearestOnSegment(at, scenePoint);
+    const hit =
+      segment.kind === 'line'
+        ? nearestOnLine(sceneFrom, sceneTo, scenePoint)
+        : nearestOnSegment(at, scenePoint);
+    if (hit.distance > maxDistance) return;
     if (best === null || hit.distance < best.distance) best = { segmentIndex, ...hit };
   });
   return best;

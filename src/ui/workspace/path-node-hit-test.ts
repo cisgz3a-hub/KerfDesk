@@ -1,8 +1,6 @@
 import {
   applyTransform,
   curveControlPoint,
-  curveNodeCount,
-  curveNodePoint,
   sceneLayerVisibility,
   type ColoredPath,
   type Scene,
@@ -10,6 +8,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
+import { hitIndexedPathNode } from './path-node-hit-index';
 
 export const PATH_NODE_HIT_RADIUS_PX = 8;
 
@@ -71,17 +70,12 @@ function hitPathNodes(
   for (let polylineIndex = 0; polylineIndex < path.polylines.length; polylineIndex += 1) {
     const polyline = path.polylines[polylineIndex];
     if (polyline === undefined) continue;
-    for (let pointIndex = 0; pointIndex < polyline.points.length; pointIndex += 1) {
-      const node = polyline.points[pointIndex];
-      if (node === undefined) continue;
-      const distanceSq = squaredDistance(point, applyTransform(node, object.transform));
-      if (distanceSq > maxDistanceSq) continue;
-      if (best !== null && distanceSq >= best.distanceSq) continue;
-      best = {
-        distanceSq,
-        ref: { objectId: object.id, pathIndex, polylineIndex, pointIndex },
-      };
-    }
+    const hit = hitIndexedPathNode(polyline, object.transform, point, maxDistanceSq);
+    if (hit === null || (best !== null && hit.distanceSq >= best.distanceSq)) continue;
+    best = {
+      distanceSq: hit.distanceSq,
+      ref: { objectId: object.id, pathIndex, polylineIndex, pointIndex: hit.pointIndex },
+    };
   }
   return best;
 }
@@ -101,17 +95,18 @@ function hitCurveNodes(
   for (let curveIndex = 0; curveIndex < (path.curves?.length ?? 0); curveIndex += 1) {
     const curve = path.curves?.[curveIndex];
     if (curve === undefined) continue;
-    for (let nodeIndex = 0; nodeIndex < curveNodeCount(curve); nodeIndex += 1) {
-      const anchor = curveNodePoint(curve, nodeIndex);
-      if (anchor !== null) {
-        best = nearerHit(best, point, applyTransform(anchor, object.transform), maxDistanceSq, {
+    const anchor = hitIndexedPathNode(curve, object.transform, point, maxDistanceSq);
+    if (anchor !== null && (best === null || anchor.distanceSq < best.distanceSq)) {
+      best = {
+        distanceSq: anchor.distanceSq,
+        ref: {
           objectId: object.id,
           pathIndex,
           polylineIndex: curveIndex,
-          pointIndex: nodeIndex,
+          pointIndex: anchor.pointIndex,
           geometry: 'curve',
-        });
-      }
+        },
+      };
     }
     for (const selected of selectedNodes) {
       if (

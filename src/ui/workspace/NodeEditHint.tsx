@@ -13,13 +13,20 @@ export function NodeEditHint(): JSX.Element | null {
   const selection = objects.filter(
     (object) => object.id === selectedId || additionalIds.has(object.id),
   );
-  if (selection.length === 0 || !selection.every(needsPathConversion)) return null;
+  if (selection.length === 0 || !selection.every(needsPathConversion)) {
+    return (
+      <span>
+        Drag nodes or curve handles to reshape the path. Shift-click adds nodes. Esc cancels a drag;
+        press Esc again or choose Done to finish.
+      </span>
+    );
+  }
   const instruction =
     selection.length === 1
       ? `Convert the ${primitiveName(selection[0])} to a path to edit its nodes.`
       : 'Convert the selected shapes to paths to edit their nodes.';
   return (
-    <div role="status" style={hintStyle}>
+    <>
       <span>{instruction}</span>
       <button
         type="button"
@@ -29,7 +36,7 @@ export function NodeEditHint(): JSX.Element | null {
       >
         Convert to Path
       </button>
-    </div>
+    </>
   );
 }
 
@@ -43,22 +50,3 @@ function primitiveName(object: SceneObject | undefined): string {
   if (object?.kind !== 'shape') return 'shape';
   return object.spec.kind === 'rect' ? 'rectangle' : object.spec.kind;
 }
-
-const hintStyle: React.CSSProperties = {
-  position: 'absolute',
-  left: 12,
-  bottom: 52,
-  zIndex: 8,
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  gap: 8,
-  maxWidth: 'min(420px, calc(100% - 24px))',
-  padding: '8px 12px',
-  border: '1px solid var(--lf-border)',
-  borderRadius: 6,
-  color: 'var(--lf-text)',
-  background: 'var(--lf-bg-1)',
-  boxShadow: 'var(--lf-shadow)',
-  fontSize: 12,
-};

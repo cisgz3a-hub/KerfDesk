@@ -7,7 +7,7 @@ import {
   type SceneObject,
   type Vec2,
 } from '../../core/scene';
-import { pathNodeRefsEqual, type PathNodeRef } from '../state/path-node-edit-actions';
+import type { PathNodeRef } from '../state/path-node-edit-actions';
 import { canvasTheme } from '../theme/canvas-theme';
 import type { ViewTransform } from './view-transform';
 
@@ -22,11 +22,16 @@ export function drawPathNodeHandles(
   selectedNodes: ReadonlyArray<PathNodeRef> = selectedNode === null ? [] : [selectedNode],
 ): void {
   if (!isNodeEditableVector(object)) return;
+  const objectSelection = selectedNodes.filter((node) => node.objectId === object.id);
+  const selected = new Set(objectSelection.map(nodeKey));
+  const selectedCurves = new Set(
+    objectSelection.filter((node) => node.geometry === 'curve').map(nodeKey),
+  );
   for (let pathIndex = 0; pathIndex < object.paths.length; pathIndex += 1) {
     const path = object.paths[pathIndex];
     if (path === undefined) continue;
     if (path.curves !== undefined) {
-      drawCurvePathHandles(ctx, object, path, pathIndex, view, selectedNodes);
+      drawCurvePathHandles(ctx, object, path, pathIndex, view, selectedCurves);
       continue;
     }
     for (let polylineIndex = 0; polylineIndex < path.polylines.length; polylineIndex += 1) {
@@ -38,7 +43,7 @@ export function drawPathNodeHandles(
         drawNodeHandle(
           ctx,
           screenPoint(point, object, view),
-          isSelectedNode(selectedNodes, object.id, pathIndex, polylineIndex, pointIndex),
+          nodeSelected(selected, { pathIndex, polylineIndex, pointIndex }),
         );
       }
     }
@@ -51,7 +56,7 @@ function drawCurvePathHandles(
   path: ColoredPath,
   pathIndex: number,
   view: ViewTransform,
-  selectedNodes: ReadonlyArray<PathNodeRef>,
+  selectedNodes: ReadonlySet<string>,
 ): void {
   for (let curveIndex = 0; curveIndex < (path.curves?.length ?? 0); curveIndex += 1) {
     const curve = path.curves?.[curveIndex];
@@ -66,15 +71,7 @@ function drawCurvePathHandles(
         pointIndex: nodeIndex,
         geometry: 'curve',
       };
-      const selected = selectedNodes.some(
-        (candidate) =>
-          pathNodeRefsEqual(candidate, ref) ||
-          (candidate.geometry === 'curve' &&
-            candidate.objectId === ref.objectId &&
-            candidate.pathIndex === ref.pathIndex &&
-            candidate.polylineIndex === ref.polylineIndex &&
-            candidate.pointIndex === ref.pointIndex),
-      );
+      const selected = nodeSelected(selectedNodes, ref);
       drawNodeHandle(ctx, screenPoint(anchor, object, view), selected);
       if (selected) drawCurveControls(ctx, object, curve, ref, view);
     }
@@ -108,6 +105,7 @@ function drawCurveControls(
 function drawControlHandle(ctx: CanvasRenderingContext2D, point: Vec2): void {
   const size = 5;
   const half = size / 2;
+  if (!handleOnCanvas(ctx, point, half)) return;
   ctx.fillStyle = canvasTheme.pathNodeHandleFill;
   ctx.strokeStyle = canvasTheme.pathNodeHandleStroke;
   ctx.fillRect(point.x - half, point.y - half, size, size);
@@ -124,6 +122,7 @@ function isNodeEditableVector(
 function drawNodeHandle(ctx: CanvasRenderingContext2D, point: Vec2, selected: boolean): void {
   const size = selected ? ACTIVE_NODE_HANDLE_PX : NODE_HANDLE_PX;
   const half = size / 2;
+  if (!handleOnCanvas(ctx, point, half)) return;
   ctx.fillStyle = selected ? canvasTheme.pathNodeHandleActiveFill : canvasTheme.pathNodeHandleFill;
   ctx.strokeStyle = selected
     ? canvasTheme.pathNodeHandleActiveStroke
@@ -141,18 +140,25 @@ function screenPoint(point: Vec2, object: SceneObject, view: ViewTransform): Vec
   };
 }
 
-function isSelectedNode(
-  selectedNodes: ReadonlyArray<PathNodeRef>,
-  objectId: string,
-  pathIndex: number,
-  polylineIndex: number,
-  pointIndex: number,
-): boolean {
-  return selectedNodes.some(
-    (selectedNode) =>
-      selectedNode.objectId === objectId &&
-      selectedNode.pathIndex === pathIndex &&
-      selectedNode.polylineIndex === polylineIndex &&
-      selectedNode.pointIndex === pointIndex,
+function handleOnCanvas(ctx: CanvasRenderingContext2D, point: Vec2, half: number): boolean {
+  const width = ctx.canvas?.width ?? Number.POSITIVE_INFINITY;
+  const height = ctx.canvas?.height ?? Number.POSITIVE_INFINITY;
+  const margin = half + 1;
+  return (
+    point.x >= -margin &&
+    point.y >= -margin &&
+    point.x <= width + margin &&
+    point.y <= height + margin
   );
+}
+
+function nodeKey(ref: Pick<PathNodeRef, 'pathIndex' | 'polylineIndex' | 'pointIndex'>): string {
+  return `${ref.pathIndex}:${ref.polylineIndex}:${ref.pointIndex}`;
+}
+
+function nodeSelected(
+  selected: ReadonlySet<string>,
+  ref: Pick<PathNodeRef, 'pathIndex' | 'polylineIndex' | 'pointIndex'>,
+): boolean {
+  return selected.size > 0 && selected.has(nodeKey(ref));
 }

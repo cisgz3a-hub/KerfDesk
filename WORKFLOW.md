@@ -429,7 +429,7 @@ destination and cannot overwrite the template source.
 
 ---
 
-### Edit individual trace parts (ADR-587)
+### Edit individual trace parts (ADR-587, ADR-596)
 
 1. After tracing, click **Edit trace parts** in the canvas hint or the left tool strip.
    Double-clicking a trace with Select also opens this tool.
@@ -445,6 +445,11 @@ destination and cannot overwrite the template source.
    Done or Escape outside a drag returns to Select. The retained source image can start a fresh trace.
 6. Large traces stay together except for the parts you pick. **Arrange → Break Apart** remains
    available when you deliberately want every shape separated.
+7. Dense traces briefly show **Preparing trace parts** before picking is ready. **Done** stays
+   available to stop preparation and leave the tool. If preparation fails, choose **Retry**.
+8. **Edit nodes** also shows a visible **Done** button. Either editing tool can be turned off by
+   clicking its active toolbar button. Completed edits remain; leaving during a drag cancels
+   that unfinished drag. After Done, arrow keys and Delete operate on selected artwork again.
 
 Pick the visible edge of a line-only trace or a trace in wireframe view. Filled parts can also
 be picked through their interior. If a trace is used as an image mask, a text-path guide, or a
