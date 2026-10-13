@@ -7,6 +7,7 @@ import {
 } from './command-types';
 import { copyAlongPathCommand } from './design-tools-commands';
 import { placementCommands } from './editing-tools-commands';
+import { layoutCommands } from './layout-commands';
 import { machineMoveCommands } from './machine-move-commands';
 import { arrangeShortcutLabel } from './arrange-shortcut-keys';
 
@@ -66,6 +67,7 @@ export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppComman
     breakApartCommand(ctx),
     flipHorizontalCommand(ctx),
     flipVerticalCommand(ctx),
+    ...layoutCommands(ctx),
     ...placementCommands(ctx),
     ...machineMoveCommands(ctx),
   ];

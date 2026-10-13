@@ -28,6 +28,8 @@ export function CanvasVariableTextFields(props: {
             source={fields.values.content}
             onSourceChange={fields.setContent}
             textValues={fields.values}
+            ignoreEmptyLines={fields.ignoreEmptyLines}
+            onIgnoreEmptyLinesChange={fields.setIgnoreEmptyLines}
             firstColumn={variables.variables.csv?.headers[0]}
             onInsert={props.onInsert}
             setCsv={variables.setCsv}

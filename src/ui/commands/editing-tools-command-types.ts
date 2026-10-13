@@ -10,6 +10,8 @@ export type EditingToolsCommandContext = DesignToolsCommandContext & {
   readonly pasteInPlace: () => void;
   readonly invertSelection: () => void;
   readonly selectOpenShapes: () => void;
+  readonly selectOpenFillShapes: () => void;
+  readonly openSelectCircles: () => void;
   readonly canOffsetShapes: boolean;
   readonly offsetShapes: () => void;
   readonly rotateSelectionQuarterTurn: (direction: QuarterTurnDirection) => void;
@@ -23,6 +25,8 @@ export type EditingToolsCommandId =
   | 'edit.paste-in-place'
   | 'edit.invert-selection'
   | 'edit.select-open-shapes'
+  | 'edit.select-open-fill-shapes'
+  | 'edit.select-circles'
   | 'tools.offset-shapes'
   | 'arrange.rotate-90-cw'
   | 'arrange.rotate-90-ccw'

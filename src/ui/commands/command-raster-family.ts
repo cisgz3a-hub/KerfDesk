@@ -34,6 +34,21 @@ export function processedRasterToolCommands(ctx: AppCommandContext): ReadonlyArr
       'Save Processed Bitmap...',
       'Save selected image after layer processing',
     ),
+    ctx.hasRasterSelection
+      ? enabled(
+          'tools.save-original-image',
+          'tools',
+          'Save Original Image...',
+          'Save the selected image unprocessed, as PNG, JPEG or BMP',
+          ctx.saveOriginalImage,
+        )
+      : disabled(
+          'tools.save-original-image',
+          'tools',
+          'Save Original Image...',
+          'Select an image first.',
+          ctx.saveOriginalImage,
+        ),
     // Alt+T is LightBurn's Trace Image binding (handled in app/shortcuts.ts).
     rasterToolCommand(ctx, 'tools.trace-image', 'Trace Image...', 'Trace selected image', 'Alt+T'),
     retraceOriginalCommand(ctx),

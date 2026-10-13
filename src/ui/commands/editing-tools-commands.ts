@@ -32,6 +32,20 @@ export function selectionEditCommands(ctx: AppCommandContext): ReadonlyArray<App
       'Select artwork with a path whose ends do not meet',
       ctx.selectOpenShapes,
     ),
+    enabled(
+      'edit.select-open-fill-shapes',
+      'edit',
+      'Select Open Shapes Set to Fill',
+      'Select open artwork on a Fill operation, which Fill cannot engrave inside',
+      ctx.selectOpenFillShapes,
+    ),
+    enabled(
+      'edit.select-circles',
+      'edit',
+      'Select Circles...',
+      'Select circles of one diameter or within a range',
+      ctx.openSelectCircles,
+    ),
   ];
 }
 

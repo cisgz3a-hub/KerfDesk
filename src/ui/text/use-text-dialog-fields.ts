@@ -67,6 +67,8 @@ export type DialogFields = {
   readonly setPathAcrossAlign: (align: PathTextAcrossAlign) => void;
   readonly variableEnabled: boolean;
   readonly setVariableEnabled: (enabled: boolean) => void;
+  readonly ignoreEmptyLines: boolean;
+  readonly setIgnoreEmptyLines: (ignore: boolean) => void;
 };
 
 export function useTextDialogFields(
@@ -80,11 +82,14 @@ export function useTextDialogFields(
   const [variableEnabled, setVariableEnabled] = useState(
     state.mode === 'edit' && state.variableTemplate !== undefined,
   );
+  const [ignoreEmptyLines, setIgnoreEmptyLines] = useState(
+    state.mode === 'edit' && state.variableTemplate?.ignoreEmptyLines === true,
+  );
   const embeddedFonts = useMemo(
     () => availableEmbeddedFonts(project.embeddedFonts, font.importedFont),
     [project.embeddedFonts, font.importedFont],
   );
-  const variableTemplate = variableTemplateValue(state, variableEnabled);
+  const variableTemplate = variableTemplateValue(state, variableEnabled, ignoreEmptyLines);
   const color = state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR;
   return {
     values: dialogValues(basic, font, path, color, embeddedFonts, variableTemplate),
@@ -115,6 +120,8 @@ export function useTextDialogFields(
     },
     variableEnabled,
     setVariableEnabled,
+    ignoreEmptyLines,
+    setIgnoreEmptyLines,
   };
 }
 
@@ -148,11 +155,15 @@ function dialogValues(
 function variableTemplateValue(
   state: TextDialogState,
   enabled: boolean,
+  ignoreEmptyLines: boolean,
 ): VariableTemplate | undefined {
   if (!enabled) return undefined;
-  return state.mode === 'edit' && state.variableTemplate !== undefined
-    ? state.variableTemplate
-    : { tokens: [] };
+  const base: VariableTemplate =
+    state.mode === 'edit' && state.variableTemplate !== undefined
+      ? state.variableTemplate
+      : { tokens: [] };
+  const { ignoreEmptyLines: _previous, ...template } = base;
+  return ignoreEmptyLines ? { ...template, ignoreEmptyLines } : template;
 }
 
 function useBasicFields(state: TextDialogState) {

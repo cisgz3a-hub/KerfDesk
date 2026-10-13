@@ -6,19 +6,23 @@ import { useUiStore } from '../state/ui-store';
 import type { CommandShellCallbacks } from './app-command-context-types';
 import { designToolsCommandContext } from './design-tools-command-context';
 import type { EditingToolsCommandContext } from './editing-tools-command-types';
+import type { ParityToolsCommandContext } from './parity-tools-command-types';
 import { selectionHasUnlockedVectorObject } from './selection-command-state';
+import { openSelectCirclesDialog } from './select-circles-dialog-store';
 
 export function editingToolsCommandContext(
   app: ReturnType<typeof useStore.getState>,
   callbacks: CommandShellCallbacks,
   selectedIds: ReadonlyArray<string>,
   wireframeActive: boolean,
-): EditingToolsCommandContext {
+): Omit<EditingToolsCommandContext, keyof ParityToolsCommandContext> {
   return {
     ...designToolsCommandContext(app, selectedIds),
     pasteInPlace: app.pasteClipboardInPlace,
     invertSelection: app.invertSelection,
     selectOpenShapes: app.selectOpenShapes,
+    selectOpenFillShapes: app.selectOpenFillShapes,
+    openSelectCircles: openSelectCirclesDialog,
     canOffsetShapes: selectionHasUnlockedVectorObject(app.project, selectedIds),
     offsetShapes: callbacks.requestOffsetShapes,
     rotateSelectionQuarterTurn: app.rotateSelectionQuarterTurn,
