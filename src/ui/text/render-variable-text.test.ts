@@ -17,6 +17,10 @@ vi.mock('./font-loader', () => ({
 vi.mock('../../core/text', async (importOriginal) => ({
   ...(await importOriginal<typeof CoreText>()),
   textToPolylines: mocks.textToPolylines,
+}));
+
+vi.mock('../../core/text/text-style', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../core/text/text-style')>()),
   styledBentRender: mocks.styledBentRender,
 }));
 

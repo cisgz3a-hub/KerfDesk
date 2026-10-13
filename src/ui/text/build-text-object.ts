@@ -1,9 +1,5 @@
-import {
-  placeTextOnPath,
-  styledBentRender,
-  styledTextContent,
-  styleTextRender,
-} from '../../core/text';
+import { placeTextOnPath } from '../../core/text';
+import { styledBentRender, styledTextContent, styleTextRender } from '../../core/text/text-style';
 import { IDENTITY_TRANSFORM, type TextObject } from '../../core/scene';
 import { parseVariableTemplateSource } from '../../core/variables';
 import type { TextDialogState } from '../state/ui-store';

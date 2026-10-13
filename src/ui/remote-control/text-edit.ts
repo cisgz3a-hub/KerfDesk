@@ -1,5 +1,6 @@
 import type { AppState } from '../state/store';
-import { findFontEntry, styledBentRender, styledTextContent } from '../../core/text';
+import { findFontEntry } from '../../core/text';
+import { styledBentRender, styledTextContent } from '../../core/text/text-style';
 import type { TextObject } from '../../core/scene';
 import { transformedBBox } from '../../core/scene/hit-test';
 import { renderTextGeometry } from '../text/render-text-geometry';
