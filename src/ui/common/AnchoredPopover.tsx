@@ -131,7 +131,10 @@ function focusLeftPopover(
   const next = event.relatedTarget;
   // Disabling an async action's focused button blurs it with no next target.
   // Keep its dropdown mounted and visible for the dialog it is preparing.
-  return next instanceof Node && !event.currentTarget.contains(next) && !anchor?.contains(next);
+  if (!(next instanceof Node)) {
+    return !(event.target instanceof HTMLElement && event.target.matches(':disabled'));
+  }
+  return !event.currentTarget.contains(next) && !anchor?.contains(next);
 }
 
 function popoverPosition(

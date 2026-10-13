@@ -22,6 +22,9 @@ describe('Machine tool dropdowns', () => {
               <div>
                 <span>Console active: {String(active)}</span>
                 <input aria-label="Command draft" />
+                <button type="button" data-async-action>
+                  Prepare preview
+                </button>
               </div>
             )}
           />,
@@ -46,10 +49,11 @@ describe('Machine tool dropdowns', () => {
       expect(dialog('Origin').hidden).toBe(true);
       expect(dialog('Console').hidden).toBe(false);
       expect(dialog('Console').textContent).toContain('Console active: true');
+      const preparing = dialog('Console').querySelector<HTMLButtonElement>('[data-async-action]');
+      if (!preparing) throw new Error('Missing async action');
+      preparing.disabled = true;
       await act(async () =>
-        dialog('Console').dispatchEvent(
-          new FocusEvent('focusout', { relatedTarget: null, bubbles: true }),
-        ),
+        preparing.dispatchEvent(new FocusEvent('focusout', { relatedTarget: null, bubbles: true })),
       );
       expect(dialog('Console').hidden).toBe(false);
       await act(async () =>
@@ -60,6 +64,13 @@ describe('Machine tool dropdowns', () => {
       expect(document.activeElement).toBe(trigger('Console'));
       expect(dialog('Console').hidden).toBe(true);
       expect(dialog('Console').textContent).toContain('Console active: false');
+      await act(async () => trigger('Console').click());
+      const command = dialog('Console').querySelector('input');
+      if (!command) throw new Error('Missing command draft');
+      await act(async () =>
+        command.dispatchEvent(new FocusEvent('focusout', { relatedTarget: null, bubbles: true })),
+      );
+      expect(dialog('Console').hidden).toBe(true);
       await act(async () => trigger('Origin').click());
       expect(dialog('Origin').querySelector('input')).toBe(position);
       expect(position.value).toBe('Front corner');
