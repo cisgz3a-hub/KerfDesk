@@ -213,6 +213,7 @@ function browseFonts(event: React.KeyboardEvent<HTMLDivElement>, selected: strin
       '[role="option"] button[data-font-key]',
     ),
   ];
+  if (event.target instanceof HTMLInputElement && event.target.type === 'range') return;
   const search = event.target instanceof HTMLInputElement;
   if (search && event.key === 'Enter') {
     event.preventDefault();

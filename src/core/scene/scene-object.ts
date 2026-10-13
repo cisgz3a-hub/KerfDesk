@@ -1,3 +1,13 @@
+import type { PagedRasterImageAsset } from './raster-image-asset';
+import type { FontKey, TextAlignment, PathTextSettings, TextStyle } from './text-settings';
+export type {
+  FontKey,
+  TextAlignment,
+  PathTextAlongAlign,
+  PathTextAcrossAlign,
+  PathTextSettings,
+  TextStyle,
+} from './text-settings';
 import type { ConstrainedSketch2d } from '../sketch-constraints/constrained-sketch';
 import type { PartGeneratorSource } from '../parts/part-generator';
 import type { RegistrationJigIdentity } from './registration-jig-identity';
@@ -217,38 +227,6 @@ export type ImportedSvg = ObjectPowerScale & {
 // registry + opentype rendering pipeline live in core/text/ and
 // reference TextObject FROM here, not the other way around (avoids a
 // circular dependency).
-export type TextAlignment = 'left' | 'center' | 'right';
-
-// The string-keyed font identifier. Concrete keys are enumerated in
-// core/text/font-registry.ts; this module stays unaware of which
-// fonts are bundled (so adding a font doesn't ripple here).
-export type FontKey = string;
-
-// Where the text sits along the guide (measured from the guide's start, or
-// from its end for 'end') and across it. Absent means 'start' and 'above',
-// the placement every path text had before ADR-480.
-export type PathTextAlongAlign = 'start' | 'middle' | 'end';
-export type PathTextAcrossAlign = 'above' | 'center' | 'below';
-
-export type PathTextSettings = {
-  readonly guideObjectId: string;
-  readonly offsetMm: number;
-  readonly reverse: boolean;
-  readonly alongAlign?: PathTextAlongAlign;
-  readonly acrossAlign?: PathTextAcrossAlign;
-};
-
-export type TextStyle = {
-  readonly bold?: boolean;
-  readonly italic?: boolean;
-  readonly uppercase?: boolean;
-  readonly forceRtl?: boolean;
-  /** Squeeze wider text horizontally to this width; height is kept. */
-  readonly maxWidthMm?: number;
-  /** Bend moves glyphs rigidly instead of bending their outlines. */
-  readonly bendUndistorted?: boolean;
-};
-
 export type TextObject = ObjectPowerScale & {
   readonly kind: 'text';
   readonly id: string;
@@ -361,26 +339,6 @@ export const DITHER_ALGORITHMS = [
 ] as const;
 
 export type DitherAlgorithm = (typeof DITHER_ALGORITHMS)[number];
-
-type PagedRasterImageAsset = {
-  readonly schemaVersion: 1;
-  readonly repository: 'curvedesk-import-assets-v1';
-  readonly sourceAssetId: string;
-  readonly lumaAssetId: string;
-  readonly sourceMimeType: string;
-  readonly sourceByteLength: number;
-  readonly lumaByteLength: number;
-  readonly naturalWidth: number;
-  readonly naturalHeight: number;
-  readonly sampledWidth: number;
-  readonly sampledHeight: number;
-  readonly thumbnail: {
-    readonly mimeType: 'image/bmp';
-    readonly dataUrl: string;
-    readonly width: number;
-    readonly height: number;
-  };
-};
 
 export type RasterImage = ObjectPowerScale & {
   readonly kind: 'raster-image';

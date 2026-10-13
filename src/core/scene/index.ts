@@ -75,7 +75,6 @@ export type {
   ShapeSpec,
   TextAlignment,
   TextObject,
-  TextStyle,
   TracedImage,
   Transform,
   Vec2,
