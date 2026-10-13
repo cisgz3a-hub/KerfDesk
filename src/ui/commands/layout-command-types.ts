@@ -3,6 +3,7 @@
 // batch 5 slice so command-types.ts stays as it is.
 
 import type { DrawOrderMove } from '../../core/draw-order';
+import type { DockDirection } from '../../core/scene/selection-dock';
 import type { SelectionMatchSizeKind } from '../../core/scene/selection-match-size';
 import type { SelectionMoveTogetherAxis } from '../../core/scene/selection-move-together';
 
@@ -10,6 +11,19 @@ export type LayoutCommandContext = {
   readonly moveSelectionInDrawOrder: (move: DrawOrderMove) => void;
   readonly matchSelectionSize: (kind: SelectionMatchSizeKind, proportional: boolean) => void;
   readonly moveSelectionTogether: (axis: SelectionMoveTogetherAxis) => void;
+  readonly mirrorSelectionAcrossLine: () => void;
+  readonly startTwoPointTransform: () => void;
+  readonly dockSelection: (direction: DockDirection) => void;
+  readonly dockOptions: () => void;
+  readonly hasThreeCircles: boolean;
+  readonly tangentCircle: () => void;
+  readonly closePathsWithTolerance: () => void;
+  readonly radiusFillet: () => void;
+  readonly shear: () => void;
+  readonly hasGuides: boolean;
+  readonly guidesLocked: boolean;
+  readonly toggleGuidesLocked: () => void;
+  readonly clearGuides: () => void;
 };
 
 export type LayoutCommandId =
@@ -22,4 +36,17 @@ export type LayoutCommandId =
   | 'arrange.same-width-proportional'
   | 'arrange.same-height-proportional'
   | 'arrange.move-together-horizontal'
-  | 'arrange.move-together-vertical';
+  | 'arrange.move-together-vertical'
+  | 'arrange.mirror-across-line'
+  | 'arrange.two-point-rotate-scale'
+  | 'arrange.dock-left'
+  | 'arrange.dock-right'
+  | 'arrange.dock-up'
+  | 'arrange.dock-down'
+  | 'arrange.dock-options'
+  | 'tools.tangent-circle'
+  | 'tools.close-paths-with-tolerance'
+  | 'tools.radius-fillet'
+  | 'tools.shear'
+  | 'window.lock-guides'
+  | 'window.clear-guides';

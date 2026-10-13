@@ -1,7 +1,10 @@
 import { applyTransform, type Project, type Vec2 } from '../../core/scene';
 import { pathNodeRefsEqual, type PathNodeRef } from '../state/path-node-edit-actions';
 import { pathNodePoint } from '../state/path-node-edit-geometry';
-import { hitPathNode } from './path-node-hit-test';
+import { useStore } from '../state';
+import { dropTarget } from '../state/path-node-drag-join-actions';
+import { hitPathNode, PATH_NODE_HIT_RADIUS_PX } from './path-node-hit-test';
+import { pxToMmForCanvas, type ViewState } from './view-transform';
 
 export type PathNodeDragState = {
   readonly kind: 'path-node';
@@ -63,6 +66,22 @@ export function updatePathNodeDrag(args: {
     x: startPrimaryScenePoint.x + args.point.x - startScenePoint.x,
     y: startPrimaryScenePoint.y + args.point.y - startScenePoint.y,
   });
+}
+
+/** Pointer up: dropping an open endpoint on another open endpoint of its path joins them. */
+export function joinPathNodeOnDrop(
+  canvas: HTMLCanvasElement | null,
+  project: Project,
+  viewState: ViewState,
+): boolean {
+  const state = useStore.getState();
+  const dragged = state.selectedPathNode;
+  if (dragged === null || dragged.handle !== undefined || state.selectedPathNodes.length !== 1) {
+    return false;
+  }
+  const radiusMm = PATH_NODE_HIT_RADIUS_PX * pxToMmForCanvas(canvas, project, viewState);
+  const target = dropTarget(state.project, dragged, radiusMm);
+  return target !== null && state.joinDraggedPathNode(target);
 }
 
 function nodeScenePoint(project: Project, ref: PathNodeRef): Vec2 | null {

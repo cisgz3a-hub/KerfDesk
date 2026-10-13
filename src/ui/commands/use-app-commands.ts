@@ -49,6 +49,7 @@ import {
 import { controllerActionFailureHandler } from '../laser/report-controller-action-failure';
 import { connectMachine } from '../laser/connect-machine';
 import { useEdition } from '../licensing/edition';
+import { useGuideLockStore } from '../workspace/guide-lock-store';
 import { labelProCommands } from './edition-command-gate';
 
 export type { CommandShellCallbacks } from './app-command-context-types';
@@ -72,6 +73,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const printAndCutFeatureEnabled = useExperimentalLaserFeatures((s) => s.features.printAndCut);
   const appTheme = useAppThemePreference();
   const wireframeActive = useUiStore((s) => s.wireframeView);
+  // Re-render when guidelines lock, so the menu item re-labels.
+  useGuideLockStore((s) => s.locked);
   const edition = useEdition();
   const commands = buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {

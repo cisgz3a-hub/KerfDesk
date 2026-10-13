@@ -3,6 +3,13 @@
 import type { Project } from '../../core/scene';
 import { objectVariableTemplate } from '../../core/variables/object-variable-template';
 import { bakeSelectedVariableText } from '../app/bake-variable-text';
+import { startTwoPointTool } from '../workspace/two-point-tool';
+import { useDockOptionsStore } from './dock-options-store';
+import { openClosePathsToleranceDialog } from './ClosePathsToleranceDialog';
+import { openRadiusFilletDialog } from './RadiusFilletDialog';
+import { openShearDialog } from './ShearDialog';
+import { useGuideLockStore } from '../workspace/guide-lock-store';
+import { openTangentCircleDialog, selectedThreeCircles } from './TangentCircleDialog';
 import type { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { openCopyAlongPathDialog } from './copy-along-path-dialog-store';
@@ -43,6 +50,20 @@ export function designToolsCommandContext(
     moveSelectionInDrawOrder: app.moveSelectionInDrawOrder,
     matchSelectionSize: app.matchSelectionSize,
     moveSelectionTogether: app.moveSelectionTogether,
+    mirrorSelectionAcrossLine: app.mirrorSelectionAcrossLine,
+    startTwoPointTransform: startTwoPointTool,
+    dockSelection: (direction) =>
+      app.dockSelection({ direction, ...useDockOptionsStore.getState().settings }),
+    dockOptions: () => useDockOptionsStore.getState().openDialog(),
+    hasThreeCircles: selectedThreeCircles(app.project, selectedIds) !== null,
+    tangentCircle: openTangentCircleDialog,
+    closePathsWithTolerance: openClosePathsToleranceDialog,
+    radiusFillet: openRadiusFilletDialog,
+    shear: openShearDialog,
+    hasGuides: (app.project.guides ?? []).length > 0,
+    guidesLocked: useGuideLockStore.getState().locked,
+    toggleGuidesLocked: () => useGuideLockStore.getState().toggle(),
+    clearGuides: app.clearGuides,
   };
 }
 

@@ -12,7 +12,14 @@ import { isUnlockedVectorArtwork } from '../../core/geometry/trim-contours';
 import { remapTrimmedAnchors, trimEdit, type TrimEdit } from '../../core/geometry/trim-shape-edit';
 import { findTrimTarget } from '../../core/geometry/trim-shapes';
 import { boundsForPaths, type VectorSceneObject } from '../../core/geometry/vector-path-tools';
-import { removeObject, replaceObject, type SceneObject, type Vec2 } from '../../core/scene';
+import {
+  removeObject,
+  replaceObject,
+  type Scene,
+  type SceneObject,
+  type Vec2,
+} from '../../core/scene';
+import { autoJoinTrimmed, preservedStretch } from './trim-shapes-extras';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
 import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
 import { removeObjectIdsFromGroups } from './scene-group-actions';
@@ -22,19 +29,26 @@ import { useToastStore } from './toast-store';
 
 export type TrimShapesActions = {
   /** Delete the stretch of outline within `toleranceMm` of `point`; true when one was trimmed. */
-  readonly trimShapeAt: (point: Vec2, toleranceMm: number) => boolean;
+  readonly trimShapeAt: (point: Vec2, toleranceMm: number, options?: TrimOptions) => boolean;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
+
+export type TrimOptions = {
+  /** Join the cut ends to open contours meeting them (LightBurn default; Ctrl turns it off). */
+  readonly autoJoin?: boolean;
+  /** Keep a copy of the deleted stretch on the drawing layer (LightBurn Shift+click). */
+  readonly keepRemoved?: { readonly color: string };
+};
 
 type Trimmed = { readonly object: SceneObject; readonly converted: string | null };
 
 export function trimShapesActions(set: Setter): TrimShapesActions {
   return {
-    trimShapeAt: (point, toleranceMm) => {
+    trimShapeAt: (point, toleranceMm, options = {}) => {
       let trimmed = false;
       set((state) => {
-        const next = trimShapeMutation(state, point, toleranceMm);
+        const next = trimShapeMutation(state, point, toleranceMm, options);
         trimmed = next !== state;
         return next;
       });
@@ -47,6 +61,7 @@ function trimShapeMutation(
   state: AppState,
   point: Vec2,
   toleranceMm: number,
+  options: TrimOptions,
 ): AppState | Partial<AppState> {
   const scene = state.project.scene;
   const target = findTrimTarget(scene, point, toleranceMm);
@@ -66,12 +81,33 @@ function trimShapeMutation(
     selectedPathNodes: [],
   } as const;
   if (edit.paths.every((path) => path.polylines.length === 0)) {
-    return { ...removeTrimmedObject(state, object.id), ...history };
+    const kept = keptStretch(state, object, edit, options);
+    return { ...removeTrimmedObject(state, object.id, kept), ...history };
   }
+  return { ...trimmedScenePatch(state, object, edit, options), ...history };
+}
+
+function trimmedScenePatch(
+  state: AppState,
+  object: VectorSceneObject,
+  edit: TrimEdit,
+  options: TrimOptions,
+): Partial<AppState> {
+  const scene = state.project.scene;
   const trimmed = trimmedObject(object, edit);
   if (trimmed.converted !== null) notify(conversionMessage(trimmed.converted));
-  const objects = replaceObject(scene, object.id, trimmed.object).objects;
-  return { project: { ...state.project, scene: { ...scene, objects } }, ...history };
+  const replaced = replaceObject(scene, object.id, trimmed.object).objects;
+  const kept = keptStretch(state, trimmed.object, edit, options);
+  const joined = options.autoJoin === true ? autoJoinTrimmed(replaced, trimmed.object, edit) : null;
+  const objects = [...(joined?.objects ?? replaced), ...(kept === null ? [] : [kept])];
+  const nextScene =
+    joined === null ? { ...scene, objects } : repairedScene({ ...scene, objects }, replaced);
+  return {
+    project: { ...state.project, scene: nextScene },
+    ...(joined === null
+      ? {}
+      : { selectedObjectId: object.id, additionalSelectedIds: new Set<string>() }),
+  };
 }
 
 function trimmedObject(object: VectorSceneObject, edit: TrimEdit): Trimmed {
@@ -95,11 +131,45 @@ function trimmedObject(object: VectorSceneObject, edit: TrimEdit): Trimmed {
   return { object: converted, converted: conversionLabel(object) };
 }
 
-function removeTrimmedObject(state: AppState, id: string): Partial<AppState> {
-  const ids = new Set([id]);
-  const repaired = repairDanglingObjectDependencies(
-    removeObjectIdsFromGroups(removeObject(state.project.scene, id), ids),
+function keptStretch(
+  state: AppState,
+  trimmed: SceneObject,
+  edit: TrimEdit,
+  options: TrimOptions,
+): SceneObject | null {
+  if (options.keepRemoved === undefined) return null;
+  const copy = preservedStretch(state.project, trimmed, edit, options.keepRemoved.color);
+  if (copy === null) return null;
+  const sameLayer =
+    JSON.stringify(copy.operationIds ?? null) === JSON.stringify(trimmed.operationIds ?? null);
+  if (sameLayer)
+    notify('The kept segment is on the same layer as the trimmed shape, so it will be cut too.');
+  return copy.operationIds === undefined && trimmed.operationIds !== undefined
+    ? { ...copy, operationIds: trimmed.operationIds }
+    : copy;
+}
+
+// Objects a join emptied are gone: drop them from groups and repair what depended on them.
+function repairedScene(scene: Scene, before: ReadonlyArray<SceneObject>): Scene {
+  const remaining = new Set(scene.objects.map((object) => object.id));
+  const removed = new Set(
+    before.filter((object) => !remaining.has(object.id)).map((object) => object.id),
   );
+  if (removed.size === 0) return scene;
+  const repaired = repairDanglingObjectDependencies(removeObjectIdsFromGroups(scene, removed));
+  reportDependencyRepairs(repaired);
+  return pruneOrphanLayers(repaired.scene);
+}
+
+function removeTrimmedObject(
+  state: AppState,
+  id: string,
+  kept: SceneObject | null,
+): Partial<AppState> {
+  const ids = new Set([id]);
+  const removed = removeObject(state.project.scene, id);
+  const scene = kept === null ? removed : { ...removed, objects: [...removed.objects, kept] };
+  const repaired = repairDanglingObjectDependencies(removeObjectIdsFromGroups(scene, ids));
   reportDependencyRepairs(repaired);
   const additionalSelectedIds = new Set(state.additionalSelectedIds);
   additionalSelectedIds.delete(id);
