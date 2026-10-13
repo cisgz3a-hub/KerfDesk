@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Project } from '../../core/scene';
 import { useStore } from '../state/store';
 import { writeStartPointDefaults } from '../state/start-point-defaults';
 import { reusableStartPoints, type StartEditingContext } from './canvas-start-editing';
 import { startEditingBusy } from './start-point-interaction';
+import { isIdleCanvasMotionSuperseded } from './idle-canvas-motion-worker-client';
 
 export function StartPointSettings(props: {
   readonly project: Project;
@@ -11,7 +12,8 @@ export function StartPointSettings(props: {
   readonly disabled: boolean;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState('');
+  const { message, setMessage, saving, save } = useSaveDefaults(props.context);
+  const disabled = props.disabled || saving;
   const settings = props.project.startPoints ?? {};
   const sideB = isCncSideB(props.project);
   const defaultsReason = defaultSaveReason(props.context);
@@ -33,7 +35,7 @@ export function StartPointSettings(props: {
           <button
             type="button"
             className="lf-btn"
-            disabled={props.disabled || settings.frame === undefined}
+            disabled={disabled || settings.frame === undefined}
             onClick={() => resetStartPoint(props.project, 'frame')}
             title="Reset this project to its automatic frame entry."
           >
@@ -42,7 +44,7 @@ export function StartPointSettings(props: {
           <button
             type="button"
             className="lf-btn"
-            disabled={props.disabled || sideB || settings.job === undefined}
+            disabled={disabled || sideB || settings.job === undefined}
             onClick={() => resetStartPoint(props.project, 'job')}
             title={
               sideB
@@ -55,16 +57,18 @@ export function StartPointSettings(props: {
           <button
             type="button"
             className="lf-btn"
-            disabled={props.disabled || props.context === undefined || defaultsReason !== undefined}
+            disabled={disabled || props.context === undefined || defaultsReason !== undefined}
             title={defaultsReason ?? 'Remember these relative starts for new jobs on this device.'}
-            onClick={() => setMessage(saveDefaultsMessage(props.context))}
+            onClick={() => {
+              void save();
+            }}
           >
             Use as defaults for new jobs
           </button>
           <button
             type="button"
             className="lf-btn lf-btn--ghost"
-            disabled={props.disabled}
+            disabled={disabled}
             onClick={() => setMessage(clearDefaultsMessage(props.project))}
             title="Use automatic starts for future jobs without changing this project."
           >
@@ -76,6 +80,33 @@ export function StartPointSettings(props: {
       )}
     </div>
   );
+}
+
+function useSaveDefaults(context: StartEditingContext | undefined) {
+  const [message, setMessage] = useState('');
+  const [saving, setSaving] = useState(false);
+  const currentContext = useRef(context);
+  currentContext.current = context;
+  const saveToken = useRef(0);
+  useEffect(
+    () => () => {
+      saveToken.current += 1;
+    },
+    [],
+  );
+  const save = async (): Promise<void> => {
+    const token = ++saveToken.current;
+    setSaving(true);
+    setMessage('Preparing defaults…');
+    const result = await saveDefaultsMessage(
+      context,
+      () => token === saveToken.current && currentContext.current === context,
+    );
+    if (token !== saveToken.current) return;
+    setSaving(false);
+    setMessage(result);
+  };
+  return { message, setMessage, saving, save };
 }
 
 function clearDefaultsMessage(project: Project): string {
@@ -107,17 +138,41 @@ function isCncSideB(project: Project): boolean {
   return project.machine?.kind === 'cnc' && project.cncSetup?.twoSided?.activeSide === 'B';
 }
 
-function saveDefaultsMessage(context: StartEditingContext | undefined): string {
+async function saveDefaultsMessage(
+  context: StartEditingContext | undefined,
+  isCurrent: () => boolean,
+): Promise<string> {
+  if (!canSaveDefaults(context)) return '';
+  const epoch = useStore.getState().projectDocumentEpoch;
+  try {
+    const settings = await reusableStartPoints(context);
+    const current = useStore.getState();
+    if (
+      !isCurrent() ||
+      current.project !== context.sourceProject ||
+      current.projectDocumentEpoch !== epoch ||
+      current.pendingUndo !== null ||
+      startEditingBusy()
+    ) {
+      return 'Defaults were not saved because the project or machine state changed.';
+    }
+    return writeStartPointDefaults(settings)
+      ? 'Saved for new jobs on this device.'
+      : 'Could not save defaults on this device.';
+  } catch (error) {
+    if (isIdleCanvasMotionSuperseded(error))
+      return 'Defaults were not saved because preparation was replaced. Try again.';
+    return 'Could not prepare defaults. Try again when the current job is ready.';
+  }
+}
+
+function canSaveDefaults(context: StartEditingContext | undefined): context is StartEditingContext {
   const state = useStore.getState();
-  if (
-    startEditingBusy() ||
-    state.pendingUndo !== null ||
-    context === undefined ||
-    defaultSaveReason(context) !== undefined ||
-    context.sourceProject !== state.project
-  )
-    return '';
-  return writeStartPointDefaults(reusableStartPoints(context))
-    ? 'Saved for new jobs on this device.'
-    : 'Could not save defaults on this device.';
+  return (
+    context !== undefined &&
+    !startEditingBusy() &&
+    state.pendingUndo === null &&
+    defaultSaveReason(context) === undefined &&
+    context.sourceProject === state.project
+  );
 }

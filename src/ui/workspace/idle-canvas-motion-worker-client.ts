@@ -7,6 +7,10 @@
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { packProjectMessage } from '../packed-project-transfer';
 import { reserveWorkerMemory } from '../worker-memory-lane';
+import {
+  registerCanvasStartBoundsLoader,
+  requestedCanvasStartBounds,
+} from '../state/canvas-start-bounds-loader';
 import type { IdleCanvasMotionPlanRequest } from './idle-canvas-motion-plan';
 import type {
   IdleCanvasMotionWorkerRequest,
@@ -19,6 +23,7 @@ import {
 
 type Pending = {
   readonly id: number;
+  readonly request: IdleCanvasMotionPlanRequest;
   readonly resolve: (plan: CanvasMotionPlan | null) => void;
   readonly reject: (error: Error) => void;
   worker: Worker | null;
@@ -49,10 +54,12 @@ export function prepareIdleCanvasMotionPlanOffThread(
     return null;
   }
   nextRequestId += 1;
+  request = { ...request, evaluatedAtIso: request.evaluatedAtIso ?? new Date().toISOString() };
   const id = nextRequestId;
   return new Promise<CanvasMotionPlan | null>((resolve, reject) => {
     const active: Pending = {
       id,
+      request,
       resolve,
       reject,
       worker: null,
@@ -125,7 +132,19 @@ function handleMessage(active: Pending, response: IdleCanvasMotionWorkerResponse
   pending = null;
   retireWorker(active);
   if (response.kind === 'error') active.reject(new Error(response.message));
-  else active.resolve(response.plan);
+  else {
+    if (response.plan !== null) {
+      registerCanvasStartBoundsLoader(response.plan, async () => {
+        const requested = prepareIdleCanvasMotionPlanOffThread({
+          ...active.request,
+          includeStartPointBounds: true,
+        });
+        if (requested === null) throw new Error('Background start point defaults are unavailable.');
+        return requestedCanvasStartBounds(await requested);
+      });
+    }
+    active.resolve(response.plan);
+  }
 }
 
 function failRequest(active: Pending, error: Error): void {

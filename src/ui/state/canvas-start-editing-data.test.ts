@@ -23,6 +23,7 @@ import {
   type CanvasMotionPlan,
 } from './canvas-motion-plan';
 import { stockNativeEvidence } from './native-bed-frame.test-support';
+import { registerCanvasStartBoundsLoader } from './canvas-start-bounds-loader';
 
 function rectangle(
   id: string,
@@ -118,10 +119,20 @@ function expectMappedFrame(plan: CanvasMotionPlan, relative: boolean): void {
   }
 }
 
+function transferredPlan(original: ReturnType<typeof idlePlan>): CanvasMotionPlan {
+  const plan = structuredClone(original.plan);
+  // Model the client retaining the exact full preparation request after transfer.
+  registerCanvasStartBoundsLoader(
+    plan,
+    async () => buildCanvasStartEditingData(original.prepared, true).bounds ?? null,
+  );
+  return plan;
+}
+
 describe('idle marker editing metadata crossing the worker boundary', () => {
   it.each([false, true])(
     'saves and reapplies the right cutting edge without zero-power geometry (relative placement=%s)',
-    (relative) => {
+    async (relative) => {
       const base = twoOperations();
       const project: Project = {
         ...base,
@@ -137,13 +148,13 @@ describe('idle marker editing metadata crossing the worker boundary', () => {
         ? { startFrom: 'verified-origin', anchor: 'center' }
         : { startFrom: 'absolute', anchor: 'front-left' };
       const original = idlePlan(project, jobOrigin);
-      const context = startEditingContext(structuredClone(original.plan), project);
+      const context = startEditingContext(transferredPlan(original), project);
       if (context === undefined) throw new Error('Expected cloned context');
-      const defaults = reusableStartPoints(context);
+      const defaults = await reusableStartPoints(context);
       expect(defaults.job).toEqual({ x: 1, y: 0.5, relative: true });
       // Both direct and worker-cloned saving use the same process bounds.
       expect(
-        reusableStartPoints({
+        await reusableStartPoints({
           prepared: original.prepared,
           sourceProject: project,
           registered: false,
@@ -155,7 +166,7 @@ describe('idle marker editing metadata crossing the worker boundary', () => {
       const first = buildMotionManifest(output.gcode, { machineKind: 'laser' }).firstProcessPoint;
       if (first === null) throw new Error('Expected powered output');
       expect(mapControllerPointToScene(first, next.plan)).toEqual(next.plan.jobStart);
-      expect(next.plan.startEditingData?.bounds).toBeNull();
+      expect(next.plan.startEditingData?.bounds).toBeUndefined();
     },
   );
 
@@ -205,7 +216,7 @@ describe('idle marker editing metadata crossing the worker boundary', () => {
 
   it.each([false, true])(
     'restores edits, executable start and full-job defaults after structuredClone (relative=%s)',
-    (relative) => {
+    async (relative) => {
       const project = twoOperations();
       const jobOrigin: JobOriginPlacement = relative
         ? { startFrom: 'verified-origin', anchor: 'center' }
@@ -240,9 +251,9 @@ describe('idle marker editing metadata crossing the worker boundary', () => {
       expect(mapControllerPointToScene(first, changed.plan)).toEqual(selected.point);
       expect(changed.plan.jobStart).toEqual(selected.point);
 
-      const changedContext = startEditingContext(structuredClone(changed.plan), changedProject);
+      const changedContext = startEditingContext(transferredPlan(changed), changedProject);
       if (changedContext === undefined) throw new Error('Expected edited metadata');
-      const defaults = reusableStartPoints(changedContext);
+      const defaults = await reusableStartPoints(changedContext);
       expect(defaults.frame).toEqual(project.startPoints?.frame);
       expect(defaults.job?.relative).toBe(true);
       // The retained full bounds are 10..130 and 20..160. The compact first

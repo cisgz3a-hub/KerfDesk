@@ -179,7 +179,7 @@ describe.each([false, true])('canvas start mapping with relative view=%s', (rela
 describe('reusable start preferences', () => {
   it.each(origins)(
     'normalizes scene proportions without origin flips or placement offsets for $origin',
-    ({ origin }) => {
+    async ({ origin }) => {
       const project = {
         ...rectangle(origin),
         startPoints: {
@@ -187,21 +187,21 @@ describe('reusable start preferences', () => {
           job: { x: 20, y: 50 },
         },
       };
-      expect(reusableStartPoints(editing(project, true).context)).toEqual({
+      expect(await reusableStartPoints(editing(project, true).context)).toEqual({
         frame: project.startPoints.frame,
         job: { x: 0.25, y: 0.75, relative: true },
       });
     },
   );
 
-  it('keeps relative preferences unchanged and clamps absolute points to future bounds', () => {
+  it('keeps relative preferences unchanged and clamps absolute points to future bounds', async () => {
     const project = {
       ...rectangle(),
       startPoints: { job: { x: 0.2, y: 0.8, relative: true as const } },
     };
-    expect(reusableStartPoints(editing(project, true).context)).toEqual(project.startPoints);
+    expect(await reusableStartPoints(editing(project, true).context)).toEqual(project.startPoints);
     const outside = { ...project, startPoints: { job: { x: -40, y: 100 } } };
-    expect(reusableStartPoints(editing(outside, false).context)).toEqual({
+    expect(await reusableStartPoints(editing(outside, false).context)).toEqual({
       job: { x: 0, y: 1, relative: true },
     });
   });

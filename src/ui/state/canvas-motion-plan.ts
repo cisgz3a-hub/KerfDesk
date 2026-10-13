@@ -121,6 +121,7 @@ type CanvasPlanBuildContext = {
   readonly relativeView?: boolean;
   readonly retentionKey?: string;
   readonly resumed?: boolean;
+  readonly includeStartPointBounds?: boolean;
 };
 
 export function buildCanvasMotionPlan(
@@ -192,7 +193,7 @@ function assembleCanvasPlan(
     device: args.prepared.project.device,
     coordinateFrame,
     framePerimeter: capability === 'file-only' ? [] : framePerimeterForCanvas(args.prepared, map),
-    startEditingData: buildCanvasStartEditingData(args.prepared),
+    startEditingData: buildCanvasStartEditingData(args.prepared, args.includeStartPointBounds),
     jobStart,
     approachFrom: rotary || initial === null ? null : map(initial),
     capability,

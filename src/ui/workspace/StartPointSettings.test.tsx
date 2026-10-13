@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { JobBounds } from '../../core/job';
 import {
   createLayer,
   createProject,
@@ -83,6 +84,44 @@ function editingContext(project: Project): StartEditingContext {
 }
 
 describe('start point reset ownership', () => {
+  it.each(['project', 'document', 'unmount'] as const)(
+    'does not write delayed defaults after changing the %s owner',
+    async (change) => {
+      const project = { ...createProject(), startPoints: settings };
+      let finish!: (bounds: JobBounds) => void;
+      const waiting = new Promise<JobBounds>((resolve) => {
+        finish = resolve;
+      });
+      const context = { ...editingContext(project), loadBounds: vi.fn(() => waiting) };
+      await show(project, context);
+      await act(async () => button('Use as defaults for new jobs').click());
+      expect(button('Use as defaults for new jobs').disabled).toBe(true);
+      expect(context.loadBounds).toHaveBeenCalledTimes(1);
+      if (change === 'project') useStore.setState({ project: createProject() });
+      if (change === 'document')
+        useStore.setState({ projectDocumentEpoch: useStore.getState().projectDocumentEpoch + 1 });
+      if (change === 'unmount') await act(async () => root.render(null));
+      await act(async () => finish({ minX: 0, maxX: 100, minY: 0, maxY: 100 }));
+      expect(readStartPointDefaults()).toBeUndefined();
+      if (change !== 'unmount') expect(host.textContent).toContain('Defaults were not saved');
+    },
+  );
+
+  it('reports a defaults preparation failure without replacing saved preferences', async () => {
+    const project = { ...createProject(), startPoints: settings };
+    writeStartPointDefaults({ frame: { edge: 3, fraction: 0.2 } });
+    const context = {
+      ...editingContext(project),
+      loadBounds: async () => {
+        throw new Error('worker failed');
+      },
+    };
+    await show(project, context);
+    await act(async () => button('Use as defaults for new jobs').click());
+    expect(host.textContent).toContain('Could not prepare defaults');
+    expect(readStartPointDefaults()).toEqual({ frame: { edge: 3, fraction: 0.2 } });
+  });
+
   it('keeps the source cutting start on Side B while allowing its frame reset', async () => {
     const project = sideBProject();
     await show(project);

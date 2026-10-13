@@ -8,6 +8,7 @@ import type { ProjectStartPoints } from '../../core/scene/start-points';
 import type { PreparedOutput } from '../../io/gcode';
 import { mapControllerPointToScene, type CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
+import { loadCanvasStartBounds } from '../state/canvas-start-bounds-loader';
 
 type Prepared = Extract<PreparedOutput, { readonly ok: true }>;
 export type StartEditingContext = {
@@ -16,6 +17,7 @@ export type StartEditingContext = {
   readonly registered: boolean;
   readonly bounds?: JobBounds | null;
   readonly jobReason?: string | null;
+  readonly loadBounds?: () => Promise<JobBounds | null>;
 };
 const contexts = new WeakMap<CanvasMotionPlan, StartEditingContext>();
 const jobEditReasons = new WeakMap<StartEditingContext, string | null>();
@@ -35,7 +37,8 @@ export function startEditingContext(
   const context: StartEditingContext = {
     sourceProject: project,
     prepared: { ok: true, project, job: data.job, jobOriginOffset: data.jobOriginOffset },
-    bounds: data.bounds,
+    ...(data.bounds === undefined ? {} : { bounds: data.bounds }),
+    loadBounds: () => loadCanvasStartBounds(plan),
     jobReason: data.jobReason,
     registered: currentPrintCutOutputRegistration(project) != null,
   };
@@ -158,13 +161,17 @@ function controllerFrameBounds(plan: CanvasMotionPlan) {
 }
 
 /** Save a relative preference for future artwork, never an old artwork's coordinates. */
-export function reusableStartPoints(context: StartEditingContext): ProjectStartPoints {
+export async function reusableStartPoints(
+  context: StartEditingContext,
+): Promise<ProjectStartPoints> {
   const settings = context.sourceProject.startPoints ?? {};
   const job = settings.job;
   if (job === undefined || job.relative === true) return settings;
   const bounds =
     context.bounds === undefined
-      ? computeJobStartBounds(context.prepared.job, context.prepared.project.device)
+      ? context.loadBounds === undefined
+        ? computeJobStartBounds(context.prepared.job, context.prepared.project.device)
+        : await context.loadBounds()
       : context.bounds;
   if (bounds === null) return settings.frame === undefined ? {} : { frame: settings.frame };
   const offset = context.prepared.jobOriginOffset;

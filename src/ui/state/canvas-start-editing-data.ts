@@ -13,12 +13,13 @@ import type { PreparedOutput } from '../../io/gcode';
 export type CanvasStartEditingData = {
   readonly job: Job;
   readonly jobOriginOffset: Vec2;
-  readonly bounds: JobBounds | null;
+  readonly bounds?: JobBounds | null;
   readonly jobReason: string | null;
 };
 
 export function buildCanvasStartEditingData(
   prepared: Extract<PreparedOutput, { readonly ok: true }>,
+  includeBounds = false,
 ): CanvasStartEditingData {
   const options = jobStartPointOptions(
     prepared.project.optimization,
@@ -29,11 +30,9 @@ export function buildCanvasStartEditingData(
   return {
     job: jobStartEditingJob(prepared.job, options),
     jobOriginOffset: prepared.jobOriginOffset,
-    bounds:
-      prepared.project.startPoints?.job !== undefined &&
-      prepared.project.startPoints.job.relative !== true
-        ? computeJobStartBounds(prepared.job, prepared.project.device)
-        : null,
+    ...(includeBounds
+      ? { bounds: computeJobStartBounds(prepared.job, prepared.project.device) }
+      : {}),
     jobReason:
       selection?.supported === true
         ? null

@@ -33,6 +33,7 @@ import {
 } from './idle-canvas-motion-worker-client';
 import { projectHasVariableData } from '../../core/variables/object-variable-template';
 import { useCurrentCanvasRun } from '../state/use-current-canvas-run';
+import { inheritCanvasStartBoundsLoader } from '../state/canvas-start-bounds-loader';
 
 export function useCanvasMotionOverlay(
   project: Project,
@@ -95,6 +96,7 @@ export function useCanvasMotionOverlay(
     void colorScheme;
     if (previewMode || canvasCovered) return null;
     if (liveRun !== null && !staleTerminalRun) {
+      inheritTerminalStartBounds(liveRun, visiblePlan, visiblePlanIsCurrent, activeStreamer);
       return {
         plan: liveRun.plan,
         run: liveRun,
@@ -115,6 +117,21 @@ export function useCanvasMotionOverlay(
     showStartMarkers,
     colorScheme,
   ]);
+}
+
+function inheritTerminalStartBounds(
+  liveRun: LiveCanvasRun,
+  visiblePlan: CanvasMotionPlan | null,
+  visiblePlanIsCurrent: boolean,
+  activeStreamer: boolean,
+): void {
+  if (
+    !activeStreamer &&
+    !isActiveCanvasLifecycle(liveRun) &&
+    visiblePlanIsCurrent &&
+    visiblePlan !== null
+  )
+    inheritCanvasStartBoundsLoader(liveRun.plan, visiblePlan);
 }
 
 function idleCanvasOverlay(
