@@ -3,6 +3,7 @@ import { containmentDepths } from './containment-depth';
 import { nearestClosedStart } from './closed-shape-start';
 import { reverseCutSegment, rotateClosedCutSegment, validCutArcMoves } from './cut-arc-moves';
 import { firstToolpathProcessPoint } from './first-process-point';
+import { isEmittableCutSegment } from './cut-emission-resolution';
 import {
   cncPassXyPoints,
   type CncGroup,
@@ -42,7 +43,12 @@ function containmentEligibility(segments: ReadonlyArray<CutSegment>): Containmen
   const cached = containmentCache.get(segments);
   if (cached !== undefined) return cached;
   const depths = containmentDepths(segments);
-  const eligibility = { depths, maxDepth: depths.reduce((max, depth) => Math.max(max, depth), 0) };
+  const maxDepth = segments.reduce(
+    (max, segment, index) =>
+      isEmittableCutSegment(segment) ? Math.max(max, depths[index] ?? 0) : max,
+    0,
+  );
+  const eligibility = { depths, maxDepth };
   containmentCache.set(segments, eligibility);
   return eligibility;
 }
@@ -113,7 +119,7 @@ function selectStart(job: Job, target: Vec2, options: JobStartPointOptions): Sel
     if (group.kind === 'cnc') {
       const first = group.passes[0];
       if (first?.kind === 'contour' && canRotateCnc(group)) {
-        return selectCut([first], groupIndex, target, { allowReverse: false });
+        return selectCut([first], groupIndex, target, { allowReverse: false }, () => true);
       }
     }
     return {
@@ -160,7 +166,9 @@ function firstPoint(group: Group): Vec2 | undefined {
     const pass = group.passes.find((item) => cncPassXyPoints(item).length >= 2);
     return pass === undefined ? undefined : cncPassXyPoints(pass)[0];
   }
-  return group.segments.find((segment) => segment.polyline.length >= 2)?.polyline[0];
+  return group.segments.find((segment) =>
+    group.kind === 'cut' ? isEmittableCutSegment(segment) : segment.polyline.length >= 2,
+  )?.polyline[0];
 }
 
 function selectCut(
@@ -168,6 +176,7 @@ function selectCut(
   groupIndex: number,
   target: Vec2,
   options: JobStartPointOptions,
+  acceptSegment: (segment: CutSegment) => boolean = isEmittableCutSegment,
 ): Selection | null {
   const eligibility = options.insideFirst === true ? containmentEligibility(segments) : null;
   let best: Selection | null = null;
@@ -176,6 +185,7 @@ function selectCut(
     const segment = segments[segmentIndex];
     if (
       segment === undefined ||
+      !acceptSegment(segment) ||
       (eligibility !== null && eligibility.depths[segmentIndex] !== eligibility.maxDepth)
     )
       continue;

@@ -47,6 +47,38 @@ function firstPolyline(job: Job): ReadonlyArray<Vec2> {
 }
 
 describe('job start selection', () => {
+  it('skips contours omitted at output precision, both before and inside the first cutting group', () => {
+    const collapsed: CutSegment = {
+      closed: false,
+      polyline: [
+        { x: 10.0001, y: 20 },
+        { x: 10.0002, y: 20 },
+      ],
+    };
+    const emptyGroup = cut([collapsed]);
+    const vector = cut([collapsed, square(20, 20)]);
+    const job: Job = { groups: [emptyGroup, vector] };
+    const target = { x: 10, y: 20 };
+    expect(resolveJobStartPoint(job, target)).toEqual({
+      point: { x: 20, y: 20 },
+      supported: true,
+    });
+    expect(jobStartEditingJob(job)).toEqual({ groups: [vector] });
+    const changed = applyJobStartPoint(job, target);
+    expect(changed.groups[0]).toBe(emptyGroup);
+    const selected = changed.groups[1];
+    expect(selected?.kind === 'cut' && selected.segments[0]?.polyline[0]).toEqual({ x: 20, y: 20 });
+    expect(resolveJobStartPoint({ groups: [emptyGroup] }, target)).toBeNull();
+  });
+
+  it('does not let a collapsed inner contour exclude every real contour with inside-first enabled', () => {
+    const job: Job = { groups: [cut([square(), square(5.0001, 5.0001, 0.0001)])] };
+    expect(resolveJobStartPoint(job, { x: 5, y: 5 }, { insideFirst: true })).toEqual({
+      point: { x: 5, y: 0 },
+      supported: true,
+    });
+  });
+
   it.each(['buffered', 'streamed'] as const)(
     'skips an empty %s raster before the first vector cut',
     (storage) => {

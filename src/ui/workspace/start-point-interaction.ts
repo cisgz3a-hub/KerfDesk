@@ -36,6 +36,7 @@ type Drag = {
   readonly project: Project;
   readonly plan: CanvasMotionPlan;
   readonly epoch: number;
+  readonly environment: ReadonlyArray<unknown>;
   selection: StartSelection | null;
 };
 type KeyboardSelection = {
@@ -65,10 +66,15 @@ type InteractionState = {
 export function useStartPointInteraction(input: StartInteractionInput) {
   const drag = useRef<Drag | null>(null);
   const keyboard = useRef<KeyboardSelection | null>(null);
+  const [draft, setDraft] = useState<{ kind: StartKind; point: Vec2 } | null>(null);
   useEffect(() => {
     const invalidate = () => {
-      if (keyboard.current !== null && !keyboardEnvironmentCurrent(keyboard.current))
+      if (keyboard.current !== null && !selectionEnvironmentCurrent(keyboard.current))
         keyboard.current = null;
+      if (drag.current !== null && !selectionEnvironmentCurrent(drag.current)) {
+        drag.current = null;
+        setDraft(null);
+      }
     };
     const unsubscribers = [
       useStore,
@@ -79,7 +85,6 @@ export function useStartPointInteraction(input: StartInteractionInput) {
     ].map((store) => store.subscribe(invalidate));
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, []);
-  const [draft, setDraft] = useState<{ kind: StartKind; point: Vec2 } | null>(null);
   const cancel = (): void => {
     drag.current = null;
     setDraft(null);
@@ -286,6 +291,7 @@ function beginDrag(
     project,
     plan,
     epoch: useStore.getState().projectDocumentEpoch,
+    environment: keyboardEnvironment(),
     selection: null,
   };
 }
@@ -299,12 +305,14 @@ function reusableKeyboardSelection(
     selection.kind === kind &&
     selection.plan === input.plan &&
     (selection.project === input.project || selection.inputProject === input.project) &&
-    keyboardEnvironmentCurrent(selection)
+    selectionEnvironmentCurrent(selection)
     ? selection
     : null;
 }
 
-function keyboardEnvironmentCurrent(selection: KeyboardSelection): boolean {
+function selectionEnvironmentCurrent(
+  selection: Pick<KeyboardSelection, 'project' | 'environment'>,
+): boolean {
   return (
     !startEditingBusy() &&
     useStore.getState().project === selection.project &&
@@ -328,10 +336,10 @@ function keyboardEnvironment(): ReadonlyArray<unknown> {
     laser.controllerSessionEpoch,
     laser.trustedPositionEpoch,
     laser.workOriginActive,
-    laser.wcoCache,
-    laser.statusReport?.wco,
-    laser.statusReport?.wPos,
-    laser.statusReport?.mPos,
+    ...coordinateComponents(laser.wcoCache),
+    ...coordinateComponents(laser.statusReport?.wco ?? laser.wcoCache),
+    ...coordinateComponents(laser.statusReport?.wPos),
+    ...coordinateComponents(laser.statusReport?.mPos),
     laser.controllerSettings,
     laser.controllerBuildInfo,
     laser.homingState,
@@ -339,6 +347,10 @@ function keyboardEnvironment(): ReadonlyArray<unknown> {
     laser.activeControllerCommandSet,
     laser.detectedControllerKind,
   ];
+}
+
+function coordinateComponents(point: { x: number; y: number; z: number } | null | undefined) {
+  return [point?.x, point?.y, point?.z];
 }
 
 function pointerScene(

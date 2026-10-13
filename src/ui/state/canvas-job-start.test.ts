@@ -42,6 +42,46 @@ function prepared(groups: CutGroup[]): Extract<PreparedOutput, { ok: true }> {
 }
 
 describe('canvas selected cutting start', () => {
+  it.each(['group', 'segment'] as const)(
+    'matches the emitted first burn after a %s collapses at output precision',
+    (kind) => {
+      const collapsed: CutGroup = {
+        ...cut(50, 10),
+        segments: [
+          {
+            closed: false,
+            polyline: [
+              { x: 10.0001, y: 20 },
+              { x: 10.0002, y: 20 },
+            ],
+          },
+        ],
+      };
+      const vector = cut(50, 50);
+      const groups =
+        kind === 'group'
+          ? [collapsed, vector]
+          : [{ ...vector, segments: [...collapsed.segments, ...vector.segments] }];
+      const source = prepared(groups);
+      const marker = buildCanvasMarkerPlan({ prepared: source, machine, relativeView: true });
+      const live = buildCanvasMotionPlan({
+        prepared: source,
+        machine,
+        relativeView: true,
+        gcode: emitPreparedGcode(source).gcode,
+      });
+      expect(marker.jobStart).toEqual({ x: 55, y: 20 });
+      expect(marker.jobStart).toEqual(live.jobStart);
+
+      const empty = buildCanvasMarkerPlan({
+        prepared: prepared([collapsed]),
+        machine,
+        relativeView: true,
+      });
+      expect(empty.jobStart).toBeNull();
+    },
+  );
+
   it('matches the actual first burn after zero-power travel operations', () => {
     const source = prepared([cut(0, 10), cut(50, 50)]);
     const marker = buildCanvasMarkerPlan({ prepared: source, machine, relativeView: true });

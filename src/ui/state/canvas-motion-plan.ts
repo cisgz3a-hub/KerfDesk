@@ -7,6 +7,7 @@ import {
   type JobPlacementSettings,
 } from '../../core/job';
 import { firstToolpathProcessPoint } from '../../core/job/first-process-point';
+import { isEmittableCutSegment } from '../../core/job/cut-emission-resolution';
 import {
   buildMotionManifest,
   type MotionManifest,
@@ -434,7 +435,13 @@ function firstSurfaceProcessPoint(
   // still contributes travel to the toolpath, but cannot own the cutting marker.
   const markerJob = {
     ...prepared.job,
-    groups: prepared.job.groups.filter((group) => group.kind === 'cnc' || group.power > 0),
+    groups: prepared.job.groups
+      .filter((group) => group.kind === 'cnc' || group.power > 0)
+      .map((group) =>
+        group.kind === 'cut'
+          ? { ...group, segments: group.segments.filter(isEmittableCutSegment) }
+          : group,
+      ),
   };
   return firstToolpathProcessPoint(markerJob, {
     scanningOffsets: prepared.project.device.scanningOffsets,

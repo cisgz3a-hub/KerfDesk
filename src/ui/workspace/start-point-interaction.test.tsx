@@ -1,6 +1,7 @@
 import { act, useMemo, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseStatusReport } from '../../core/controllers/grbl';
 import { createLayer, createProject, type Project } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
 import { buildCanvasMarkerPlan } from '../state/canvas-motion-plan';
@@ -130,9 +131,7 @@ beforeEach(async () => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  await act(async () => {
-    root?.render(<Harness />);
-  });
+  await act(async () => root?.render(<Harness />));
   const canvas = host.querySelector('canvas');
   const button = host.querySelector('button');
   if (canvas === null || button === null) throw new Error('missing harness controls');
@@ -151,9 +150,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await act(async () => {
-    root?.unmount();
-  });
+  await act(async () => root?.unmount());
   root = undefined;
   host.remove();
   resetStore();
@@ -173,9 +170,7 @@ async function pointer(type: string, x = 20, y = 20, pointerId = 1) {
     clientY: 200 + 2 * (view.offsetY + view.scale * y),
   });
   Object.defineProperty(event, 'pointerId', { value: pointerId });
-  await act(async () => {
-    host.querySelector('button')?.dispatchEvent(event);
-  });
+  await act(async () => host.querySelector('button')?.dispatchEvent(event));
 }
 
 async function beginDrag() {
@@ -201,9 +196,7 @@ function expectDiscarded() {
 
 describe('start point drag transactions', () => {
   it('accumulates rapid arrow presses while the new start-only plan is pending', async () => {
-    await act(async () => {
-      root?.render(<Harness retainPlan />);
-    });
+    await act(async () => root?.render(<Harness retainPlan />));
     await pressKey('ArrowRight');
     await pressKey('ArrowRight');
     await act(async () => {
@@ -226,9 +219,7 @@ describe('start point drag transactions', () => {
     'epoch',
     'plan',
   ] as const)('invalidates retained keyboard geometry after %s changes', async (change) => {
-    await act(async () => {
-      root?.render(<Harness retainPlan />);
-    });
+    await act(async () => root?.render(<Harness retainPlan />));
     await pressKey('ArrowRight');
     const first = useStore.getState().project.startPoints;
     await act(async () => {
@@ -311,15 +302,7 @@ describe('start point drag transactions', () => {
     try {
       const handle = host.querySelector<HTMLButtonElement>('[aria-label="Job start"]');
       expect(handle?.getAttribute('aria-disabled')).toBe('true');
-      await act(async () =>
-        handle?.dispatchEvent(
-          new KeyboardEvent('keydown', {
-            key: 'ArrowRight',
-            bubbles: true,
-            cancelable: true,
-          }),
-        ),
-      );
+      await act(async () => handle?.dispatchEvent(keyEvent('ArrowRight')));
       expect(shortcut).not.toHaveBeenCalled();
       expectDiscarded();
     } finally {
@@ -346,9 +329,7 @@ describe('start point drag transactions', () => {
 
   it('discards a draft when a new coordinate plan replaces it for the same project', async () => {
     await beginDrag();
-    await act(async () => {
-      root?.render(<Harness planRevision={1} />);
-    });
+    await act(async () => root?.render(<Harness planRevision={1} />));
     await pointer('pointerup');
     expectDiscarded();
   });
@@ -363,31 +344,52 @@ describe('start point drag transactions', () => {
     expect(useStore.getState().undoStack).toHaveLength(1);
     expect(useStore.getState().dirty).toBe(true);
     expect(host.querySelector('output')?.textContent).toBe('no draft');
-    await act(async () => {
-      useStore.getState().undo();
-    });
+    await act(async () => useStore.getState().undo());
     expect(useStore.getState().project.startPoints).toBeUndefined();
   });
 
-  it('discards a draft if the machine becomes busy before release without another move', async () => {
-    await beginDrag();
-    useLaserStore.setState({ motionOperation: startMotionOperation('frame') });
-    await pointer('pointerup');
-    expectDiscarded();
-  });
+  it.each(['busy', 'preparing', 'coordinates', 'epoch'])(
+    'permanently discards a pointer draft after transient %s changes before release',
+    async (change) => {
+      await beginDrag();
+      await act(async () => {
+        if (change === 'busy') {
+          useLaserStore.setState({ motionOperation: startMotionOperation('frame') });
+          useLaserStore.setState({ motionOperation: null });
+        } else if (change === 'preparing') {
+          useFramePreparationStore.setState({ pending: true });
+          useFramePreparationStore.setState({ pending: false });
+        } else if (change === 'coordinates') {
+          const previous = useLaserStore.getState().wcoCache;
+          useLaserStore.setState({ wcoCache: { x: 5, y: 0, z: 0 } });
+          useLaserStore.setState({ wcoCache: previous });
+        } else useStore.setState({ projectDocumentEpoch: 5 });
+      });
+      expectDiscarded();
+      await pointer('pointerup');
+      expectDiscarded();
+    },
+  );
 
-  it('discards a draft when document ownership changes before release', async () => {
+  it('keeps a drag across fresh idle reports with unchanged coordinates', async () => {
+    const point = { x: 0, y: 0, z: 0 };
+    const report = (wco = '|WCO:0,0,0') =>
+      parseStatusReport(`<Idle|MPos:0,0,0|WPos:0,0,0${wco}|FS:0,0>`);
+    expect(report()).not.toBeNull();
+    useLaserStore.setState({ statusReport: report(), wcoCache: point });
     await beginDrag();
-    useStore.setState((state) => ({ projectDocumentEpoch: state.projectDocumentEpoch + 1 }));
+    await act(async () =>
+      useLaserStore.setState({ wcoCache: { ...point }, statusReport: report('') }),
+    );
+    expectDraft(20, 20);
     await pointer('pointerup');
-    expectDiscarded();
+    expect(useStore.getState().project.startPoints?.job?.x).toBeCloseTo(20, 8);
+    expect(useStore.getState().undoStack).toHaveLength(1);
   });
 
   it('cannot apply a stale draft to a newly opened project', async () => {
     await beginDrag();
-    await act(async () => {
-      useStore.getState().setProject(createProject());
-    });
+    await act(async () => useStore.getState().setProject(createProject()));
     await pointer('pointerup');
     expectDiscarded();
   });
@@ -418,8 +420,6 @@ function keyEvent(key: string, shiftKey = false): KeyboardEvent {
 
 async function pressKey(key: string, shiftKey = false): Promise<KeyboardEvent> {
   const event = keyEvent(key, shiftKey);
-  await act(async () => {
-    host.querySelector('button')?.dispatchEvent(event);
-  });
+  await act(async () => host.querySelector('button')?.dispatchEvent(event));
   return event;
 }
