@@ -42,6 +42,7 @@ for (const cnc of [false, true]) {
     expect(source.selectedIds).toEqual(['source']);
     await recipePanelView(page, cnc ? 'Recipes' : 'Materials');
     await page.getByRole('button', { name: 'Create new material library', exact: true }).click();
+    if (!cnc) await openLaserProcessRecipes(recipeArtworkPanel(page));
     const recipes = page.getByRole('region', { name: 'Process recipes', exact: true });
     const name = `${kind} ordered acceptance recipe`;
     await recipes.getByLabel('Process recipe name', { exact: true }).fill(name);
@@ -78,6 +79,7 @@ for (const cnc of [false, true]) {
     const before = await recipeAcceptanceSnapshot(page);
     expect(before.selectedIds.sort()).toEqual(['fresh-a', 'fresh-b']);
     await recipePanelView(page, cnc ? 'Recipes' : 'Materials');
+    if (!cnc) await openLaserProcessRecipes(recipeArtworkPanel(page));
     await expect(recipes.getByLabel('Saved process recipe')).toHaveValue(capturedRecipe.id);
     await recipes.getByRole('button', { name: 'Apply recipe to selection', exact: true }).click();
     await expect(recipes.getByRole('status')).toHaveText(`Applied ${name} to 2 artworks.`);
@@ -154,6 +156,7 @@ for (const cnc of [false, true]) {
       inspector.getByRole('spinbutton', { name: cnc ? /^Feed for/ : /^Power for/ }),
     ).toHaveValue(cnc ? '575' : '17');
     await recipePanelView(page, cnc ? 'Recipes' : 'Materials');
+    if (!cnc) await openLaserProcessRecipes(recipeArtworkPanel(page));
     await expect(recipes.getByLabel('Saved process recipe').locator('option:checked')).toHaveText(
       name,
     );
@@ -271,4 +274,11 @@ function required<T>(value: T | null | undefined): T {
   if (value === null || value === undefined)
     throw new Error('Recipe acceptance fixture value missing');
   return value;
+}
+
+async function openLaserProcessRecipes(panel: Locator): Promise<void> {
+  const summary = panel.getByText('Multi-step process recipes', { exact: true });
+  const disclosure = summary.locator('..');
+  if ((await disclosure.getAttribute('open')) === null) await summary.click();
+  await expect(panel.getByRole('region', { name: 'Process recipes', exact: true })).toBeVisible();
 }
