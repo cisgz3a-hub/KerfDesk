@@ -18,6 +18,7 @@
 }
 
 .lf-operation-slider__heading input {
+  flex: 0 0 100px;
   width: 100px;
   min-width: 0;
   min-height: 32px;
