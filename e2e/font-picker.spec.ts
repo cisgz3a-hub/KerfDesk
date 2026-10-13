@@ -51,7 +51,7 @@ for (const height of [600, 768]) {
     await expect(trigger).toBeFocused();
     await trigger.click();
     await expect(list.locator('[aria-selected="true"]')).toBeInViewport({ ratio: 1 });
-    await expect(list.locator('[aria-selected="true"] button')).toHaveAttribute(
+    await expect(list.locator('[aria-selected="true"] button[data-font-key]')).toHaveAttribute(
       'data-font-key',
       selected,
     );
