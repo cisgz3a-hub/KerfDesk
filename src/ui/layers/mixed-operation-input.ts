@@ -7,12 +7,14 @@ export function useMixedOperationNumber(args: {
   readonly value: number;
   readonly mixed?: boolean | undefined;
   readonly reconcileKey?: unknown;
+  readonly commitOnBlur?: boolean;
   readonly parse: (value: string) => number;
   readonly commit: (value: number) => void;
 }) {
   const debounced = useDebouncedCommit<number | null>({
     value: args.mixed ? null : args.value,
     reconcileKey: args.reconcileKey,
+    commitOnBlur: args.commitOnBlur === true,
     parse: (value) => (value.trim() === '' ? null : args.parse(value)),
     format: (value) => (value === null ? '' : String(value)),
     validate: validateEnglishDecimalInput,
