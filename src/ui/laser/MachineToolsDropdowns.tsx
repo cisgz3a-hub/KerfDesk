@@ -10,6 +10,7 @@ import {
 import { AnchoredPopover } from '../common/AnchoredPopover';
 import { Icon, type IconName } from '../kit/icons';
 import { useLaserStore } from '../state/laser-store';
+import { useUiStore } from '../state/ui-store';
 import { probePlateRemovalRequired } from '../state/work-z-zero-evidence';
 import './MachineToolsDropdowns.css';
 
@@ -26,16 +27,7 @@ export function MachineToolsDropdowns(props: MachineToolContents): JSX.Element {
   const [active, setActive] = useState<Tool | null>(null);
   const group = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setActive(null), []);
-  const plateReminder = useLaserStore((state) =>
-    probePlateRemovalRequired(state.workZZeroEvidence),
-  );
-  useLayoutEffect(() => {
-    if (!plateReminder) return;
-    const opener = group.current?.querySelector<HTMLButtonElement>('[aria-expanded="true"]');
-    const panel = document.getElementById(opener?.getAttribute('aria-controls') ?? '');
-    if (panel?.contains(document.activeElement)) opener?.focus();
-    close();
-  }, [plateReminder, close]);
+  useProbeReminderDismissal(group, close);
   return (
     <div
       ref={group}
@@ -79,6 +71,28 @@ export function MachineToolsDropdowns(props: MachineToolContents): JSX.Element {
       </ToolDropdown>
     </div>
   );
+}
+
+function useProbeReminderDismissal(group: RefObject<HTMLDivElement>, close: () => void): void {
+  const plateReminder = useLaserStore((state) =>
+    probePlateRemovalRequired(state.workZZeroEvidence),
+  );
+  const modalDepth = useUiStore((state) => state.modalDepth);
+  const pending = useRef(false);
+  useLayoutEffect(() => {
+    pending.current = plateReminder;
+  }, [plateReminder]);
+  useLayoutEffect(() => {
+    if (!pending.current || modalDepth > 0) return;
+    const opener = group.current?.querySelector<HTMLButtonElement>('[aria-expanded="true"]');
+    const panel = document.getElementById(opener?.getAttribute('aria-controls') ?? '');
+    // A child may register its modal in this commit before our subscription rerenders.
+    // Never hide a live inline dialog or leave its modal registration invisible.
+    if (panel?.querySelector('[aria-modal="true"]')) return;
+    pending.current = false;
+    if (panel?.contains(document.activeElement)) opener?.focus();
+    close();
+  }, [plateReminder, modalDepth, close, group]);
 }
 
 function ToolDropdown(props: {

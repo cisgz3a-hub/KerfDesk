@@ -1,7 +1,9 @@
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
+import { Dialog } from '../kit/Dialog';
 import { useLaserStore } from '../state/laser-store';
+import { useUiStore } from '../state/ui-store';
 import { MachineToolsDropdowns } from './MachineToolsDropdowns';
 
 (
@@ -9,6 +11,68 @@ import { MachineToolsDropdowns } from './MachineToolsDropdowns';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('Machine tool dropdowns', () => {
+  it('waits for an inline modal to close before revealing a new probe reminder', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    useLaserStore.setState({ workZZeroEvidence: null });
+    try {
+      await act(async () =>
+        root.render(
+          <MachineToolsDropdowns
+            origin={<span>Origin tools</span>}
+            placement={<span>Placement tools</span>}
+            console={() => <InlineModalConsole />}
+          />,
+        ),
+      );
+      const trigger = host.querySelector<HTMLButtonElement>('button[aria-label="Console"]');
+      if (!trigger) throw new Error('Missing console trigger');
+      const panel = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
+      if (!panel) throw new Error('Missing console panel');
+      const launch = panel.querySelector<HTMLButtonElement>('[data-open-console]');
+      const draft = panel.querySelector<HTMLInputElement>('input[aria-label="Command draft"]');
+      if (!launch || !draft) throw new Error('Missing console controls');
+      await act(async () => trigger.click());
+      draft.value = 'G0 X42';
+      await act(async () => launch.click());
+      const modal = panel.querySelector<HTMLElement>('[aria-modal="true"]');
+      if (!modal) throw new Error('Missing expanded console dialog');
+      expect(useUiStore.getState().modalDepth).toBe(1);
+      await act(async () =>
+        useLaserStore.setState({
+          workZZeroEvidence: {
+            source: 'probe',
+            referenceEpoch: 1,
+            probePlateRemoved: false,
+          },
+        }),
+      );
+      expect(panel.hidden).toBe(false);
+      expect(modal.closest('[hidden]')).toBeNull();
+      expect(document.activeElement).toBe(modal.querySelector('input'));
+      const close = modal.querySelector<HTMLButtonElement>('button');
+      if (!close) throw new Error('Missing expanded console close button');
+      await act(async () => close.click());
+      expect(useUiStore.getState().modalDepth).toBe(0);
+      expect(panel.hidden).toBe(true);
+      expect(document.activeElement).toBe(trigger);
+      await act(async () => trigger.click());
+      expect(panel.hidden).toBe(false);
+      expect(panel.querySelector('input[aria-label="Command draft"]')).toBe(draft);
+      expect(draft.value).toBe('G0 X42');
+      await act(async () => launch.click());
+      expect(panel.hidden).toBe(false);
+      expect(panel.querySelector('[aria-modal="true"]')).not.toBeNull();
+      expect(useUiStore.getState().modalDepth).toBe(1);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      useLaserStore.setState({ workZZeroEvidence: null });
+    }
+    expect(useUiStore.getState().modalDepth).toBe(0);
+  });
+
   it('opens one utility at a time, retains form drafts, and returns Escape to its trigger', async () => {
     const host = document.createElement('div');
     document.body.append(host);
@@ -126,3 +190,23 @@ describe('Machine tool dropdowns', () => {
     }
   });
 });
+
+function InlineModalConsole(): JSX.Element {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <input aria-label="Command draft" />
+      <button type="button" data-open-console onClick={() => setOpen(true)}>
+        Super console
+      </button>
+      {open && (
+        <Dialog title="Expanded console" onClose={() => setOpen(false)}>
+          <input aria-label="Expanded console search" />
+          <button type="button" onClick={() => setOpen(false)}>
+            Close expanded console
+          </button>
+        </Dialog>
+      )}
+    </>
+  );
+}

@@ -16,8 +16,10 @@ the existing placement/output fields and CNC maintenance utilities. Console
 contains communication controls, Super console, machine hours and execution
 history/recovery. No function is deleted. Live-job controls, accessory resets,
 checkpoint notices, probe-plate removal and work-Z recovery remain outside the
-dropdowns. A newly required probe-plate reminder dismisses the covering dropdown.
-The Frame/Start dock stays in its current location.
+dropdowns. A newly required probe-plate reminder dismisses the covering dropdown
+after any open modal closes, preserving its focus and modal lifetime. The tools
+can then reopen while the reminder remains required. The Frame/Start dock stays
+in its current location.
 
 The current machine state shares the rail heading; full coordinates, work-origin
 identity and feed/power details remain in Origin. On short laptop bodies the
