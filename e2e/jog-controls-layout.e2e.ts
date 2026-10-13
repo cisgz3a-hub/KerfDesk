@@ -2,13 +2,14 @@ import { test, expect, type Locator } from './fixtures/kerfdesk-test';
 import {
   connectMachineAndDismissFirstSetup,
   machineJogAction,
+  openMachineToolDropdown,
   selectWorkspacePanel,
 } from './fixtures/workspace-ui';
 import type { AppState } from '../src/ui/state';
 
-test('configured jog actions and powered Z remain pointer reachable while lower tools scroll', async ({
+test('configured jog actions and powered Z stay put while tool dropdowns open', async ({
   page,
-}) => {
+}, info) => {
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto('/');
   await selectWorkspacePanel(page, 'Machine');
@@ -34,6 +35,7 @@ test('configured jog actions and powered Z remain pointer reachable while lower 
     machineJogAction(page, 'Home'),
     machineJogAction(page, 'Auto-focus'),
     machineJogAction(page, 'Set origin here'),
+    page.getByRole('button', { name: /^Turn manual air assist on/ }),
     page.getByRole('button', { name: 'Jog Z+ 1 mm', exact: true }),
     page.getByRole('button', { name: 'Jog Z- 1 mm', exact: true }),
   ];
@@ -43,12 +45,19 @@ test('configured jog actions and powered Z remain pointer reachable while lower 
   }
   const positions = await Promise.all(actions.map((action) => action.boundingBox()));
   const tools = page.getByRole('region', { name: 'Machine tools', exact: true });
-  const consoleSummary = tools.locator('summary').filter({ hasText: /^Console$/ });
-  await consoleSummary.click();
-  await expect(consoleSummary.locator('..')).toHaveAttribute('open', '');
-  await tools.evaluate((element) => {
-    element.scrollTop = element.scrollHeight;
-  });
+  await expect
+    .poll(() => tools.evaluate((element) => element.scrollHeight <= element.clientHeight + 1))
+    .toBe(true);
+  await page.screenshot({ path: info.outputPath('machine-configured-laptop.png') });
+  for (const name of ['Origin', 'Placement & output', 'Console'] as const) {
+    const panel = await openMachineToolDropdown(page, name);
+    for (const [index, action] of actions.entries()) {
+      expect(await action.boundingBox()).toEqual(positions[index]);
+      await expectUnclippedPointerTarget(action);
+    }
+    await page.screenshot({ path: info.outputPath(`configured-${name.split(' ')[0]}.png`) });
+    await panel.getByRole('button', { name: `Close ${name}`, exact: true }).click();
+  }
   for (const [index, action] of actions.entries()) {
     expect(await action.boundingBox()).toEqual(positions[index]);
     await expectUnclippedPointerTarget(action);

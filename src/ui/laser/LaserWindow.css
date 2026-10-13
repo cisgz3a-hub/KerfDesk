@@ -12,8 +12,8 @@
   min-width: 0;
 }
 
-/* Ordinary positioning controls have no separate scroller. Opening Console or
-   other lower tools leaves the entire jog cluster in place. */
+/* Utilities float outside the rail. The outer fallback keeps recovery notices
+   and the full jog cluster reachable in exceptionally short windows. */
 .lf-rail.lf-machine-rail {
   overflow-y: auto;
   overflow-x: hidden;
@@ -32,12 +32,9 @@
 }
 
 .lf-machine-rail > .lf-machine-details {
-  flex: 1 1 100px;
-  min-height: min(60px, 25%);
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-gutter: stable;
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
 }
 
 .lf-machine-primary-controls > *,
@@ -46,8 +43,8 @@
   min-width: 0;
 }
 
-/* When the real body is too short for two usable scroll targets, retain one
-   full rail scroller. Heading, jog/focus and lower tools stay reachable while
+/* When the real body is exceptionally short, retain one full rail scroller.
+   Heading, jog/focus and lower tools stay reachable while
    the sibling Frame/Start dock keeps the available window space. */
 @container machine-rail-body (max-height: 192px) {
   .lf-machine-rail > .lf-machine-primary-controls,
@@ -73,6 +70,17 @@
   color: var(--lf-text-muted);
   font-size: var(--lf-text-sm);
   font-weight: 600;
+}
+
+.lf-machine-heading {
+  position: relative;
+}
+
+.lf-machine-heading-state {
+  position: absolute;
+  right: 36px;
+  top: 2px;
+  font-size: var(--lf-text-sm);
 }
 
 .lf-jog-panel {

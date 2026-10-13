@@ -378,7 +378,7 @@ test('recovery after a controller reset warns when the work origin differs from 
     void dialog.accept();
   });
   await connectAndHome(page, kerfdesk);
-  await page.getByText('Placement & output', { exact: true }).click();
+  await page.getByRole('button', { name: 'Placement & output', exact: true }).click();
   await page.getByRole('combobox', { name: 'Start from' }).selectOption('user-origin');
   await kerfdesk.emitSerialLine('<Idle|MPos:20.000,20.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await page.getByRole('button', { name: 'Set origin here', exact: true }).click();
@@ -426,7 +426,7 @@ test('after a lost link the Review opens by itself, homes, and puts the saved or
   test.setTimeout(180_000);
   page.on('dialog', (dialog) => void dialog.accept());
   await connectAndHome(page, kerfdesk);
-  await page.getByText('Placement & output', { exact: true }).click();
+  await page.getByRole('button', { name: 'Placement & output', exact: true }).click();
   await page.getByRole('combobox', { name: 'Start from' }).selectOption('user-origin');
   await kerfdesk.emitSerialLine('<Idle|MPos:20.000,20.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await page.getByRole('button', { name: 'Set origin here', exact: true }).click();

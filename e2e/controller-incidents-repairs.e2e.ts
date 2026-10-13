@@ -1,6 +1,10 @@
 import { writeFileSync } from 'node:fs';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
-import { connectMachineAndDismissFirstSetup, selectWorkspacePanel } from './fixtures/workspace-ui';
+import {
+  connectMachineAndDismissFirstSetup,
+  openMachineToolDropdown,
+  selectWorkspacePanel,
+} from './fixtures/workspace-ui';
 import type { SerialTranscriptEntry } from '../src/ui/state/laser-transcript';
 
 test('controller incidents survive acknowledgements and reconnect in the console and saved report', async ({
@@ -48,8 +52,7 @@ test('controller incidents survive acknowledgements and reconnect in the console
     (await incidents(page)).filter((entry) => original.some((prior) => prior.id === entry.id)),
   ).toEqual(original);
 
-  const summary = page.locator('.lf-machine-rail summary').filter({ hasText: /^Console$/ });
-  if ((await summary.locator('..').getAttribute('open')) === null) await summary.click();
+  await openMachineToolDropdown(page, 'Console');
   await page.getByRole('button', { name: 'Super console', exact: true }).click();
   const consoleDialog = page.getByRole('dialog', { name: 'Super console', exact: true });
   await expect(consoleDialog).toBeVisible();
@@ -93,6 +96,7 @@ test('controller incidents survive acknowledgements and reconnect in the console
     info.outputPath('retained-incidents.json'),
     JSON.stringify(await incidents(page), null, 2),
   );
+  await openMachineToolDropdown(page, 'Console');
   await page.getByRole('button', { name: 'Super console', exact: true }).click();
   await expect(consoleDialog).toBeVisible();
   const clearHistory = consoleDialog.getByRole('button', {

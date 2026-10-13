@@ -1,4 +1,9 @@
-import { applicationHeader, machineJogAction, toolbarCommand } from './fixtures/workspace-ui';
+import {
+  applicationHeader,
+  machineJogAction,
+  openMachineToolDropdown,
+  toolbarCommand,
+} from './fixtures/workspace-ui';
 import { test, expect } from './fixtures/kerfdesk-test';
 
 test('routine controls stay visible while setup, history, and Learn remain reachable', async ({
@@ -14,7 +19,6 @@ test('routine controls stay visible while setup, history, and Learn remain reach
   await expect(page.locator('#app-splash')).toHaveCount(0);
   await page.getByRole('tab', { name: 'Machine', exact: true }).click();
   await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
-  const rail = page.getByLabel('Laser controls', { exact: true });
   const homing = machineJogAction(page, 'Set up homing');
   await expect(homing).toBeVisible();
   await expect(homing).toBeEnabled();
@@ -26,15 +30,19 @@ test('routine controls stay visible while setup, history, and Learn remain reach
   await setup.getByRole('button', { name: 'Cancel without saving', exact: true }).click();
   await expect(setup).not.toBeVisible();
   await expect(homing).toBeFocused();
-  const history = rail.locator('summary').filter({ hasText: /^History & recovery$/ });
+  const consolePanel = await openMachineToolDropdown(page, 'Console');
+  const history = consolePanel.locator('summary').filter({ hasText: /^History & recovery$/ });
   await history.focus();
   await page.keyboard.press('Enter');
-  await rail
+  await consolePanel
     .locator('summary')
     .filter({ hasText: /^Execution archive/ })
     .click();
-  await expect(rail.getByText('No archived executions yet.', { exact: false })).toBeVisible();
+  await expect(
+    consolePanel.getByText('No archived executions yet.', { exact: false }),
+  ).toBeVisible();
   await history.click();
+  await page.keyboard.press('Escape');
   const learn = page.getByRole('button', { name: 'Learn', exact: true });
   await learn.click();
   await expect(page.getByRole('dialog')).toBeVisible();
