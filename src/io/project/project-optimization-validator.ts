@@ -1,4 +1,5 @@
 import { LINE_START_REGIONS } from '../../core/scene/project';
+import { CUT_DIRECTIONS } from '../../core/job/directional-order';
 import {
   firstError,
   isObject,
@@ -28,5 +29,6 @@ export function validateOptimization(value: unknown): string | null {
     ]),
     optionalLiteral(value, 'optimization.lineStartRegion', LINE_START_REGIONS),
     optionalLiteral(value, 'optimization.closedShapeStart', ['drawn', 'nearest', 'nearest-corner']),
+    optionalLiteral(value, 'optimization.cutDirection', CUT_DIRECTIONS),
   ]);
 }

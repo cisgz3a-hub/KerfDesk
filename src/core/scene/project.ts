@@ -70,6 +70,17 @@ export type ProjectOptimizationSettings = {
    * field and starts closed shapes where drawn, which cuts the same outline.
    */
   readonly closedShapeStart: 'drawn' | 'nearest' | 'nearest-corner';
+  /**
+   * Line shapes run in a sweep across the workspace instead of nearest-first
+   * (LightBurn Order by direction). Absent keeps the planner; an older reader
+   * ignores it and cuts the same shapes in planner order.
+   */
+  readonly cutDirection?:
+    | 'top-to-bottom'
+    | 'bottom-to-top'
+    | 'left-to-right'
+    | 'right-to-left'
+    | undefined;
 };
 
 export type ProjectJobPlacement = {

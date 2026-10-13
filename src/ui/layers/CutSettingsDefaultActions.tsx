@@ -1,4 +1,6 @@
 import { Button } from '../kit';
+import { useLayerDefaultsPreference } from '../state/layer-defaults-preference';
+import { useStore } from '../state';
 
 export type CutSettingsDefaultHandlers = {
   readonly onMakeDefault: () => void;
@@ -18,14 +20,15 @@ export function CutSettingsDefaultActions(props: CutSettingsDefaultHandlers): JS
       <div className="lf-cut-settings-disclosure__body">
         <p className="lf-laser-help">
           Apply edits before saving a default. Make Default uses it for added operations in this
-          canvas. New and restart use app starter values; Reset explicitly reuses saved settings.
-          Choose power and speed from a material recipe or your selected machine’s instructions.
+          canvas. New and restart use app starter values unless you tick the box below; Reset
+          explicitly reuses saved settings. Choose power and speed from a material recipe or your
+          selected machine’s instructions.
         </p>
         <section aria-label="Default layer settings" className="lf-cut-settings-default-actions">
           <Button
             type="button"
             onClick={props.onMakeDefault}
-            title={`Save settings for ${props.makeDefaultColor} and use them for added artwork in this canvas. New and restart do not apply them automatically.`}
+            title={`Save settings for ${props.makeDefaultColor} and use them for added artwork in this canvas. New projects and restarts use them only when the option below is on.`}
           >
             Make Default for {props.makeDefaultColor}
           </Button>
@@ -39,12 +42,35 @@ export function CutSettingsDefaultActions(props: CutSettingsDefaultHandlers): JS
           <Button
             type="button"
             onClick={props.onMakeDefaultForAll}
-            title="Save settings for all colours and use them for added artwork in this canvas. New and restart use app starter values."
+            title="Save settings for all colours and use them for added artwork in this canvas. New projects and restarts use them only when the option below is on."
           >
             Make Default for All
           </Button>
         </section>
+        <AutoApplyDefaults />
       </div>
     </details>
+  );
+}
+
+// Opt-in: saved defaults also seed new projects and the next session.
+function AutoApplyDefaults(): JSX.Element {
+  const autoApply = useLayerDefaultsPreference((state) => state.autoApply);
+  const setAutoApply = useLayerDefaultsPreference((state) => state.setAutoApply);
+  return (
+    <label className="lf-laser-help" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <input
+        type="checkbox"
+        checked={autoApply}
+        title="Use the saved defaults for added operations in new projects and after a restart too, as LightBurn does. Check power and speed for the material each time."
+        onChange={(event) => {
+          const on = event.currentTarget.checked;
+          setAutoApply(on);
+          const store = useStore.getState();
+          store.setLayerDefaults({ ...store.layerDefaults, applyToNewOperations: on });
+        }}
+      />
+      Also use saved defaults in new projects and after a restart
+    </label>
   );
 }

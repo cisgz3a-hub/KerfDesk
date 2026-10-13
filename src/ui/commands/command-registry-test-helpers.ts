@@ -28,6 +28,10 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     exportPdf: vi.fn(),
     exportEps: vi.fn(),
     exportGeoJson: vi.fn(),
+    exportAi: vi.fn(),
+    exportPalette: vi.fn(),
+    importGcodeArtwork: vi.fn(),
+    printArtwork: vi.fn(),
     ...baseCtxAppearance(),
     ...overrides,
   } as AppCommandContext;
@@ -78,6 +82,7 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     bakeVariableText: vi.fn(),
     saveOriginalImage: vi.fn(),
     savePreviewImage: vi.fn(),
+    generatePathFromCut: vi.fn(),
     moveSelectionInDrawOrder: vi.fn(),
     matchSelectionSize: vi.fn(),
     moveSelectionTogether: vi.fn(),

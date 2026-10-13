@@ -7,6 +7,7 @@ import { RadiusFilletDialogHost } from './RadiusFilletDialog';
 import { SaveOriginalImageDialogHost } from './SaveOriginalImageDialog';
 import { SelectCirclesDialogHost } from './SelectCirclesDialog';
 import { ShearDialogHost } from './ShearDialog';
+import { PrintArtworkDialogHost } from './PrintArtworkDialog';
 import { TangentCircleDialogHost } from './TangentCircleDialog';
 
 export function ParityDialogHosts(): JSX.Element {
@@ -19,6 +20,7 @@ export function ParityDialogHosts(): JSX.Element {
       <ClosePathsToleranceDialogHost />
       <RadiusFilletDialogHost />
       <ShearDialogHost />
+      <PrintArtworkDialogHost />
     </>
   );
 }

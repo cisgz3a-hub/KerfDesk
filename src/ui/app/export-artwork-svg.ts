@@ -2,7 +2,7 @@ import { DEFAULT_PROJECT_VARIABLE_DATA, type Project, type RasterImage } from '.
 import { materializeVariableText } from '../../io/gcode/prepare-output-snapshot';
 import { exportSceneSvg } from '../../io/svg/export-scene-svg';
 import type { PlatformAdapter } from '../../platform/types';
-import { readRasterSourceFile } from '../import/paged-raster-source';
+import { embedSvgRasterImages } from './svg-artwork-images';
 import { renderVariableText } from '../text/render-variable-text';
 import type { ToastVariant } from '../state/toast-store';
 
@@ -53,13 +53,7 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
       );
       return;
     }
-    const objects = await Promise.all(
-      resolved.project.scene.objects.map(async (object) => {
-        if (object.kind !== 'raster-image') return object;
-        const { imageAsset: _asset, ...image } = object;
-        return { ...image, dataUrl: await (ctx.readImageSource ?? svgImageSource)(object) };
-      }),
-    );
+    const objects = await embedSvgRasterImages(resolved.project.scene.objects, ctx.readImageSource);
     const result = exportSceneSvg(
       { ...resolved.project, scene: { ...resolved.project.scene, objects } },
       ids,
@@ -108,20 +102,6 @@ export function exportProjectSelection(
       objects: project.scene.objects.filter((object) => selected.has(object.id)),
     },
   };
-}
-
-async function svgImageSource(image: RasterImage): Promise<string> {
-  if (image.imageAsset === undefined && image.dataUrl !== undefined) return image.dataUrl;
-  const file = await readRasterSourceFile(image, image.source);
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Could not read image pixels for SVG export.'));
-    reader.onload = () =>
-      typeof reader.result === 'string'
-        ? resolve(reader.result)
-        : reject(new Error('The image source did not contain bytes.'));
-    reader.readAsDataURL(file);
-  });
 }
 
 function svgFilename(savedName: string | null, selected: boolean): string {

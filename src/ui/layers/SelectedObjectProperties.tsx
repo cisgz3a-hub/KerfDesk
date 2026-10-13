@@ -18,6 +18,7 @@ import { SelectedImageAdjustments } from './SelectedImageAdjustments';
 import { SelectedOperationInspector } from './SelectedOperationInspector';
 import { SelectedReliefProperties } from './SelectedReliefProperties';
 import { SelectedSourceReimportControl } from './SelectedSourceReimportControl';
+import { SelectedImageReplaceControl } from './SelectedImageReplaceControl';
 import {
   isParametricShapeObject,
   SelectedShapeGeometryFields,
@@ -168,6 +169,11 @@ function ArtworkAdjustmentFields(props: ArtworkPropertiesInspectorProps): JSX.El
         <PowerScaleInput objects={context.objects} selectionActive={context.selectionActive} />
       )}
       <SelectedSourceReimportControl
+        object={
+          context.selectionActive && context.objects.length === 1 ? context.primaryObject : null
+        }
+      />
+      <SelectedImageReplaceControl
         object={
           context.selectionActive && context.objects.length === 1 ? context.primaryObject : null
         }
