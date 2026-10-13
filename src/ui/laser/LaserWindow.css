@@ -12,8 +12,8 @@
   min-width: 0;
 }
 
-/* Utilities float outside the rail. The outer fallback keeps recovery notices
-   and the full jog cluster reachable in exceptionally short windows. */
+/* Utilities expand inside the rail. The outer fallback keeps recovery notices
+   and the full jog cluster reachable when the controls cannot fit together. */
 .lf-rail.lf-machine-rail {
   overflow-y: auto;
   overflow-x: hidden;
@@ -32,7 +32,7 @@
 }
 
 .lf-machine-rail > .lf-machine-details {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: visible;
 }
@@ -43,10 +43,25 @@
   min-width: 0;
 }
 
-/* When the real body is exceptionally short, retain one full rail scroller.
+.lf-machine-details > .lf-job-controls {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.lf-machine-details > .lf-job-controls > * {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.lf-machine-details > .lf-job-controls > .lf-machine-tools {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* When jog and an open utility cannot fit, use one full rail scroller.
    Heading, jog/focus and lower tools stay reachable while
    the sibling Frame/Start dock keeps the available window space. */
-@container machine-rail-body (max-height: 192px) {
+@container machine-rail-body (max-height: 440px) {
   .lf-machine-rail > .lf-machine-primary-controls,
   .lf-machine-rail > .lf-machine-details {
     flex: 0 0 auto;
