@@ -1,5 +1,9 @@
 import { computeJobBounds, type Job, type JobBounds } from '../../core/job';
-import { jobStartEditingJob, resolveJobStartPoint } from '../../core/job/job-start-point';
+import {
+  jobStartEditingJob,
+  jobStartPointOptions,
+  resolveJobStartPoint,
+} from '../../core/job/job-start-point';
 import type { Vec2 } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 
@@ -18,10 +22,7 @@ export function buildCanvasStartEditingData(
   const selection = resolveJobStartPoint(
     prepared.job,
     { x: 0, y: 0 },
-    {
-      allowReverse: prepared.project.optimization.pathDirection === 'allow-reverse',
-      insideFirst: prepared.project.optimization.insideFirst,
-    },
+    jobStartPointOptions(prepared.project.optimization),
   );
   return {
     job: jobStartEditingJob(prepared.job),

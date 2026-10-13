@@ -24,7 +24,7 @@ import {
 } from '../../core/job';
 import { compileCncJobResult, type CncJobCompilationResult } from '../../core/cnc/compile-cnc-job';
 import { toMachineCoords, toSceneCoords } from '../../core/devices';
-import { applyJobStartPoint } from '../../core/job/job-start-point';
+import { applyJobStartPoint, jobStartPointOptions } from '../../core/job/job-start-point';
 import { registrationBoxScene } from '../../core/job/registration-placement';
 import {
   COMPILE_INTEGRITY_PREFLIGHT_CODES,
@@ -263,10 +263,11 @@ export function completePreparedOutput(
     job:
       target === null
         ? optimized
-        : applyJobStartPoint(optimized, target, {
-            allowReverse: input.sourceProject.optimization.pathDirection === 'allow-reverse',
-            insideFirst: input.sourceProject.optimization.insideFirst,
-          }),
+        : applyJobStartPoint(
+            optimized,
+            target,
+            jobStartPointOptions(input.sourceProject.optimization),
+          ),
     jobOriginOffset: offset,
     advisories: input.advisories,
   };

@@ -4,6 +4,7 @@ import type { Vec2 } from '../scene';
 import type { CncGroup, CutGroup, CutSegment, Job, RasterGroup } from './job';
 import { applyJobStartPoint, jobStartEditingJob, resolveJobStartPoint } from './job-start-point';
 import { validCutArcMoves, withCutArcMoves } from './cut-arc-moves';
+import { firstToolpathProcessPoint } from './first-process-point';
 
 function square(x = 0, y = 0, size = 10): CutSegment {
   return {
@@ -301,6 +302,42 @@ function cnc(): CncGroup {
 }
 
 describe('CNC start selection', () => {
+  it('skips a CNC contour with no controller-representable motion before selecting a later group', () => {
+    const collapsed: CncGroup = {
+      ...cnc(),
+      passes: [
+        {
+          kind: 'contour',
+          zMm: -1,
+          closed: false,
+          polyline: [
+            { x: 247.01767, y: 20 },
+            { x: 247.01768, y: 20 },
+          ],
+        },
+      ],
+    };
+    expect(firstToolpathProcessPoint({ groups: [collapsed] })).toBeNull();
+    expect(resolveJobStartPoint({ groups: [collapsed] }, { x: 4, y: 0 })).toBeNull();
+    const real = cnc();
+    const input: Job = { groups: [collapsed, real] };
+    expect(jobStartEditingJob(input)).toEqual({ groups: [real] });
+    expect(resolveJobStartPoint(input, { x: 4, y: 0 })).toEqual({
+      point: { x: 4, y: 0 },
+      supported: true,
+    });
+    const changed = applyJobStartPoint(input, { x: 4, y: 0 });
+    expect(changed.groups[0]).toBe(collapsed);
+    expect(firstToolpathProcessPoint(changed)).toEqual({ x: 4, y: 0 });
+    const selected = changed.groups[1];
+    if (selected?.kind !== 'cnc') throw new Error('expected cnc');
+    expect(selected.passes.map((pass) => pass.kind === 'contour' && pass.polyline[0])).toEqual([
+      { x: 4, y: 0 },
+      { x: 4, y: 0 },
+      { x: 4, y: 0 },
+    ]);
+  });
+
   it('rotates matching depth passes together without changing depths or direction', () => {
     const changed = applyJobStartPoint({ groups: [cnc()] }, { x: 4, y: 0 });
     const group = changed.groups[0];

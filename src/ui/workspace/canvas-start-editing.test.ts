@@ -20,7 +20,11 @@ import {
   type StartEditingContext,
 } from './canvas-start-editing';
 
-function rectangle(origin: Origin = 'rear-left', mode: 'line' | 'fill' = 'line'): Project {
+function rectangle(
+  origin: Origin = 'rear-left',
+  mode: 'line' | 'fill' = 'line',
+  closed = true,
+): Project {
   const base = createProject();
   return {
     ...base,
@@ -39,14 +43,19 @@ function rectangle(origin: Origin = 'rear-left', mode: 'line' | 'fill' = 'line')
               color: '#000000',
               polylines: [
                 {
-                  closed: true,
-                  points: [
-                    { x: 10, y: 20 },
-                    { x: 50, y: 20 },
-                    { x: 50, y: 60 },
-                    { x: 10, y: 60 },
-                    { x: 10, y: 20 },
-                  ],
+                  closed,
+                  points: closed
+                    ? [
+                        { x: 10, y: 20 },
+                        { x: 50, y: 20 },
+                        { x: 50, y: 60 },
+                        { x: 10, y: 60 },
+                        { x: 10, y: 20 },
+                      ]
+                    : [
+                        { x: 10, y: 20 },
+                        { x: 50, y: 20 },
+                      ],
                 },
               ],
             },
@@ -99,6 +108,30 @@ const origins: ReadonlyArray<{ origin: Origin; frame: FrameStartPoint }> = [
 ];
 
 describe.each([false, true])('canvas start mapping with relative view=%s', (relative) => {
+  it('keeps an open path drawn direction when source order retains a stale allow-reverse setting', () => {
+    const base = rectangle('rear-left', 'line', false);
+    const project: Project = {
+      ...base,
+      optimization: {
+        ...base.optimization,
+        travelPolicy: 'source-order',
+        pathDirection: 'allow-reverse',
+      },
+    };
+    const { context, plan, displayed } = editing(project, relative);
+    const selected = selectCanvasStart('job', displayed({ x: 50, y: 20 }), plan, context);
+    expect(selected?.settings.job).toEqual({ x: 10, y: 20 });
+    expect(selected?.point).toEqual(displayed({ x: 10, y: 20 }));
+    if (selected === null) throw new Error('expected cutting selection');
+    const changed = editing({ ...project, startPoints: selected.settings }, relative);
+    const emitted = emitPreparedGcode(changed.context.prepared);
+    const manifest = buildMotionManifest(emitted.gcode, { machineKind: 'laser' });
+    if (manifest.firstProcessPoint === null) throw new Error('expected emitted cutting motion');
+    expect(mapControllerPointToScene(manifest.firstProcessPoint, changed.plan)).toEqual(
+      selected.point,
+    );
+  });
+
   it.each(origins)(
     'snaps the frame to the actual controller edge for $origin',
     ({ origin, frame }) => {

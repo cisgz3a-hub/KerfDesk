@@ -1,22 +1,28 @@
-import type { Vec2 } from '../scene';
+import type { ProjectOptimizationSettings, Vec2 } from '../scene';
 import { containmentDepths } from './containment-depth';
 import { nearestClosedStart } from './closed-shape-start';
 import { reverseCutSegment, rotateClosedCutSegment, validCutArcMoves } from './cut-arc-moves';
 import { firstToolpathProcessPoint } from './first-process-point';
 import { isEmittableCutSegment } from './cut-emission-resolution';
-import {
-  cncPassXyPoints,
-  type CncGroup,
-  type CutSegment,
-  type Group,
-  type Job,
-  type RasterGroup,
-} from './job';
+import { type CncGroup, type CutSegment, type Group, type Job, type RasterGroup } from './job';
 
 export type JobStartPointOptions = {
   readonly allowReverse?: boolean;
   readonly insideFirst?: boolean;
 };
+
+/** Source order preserves drawn direction even if a former planner setting
+ * still allows reversal. Output and canvas snapping must use the same policy. */
+export function jobStartPointOptions(
+  optimization: Pick<ProjectOptimizationSettings, 'travelPolicy' | 'pathDirection' | 'insideFirst'>,
+): JobStartPointOptions {
+  return {
+    allowReverse:
+      optimization.travelPolicy !== 'source-order' &&
+      optimization.pathDirection === 'allow-reverse',
+    insideFirst: optimization.insideFirst,
+  };
+}
 
 export type ResolvedJobStartPoint = {
   readonly point: Vec2;
@@ -37,7 +43,7 @@ type ContainmentEligibility = {
 // Prepared jobs and their segment arrays are immutable. Pointer movement only
 // changes the target, so keep containment work once per prepared geometry.
 const containmentCache = new WeakMap<ReadonlyArray<CutSegment>, ContainmentEligibility>();
-const rasterStartCache = new WeakMap<RasterGroup, Vec2 | null>();
+const processStartCache = new WeakMap<RasterGroup | CncGroup, Vec2 | null>();
 
 function containmentEligibility(segments: ReadonlyArray<CutSegment>): ContainmentEligibility {
   const cached = containmentCache.get(segments);
@@ -152,19 +158,15 @@ function canRotateCnc(group: CncGroup): boolean {
 
 function firstPoint(group: Group): Vec2 | undefined {
   if (group.kind !== 'cnc' && (group.power <= 0 || group.passes <= 0)) return undefined;
-  if (group.kind === 'raster') {
-    // White/transparent rasters can have dimensions without any burn. Match
-    // the canonical raster sweep planner before treating them as an operation.
-    // Cache by immutable group so pointer movement never rescans streamed rows.
-    const cached = rasterStartCache.get(group);
+  if (group.kind === 'raster' || group.kind === 'cnc') {
+    // Dimensions/vertex counts do not guarantee executable motion. Reuse the
+    // raster sweep and CNC controller-precision rules from the canonical marker.
+    // Cache by immutable group so dragging does not rescan rows or precision.
+    const cached = processStartCache.get(group);
     if (cached !== undefined) return cached ?? undefined;
     const point = firstToolpathProcessPoint({ groups: [group] });
-    rasterStartCache.set(group, point);
+    processStartCache.set(group, point);
     return point ?? undefined;
-  }
-  if (group.kind === 'cnc') {
-    const pass = group.passes.find((item) => cncPassXyPoints(item).length >= 2);
-    return pass === undefined ? undefined : cncPassXyPoints(pass)[0];
   }
   return group.segments.find((segment) =>
     group.kind === 'cut' ? isEmittableCutSegment(segment) : segment.polyline.length >= 2,

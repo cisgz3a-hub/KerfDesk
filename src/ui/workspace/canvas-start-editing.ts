@@ -1,7 +1,7 @@
 import { toMachineCoords, toSceneCoords } from '../../core/devices';
 import { computeJobBounds, rotaryAppliesTo, type JobBounds } from '../../core/job';
 import { buildFramePerimeter, nearestFrameStartPoint } from '../../core/job/frame-perimeter';
-import { resolveJobStartPoint } from '../../core/job/job-start-point';
+import { jobStartPointOptions, resolveJobStartPoint } from '../../core/job/job-start-point';
 import type { Project, Vec2 } from '../../core/scene';
 import type { ProjectStartPoints } from '../../core/scene/start-points';
 import type { PreparedOutput } from '../../io/gcode';
@@ -63,7 +63,11 @@ function jobEditReason(context: StartEditingContext): string | null {
   const { prepared, sourceProject } = context;
   if (context.jobReason !== undefined) return context.jobReason;
   if (jobEditReasons.has(context)) return jobEditReasons.get(context) ?? null;
-  const first = resolveJobStartPoint(prepared.job, { x: 0, y: 0 }, selectionOptions(sourceProject));
+  const first = resolveJobStartPoint(
+    prepared.job,
+    { x: 0, y: 0 },
+    jobStartPointOptions(sourceProject.optimization),
+  );
   const reason =
     first?.supported === true
       ? null
@@ -100,7 +104,7 @@ export function selectCanvasStart(
   const selected = resolveJobStartPoint(
     context.prepared.job,
     target,
-    selectionOptions(context.sourceProject),
+    jobStartPointOptions(context.sourceProject.optimization),
   );
   if (selected?.supported !== true) return null;
   const offset = context.prepared.jobOriginOffset;
@@ -111,13 +115,6 @@ export function selectCanvasStart(
   return {
     point: mapControllerPointToScene({ ...selected.point, z: 0 }, plan),
     settings: { ...settings, job },
-  };
-}
-
-function selectionOptions(project: Project) {
-  return {
-    allowReverse: project.optimization.pathDirection === 'allow-reverse',
-    insideFirst: project.optimization.insideFirst,
   };
 }
 

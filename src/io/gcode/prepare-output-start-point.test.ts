@@ -13,7 +13,7 @@ import { emitGcode } from './emit-gcode';
 import { buildGcodeRenderModel, SEG_MOTION } from '../../core/gcode-view';
 import { prepareOutput } from './prepare-output';
 
-function project(): Project {
+function project(closed = true): Project {
   const base = createProject();
   const scene = addObject(base.scene, {
     kind: 'imported-svg',
@@ -26,14 +26,19 @@ function project(): Project {
         color: '#ff0000',
         polylines: [
           {
-            closed: true,
-            points: [
-              { x: 10, y: 20 },
-              { x: 30, y: 20 },
-              { x: 30, y: 40 },
-              { x: 10, y: 40 },
-              { x: 10, y: 20 },
-            ],
+            closed,
+            points: closed
+              ? [
+                  { x: 10, y: 20 },
+                  { x: 30, y: 20 },
+                  { x: 30, y: 40 },
+                  { x: 10, y: 40 },
+                  { x: 10, y: 20 },
+                ]
+              : [
+                  { x: 10, y: 20 },
+                  { x: 30, y: 20 },
+                ],
           },
         ],
       },
@@ -50,6 +55,33 @@ function firstCut(prepared: ReturnType<typeof prepareOutput>): Vec2 | undefined 
 }
 
 describe('prepared output explicit job start', () => {
+  it.each(['source-order', 'nearest-neighbor'] as const)(
+    'uses the effective %s direction policy for a saved start on an open path',
+    (travelPolicy) => {
+      const base = project(false);
+      const input: Project = {
+        ...base,
+        optimization: { ...base.optimization, travelPolicy, pathDirection: 'allow-reverse' },
+        startPoints: { job: { x: 30, y: 20 } },
+      };
+      const expected = toMachineCoords(
+        { x: travelPolicy === 'source-order' ? 10 : 30, y: 20 },
+        input.device,
+      );
+      expect(firstCut(prepareOutput(input))).toEqual(expected);
+      const parsed = buildGcodeRenderModel(emitGcode(input).gcode);
+      if (parsed.kind !== 'ok') throw new Error('emitted program did not parse');
+      const index = parsed.model.segPower.findIndex(
+        (power, index) => power > 0 && parsed.model.segMotion[index] !== SEG_MOTION.rapid,
+      );
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect({
+        x: parsed.model.positions[index * 6],
+        y: parsed.model.positions[index * 6 + 1],
+      }).toEqual(expected);
+    },
+  );
+
   it('applies the absolute bed-to-program offset to the chosen start exactly once', () => {
     const base = project();
     const input: Project = { ...base, startPoints: { job: { x: 17, y: 20 } } };
