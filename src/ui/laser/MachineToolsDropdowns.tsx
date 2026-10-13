@@ -174,6 +174,7 @@ function ToolPanel(props: {
       }}
     >
       <div className="lf-machine-tool-dropdown-heading">
+        {props.label === 'Origin' && <span className="lf-machine-tool-caption">Origin</span>}
         <button
           type="button"
           className="lf-btn"

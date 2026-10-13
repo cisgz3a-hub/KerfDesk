@@ -197,6 +197,7 @@ export function OriginRow(props: Props): JSX.Element | null {
   return (
     <div style={originSectionStyle}>
       <div
+        className="lf-origin-heading"
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
       >
         <span style={sectionCaptionStyle}>Origin</span>
