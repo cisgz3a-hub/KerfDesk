@@ -1,0 +1,115 @@
+{
+  "baseCommit": "c700863a14dfbed71a49e32182ec3b75b989ebb1",
+  "distinctPassedTests": 1025,
+  "distinctFiles": 117,
+  "reports": [
+    { "name": "cnc-correctness-results.json", "passed": 232, "pending": 0 },
+    { "name": "dense-coverage-results.json", "passed": 1, "pending": 12 },
+    { "name": "index-final-results.json", "passed": 27, "pending": 0 },
+    { "name": "laser-results.json", "passed": 168, "pending": 0 },
+    { "name": "performance-results.json", "passed": 26, "pending": 1 },
+    { "name": "planner-results.json", "passed": 52, "pending": 0 },
+    { "name": "ruida-results.json", "passed": 20, "pending": 0 },
+    { "name": "transport-results.json", "passed": 475, "pending": 0 },
+    { "name": "transport-ruida-results.json", "passed": 51, "pending": 0 }
+  ],
+  "configuration": {
+    "event": "configuration",
+    "sizes": [1000, 10000, 50000],
+    "seeds": [17, 491, 20261013],
+    "patterns": ["grid", "cluster", "coincident", "nested"],
+    "directions": ["preserve", "allow-reverse"],
+    "mode": "stress-with-repeat",
+    "timeoutMs": 30000,
+    "timeoutScope": "Whole fixture worker: setup, generation, selected calls and checks, cleanup. Diagnostic mode omits repeat and greedy oracle.",
+    "elapsedScope": "elapsedMs and repeatMs each measure only one optimizePaths call.",
+    "heapScope": "Worker heap snapshots immediately before and after first call; not peak memory, no forced GC.",
+    "memoryLimitScope": "768 MiB worker V8 old generation; not a total process RSS limit.",
+    "qualification": "Software geometry invariants only. Elapsed time, heap and travel are observations, not machine runtime or quality proof."
+  },
+  "summary": {
+    "event": "summary",
+    "fixtures": 36,
+    "passedFixtures": 36,
+    "failedFixtures": 0,
+    "timedOutFixtures": 0,
+    "passedRouteCases": 72,
+    "passedDiagnosticCases": 0
+  },
+  "beforeAndAfterEqualTravelCases": 66,
+  "optimizerFirstCallRanges": [
+    {
+      "fixture": "1000/grid",
+      "calls": 6,
+      "minMs": 4.593899999999849,
+      "maxMs": 9.533800000000156
+    },
+    {
+      "fixture": "1000/cluster",
+      "calls": 6,
+      "minMs": 8.310099999998783,
+      "maxMs": 51.00520000000006
+    },
+    {
+      "fixture": "1000/coincident",
+      "calls": 6,
+      "minMs": 2.1538000000000466,
+      "maxMs": 20.715500000000247
+    },
+    {
+      "fixture": "1000/nested",
+      "calls": 6,
+      "minMs": 7.942300000000614,
+      "maxMs": 23.248100000000704
+    },
+    {
+      "fixture": "10000/grid",
+      "calls": 6,
+      "minMs": 40.63799999999901,
+      "maxMs": 50.19609999999375
+    },
+    {
+      "fixture": "10000/cluster",
+      "calls": 6,
+      "minMs": 121.71639999999752,
+      "maxMs": 268.89789999999994
+    },
+    {
+      "fixture": "10000/coincident",
+      "calls": 6,
+      "minMs": 13.60399999999936,
+      "maxMs": 23.73309999999765
+    },
+    {
+      "fixture": "10000/nested",
+      "calls": 6,
+      "minMs": 63.82220000000234,
+      "maxMs": 77.62710000000516
+    },
+    {
+      "fixture": "50000/grid",
+      "calls": 6,
+      "minMs": 202.84040000000095,
+      "maxMs": 270.8038000000015
+    },
+    {
+      "fixture": "50000/cluster",
+      "calls": 6,
+      "minMs": 1725.5405000000028,
+      "maxMs": 2728.9042999999947
+    },
+    {
+      "fixture": "50000/coincident",
+      "calls": 6,
+      "minMs": 78.97230000000127,
+      "maxMs": 288.2036999999982
+    },
+    {
+      "fixture": "50000/nested",
+      "calls": 6,
+      "minMs": 320.53979999999865,
+      "maxMs": 380.7396000000008
+    }
+  ],
+  "qualification": "Software-only. Timing observations are planning time, not machine job time."
+}

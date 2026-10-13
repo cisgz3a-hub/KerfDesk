@@ -1,0 +1,4 @@
+# Logs and source snapshots retain the exact bytes used by evidence hashes.
+# Console output may contain CRLF and terminal blank lines; retain them verbatim.
+*.txt -text whitespace=cr-at-eol,-blank-at-eof
+*.jsonl -text whitespace=cr-at-eol

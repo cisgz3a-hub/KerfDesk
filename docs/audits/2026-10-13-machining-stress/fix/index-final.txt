@@ -1,0 +1,12 @@
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0
+
+ ✓ src/core/job/segment-entry-index-coincident.test.ts (10 tests) 175ms
+ ✓ src/core/job/segment-entry-index.test.ts (17 tests) 255ms
+
+ Test Files  2 passed (2)
+      Tests  27 passed (27)
+   Start at  19:57:00
+   Duration  2.33s (transform 96ms, setup 47ms, import 107ms, tests 431ms, environment 1.28s)
+
+JSON report written to C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/docs/audits/2026-10-13-machining-stress/fix/index-final-results.json

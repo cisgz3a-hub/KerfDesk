@@ -1,0 +1,26 @@
+[
+  {
+    "Hash": "BC6557A954CC6B48DBD930538A4B67DC19E43A0DFA180D00B59238F20B42EE66",
+    "Path": "C:\\Users\\Asus\\.codex\\worktrees\\de9a\\LaserForge-2.0\\scripts\\stress-quality-first-paths.mjs"
+  },
+  {
+    "Hash": "8F65BAADB5245468EC7BF99F67AA18D47E589623EC309BF43BDA03A0160758E5",
+    "Path": "C:\\Users\\Asus\\.codex\\worktrees\\de9a\\LaserForge-2.0\\docs\\audits\\2026-10-13-machining-stress\\large-paths-results.jsonl"
+  },
+  {
+    "Hash": "60C35FBF01EA490E4BA776DE82BE0B7191D0A6AE5077F072748CC3D7CFACDF5F",
+    "Path": "C:\\Users\\Asus\\.codex\\worktrees\\de9a\\LaserForge-2.0\\docs\\audits\\2026-10-13-machining-stress\\large-paths-reviewed-smoke.jsonl"
+  },
+  {
+    "Hash": "30CB75850B0EC636A09A4A9F537C04836BF8BD49D6A01FEE0B99394B2F9CAB89",
+    "Path": "C:\\Users\\Asus\\.codex\\worktrees\\de9a\\LaserForge-2.0\\docs\\audits\\2026-10-13-machining-stress\\large-paths-coincident-single-call.jsonl"
+  },
+  {
+    "Hash": "B2054E71662B32C0C9AF7A91FE66E210E5D10193DBEE570852958A983151F318",
+    "Path": "C:\\Users\\Asus\\.codex\\worktrees\\de9a\\LaserForge-2.0\\docs\\audits\\2026-10-13-machining-stress\\large-paths-runner-full.mjs.txt"
+  },
+  {
+    "Hash": "BC6557A954CC6B48DBD930538A4B67DC19E43A0DFA180D00B59238F20B42EE66",
+    "Path": "C:\\Users\\Asus\\.codex\\worktrees\\de9a\\LaserForge-2.0\\docs\\audits\\2026-10-13-machining-stress\\large-paths-runner-reviewed.mjs.txt"
+  }
+]

@@ -1,0 +1,38 @@
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0
+
+stdout | src/io/gcode/connected-script-compile-performance.test.ts > multi-artwork connected-script compilation > stays byte-exact and measurable
+{"artworkCount":4,"regionCount":12,"stagesMs":{"preTask":93.04050000000097,"regionPlanning":12884.713299999998,"finalize":32.430600000003324,"emit":626.0879999999997,"total":13636.272400000002},"regionsMs":[{"taskId":"vcarve:0:0","geometryMs":160.88440000000082,"passesMs":309.60989999999947,"coverageMs":19.181500000000597},{"taskId":"vcarve:0:1","geometryMs":370.8855999999996,"passesMs":763.6455999999998,"coverageMs":80.00879999999961},{"taskId":"vcarve:0:2","geometryMs":4.114700000000084,"passesMs":36.44739999999911,"coverageMs":2.034700000000157},{"taskId":"vcarve:1:0","geometryMs":130.3064000000013,"passesMs":218.51519999999982,"coverageMs":11.02139999999963},{"taskId":"vcarve:1:1","geometryMs":336.7556999999997,"passesMs":2107.4161999999997,"coverageMs":130.1846000000005},{"taskId":"vcarve:1:2","geometryMs":6.276299999999537,"passesMs":51.860099999999875,"coverageMs":3.389999999999418},{"taskId":"vcarve:2:0","geometryMs":254.35039999999935,"passesMs":541.7572,"coverageMs":32.69620000000032},{"taskId":"vcarve:2:1","geometryMs":1004.3477000000003,"passesMs":1957.892899999999,"coverageMs":106.83660000000236},{"taskId":"vcarve:2:2","geometryMs":6.871100000000297,"passesMs":47.90030000000115,"coverageMs":2.412799999998242},{"taskId":"vcarve:3:0","geometryMs":241.87029999999868,"passesMs":585.3316999999988,"coverageMs":32.96650000000227},{"taskId":"vcarve:3:1","geometryMs":1094.0227000000014,"passesMs":2032.0985999999975,"coverageMs":132.57560000000012},{"taskId":"vcarve:3:2","geometryMs":6.418499999999767,"passesMs":58.100500000000466,"coverageMs":2.896199999999226}],"gcodeCodeUnits":1100098,"gcodeSha256":"6213711b652de729c1d4c57f905817bf39eab2ef86e8d8a1627f37ba20a6dbc6","gcodeUtf8Bytes":1100098}
+
+ ✓ src/io/gcode/connected-script-compile-performance.test.ts (1 test) 13731ms
+     ✓ stays byte-exact and measurable  13728ms
+{"fixture":"600 disconnected dense contours","baselineMs":893.0364000000002,"optimizedMs":10.307000000000016,"baselineBoundaryBuilds":0,"optimizedBoundaryBuilds":0}
+{"fixture":"64 concentric dense contours","baselineMs":224.9217000000001,"optimizedMs":69.02500000000009,"baselineBoundaryBuilds":2016,"optimizedBoundaryBuilds":63}
+{"fixture":"240 overlapping dense contours","baselineMs":151.0658000000003,"optimizedMs":6.93139999999994,"baselineBoundaryBuilds":0,"optimizedBoundaryBuilds":0}
+ ✓ src/core/cnc/strict-contour-nesting-performance.test.ts (3 tests) 1364ms
+     ✓ preserves the original source layout for 600 disconnected dense contours  908ms
+{"fixture":"600 dense disconnected source witnesses","baselineRankMs":446.0908000000002,"indexedRankMs":6.64630000000011,"baselineRankPolygonCalls":360000,"indexedRankPolygonCalls":600,"baselineBucketsMs":230.5598,"indexedBucketsMs":1.442199999999957,"baselineBucketPolygonCalls":180300,"indexedBucketPolygonCalls":600}
+ ✓ src/core/cnc/vcarve-region-order-performance.test.ts (5 tests) 767ms
+     ✓ ranks and assigns 600 dense disconnected witnesses with local polygon tests  709ms
+stdout | src/__fixtures__/performance/laser-workflow-budgets.test.ts > laser workflow performance budgets > keeps the small fixture inside every phase budget
+[workflow-perf] small: import=75.1ms trace=158.0ms editing=29.9ms preview=21.3ms save=0.9ms compile=21.1ms streaming=5.5ms
+
+stdout | src/__fixtures__/performance/laser-workflow-budgets.test.ts > laser workflow performance budgets > keeps the medium fixture inside every phase budget
+[workflow-perf] medium: import=135.0ms trace=177.6ms editing=5.5ms preview=17.2ms save=2.9ms compile=39.5ms streaming=30.7ms
+
+stdout | src/__fixtures__/performance/laser-workflow-budgets.test.ts > laser workflow performance budgets > keeps the large fixture inside every phase budget
+[workflow-perf] large: import=780.4ms trace=258.8ms editing=9.7ms preview=48.4ms save=14.8ms compile=97.4ms streaming=129.7ms
+
+ ✓ src/__fixtures__/performance/laser-workflow-budgets.test.ts (3 tests) 2083ms
+     ✓ keeps the small fixture inside every phase budget  322ms
+     ✓ keeps the medium fixture inside every phase budget  412ms
+     ✓ keeps the large fixture inside every phase budget  1344ms
+ ✓ src/core/cnc/vcarve-source-boundary-coverage-performance.test.ts (13 tests | 1 skipped) 365ms
+ ✓ src/core/job/optimize-paths-large-groups.test.ts (2 tests) 91ms
+
+ Test Files  6 passed (6)
+      Tests  26 passed | 1 skipped (27)
+   Start at  20:02:15
+   Duration  42.31s (transform 12.35s, setup 85ms, import 18.63s, tests 18.40s, environment 3.66s)
+
+JSON report written to C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/docs/audits/2026-10-13-machining-stress/fix/performance-results.json

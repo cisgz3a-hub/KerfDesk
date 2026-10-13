@@ -2,6 +2,7 @@ import { expect, test, type Page } from './fixtures/kerfdesk-test';
 
 test('paints the splash before the bundle and honours reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const waitForDesktopModule = await observeDesktopModule(page);
   const main = await holdRequest(page, /\/src\/ui\/app\/main\.tsx(?:\?|$)/);
   try {
     await page.goto('/', { waitUntil: 'commit' });
@@ -18,9 +19,9 @@ test('paints the splash before the bundle and honours reduced motion', async ({ 
     await expect.poll(() => beam.evaluate((element) => element.getAnimations().length)).toBe(0);
 
     await main.release();
-    // Releasing the entry request starts its ES module graph; wait for those
-    // scripts to execute before checking the mounted workspace's readiness.
-    await page.waitForLoadState('domcontentloaded');
+    // The desktop module is attached dynamically after DOMContentLoaded. Its
+    // own load event includes the graph released by the held entry request.
+    await waitForDesktopModule();
     await expect(page.locator('canvas[aria-label="KerfDesk workspace"]')).toBeVisible();
     await expect(page.locator('canvas[aria-label="KerfDesk workspace"]')).toHaveAttribute(
       'data-workspace-painted',
@@ -52,32 +53,12 @@ test('waits for a successful workspace paint after a canvas mounts', async ({ pa
 });
 
 test('reveals the workspace while the decorative artwork is still pending', async ({ page }) => {
-  // DOMContentLoaded precedes the dynamically attached desktop module. The
-  // held image prevents waiting for the page's load event, so observe the
-  // module's own load separately from workspace paint and splash dismissal.
-  await page.addInitScript(() => {
-    document.addEventListener(
-      'load',
-      (event) => {
-        const target = event.target;
-        if (
-          target instanceof HTMLScriptElement &&
-          target.src !== '' &&
-          new URL(target.src).pathname === '/src/ui/app/main.tsx'
-        ) {
-          document.documentElement.dataset.workspaceModuleLoaded = 'true';
-        }
-      },
-      true,
-    );
-  });
+  const waitForDesktopModule = await observeDesktopModule(page);
   const artwork = await holdRequest(page, /\/startup-craft\.webp(?:\?|$)/);
   try {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect.poll(artwork.requested).toBe(true);
-    await expect(page.locator('html')).toHaveAttribute('data-workspace-module-loaded', 'true', {
-      timeout: 45_000,
-    });
+    await waitForDesktopModule();
     await expect(page.locator('canvas[aria-label="KerfDesk workspace"]')).toBeVisible();
     await expect(page.locator('canvas[aria-label="KerfDesk workspace"]')).toHaveAttribute(
       'data-workspace-painted',
@@ -121,6 +102,32 @@ test('eventually dismisses when the mounted app has neither canvas nor error scr
   await expect(page.locator('#app-root')).toBeEmpty();
   await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 7000 });
 });
+
+async function observeDesktopModule(page: Page) {
+  // DOMContentLoaded precedes the dynamically attached desktop module. A held
+  // image prevents waiting for the page's load event, so observe the module's
+  // own load separately from workspace paint and splash dismissal.
+  await page.addInitScript(() => {
+    document.addEventListener(
+      'load',
+      (event) => {
+        const target = event.target;
+        if (
+          target instanceof HTMLScriptElement &&
+          target.src !== '' &&
+          new URL(target.src).pathname === '/src/ui/app/main.tsx'
+        ) {
+          document.documentElement.dataset.workspaceModuleLoaded = 'true';
+        }
+      },
+      true,
+    );
+  });
+  return () =>
+    expect(page.locator('html')).toHaveAttribute('data-workspace-module-loaded', 'true', {
+      timeout: 45_000,
+    });
+}
 
 async function holdRequest(page: Page, url: RegExp) {
   let requested = false;

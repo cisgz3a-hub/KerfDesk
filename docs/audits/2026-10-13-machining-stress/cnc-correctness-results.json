@@ -1,0 +1,2580 @@
+{
+  "numTotalTestSuites": 66,
+  "numPassedTestSuites": 66,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 232,
+  "numPassedTests": 232,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791891428168,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["AdaptiveCutterContact"],
+          "fullName": "AdaptiveCutterContact measures a side cut beside an earlier pass by its leading arc",
+          "status": "passed",
+          "title": "measures a side cut beside an earlier pass by its leading arc",
+          "duration": 2.5625,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AdaptiveCutterContact"],
+          "fullName": "AdaptiveCutterContact measures a straight step into a flat wall as its depth",
+          "status": "passed",
+          "title": "measures a straight step into a flat wall as its depth",
+          "duration": 0.4659000000000333,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AdaptiveCutterContact"],
+          "fullName": "AdaptiveCutterContact measures a slot as the cutter radius",
+          "status": "passed",
+          "title": "measures a slot as the cutter radius",
+          "duration": 0.3629999999999427,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AdaptiveCutterContact"],
+          "fullName": "AdaptiveCutterContact finds no stock inside the entry helix and a concave wall at its edge",
+          "status": "passed",
+          "title": "finds no stock inside the entry helix and a concave wall at its edge",
+          "duration": 0.5959000000000287,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AdaptiveCutterContact"],
+          "fullName": "AdaptiveCutterContact leaves the core of a helix wider than the cutter in stock",
+          "status": "passed",
+          "title": "leaves the core of a helix wider than the cutter in stock",
+          "duration": 0.31759999999997035,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AdaptiveCutterContact"],
+          "fullName": "AdaptiveCutterContact agrees with a finely sampled rim for arbitrary earlier moves",
+          "status": "passed",
+          "title": "agrees with a finely sampled rim for arbitrary earlier moves",
+          "duration": 186.48860000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891487435,
+      "endTime": 1791891487625.4885,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/adaptive-pocket-contact.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "emits island entry helices, plunge-feed seed slotting and cutters wholly clear of protected stock",
+          "status": "passed",
+          "title": "emits island entry helices, plunge-feed seed slotting and cutters wholly clear of protected stock",
+          "duration": 507.92700000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891493549,
+      "endTime": 1791891494056.927,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/adaptive-pocket-islands-emission.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["island-aware adaptive partition certification"],
+          "fullName": "island-aware adaptive partition certification certifies original island boundaries, coverage and radial engagement for {\"closed\":true,\"points\":[{\"x\":0,\"y\":0},{\"x\":30,\"y\":0},{\"x\":30,\"y\":30},{\"x\":0,\"y\":30}]}",
+          "status": "passed",
+          "title": "certifies original island boundaries, coverage and radial engagement for {\"closed\":true,\"points\":[{\"x\":0,\"y\":0},{\"x\":30,\"y\":0},{\"x\":30,\"y\":30},{\"x\":0,\"y\":30}]}",
+          "duration": 409.52340000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["island-aware adaptive partition certification"],
+          "fullName": "island-aware adaptive partition certification certifies original island boundaries, coverage and radial engagement for {\"closed\":true,\"points\":[{\"x\":0,\"y\":0},{\"x\":40,\"y\":0},{\"x\":40,\"y\":40},{\"x\":0,\"y\":40}]}",
+          "status": "passed",
+          "title": "certifies original island boundaries, coverage and radial engagement for {\"closed\":true,\"points\":[{\"x\":0,\"y\":0},{\"x\":40,\"y\":0},{\"x\":40,\"y\":40},{\"x\":0,\"y\":40}]}",
+          "duration": 438.01279999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["island-aware adaptive partition certification"],
+          "fullName": "island-aware adaptive partition certification certifies original island boundaries, coverage and radial engagement for {\"closed\":true,\"points\":[{\"x\":0,\"y\":0},{\"x\":40,\"y\":0},{\"x\":40,\"y\":40},{\"x\":0,\"y\":40}]}",
+          "status": "passed",
+          "title": "certifies original island boundaries, coverage and radial engagement for {\"closed\":true,\"points\":[{\"x\":0,\"y\":0},{\"x\":40,\"y\":0},{\"x\":40,\"y\":40},{\"x\":0,\"y\":40}]}",
+          "duration": 282.30009999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891499673,
+      "endTime": 1791891500803.3,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/adaptive-pocket-islands.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["linked relief preparation dependency evidence"],
+          "fullName": "linked relief preparation dependency evidence marks a missing linked source dirty even while the canonical field stays available for repair",
+          "status": "passed",
+          "title": "marks a missing linked source dirty even while the canonical field stays available for repair",
+          "duration": 14.860700000000179,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["linked relief preparation dependency evidence"],
+          "fullName": "linked relief preparation dependency evidence tracks invalid mask geometry that cannot replace the retained canonical field",
+          "status": "passed",
+          "title": "tracks invalid mask geometry that cannot replace the retained canonical field",
+          "duration": 3.1298000000001593,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["linked relief preparation dependency evidence"],
+          "fullName": "linked relief preparation dependency evidence tracks links of an unselected target used by a selected projected vector",
+          "status": "passed",
+          "title": "tracks links of an unselected target used by a selected projected vector",
+          "duration": 3.8896999999997206,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["linked relief preparation dependency evidence"],
+          "fullName": "linked relief preparation dependency evidence keeps linked source labels, colours and output bindings ready",
+          "status": "passed",
+          "title": "keeps linked source labels, colours and output bindings ready",
+          "duration": 3.1831999999999425,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["linked relief preparation dependency evidence"],
+          "fullName": "linked relief preparation dependency evidence includes clip, level, sculpt, component and both rail links in the same live source contract",
+          "status": "passed",
+          "title": "includes clip, level, sculpt, component and both rail links in the same live source contract",
+          "duration": 0.7875999999996566,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891484455,
+      "endTime": 1791891484480.7876,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/cnc-relief-link-dependencies.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["tabRampedPoints (ADR-258)"],
+          "fullName": "tabRampedPoints (ADR-258) rides the cut depth and rises to the tab top, never above it",
+          "status": "passed",
+          "title": "rides the cut depth and rises to the tab top, never above it",
+          "duration": 2.8174999999999955,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tabRampedPoints (ADR-258)"],
+          "fullName": "tabRampedPoints (ADR-258) makes every tab wall a same-XY vertical move",
+          "status": "passed",
+          "title": "makes every tab wall a same-XY vertical move",
+          "duration": 0.7083000000000084,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tabRampedPoints (ADR-258)"],
+          "fullName": "tabRampedPoints (ADR-258) produces one rise and one fall per tab",
+          "status": "passed",
+          "title": "produces one rise and one fall per tab",
+          "duration": 0.40660000000002583,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tabRampedPoints (ADR-258)"],
+          "fullName": "tabRampedPoints (ADR-258) keeps a small contour cutting instead of dropping its deep pass",
+          "status": "passed",
+          "title": "keeps a small contour cutting instead of dropping its deep pass",
+          "duration": 0.3402999999999565,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tabRampedPoints (ADR-258)"],
+          "fullName": "tabRampedPoints (ADR-258) honors persisted manual anchor positions (ADR-156)",
+          "status": "passed",
+          "title": "honors persisted manual anchor positions (ADR-156)",
+          "duration": 0.9429999999999836,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tabRampedPoints (ADR-258)"],
+          "fullName": "tabRampedPoints (ADR-258) declines an open path, a non-rise, and a zero window",
+          "status": "passed",
+          "title": "declines an open path, a non-rise, and a zero window",
+          "duration": 0.16489999999998872,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891491200,
+      "endTime": 1791891491205.1648,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/cnc-tab-ramp.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["relief roughing rings"],
+          "fullName": "relief roughing rings end every ring where it starts, for any bit",
+          "status": "passed",
+          "title": "end every ring where it starts, for any bit",
+          "duration": 195.83289999999943,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief roughing rings"],
+          "fullName": "relief roughing rings leave no stock at the ring seams with an end mill",
+          "status": "passed",
+          "title": "leave no stock at the ring seams with an end mill",
+          "duration": 1041.1014999999989,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief roughing rings"],
+          "fullName": "relief roughing rings leave no stock at the ring seams with a tapered ball nose",
+          "status": "passed",
+          "title": "leave no stock at the ring seams with a tapered ball nose",
+          "duration": 2906.1167000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief roughing core cleanup"],
+          "fullName": "relief roughing core cleanup clears the centre an end mill leaves above 50% stepover",
+          "status": "passed",
+          "title": "clears the centre an end mill leaves above 50% stepover",
+          "duration": 1021.5727999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief roughing core cleanup"],
+          "fullName": "relief roughing core cleanup clears the centre a tapered ball nose leaves above 50% stepover",
+          "status": "passed",
+          "title": "clears the centre a tapered ball nose leaves above 50% stepover",
+          "duration": 374.4939999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief roughing core cleanup"],
+          "fullName": "relief roughing core cleanup adds no pass where the rings already reach the centre",
+          "status": "passed",
+          "title": "adds no pass where the rings already reach the centre",
+          "duration": 386.78090000000157,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief roughing motion (ADR-424)"],
+          "fullName": "relief roughing motion (ADR-424) joins each level of a flat relief into one pass at depth",
+          "status": "passed",
+          "title": "joins each level of a flat relief into one pass at depth",
+          "duration": 16.402799999999843,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief roughing motion (ADR-424)"],
+          "fullName": "relief roughing motion (ADR-424) clears the floor with ramped entries as it does with plunges",
+          "status": "passed",
+          "title": "clears the floor with ramped entries as it does with plunges",
+          "duration": 1040.0975999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief roughing motion (ADR-424)"],
+          "fullName": "relief roughing motion (ADR-424) climbs round an island as it does round the outside",
+          "status": "passed",
+          "title": "climbs round an island as it does round the outside",
+          "duration": 110.11150000000089,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief roughing fine steps (ADR-422 Amendment 1)"],
+          "fullName": "relief roughing fine steps (ADR-422 Amendment 1) cuts the terraces on a slope down to one fine step",
+          "status": "passed",
+          "title": "cuts the terraces on a slope down to one fine step",
+          "duration": 2824.8033000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891439923,
+      "endTime": 1791891449842.8032,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/compile-cnc-relief-roughing-coverage.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["compileCncJob holding tabs (ADR-258)"],
+          "fullName": "compileCncJob holding tabs (ADR-258) keeps waste-side leads and tab-wall Z moves on every deep pass through emitted G-code",
+          "status": "passed",
+          "title": "keeps waste-side leads and tab-wall Z moves on every deep pass through emitted G-code",
+          "duration": 19.155699999999797,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compileCncJob holding tabs (ADR-258)"],
+          "fullName": "compileCncJob holding tabs (ADR-258) keeps translated default arc leads on every deep tab pass (reversed=false)",
+          "status": "passed",
+          "title": "keeps translated default arc leads on every deep tab pass (reversed=false)",
+          "duration": 12.222699999999804,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compileCncJob holding tabs (ADR-258)"],
+          "fullName": "compileCncJob holding tabs (ADR-258) keeps translated default arc leads on every deep tab pass (reversed=true)",
+          "status": "passed",
+          "title": "keeps translated default arc leads on every deep tab pass (reversed=true)",
+          "duration": 6.716999999999871,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compileCncJob holding tabs (ADR-258)"],
+          "fullName": "compileCncJob holding tabs (ADR-258) rides deep profile passes over the tabs in one continuous path",
+          "status": "passed",
+          "title": "rides deep profile passes over the tabs in one continuous path",
+          "duration": 1.7246999999999844,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compileCncJob holding tabs (ADR-258)"],
+          "fullName": "compileCncJob holding tabs (ADR-258) inserts a full-loop pass at the exact tab top so tabs are the requested height",
+          "status": "passed",
+          "title": "inserts a full-loop pass at the exact tab top so tabs are the requested height",
+          "duration": 1.631900000000087,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compileCncJob holding tabs (ADR-258)"],
+          "fullName": "compileCncJob holding tabs (ADR-258) keeps holding tabs on the finishing pass so the part is not fully severed",
+          "status": "passed",
+          "title": "keeps holding tabs on the finishing pass so the part is not fully severed",
+          "duration": 3.712299999999914,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891453946,
+      "endTime": 1791891453991.7124,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/compile-cnc-tabs.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["contour ramp guarantees in emitted, placed XYZ/F words"],
+          "fullName": "contour ramp guarantees in emitted, placed XYZ/F words bounds angle and Z rate while preserving full-feed cleanup: 64-vertex 2.8 mm circle",
+          "status": "passed",
+          "title": "bounds angle and Z rate while preserving full-feed cleanup: 64-vertex 2.8 mm circle",
+          "duration": 36.431100000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour ramp guarantees in emitted, placed XYZ/F words"],
+          "fullName": "contour ramp guarantees in emitted, placed XYZ/F words bounds angle and Z rate while preserving full-feed cleanup: 30 mm open line",
+          "status": "passed",
+          "title": "bounds angle and Z rate while preserving full-feed cleanup: 30 mm open line",
+          "duration": 1.508299999999963,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour ramp guarantees in emitted, placed XYZ/F words"],
+          "fullName": "contour ramp guarantees in emitted, placed XYZ/F words bounds angle and Z rate while preserving full-feed cleanup: 5 mm open line requiring repeated legs",
+          "status": "passed",
+          "title": "bounds angle and Z rate while preserving full-feed cleanup: 5 mm open line requiring repeated legs",
+          "duration": 1.1446000000000822,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour ramp guarantees in emitted, placed XYZ/F words"],
+          "fullName": "contour ramp guarantees in emitted, placed XYZ/F words bounds a ramp ending at the original ring seam before a stay-down link",
+          "status": "passed",
+          "title": "bounds a ramp ending at the original ring seam before a stay-down link",
+          "duration": 24.744199999999864,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour ramp guarantees in emitted, placed XYZ/F words"],
+          "fullName": "contour ramp guarantees in emitted, placed XYZ/F words keeps bends and zero-capacity spans on an open path, then cuts every vertex at depth",
+          "status": "passed",
+          "title": "keeps bends and zero-capacity spans on an open path, then cuts every vertex at depth",
+          "duration": 1.6387999999999465,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour ramp guarantees in emitted, placed XYZ/F words"],
+          "fullName": "contour ramp guarantees in emitted, placed XYZ/F words keeps a sub-quantum depth change without claiming an emitted ramp",
+          "status": "passed",
+          "title": "keeps a sub-quantum depth change without claiming an emitted ramp",
+          "duration": 0.18509999999992033,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour ramp guarantees in emitted, placed XYZ/F words"],
+          "fullName": "contour ramp guarantees in emitted, placed XYZ/F words honours a positive angle below the old half-degree minimum",
+          "status": "passed",
+          "title": "honours a positive angle below the old half-degree minimum",
+          "duration": 2.3514999999999873,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour ramp guarantees in emitted, placed XYZ/F words"],
+          "fullName": "contour ramp guarantees in emitted, placed XYZ/F words discloses a precision fallback without removing any densely spaced source vertices",
+          "status": "passed",
+          "title": "discloses a precision fallback without removing any densely spaced source vertices",
+          "duration": 0.6069999999999709,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour ramp guarantees in emitted, placed XYZ/F words"],
+          "fullName": "contour ramp guarantees in emitted, placed XYZ/F words preserves raised tab walls and a complete final ring while capping entry motion",
+          "status": "passed",
+          "title": "preserves raised tab walls and a complete final ring while capping entry motion",
+          "duration": 1.7636999999999716,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891478933,
+      "endTime": 1791891479003.7637,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/contour-ramp-emission.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["applyRampEntry on paths shorter than their ramp (ADR-471)"],
+          "fullName": "applyRampEntry on paths shorter than their ramp (ADR-471) laps a closed loop at the angle, then cuts one whole lap at depth",
+          "status": "passed",
+          "title": "laps a closed loop at the angle, then cuts one whole lap at depth",
+          "duration": 3.187999999999647,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyRampEntry on paths shorter than their ramp (ADR-471)"],
+          "fullName": "applyRampEntry on paths shorter than their ramp (ADR-471) zig-zags an open path back to its start at depth, then cuts it end to end",
+          "status": "passed",
+          "title": "zig-zags an open path back to its start at depth, then cuts it end to end",
+          "duration": 0.8043999999999869,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyRampEntry on paths shorter than their ramp (ADR-471)"],
+          "fullName": "applyRampEntry on paths shorter than their ramp (ADR-471) keeps the plunge, marked, on a path under one cut width",
+          "status": "passed",
+          "title": "keeps the plunge, marked, on a path under one cut width",
+          "duration": 0.39800000000013824,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyRampEntry on paths shorter than their ramp (ADR-471)"],
+          "fullName": "applyRampEntry on paths shorter than their ramp (ADR-471) ramps each ring of a pocket ladder from the level above",
+          "status": "passed",
+          "title": "ramps each ring of a pocket ladder from the level above",
+          "duration": 0.3688999999999396,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["the reported 6 mm pocket (ADR-471)"],
+          "fullName": "the reported 6 mm pocket (ADR-471) laps the outer ring from the level above and plunges only the marked inner ring",
+          "status": "passed",
+          "title": "laps the outer ring from the level above and plunges only the marked inner ring",
+          "duration": 1.2599999999997635,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["the reported 6 mm pocket (ADR-471)"],
+          "fullName": "the reported 6 mm pocket (ADR-471) never finishes a ramp straight down, and says which passes plunge",
+          "status": "passed",
+          "title": "never finishes a ramp straight down, and says which passes plunge",
+          "duration": 1.4038000000000466,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["the reported 6 mm pocket (ADR-471)"],
+          "fullName": "the reported 6 mm pocket (ADR-471) reports the plunges as a Job Review advisory, never a refusal",
+          "status": "passed",
+          "title": "reports the plunges as a Job Review advisory, never a refusal",
+          "duration": 3.783400000000256,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyRampEntry before a stay-down link (ADR-491)"],
+          "fullName": "applyRampEntry before a stay-down link (ADR-491) ends a 30 mm ring's lap on its start, where the link leaves from",
+          "status": "passed",
+          "title": "ends a 30 mm ring's lap on its start, where the link leaves from",
+          "duration": 0.4499000000000706,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyRampEntry before a stay-down link (ADR-491)"],
+          "fullName": "applyRampEntry before a stay-down link (ADR-491) ends a 3 mm ring's lap on its start, where the link leaves from",
+          "status": "passed",
+          "title": "ends a 3 mm ring's lap on its start, where the link leaves from",
+          "duration": 0.5061000000000604,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyRampEntry before a stay-down link (ADR-491)"],
+          "fullName": "applyRampEntry before a stay-down link (ADR-491) leaves a ring with no link after it ending where its descent ended",
+          "status": "passed",
+          "title": "leaves a ring with no link after it ending where its descent ended",
+          "duration": 0.35140000000001237,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyRampEntry before a stay-down link (ADR-491)"],
+          "fullName": "applyRampEntry before a stay-down link (ADR-491) leaves a ring the link already enters alone",
+          "status": "passed",
+          "title": "leaves a ring the link already enters alone",
+          "duration": 0.13910000000032596,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891456294,
+      "endTime": 1791891456307.3513,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/contour-ramp-entry.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit)"],
+          "fullName": "ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit) keeps every move of a 2 degree hole ramp within the angle",
+          "status": "passed",
+          "title": "keeps every move of a 2 degree hole ramp within the angle",
+          "duration": 50.02649999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit)"],
+          "fullName": "ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit) keeps every move of a 5 degree hole ramp within the angle",
+          "status": "passed",
+          "title": "keeps every move of a 5 degree hole ramp within the angle",
+          "duration": 16.428899999999885,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit)"],
+          "fullName": "ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit) keeps every move of a 30 degree hole ramp within the angle",
+          "status": "passed",
+          "title": "keeps every move of a 30 degree hole ramp within the angle",
+          "duration": 6.36220000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit)"],
+          "fullName": "ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit) keeps every move of a 45 degree hole ramp within the angle",
+          "status": "passed",
+          "title": "keeps every move of a 45 degree hole ramp within the angle",
+          "duration": 6.0228000000001884,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit)"],
+          "fullName": "ramp angle after 0.001 mm rounding (ADR-471 emitted-output audit) keeps every move of a tabbed ramp within the angle",
+          "status": "passed",
+          "title": "keeps every move of a tabbed ramp within the angle",
+          "duration": 83.59870000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ramp Z rate (ADR-471 emitted-output audit)"],
+          "fullName": "ramp Z rate (ADR-471 emitted-output audit) holds a 45 degree hole ramp to the plunge rate",
+          "status": "passed",
+          "title": "holds a 45 degree hole ramp to the plunge rate",
+          "duration": 4.8353000000001884,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ramp Z rate (ADR-471 emitted-output audit)"],
+          "fullName": "ramp Z rate (ADR-471 emitted-output audit) holds a 45 degree tabbed disc ramp to the plunge rate",
+          "status": "passed",
+          "title": "holds a 45 degree tabbed disc ramp to the plunge rate",
+          "duration": 23.94439999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "a ramp on moves too short for whole 0.001 mm steps (ADR-471 emitted-output audit)"
+          ],
+          "fullName": "a ramp on moves too short for whole 0.001 mm steps (ADR-471 emitted-output audit) retains the source path and explicitly discloses an unrepresentable ramp",
+          "status": "passed",
+          "title": "retains the source path and explicitly discloses an unrepresentable ramp",
+          "duration": 7.1129000000000815,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "a ramp on moves too short for whole 0.001 mm steps (ADR-471 emitted-output audit)"
+          ],
+          "fullName": "a ramp on moves too short for whole 0.001 mm steps (ADR-471 emitted-output audit) adds no such advisory where whole steps hold the angle",
+          "status": "passed",
+          "title": "adds no such advisory where whole steps hold the angle",
+          "duration": 3.725800000000163,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891482146,
+      "endTime": 1791891482348.7258,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/contour-ramp-feed-angle.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["compiled short contour ramps with independent finishing recipes"],
+          "fullName": "compiled short contour ramps with independent finishing recipes laps both depth ladders and keeps the finishing feed, plunge and spindle",
+          "status": "passed",
+          "title": "laps both depth ladders and keeps the finishing feed, plunge and spindle",
+          "duration": 19.17990000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled short contour ramps with independent finishing recipes"],
+          "fullName": "compiled short contour ramps with independent finishing recipes retains finishing provenance and emitted disclosure for sub-width plunges",
+          "status": "passed",
+          "title": "retains finishing provenance and emitted disclosure for sub-width plunges",
+          "duration": 3.233399999999847,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled short contour ramps with independent finishing recipes"],
+          "fullName": "compiled short contour ramps with independent finishing recipes uses the V-bit width at depth for real wall layout and the ramp threshold",
+          "status": "passed",
+          "title": "uses the V-bit width at depth for real wall layout and the ramp threshold",
+          "duration": 2.1131000000000313,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891477479,
+      "endTime": 1791891477504.113,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/contour-ramp-stage-integration.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["stayDownPocketPasses"],
+          "fullName": "stayDownPocketPasses links nested rings at the same depth and re-starts each at its point nearest the bit",
+          "status": "passed",
+          "title": "links nested rings at the same depth and re-starts each at its point nearest the bit",
+          "duration": 7.599299999999971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["stayDownPocketPasses"],
+          "fullName": "stayDownPocketPasses keeps the lift when the step is longer than one bit diameter",
+          "status": "passed",
+          "title": "keeps the lift when the step is longer than one bit diameter",
+          "duration": 0.7632000000000971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["stayDownPocketPasses"],
+          "fullName": "stayDownPocketPasses keeps the lift between depths, so every level still enters on its own",
+          "status": "passed",
+          "title": "keeps the lift between depths, so every level still enters on its own",
+          "duration": 0.5015999999999394,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["stayDownPocketPasses"],
+          "fullName": "stayDownPocketPasses never links across an island the step would pass within a radius of",
+          "status": "passed",
+          "title": "never links across an island the step would pass within a radius of",
+          "duration": 0.42060000000003583,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["stayDownPocketPasses"],
+          "fullName": "stayDownPocketPasses runs an open row from its nearer end when only that end is in reach",
+          "status": "passed",
+          "title": "runs an open row from its nearer end when only that end is in reach",
+          "duration": 0.4237000000000535,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["stayDownPocketPasses"],
+          "fullName": "stayDownPocketPasses pulls a pass forward past one that shares no stock with it",
+          "status": "passed",
+          "title": "pulls a pass forward past one that shares no stock with it",
+          "duration": 0.5960000000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["stayDownPocketPasses"],
+          "fullName": "stayDownPocketPasses never pulls a pass forward past one within a bit diameter of it",
+          "status": "passed",
+          "title": "never pulls a pass forward past one within a bit diameter of it",
+          "duration": 0.41449999999997544,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["stayDownPocketPasses"],
+          "fullName": "stayDownPocketPasses turns a linked helical-entry ring into a plain ring at depth",
+          "status": "passed",
+          "title": "turns a linked helical-entry ring into a plain ring at depth",
+          "duration": 0.5847999999999729,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["stayDownPocketPasses"],
+          "fullName": "stayDownPocketPasses keeps every cut exactly once",
+          "status": "passed",
+          "title": "keeps every cut exactly once",
+          "duration": 0.5990000000000464,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["pocketPassLinks"],
+          "fullName": "pocketPassLinks leaves the passes alone when the layer asks for the lift between rings",
+          "status": "passed",
+          "title": "leaves the passes alone when the layer asks for the lift between rings",
+          "duration": 1.0588000000000193,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["nearestRingStart"],
+          "fullName": "nearestRingStart re-starts a ring on the nearest point of its nearest side, keeping its direction",
+          "status": "passed",
+          "title": "re-starts a ring on the nearest point of its nearest side, keeping its direction",
+          "duration": 0.41440000000000055,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["nearestRingStart"],
+          "fullName": "nearestRingStart snaps a start within a hundredth of a millimetre onto the corner",
+          "status": "passed",
+          "title": "snaps a start within a hundredth of a millimetre onto the corner",
+          "duration": 0.20640000000003056,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891479899,
+      "endTime": 1791891479913.4143,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/pocket-stay-down-links.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ramp composition with rectangular tabs"],
+          "fullName": "ramp composition with rectangular tabs starts a lateral descent after a tab covering the entry seam",
+          "status": "passed",
+          "title": "starts a lateral descent after a tab covering the entry seam",
+          "duration": 3.615099999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ramp composition with rectangular tabs"],
+          "fullName": "ramp composition with rectangular tabs continues around a small ring until the requested angle reaches depth",
+          "status": "passed",
+          "title": "continues around a small ring until the requested angle reaches depth",
+          "duration": 4.54060000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ramp composition with rectangular tabs"],
+          "fullName": "ramp composition with rectangular tabs carries tabbed depth history into the next pass",
+          "status": "passed",
+          "title": "carries tabbed depth history into the next pass",
+          "duration": 0.561800000000062,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ramp composition with rectangular tabs"],
+          "fullName": "ramp composition with rectangular tabs requires explicit tab ownership before transforming a path3d",
+          "status": "passed",
+          "title": "requires explicit tab ownership before transforming a path3d",
+          "duration": 0.18829999999991287,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ramp composition with rectangular tabs"],
+          "fullName": "ramp composition with rectangular tabs does not remove an all-tab ring or invent a deeper pass",
+          "status": "passed",
+          "title": "does not remove an all-tab ring or invent a deeper pass",
+          "duration": 0.19439999999997326,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ramp composition with rectangular tabs"],
+          "fullName": "ramp composition with rectangular tabs reports an unmaterializable array instead of iterating an unrepresentable ramp",
+          "status": "passed",
+          "title": "reports an unmaterializable array instead of iterating an unrepresentable ramp",
+          "duration": 0.8511999999999489,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ramp composition with rectangular tabs"],
+          "fullName": "ramp composition with rectangular tabs keeps every tab wall and discloses a ramp with no representable low-span descent",
+          "status": "passed",
+          "title": "keeps every tab wall and discloses a ramp with no representable low-span descent",
+          "duration": 0.28789999999992233,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891494965,
+      "endTime": 1791891494975.2878,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/tabbed-ramp-entry.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["final ordinary and tiled V-carve containment"],
+          "fullName": "final ordinary and tiled V-carve containment contains complete final chords after half-grid placement and tile splits at 1 degrees",
+          "status": "passed",
+          "title": "contains complete final chords after half-grid placement and tile splits at 1 degrees",
+          "duration": 3640.7908999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["final ordinary and tiled V-carve containment"],
+          "fullName": "final ordinary and tiled V-carve containment contains complete final chords after half-grid placement and tile splits at 30 degrees",
+          "status": "passed",
+          "title": "contains complete final chords after half-grid placement and tile splits at 30 degrees",
+          "duration": 924.6995999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["final ordinary and tiled V-carve containment"],
+          "fullName": "final ordinary and tiled V-carve containment contains complete final chords after half-grid placement and tile splits at 90 degrees",
+          "status": "passed",
+          "title": "contains complete final chords after half-grid placement and tile splits at 90 degrees",
+          "duration": 870.2234000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["final ordinary and tiled V-carve containment"],
+          "fullName": "final ordinary and tiled V-carve containment contains complete final chords after half-grid placement and tile splits at 150 degrees",
+          "status": "passed",
+          "title": "contains complete final chords after half-grid placement and tile splits at 150 degrees",
+          "duration": 908.5308999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["final ordinary and tiled V-carve containment"],
+          "fullName": "final ordinary and tiled V-carve containment contains complete final chords after half-grid placement and tile splits at 179 degrees",
+          "status": "passed",
+          "title": "contains complete final chords after half-grid placement and tile splits at 179 degrees",
+          "duration": 983.3151999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["final ordinary and tiled V-carve containment"],
+          "fullName": "final ordinary and tiled V-carve containment keeps represented rest-finishing fragments conservative after placement",
+          "status": "passed",
+          "title": "keeps represented rest-finishing fragments conservative after placement",
+          "duration": 39.72659999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["final ordinary and tiled V-carve containment"],
+          "fullName": "final ordinary and tiled V-carve containment emits no negative exterior material for the audited microscopic triangle",
+          "status": "passed",
+          "title": "emits no negative exterior material for the audited microscopic triangle",
+          "duration": 3.3205999999991036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891467460,
+      "endTime": 1791891474831.3206,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/cnc/vcarve-emission-containment.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["cnc emitter × motion invariant (property)"],
+          "fullName": "cnc emitter × motion invariant (property) emitted G-code never travels plunged (100 seeds)",
+          "status": "passed",
+          "title": "emitted G-code never travels plunged (100 seeds)",
+          "duration": 69.91099999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cnc emitter × motion invariant (property)"],
+          "fullName": "cnc emitter × motion invariant (property) is deterministic: same job emits byte-identical G-code (100 seeds)",
+          "status": "passed",
+          "title": "is deterministic: same job emits byte-identical G-code (100 seeds)",
+          "duration": 77.2829999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891498299,
+      "endTime": 1791891498446.283,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/invariants/cnc-motion-emitter.property.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["mesh contact matches the independent oracle"],
+          "fullName": "mesh contact matches the independent oracle end-mill",
+          "status": "passed",
+          "title": "end-mill",
+          "duration": 36.77320000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["mesh contact matches the independent oracle"],
+          "fullName": "mesh contact matches the independent oracle ball-nose",
+          "status": "passed",
+          "title": "ball-nose",
+          "duration": 24.76859999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["mesh contact matches the independent oracle"],
+          "fullName": "mesh contact matches the independent oracle v-bit",
+          "status": "passed",
+          "title": "v-bit",
+          "duration": 19.857899999999972,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["mesh contact matches the independent oracle"],
+          "fullName": "mesh contact matches the independent oracle engraving",
+          "status": "passed",
+          "title": "engraving",
+          "duration": 19.274999999999864,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["mesh contact matches the independent oracle"],
+          "fullName": "mesh contact matches the independent oracle tapered-ball-nose",
+          "status": "passed",
+          "title": "tapered-ball-nose",
+          "duration": 16.08739999999989,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["mesh contact matches the independent oracle"],
+          "fullName": "mesh contact matches the independent oracle solves a roughing envelope widened by the allowance",
+          "status": "passed",
+          "title": "solves a roughing envelope widened by the allowance",
+          "duration": 27.69399999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["mesh contact known answers"],
+          "fullName": "mesh contact known answers a ball on a plane rides r (sec - 1) above it, with no grid error",
+          "status": "passed",
+          "title": "a ball on a plane rides r (sec - 1) above it, with no grid error",
+          "duration": 0.580199999999877,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["mesh contact known answers"],
+          "fullName": "mesh contact known answers a vertical wall stops a flat end mill at the wall top within its radius",
+          "status": "passed",
+          "title": "a vertical wall stops a flat end mill at the wall top within its radius",
+          "duration": 0.3191999999999098,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["mesh contact known answers"],
+          "fullName": "mesh contact known answers a stock-top background holds the cutter at its nearest uncovered cell",
+          "status": "passed",
+          "title": "a stock-top background holds the cutter at its nearest uncovered cell",
+          "duration": 0.4995000000001255,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["mesh contact along a move"],
+          "fullName": "mesh contact along a move keeps every triangle that can rise above the move, and answers as the full field",
+          "status": "passed",
+          "title": "keeps every triangle that can rise above the move, and answers as the full field",
+          "duration": 28.279899999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891475925,
+      "endTime": 1791891476100.2798,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/relief/heightmap-mesh-contact.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) agrees with the sample query on every sample ('end-mill')",
+          "status": "passed",
+          "title": "agrees with the sample query on every sample ('end-mill')",
+          "duration": 34.036400000000185,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) agrees with the sample query on every sample ('ball-nose')",
+          "status": "passed",
+          "title": "agrees with the sample query on every sample ('ball-nose')",
+          "duration": 27.133100000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) agrees with the sample query on every sample ('v-bit')",
+          "status": "passed",
+          "title": "agrees with the sample query on every sample ('v-bit')",
+          "duration": 21.87000000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) agrees with the sample query on every sample ('tapered-ball-nose')",
+          "status": "passed",
+          "title": "agrees with the sample query on every sample ('tapered-ball-nose')",
+          "duration": 22.988900000000058,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) matches the oracle between samples and beyond the map ('end-mill')",
+          "status": "passed",
+          "title": "matches the oracle between samples and beyond the map ('end-mill')",
+          "duration": 17.68769999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) matches the oracle between samples and beyond the map ('ball-nose')",
+          "status": "passed",
+          "title": "matches the oracle between samples and beyond the map ('ball-nose')",
+          "duration": 26.680900000000065,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) matches the oracle between samples and beyond the map ('v-bit')",
+          "status": "passed",
+          "title": "matches the oracle between samples and beyond the map ('v-bit')",
+          "duration": 35.2324000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) matches the oracle between samples and beyond the map ('tapered-ball-nose')",
+          "status": "passed",
+          "title": "matches the oracle between samples and beyond the map ('tapered-ball-nose')",
+          "duration": 14.975500000000011,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) answers \"does it clear z\" exactly as the height does ('end-mill')",
+          "status": "passed",
+          "title": "answers \"does it clear z\" exactly as the height does ('end-mill')",
+          "duration": 7.622200000000021,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) answers \"does it clear z\" exactly as the height does ('ball-nose')",
+          "status": "passed",
+          "title": "answers \"does it clear z\" exactly as the height does ('ball-nose')",
+          "duration": 4.873000000000047,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) answers \"does it clear z\" exactly as the height does ('v-bit')",
+          "status": "passed",
+          "title": "answers \"does it clear z\" exactly as the height does ('v-bit')",
+          "duration": 5.01059999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) answers \"does it clear z\" exactly as the height does ('tapered-ball-nose')",
+          "status": "passed",
+          "title": "answers \"does it clear z\" exactly as the height does ('tapered-ball-nose')",
+          "duration": 4.375700000000052,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) keeps every element that can rise above a move ('end-mill')",
+          "status": "passed",
+          "title": "keeps every element that can rise above a move ('end-mill')",
+          "duration": 19.74090000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) keeps every element that can rise above a move ('ball-nose')",
+          "status": "passed",
+          "title": "keeps every element that can rise above a move ('ball-nose')",
+          "duration": 28.046400000000176,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) keeps every element that can rise above a move ('v-bit')",
+          "status": "passed",
+          "title": "keeps every element that can rise above a move ('v-bit')",
+          "duration": 19.739700000000084,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) keeps every element that can rise above a move ('tapered-ball-nose')",
+          "status": "passed",
+          "title": "keeps every element that can rise above a move ('tapered-ball-nose')",
+          "duration": 16.620800000000145,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) keeps the far side of a ridge a short move crosses ('end-mill')",
+          "status": "passed",
+          "title": "keeps the far side of a ridge a short move crosses ('end-mill')",
+          "duration": 98.50749999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) keeps the far side of a ridge a short move crosses ('ball-nose')",
+          "status": "passed",
+          "title": "keeps the far side of a ridge a short move crosses ('ball-nose')",
+          "duration": 151.35879999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) keeps the far side of a ridge a short move crosses ('v-bit')",
+          "status": "passed",
+          "title": "keeps the far side of a ridge a short move crosses ('v-bit')",
+          "duration": 134.82299999999987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact at any point (ADR-423)"],
+          "fullName": "surface contact at any point (ADR-423) keeps the far side of a ridge a short move crosses ('tapered-ball-nose')",
+          "status": "passed",
+          "title": "keeps the far side of a ridge a short move crosses ('tapered-ball-nose')",
+          "duration": 155.42090000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891460523,
+      "endTime": 1791891461371.421,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/relief/heightmap-surface-contact-point.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane lifts a flat end mill by slope x radius (slope 0)",
+          "status": "passed",
+          "title": "lifts a flat end mill by slope x radius (slope 0)",
+          "duration": 4.346599999999853,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane lifts a flat end mill by slope x radius (slope 0.3)",
+          "status": "passed",
+          "title": "lifts a flat end mill by slope x radius (slope 0.3)",
+          "duration": 1.0080000000000382,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane lifts a flat end mill by slope x radius (slope 1)",
+          "status": "passed",
+          "title": "lifts a flat end mill by slope x radius (slope 1)",
+          "duration": 0.6050999999999931,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane lifts a flat end mill by slope x radius (slope 2.5)",
+          "status": "passed",
+          "title": "lifts a flat end mill by slope x radius (slope 2.5)",
+          "duration": 0.6277000000000044,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane seats a ball on its tangent point (slope 0)",
+          "status": "passed",
+          "title": "seats a ball on its tangent point (slope 0)",
+          "duration": 1.5237999999999374,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane seats a ball on its tangent point (slope 0.3)",
+          "status": "passed",
+          "title": "seats a ball on its tangent point (slope 0.3)",
+          "duration": 0.5868000000000393,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane seats a ball on its tangent point (slope 1)",
+          "status": "passed",
+          "title": "seats a ball on its tangent point (slope 1)",
+          "duration": 0.4522999999999229,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane seats a ball on its tangent point (slope 2.5)",
+          "status": "passed",
+          "title": "seats a ball on its tangent point (slope 2.5)",
+          "duration": 0.48210000000017317,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane seats a ball on its tangent point (slope 6)",
+          "status": "passed",
+          "title": "seats a ball on its tangent point (slope 6)",
+          "duration": 1.0652000000000044,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane keeps a v-bit on its tip below the flank slope (slope 0.5)",
+          "status": "passed",
+          "title": "keeps a v-bit on its tip below the flank slope (slope 0.5)",
+          "duration": 0.7811000000001513,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane keeps a v-bit on its tip below the flank slope (slope 1.5)",
+          "status": "passed",
+          "title": "keeps a v-bit on its tip below the flank slope (slope 1.5)",
+          "duration": 0.5054000000000087,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane moves a v-bit contact to the rim above the flank slope (slope 2)",
+          "status": "passed",
+          "title": "moves a v-bit contact to the rim above the flank slope (slope 2)",
+          "duration": 0.7690000000000055,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane moves a v-bit contact to the rim above the flank slope (slope 4)",
+          "status": "passed",
+          "title": "moves a v-bit contact to the rim above the flank slope (slope 4)",
+          "duration": 0.3894999999999982,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane seats an engraving bit on its flat land edge (slope 0.5)",
+          "status": "passed",
+          "title": "seats an engraving bit on its flat land edge (slope 0.5)",
+          "duration": 0.6468999999999596,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane seats an engraving bit on its flat land edge (slope 2)",
+          "status": "passed",
+          "title": "seats an engraving bit on its flat land edge (slope 2)",
+          "duration": 0.3263999999999214,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane moves an engraving contact to the rim above the flank slope",
+          "status": "passed",
+          "title": "moves an engraving contact to the rim above the flank slope",
+          "duration": 0.470299999999952,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane seats a tapered ball on its ball below the flank (slope 0.3)",
+          "status": "passed",
+          "title": "seats a tapered ball on its ball below the flank (slope 0.3)",
+          "duration": 0.6658999999999651,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane seats a tapered ball on its ball below the flank (slope 1)",
+          "status": "passed",
+          "title": "seats a tapered ball on its ball below the flank (slope 1)",
+          "duration": 0.3610000000001037,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answers on a plane"],
+          "fullName": "surface contact — known answers on a plane moves a tapered ball contact to the rim above the flank slope",
+          "status": "passed",
+          "title": "moves a tapered ball contact to the rim above the flank slope",
+          "duration": 0.3931999999999789,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answer on a ridge edge"],
+          "fullName": "surface contact — known answer on a ridge edge finds a ball contact on a ridge sloping 0.5 between samples",
+          "status": "passed",
+          "title": "finds a ball contact on a ridge sloping 0.5 between samples",
+          "duration": 1.0183999999999287,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — known answer on a ridge edge"],
+          "fullName": "surface contact — known answer on a ridge edge finds a ball contact on a ridge sloping 0 between samples",
+          "status": "passed",
+          "title": "finds a ball contact on a ridge sloping 0 between samples",
+          "duration": 0.8794000000000324,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — level edges"],
+          "fullName": "surface contact — level edges finds a v-bit contact at the nearest approach of a level edge",
+          "status": "passed",
+          "title": "finds a v-bit contact at the nearest approach of a level edge",
+          "duration": 0.6614000000001852,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — field bounds"],
+          "fullName": "surface contact — field bounds has no field for a single sample or a zero-radius cutter",
+          "status": "passed",
+          "title": "has no field for a single sample or a zero-radius cutter",
+          "duration": 0.3023000000000593,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — field bounds"],
+          "fullName": "surface contact — field bounds keeps a lower bound that the surface does not exceed",
+          "status": "passed",
+          "title": "keeps a lower bound that the surface does not exceed",
+          "duration": 0.5125000000000455,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — field bounds"],
+          "fullName": "surface contact — field bounds never builds surface from mask-excluded samples",
+          "status": "passed",
+          "title": "never builds surface from mask-excluded samples",
+          "duration": 0.4238000000000284,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — independent oracle"],
+          "fullName": "surface contact — independent oracle matches the oracle for 'end-mill' grown by +0 mm",
+          "status": "passed",
+          "title": "matches the oracle for 'end-mill' grown by +0 mm",
+          "duration": 142.10719999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — independent oracle"],
+          "fullName": "surface contact — independent oracle matches the oracle for 'end-mill' grown by 0.3 mm",
+          "status": "passed",
+          "title": "matches the oracle for 'end-mill' grown by 0.3 mm",
+          "duration": 137.99810000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — independent oracle"],
+          "fullName": "surface contact — independent oracle matches the oracle for 'ball-nose' grown by +0 mm",
+          "status": "passed",
+          "title": "matches the oracle for 'ball-nose' grown by +0 mm",
+          "duration": 139.4031,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — independent oracle"],
+          "fullName": "surface contact — independent oracle matches the oracle for 'ball-nose' grown by 0.3 mm",
+          "status": "passed",
+          "title": "matches the oracle for 'ball-nose' grown by 0.3 mm",
+          "duration": 136.33619999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — independent oracle"],
+          "fullName": "surface contact — independent oracle matches the oracle for 'v-bit' grown by +0 mm",
+          "status": "passed",
+          "title": "matches the oracle for 'v-bit' grown by +0 mm",
+          "duration": 205.30449999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — independent oracle"],
+          "fullName": "surface contact — independent oracle matches the oracle for 'v-bit' grown by 0.3 mm",
+          "status": "passed",
+          "title": "matches the oracle for 'v-bit' grown by 0.3 mm",
+          "duration": 152.44339999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — independent oracle"],
+          "fullName": "surface contact — independent oracle matches the oracle for 'engraving' grown by +0 mm",
+          "status": "passed",
+          "title": "matches the oracle for 'engraving' grown by +0 mm",
+          "duration": 152.59810000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — independent oracle"],
+          "fullName": "surface contact — independent oracle matches the oracle for 'engraving' grown by 0.3 mm",
+          "status": "passed",
+          "title": "matches the oracle for 'engraving' grown by 0.3 mm",
+          "duration": 292.8953999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — independent oracle"],
+          "fullName": "surface contact — independent oracle matches the oracle for 'tapered-ball-nose' grown by +0 mm",
+          "status": "passed",
+          "title": "matches the oracle for 'tapered-ball-nose' grown by +0 mm",
+          "duration": 239.08680000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["surface contact — independent oracle"],
+          "fullName": "surface contact — independent oracle matches the oracle for 'tapered-ball-nose' grown by 0.3 mm",
+          "status": "passed",
+          "title": "matches the oracle for 'tapered-ball-nose' grown by 0.3 mm",
+          "duration": 212.70460000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891457489,
+      "endTime": 1791891459322.7046,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/relief/heightmap-surface-contact.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'x' / 'end-mill' / masked=false",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'x' / 'end-mill' / masked=false",
+          "duration": 50.9704999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'x' / 'end-mill' / masked=true",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'x' / 'end-mill' / masked=true",
+          "duration": 25.630800000000136,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'x' / 'ball-nose' / masked=false",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'x' / 'ball-nose' / masked=false",
+          "duration": 27.36550000000011,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'x' / 'ball-nose' / masked=true",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'x' / 'ball-nose' / masked=true",
+          "duration": 26.846199999999953,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'x' / 'v-bit' / masked=false",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'x' / 'v-bit' / masked=false",
+          "duration": 22.91099999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'x' / 'v-bit' / masked=true",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'x' / 'v-bit' / masked=true",
+          "duration": 20.12220000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'x' / 'engraving' / masked=false",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'x' / 'engraving' / masked=false",
+          "duration": 29.995899999999892,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'x' / 'engraving' / masked=true",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'x' / 'engraving' / masked=true",
+          "duration": 18.323399999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'y' / 'end-mill' / masked=false",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'y' / 'end-mill' / masked=false",
+          "duration": 16.201099999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'y' / 'end-mill' / masked=true",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'y' / 'end-mill' / masked=true",
+          "duration": 17.51240000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'y' / 'ball-nose' / masked=false",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'y' / 'ball-nose' / masked=false",
+          "duration": 20.96530000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'y' / 'ball-nose' / masked=true",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'y' / 'ball-nose' / masked=true",
+          "duration": 12.82809999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'y' / 'v-bit' / masked=false",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'y' / 'v-bit' / masked=false",
+          "duration": 17.395300000000134,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'y' / 'v-bit' / masked=true",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'y' / 'v-bit' / masked=true",
+          "duration": 21.672600000000102,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'y' / 'engraving' / masked=false",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'y' / 'engraving' / masked=false",
+          "duration": 15.364699999999857,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'y' / 'engraving' / masked=true",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'y' / 'engraving' / masked=true",
+          "duration": 19.752700000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'both' / 'end-mill' / masked=false",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'both' / 'end-mill' / masked=false",
+          "duration": 18.384000000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'both' / 'end-mill' / masked=true",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'both' / 'end-mill' / masked=true",
+          "duration": 11.824100000000044,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'both' / 'ball-nose' / masked=false",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'both' / 'ball-nose' / masked=false",
+          "duration": 17.226300000000037,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'both' / 'ball-nose' / masked=true",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'both' / 'ball-nose' / masked=true",
+          "duration": 14.741300000000138,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'both' / 'v-bit' / masked=false",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'both' / 'v-bit' / masked=false",
+          "duration": 19.57159999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'both' / 'v-bit' / masked=true",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'both' / 'v-bit' / masked=true",
+          "duration": 12.995800000000145,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'both' / 'engraving' / masked=false",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'both' / 'engraving' / masked=false",
+          "duration": 15.555899999999838,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence matches a physical brute-force oracle for 'both' / 'engraving' / masked=true",
+          "status": "passed",
+          "title": "matches a physical brute-force oracle for 'both' / 'engraving' / masked=true",
+          "duration": 23.737800000000107,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence preserves exact-divisible Uint32 output for 'end-mill' tools",
+          "status": "passed",
+          "title": "preserves exact-divisible Uint32 output for 'end-mill' tools",
+          "duration": 9.471700000000055,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence preserves exact-divisible Uint32 output for 'ball-nose' tools",
+          "status": "passed",
+          "title": "preserves exact-divisible Uint32 output for 'ball-nose' tools",
+          "duration": 9.700400000000172,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence preserves exact-divisible Uint32 output for 'v-bit' tools",
+          "status": "passed",
+          "title": "preserves exact-divisible Uint32 output for 'v-bit' tools",
+          "duration": 10.865999999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence preserves exact-divisible Uint32 output for 'engraving' tools",
+          "status": "passed",
+          "title": "preserves exact-divisible Uint32 output for 'engraving' tools",
+          "duration": 9.567700000000059,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["partial-edge dilation equivalence"],
+          "fullName": "partial-edge dilation equivalence keeps a max-finite flat terminal shift finite and reaches a boundary sample",
+          "status": "passed",
+          "title": "keeps a max-finite flat terminal shift finite and reaches a boundary sample",
+          "duration": 1.0747000000001208,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891485981,
+      "endTime": 1791891486521.0747,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/relief/heightmap-tool-offset-property.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["relief floors survive final placement and output rounding"],
+          "fullName": "relief floors survive final placement and output rounding declines a subdivided path after mirror 1 and offset 0",
+          "status": "passed",
+          "title": "declines a subdivided path after mirror 1 and offset 0",
+          "duration": 4.55639999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief floors survive final placement and output rounding"],
+          "fullName": "relief floors survive final placement and output rounding declines a subdivided path after mirror 1 and offset 10.0005",
+          "status": "passed",
+          "title": "declines a subdivided path after mirror 1 and offset 10.0005",
+          "duration": 0.532799999999952,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief floors survive final placement and output rounding"],
+          "fullName": "relief floors survive final placement and output rounding declines a subdivided path after mirror -1 and offset 10.0005",
+          "status": "passed",
+          "title": "declines a subdivided path after mirror -1 and offset 10.0005",
+          "duration": 0.3706999999999425,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief floors survive final placement and output rounding"],
+          "fullName": "relief floors survive final placement and output rounding retains an identical path after mirror 1 and offset 0",
+          "status": "passed",
+          "title": "retains an identical path after mirror 1 and offset 0",
+          "duration": 1.0778999999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief floors survive final placement and output rounding"],
+          "fullName": "relief floors survive final placement and output rounding retains an identical path after mirror 1 and offset 10.0005",
+          "status": "passed",
+          "title": "retains an identical path after mirror 1 and offset 10.0005",
+          "duration": 0.399599999999964,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief floors survive final placement and output rounding"],
+          "fullName": "relief floors survive final placement and output rounding retains an identical path after mirror -1 and offset 10.0005",
+          "status": "passed",
+          "title": "retains an identical path after mirror -1 and offset 10.0005",
+          "duration": 0.28950000000008913,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief floors survive final placement and output rounding"],
+          "fullName": "relief floors survive final placement and output rounding keeps dense repeated paths without geometry-offset allocation or argument spreads",
+          "status": "passed",
+          "title": "keeps dense repeated paths without geometry-offset allocation or argument spreads",
+          "duration": 772.3672999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891496063,
+      "endTime": 1791891496842.3672,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/relief/relief-air-floor-emission.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["keepProvenAirFloors (ADR-489 Amendment 1)"],
+          "fullName": "keepProvenAirFloors (ADR-489 Amendment 1) does not count a thin strip of tall stock as cleared",
+          "status": "passed",
+          "title": "does not count a thin strip of tall stock as cleared",
+          "duration": 2.1241999999999734,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["keepProvenAirFloors (ADR-489 Amendment 1)"],
+          "fullName": "keepProvenAirFloors (ADR-489 Amendment 1) keeps a floor on a path an earlier cut at the ceiling followed exactly",
+          "status": "passed",
+          "title": "keeps a floor on a path an earlier cut at the ceiling followed exactly",
+          "duration": 0.49670000000003256,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["keepProvenAirFloors (ADR-489 Amendment 1)"],
+          "fullName": "keepProvenAirFloors (ADR-489 Amendment 1) drops a floor whose sweep reaches past every earlier cut",
+          "status": "passed",
+          "title": "drops a floor whose sweep reaches past every earlier cut",
+          "duration": 0.3283000000000129,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["keepProvenAirFloors (ADR-489 Amendment 1)"],
+          "fullName": "keepProvenAirFloors (ADR-489 Amendment 1) declines area-based coverage until final placed geometry is available",
+          "status": "passed",
+          "title": "declines area-based coverage until final placed geometry is available",
+          "duration": 0.3048000000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["keepProvenAirFloors (ADR-489 Amendment 1)"],
+          "fullName": "keepProvenAirFloors (ADR-489 Amendment 1) ignores earlier cuts above the ceiling and the risen parts of a 3D path",
+          "status": "passed",
+          "title": "ignores earlier cuts above the ceiling and the risen parts of a 3D path",
+          "duration": 0.3704000000000178,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["keepProvenAirFloors (ADR-489 Amendment 1)"],
+          "fullName": "keepProvenAirFloors (ADR-489 Amendment 1) keeps no floor without a ceiling or a cutter radius, and leaves other passes alone",
+          "status": "passed",
+          "title": "keeps no floor without a ceiling or a cutter radius, and leaves other passes alone",
+          "duration": 0.7862999999999829,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891492085,
+      "endTime": 1791891492088.7864,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/relief/relief-air-floor-proof.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["finishing moves against the exact contact (ADR-421 Amendment 1)"],
+          "fullName": "finishing moves against the exact contact (ADR-421 Amendment 1) leaves no move of any strategy cutting into the part",
+          "status": "passed",
+          "title": "leaves no move of any strategy cutting into the part",
+          "duration": 2439.0678,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["finishing moves against the exact contact (ADR-421 Amendment 1)"],
+          "fullName": "finishing moves against the exact contact (ADR-421 Amendment 1) lifts a link down the edge column over a wall parallel to the rows",
+          "status": "passed",
+          "title": "lifts a link down the edge column over a wall parallel to the rows",
+          "duration": 365.2918999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["checkedPath"],
+          "fullName": "checkedPath keeps a move that stays on or above the contact",
+          "status": "passed",
+          "title": "keeps a move that stays on or above the contact",
+          "duration": 0.8591999999998734,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["checkedPath"],
+          "fullName": "checkedPath adds points on the contact where a move would cut under it",
+          "status": "passed",
+          "title": "adds points on the contact where a move would cut under it",
+          "duration": 3.507400000000416,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["checkedPath"],
+          "fullName": "checkedPath never lowers a point",
+          "status": "passed",
+          "title": "never lowers a point",
+          "duration": 0.5097999999998137,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["checkedPath"],
+          "fullName": "checkedPath follows a flat end mill up a sampled wall",
+          "status": "passed",
+          "title": "follows a flat end mill up a sampled wall",
+          "duration": 1.0079999999998108,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["checkedPath"],
+          "fullName": "checkedPath holds the tolerance normal to the move",
+          "status": "passed",
+          "title": "holds the tolerance normal to the move",
+          "duration": 0.38439999999991414,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891462695,
+      "endTime": 1791891465506.3845,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/relief/relief-finishing-contact.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["relief finishing mask sweep safety"],
+          "fullName": "relief finishing mask sweep safety ends a flat-tool scanline before its interpolated chord enters excluded stock",
+          "status": "passed",
+          "title": "ends a flat-tool scanline before its interpolated chord enters excluded stock",
+          "duration": 6.709600000000137,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief finishing mask sweep safety"],
+          "fullName": "relief finishing mask sweep safety rides a ball-nose row up to the mask and leaves the excluded stock whole",
+          "status": "passed",
+          "title": "rides a ball-nose row up to the mask and leaves the excluded stock whole",
+          "duration": 10.250099999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief finishing mask sweep safety"],
+          "fullName": "relief finishing mask sweep safety links the rows inside a round mask into one stay-down pass",
+          "status": "passed",
+          "title": "links the rows inside a round mask into one stay-down pass",
+          "duration": 402.4223999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relief finishing mask sweep safety"],
+          "fullName": "relief finishing mask sweep safety keeps every move out of concave, diagonal, and island masks",
+          "status": "passed",
+          "title": "keeps every move out of concave, diagonal, and island masks",
+          "duration": 76.87699999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891451598,
+      "endTime": 1791891452094.877,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/relief/relief-finishing-mask-safety.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["blockExcess (ADR-484)"],
+          "fullName": "blockExcess (ADR-484) never finds a move higher above a block than dense sampling does",
+          "status": "passed",
+          "title": "never finds a move higher above a block than dense sampling does",
+          "duration": 860.1828,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["stockCheckedPath (ADR-484)"],
+          "fullName": "stockCheckedPath (ADR-484) keeps every point of every move clear of the real blocks",
+          "status": "passed",
+          "title": "keeps every point of every move clear of the real blocks",
+          "duration": 547.5796,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891488819,
+      "endTime": 1791891490226.5796,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/relief/relief-mask-stock-path.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion admits exact link-region boundaries without admitting adjacent excluded points",
+          "status": "passed",
+          "title": "admits exact link-region boundaries without admitting adjacent excluded points",
+          "duration": 2.02370000000019,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion cuts a square level inside out in one chain, every loop closed",
+          "status": "passed",
+          "title": "cuts a square level inside out in one chain, every loop closed",
+          "duration": 11.499399999999696,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion cuts the deepest cleanup before the rings while retaining linked motion",
+          "status": "passed",
+          "title": "cuts the deepest cleanup before the rings while retaining linked motion",
+          "duration": 3.5473000000001775,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion keeps the stock right of travel for climb and left for conventional",
+          "status": "passed",
+          "title": "keeps the stock right of travel for climb and left for conventional",
+          "duration": 2.0358000000001084,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion circles an island the other way round, so it climbs there too",
+          "status": "passed",
+          "title": "circles an island the other way round, so it climbs there too",
+          "duration": 2.6275000000000546,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion stays down from a piece outline to its island however far",
+          "status": "passed",
+          "title": "stays down from a piece outline to its island however far",
+          "duration": 2.870800000000145,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion lifts rather than link across the gap between two pieces",
+          "status": "passed",
+          "title": "lifts rather than link across the gap between two pieces",
+          "duration": 0.8182000000001608,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion links a band across deeper cells its depth also reaches (ADR-422)",
+          "status": "passed",
+          "title": "links a band across deeper cells its depth also reaches (ADR-422)",
+          "duration": 1.106499999999869,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion never leaves the link region between loops, on random reliefs",
+          "status": "passed",
+          "title": "never leaves the link region between loops, on random reliefs",
+          "duration": 1811.5659,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion ramps down along the first loop from the level above",
+          "status": "passed",
+          "title": "ramps down along the first loop from the level above",
+          "duration": 1.2865999999999076,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion plunges into a loop too short to ramp round",
+          "status": "passed",
+          "title": "plunges into a loop too short to ramp round",
+          "duration": 1.3656999999998334,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion marks each chain the ramp leaves to plunge, and only those (ADR-424 Amendment 1)",
+          "status": "passed",
+          "title": "marks each chain the ramp leaves to plunge, and only those (ADR-424 Amendment 1)",
+          "duration": 1.1579999999999018,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion marks no plunge where the level leaves no stock to ramp through",
+          "status": "passed",
+          "title": "marks no plunge where the level leaves no stock to ramp through",
+          "duration": 0.6676000000002205,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion emits each straight run of a traced ring as one move (ADR-488)",
+          "status": "passed",
+          "title": "emits each straight run of a traced ring as one move (ADR-488)",
+          "duration": 55.66319999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reliefRoughingMotion"],
+          "fullName": "reliefRoughingMotion keeps a cleanup trace round its stock on the climb side",
+          "status": "passed",
+          "title": "keeps a cleanup trace round its stock on the climb side",
+          "duration": 0.8692999999998392,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791891431004,
+      "endTime": 1791891432902.8694,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/relief/relief-roughing-motion.test.ts"
+    }
+  ]
+}

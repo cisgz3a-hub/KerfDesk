@@ -1,0 +1,22 @@
+Command: node scripts/stress-quality-first-paths.mjs
+Working directory: C:\Users\Asus\.codex\worktrees\de9a\LaserForge-2.0
+Results: large-paths-results.jsonl
+Parameters: 1,000, 10,000 and 50,000 paths; seeds 17, 491, 20261013; grid, cluster, coincident and nested patterns; preserve and allow-reverse directions.
+Timeout: 30,000 ms per whole fixture worker, including Vite setup, both directions, repeats, checks and cleanup. Timed-out fixtures are incomplete, not invariant passes.
+Heap bound: 768 MiB V8 old-generation per worker, not total RSS. Only one worker runs at a time.
+Timing fields: elapsedMs and repeatMs each measure one optimizePaths invocation. Heap fields are before/after snapshots, not peaks, with no forced GC.
+Geometry checks: frozen source plus SHA-256 immutability, unique segment IDs, exact directed geometry or allowed full reversal, finite coordinates, unchanged group settings, deterministic repeat, analytic nested-child precedence, separate exhaustive linear greedy oracle on 48 paths.
+Limits: no hardware/controller/material qualification; route travel is an observed metric and no global optimality assertion is made.
+Full run outcome: exit code 1; 36 fixtures, 33 passed, 0 invariant failures, 3 whole-fixture timeouts (50,000 coincident paths, all three seeds). 66 route cases completed all checks. The 6 route cases inside timed-out fixtures remain incomplete.
+Version note: full run used the archived large-paths-runner-full.mjs before explicit result/repeat group-count assertions were added. All checks that version implements ran as recorded. Reviewed smoke and single-call diagnosis use the later script version, identified separately.
+Full-run runner SHA256: B2054E71662B32C0C9AF7A91FE66E210E5D10193DBEE570852958A983151F318
+Reviewed runner SHA256: BC6557A954CC6B48DBD930538A4B67DC19E43A0DFA180D00B59238F20B42EE66
+Reviewed source snapshot: large-paths-runner-reviewed.mjs
+Reviewed smoke command: node scripts/stress-quality-first-paths.mjs --smoke
+Reviewed smoke log: large-paths-reviewed-smoke.jsonl
+Reviewed smoke outcome: exit 0; 12 fixtures passed, 24 route cases passed, no failures/timeouts; explicit result and repeated-result group-count assertions included.
+Single-call diagnostic command: node scripts/stress-quality-first-paths.mjs --diagnose-coincident
+Single-call diagnostic log: large-paths-coincident-single-call.jsonl
+Single-call outcome: exit 1; seed 17, 50,000 coincident paths, preserve direction. Vite/generation setup reached optimizer-starting at 1334.2161 ms after worker entry. No optimizer-returned event before the unchanged 30,000 ms whole-worker timeout. This isolates a slow first optimizer invocation, not only repeat/oracle overhead. No completed output or geometry pass is claimed for this diagnostic.
+Checks: pnpm exec eslint scripts/stress-quality-first-paths.mjs and pnpm exec prettier --write scripts/stress-quality-first-paths.mjs passed before reviewed smoke and diagnostic.
+Source snapshots are evidence copies. Their original runnable location was scripts/stress-quality-first-paths.mjs (relative source loading assumes that location).

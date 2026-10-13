@@ -1,0 +1,31 @@
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0
+
+ ✓ src/core/job/compile-job-compensated-topology.test.ts (9 tests) 64ms
+ ✓ src/core/job/segment-entry-index.test.ts (17 tests) 230ms
+ ✓ src/core/laser-second-pass/second-pass.property.test.ts (6 tests) 3595ms
+     ✓ 'Falcon grayscale image, 2 passes, air': exposure, containment, beam safety and air assist hold for 60 random selections  2422ms
+     ✓ 'GRBL cross-hatched fill with air and …': exposure, containment, beam safety and air assist hold for 60 random selections  749ms
+     ✓ 'GRBL dithered one-way image': exposure, containment, beam safety and air assist hold for 60 random selections  319ms
+ ✓ src/core/job/compile-job-topology-context.test.ts (10 tests) 40ms
+ ✓ src/core/job/compile-job-topology-boundaries.test.ts (26 tests) 196ms
+ ✓ src/io/gcode/prepared-output-topology-archive.test.ts (4 tests) 158ms
+ ✓ src/io/gcode/registration-placement.property.test.ts (4 tests) 61ms
+ ✓ src/core/job/compile-job-raster-rotated-fidelity.test.ts (7 tests) 184ms
+ ✓ src/core/job/containment-depth.test.ts (9 tests) 15ms
+ ✓ src/core/job/compile-job-process-topology.test.ts (11 tests) 33ms
+ ✓ src/core/job/proper-contour-containment.test.ts (6 tests) 487ms
+ ✓ src/core/raster/emit-raster.property.test.ts (5 tests) 94ms
+ ✓ src/io/gcode/closed-shape-start-output.test.ts (2 tests) 58ms
+ ✓ src/core/job/topology-legacy-output.test.ts (8 tests) 121ms
+ ✓ src/core/job/compile-job-segmented-topology.test.ts (5 tests) 28ms
+ ✓ src/core/job/estimate-duration-raster-bounded-split.test.ts (1 test) 17ms
+ ✓ src/core/job/toolpath-raster-bounded-split.test.ts (1 test) 11ms
+ ✓ src/core/raster/emit-raster-serial-density.test.ts (1 test) 15ms
+
+ Test Files  18 passed (18)
+      Tests  132 passed (132)
+   Start at  19:36:41
+   Duration  40.51s (transform 8.13s, setup 136ms, import 19.24s, tests 5.41s, environment 11.78s)
+
+JSON report written to C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/docs/audits/2026-10-13-machining-stress/laser-results.json

@@ -1,0 +1,303 @@
+{
+  "sourceHead": "c700863a14dfbed71a49e32182ec3b75b989ebb1",
+  "sourceChanges": "Audit artifacts only; no production or assertion changes",
+  "fastCheckSeed": 20261013,
+  "fastCheckProperties": 16,
+  "fastCheckRunsPerProperty": 100,
+  "seededAckChunkCases": "1 through 60",
+  "largeHandoverJobLines": 200000,
+  "mainCommand": "pnpm exec vitest run --config docs/audits/2026-10-13-machining-stress/transport.vitest.config.mjs --maxWorkers=1 --reporter=verbose --reporter=json --outputFile.json=docs/audits/2026-10-13-machining-stress/transport-results.json",
+  "ruidaCommand": "pnpm exec vitest run src/core/controllers/ruida --maxWorkers=1 --reporter=verbose --reporter=json --outputFile.json=docs/audits/2026-10-13-machining-stress/transport-ruida-results.json",
+  "main": {
+    "failed": 0,
+    "success": true,
+    "pending": 0,
+    "files": 50,
+    "passed": 475
+  },
+  "ruida": {
+    "failed": 0,
+    "success": true,
+    "pending": 0,
+    "files": 5,
+    "passed": 51
+  },
+  "files": [
+    {
+      "tests": 3,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/grbl-streaming.test.ts"
+    },
+    {
+      "tests": 9,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/controllers/grbl-family-drivers.test.ts"
+    },
+    {
+      "tests": 4,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/estimator-parity.test.ts"
+    },
+    {
+      "tests": 2,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/gcode-fractional-feed-time.test.ts"
+    },
+    {
+      "tests": 5,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/gcode-timing-calibration.test.ts"
+    },
+    {
+      "tests": 9,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/gcode-timing-dwell-progress.test.ts"
+    },
+    {
+      "tests": 5,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/gcode-timing-plan.test.ts"
+    },
+    {
+      "tests": 2,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/program-dwell-order.test.ts"
+    },
+    {
+      "tests": 3,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/program-native-controller-timing.test.ts"
+    },
+    {
+      "tests": 10,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/program-planner-window.test.ts"
+    },
+    {
+      "tests": 6,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/program-time-3d.test.ts"
+    },
+    {
+      "tests": 6,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/program-time-arc-length.test.ts"
+    },
+    {
+      "tests": 10,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/program-time-coordinate-representation.test.ts"
+    },
+    {
+      "tests": 15,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/program-time.test.ts"
+    },
+    {
+      "tests": 10,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/program-timeline.test.ts"
+    },
+    {
+      "tests": 8,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/gcode-time/program-transport-time.test.ts"
+    },
+    {
+      "tests": 5,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/devices/controller-streaming-mode.test.ts"
+    },
+    {
+      "tests": 2,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/motion-planner/junction-3d.test.ts"
+    },
+    {
+      "tests": 12,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/motion-planner/motion-planner.test.ts"
+    },
+    {
+      "tests": 4,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/motion-planner/plan-velocities.test.ts"
+    },
+    {
+      "tests": 1,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/output/grbl-power-modes.test.ts"
+    },
+    {
+      "tests": 4,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/output/grbl-strategy-per-layer-settings.property.test.ts"
+    },
+    {
+      "tests": 13,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/output/grbl-strategy.fill-power-mode.test.ts"
+    },
+    {
+      "tests": 7,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/output/grbl-strategy.property.test.ts"
+    },
+    {
+      "tests": 11,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/output/marlin-raster-power.test.ts"
+    },
+    {
+      "tests": 5,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/output/marlin-strategy.property.test.ts"
+    },
+    {
+      "tests": 18,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/output/smoothieware-raster-power.test.ts"
+    },
+    {
+      "tests": 5,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/output/smoothieware-strategy.property.test.ts"
+    },
+    {
+      "tests": 4,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/platform/web/serial-wire.test.ts"
+    },
+    {
+      "tests": 1,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/platform/web/web-serial-background-stream.test.ts"
+    },
+    {
+      "tests": 11,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/platform/web/worker-refill-handover.test.ts"
+    },
+    {
+      "tests": 20,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/platform/web/worker-serial-connection.test.ts"
+    },
+    {
+      "tests": 22,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/__fixtures__/controllers/fluidnc-v403-direct-channel-model.test.ts"
+    },
+    {
+      "tests": 43,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/__fixtures__/controllers/fluidnc-v403-realtime-dispatch.test.ts"
+    },
+    {
+      "tests": 2,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/ui/state/laser-hosted-refill-abort.test.ts"
+    },
+    {
+      "tests": 10,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/ui/state/laser-hosted-refill-resume.test.ts"
+    },
+    {
+      "tests": 11,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/ui/state/laser-hosted-refill-tool-change.test.ts"
+    },
+    {
+      "tests": 6,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/ui/state/laser-hosted-refill.test.ts"
+    },
+    {
+      "tests": 13,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/ui/state/laser-job-effective-stream-options.test.ts"
+    },
+    {
+      "tests": 21,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/ui/state/laser-planner-capacity-recovery.test.ts"
+    },
+    {
+      "tests": 5,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/ui/state/laser-store-streaming-options.test.ts"
+    },
+    {
+      "tests": 5,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/ui/state/laser-stream-ack-batch.test.ts"
+    },
+    {
+      "tests": 7,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/ui/state/laser-stream-ack-stall.test.ts"
+    },
+    {
+      "tests": 32,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/ui/state/laser-stream-ack.test.ts"
+    },
+    {
+      "tests": 7,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/controllers/grbl/stream-pump.test.ts"
+    },
+    {
+      "tests": 4,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/controllers/grbl/streamer-planner-backpressure.test.ts"
+    },
+    {
+      "tests": 3,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/controllers/grbl/streamer-planner-starvation.test.ts"
+    },
+    {
+      "tests": 7,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/controllers/grbl/streamer-tool-change.test.ts"
+    },
+    {
+      "tests": 34,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/controllers/grbl/streamer.test.ts"
+    },
+    {
+      "tests": 13,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/ui/laser/job-review/stream-throughput-warnings.test.ts"
+    },
+    {
+      "tests": 1,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/controllers/ruida/rd-encoder-golden.test.ts"
+    },
+    {
+      "tests": 20,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/controllers/ruida/rd-encoder.test.ts"
+    },
+    {
+      "tests": 7,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/controllers/ruida/ruida-udp-session.test.ts"
+    },
+    {
+      "tests": 20,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/controllers/ruida/ruida.test.ts"
+    },
+    {
+      "tests": 3,
+      "status": "passed",
+      "path": "C:/Users/Asus/.codex/worktrees/de9a/LaserForge-2.0/src/core/controllers/ruida/swizzle-meerk40t.test.ts"
+    }
+  ],
+  "limitations": "Software correctness and hypothetical/simulated transport evidence only. No hardware, physical quality, or measured controller latency claims. Concurrent correctness cohorts mean wall duration is not a performance benchmark."
+}
