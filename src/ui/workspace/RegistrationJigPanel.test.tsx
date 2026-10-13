@@ -93,15 +93,15 @@ describe('RegistrationJigPanel', () => {
   it('keeps How to use collapsed until the operator opens it', () => {
     render();
 
-    expect(buttonByLabel('▸ How to use').getAttribute('aria-expanded')).toBe('false');
+    expect(buttonByLabel('How to use').getAttribute('aria-expanded')).toBe('false');
     expect(container.textContent).not.toContain('Put one object inside each burned outline.');
 
-    click('▸ How to use');
+    click('How to use');
 
-    expect(buttonByLabel('▾ How to use').getAttribute('aria-expanded')).toBe('true');
+    expect(buttonByLabel('How to use').getAttribute('aria-expanded')).toBe('true');
     expect(container.textContent).toContain('Put one object inside each burned outline.');
-    click('▾ How to use');
-    expect(buttonByLabel('▸ How to use').getAttribute('aria-expanded')).toBe('false');
+    click('How to use');
+    expect(buttonByLabel('How to use').getAttribute('aria-expanded')).toBe('false');
     expect(container.textContent).not.toContain('Put one object inside each burned outline.');
   });
 

@@ -1,4 +1,5 @@
-import { Button } from '../kit';
+import { Button, Icon } from '../kit';
+import { IconFrame } from '../kit/icon-frame';
 import { useStore } from '../state';
 import { nodeOrderKey } from '../../core/scene/design-hierarchy-order';
 import { designRowId, designRowName, designRowRef, type DesignTreeRow } from './design-tree-rows';
@@ -38,7 +39,7 @@ export function DesignRowButtons({
             : useStore.getState().selectDesignArtwork(id)
         }
       >
-        {row.kind === 'group' ? '▸ ' : ''}
+        {row.kind === 'group' ? <Icon name="chevron-right" size={14} /> : null}
         {name}
       </Button>
       {row.kind === 'group' ? (
@@ -93,7 +94,9 @@ function DesignDragHandle({
       onDragStart={(event) => transfer.dragStart(event, designRowRef(row), name)}
       onDragEnd={transfer.dragEnd}
     >
-      ⋮⋮
+      <IconFrame size={16}>
+        <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth={3} />
+      </IconFrame>
     </button>
   );
 }

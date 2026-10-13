@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useId, useRef, useState } from 'react';
+import { Icon } from '../kit/icons';
 import { runCommand, type AppCommand, type CommandId } from '../commands/command-registry';
 import { commandHelpId, controlHelp } from '../help/help-topics';
 import { AnchoredPopover, movePopoverFocus } from './AnchoredPopover';
@@ -137,7 +138,7 @@ function OverflowCommand(props: {
       <ToolbarIcon icon={command.id} />
       <span className="lf-toolbar-command-label">{command.label}</span>
       {command.shortcut === undefined ? null : <kbd>{command.shortcut}</kbd>}
-      {command.active === true ? <span aria-hidden="true">✓</span> : null}
+      {command.active === true ? <Icon name="check" size={15} /> : null}
     </button>
   );
 }

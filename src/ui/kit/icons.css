@@ -1,0 +1,59 @@
+/* One optical weight for authored glyphs and pinned Lucide assets. Colour
+   belongs to the control; warm detail is limited to neutral controls. */
+:root {
+  --lf-icon-brass: #986733;
+}
+[data-theme='dark'] {
+  --lf-icon-brass: #c99a63;
+}
+.lf-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+.lf-icon,
+.lf-toolbar-icon > svg,
+svg.lucide {
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.lf-toolbar-icon > svg {
+  overflow: visible;
+}
+.lf-icon-accent {
+  stroke: var(--lf-icon-detail, currentColor);
+}
+.lf-icon-plane {
+  fill: currentColor;
+  fill-opacity: 0.07;
+}
+:where(
+  button:not(:disabled):not([aria-disabled='true']),
+  [role='button']:not([aria-disabled='true']),
+  a:not([aria-disabled='true'])
+) {
+  --lf-icon-detail: var(--lf-icon-brass);
+}
+:where(
+  .lf-btn--primary,
+  .lf-btn--danger,
+  .lf-btn--go,
+  .lf-btn--pressed,
+  .lf-btn--attention,
+  .lf-banner,
+  [aria-pressed='true'],
+  [aria-selected='true'],
+  :disabled,
+  [aria-disabled='true']
+) {
+  --lf-icon-detail: currentColor;
+}
+@media (forced-colors: active) {
+  .lf-icon-accent {
+    stroke: currentColor;
+  }
+  .lf-icon-plane {
+    fill: none;
+  }
+}

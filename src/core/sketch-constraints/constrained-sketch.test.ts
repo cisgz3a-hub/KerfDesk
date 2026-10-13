@@ -8,6 +8,7 @@ import {
 } from './materialize-constrained-sketch';
 import { IDENTITY_TRANSFORM, type ImportedSvg, createProject } from '../scene';
 import { deserializeProject, serializeProject } from '../../io/project';
+import { flattenCurveSubpath, polylineToCurveSubpath } from '../scene/curve-path';
 describe('bounded dimensional sketch', () => {
   it('solves a 60 to 75 mm bracket against independent fractional-hole coordinates', () => {
     const draft = defaultConstrainedSketch();
@@ -130,5 +131,48 @@ describe('bounded dimensional sketch', () => {
       materializeConstrainedSketch(changed, '#000000', loaded).paths?.map((p) => p.operationIds),
     ).toEqual([['profile'], ['holes'], ['holes']]);
     expect(sketchGeometryMatches({ ...loaded, paths: loaded.paths.slice(0, 1) })).toBe(false);
+  });
+  it('draws the closing edge of closed profiles and still binds sketches saved without it', () => {
+    const built = materializeConstrainedSketch(defaultConstrainedSketch(), '#000000');
+    if (built.result.kind !== 'solved' || built.paths === undefined || built.bounds === undefined)
+      throw new Error('no geometry');
+    for (const path of built.paths) {
+      const curve = path.curves?.[0];
+      if (curve === undefined || !curve.closed) continue;
+      const flat = flattenCurveSubpath(curve, { toleranceMm: 0.01 });
+      if (flat.kind !== 'ok') throw new Error('Sketch curve did not flatten');
+      expect(flat.polyline.points.at(-1)).toEqual(curve.start);
+      expect(path.polylines[0]?.points.at(-1)).toEqual(path.polylines[0]?.points[0]);
+    }
+    const legacy: ImportedSvg = {
+      kind: 'imported-svg',
+      id: 'sketch',
+      source: 'bracket',
+      transform: IDENTITY_TRANSFORM,
+      paths: built.paths.map((path, index) => {
+        const polylines = path.polylines.map((polyline) => ({
+          ...polyline,
+          points: polyline.closed ? polyline.points.slice(0, -1) : polyline.points,
+        }));
+        const lines = path.curves?.[0]?.segments[0]?.kind === 'line';
+        return {
+          ...path,
+          operationIds: [index === 0 ? 'profile' : 'holes'],
+          polylines,
+          ...(lines ? { curves: polylines.map(polylineToCurveSubpath) } : {}),
+        };
+      }),
+      bounds: built.bounds,
+      constrainedSketch: built.result.sketch,
+    };
+    expect(sketchGeometryMatches(legacy)).toBe(true);
+    const sketch = built.result.sketch;
+    const changed = {
+      ...sketch,
+      parameters: sketch.parameters.map((p) => (p.name === 'width' ? { ...p, value: 75 } : p)),
+    };
+    expect(
+      materializeConstrainedSketch(changed, '#000000', legacy).paths?.map((p) => p.operationIds),
+    ).toEqual([['profile'], ['holes'], ['holes']]);
   });
 });

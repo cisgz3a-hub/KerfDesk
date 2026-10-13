@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deviceForActiveHead } from '../../../core/cnc/cnc-head-feeds';
-import { Button } from '../../kit';
+import { Button, Icon } from '../../kit';
 import { TutorialButton } from '../../tutorials/TutorialButton';
 import { useStore } from '../../state';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
@@ -262,7 +262,7 @@ function PanelHeader(props: {
         disabled={props.disabled}
         onClick={props.onClose}
       >
-        ×
+        <Icon name="close" size={16} />
       </Button>
     </header>
   );

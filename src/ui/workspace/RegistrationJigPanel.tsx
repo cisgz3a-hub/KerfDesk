@@ -13,7 +13,7 @@ import {
   registrationRunState,
   type RegistrationRunState,
 } from '../../core/scene';
-import { Button } from '../kit';
+import { Button, Icon } from '../kit';
 import { useStore } from '../state';
 import { useUiStore, type FloatingPanelPosition } from '../state/ui-store';
 import { RegistrationJigOutlineControls } from './RegistrationJigOutlineControls';
@@ -73,7 +73,7 @@ export function RegistrationJigPanel(): JSX.Element | null {
         </strong>
         <TutorialButton tutorialId="registration" compact label="Registration jig" />
         <Button variant="ghost" aria-label="Close registration jig panel" onClick={close}>
-          ×
+          <Icon name="close" size={16} />
         </Button>
       </header>
 
@@ -280,18 +280,15 @@ function NextBurnBanner(props: {
   const banner = bannerFor(props.state, props.outlineCount);
   return (
     <div className={banner.className} role="status">
+      {props.state === 'box' || props.state === 'artwork' ? <Icon name="play" size={15} /> : null}
       {banner.text}
     </div>
   );
 }
 
-function bannerFor(
-  state: RegistrationRunState,
-  outlineCount: number,
-): {
-  readonly className: string;
-  readonly text: string;
-} {
+type BurnBanner = { readonly className: string; readonly text: string };
+
+function bannerFor(state: RegistrationRunState, outlineCount: number): BurnBanner {
   switch (state) {
     case 'none':
       return { className: 'lf-banner', text: 'Create a jig outline below to begin.' };
@@ -300,16 +297,16 @@ function bannerFor(
         className: 'lf-banner lf-banner--info',
         text:
           outlineCount === 1
-            ? '▶ Next Start burns: JIG outline (run 1)'
-            : `▶ Next Start burns: all ${outlineCount} JIG outlines (run 1)`,
+            ? 'Next Start burns: JIG outline (run 1)'
+            : `Next Start burns: all ${outlineCount} JIG outlines (run 1)`,
       };
     case 'artwork':
       return {
         className: 'lf-banner lf-banner--info',
         text:
           outlineCount === 1
-            ? '▶ Next Start burns: your ARTWORK (run 2)'
-            : '▶ Next Start burns: all ARTWORK copies (run 2)',
+            ? 'Next Start burns: your ARTWORK (run 2)'
+            : 'Next Start burns: all ARTWORK copies (run 2)',
       };
     case 'mixed':
       return {
@@ -354,7 +351,7 @@ function RegistrationJigHelp(props: { readonly outlineCount: number }): JSX.Elem
   return (
     <div style={helpStyle}>
       <Button variant="ghost" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        {open ? '▾' : '▸'} How to use
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} /> How to use
       </Button>
       {open && (
         <ol style={helpListStyle}>

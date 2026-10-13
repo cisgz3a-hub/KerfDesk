@@ -4,6 +4,7 @@
 // so switching layers keeps undo — Ctrl+Z follows strokes across layers.
 
 import { useState } from 'react';
+import { Icon } from '../kit/icons';
 import { resampleBuffer } from '../../core/image-resample';
 import {
   addLayerAboveActive,
@@ -78,9 +79,10 @@ export function LayersPanel(): JSX.Element | null {
                 )
               }
               aria-pressed={layer.isVisible}
+              aria-label={layer.isVisible ? 'Hide this layer' : 'Show this layer'}
               title={layer.isVisible ? 'Hide this layer' : 'Show this layer'}
             >
-              {layer.isVisible ? '👁' : '—'}
+              <Icon name={layer.isVisible ? 'eye' : 'eye-off'} size={16} />
             </button>
             <button
               type="button"
@@ -153,8 +155,9 @@ function LayerActions(props: {
         style={actionStyle}
         onClick={() => updateSession((s) => addLayerAboveActive(s, crypto.randomUUID()))}
         title="Add a transparent layer above the active one"
+        aria-label="Add layer"
       >
-        +
+        <Icon name="plus" size={16} />
       </button>
       <button
         type="button"
@@ -162,8 +165,9 @@ function LayerActions(props: {
         style={actionStyle}
         onClick={() => updateSession((s) => duplicateActiveLayer(s, crypto.randomUUID()))}
         title="Duplicate the active layer"
+        aria-label="Duplicate layer"
       >
-        ⧉
+        <Icon name="copy" size={16} />
       </button>
       <button
         type="button"
@@ -172,8 +176,9 @@ function LayerActions(props: {
         onClick={() => updateSession((s) => moveActiveLayer(s, 1))}
         disabled={!props.canMoveUp}
         title="Move the active layer up"
+        aria-label="Move layer up"
       >
-        ↑
+        <Icon name="arrow-up" size={16} />
       </button>
       <button
         type="button"
@@ -182,8 +187,9 @@ function LayerActions(props: {
         onClick={() => updateSession((s) => moveActiveLayer(s, -1))}
         disabled={!props.canMoveDown}
         title="Move the active layer down"
+        aria-label="Move layer down"
       >
-        ↓
+        <Icon name="arrow-down" size={16} />
       </button>
       <button
         type="button"
@@ -192,8 +198,9 @@ function LayerActions(props: {
         onClick={() => updateSession((s) => mergeActiveLayerDown(s))}
         disabled={!props.canMoveDown}
         title="Merge the active layer into the one below it"
+        aria-label="Merge layer down"
       >
-        ⤓
+        <Icon name="merge-down" size={16} />
       </button>
       <button
         type="button"
@@ -202,8 +209,9 @@ function LayerActions(props: {
         onClick={() => updateSession((s) => removeActiveLayer(s))}
         disabled={!props.canDelete}
         title="Delete the active layer (the last layer always stays)"
+        aria-label="Delete layer"
       >
-        🗑
+        <Icon name="trash" size={16} />
       </button>
     </div>
   );

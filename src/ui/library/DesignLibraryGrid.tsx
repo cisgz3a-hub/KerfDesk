@@ -1,4 +1,6 @@
 import type { LibraryEntry } from './design-library-types';
+import { Icon } from '../kit/icons';
+import { IconFrame } from '../kit/icon-frame';
 import { LibraryPreview } from './LibraryPreview';
 
 export function DesignLibraryGrid(props: {
@@ -83,7 +85,7 @@ function LibraryCard(props: {
         disabled={props.addDisabled}
         onClick={props.onAdd}
       >
-        {props.adding ? null : <span aria-hidden="true">+</span>}
+        {props.adding ? null : <Icon name="plus" size={16} />}
         {props.adding ? 'Adding...' : 'Add'}
       </button>
     </article>
@@ -94,7 +96,9 @@ function EmptyLibraryState(props: { readonly clearFilters: () => void }): JSX.El
   return (
     <div className="lf-library-empty">
       <span className="lf-library-empty__mark" aria-hidden="true">
-        ◌
+        <IconFrame size={36}>
+          <circle cx="12" cy="12" r="8" strokeDasharray="1 4" />
+        </IconFrame>
       </span>
       <h3>No designs found</h3>
       <p>Try a broader search or reset the active collection and filters.</p>

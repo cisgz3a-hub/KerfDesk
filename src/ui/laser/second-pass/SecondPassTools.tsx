@@ -1,5 +1,6 @@
 import type { LaserSecondPassSelection } from '../../../core/laser-second-pass';
 import { DraftNumberInput } from '../../kit/DraftNumberInput';
+import { Icon } from '../../kit/icons';
 import type { SecondPassTool } from './SecondPassCanvas';
 
 type SecondPassToolsProps = {
@@ -165,7 +166,7 @@ function StrokeList(props: SecondPassToolsProps): JSX.Element {
             disabled={props.disabled}
             onClick={() => props.onRemove(stroke.id)}
           >
-            ×
+            <Icon name="close" size={14} />
           </button>
         </li>
       ))}

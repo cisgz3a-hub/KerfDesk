@@ -78,9 +78,11 @@ async function press(init: KeyboardEventInit): Promise<KeyboardEvent> {
   return event;
 }
 
-function arrow(host: HTMLElement, glyph: string): HTMLButtonElement {
-  const button = [...host.querySelectorAll('button')].find((b) => b.textContent === glyph);
-  if (button === undefined) throw new Error(`jog arrow ${glyph} missing`);
+function arrow(host: HTMLElement, label: string): HTMLButtonElement {
+  const button = [...host.querySelectorAll('button')].find(
+    (b) => b.getAttribute('aria-label') === label,
+  );
+  if (button === undefined) throw new Error(`jog arrow ${label} missing`);
   return button;
 }
 
@@ -102,20 +104,20 @@ describe('JogPad keyboard XY jog (ADR-493)', () => {
     const { host, unmount } = await renderJogPad();
 
     const pairs: ReadonlyArray<readonly [KeyboardEventInit, string]> = [
-      [UP_CHORD, '↑'],
-      [DOWN_CHORD, '↓'],
-      [LEFT_CHORD, '←'],
-      [RIGHT_CHORD, '→'],
-      [numpad('8'), '↑'],
-      [numpad('7'), '↖'],
-      [numpad('3'), '↘'],
+      [UP_CHORD, 'Jog -Y 10 mm'],
+      [DOWN_CHORD, 'Jog +Y 10 mm'],
+      [LEFT_CHORD, 'Jog +X 10 mm'],
+      [RIGHT_CHORD, 'Jog -X 10 mm'],
+      [numpad('8'), 'Jog -Y 10 mm'],
+      [numpad('7'), 'Jog +X -Y 10 mm'],
+      [numpad('3'), 'Jog -X +Y 10 mm'],
     ];
-    for (const [init, glyph] of pairs) {
+    for (const [init, label] of pairs) {
       jog.mockClear();
       const event = await press(init);
-      await act(async () => arrow(host, glyph).click());
+      await act(async () => arrow(host, label).click());
       expect(jog).toHaveBeenCalledTimes(2);
-      expect(jog.mock.calls[0], glyph).toEqual(jog.mock.calls[1]);
+      expect(jog.mock.calls[0], label).toEqual(jog.mock.calls[1]);
       expect(event.defaultPrevented).toBe(true);
     }
     // Physical up on a rear-origin machine is machine -Y (the pad's own label).
@@ -144,10 +146,10 @@ describe('JogPad keyboard XY jog (ADR-493)', () => {
   it('names the keys in each arrow tooltip', async () => {
     const { host, unmount } = await renderJogPad();
 
-    expect(arrow(host, '↑').title).toContain('Ctrl+Shift+] or Numpad 8');
-    expect(arrow(host, '←').title).toContain('Ctrl+Alt+[ or Numpad 4');
-    expect(arrow(host, '↘').title).toContain('Numpad 3');
-    expect(arrow(host, '↑').getAttribute('aria-label')).toBe('Jog +Y 10 mm');
+    expect(arrow(host, 'Jog +Y 10 mm').title).toContain('Ctrl+Shift+] or Numpad 8');
+    expect(arrow(host, 'Jog -X 10 mm').title).toContain('Ctrl+Alt+[ or Numpad 4');
+    expect(arrow(host, 'Jog +X -Y 10 mm').title).toContain('Numpad 3');
+    expect(arrow(host, 'Jog +Y 10 mm').getAttribute('aria-label')).toBe('Jog +Y 10 mm');
 
     await unmount();
   });

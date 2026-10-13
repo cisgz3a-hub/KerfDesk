@@ -10,6 +10,7 @@
 // started a rectangle drag (e2e shape-properties caught it).
 
 import { createPortal } from 'react-dom';
+import { Icon } from '../kit/icons';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
 import { useToastPlacement } from './use-toast-placement';
 import './Toasts.css';
@@ -49,7 +50,7 @@ export function Toasts(): JSX.Element {
               aria-label={dismissLabel}
               title={dismissLabel}
             >
-              <span aria-hidden="true">×</span>
+              <Icon name="close" size={16} />
             </button>
           </div>
         );

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { assertRoundtrip, validateProject } from './installed-app-evidence.mjs';
 
@@ -91,7 +91,11 @@ function canonicalUpgradeCncSetup(project, currentSchemaVersion) {
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+const entrypoint = process.argv[1]
+  ? await realpath(resolve(process.argv[1])).catch(() => undefined)
+  : undefined;
+
+if (entrypoint !== undefined && entrypoint === (await realpath(fileURLToPath(import.meta.url)))) {
   const args = process.argv.slice(2);
   const hasExpectedSource = args[0] === '--expected-source';
   const sourceSha = hasExpectedSource ? args[1] : undefined;

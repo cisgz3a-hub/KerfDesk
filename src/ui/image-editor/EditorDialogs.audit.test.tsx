@@ -41,7 +41,7 @@ it.each(ADJUSTMENTS)(
   'menu routes $id to its actual dialog or instant image operation',
   async (spec) => {
     const host = await mountControl(<EditorAdjustMenus />);
-    await clickControl(host, spec.menu === 'adjust' ? 'Adjust ▾' : 'Filter ▾');
+    await clickControl(host, spec.menu === 'adjust' ? 'Adjust' : 'Filter');
     const item = [...host.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
       (button) => button.querySelector('span')?.textContent === spec.label,
     )!;
@@ -61,14 +61,14 @@ it('Image menu routes both resize kinds, Text opens its dialog and backdrop dism
     ['Image Size', 'image-size'],
     ['Canvas Size', 'canvas-size'],
   ]) {
-    await clickControl(host, 'Image ▾');
+    await clickControl(host, 'Image');
     await clickControl(host, label!);
     expect(resize.getState().dialog?.kind).toBe(kind);
     await act(async () => resize.getState().cancel());
   }
   await clickControl(host, 'Text…');
   expect(textDialog.getState().isOpen).toBe(true);
-  await clickControl(host, 'Adjust ▾');
+  await clickControl(host, 'Adjust');
   await clickElement(host.querySelector<HTMLDivElement>('div[aria-hidden="true"]'));
   expect(host.querySelector('[role="menu"]')).toBeNull();
 });
@@ -188,7 +188,7 @@ it('top bar dispatches each session action and prevents empty or in-flight opera
     ['Revert', 'revert'],
     ['Apply', 'apply'],
     ['Apply & Trace', 'applyAndTrace'],
-    ['✕', 'close'],
+    ['Close Image Studio', 'close'],
   ] as const) {
     await clickControl(host, label);
     expect(actions[key]).toHaveBeenCalledTimes(1);

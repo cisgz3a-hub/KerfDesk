@@ -143,14 +143,16 @@ textarea {
   flex: 1;
 }
 .brand-mark {
+  --brand-brass: #d6b48a;
   width: 30px;
   height: 30px;
   flex: none;
   border-radius: 9px;
-  background: var(--accent);
+  background: linear-gradient(145deg, #32312e, #101113);
+  border: 1px solid rgb(214 180 138 / 24%);
   display: grid;
   place-items: center;
-  color: var(--on-fill);
+  color: #fffaf2;
 }
 .brand-text {
   min-width: 0;

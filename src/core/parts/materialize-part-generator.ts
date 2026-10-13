@@ -1,5 +1,6 @@
 import type { ColoredPath } from '../scene/scene-object';
 import { polylineToCurveSubpath } from '../scene/curve-path';
+import { withClosingPoint } from '../scene/polyline-closure';
 import type {
   PartGeneratorDefinition,
   PartGeneratorGeometry,
@@ -45,17 +46,13 @@ export function materializePartGenerator(
   };
 }
 function holePath(hole: GeneratedPartHole): ColoredPath {
+  const points = Array.from({ length: 64 }, (_, index) => ({
+    x: hole.center.x + (hole.diameterMm / 2) * Math.cos((-index * Math.PI) / 32),
+    y: hole.center.y + (hole.diameterMm / 2) * Math.sin((-index * Math.PI) / 32),
+  }));
   return {
     color: PART_GENERATOR_COLOR,
-    polylines: [
-      {
-        closed: true,
-        points: Array.from({ length: 64 }, (_, index) => ({
-          x: hole.center.x + (hole.diameterMm / 2) * Math.cos((-index * Math.PI) / 32),
-          y: hole.center.y + (hole.diameterMm / 2) * Math.sin((-index * Math.PI) / 32),
-        })),
-      },
-    ],
+    polylines: [{ closed: true, points: withClosingPoint(points, true) }],
     curves: [exactHoleCurve(hole)],
   };
 }

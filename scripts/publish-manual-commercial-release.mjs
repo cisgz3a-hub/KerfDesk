@@ -8,7 +8,11 @@ import {
 import { readCommercialInput } from './commercial-release-package.mjs';
 import { requireCommercialSource } from './publish-commercial-release.mjs';
 import { setTimeout } from 'node:timers/promises';
-import { createStableReleaseStore, ReleaseRateLimitError } from './stable-release-store.mjs';
+import {
+  createStableReleaseStore,
+  printableStorageFailure,
+  ReleaseRateLimitError,
+} from './stable-release-store.mjs';
 import { commercialArtifactNames } from '../public/desktop-commercial-catalog.mjs';
 import { publishManualCommercialRelease } from './manual-commercial-publisher.mjs';
 import { readReviewedDesktopUpdateNotes } from './reviewed-desktop-update-notes.mjs';
@@ -19,6 +23,14 @@ import {
 
 const USAGE =
   'Usage: publish-manual-commercial-release.mjs --expected-latest-sha256 <64-hex|none> [--reviewed-history <file>] <release-directory> <commercial-release-identity.json> <packaged-resources-directory>';
+
+export function manualPublicationFailure(error, env = process.env) {
+  return (
+    printableStorageFailure(error) ??
+    printableRefusal(error, env) ??
+    'Manual commercial publication failed. Check trusted release identity, unsigned package, source checkout and protected R2 configuration.'
+  );
+}
 
 export function parseManualPublicationArguments(args) {
   const paths = [...args];
@@ -150,9 +162,6 @@ async function publishWithRateLimitRetry() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
   publishWithRateLimitRetry().catch((error) => {
-    console.error(
-      printableRefusal(error) ??
-        'Manual commercial publication failed. Check trusted release identity, unsigned package, source checkout and protected R2 configuration.',
-    );
+    console.error(manualPublicationFailure(error));
     process.exitCode = 1;
   });

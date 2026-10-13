@@ -31,7 +31,7 @@ afterEach(async () => {
 
 function trigger(name: string): HTMLButtonElement {
   const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
-    (candidate) => candidate.textContent === `${name} ▾`,
+    (candidate) => candidate.getAttribute('aria-label') === name,
   );
   if (button === undefined) throw new Error(`${name} menu trigger missing`);
   return button;
