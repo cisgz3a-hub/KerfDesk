@@ -87,7 +87,7 @@ export function JobControls(props: Props): JSX.Element {
   // Standalone consumers keep all setup actions. The integrated rail keeps
   // origin utilities here while its ordinary actions live beside the jog pad.
   return (
-    <div style={containerStyle}>
+    <div className="lf-job-controls" style={containerStyle}>
       <JobToolControls {...props} streaming={controlsBusy} machineKind={machineKind} />
       {!props.dockedJobActions && (
         <div className="lf-machine-section-heading">
