@@ -1,7 +1,7 @@
 // Presentational controls; trace requests and commit ownership stay in the dialog.
 import type { TraceOptions } from '../../core/trace';
 import type { RasterImage } from '../../core/scene';
-import { Button, DialogActions as KitDialogActions } from '../kit';
+import { Button, Icon, DialogActions as KitDialogActions } from '../kit';
 import { TutorialButton } from '../tutorials/TutorialButton';
 import { useEdition } from '../licensing/edition';
 import { proChoiceLabel } from '../licensing/pro-features';
@@ -69,7 +69,7 @@ export function TraceDialogHeader(props: {
         title="Close the preview without adding a trace."
         onClick={props.onClose}
       >
-        <span aria-hidden="true">×</span>
+        <Icon name="close" size={18} />
       </button>
     </header>
   );

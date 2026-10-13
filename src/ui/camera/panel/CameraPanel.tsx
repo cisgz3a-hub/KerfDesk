@@ -28,6 +28,7 @@ import { SnapshotControls } from './SnapshotControls';
 import { UsbCameraSection } from './UsbCameraSection';
 import { localCameraBridgeAvailable } from './camera-platform-capability';
 import { DownloadDesktopLink } from '../../common/DownloadDesktopLink';
+import { Icon } from '../../kit/icons';
 
 export function CameraPanel(): JSX.Element | null {
   const open = useCameraStore((s) => s.panelOpen);
@@ -68,7 +69,7 @@ function CameraPanelOpen(): JSX.Element {
           aria-label="Close camera panel"
           title="Close the camera panel."
         >
-          ×
+          <Icon name="close" size={16} />
         </button>
       </div>
       <CameraSetupSteps />

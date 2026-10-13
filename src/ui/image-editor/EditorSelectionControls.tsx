@@ -4,6 +4,7 @@
 // Feather by a px amount), and the selection action buttons.
 
 import { useState } from 'react';
+import { IconFrame } from '../kit/icon-frame';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { invertMask, type SelectionCombineMode } from '../../core/image-select';
 import type { SelectionModifyKind } from './editor-session';
@@ -11,13 +12,12 @@ import { useImageEditorStore } from './image-editor-store';
 
 const MODES: readonly {
   readonly mode: SelectionCombineMode;
-  readonly glyph: string;
   readonly label: string;
 }[] = [
-  { mode: 'replace', glyph: '□', label: 'New selection' },
-  { mode: 'add', glyph: '⊞', label: 'Add to selection (Shift while dragging)' },
-  { mode: 'subtract', glyph: '⊟', label: 'Subtract from selection (Alt while dragging)' },
-  { mode: 'intersect', glyph: '⊡', label: 'Intersect with selection (Shift+Alt while dragging)' },
+  { mode: 'replace', label: 'New selection' },
+  { mode: 'add', label: 'Add to selection (Shift while dragging)' },
+  { mode: 'subtract', label: 'Subtract from selection (Alt while dragging)' },
+  { mode: 'intersect', label: 'Intersect with selection (Shift+Alt while dragging)' },
 ];
 
 const MODIFY_KINDS: readonly { readonly kind: SelectionModifyKind; readonly label: string }[] = [
@@ -42,12 +42,13 @@ export function SelectionModeButtons(): JSX.Element {
           onClick={() => setSelectionMode(entry.mode)}
           aria-pressed={selectionMode === entry.mode}
           title={entry.label}
+          aria-label={entry.label}
           style={{
             ...modeButtonStyle,
             ...(selectionMode === entry.mode ? activeModeStyle : null),
           }}
         >
-          <span aria-hidden="true">{entry.glyph}</span>
+          <SelectionModeIcon mode={entry.mode} />
         </button>
       ))}
       <label style={radiusLabelStyle}>
@@ -100,6 +101,19 @@ export function SelectionModifyRow(): JSX.Element | null {
         </button>
       ))}
     </span>
+  );
+}
+
+function SelectionModeIcon({ mode }: { readonly mode: SelectionCombineMode }): JSX.Element {
+  return (
+    <IconFrame size={18}>
+      <rect x="4" y="4" width="16" height="16" rx="2" strokeDasharray="2.5 2.5" />
+      {mode === 'add' ? <path className="lf-icon-accent" d="M8 12h8m-4-4v8" /> : null}
+      {mode === 'subtract' ? <path className="lf-icon-accent" d="M8 12h8" /> : null}
+      {mode === 'intersect' ? (
+        <rect className="lf-icon-accent" x="9" y="9" width="6" height="6" rx="1" />
+      ) : null}
+    </IconFrame>
   );
 }
 

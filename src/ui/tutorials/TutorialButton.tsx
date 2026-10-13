@@ -1,4 +1,5 @@
 import { useTutorialStore } from './tutorial-store';
+import { Icon } from '../kit/icons';
 import './tutorial-button.css';
 
 export function TutorialButton(props: {
@@ -33,20 +34,5 @@ export function TutorialButton(props: {
 }
 
 export function TutorialIcon(): JSX.Element {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 5C9 3 5 3 2 4v15c4-1 7-1 10 1 3-2 6-2 10-1V4c-3-1-7-1-10 1v15" />
-      <path d="M6 8h2M6 12h2m8-4h2m-2 4h2" />
-    </svg>
-  );
+  return <Icon name="tutorial" size={16} />;
 }

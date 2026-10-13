@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { JogAxisSigns, MachineBounds } from '../../core/devices';
 import type { Vec2 } from '../../core/scene';
+import { Icon, type IconName } from '../kit/icons';
 import {
   continuousJogVector,
   jogVectorLabel,
@@ -13,16 +14,16 @@ import { useHoldJog } from './use-hold-jog';
 
 const DIRECTIONS: ReadonlyArray<{
   readonly direction: PhysicalJogDirection;
-  readonly glyph: string;
+  readonly icon: IconName;
 }> = [
-  { direction: { x: -1, y: 1 }, glyph: '↖' },
-  { direction: { x: 0, y: 1 }, glyph: '↑' },
-  { direction: { x: 1, y: 1 }, glyph: '↗' },
-  { direction: { x: -1, y: 0 }, glyph: '←' },
-  { direction: { x: 1, y: 0 }, glyph: '→' },
-  { direction: { x: -1, y: -1 }, glyph: '↙' },
-  { direction: { x: 0, y: -1 }, glyph: '↓' },
-  { direction: { x: 1, y: -1 }, glyph: '↘' },
+  { direction: { x: -1, y: 1 }, icon: 'arrow-up-left' },
+  { direction: { x: 0, y: 1 }, icon: 'arrow-up' },
+  { direction: { x: 1, y: 1 }, icon: 'arrow-up-right' },
+  { direction: { x: -1, y: 0 }, icon: 'arrow-left' },
+  { direction: { x: 1, y: 0 }, icon: 'arrow-right' },
+  { direction: { x: -1, y: -1 }, icon: 'arrow-down-left' },
+  { direction: { x: 0, y: -1 }, icon: 'arrow-down' },
+  { direction: { x: 1, y: -1 }, icon: 'arrow-down-right' },
 ];
 
 export function JogArrowGrid(props: {
@@ -43,17 +44,17 @@ export function JogArrowGrid(props: {
   return (
     <div className="lf-jog-arrow-grid" style={gridStyle}>
       {DIRECTIONS.slice(0, 4).map((item) => (
-        <JogArrowButton key={item.glyph} {...item} {...props} />
+        <JogArrowButton key={item.icon} {...item} {...props} />
       ))}
       <div
         className="lf-jog-center"
         style={centerStyle}
         aria-hidden={props.centerAction === undefined ? true : undefined}
       >
-        {props.centerAction ?? '·'}
+        {props.centerAction ?? <Icon name="crosshair" size={16} />}
       </div>
       {DIRECTIONS.slice(4).map((item) => (
-        <JogArrowButton key={item.glyph} {...item} {...props} />
+        <JogArrowButton key={item.icon} {...item} {...props} />
       ))}
     </div>
   );
@@ -62,7 +63,7 @@ export function JogArrowGrid(props: {
 function JogArrowButton(
   props: {
     readonly direction: PhysicalJogDirection;
-    readonly glyph: string;
+    readonly icon: IconName;
   } & Parameters<typeof JogArrowGrid>[0],
 ): JSX.Element {
   const stepVector = stepJogVector(props.direction, props.stepMm, props.signs, props.feed);
@@ -95,7 +96,7 @@ function JogArrowButton(
       title={props.continuousJogSupported ? `${hinted}. Hold for continuous jog.` : hinted}
       {...handlers}
     >
-      {props.glyph}
+      <Icon name={props.icon} size={20} />
     </button>
   );
 }

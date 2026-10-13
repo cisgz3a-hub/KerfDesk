@@ -30,6 +30,7 @@ import { unownedControllerMotion } from '../state/unowned-controller-motion';
 // Design tokens + shared chrome classes (ADR-047). Imported exactly once,
 // here — jsdom tests never load main.tsx, so styling stays out of unit tests.
 import '../theme/tokens.css';
+import '../kit/icons.css';
 import { initAppTheme } from '../theme/app-theme';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';

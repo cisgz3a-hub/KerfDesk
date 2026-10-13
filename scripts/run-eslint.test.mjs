@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -79,7 +79,7 @@ test('global options and explicit paths retain the original single ESLint invoca
 });
 
 test('real ESLint preserves scope, cross-partition cycles, type-aware rules and fixes', async () => {
-  const fixture = await mkdtemp(path.join(tmpdir(), 'kerfdesk-eslint-partitions-'));
+  const fixture = await realpath(await mkdtemp(path.join(tmpdir(), 'kerfdesk-eslint-partitions-')));
   const put = async (name, contents) => {
     await mkdir(path.dirname(path.join(fixture, name)), { recursive: true });
     await writeFile(path.join(fixture, name), contents);
@@ -181,7 +181,7 @@ export default [...config, { files: ['src/**/*.ts'], settings: { 'import/extensi
     );
   } finally {
     // mkdtemp produced this exact owned directory; never clean the checkout.
-    assert.equal(path.dirname(fixture), tmpdir());
+    assert.equal(path.dirname(fixture), await realpath(tmpdir()));
     await rm(fixture, { recursive: true, force: true });
   }
 });

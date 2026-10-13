@@ -8,8 +8,10 @@ const SHELL = [
   '/app/app.css',
   '/app/manifest.webmanifest',
   '/app/icon.svg',
+  '/app/icon-maskable.svg',
   '/app/icon-192.png',
   '/app/icon-512.png',
+  '/app/icon-maskable-512.png',
 ];
 
 self.addEventListener('install', (event) => {

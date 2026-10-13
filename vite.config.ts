@@ -87,8 +87,8 @@ export default defineConfig({
         short_name: 'KerfDesk',
         description:
           'GRBL CAM for laser cutters, engravers, and CNC routers — design, trace, and burn, fully offline.',
-        theme_color: '#111827',
-        background_color: '#f8fafc',
+        theme_color: '#101113',
+        background_color: '#faf9f7',
         display: 'standalone',
         start_url: '.',
         // Installed from a Chromium desktop browser, the app opens .lf2
@@ -98,7 +98,7 @@ export default defineConfig({
         file_handlers: [{ action: '.', accept: { 'application/x-kerfdesk-project': ['.lf2'] } }],
         launch_handler: { client_mode: 'focus-existing' },
         icons: [
-          { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          { src: 'app-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
           {
             src: 'app-icon-192x192.png',
             sizes: '192x192',

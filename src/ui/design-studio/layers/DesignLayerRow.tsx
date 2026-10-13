@@ -5,6 +5,7 @@
 
 import type { CncTool } from '../../../core/scene';
 import type { DesignLayer } from '../../../core/design/layers';
+import { Icon } from '../../kit/icons';
 import { DESIGN_CUT_TYPE_LABELS } from './design-cut-type-labels';
 
 export function DesignLayerRow(props: {
@@ -57,22 +58,25 @@ export function DesignLayerRow(props: {
         onClick={() => props.onMove('up')}
         disabled={!props.canMoveUp}
         title="Move this layer up the list"
+        aria-label="Move this layer up the list"
         style={iconButtonStyle}
       >
-        ↑
+        <Icon name="arrow-up" size={14} />
       </button>
       <button
         type="button"
         onClick={() => props.onMove('down')}
         disabled={!props.canMoveDown}
         title="Move this layer down the list"
+        aria-label="Move this layer down the list"
         style={iconButtonStyle}
       >
-        ↓
+        <Icon name="arrow-down" size={14} />
       </button>
       <button
         type="button"
         onClick={props.onRemove}
+        aria-label="Remove this layer"
         disabled={!props.canRemove}
         title={
           props.canRemove
@@ -81,7 +85,7 @@ export function DesignLayerRow(props: {
         }
         style={iconButtonStyle}
       >
-        ✕
+        <Icon name="trash" size={14} />
       </button>
     </div>
   );
@@ -171,6 +175,8 @@ const metaStyle: React.CSSProperties = {
 };
 
 const iconButtonStyle: React.CSSProperties = {
+  display: 'grid',
+  placeItems: 'center',
   width: 22,
   height: 22,
   fontSize: 11,

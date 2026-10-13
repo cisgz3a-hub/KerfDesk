@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { taperedBallCuttingLengthMm, taperedBallEnvelope } from '../../core/cnc-tapered-ball';
 import type { CncTool } from '../../core/scene';
+import { Icon } from '../kit/icons';
 import {
   canvasFrameStyle,
   canvasStyle,
@@ -107,7 +108,7 @@ export function CncBitPreviewToast({
         aria-label={`Dismiss preview for ${tool.name}`}
         title="Dismiss preview"
       >
-        ×
+        <Icon name="close" size={16} />
       </button>
     </section>
   );

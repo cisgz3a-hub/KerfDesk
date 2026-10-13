@@ -246,7 +246,7 @@ describe('LaserWindow jog gating during a job (H6)', () => {
       expect(host.textContent).toContain('Controller reports Alarm');
       expect(host.textContent).toContain('Home ($H)');
       const arrows = [...host.querySelectorAll('button')].filter((b) =>
-        ['â†‘', 'â†“', 'â†', 'â†’'].includes(b.textContent ?? ''),
+        /^Jog [+-][XY] \d/.test(b.getAttribute('aria-label') ?? ''),
       );
       for (const arrow of arrows) expect(arrow.disabled).toBe(true);
       const stepSelect = host.querySelector<HTMLSelectElement>(
@@ -293,7 +293,7 @@ describe('LaserWindow jog gating during a job (H6)', () => {
       });
 
       const arrows = [...host.querySelectorAll('button')].filter((b) =>
-        ['↑', '↓', '←', '→'].includes(b.textContent ?? ''),
+        /^Jog [+-][XY] \d/.test(b.getAttribute('aria-label') ?? ''),
       );
       expect(arrows.length).toBeGreaterThan(0);
       for (const arrow of arrows) expect(arrow.disabled).toBe(true);
@@ -335,7 +335,7 @@ describe('LaserWindow jog gating during a job (H6)', () => {
       });
 
       const arrows = [...host.querySelectorAll('button')].filter((b) =>
-        ['↑', '↓', '←', '→'].includes(b.textContent ?? ''),
+        /^Jog [+-][XY] \d/.test(b.getAttribute('aria-label') ?? ''),
       );
       expect(arrows.length).toBeGreaterThan(0);
       for (const arrow of arrows) expect(arrow.disabled).toBe(false);

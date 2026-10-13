@@ -12,7 +12,7 @@ import {
   parsePartGeneratorSource,
   parsePartGeneratorDefinition,
 } from '../../io/project/project-part-generator-validator';
-import { flattenCurveSubpath } from '../scene/curve-path';
+import { flattenCurveSubpath, polylineToCurveSubpath } from '../scene/curve-path';
 
 describe('bounded linked part generators', () => {
   it.each<PartGeneratorKind>(['panel', 'bracket', 'hole-grid', 'fixture'])(
@@ -41,6 +41,46 @@ describe('bounded linked part generators', () => {
       });
     },
   );
+  it.each<PartGeneratorKind>(['panel', 'bracket', 'hole-grid', 'fixture'])(
+    'draws every edge of the %s outline, including the closing edge',
+    (kind) => {
+      const built = requirePart(materializePartGenerator(defaultPartGenerator(kind)));
+      for (const path of built.paths) {
+        const curve = path.curves?.[0];
+        if (curve === undefined) throw new Error('Missing generated curve');
+        const flat = flattenCurveSubpath(curve, { toleranceMm: 0.01 });
+        if (flat.kind !== 'ok') throw new Error('Generated curve did not flatten');
+        expect(flat.polyline.points.at(-1)).toEqual(curve.start);
+        for (const polyline of path.polylines)
+          expect(polyline.points.at(-1)).toEqual(polyline.points[0]);
+      }
+    },
+  );
+  it('still recognises and regenerates parts saved without the closing edge', () => {
+    const current = generatedPart(defaultPartGenerator('panel'));
+    const legacy = {
+      ...current,
+      paths: current.paths.map((path) => {
+        const polylines = path.polylines.map((polyline) => ({
+          ...polyline,
+          points: polyline.points.slice(0, -1),
+        }));
+        const lines = path.curves?.[0]?.segments[0]?.kind === 'line';
+        return {
+          ...path,
+          polylines,
+          ...(lines ? { curves: polylines.map(polylineToCurveSubpath) } : {}),
+        };
+      }),
+    };
+    expect(legacy.paths[0]?.curves?.[0]?.segments).toHaveLength(3);
+    expect(partGeneratorGeometryMatches(legacy)).toBe(true);
+    const definition = legacy.partGenerator.definition;
+    const next = requirePart(regeneratePartGenerator(legacy, { ...definition, widthMm: 90 }));
+    expect(next.paths[0]?.operationIds).toEqual(['boundary']);
+    expect(next.paths[0]?.curves?.[0]?.segments).toHaveLength(4);
+    expect(partGeneratorGeometryMatches(next)).toBe(true);
+  });
   it('preserves semantic hole bindings and tabs when row indices shift after resizing', () => {
     const original = generatedPart();
     const definition = original.partGenerator.definition as HoleGridGenerator;

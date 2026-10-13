@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from '../../kit/icons';
 import {
   findRegistrationBoxBounds,
   type BoardVerificationTarget,
@@ -96,7 +97,7 @@ function BoardAnchorButton(props: {
       }}
     >
       <span aria-hidden="true" style={props.active ? activeMarkerStyle : markerStyle}>
-        +
+        <Icon name="plus" size={16} />
       </span>
     </button>
   );
