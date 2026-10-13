@@ -25,6 +25,7 @@ import {
 import { retainedArrayActions, type RetainedArrayActions } from './retained-array-actions';
 import type { AppState } from './store';
 import { useUiStore } from './ui-store';
+import { applyStartPointDefaults } from './start-point-defaults';
 import {
   canonicalizeOpenedProjectBed,
   type ProjectBedReconciliationNotice,
@@ -94,7 +95,7 @@ export function projectActions(
           cncHardware !== undefined
             ? { ...state.project.device, cncSubProfile: { ...cncHardware.params } }
             : state.project.device;
-        const blankProject = createProject(device);
+        const blankProject = applyStartPointDefaults(createProject(device));
         const project = resolveProjectMachineCapability(
           blankProject,
           state.cncLibrary.customTools,

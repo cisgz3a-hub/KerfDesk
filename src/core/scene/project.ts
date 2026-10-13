@@ -6,6 +6,7 @@ import type { CncMachineConfig, MachineConfig } from './machine';
 import { EMPTY_SCENE, type Scene } from './scene';
 import type { ProjectVariableData } from './variable-template';
 import type { PrintAndCutDesignTargets } from './print-and-cut';
+import type { ProjectStartPoints } from './start-points';
 import type { ProjectSheetBook } from './project-sheets';
 import type { FixtureTemplate } from '../camera/fixtures/fixture-template';
 import type { ProductionManifest } from './production-manifest';
@@ -158,6 +159,7 @@ export type Project = {
   readonly device: DeviceProfile;
   readonly workspace: Workspace;
   readonly optimization: ProjectOptimizationSettings;
+  readonly startPoints?: ProjectStartPoints;
   readonly jobSetup: ProjectJobSetup;
   readonly variables?: ProjectVariableData;
   readonly printAndCutTargets?: PrintAndCutDesignTargets;

@@ -1,5 +1,6 @@
 import type { AppState } from './store';
 import { createStartupProject } from './startup-project';
+import { applyStartPointDefaults } from './start-point-defaults';
 import { initialProjectWorkspaceState } from './store-initial-project-state';
 import { CNC_LIBRARY_STATE_DEFAULTS } from './cnc-library-actions';
 import { DEFAULT_LAYER_DEFAULTS_STATE } from './layer-default-actions';
@@ -12,7 +13,7 @@ import {
   type currentSavedLibrariesState,
 } from './saved-libraries-actions';
 export const initialState = (
-  project = createStartupProject(),
+  project = applyStartPointDefaults(createStartupProject()),
 ): Pick<
   AppState,
   | 'project'

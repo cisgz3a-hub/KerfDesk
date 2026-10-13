@@ -101,11 +101,7 @@ import type { InteractionHistorySnapshot } from './interaction-history-snapshot'
 import { sceneGroupActions, type SceneGroupActions } from './scene-group-actions';
 import { sceneLockActions, type SceneLockActions } from './scene-lock-actions';
 import { generatedSceneActions } from './generated-scene-actions';
-import {
-  projectOptimizationActions,
-  type ProjectOptimizationActions,
-} from './project-optimization-actions';
-import { projectNotesActions, type ProjectNotesActions } from './project-notes-actions';
+import { projectSettingsActions, type ProjectSettingsActions } from './project-settings-actions';
 import {
   selectionTransformActions,
   type SelectionTransformActions,
@@ -173,8 +169,7 @@ export type AppState = PartGeneratorActions &
   VariableDataActions &
   ImageEditActions &
   ImageMaskActions &
-  ProjectOptimizationActions &
-  ProjectNotesActions &
+  ProjectSettingsActions &
   SelectionTransformActions &
   RegistrationActions &
   PathNodeEditActions &
@@ -456,8 +451,7 @@ export const useStore = create<AppState>((rawSet, get) => {
     ...sceneGroupActions(set),
     ...sceneLockActions(set),
     ...generatedSceneActions(proOperationMutationSetter(set, get)),
-    ...projectOptimizationActions(set),
-    ...projectNotesActions(set),
+    ...projectSettingsActions(set),
     ...selectionTransformActions(set),
     ...registrationActions(set),
     ...boardCaptureActions(set),

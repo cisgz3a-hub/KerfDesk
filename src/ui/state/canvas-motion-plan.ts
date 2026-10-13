@@ -7,7 +7,6 @@ import {
   type JobPlacementSettings,
 } from '../../core/job';
 import { firstToolpathProcessPoint } from '../../core/job/first-process-point';
-import { computeFrameJobBounds } from '../../core/job/job-bounds';
 import {
   buildMotionManifest,
   type MotionManifest,
@@ -35,6 +34,11 @@ import { registerCanvasProgramSource } from './canvas-program-source';
 import { canvasExecutableSidecarWithinBudget } from './canvas-program-analysis-budget';
 import type { LiveJobTiming } from './live-job-timing';
 import { resolveNativeBedFrame } from './native-bed-frame';
+import { framePerimeterForCanvas } from './canvas-frame-perimeter';
+import {
+  buildCanvasStartEditingData,
+  type CanvasStartEditingData,
+} from './canvas-start-editing-data';
 
 export type CanvasPlanCapability = 'realtime' | 'settle-only' | 'file-only' | 'unavailable';
 
@@ -52,6 +56,7 @@ export type CanvasMotionPlan = {
       }
     | { readonly kind: 'relative'; readonly jobOriginOffset: Vec2 };
   readonly framePerimeter: ReadonlyArray<Vec2>;
+  readonly startEditingData?: CanvasStartEditingData;
   readonly jobStart: Vec2 | null;
   readonly approachFrom: Vec2 | null;
   readonly capability: CanvasPlanCapability;
@@ -171,17 +176,6 @@ function assembleCanvasPlan(
       device: args.prepared.project.device,
       coordinateFrame,
     });
-  const bounds = computeFrameJobBounds(args.prepared.job, args.prepared.project.device);
-  const frameController =
-    bounds === null
-      ? []
-      : [
-          { x: bounds.minX, y: bounds.minY, z: 0 },
-          { x: bounds.maxX, y: bounds.minY, z: 0 },
-          { x: bounds.maxX, y: bounds.maxY, z: 0 },
-          { x: bounds.minX, y: bounds.maxY, z: 0 },
-          { x: bounds.minX, y: bounds.minY, z: 0 },
-        ];
   const surfaceStart = rotary ? firstSurfaceProcessPoint(args.prepared) : null;
   const jobStart =
     surfaceStart === null
@@ -197,7 +191,8 @@ function assembleCanvasPlan(
     machineKind,
     device: args.prepared.project.device,
     coordinateFrame,
-    framePerimeter: capability === 'file-only' ? [] : frameController.map(map),
+    framePerimeter: capability === 'file-only' ? [] : framePerimeterForCanvas(args.prepared, map),
+    startEditingData: buildCanvasStartEditingData(args.prepared),
     jobStart,
     approachFrom: rotary || initial === null ? null : map(initial),
     capability,
@@ -283,6 +278,7 @@ export function canvasPlanRetentionKey(
     cncSetup: project.cncSetup,
     device: retainedDeviceFields(project.device),
     optimization: project.optimization,
+    startPoints: project.startPoints,
     variables: project.variables,
     outputScope: scope,
     placement,
@@ -434,7 +430,13 @@ export function capabilityReason(capability: CanvasPlanCapability, rotary: boole
 function firstSurfaceProcessPoint(
   prepared: Extract<PreparedOutput, { readonly ok: true }>,
 ): Vec2 | null {
-  return firstToolpathProcessPoint(prepared.job, {
+  // The editable Job start names the first actual burn. A zero-power layer
+  // still contributes travel to the toolpath, but cannot own the cutting marker.
+  const markerJob = {
+    ...prepared.job,
+    groups: prepared.job.groups.filter((group) => group.kind === 'cnc' || group.power > 0),
+  };
+  return firstToolpathProcessPoint(markerJob, {
     scanningOffsets: prepared.project.device.scanningOffsets,
     bedSizeMm: {
       widthMm: prepared.project.device.bedWidth,

@@ -1,11 +1,42 @@
 import { describe, expect, it } from 'vitest';
+import { createProject, type Project } from '../scene';
 import {
   applySimilarityPoint,
+  applySimilarityProject,
   invertSimilarity,
   solveTwoPointRegistration,
 } from './similarity-transform';
 
 describe('two-point similarity registration', () => {
+  it('registers an exact chosen cutting start with its artwork and retains frame preferences', () => {
+    const project: Project = {
+      ...createProject(),
+      startPoints: { job: { x: 5, y: 10 }, frame: { edge: 2, fraction: 0.3 } },
+    };
+    const registered = applySimilarityProject(project, {
+      scale: 2,
+      rotationRad: Math.PI / 2,
+      translation: { x: 100, y: 50 },
+    });
+    expect(registered.startPoints?.job?.x).toBeCloseTo(80);
+    expect(registered.startPoints?.job?.y).toBeCloseTo(60);
+    expect(registered.startPoints?.frame).toEqual(project.startPoints?.frame);
+    expect(project.startPoints?.job).toEqual({ x: 5, y: 10 });
+  });
+
+  it('retains relative preferences for resolving against registered output bounds', () => {
+    const project: Project = {
+      ...createProject(),
+      startPoints: { job: { x: 0.2, y: 0.8, relative: true } },
+    };
+    const registered = applySimilarityProject(project, {
+      scale: 2,
+      rotationRad: Math.PI / 2,
+      translation: { x: 100, y: 50 },
+    });
+    expect(registered.startPoints).toBe(project.startPoints);
+  });
+
   it('maps both design targets exactly onto measured machine points', () => {
     const solved = solveTwoPointRegistration({
       design: [

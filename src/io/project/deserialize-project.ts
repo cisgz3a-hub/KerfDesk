@@ -27,6 +27,7 @@ import {
   type CncCoolantMode,
   type CncTiling,
   isCncCoolantMode,
+  normalizeProjectStartPoints,
   type Project,
 } from '../../core/scene';
 import {
@@ -144,19 +145,16 @@ function normalizeProject(
   // with the sanitized config. Shape validation has already rejected unknown
   // machine kinds so they cannot silently change a project into a laser job.
   const machine = normalizeMachineValue(raw['machine']);
-  if (machine === undefined) {
-    delete normalized['machine'];
-  } else {
-    normalized['machine'] = machine;
-  }
+  const startPoints = normalizeProjectStartPoints(raw['startPoints']);
+  if (startPoints === undefined) delete normalized['startPoints'];
+  else normalized['startPoints'] = startPoints;
+  if (machine === undefined) delete normalized['machine'];
+  else normalized['machine'] = machine;
   // The CNC setup parked by a Laser-mode save; a CNC project has none.
   const parked =
     machine?.['kind'] === 'cnc' ? null : normalizeCncMachineConfig(raw['parkedCncMachine']);
-  if (parked === null) {
-    delete normalized['parkedCncMachine'];
-  } else {
-    normalized['parkedCncMachine'] = parked;
-  }
+  if (parked === null) delete normalized['parkedCncMachine'];
+  else normalized['parkedCncMachine'] = parked;
   normalizeCncProductionMetadata(raw, normalized, machine, parked);
   return normalized as unknown as Project;
 }

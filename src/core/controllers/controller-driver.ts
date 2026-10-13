@@ -5,6 +5,7 @@
 // operation" — callers gate on capabilities before reaching for them.
 
 import type { ControllerCommandSet, ControllerKind } from '../devices/device-profile';
+import type { FrameStartPoint } from '../scene/start-points';
 import type { ControllerCapabilities } from './controller-capabilities';
 import type { ControllerEvent } from './controller-event';
 import type { JogParams } from './grbl/commands';
@@ -16,6 +17,7 @@ export type FrameBounds = {
   readonly minY: number;
   readonly maxX: number;
   readonly maxY: number;
+  readonly startPoint?: FrameStartPoint;
 };
 
 export type ControllerRealtime = {

@@ -21,6 +21,7 @@ function persistedSemantics(value: unknown): unknown {
     device: value['device'],
     workspace: value['workspace'],
     optimization: value['optimization'],
+    startPoints: value['startPoints'],
     notes: value['notes'],
     machine: value['machine'],
     parkedCncMachine: value['parkedCncMachine'],

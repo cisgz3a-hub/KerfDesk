@@ -50,7 +50,8 @@ export function useCanvasMotionOverlay(
   const printAndCut = useExperimentalLaserFeatures((state) => state.features.printAndCut);
   const firstRegistration = usePrintCutSessionStore((state) => state.first);
   const secondRegistration = usePrintCutSessionStore((state) => state.second);
-  const showStartMarkers = useUiStore((state) => state.showCanvasStartMarkers);
+  const markersEnabled = useUiStore((state) => state.showCanvasStartMarkers);
+  const showStartMarkers = markersEnabled && !interactionActive;
   const canvasCovered = useCanvasViewStore((state) => state.showGcode);
   const placement = useMemo(
     () => resolveJobPlacement(placementSettings, laser),
@@ -97,18 +98,12 @@ export function useCanvasMotionOverlay(
       return {
         plan: liveRun.plan,
         run: liveRun,
+        compactStartMarkers: true,
         showStartMarkers,
         planIsCurrent: activeStreamer || isActiveCanvasLifecycle(liveRun) || visiblePlanIsCurrent,
       };
     }
-    return visiblePlan === null
-      ? null
-      : {
-          plan: visiblePlan,
-          run: null,
-          showStartMarkers,
-          planIsCurrent: visiblePlanIsCurrent,
-        };
+    return idleCanvasOverlay(visiblePlan, showStartMarkers, visiblePlanIsCurrent);
   }, [
     previewMode,
     canvasCovered,
@@ -120,6 +115,16 @@ export function useCanvasMotionOverlay(
     showStartMarkers,
     colorScheme,
   ]);
+}
+
+function idleCanvasOverlay(
+  plan: CanvasMotionPlan | null,
+  showStartMarkers: boolean,
+  planIsCurrent: boolean,
+): CanvasMotionOverlay | null {
+  return plan === null
+    ? null
+    : { plan, run: null, compactStartMarkers: true, showStartMarkers, planIsCurrent };
 }
 
 type IdlePlanInput = {
