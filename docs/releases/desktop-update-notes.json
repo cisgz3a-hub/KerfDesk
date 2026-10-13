@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+  "sinceSourceSha": "c700863a14dfbed71a49e32182ec3b75b989ebb1",
   "highlights": [
-    "A new ivory and brass app icon and matching tool icons bring desktop, browser and phone workspaces into the current KerfDesk style. The startup screen keeps the Ons Houtkombuis credit.",
-    "Approved full purchase refunds and chargebacks revoke Pro at the next online refresh. New Pro choices require confirmation within 30 days for paid licences or three days for trials. Existing work and output remain available.",
-    "Desktop Free reopens this computer's saved Pro work for settings edits. Imported Pro work and artwork changes ask for Pro; older unsealed projects need Pro once. Trials use a one-way firmware code to recognise repeat use.",
-    "KerfDesk Design Studio brings photo and vector work into one workspace. Individual traced lines and shapes can be selected and edited directly, with better Trim tangencies and curve-preserving Close Path.",
-    "Offline multilingual text shaping, Photoshop composite import and advanced nesting add more design options. Phone & MCP controls are now in the main toolbar with a live status panel.",
-    "Licence purchases recover saved Paddle orders more reliably and work on www and older browsers. Console coordinate changes refresh machine evidence, and exported G-code comments exclude realtime control bytes."
+    "Drag Frame and cutting start points on the canvas and save reusable defaults. Saved projects retain their chosen starts; Frame still verifies the exact reviewed job before Start.",
+    "Power and Speed now pair sliders with exact number entry and one-step undo. Refreshed artwork panels, machine tool tabs and compact Origin controls make settings easier to reach.",
+    "Trace-part and node editing respond more quickly on dense artwork, with clearer Done controls. Preview status updates keep the canvas layout steady.",
+    "New layout and selection tools change draw order, match sizes, close gaps and select circles or open Fill shapes. Bake variable text, export original or preview images, and share image presets.",
+    "More text styles, barcode formats, font favourites and array options expand design choices. Saved artwork can be renamed, recategorised or replaced while keeping its library entry.",
+    "Expanded precision editing, material workflows and portable printing accompany faster path indexing. Generated cut paths use the prepared output, including variable text and cutting adjustments."
   ]
 }
