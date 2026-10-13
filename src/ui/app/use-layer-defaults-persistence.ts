@@ -7,6 +7,7 @@ import {
 import { useStore } from '../state';
 import { browserLocalStorage } from '../state/browser-local-storage';
 import { DEFAULT_LAYER_DEFAULTS_STATE } from '../state/layer-default-actions';
+import { layerDefaultsAutoApply } from '../state/layer-defaults-preference';
 import { useToastStore } from '../state/toast-store';
 
 export const LAYER_DEFAULTS_PERSIST_FAILURE_MESSAGE =
@@ -21,7 +22,9 @@ export function useLayerDefaultsPersistence(): void {
         ? null
         : restoreLayerDefaults(storage, useStore.getState().project.device.name);
     if (restored !== null)
-      useStore.getState().setLayerDefaults({ ...restored, applyToNewOperations: false });
+      useStore
+        .getState()
+        .setLayerDefaults({ ...restored, applyToNewOperations: layerDefaultsAutoApply() });
 
     let hasWarned = false;
     let restoringProfile = false;
@@ -39,7 +42,7 @@ export function useLayerDefaultsPersistence(): void {
         try {
           useStore.getState().setLayerDefaults({
             ...(nextDefaults ?? DEFAULT_LAYER_DEFAULTS_STATE),
-            applyToNewOperations: false,
+            applyToNewOperations: layerDefaultsAutoApply(),
           });
         } finally {
           restoringProfile = false;

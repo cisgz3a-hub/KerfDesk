@@ -20,7 +20,7 @@ import { renderVariableText } from '../text/render-variable-text';
 import type { ToastVariant } from '../state/toast-store';
 import { exportProjectSelection } from './export-artwork-svg';
 
-export type ArtworkVectorFormat = 'pdf' | 'eps' | 'geojson';
+export type ArtworkVectorFormat = 'pdf' | 'ai' | 'eps' | 'geojson';
 
 type WrittenFile = {
   readonly text: string;
@@ -43,6 +43,13 @@ const FORMATS: Readonly<Record<ArtworkVectorFormat, FormatSpec>> = {
     mime: 'application/pdf',
     write: (items, title) => ({ text: writePdfDocument(items, { title }).text, warning: null }),
     note: 'The page fits the artwork and its strokes; curves stay curves.',
+  },
+  ai: {
+    label: 'Illustrator (.ai)',
+    extension: '.ai',
+    mime: 'application/pdf',
+    write: (items, title) => ({ text: writePdfDocument(items, { title }).text, warning: null }),
+    note: 'It is a PDF-based .ai file, as Illustrator saves with PDF compatibility: Illustrator and other editors open it as artwork; it holds no Illustrator-only editing data.',
   },
   eps: {
     label: 'EPS',

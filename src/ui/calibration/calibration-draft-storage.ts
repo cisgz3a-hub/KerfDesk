@@ -75,3 +75,28 @@ function safeLocalStorage(): Storage | null {
   if (typeof localStorage === 'undefined') return null;
   return localStorage;
 }
+
+// Test settings as a file (LightBurn material-test presets): the same draft
+// envelope with a kind, so a Material Test preset never loads into another
+// calibration dialog. Unknown fields are ignored; missing ones keep defaults.
+export function serializeCalibrationPreset<T extends object>(kind: string, draft: T): string {
+  return `${JSON.stringify({ kind, schemaVersion: 1, draft }, null, 2)}\n`;
+}
+
+export function parseCalibrationPreset<T extends object>(
+  kind: string,
+  text: string,
+  fallback: T,
+  fields: ReadonlyArray<keyof T>,
+): T {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error('This is not a KerfDesk test preset file.');
+  }
+  if (!isDraftEnvelope(parsed) || (parsed as Record<string, unknown>)['kind'] !== kind) {
+    throw new Error('This file holds settings for a different test.');
+  }
+  return mergeDraft(fallback, parsed.draft, fields);
+}

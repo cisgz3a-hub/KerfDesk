@@ -1,3 +1,4 @@
+import { layerDefaultsAutoApply } from './layer-defaults-preference';
 import { studioDocumentActions, type StudioDocumentActions } from './studio-document-actions';
 import {
   createProject,
@@ -206,7 +207,7 @@ function retainedApplicationState(
   return {
     ...currentMaterialLibraryState(state),
     ...currentSavedLibrariesState(state),
-    layerDefaults: { ...state.layerDefaults, applyToNewOperations: false },
+    layerDefaults: { ...state.layerDefaults, applyToNewOperations: layerDefaultsAutoApply() },
     cncLibrary: state.cncLibrary,
     cncLiveCaps: state.cncLiveCaps,
     projectOpenRequestEpoch: state.projectOpenRequestEpoch,

@@ -93,6 +93,26 @@ export const FILE_COMMAND_HELP: Readonly<
     tooltip:
       'Export selected vector artwork, or all of it when nothing is selected, as GeoJSON: polygons with holes for filled artwork and lines for strokes, flattened within 0.01 mm. Coordinates are millimetres with y up from the lower-left corner, not longitude and latitude, so the file is not georeferenced (a deliberate departure from RFC 7946 section 4) and map tools will not place it on a map. Filled shapes follow their fill rule; shapes whose outlines cross are kept as separate, overlapping polygons rather than merged, and the export warns when that happens.',
   },
+  'file.export-ai': {
+    family: 'file',
+    tooltip:
+      "Export selected vector artwork, or all of it when nothing is selected, as an Illustrator .ai file. Like Illustrator's own files saved with PDF compatibility it is PDF inside, so Illustrator, Inkscape and CorelDRAW open it as artwork; it carries no Illustrator-only editing data. Curves stay curves; images are left out.",
+  },
+  'file.export-palette': {
+    family: 'file',
+    tooltip:
+      "Save KerfDesk's operation colours as a palette for other design software: .gpl for GIMP, Inkscape and Krita, .ase for Adobe Illustrator and Photoshop, or .xml for CorelDRAW, chosen by the file type you save as. Draw in these colours and the artwork imports onto matching operations.",
+  },
+  'file.import-gcode-artwork': {
+    family: 'file',
+    tooltip:
+      'Bring the cutting moves of a G-code file in as one editable vector object, placed where the program cuts on this bed (travel moves and laser-off moves are left out; arcs come in as short lines). Only the shapes come across, not speeds, powers or passes. To check or run a program as it is, open it in the G-code Inspector instead.',
+  },
+  'file.print-artwork': {
+    family: 'file',
+    tooltip:
+      'Print the selected artwork, or all of it, at true size through the system print dialog: in its own colours or all black, with every line at the width you choose. Text is outlined and variable fields show their current values; the project and the job are not changed. Turn off scaling in the print dialog so sizes stay exact.',
+  },
   'file.exit': {
     family: 'file',
     tooltip:

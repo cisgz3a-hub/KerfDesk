@@ -6,6 +6,7 @@ import type { CommandId } from './command-types';
 // boolean operations.
 export const TOOLS_VECTOR_IDS: ReadonlyArray<CommandId> = [
   'tools.convert-to-path',
+  'tools.generate-path-from-cut',
   'tools.weld',
   'tools.union-silhouette',
   'tools.join-paths',

@@ -3,6 +3,7 @@ import type { MaterialTestGridOptions } from '../../core/job';
 import type { MaterialTestParameter } from '../../core/job/material-test-axes';
 import { materialTestRunwayMm } from '../../core/job/material-test-grid';
 import { CalibrationNumberField } from './CalibrationNumberField';
+import { CalibrationPresetButtons } from './CalibrationPresetButtons';
 import { Button, Dialog, DialogActions } from '../kit';
 import { persistCalibrationDraft, restoreCalibrationDraft } from './calibration-draft-storage';
 import { calibrationFieldStyle, calibrationGridStyle } from './calibration-dialog-styles';
@@ -90,6 +91,15 @@ export function MaterialTestDialog(props: {
         accelMmPerSec2={props.accelMmPerSec2}
       />
       <DialogActions>
+        <CalibrationPresetButtons
+          kind="kerfdesk-material-test"
+          extension=".lftest"
+          suggestedName="material-test.lftest"
+          draft={draft}
+          fallback={DEFAULT_MATERIAL_TEST_DRAFT}
+          fields={MATERIAL_TEST_DRAFT_FIELDS}
+          load={setDraft}
+        />
         <Button onClick={props.onCancel}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={issues.length > 0}>
           Generate

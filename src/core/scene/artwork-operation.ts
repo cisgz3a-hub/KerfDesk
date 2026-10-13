@@ -13,7 +13,7 @@ import { effectiveOperationForObject } from '../effective-output';
 
 // New artwork starts in black; later operations receive distinct colors in
 // this stable order so the canvas stays readable as the design grows.
-const OPERATION_PALETTE = [
+export const OPERATION_PALETTE = [
   '#000000',
   '#2563eb',
   '#dc2626',

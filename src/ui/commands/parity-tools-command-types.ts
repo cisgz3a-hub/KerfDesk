@@ -5,6 +5,10 @@
 export type ParityToolsCommandContext = {
   readonly saveOriginalImage: () => void;
   readonly savePreviewImage: () => void;
+  readonly generatePathFromCut: () => void;
 };
 
-export type ParityToolsCommandId = 'tools.save-original-image' | 'window.save-preview-image';
+export type ParityToolsCommandId =
+  | 'tools.save-original-image'
+  | 'window.save-preview-image'
+  | 'tools.generate-path-from-cut';

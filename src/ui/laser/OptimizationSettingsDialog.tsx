@@ -27,6 +27,11 @@ export function OptimizationSettingsDialog(props: {
       size="sm"
     >
       <PlannerFields settings={settings} update={update} />
+      <CutDirectionField
+        value={settings.cutDirection}
+        disabled={settings.travelPolicy === 'source-order'}
+        set={(cutDirection) => setSettings((current) => ({ ...current, cutDirection }))}
+      />
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
         <Button type="submit" variant="primary">
@@ -319,3 +324,38 @@ const precedenceNoteStyle: React.CSSProperties = {
   fontSize: 12,
   lineHeight: 1.4,
 };
+
+const CUT_DIRECTION_OPTIONS: ReadonlyArray<readonly [string, string]> = [
+  ['off', 'Nearest first (planner)'],
+  ['top-to-bottom', 'Top to bottom'],
+  ['bottom-to-top', 'Bottom to top'],
+  ['left-to-right', 'Left to right'],
+  ['right-to-left', 'Right to left'],
+];
+
+// LightBurn Order by direction: Line shapes sweep across the workspace.
+function CutDirectionField(props: {
+  readonly value: ProjectOptimizationSettings['cutDirection'];
+  readonly disabled: boolean;
+  readonly set: (value: ProjectOptimizationSettings['cutDirection']) => void;
+}): JSX.Element {
+  return (
+    <PlannerSelect
+      label="Cut direction"
+      name="cutDirection"
+      value={props.value ?? 'off'}
+      disabled={props.disabled}
+      title={
+        props.disabled
+          ? 'Keep source order bypasses this setting. Switch Travel policy to Reduce travel to use it.'
+          : 'Run Line shapes in a sweep across the workspace instead of nearest first. Inside-first still cuts enclosed shapes before the shapes around them; a Line burn start choice takes precedence.'
+      }
+      onChange={(value) =>
+        props.set(
+          value === 'off' ? undefined : (value as ProjectOptimizationSettings['cutDirection']),
+        )
+      }
+      options={CUT_DIRECTION_OPTIONS}
+    />
+  );
+}
