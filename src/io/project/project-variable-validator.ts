@@ -55,6 +55,10 @@ export function validateVariableTemplate(value: unknown, path: string): string |
   ) {
     return invalid(`${path}.sequenceOffset`);
   }
+  const ignoreEmptyLines = value['ignoreEmptyLines'];
+  if (ignoreEmptyLines !== undefined && typeof ignoreEmptyLines !== 'boolean') {
+    return invalid(`${path}.ignoreEmptyLines`);
+  }
   if (value['tokens'].length > MAX_VARIABLE_TOKENS) return `\`${path}\` has too many tokens`;
   for (let index = 0; index < value['tokens'].length; index += 1) {
     const tokenError = validateToken(value['tokens'][index], `${path}.tokens[${index}]`);

@@ -28,6 +28,8 @@ export function AdjustFields(props: {
   readonly userPresets: readonly UserImagePreset[];
   readonly savePreset: () => void;
   readonly deletePreset: () => void;
+  readonly exportPresets?: () => void;
+  readonly importPresets?: () => void;
 }): JSX.Element {
   const { draft, update, applyPreset, userPresets, savePreset, deletePreset } = props;
   return (
@@ -45,6 +47,8 @@ export function AdjustFields(props: {
         onChange={applyPreset}
         onSave={savePreset}
         onDelete={deletePreset}
+        {...(props.exportPresets === undefined ? {} : { onExport: props.exportPresets })}
+        {...(props.importPresets === undefined ? {} : { onImport: props.importPresets })}
       />
       <NumberField
         name="brightness"

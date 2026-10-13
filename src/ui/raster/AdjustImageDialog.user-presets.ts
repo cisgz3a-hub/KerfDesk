@@ -125,6 +125,67 @@ export function findUserImagePreset(
   );
 }
 
+// Portable preset files (LightBurn Adjust Image preset Import/Export). A file
+// carries every saved preset; importing replaces same-named ones and keeps the
+// rest, and a file with any invalid entry is refused whole.
+const PRESET_FILE_FORMAT = 'kerfdesk-image-presets';
+
+export function exportUserImagePresetsFile(presets: readonly UserImagePreset[]): string {
+  return `${JSON.stringify(
+    { format: PRESET_FILE_FORMAT, schemaVersion: IMAGE_PRESETS_SCHEMA_VERSION, presets },
+    null,
+    2,
+  )}\n`;
+}
+
+export type ImportUserImagePresetsResult =
+  | { readonly kind: 'ok'; readonly presets: readonly UserImagePreset[]; readonly count: number }
+  | { readonly kind: 'invalid'; readonly message: string };
+
+export function importUserImagePresetsFile(
+  existing: readonly UserImagePreset[],
+  text: string,
+): ImportUserImagePresetsResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { kind: 'invalid', message: 'The file is not a preset file: it is not valid JSON.' };
+  }
+  if (
+    !isUserImagePresetRecord(parsed) ||
+    (parsed as unknown as Record<string, unknown>)['format'] !== PRESET_FILE_FORMAT
+  ) {
+    return { kind: 'invalid', message: 'The file is not a KerfDesk image preset file.' };
+  }
+  if (parsed.schemaVersion !== IMAGE_PRESETS_SCHEMA_VERSION) {
+    return { kind: 'invalid', message: 'The preset file comes from a newer version of KerfDesk.' };
+  }
+  let presets = existing;
+  for (const candidate of parsed.presets) {
+    if (!isUserImagePreset(candidate)) {
+      return {
+        kind: 'invalid',
+        message: 'The preset file has a damaged preset. Nothing was imported.',
+      };
+    }
+    const saved = saveUserImagePreset(
+      presets,
+      candidate.name,
+      candidate.settings,
+      candidate.updatedAt,
+    );
+    if (saved.kind !== 'ok') {
+      return {
+        kind: 'invalid',
+        message: `The preset "${candidate.name}" has a reserved or empty name.`,
+      };
+    }
+    presets = saved.presets;
+  }
+  return { kind: 'ok', presets, count: parsed.presets.length };
+}
+
 function normalizePresetName(name: string): string | null {
   const trimmed = name.trim().replace(/\s+/g, ' ');
   return trimmed.length === 0 ? null : trimmed;

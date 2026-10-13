@@ -28,6 +28,8 @@ export function PresetField(props: {
   readonly onChange: (value: ImagePresetId) => void;
   readonly onSave: () => void;
   readonly onDelete: () => void;
+  readonly onExport?: () => void;
+  readonly onImport?: () => void;
 }): JSX.Element {
   const canDelete = findUserImagePreset(props.userPresets, props.value) !== null;
   return (
@@ -74,8 +76,46 @@ export function PresetField(props: {
         >
           Delete
         </button>
+        <PresetFileButtons {...props} />
       </span>
     </label>
+  );
+}
+
+function PresetFileButtons(props: {
+  readonly userPresets: readonly UserImagePreset[];
+  readonly onExport?: () => void;
+  readonly onImport?: () => void;
+}): JSX.Element {
+  const empty = props.userPresets.length === 0;
+  return (
+    <>
+      {props.onImport === undefined ? null : (
+        <button
+          name="importImagePresets"
+          type="button"
+          onClick={props.onImport}
+          title="Add the presets from a preset file. Presets with the same name are replaced."
+        >
+          Import
+        </button>
+      )}
+      {props.onExport === undefined ? null : (
+        <button
+          name="exportImagePresets"
+          type="button"
+          disabled={empty}
+          onClick={props.onExport}
+          title={
+            empty
+              ? 'Save a preset first; only saved presets are exported.'
+              : 'Save every saved preset to a file you can import on another computer.'
+          }
+        >
+          Export
+        </button>
+      )}
+    </>
   );
 }
 

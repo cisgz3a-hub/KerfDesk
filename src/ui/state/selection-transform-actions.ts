@@ -1,4 +1,12 @@
 import {
+  buildSelectionMatchSizeEdit,
+  type SelectionMatchSizeKind,
+} from '../../core/scene/selection-match-size';
+import {
+  buildSelectionMoveTogetherEdit,
+  type SelectionMoveTogetherAxis,
+} from '../../core/scene/selection-move-together';
+import {
   type BoardAnchor,
   boardFitRegion,
   buildBoxAnchorAlign,
@@ -27,6 +35,7 @@ import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { applyCenterArtworkInRegistrationJigSet } from './registration-jig-artwork-actions';
 import { selectionReferenceId, type SelectionReferenceState } from './selection-reference';
+import { useToastStore } from './toast-store';
 
 export type SelectionTransformEdit = {
   readonly id: string;
@@ -38,6 +47,8 @@ export type SelectionTransformActions = SelectionReferenceState & {
   readonly applySelectionTransforms: (edits: ReadonlyArray<SelectionTransformEdit>) => void;
   readonly alignSelection: (kind: SelectionAlignKind) => void;
   readonly distributeSelection: (kind: SelectionDistributeKind) => void;
+  readonly matchSelectionSize: (kind: SelectionMatchSizeKind, proportional: boolean) => void;
+  readonly moveSelectionTogether: (axis: SelectionMoveTogetherAxis) => void;
   readonly nudgeSelection: (dx: number, dy: number) => void;
   readonly flipSelection: (axis: SelectionFlipAxis) => void;
   // ADR-410: Rotate 90° about the selection centre (+1 clockwise on screen).
@@ -64,6 +75,9 @@ export function selectionTransformActions(set: Setter): SelectionTransformAction
       set((state) => applySelectionTransformsToState(state, edits)),
     alignSelection: (kind) => set((state) => applySelectionAlignToState(state, kind)),
     distributeSelection: (kind) => set((state) => applySelectionDistributeToState(state, kind)),
+    matchSelectionSize: (kind, proportional) =>
+      set((state) => applySelectionMatchSizeToState(state, kind, proportional)),
+    moveSelectionTogether: (axis) => set((state) => applySelectionMoveTogetherToState(state, axis)),
     nudgeSelection: (dx, dy) => set((state) => applySelectionNudgeToState(state, dx, dy)),
     flipSelection: (axis) => set((state) => applySelectionFlipToState(state, axis)),
     rotateSelectionQuarterTurn: (direction) =>
@@ -125,18 +139,68 @@ function applySelectionAlignToState(
   state: AppState,
   kind: SelectionAlignKind,
 ): AppState | Partial<AppState> {
-  const ids = selectedObjectIds(state);
   const scene = state.project.scene;
-  const objects = selectedObjects(scene, ids);
+  const { objects, referenceId } = referencedSelection(state);
+  if (referenceId === undefined) return state;
+  const result = buildSelectionAlignEdit(objects, { kind, referenceId }, scene.groups ?? []);
+  if (result.kind === 'error') return state;
+  return applySelectionTransformsToState(state, result.transforms);
+}
+
+// Make Same Width / Height take the same reference as Align.
+function applySelectionMatchSizeToState(
+  state: AppState,
+  kind: SelectionMatchSizeKind,
+  proportional: boolean,
+): AppState | Partial<AppState> {
+  const { objects, referenceId } = referencedSelection(state);
+  if (referenceId === undefined) return state;
+  const result = buildSelectionMatchSizeEdit(
+    objects,
+    { kind, referenceId, proportional },
+    state.project.scene.groups ?? [],
+  );
+  if (result.kind === 'error') return state;
+  if (result.skipped > 0) {
+    const count = result.skipped === 1 ? '1 rotated object' : `${result.skipped} rotated objects`;
+    useToastStore
+      .getState()
+      .pushToast(
+        `Left ${count} unchanged: stretching one side would skew it. Use the Proportional command, or turn it to a right angle first.`,
+        'info',
+      );
+  }
+  return applySelectionTransformsToState(state, result.transforms);
+}
+
+// Move H / V Together keep the reference unit fixed, as Align does.
+function applySelectionMoveTogetherToState(
+  state: AppState,
+  axis: SelectionMoveTogetherAxis,
+): AppState | Partial<AppState> {
+  const { objects, referenceId } = referencedSelection(state);
+  if (referenceId === undefined) return state;
+  const result = buildSelectionMoveTogetherEdit(
+    objects,
+    { axis, referenceId },
+    state.project.scene.groups ?? [],
+  );
+  if (result.kind === 'error') return state;
+  return applySelectionTransformsToState(state, result.transforms);
+}
+
+function referencedSelection(state: AppState): {
+  readonly objects: ReadonlyArray<SceneObject>;
+  readonly referenceId: string | undefined;
+} {
+  const ids = selectedObjectIds(state);
+  const objects = selectedObjects(state.project.scene, ids);
   const clickedId = selectionReferenceId(state);
   const referenceId =
     clickedId !== null && objects.some((object) => object.id === clickedId)
       ? clickedId
       : ids[ids.length - 1];
-  if (referenceId === undefined) return state;
-  const result = buildSelectionAlignEdit(objects, { kind, referenceId }, scene.groups ?? []);
-  if (result.kind === 'error') return state;
-  return applySelectionTransformsToState(state, result.transforms);
+  return { objects, referenceId };
 }
 
 function applySelectionDistributeToState(

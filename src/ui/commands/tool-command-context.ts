@@ -14,6 +14,8 @@ import type {
 } from './app-command-context-types';
 import type { AppCommandContext } from './command-types';
 import { openBooleanDialog } from './boolean-dialog-store';
+import { parityToolsCommandContext } from './parity-tools-command-context';
+import type { ParityToolsCommandContext } from './parity-tools-command-types';
 import {
   applyImageMaskAction,
   cropImageAction,
@@ -66,8 +68,9 @@ export function toolCommandContext(
   dialogs: CommandDialogs,
   pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
   selection: CommandSelection,
-): ToolCommandContext {
+): ToolCommandContext & ParityToolsCommandContext {
   return {
+    ...parityToolsCommandContext(app, platform, pushToast, selection.selected),
     boxGenerator: callbacks.requestBoxGenerator,
     barcodeGenerator: callbacks.requestBarcodeGenerator,
     boxFitTest: callbacks.requestBoxFitTest,

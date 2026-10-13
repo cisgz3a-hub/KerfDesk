@@ -165,6 +165,8 @@ export type Project = {
   readonly studioDocuments?: ReadonlyArray<StudioDocument>;
   readonly designStudioDocument?: DesignStudioDocument;
   readonly notes: string;
+  /** LightBurn Show Notes "show on open": the notes dialog opens with the project. */
+  readonly showNotesOnOpen?: boolean;
   readonly sheetBook?: ProjectSheetBook;
   readonly fixtureTemplates?: ReadonlyArray<FixtureTemplate>;
   readonly productionManifest?: ProductionManifest;

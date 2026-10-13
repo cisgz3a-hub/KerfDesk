@@ -21,6 +21,16 @@ export const EDITING_TOOLS_COMMAND_HELP: Readonly<Record<EditingToolsCommandId, 
       tooltip:
         'Select artwork on any operation that has a path whose ends do not meet, and report how many open paths it found.',
     },
+    'edit.select-open-fill-shapes': {
+      family: 'edit',
+      tooltip:
+        'Select unlocked, visible artwork with an open contour on a Fill operation. Fill cannot engrave inside a shape whose ends do not meet, so this finds what would come out empty.',
+    },
+    'edit.select-circles': {
+      family: 'edit',
+      tooltip:
+        'Select every unlocked, visible circle of one diameter, or with a diameter in a range: handy for picking out screw holes. A circle is a drawn circle, or artwork whose whole outline is one round closed path. A circle inside a group selects its group.',
+    },
     'tools.offset-shapes': {
       family: 'tools',
       tooltip:

@@ -152,6 +152,8 @@ function TextVariables(props: Props): JSX.Element {
           onSourceChange={fields.setContent}
           textValues={values}
           onInsert={props.onInsert ?? ((source) => fields.setContent(`${values.content}${source}`))}
+          ignoreEmptyLines={fields.ignoreEmptyLines}
+          onIgnoreEmptyLinesChange={fields.setIgnoreEmptyLines}
         />
       ) : (
         props.variableFields

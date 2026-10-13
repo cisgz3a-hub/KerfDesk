@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react';
+import { useCallback, useState, type ComponentType } from 'react';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { primaryOperationForObject } from '../../core/scene';
 import { CONNECTION_HELP_TEXT } from '../help/connection-help';
@@ -37,6 +37,9 @@ import { WorkspaceContextBar } from './WorkspaceContextBar';
 import { ArrayDialogHost } from './ArrayDialogHost';
 import { CopyAlongPathDialogHost } from './CopyAlongPathDialogHost';
 import { OptimizeShapesDialogHost } from './OptimizeShapesDialogHost';
+import { SaveOriginalImageDialogHost } from './SaveOriginalImageDialog';
+import { SelectCirclesDialogHost } from './SelectCirclesDialog';
+import { useShowNotesOnOpen } from './use-show-notes-on-open';
 import { BooleanDialogHost } from './BooleanDialogHost';
 import { QuickNestDialogHost } from './QuickNestDialogHost';
 import { PrintAndCutDialogHost } from '../laser/PrintAndCutDialogHost';
@@ -76,6 +79,7 @@ export function CommandShell(): JSX.Element {
   const [scanOffsetTestDialogOpen, setScanOffsetTestDialogOpen] = useState(false);
   const [settingsDialog, setSettingsDialog] = useState<SettingsDialogKind>(null);
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
+  useShowNotesOnOpen(useCallback(() => setProjectNotesOpen(true), []));
   const [undoHistoryOpen, setUndoHistoryOpen] = useState(false);
   const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
   const gcodeInspector = useCommandShellGcodeInspector();
@@ -169,6 +173,8 @@ function StoreOpenedDialogs(): JSX.Element {
       <BarcodeDialogHost />
       <CopyAlongPathDialogHost />
       <OptimizeShapesDialogHost />
+      <SelectCirclesDialogHost />
+      <SaveOriginalImageDialogHost />
       <BooleanDialogHost />
       <ExportSvgDialogHost />
       <SettingsWindowHost />
@@ -283,14 +289,16 @@ function UndoHistoryPanel(props: { readonly onClose: () => void }): JSX.Element 
 
 function ProjectNotesPanel(props: { readonly onClose: () => void }): JSX.Element {
   const notes = useStore((s) => s.project.notes);
+  const showOnOpen = useStore((s) => s.project.showNotesOnOpen === true);
   const setProjectNotes = useStore((s) => s.setProjectNotes);
   const pushToast = useToastStore((s) => s.pushToast);
   return (
     <ProjectNotesDialog
       notes={notes}
+      showOnOpen={showOnOpen}
       onCancel={props.onClose}
-      onApply={(next) => {
-        setProjectNotes(next);
+      onApply={(next, show) => {
+        setProjectNotes(next, show);
         props.onClose();
         pushToast('Updated project notes.', 'success');
       }}

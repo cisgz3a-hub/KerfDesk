@@ -191,6 +191,9 @@ function useRows(
       ...(props.textValues?.variableTemplate?.sequenceOffset === undefined
         ? {}
         : { sequenceOffset: props.textValues.variableTemplate.sequenceOffset }),
+      ...(props.textValues?.variableTemplate?.ignoreEmptyLines === true
+        ? { ignoreEmptyLines: true }
+        : {}),
     };
     const object =
       project.scene.objects.find((candidate) => candidate.id === selectedId) ??

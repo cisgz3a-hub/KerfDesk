@@ -1,6 +1,8 @@
 import type { DesignToolsCommandId } from '../commands/design-tools-command-types';
 import type { CommandHelpTopic } from './command-help-topics';
+import { LAYOUT_COMMAND_HELP } from './layout-command-help';
 import { OPTIMIZE_SHAPES_COMMAND_HELP } from './optimize-shapes-command-help';
+import { PARITY_TOOLS_COMMAND_HELP } from './parity-tools-command-help';
 import { VECTOR_CUT_COMMAND_HELP } from './vector-cut-command-help';
 import { WARP_DEFORM_COMMAND_HELP } from './warp-deform-command-help';
 
@@ -9,6 +11,8 @@ export const DESIGN_TOOLS_COMMAND_HELP: Readonly<Record<DesignToolsCommandId, Co
   ...VECTOR_CUT_COMMAND_HELP,
   ...WARP_DEFORM_COMMAND_HELP,
   ...OPTIMIZE_SHAPES_COMMAND_HELP,
+  ...LAYOUT_COMMAND_HELP,
+  ...PARITY_TOOLS_COMMAND_HELP,
   'edit.select-contained': {
     family: 'edit',
     tooltip:
@@ -43,6 +47,11 @@ export const DESIGN_TOOLS_COMMAND_HELP: Readonly<Record<DesignToolsCommandId, Co
     family: 'arrange',
     tooltip:
       'Copy the selected artwork along a guide path: a number of copies, a set spacing between centres or a set gap between edges, turned to follow the path. The top-most (last added) single path in the selection is the guide; the dialog can pick another. Reverse Direction on the guide flips which way turned copies face.',
+  },
+  'tools.bake-variable-text': {
+    family: 'tools',
+    tooltip:
+      'Replace the fields of the selected variable text and variable barcodes with the value they would engrave now: the current CSV record, serial, date and cut settings. The result is ordinary text or a fixed code that no longer advances. Undo restores the fields.',
   },
   'tools.flatten-image-mask': {
     family: 'tools',

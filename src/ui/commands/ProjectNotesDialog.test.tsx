@@ -10,7 +10,7 @@ import { ProjectNotesDialog } from './ProjectNotesDialog';
 async function renderDialog(
   props: {
     readonly notes?: string;
-    readonly onApply?: (notes: string) => void;
+    readonly onApply?: (notes: string, showOnOpen: boolean) => void;
     readonly onCancel?: () => void;
   } = {},
 ): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
@@ -55,7 +55,15 @@ describe('ProjectNotesDialog', () => {
         save.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(onApply).toHaveBeenCalledWith('New note\nFocus 6 mm');
+      expect(onApply).toHaveBeenCalledWith('New note\nFocus 6 mm', false);
+
+      const showOnOpen = host.querySelector<HTMLInputElement>('input[type="checkbox"]');
+      if (showOnOpen === null) throw new Error('show-on-open checkbox missing');
+      await act(async () => showOnOpen.click());
+      await act(async () => {
+        save.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(onApply).toHaveBeenLastCalledWith('New note\nFocus 6 mm', true);
     } finally {
       await act(async () => root.unmount());
     }
