@@ -7,6 +7,8 @@
 
 import type { ColoredPath, Polyline, Vec2 } from '../scene';
 import type { Job } from './job';
+import { buildToolpath } from './toolpath';
+import type { BuildToolpathOptions } from './toolpath-types';
 
 export type CutPathsArtwork = {
   /** One path per operation colour, in burn order. */
@@ -14,21 +16,28 @@ export type CutPathsArtwork = {
   readonly skippedRasterGroups: number;
 };
 
-export function cutPathsArtwork(job: Job, toScene: (machine: Vec2) => Vec2): CutPathsArtwork {
+export function cutPathsArtwork(
+  job: Job,
+  toScene: (machine: Vec2) => Vec2,
+  options: BuildToolpathOptions = {},
+): CutPathsArtwork {
   const byColor = new Map<string, Polyline[]>();
-  let skippedRasterGroups = 0;
-  for (const group of job.groups) {
-    if (group.kind === 'raster') {
-      skippedRasterGroups += 1;
-      continue;
-    }
-    if (group.kind !== 'cut' && group.kind !== 'fill') continue;
-    const lines = byColor.get(group.color) ?? [];
-    for (const segment of group.segments) {
-      if (segment.polyline.length < 2) continue;
-      lines.push({ points: segment.polyline.map(toScene), closed: segment.closed });
-    }
-    byColor.set(group.color, lines);
+  const skippedRasterGroups = job.groups.filter((group) => group.kind === 'raster').length;
+  const groups = job.groups.filter(
+    (group) => (group.kind === 'cut' || group.kind === 'fill') && group.power > 0,
+  );
+  // Share the preview's final-pass, arc and calibrated fill sweep expansion.
+  for (const step of buildToolpath({ ...job, groups }, options).steps) {
+    if (step.kind !== 'cut' || step.polyline.length < 2) continue;
+    const lines = byColor.get(step.color) ?? [];
+    const points = step.polyline.map(toScene);
+    const first = points[0] as Vec2;
+    const last = points[points.length - 1] as Vec2;
+    lines.push({
+      points,
+      closed: points.length > 2 && Math.hypot(last.x - first.x, last.y - first.y) < 1e-8,
+    });
+    byColor.set(step.color, lines);
   }
   const paths = [...byColor]
     .filter(([, polylines]) => polylines.length > 0)

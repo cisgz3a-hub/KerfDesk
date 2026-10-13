@@ -4,7 +4,10 @@
 // lines, or for reusing them as artwork. The source artwork is not changed.
 
 import { toSceneCoords } from '../../core/devices';
-import { compileJob } from '../../core/job/compile-job';
+import { prepareOutputSnapshot } from '../../io/gcode/prepare-output-snapshot';
+import { renderVariableText } from '../text/render-variable-text';
+import { exportProjectSelection } from '../app/export-artwork-svg';
+import type { CutPathsArtwork } from '../../core/job/cut-paths-artwork';
 import { cutPathsArtwork } from '../../core/job/cut-paths-artwork';
 import { IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
 import { boundsForPaths } from '../../core/geometry/vector-path-tools';
@@ -14,21 +17,81 @@ import type { AppState } from './store';
 import { useToastStore } from './toast-store';
 
 export type PathFromCutActions = {
-  readonly generatePathFromCut: () => void;
+  readonly generatePathFromCut: () => Promise<void>;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
 export function pathFromCutActions(set: Setter): PathFromCutActions {
-  return { generatePathFromCut: () => set(pathFromCutMutation) };
+  return {
+    generatePathFromCut: async () => {
+      let captured: AppState | undefined;
+      set((state) => {
+        captured = state;
+        return state;
+      });
+      if (captured === undefined) return;
+      const source = captured;
+      const ids = selectedObjectIds(source);
+      const project = exportProjectSelection(source.project, ids.length === 0 ? undefined : ids);
+      try {
+        const prepared = await prepareOutputSnapshot(project, {
+          clock: () => new Date(),
+          renderVariableText,
+          outputScope: {
+            cutSelectedGraphics: ids.length > 0,
+            useSelectionOrigin: false,
+            selectedObjectIds: ids,
+          },
+        });
+        if (!prepared.ok) {
+          useToastStore
+            .getState()
+            .pushToast(
+              prepared.preflight.issues.map((issue) => issue.message).join(' '),
+              'warning',
+            );
+          return;
+        }
+        const artwork = cutPathsArtwork(
+          prepared.job,
+          (point) => toSceneCoords(point, project.device),
+          {
+            scanningOffsets: project.device.scanningOffsets,
+          },
+        );
+        set((state) => {
+          if (
+            state.project !== source.project ||
+            state.projectDocumentEpoch !== source.projectDocumentEpoch
+          ) {
+            useToastStore
+              .getState()
+              .pushToast(
+                'The project changed while preparing the paths. Generate them again.',
+                'warning',
+              );
+            return state;
+          }
+          return pathFromCutMutation(state, artwork);
+        });
+      } catch (error) {
+        useToastStore
+          .getState()
+          .pushToast(
+            `Could not generate paths: ${error instanceof Error ? error.message : String(error)}`,
+            'error',
+          );
+      }
+    },
+  };
 }
 
-export function pathFromCutMutation(state: AppState): AppState | Partial<AppState> {
-  const ids = new Set(selectedObjectIds(state));
+export function pathFromCutMutation(
+  state: AppState,
+  artwork: CutPathsArtwork,
+): AppState | Partial<AppState> {
   const scene = state.project.scene;
-  const objects = ids.size === 0 ? scene.objects : scene.objects.filter((o) => ids.has(o.id));
-  const job = compileJob({ ...scene, objects }, state.project.device);
-  const artwork = cutPathsArtwork(job, (point) => toSceneCoords(point, state.project.device));
   const toast = useToastStore.getState().pushToast;
   if (artwork.paths.length === 0) {
     toast(
