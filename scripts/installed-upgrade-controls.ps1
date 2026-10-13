@@ -48,7 +48,7 @@ function Get-UpgradeWindowTitle {
   return (Get-UpgradeWindowElement $script:upgradeWindow).Current.Name
 }
 
-function Get-UpgradeControl([string]$Name, [string]$Role, $Parent = $null, [switch]$Prefix, [int]$TimeoutSeconds = 30, [switch]$Optional) {
+function Get-UpgradeControl([string]$Name, [string]$Role, $Parent = $null, [switch]$Prefix, [int]$TimeoutSeconds = 30, [switch]$Optional, [switch]$IncludeOffscreen) {
   # Chromium can expose unrelated provider elements without a ControlType.
   # Filter in UIA before reading control properties under StrictMode.
   $controlType = [Windows.Automation.ControlType]::$Role
@@ -62,7 +62,7 @@ function Get-UpgradeControl([string]$Name, [string]$Role, $Parent = $null, [swit
     } else { $root = $Parent }
     $matches = @($root.FindAll([Windows.Automation.TreeScope]::Descendants, $condition) | Where-Object {
       $controlName = [string]$_.Current.Name
-      -not $_.Current.IsOffscreen -and
+      ($IncludeOffscreen -or -not $_.Current.IsOffscreen) -and
       $(if ($Prefix) { $controlName -eq $Name -or $controlName.StartsWith($Name + ' ', [StringComparison]::Ordinal) } else { $controlName -eq $Name })
     })
     if ($matches.Count -gt 1) { throw "Ambiguous native control: $Role $Name" }
@@ -73,10 +73,24 @@ function Get-UpgradeControl([string]$Name, [string]$Role, $Parent = $null, [swit
   throw "Native control did not appear: $Role $Name"
 }
 
-function Invoke-UpgradeControl([string]$Name, [string]$Role = 'Button', $Parent = $null, [switch]$Prefix) {
-  $control = Get-UpgradeControl $Name $Role $Parent -Prefix:$Prefix
+function Invoke-UpgradeControl([string]$Name, [string]$Role = 'Button', $Parent = $null, [switch]$Prefix, [switch]$RevealOffscreen) {
+  $control = Get-UpgradeControl $Name $Role $Parent -Prefix:$Prefix -IncludeOffscreen:$RevealOffscreen
   Assert-UpgradeApp
   if (-not $control.Current.IsEnabled) { throw "Native control is disabled: $Name" }
+  if ($RevealOffscreen -and $control.Current.IsOffscreen) {
+    # New commands can push Settings below the Edit menu's scroll viewport.
+    # Use the native provider to reveal it, then require the ordinary visible
+    # selector again before invoking. Older menus already expose it onscreen.
+    $scrollItem = $null
+    if ($control.TryGetCurrentPattern([Windows.Automation.ScrollItemPattern]::Pattern, [ref]$scrollItem)) {
+      $scrollItem.ScrollIntoView()
+    } else {
+      $control.SetFocus()
+    }
+    $control = Get-UpgradeControl $Name $Role $Parent -Prefix:$Prefix
+    Assert-UpgradeApp
+    if (-not $control.Current.IsEnabled) { throw "Native control is disabled: $Name" }
+  }
   if ($Role -eq 'TabItem' -or $Role -eq 'RadioButton') {
     $control.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
   } elseif ($Name -in @('Edit', 'File', 'More commands')) {
@@ -110,7 +124,7 @@ function Set-UpgradeValue([string]$Name, [string]$Role, [string]$Value, $Parent 
 
 function Open-UpgradeSettings {
   Invoke-UpgradeControl 'Edit' 'MenuItem'
-  Invoke-UpgradeControl 'Settings...' 'MenuItem' -Prefix
+  Invoke-UpgradeControl 'Settings...' 'MenuItem' -Prefix -RevealOffscreen
   return Get-UpgradeControl 'Settings' 'Window'
 }
 

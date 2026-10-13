@@ -88,12 +88,15 @@ $hiddenEdit = New-Control 'Edit' 'MenuItem' $true
 $unnamed = New-Control '' 'MenuItem'
 $unnamed.Current.Name = $null
 $settings = New-Control ('Settings... ' + [char]9 + 'Ctrl+,') 'MenuItem'
+$offscreenSettings = New-Control 'Settings...' 'MenuItem' $true
 $reports = foreach ($case in @(
   @{ label = 'mixed-provider'; name = 'Edit'; prefix = $false; pid = 8000; controls = @($unsupported, $wrongRole, $edit, $hiddenEdit) },
   @{ label = 'shortcut-name'; name = 'Settings...'; prefix = $true; pid = 8000; controls = @($unsupported, $unnamed, $settings) },
   @{ label = 'wrong-role-only'; name = 'Edit'; prefix = $false; pid = 8000; controls = @($unsupported, $wrongRole) },
   @{ label = 'ambiguous'; name = 'Edit'; prefix = $false; pid = 8000; controls = @($unsupported, $edit, (New-Control 'Edit' 'MenuItem')) },
-  @{ label = 'foreign-root'; name = 'Edit'; prefix = $false; pid = 9001; controls = @($edit) }
+  @{ label = 'foreign-root'; name = 'Edit'; prefix = $false; pid = 9001; controls = @($edit) },
+  @{ label = 'scrolled-settings'; name = 'Settings...'; prefix = $true; pid = 8000; controls = @($offscreenSettings) },
+  @{ label = 'ambiguous-scrolled-settings'; name = 'Settings...'; prefix = $true; pid = 8000; controls = @($settings, $offscreenSettings) }
 )) {
   $script:queries = [Collections.Generic.List[int]]::new()
   $script:root = [pscustomobject]@{ Current = [pscustomobject]@{ ProcessId = $case.pid }; Controls = $case.controls }
@@ -108,7 +111,8 @@ $reports = foreach ($case in @(
   try {
     # A supplied dialog exercises the same selector without depending on an OS HWND.
     $parent = $(if ($case.label -eq 'foreign-root') { $null } else { $script:root })
-    $control = Get-UpgradeControl $case.name 'MenuItem' $parent -Prefix:$case.prefix -TimeoutSeconds 0 -Optional
+    $includeOffscreen = $case.label -in @('scrolled-settings', 'ambiguous-scrolled-settings')
+    $control = Get-UpgradeControl $case.name 'MenuItem' $parent -Prefix:$case.prefix -TimeoutSeconds 0 -Optional -IncludeOffscreen:$includeOffscreen
     @{ label = $case.label; passed = $true; found = $null -ne $control; name = $(if ($control) { $control.Current.Name } else { $null }); queries = @($script:queries) }
   } catch { @{ label = $case.label; passed = $false; error = $_.ToString(); queries = @($script:queries) } }
 }
@@ -125,7 +129,9 @@ $reports | ConvertTo-Json -Depth 5 -Compress
     );
     assert.ifError(result.error);
     assert.equal(result.status, 0, result.stderr);
-    const [mixed, shortcut, missing, ambiguous, foreign] = JSON.parse(result.stdout);
+    const [mixed, shortcut, missing, ambiguous, foreign, scrolled, ambiguousScrolled] = JSON.parse(
+      result.stdout,
+    );
     assert.equal(mixed.passed, true, mixed.error);
     assert.equal(mixed.name, 'Edit');
     assert.deepEqual(mixed.queries, [50011]);
@@ -138,6 +144,10 @@ $reports | ConvertTo-Json -Depth 5 -Compress
     assert.equal(foreign.passed, false);
     assert.match(foreign.error, /another PID/u);
     assert.deepEqual(foreign.queries, [], 'reject a foreign root before querying descendants');
+    assert.equal(scrolled.passed, true, scrolled.error);
+    assert.equal(scrolled.name, 'Settings...');
+    assert.equal(ambiguousScrolled.passed, false);
+    assert.match(ambiguousScrolled.error, /Ambiguous native control/u);
   },
 );
 
