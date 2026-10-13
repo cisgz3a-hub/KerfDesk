@@ -18,6 +18,7 @@ import type {
 import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import type { WarpDeformGrid } from '../../core/geometry/warp-deform-map';
 import type { TextAlignment } from '../../core/text';
+import type { TextStyle } from '../../core/scene/scene-object';
 import type { MeasureDraft } from '../workspace/measure-tool';
 import {
   readCanvasStartMarkersVisible,
@@ -48,6 +49,7 @@ export type TextDialogState =
       readonly lineHeight: number;
       readonly letterSpacing: number;
       readonly bendDeg?: number;
+      readonly textStyle?: TextStyle;
       readonly weldOverlaps?: boolean;
       readonly pathText?: PathTextSettings;
       readonly textBox?: TextBoxSettings;
@@ -87,6 +89,9 @@ export type ToolMode =
   // LBG-T04 Trim Shapes: hover highlights a stretch of outline, a click deletes it.
   | { readonly kind: 'trim-shapes' }
   | { readonly kind: 'extend-shapes' }
+  // LightBurn Two-Point Rotate / Scale: click the pivot, click a reference
+  // point, then click where that point goes (Shift also scales).
+  | { readonly kind: 'two-point'; readonly pivot?: Vec2; readonly from?: Vec2 }
   | { readonly kind: 'draw'; readonly shape: 'rect' | 'ellipse' | 'polygon' | 'star' | 'polyline' };
 
 // Pen-tool in-progress polyline (ADR-051 B6). Null unless the pen is mid-draw.
@@ -96,6 +101,17 @@ export type ToolMode =
 export type PenDraft = {
   readonly vertices: ReadonlyArray<Vec2>;
   readonly cursor: Vec2 | null;
+  /** Outgoing Bezier handle per vertex (click-and-drag); null for a corner. */
+  readonly handles?: ReadonlyArray<Vec2 | null>;
+  /** The open endpoint this drawing continues, when it started on one. */
+  readonly continueFrom?: PenContinuation;
+};
+
+export type PenContinuation = {
+  readonly objectId: string;
+  readonly pathIndex: number;
+  readonly curveIndex: number;
+  readonly node: number;
 };
 
 export type SelectionMarquee = {

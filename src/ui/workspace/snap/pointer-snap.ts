@@ -10,6 +10,7 @@
 // guide across the bed; both axes together show the grid marker.
 
 import type { Project, Vec2 } from '../../../core/scene';
+import { nearestGuidePosition } from '../../../core/scene/guides';
 import type { SnapSettings } from '../snap-settings';
 import type { SnapGuide } from '../snapping';
 import type { SnapExclusion } from './snap-exclusion';
@@ -54,8 +55,23 @@ export function resolvePointerSnap(args: {
       guides: [],
     };
   }
+  const guided = snapToGuides(args.project, args.rawMm, radiusMm);
+  if (guided !== null) return guided;
   if (!args.settings.snapToGrid) return unsnapped;
   return snapToGridLines(args.project, args.rawMm, args.settings.gridMm, radiusMm);
+}
+
+// A pointer near a guideline lands on it, per axis, ahead of the grid.
+function snapToGuides(project: Project, rawMm: Vec2, radiusMm: number): PointerSnapResult | null {
+  const x = nearestGuidePosition(project.guides, 'x', rawMm.x, radiusMm);
+  const y = nearestGuidePosition(project.guides, 'y', rawMm.y, radiusMm);
+  if (x === null && y === null) return null;
+  const pointMm = { x: x ?? rawMm.x, y: y ?? rawMm.y };
+  const guides: SnapGuide[] = [];
+  const { bedWidth, bedHeight } = project.device;
+  if (x !== null) guides.push({ axis: 'x', positionMm: x, fromMm: 0, toMm: bedHeight });
+  if (y !== null) guides.push({ axis: 'y', positionMm: y, fromMm: 0, toMm: bedWidth });
+  return { pointMm, marker: null, guides };
 }
 
 export function snapToGridLines(

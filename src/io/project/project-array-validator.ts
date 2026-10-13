@@ -20,6 +20,9 @@ const spec = z.discriminatedUnion('kind', [
       reverseRows: z.boolean().optional(),
       mirrorColumns: axes.optional(),
       mirrorRows: axes.optional(),
+      randomRotation: z
+        .object({ seed: z.number().int(), stepDeg: finite.nonnegative().max(360) })
+        .optional(),
     })
     .refine((value) => value.rows * value.columns <= 10_000),
   z.object({

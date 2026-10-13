@@ -9,6 +9,7 @@ import type { ToolMode } from '../state/ui-store';
 import { dispatchPositionLaser } from './position-laser-click';
 import { extendAtPointer } from './extend-shapes-tool';
 import { trimAtPointer } from './trim-shapes-tool';
+import { twoPointClick } from './two-point-tool';
 import { canvasMouseToScene, type ViewState } from './view-transform';
 
 /** True when the active tool handled the click. */
@@ -30,6 +31,10 @@ export function runClickTool(args: {
   }
   if (args.toolMode.kind === 'trim-shapes') {
     trimAtPointer(args);
+    return true;
+  }
+  if (args.toolMode.kind === 'two-point') {
+    twoPointClick(args);
     return true;
   }
   return false;

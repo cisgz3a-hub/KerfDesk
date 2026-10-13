@@ -6,6 +6,7 @@ import { BARCODE_LIMITS } from '../../core/barcode';
 import { validateVariableTemplate } from './project-variable-validator';
 import {
   firstError,
+  optionalBoolean,
   requireBoolean,
   requireIntegerInRange,
   requireLiteral,
@@ -13,7 +14,20 @@ import {
   valueAtPath,
 } from './project-shape-primitives';
 
-const SYMBOLOGIES = ['qr', 'data-matrix', 'code128', 'code39', 'ean13', 'upca', 'ean8'] as const;
+const SYMBOLOGIES = [
+  'qr',
+  'data-matrix',
+  'code128',
+  'code39',
+  'ean13',
+  'upca',
+  'ean8',
+  'code93',
+  'upce',
+  'codabar',
+  'itf',
+  'isbn',
+] as const;
 // Far above any symbology's capacity (QR Code tops out at 7089 digits) while
 // still bounding a hand-edited file.
 const MAX_BARCODE_DATA_LENGTH = 8_000;
@@ -37,6 +51,7 @@ export function validateBarcodeSpec(value: Record<string, unknown>, path: string
     ),
     requireBoolean(value, `${path}.invert`),
     requireBoolean(value, `${path}.showText`),
+    optionalBoolean(value, `${path}.processEscapes`),
   ]);
 }
 

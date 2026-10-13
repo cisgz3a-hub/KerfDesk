@@ -81,6 +81,19 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     moveSelectionInDrawOrder: vi.fn(),
     matchSelectionSize: vi.fn(),
     moveSelectionTogether: vi.fn(),
+    mirrorSelectionAcrossLine: vi.fn(),
+    startTwoPointTransform: vi.fn(),
+    dockSelection: vi.fn(),
+    dockOptions: vi.fn(),
+    hasThreeCircles: false,
+    tangentCircle: vi.fn(),
+    closePathsWithTolerance: vi.fn(),
+    radiusFillet: vi.fn(),
+    shear: vi.fn(),
+    hasGuides: false,
+    guidesLocked: false,
+    toggleGuidesLocked: vi.fn(),
+    clearGuides: vi.fn(),
   };
 }
 

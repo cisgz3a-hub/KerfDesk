@@ -91,7 +91,7 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   node: {
     label: 'Edit nodes',
     tooltip:
-      'Edit vector path nodes without moving or resizing the whole object. A dragged node snaps to other nodes, midpoints, centres, crossings and the grid; hold Alt to place it freely.',
+      'Edit vector path nodes without moving or resizing the whole object. A dragged node snaps to other nodes, midpoints, centres, crossings and the grid; hold Alt to place it freely. Hover keys, as in LightBurn: D deletes the node or segment, I inserts a node, M inserts one at the midpoint, C and S make a node corner or smooth, L and S turn a segment into a line or a curve, B breaks the path at a node, A turns the selection so the segment lies on the nearest 45°, T trims and E extends.',
   },
   measure: {
     label: 'Measure',
@@ -121,7 +121,7 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   polyline: {
     label: 'Draw polyline',
     tooltip:
-      'Draw connected line segments. Press Enter or double-click to finish. Each click snaps to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
+      'Draw connected line segments; click and drag to place a smooth curve node with Bezier handles. Start on the open end of existing artwork to continue it, and click its other end to close it. Press Enter or double-click to finish. Each click snaps to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
   },
 };
 

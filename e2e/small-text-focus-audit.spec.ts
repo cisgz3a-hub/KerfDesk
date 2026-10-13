@@ -120,10 +120,10 @@ test('font arrows and wheel browse without changing the draft and Enter selects 
   const scroll = page.locator('.lf-canvas-text-scroll');
   const oldScroll = await scroll.evaluate((element) => element.scrollTop);
   await search.press('ArrowDown');
-  const first = chooser.getByRole('option').first().locator('button');
+  const first = chooser.getByRole('option').first().locator('button[data-font-key]');
   await expect(first).toBeFocused();
   await first.press('End');
-  const last = chooser.getByRole('option').last().locator('button');
+  const last = chooser.getByRole('option').last().locator('button[data-font-key]');
   await expect(last).toBeFocused();
   await last.hover();
   await page.mouse.wheel(0, 900);

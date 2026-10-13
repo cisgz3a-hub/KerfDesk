@@ -97,6 +97,7 @@ function snapCandidates(args: {
 }): ReadonlyArray<SnapCandidate> {
   return [
     ...(args.settings.snapToObjects ? objectSnapCandidates(args) : []),
+    ...guideSnapCandidates(args),
     ...(args.settings.snapToGrid ? gridSnapCandidates(args) : []),
   ];
 }
@@ -133,6 +134,21 @@ function addObjectCandidates(
       });
     }
   }
+}
+
+// Guidelines pull artwork edges and centres onto them whenever snapping is on.
+function guideSnapCandidates(args: {
+  readonly axis: SnapAxis;
+  readonly project: Project;
+  readonly movedBox: Aabb;
+}): ReadonlyArray<SnapCandidate> {
+  const guides = (args.project.guides ?? []).filter((guide) => guide.axis === args.axis);
+  return guides.flatMap((guide) =>
+    snapPositions(args.movedBox, args.axis).map((movingPosition) => ({
+      deltaMm: guide.positionMm - movingPosition,
+      guide: gridGuide(args.axis, guide.positionMm, args.movedBox),
+    })),
+  );
 }
 
 function gridSnapCandidates(args: {

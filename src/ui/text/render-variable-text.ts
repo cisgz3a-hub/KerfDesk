@@ -1,4 +1,5 @@
-import { bendTextRender, placeTextOnPath } from '../../core/text';
+import { placeTextOnPath } from '../../core/text';
+import { styledBentRender, styledTextContent, styleTextRender } from '../../core/text/text-style';
 import { IDENTITY_TRANSFORM } from '../../core/scene';
 import type { VariableTextRenderer } from '../../io/gcode';
 import { renderTextGeometry } from './render-text-geometry';
@@ -8,7 +9,7 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
   const rendered = await renderTextGeometry({
     fontKey: text.fontKey,
     embeddedFonts: project.embeddedFonts,
-    content,
+    content: styledTextContent(content, text.textStyle),
     sizeMm: text.sizeMm,
     alignment: text.alignment,
     lineHeight: text.lineHeight,
@@ -22,7 +23,8 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
     );
     if (guide === undefined)
       throw new Error('The linked text guide is missing. Relink it to output.');
-    const placed = placeTextOnPath(rendered, guide, text.pathText);
+    const styled = styleTextRender(rendered, text.textStyle, text.sizeMm);
+    const placed = placeTextOnPath(styled, guide, text.pathText);
     if (placed.kind !== 'ok') throw new Error(placed.message);
     return {
       ...applyTextWeld(placed.rendered, text.fontKey, text.weldOverlaps),
@@ -32,12 +34,12 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
   }
   if (text.textBox !== undefined)
     return {
-      ...applyTextWeld(rendered, text.fontKey, text.weldOverlaps),
+      ...applyTextWeld(
+        styleTextRender(rendered, text.textStyle, text.sizeMm),
+        text.fontKey,
+        text.weldOverlaps,
+      ),
       transform: text.transform,
     };
-  return applyTextWeld(
-    bendTextRender(rendered, text.bendDeg ?? 0),
-    text.fontKey,
-    text.weldOverlaps,
-  );
+  return applyTextWeld(styledBentRender(rendered, text), text.fontKey, text.weldOverlaps);
 };

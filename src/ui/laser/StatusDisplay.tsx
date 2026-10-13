@@ -22,27 +22,27 @@ import {
 import { isRestoredWorkOrigin } from '../state/work-origin-state';
 import { controllerReportsWorkOffset } from './work-offset-assumption';
 
-export function StatusDisplay(): JSX.Element {
+export function StatusDisplay({
+  variant = 'all',
+}: { readonly variant?: 'all' | 'state' | 'details' } = {}): JSX.Element {
   const report = useLaserStore((s) => s.statusReport);
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const originName = useLaserStore(customOriginName);
   const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
   const reportsOffset = useLaserStore((s) => controllerReportsWorkOffset(s.capabilities));
-  if (report === null) return <div style={dimStyle}>State: —</div>;
+  if (report === null) return unavailableStatus(variant);
+  if (variant === 'state') return <StatusState report={report} />;
   const pos = inferCurrentMachinePosition(report, wcoCache, reportInches);
   const wcoMm = reportedWorkOffsetMm(wcoCache, reportInches);
   const feedMmPerMin = reportedFeedMmPerMin(report, reportInches);
-  const label = report.subState === null ? report.state : `${report.state}:${report.subState}`;
   // workOriginActive covers a deliberately-set origin whose offset happens to be
   // zero (hand-set at machine 0,0 on a no-homing machine) — hasCustomOrigin(wco)
   // alone would render that as "machine 0,0" and read as if Set origin failed.
   const customOrigin = workOriginActive || hasCustomOrigin(wcoCache);
   return (
     <div style={panelStyle}>
-      <div style={stateRowStyle}>
-        <strong>State:</strong> {label}
-      </div>
+      {variant !== 'details' && <StatusState report={report} />}
       {pos !== null && (
         <div style={posRowStyle}>
           <strong>MPos:</strong> X {pos.x.toFixed(3)} Y {pos.y.toFixed(3)} Z {pos.z.toFixed(3)}
@@ -62,6 +62,24 @@ export function StatusDisplay(): JSX.Element {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function unavailableStatus(variant: 'all' | 'state' | 'details'): JSX.Element {
+  if (variant === 'details') return <div />;
+  return <div style={variant === 'state' ? stateRowStyle : dimStyle}>State: —</div>;
+}
+
+function StatusState({
+  report,
+}: {
+  readonly report: NonNullable<LaserState['statusReport']>;
+}): JSX.Element {
+  const label = report.subState === null ? report.state : `${report.state}:${report.subState}`;
+  return (
+    <div style={stateRowStyle}>
+      <strong>State:</strong> {label}
     </div>
   );
 }

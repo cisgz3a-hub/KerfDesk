@@ -24,7 +24,7 @@ import { type PenDraft, type SelectionMarquee } from '../state/ui-store';
 import type { ArtworkRunFocus } from '../state/artwork-run-order-ui';
 import type { MeasureDraft } from './measure-tool';
 import { drawSelectionMarquee } from './draw-selection-marquee';
-import { drawSnapGuides } from './draw-snap-guides';
+import { drawProjectGuides, drawSnapGuides } from './draw-snap-guides';
 import type { SnapGuide } from './snapping';
 import type { SnapMarker } from './snap/snap-kinds';
 import { drawSnapMarker } from './draw-snap-marker';
@@ -174,7 +174,7 @@ export function drawScene(
     drawRegistrationBoxDimensions(ctx, project, view);
     drawLiveWorkspaceOverlays(ctx, project, opts, view);
   }
-  if (!opts.preview) drawSnapFeedback(ctx, opts, view);
+  if (!opts.preview) drawSnapFeedback(ctx, project, opts, view);
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).
   drawRulers(ctx, canvasW, canvasH, view);
@@ -182,9 +182,11 @@ export function drawScene(
 
 function drawSnapFeedback(
   ctx: CanvasRenderingContext2D,
+  project: Project,
   opts: DrawOpts,
   view: ViewTransform,
 ): void {
+  drawProjectGuides(ctx, project.guides ?? [], view);
   drawSnapGuides(ctx, opts.snapGuides ?? [], view);
   if (opts.snapMarker !== undefined) drawSnapMarker(ctx, opts.snapMarker, view);
 }

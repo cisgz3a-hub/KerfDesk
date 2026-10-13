@@ -9,7 +9,13 @@
 import { assertNever, type Project, type ShapeObject, type Vec2 } from '../../core/scene';
 import { createPolyline } from '../../core/shapes';
 import { type PenDraft, useUiStore } from '../state/ui-store';
+import { useStore } from '../state';
+import { materializeCurves } from '../state/path-node-curve-command-actions';
+import { boundsForPaths } from '../state/path-node-edit-geometry';
+import { synchronizePolylineShapeGeometry } from '../state/path-node-shape-sync';
 import { currentDrawingColor } from './draw-tool';
+import { continuationOtherEnd, penEndpointAt } from './pen-continuation';
+import { penContour, penHasHandles } from './pen-curve';
 import { pxToMmForCanvas } from './view-transform';
 import { snapWorkspacePointer } from './workspace-pointer-snap';
 
@@ -24,6 +30,8 @@ const MIN_PEN_VERTICES_CLOSED = 3;
 // Pixel-based (converted to mm via the live scale) so the snap feels identical
 // at any zoom — matches LightBurn's snap-to-node.
 const CLOSE_THRESHOLD_PX = 10;
+// A press that moves less than this is a corner click, not a curve-node drag.
+const MIN_HANDLE_MM = 0.05;
 
 export type PenClickOutcome =
   | { readonly kind: 'ignore' }
@@ -73,16 +81,66 @@ export function handlePenMouseDown(args: {
     toolMode: { kind: 'draw', shape: 'polyline' },
   });
   if (rawPoint === null) return;
-  const pxToMm = pxToMmForCanvas(args.ref.current, args.project, args.viewState);
+  const radiusMm =
+    CLOSE_THRESHOLD_PX * pxToMmForCanvas(args.ref.current, args.project, args.viewState);
   const penDraft = useUiStore.getState().penDraft;
+  if (startOnEndpoint(penDraft, args.e.detail, args.project, rawPoint, radiusMm)) return;
   const point = constrainPenPoint(penDraft, rawPoint, args.e.shiftKey);
+  if (closeOntoOtherEnd(penDraft, args.e.detail, args.project, point, radiusMm)) {
+    finishPen({ closed: true, project: args.project, drawShape: args.drawShape });
+    return;
+  }
   const outcome = penClickOutcome({
     detail: args.e.detail,
     point,
     penDraft,
-    closeDistanceMm: CLOSE_THRESHOLD_PX * pxToMm,
+    // Continuing a path closes on its other end, never on the start it grew from.
+    closeDistanceMm: penDraft?.continueFrom === undefined ? radiusMm : 0,
   });
   applyPenClickOutcome(outcome, penDraft, args.project, args.drawShape);
+}
+
+// The first click on an open endpoint of existing artwork continues that path.
+function startOnEndpoint(
+  penDraft: PenDraft | null,
+  detail: number,
+  project: Project,
+  point: Vec2,
+  radiusMm: number,
+): boolean {
+  if (penDraft !== null || detail >= 2) return false;
+  const start = penEndpointAt(project, point, radiusMm);
+  if (start === null) return false;
+  useUiStore.getState().setPenDraft({
+    vertices: [start.point],
+    cursor: start.point,
+    handles: [null],
+    continueFrom: start.continuation,
+  });
+  return true;
+}
+
+// While continuing a path, a click on its other end lands there and closes it.
+function closeOntoOtherEnd(
+  penDraft: PenDraft | null,
+  detail: number,
+  project: Project,
+  point: Vec2,
+  radiusMm: number,
+): boolean {
+  if (penDraft?.continueFrom === undefined || detail >= 2) return false;
+  const other = continuationOtherEnd(project, penDraft.continueFrom);
+  if (other === null || distance(point, other) >= radiusMm) return false;
+  useUiStore.getState().setPenDraft({
+    ...penDraft,
+    vertices: [...penDraft.vertices, other],
+    handles: [...penHandles(penDraft), null],
+  });
+  return true;
+}
+
+function penHandles(penDraft: PenDraft): ReadonlyArray<Vec2 | null> {
+  return penDraft.handles ?? penDraft.vertices.map(() => null);
 }
 
 function applyPenClickOutcome(
@@ -96,12 +154,14 @@ function applyPenClickOutcome(
     case 'ignore':
       return;
     case 'start':
-      setPenDraft({ vertices: [outcome.point], cursor: outcome.point });
+      setPenDraft({ vertices: [outcome.point], cursor: outcome.point, handles: [null] });
       return;
     case 'append':
       setPenDraft({
+        ...penDraft,
         vertices: [...(penDraft?.vertices ?? []), outcome.point],
         cursor: outcome.point,
+        handles: [...(penDraft === null ? [] : penHandles(penDraft)), null],
       });
       return;
     case 'close':
@@ -113,11 +173,21 @@ function applyPenClickOutcome(
 }
 
 // Update the rubber-band endpoint on mousemove. No-op when the pen isn't drawing.
-export function updatePenCursor(point: Vec2 | null, constrain = false): void {
+// With the button still held after placing a vertex, the drag pulls out its
+// Bezier handle instead (LightBurn click-and-drag for a curve node).
+export function updatePenCursor(point: Vec2 | null, constrain = false, dragging = false): void {
   const current = useUiStore.getState().penDraft;
   if (current === null) return;
+  const last = current.vertices.length - 1;
+  const vertex = current.vertices[last];
+  if (dragging && point !== null && vertex !== undefined) {
+    const handles = [...penHandles(current)];
+    handles[last] = distance(point, vertex) < MIN_HANDLE_MM ? null : point;
+    useUiStore.getState().setPenDraft({ ...current, handles, cursor: point });
+    return;
+  }
   const cursor = point === null ? null : constrainPenPoint(current, point, constrain);
-  useUiStore.getState().setPenDraft({ vertices: current.vertices, cursor });
+  useUiStore.getState().setPenDraft({ ...current, cursor });
 }
 
 export function constrainPenPoint(
@@ -151,15 +221,42 @@ export function finishPen(args: {
   const penDraft = useUiStore.getState().penDraft;
   if (penDraft === null) return false;
   const points = penDraft.vertices;
+  if (penDraft.continueFrom !== undefined) return finishContinuation(penDraft, args.closed);
   const min = args.closed ? MIN_PEN_VERTICES_CLOSED : MIN_PEN_VERTICES_OPEN;
   if (points.length < min) return false;
   const color = currentDrawingColor(args.project);
+  const shape = createPolyline({
+    id: crypto.randomUUID(),
+    color,
+    spec: { points, closed: args.closed },
+  });
   args.drawShape(
-    createPolyline({ id: crypto.randomUUID(), color, spec: { points, closed: args.closed } }),
+    penHasHandles(penDraft.handles) ? curvedPenShape(shape, penDraft, args.closed) : shape,
   );
   // Return to the Select tool after finishing a polyline (maintainer request,
   // 2026-07-07), matching the drag-drawn shapes — rule 3 lets the maintainer
   // override the earlier sticky default. resetToolMode also clears the draft.
   useUiStore.getState().resetToolMode();
   return true;
+}
+
+// A drawing with dragged nodes keeps its exact Bezier segments instead of the
+// fitted outline a plain click-by-click polyline gets.
+function curvedPenShape(shape: ShapeObject, penDraft: PenDraft, closed: boolean): ShapeObject {
+  const contour = penContour(penDraft.vertices, penHandles(penDraft), closed);
+  const source = shape.paths[0];
+  const path =
+    contour === null || source === undefined ? null : materializeCurves(source, [contour]);
+  if (path === null) return shape;
+  return synchronizePolylineShapeGeometry(shape, [path], boundsForPaths([path])) ?? shape;
+}
+
+// Continuing a path: join the drawn stretch onto the endpoint it began on.
+function finishContinuation(penDraft: PenDraft, closed: boolean): boolean {
+  const from = penDraft.continueFrom;
+  const contour = penContour(penDraft.vertices, penHandles(penDraft), false);
+  if (from === undefined || contour === null) return false;
+  const extended = useStore.getState().extendPathContour(from, contour, closed);
+  if (extended) useUiStore.getState().resetToolMode();
+  return extended;
 }

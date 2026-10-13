@@ -21,7 +21,8 @@ export function copyObjectsAtArrayPlacement(
 
 /** Pure placement of one array copy: mirror, then move, then rotate. Exported for direct pivot coverage. */
 export function placedObject(object: SceneObject, placement: ArrayPlacement): SceneObject {
-  const source = placement.mirror === undefined ? object : mirrored(object, placement.mirror);
+  const flipped = placement.mirror === undefined ? object : mirrored(object, placement.mirror);
+  const source = placement.scale === undefined ? flipped : scaled(flipped, placement.scale);
   const moved = {
     ...source.transform,
     x: source.transform.x + placement.dx,
@@ -48,7 +49,8 @@ export function isIdentityArrayPlacement(placement: ArrayPlacement): boolean {
     placement.dx === 0 &&
     placement.dy === 0 &&
     normalizeDegrees(placement.rotationDeg) === 0 &&
-    placement.mirror === undefined
+    placement.mirror === undefined &&
+    placement.scale === undefined
   );
 }
 
@@ -65,6 +67,24 @@ function mirrored(object: SceneObject, mirror: ArrayPlacementMirror): SceneObjec
     result = { ...result, transform } as SceneObject;
   }
   return result;
+}
+
+// A uniform scale about the source's centre: every object of a design grows
+// or shrinks as one piece, keeping its place relative to the others.
+function scaled(object: SceneObject, scale: NonNullable<ArrayPlacement['scale']>): SceneObject {
+  const f = scale.factor;
+  if (!(f > 0) || f === 1) return object;
+  const t = object.transform;
+  return {
+    ...object,
+    transform: {
+      ...t,
+      x: scale.center.x + (t.x - scale.center.x) * f,
+      y: scale.center.y + (t.y - scale.center.y) * f,
+      scaleX: t.scaleX * f,
+      scaleY: t.scaleY * f,
+    },
+  } as SceneObject;
 }
 
 function rotateAboutPivot(

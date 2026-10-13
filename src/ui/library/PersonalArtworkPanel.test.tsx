@@ -36,6 +36,9 @@ beforeEach(() => {
     remove: vi.fn(async (id) => {
       records = records.filter((entry) => entry.id !== id);
     }),
+    put: vi.fn(async (entry) => {
+      records = records.map((existing) => (existing.id === entry.id ? entry : existing));
+    }),
   };
   onClose.mockClear();
   host = document.createElement('div');
@@ -157,4 +160,22 @@ it('cancelled file pickers and failed exports preserve local artwork and the ope
   await click('Export library...');
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('Disk full');
   expect(records).toEqual([entry]);
+});
+
+it('renames a saved entry and replaces what it holds, keeping its id', async () => {
+  const entry = await capturePersonalArtwork(useStore.getState(), 'Saved logo', 'Jigs');
+  records = [entry];
+  await render();
+  const name = host.querySelector<HTMLInputElement>('input[aria-label="Saved artwork name"]')!;
+  await act(async () => {
+    name.value = 'Club badge';
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await click('Rename');
+  expect(records).toEqual([{ ...entry, name: 'Club badge' }]);
+  useStore.setState({ selectedObjectId: 'text', additionalSelectedIds: new Set() });
+  await click('Replace with selection');
+  expect(records[0]?.id).toBe(entry.id);
+  expect(records[0]?.name).toBe('Club badge');
+  expect(records[0]?.selectedObjectIds).toEqual(['text']);
 });

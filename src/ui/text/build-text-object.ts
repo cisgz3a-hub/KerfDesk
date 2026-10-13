@@ -1,4 +1,5 @@
-import { bendTextRender, placeTextOnPath } from '../../core/text';
+import { placeTextOnPath } from '../../core/text';
+import { styledBentRender, styledTextContent, styleTextRender } from '../../core/text/text-style';
 import { IDENTITY_TRANSFORM, type TextObject } from '../../core/scene';
 import { parseVariableTemplateSource } from '../../core/variables';
 import type { TextDialogState } from '../state/ui-store';
@@ -38,7 +39,7 @@ export async function buildTextObject(
   const rendered = await renderTextGeometry({
     fontKey: values.fontKey,
     embeddedFonts: values.embeddedFonts,
-    content,
+    content: styledTextContent(content, values.textStyle),
     sizeMm: safeValues.sizeMm,
     alignment: values.alignment,
     lineHeight: safeValues.lineHeight,
@@ -66,6 +67,7 @@ export async function buildTextObject(
     letterSpacing: safeValues.letterSpacing,
     bendDeg: values.pathText === undefined ? safeValues.bendDeg : 0,
     ...(values.weldOverlaps === undefined ? {} : { weldOverlaps: values.weldOverlaps }),
+    ...(values.textStyle === undefined ? {} : { textStyle: values.textStyle }),
     color: values.color,
     ...box,
     ...(values.pathText === undefined ? {} : { pathText: values.pathText }),
@@ -105,12 +107,17 @@ function placeRenderedText(
 } {
   if (values.pathText === undefined) {
     return {
-      rendered: bendTextRender(rendered, safeValues.bendDeg),
+      rendered: styledBentRender(rendered, {
+        bendDeg: safeValues.bendDeg,
+        sizeMm: safeValues.sizeMm,
+        ...(values.textStyle === undefined ? {} : { textStyle: values.textStyle }),
+      }),
       transform: IDENTITY_TRANSFORM,
     };
   }
   if (values.pathGuide === undefined) throw new Error('Select a guide path for this text.');
-  const result = placeTextOnPath(rendered, values.pathGuide, values.pathText);
+  const styled = styleTextRender(rendered, values.textStyle, safeValues.sizeMm);
+  const result = placeTextOnPath(styled, values.pathGuide, values.pathText);
   if (result.kind !== 'ok') throw new Error(result.message);
   return {
     rendered: result.rendered,

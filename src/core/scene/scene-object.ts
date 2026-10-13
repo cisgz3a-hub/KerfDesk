@@ -1,3 +1,13 @@
+import type { PagedRasterImageAsset } from './raster-image-asset';
+import type { FontKey, TextAlignment, PathTextSettings, TextStyle } from './text-settings';
+export type {
+  FontKey,
+  TextAlignment,
+  PathTextAlongAlign,
+  PathTextAcrossAlign,
+  PathTextSettings,
+  TextStyle,
+} from './text-settings';
 import type { ConstrainedSketch2d } from '../sketch-constraints/constrained-sketch';
 import type { PartGeneratorSource } from '../parts/part-generator';
 import type { RegistrationJigIdentity } from './registration-jig-identity';
@@ -217,27 +227,6 @@ export type ImportedSvg = ObjectPowerScale & {
 // registry + opentype rendering pipeline live in core/text/ and
 // reference TextObject FROM here, not the other way around (avoids a
 // circular dependency).
-export type TextAlignment = 'left' | 'center' | 'right';
-
-// The string-keyed font identifier. Concrete keys are enumerated in
-// core/text/font-registry.ts; this module stays unaware of which
-// fonts are bundled (so adding a font doesn't ripple here).
-export type FontKey = string;
-
-// Where the text sits along the guide (measured from the guide's start, or
-// from its end for 'end') and across it. Absent means 'start' and 'above',
-// the placement every path text had before ADR-480.
-export type PathTextAlongAlign = 'start' | 'middle' | 'end';
-export type PathTextAcrossAlign = 'above' | 'center' | 'below';
-
-export type PathTextSettings = {
-  readonly guideObjectId: string;
-  readonly offsetMm: number;
-  readonly reverse: boolean;
-  readonly alongAlign?: PathTextAlongAlign;
-  readonly acrossAlign?: PathTextAcrossAlign;
-};
-
 export type TextObject = ObjectPowerScale & {
   readonly kind: 'text';
   readonly id: string;
@@ -252,6 +241,9 @@ export type TextObject = ObjectPowerScale & {
   // applies this as an extra advance after each glyph. Phase D.1 add.
   readonly letterSpacing: number;
   readonly bendDeg?: number;
+  // LightBurn text options (bold, italic, upper case, right-to-left, max width,
+  // undistorted bend). Absent keeps plain text.
+  readonly textStyle?: TextStyle;
   // Union this text object's overlapping outline glyphs while keeping its
   // editable source. Absent/false preserves legacy independent contours.
   readonly weldOverlaps?: boolean;
@@ -348,26 +340,6 @@ export const DITHER_ALGORITHMS = [
 
 export type DitherAlgorithm = (typeof DITHER_ALGORITHMS)[number];
 
-type PagedRasterImageAsset = {
-  readonly schemaVersion: 1;
-  readonly repository: 'curvedesk-import-assets-v1';
-  readonly sourceAssetId: string;
-  readonly lumaAssetId: string;
-  readonly sourceMimeType: string;
-  readonly sourceByteLength: number;
-  readonly lumaByteLength: number;
-  readonly naturalWidth: number;
-  readonly naturalHeight: number;
-  readonly sampledWidth: number;
-  readonly sampledHeight: number;
-  readonly thumbnail: {
-    readonly mimeType: 'image/bmp';
-    readonly dataUrl: string;
-    readonly width: number;
-    readonly height: number;
-  };
-};
-
 export type RasterImage = ObjectPowerScale & {
   readonly kind: 'raster-image';
   readonly id: string;
@@ -457,6 +429,8 @@ export type PolygonShape = {
   readonly kind: 'polygon';
   readonly sides: number; // circumscribed regular polygon, 3..64
   readonly radiusMm: number; // circumradius
+  /** Sides bowed into arcs: sagitta = bulge x half the side, -1..1 (0 straight). */
+  readonly bulge?: number;
 };
 
 export type StarShape = {
@@ -464,6 +438,10 @@ export type StarShape = {
   readonly points: number; // alternating outer/inner vertices, 3..64 points
   readonly outerRadiusMm: number;
   readonly innerRadiusRatio: number; // innerRadiusMm / outerRadiusMm, 0..1
+  /** Every other tip at this share of the outer radius (dual-radius star), 0.05..1. */
+  readonly alternateRadiusRatio?: number;
+  /** Sides bowed into arcs, as for a polygon. */
+  readonly bulge?: number;
 };
 
 // An open or closed run of points â€” the pen tool's freeform primitive (B6).
@@ -484,7 +462,12 @@ export type BarcodeSymbology =
   | 'code39'
   | 'ean13'
   | 'upca'
-  | 'ean8';
+  | 'ean8'
+  | 'code93'
+  | 'upce'
+  | 'codabar'
+  | 'itf'
+  | 'isbn';
 
 export type BarcodeShape = {
   readonly kind: 'barcode';
@@ -507,6 +490,8 @@ export type BarcodeShape = {
   readonly invert: boolean;
   // Human-readable text under 1D symbols.
   readonly showText: boolean;
+  // Turn \n \t \xHH ... in the data into control characters before encoding.
+  readonly processEscapes?: boolean;
 };
 
 // The parametric block.

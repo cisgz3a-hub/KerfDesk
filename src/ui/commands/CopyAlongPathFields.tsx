@@ -16,6 +16,9 @@ export type CopyAlongPathForm = {
   readonly endText: string;
   readonly rotateCopies: boolean;
   readonly keepOriginal: boolean;
+  /** The last copy's size as a percentage of the original's. */
+  readonly endScaleText: string;
+  readonly incrementVariables: boolean;
 };
 
 type Patch = (patch: Partial<CopyAlongPathForm>) => void;
@@ -112,6 +115,20 @@ export function OptionFields(props: {
         title="Turn each copy by the direction of the path where it sits."
         checked={props.form.rotateCopies}
         onChange={(rotateCopies) => props.onChange({ rotateCopies })}
+      />
+      <NumberField
+        label="Last copy size (%)"
+        title="Grow or shrink the copies evenly along the path: the first keeps the original's size, the last is this percentage of it. 100 keeps them all the same."
+        value={props.form.endScaleText}
+        min={1}
+        step={1}
+        onChange={(endScaleText) => props.onChange({ endScaleText })}
+      />
+      <Check
+        label="Next variable value on each copy"
+        title="Give each copy's variable text and barcodes the next serial number or CSV record, as a variable array does."
+        checked={props.form.incrementVariables}
+        onChange={(incrementVariables) => props.onChange({ incrementVariables })}
       />
       <Check
         label="Keep the original"

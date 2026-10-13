@@ -8,6 +8,9 @@ import { encodeCode128 } from './code128';
 import { encodeCode39 } from './code39';
 import { encodeDataMatrix, type BarcodeUse } from './data-matrix-encode';
 import { encodeEanUpc } from './ean-upc';
+import { encodeCodabar, encodeItf } from './codabar-itf';
+import { encodeCode93 } from './code93';
+import { encodeIsbn, encodeUpcE } from './upce-isbn';
 import type { LinearEncodeResult, LinearSymbol } from './linear-symbol';
 import { encodeQr } from './qr-encode';
 import type { QrErrorCorrection } from './qr-tables';
@@ -41,6 +44,29 @@ export const BARCODE_SYMBOLOGY_LABELS: Readonly<Record<BarcodeSymbology, string>
   ean13: 'EAN-13',
   upca: 'UPC-A',
   ean8: 'EAN-8',
+  code93: 'Code 93',
+  upce: 'UPC-E',
+  codabar: 'Codabar',
+  itf: 'Interleaved 2 of 5',
+  isbn: 'ISBN (EAN-13)',
+};
+
+const LINEAR_ENCODERS: Readonly<
+  Record<
+    Exclude<BarcodeSymbology, 'qr' | 'data-matrix'>,
+    readonly [(data: string) => LinearEncodeResult, string]
+  >
+> = {
+  code128: [encodeCode128, 'Code 128'],
+  code39: [(data) => encodeCode39(data), 'Code 39'],
+  ean13: [(data) => encodeEanUpc('ean13', data), 'EAN-13'],
+  upca: [(data) => encodeEanUpc('upca', data), 'UPC-A'],
+  ean8: [(data) => encodeEanUpc('ean8', data), 'EAN-8'],
+  code93: [encodeCode93, 'Code 93'],
+  upce: [encodeUpcE, 'UPC-E'],
+  codabar: [encodeCodabar, 'Codabar'],
+  itf: [(data) => encodeItf(data), 'Interleaved 2 of 5'],
+  isbn: [encodeIsbn, 'ISBN'],
 };
 
 export function encodeBarcodeSymbol(
@@ -50,20 +76,10 @@ export function encodeBarcodeSymbol(
   use: BarcodeUse = 'edit',
 ): BarcodeSymbolResult {
   if (data.length === 0) return { ok: false, message: 'Enter the data to encode.' };
-  switch (symbology) {
-    case 'qr':
-      return qrSymbol(data, errorCorrection);
-    case 'data-matrix':
-      return dataMatrixSymbol(data, use);
-    case 'code128':
-      return linear(encodeCode128(data), 'Code 128');
-    case 'code39':
-      return linear(encodeCode39(data), 'Code 39');
-    case 'ean13':
-    case 'upca':
-    case 'ean8':
-      return linear(encodeEanUpc(symbology, data), BARCODE_SYMBOLOGY_LABELS[symbology]);
-  }
+  if (symbology === 'qr') return qrSymbol(data, errorCorrection);
+  if (symbology === 'data-matrix') return dataMatrixSymbol(data, use);
+  const [encode, name] = LINEAR_ENCODERS[symbology];
+  return linear(encode(data), name);
 }
 
 function qrSymbol(data: string, errorCorrection: QrErrorCorrection): BarcodeSymbolResult {
@@ -102,7 +118,9 @@ function linear(encoded: LinearEncodeResult, name: string): BarcodeSymbolResult 
   if (!encoded.ok) return encoded;
   const digits = encoded.symbol.text.map((run) => run.text).join('');
   const detail =
-    /^\d+$/.test(digits) && name !== 'Code 128' && name !== 'Code 39' ? ` ${digits}` : '';
+    /^\d+$/.test(digits) && !['Code 128', 'Code 39', 'Code 93', 'Codabar'].includes(name)
+      ? ` ${digits}`
+      : '';
   return {
     ok: true,
     symbol: {
