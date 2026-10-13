@@ -34,13 +34,41 @@ export function evaluateVariableTemplate(
   }
   const copy = copyEvaluationContext(template, project, context);
   if (!copy.ok) return copy;
-  const values: string[] = [];
+  const pieces: EvaluatedPiece[] = [];
   for (const token of template.tokens) {
     const evaluated = evaluateToken(token, text, project, copy.context);
     if (!evaluated.ok) return evaluated;
-    values.push(evaluated.value);
+    pieces.push({
+      value: evaluated.value,
+      field: isTemplateToken(token) && token.kind !== 'literal',
+    });
   }
-  return { ok: true, value: values.join('').normalize('NFC') };
+  const value =
+    template.ignoreEmptyLines === true
+      ? withoutEmptyFieldLines(pieces)
+      : pieces.map((piece) => piece.value).join('');
+  return { ok: true, value: value.normalize('NFC') };
+}
+
+type EvaluatedPiece = { readonly value: string; readonly field: boolean };
+
+// A line is dropped, with its line break, when it holds at least one field and
+// only whitespace after evaluation. Lines typed empty on purpose are kept.
+function withoutEmptyFieldLines(pieces: ReadonlyArray<EvaluatedPiece>): string {
+  const lines: { text: string; field: boolean }[] = [{ text: '', field: false }];
+  for (const piece of pieces) {
+    const parts = piece.value.split('\n');
+    parts.forEach((part, index) => {
+      if (index > 0) lines.push({ text: '', field: false });
+      const line = lines[lines.length - 1] as { text: string; field: boolean };
+      line.text += part;
+      if (piece.field) line.field = true;
+    });
+  }
+  return lines
+    .filter((line) => !(line.field && line.text.trim() === ''))
+    .map((line) => line.text)
+    .join('\n');
 }
 
 function copyEvaluationContext(

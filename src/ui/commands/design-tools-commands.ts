@@ -89,6 +89,21 @@ export function designToolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCo
     ),
     ...warpDeformCommands(ctx),
     optimizeShapesCommand(ctx),
+    ctx.canBakeVariableText
+      ? enabled(
+          'tools.bake-variable-text',
+          'tools',
+          'Bake Variable Text',
+          'Fix the selected variable text and barcodes at the value they would engrave now',
+          ctx.bakeVariableText,
+        )
+      : disabled(
+          'tools.bake-variable-text',
+          'tools',
+          'Bake Variable Text',
+          'Select unlocked variable text or a variable barcode first.',
+          ctx.bakeVariableText,
+        ),
     ctx.hasMaskedRasterSelection
       ? enabled(
           'tools.flatten-image-mask',

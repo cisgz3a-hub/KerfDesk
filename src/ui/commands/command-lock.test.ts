@@ -150,6 +150,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     pasteInPlace: vi.fn(),
     invertSelection: vi.fn(),
     selectOpenShapes: vi.fn(),
+    selectOpenFillShapes: vi.fn(),
+    openSelectCircles: vi.fn(),
     canOffsetShapes: false,
     offsetShapes: vi.fn(),
     rotateSelectionQuarterTurn: vi.fn(),
@@ -177,6 +179,13 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     startWarp: vi.fn(),
     startDeform: vi.fn(),
     optimizeShapes: vi.fn(),
+    canBakeVariableText: false,
+    bakeVariableText: vi.fn(),
+    saveOriginalImage: vi.fn(),
+    savePreviewImage: vi.fn(),
+    moveSelectionInDrawOrder: vi.fn(),
+    matchSelectionSize: vi.fn(),
+    moveSelectionTogether: vi.fn(),
     ...overrides,
   };
 }

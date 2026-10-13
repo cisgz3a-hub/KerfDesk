@@ -3,10 +3,12 @@ import { Button, Dialog, DialogActions } from '../kit';
 
 export function ProjectNotesDialog(props: {
   readonly notes: string;
+  readonly showOnOpen?: boolean;
   readonly onCancel: () => void;
-  readonly onApply: (notes: string) => void;
+  readonly onApply: (notes: string, showOnOpen: boolean) => void;
 }): JSX.Element {
   const [draft, setDraft] = useState(props.notes);
+  const [showOnOpen, setShowOnOpen] = useState(props.showOnOpen === true);
   return (
     <Dialog title="Project Notes" size="md" onClose={props.onCancel} as="form" onSubmit={submit}>
       <label style={fieldStyle}>
@@ -18,6 +20,15 @@ export function ProjectNotesDialog(props: {
           style={textareaStyle}
           onChange={(event) => setDraft(event.currentTarget.value)}
         />
+      </label>
+      <label style={toggleStyle}>
+        <input
+          type="checkbox"
+          checked={showOnOpen}
+          title="Open these notes automatically whenever this project is opened, for setup reminders or handover."
+          onChange={(event) => setShowOnOpen(event.currentTarget.checked)}
+        />
+        Show these notes when the project is opened
       </label>
       <DialogActions>
         <Button type="button" onClick={props.onCancel}>
@@ -32,7 +43,7 @@ export function ProjectNotesDialog(props: {
 
   function submit(event: React.FormEvent): void {
     event.preventDefault();
-    props.onApply(draft);
+    props.onApply(draft, showOnOpen);
   }
 }
 
@@ -41,6 +52,8 @@ const fieldStyle: React.CSSProperties = {
   flexDirection: 'column',
   gap: 6,
 };
+
+const toggleStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
 
 const labelStyle: React.CSSProperties = {
   fontWeight: 700,

@@ -17,6 +17,8 @@ import {
 import { shapeQueryActions, type ShapeQueryActions } from './shape-query-actions';
 import type { AppState } from './store';
 import { cutShapesActions, type CutShapesActions } from './cut-shapes-actions';
+import { drawOrderActions, type DrawOrderActions } from './draw-order-actions';
+import { variableBakeActions, type VariableBakeActions } from './variable-bake-actions';
 import { extendShapesActions, type ExtendShapesActions } from './extend-shapes-actions';
 import { trimShapesActions, type TrimShapesActions } from './trim-shapes-actions';
 import { warpDeformActions, type WarpDeformActions } from './warp-deform-actions';
@@ -30,7 +32,9 @@ export type DesignToolsActions = ShapeQueryActions &
   ExtendShapesActions &
   CutShapesActions &
   WarpDeformActions &
-  OptimizeShapesActions;
+  OptimizeShapesActions &
+  DrawOrderActions &
+  VariableBakeActions;
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 type CopySetter = (
@@ -56,5 +60,7 @@ export function designToolsActions(
     ...cutShapesActions(copySet),
     ...warpDeformActions(set),
     ...optimizeShapesActions(set),
+    ...drawOrderActions(set),
+    ...variableBakeActions(set),
   };
 }

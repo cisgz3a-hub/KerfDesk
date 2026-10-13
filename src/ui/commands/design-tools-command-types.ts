@@ -7,12 +7,16 @@ import type {
   OptimizeShapesCommandContext,
   OptimizeShapesCommandId,
 } from './optimize-shapes-command-types';
+import type { LayoutCommandContext, LayoutCommandId } from './layout-command-types';
+import type { ParityToolsCommandContext, ParityToolsCommandId } from './parity-tools-command-types';
 import type { VectorCutCommandContext, VectorCutCommandId } from './vector-cut-command-types';
 import type { WarpDeformCommandContext, WarpDeformCommandId } from './warp-deform-command-types';
 
 export type DesignToolsCommandContext = VectorCutCommandContext &
   WarpDeformCommandContext &
-  OptimizeShapesCommandContext & {
+  OptimizeShapesCommandContext &
+  LayoutCommandContext &
+  ParityToolsCommandContext & {
     readonly selectContainedShapes: () => void;
     readonly selectSmallerShapes: () => void;
     readonly deleteDuplicates: () => void;
@@ -23,12 +27,16 @@ export type DesignToolsCommandContext = VectorCutCommandContext &
     readonly flattenImageMask: () => void;
     // LBG-T09: opens the Copy Along Path dialog, or explains why it cannot.
     readonly copyAlongPath: () => void;
+    readonly canBakeVariableText: boolean;
+    readonly bakeVariableText: () => void;
   };
 
 export type DesignToolsCommandId =
   | VectorCutCommandId
   | WarpDeformCommandId
   | OptimizeShapesCommandId
+  | LayoutCommandId
+  | ParityToolsCommandId
   | 'edit.select-contained'
   | 'edit.select-smaller'
   | 'edit.delete-duplicates'
@@ -36,4 +44,5 @@ export type DesignToolsCommandId =
   | 'tools.reverse-paths'
   | 'tools.rubber-band-outline'
   | 'tools.flatten-image-mask'
+  | 'tools.bake-variable-text'
   | 'arrange.copy-along-path';
