@@ -1,7 +1,8 @@
 import { expect, test, type Locator, type Page } from './fixtures/kerfdesk-test';
 
-// Side-by-side boxes stay level (a wrapped label or unit never pushes one box
-// down) and share their row evenly, at every supported Artwork panel width.
+// Laser essentials stack full-width sliders beside exact numeric entries.
+// Paired Fill fields, CNC rows and Box Fit Test boxes stay level and even
+// when labels wrap, at every supported Artwork panel width.
 
 interface Box {
   readonly top: number;
@@ -52,7 +53,7 @@ async function addTextArtwork(page: Page): Promise<Locator> {
   return page.getByRole('complementary', { name: 'Artwork / Operations panel' });
 }
 
-test('laser settings keep Power, Speed and Passes level and even at every panel width', async ({
+test('laser settings keep stacked sliders and exact entries aligned at every panel width', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -65,16 +66,49 @@ test('laser settings keep Power, Speed and Passes level and even at every panel 
   const essentials = [/^Power for/, /^Speed for/, /^Passes for/].map((name) =>
     panel.getByRole('spinbutton', { name }),
   );
+  const sliders = [/^Power slider for/, /^Speed slider for/].map((name) =>
+    panel.getByRole('slider', { name }),
+  );
   const hatch = [/^Hatch spacing for/, /^Hatch angle for/].map((name) =>
     panel.getByRole('spinbutton', { name }),
   );
 
   for (const width of [240, 260, 280, 300, 320, 360, 400]) {
     await setPanelWidth(page, panel, width);
-    const essentialBoxes = await Promise.all(essentials.map(boxOf));
-    expectLevel(essentialBoxes);
-    // Below about 270 px Speed takes a larger share so a five-digit speed fits.
-    if (width >= 280) expectEven(essentialBoxes);
+    const essentialBoxes = await Promise.all(
+      essentials.map(async (field) => {
+        const box = await field.boundingBox();
+        if (box === null) throw new Error('essential field is not rendered');
+        return {
+          top: box.y,
+          bottom: box.y + box.height,
+          width: box.width,
+          right: box.x + box.width,
+        };
+      }),
+    );
+    expectEven(essentialBoxes);
+    const rightEdges = essentialBoxes.map((box) => box.right);
+    expect(Math.max(...rightEdges) - Math.min(...rightEdges)).toBeLessThanOrEqual(1);
+    essentialBoxes.forEach((box, index) => {
+      const previous = essentialBoxes[index - 1];
+      if (previous !== undefined) expect(box.top).toBeGreaterThan(previous.bottom);
+    });
+    for (const slider of sliders) {
+      const bounds = await slider.evaluate((element) => {
+        const essentialsGrid = element.closest('.lf-laser-essentials__grid');
+        if (essentialsGrid === null) throw new Error('slider essentials grid is not rendered');
+        const track = element.getBoundingClientRect();
+        const grid = essentialsGrid.getBoundingClientRect();
+        return { leftGap: track.left - grid.left, rightGap: grid.right - track.right };
+      });
+      expect(Math.abs(bounds.leftGap)).toBeLessThanOrEqual(1);
+      expect(Math.abs(bounds.rightGap)).toBeLessThanOrEqual(1);
+    }
+    const horizontalOverflow = await panel.evaluate(
+      (element) => element.scrollWidth - element.clientWidth,
+    );
+    expect(horizontalOverflow).toBeLessThanOrEqual(1);
     const hatchBoxes = await Promise.all(hatch.map(boxOf));
     expectLevel(hatchBoxes);
     expectEven(hatchBoxes);

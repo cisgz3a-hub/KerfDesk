@@ -212,20 +212,24 @@
   border-radius: 0 6px 6px 0;
 }
 
-/* Power, Speed and Passes get three equal boxes. A panel dragged below about
-   270 px cannot fit a five-digit speed in a third, so Speed takes a larger
-   share there. */
+/* Full-width tracks leave room for dragging and exact numeric entry. */
 .lf-laser-essentials__grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
   margin-top: 10px;
 }
 
-@container (max-width: 245px) {
-  .lf-laser-essentials__grid {
-    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.35fr) minmax(0, 0.7fr);
-  }
+.lf-laser-essentials__passes .lf-laser-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.lf-laser-essentials__passes .lf-laser-field__value {
+  flex: 0 0 100px;
 }
 
 /* The one or two settings that matter for Fill or Image, laid out like the
@@ -278,7 +282,6 @@
 /* Each field spans two rows of its grid: every label in a row shares the first
    and every box the second, so one label wrapping onto two lines moves neither
    the other labels nor any box. */
-.lf-laser-essentials__grid .lf-laser-field,
 .lf-laser-process-fields .lf-laser-field {
   display: grid;
   grid-row: span 2;

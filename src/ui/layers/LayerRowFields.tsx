@@ -7,6 +7,7 @@ import { LayerImageFields } from './LayerImageFields';
 import { mixedCheckboxProps, useMixedOperationNumber } from './mixed-operation-input';
 import type { MixedOperationFields } from './selected-operation-mixed';
 import './laser-operation-settings.css';
+import { OperationSliderField } from './OperationSliderField';
 
 const inputStyle: React.CSSProperties = { width: 88, minWidth: 0 };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
@@ -107,15 +108,13 @@ export function LaserEssentialsFields(
     >
       {props.compact ? null : <h4 className="lf-laser-section-title">Essential settings</h4>}
       <div className="lf-laser-essentials__grid">
-        <FieldRow label="Power" unit="%">
-          <PowerInput layer={layer} operationTarget={operationTarget} />
-        </FieldRow>
-        <FieldRow label="Speed" unit="mm/min">
-          <SpeedInput layer={layer} operationTarget={operationTarget} ceiling={speedCeiling} />
-        </FieldRow>
-        <FieldRow label="Passes">
-          <PassesInput layer={layer} operationTarget={operationTarget} />
-        </FieldRow>
+        <PowerInput layer={layer} operationTarget={operationTarget} />
+        <SpeedInput layer={layer} operationTarget={operationTarget} ceiling={speedCeiling} />
+        <div className="lf-laser-essentials__passes">
+          <FieldRow label="Passes">
+            <PassesInput layer={layer} operationTarget={operationTarget} />
+          </FieldRow>
+        </div>
       </div>
       {/* Outside the <label> rows: the note carries its own button. */}
       <FeedCeilingNotice
@@ -332,30 +331,25 @@ function PowerInput(props: {
   readonly operationTarget: LayerOperationControlTarget;
 }): JSX.Element {
   const { layer, operationTarget } = props;
-  const debounced = useMixedOperationNumber({
-    value: operationTarget.settings.power,
-    mixed: operationTarget.mixedFields?.power,
-    reconcileKey: operationTarget.reconcileKey,
-    commit: (power) =>
-      operationTarget.commit({
-        power,
-        ...(operationTarget.selectedObjectCount > 0
-          ? {}
-          : { minPower: Math.min(operationTarget.settings.minPower, power) }),
-      }),
-    parse: (s) => clamp(numericValue(s, operationTarget.settings.power), 0, 100),
-  });
   return (
-    <input
-      type="number"
+    <OperationSliderField
+      label="Power"
+      unit="%"
+      ariaContext={targetAriaContext(layer, operationTarget)}
+      value={operationTarget.settings.power}
+      mixed={operationTarget.mixedFields?.power}
+      reconcileKey={operationTarget.reconcileKey}
+      commit={(power) =>
+        operationTarget.commit({
+          power,
+          ...(operationTarget.selectedObjectCount > 0
+            ? {}
+            : { minPower: Math.min(operationTarget.settings.minPower, power) }),
+        })
+      }
+      parse={(s) => clamp(numericValue(s, operationTarget.settings.power), 0, 100)}
       min={0}
       max={100}
-      value={debounced.displayValue}
-      {...debounced.inputProps}
-      onChange={debounced.onChange}
-      onBlur={debounced.onBlur}
-      style={inputStyle}
-      aria-label={`Power for ${targetAriaContext(layer, operationTarget)}`}
       title="Laser power percentage for this layer."
     />
   );
