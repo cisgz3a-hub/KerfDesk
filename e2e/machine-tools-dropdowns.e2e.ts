@@ -123,11 +123,16 @@ for (const theme of ['light', 'dark'] as const) {
     const tabs = page.getByRole('group', { name: 'Machine tool dropdowns', exact: true });
     await expect(tabs.getByRole('button')).toHaveCount(3);
     for (const viewport of [
-      { width: 1536, height: 900 },
-      { width: 1366, height: 900 },
-      { width: 640, height: 450 },
+      { width: 1536, height: 900, layout: 'spacious' },
+      { width: 1366, height: 900, layout: 'compact' },
+      { width: 640, height: 450, layout: 'compact' },
     ]) {
-      await page.setViewportSize(viewport);
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      // The media-query update can render after setViewportSize resolves. Wait
+      // for the new panel layout before deciding whether its tab needs a click.
+      await expect(
+        page.getByRole('region', { name: 'Workspace side panels', exact: true }),
+      ).toHaveAttribute('data-layout', viewport.layout);
       await selectWorkspacePanel(page, 'Machine');
       for (const tab of await tabs.getByRole('button').all()) {
         await expect
