@@ -1,6 +1,16 @@
-import { useCallback, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
+import {
+  useCallback,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { AnchoredPopover } from '../common/AnchoredPopover';
 import { Icon, type IconName } from '../kit/icons';
+import { useLaserStore } from '../state/laser-store';
+import { probePlateRemovalRequired } from '../state/work-z-zero-evidence';
 import './MachineToolsDropdowns.css';
 
 type Tool = 'origin' | 'placement' | 'console';
@@ -16,6 +26,16 @@ export function MachineToolsDropdowns(props: MachineToolContents): JSX.Element {
   const [active, setActive] = useState<Tool | null>(null);
   const group = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setActive(null), []);
+  const plateReminder = useLaserStore((state) =>
+    probePlateRemovalRequired(state.workZZeroEvidence),
+  );
+  useLayoutEffect(() => {
+    if (!plateReminder) return;
+    const opener = group.current?.querySelector<HTMLButtonElement>('[aria-expanded="true"]');
+    const panel = document.getElementById(opener?.getAttribute('aria-controls') ?? '');
+    if (panel?.contains(document.activeElement)) opener?.focus();
+    close();
+  }, [plateReminder, close]);
   return (
     <div
       ref={group}
@@ -83,6 +103,7 @@ function ToolDropdown(props: {
         type="button"
         className="lf-btn lf-machine-tool-tab"
         aria-label={props.label}
+        title={`Open ${props.label.toLowerCase()} tools.`}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={id}
@@ -90,6 +111,7 @@ function ToolDropdown(props: {
         onKeyDown={(event) => {
           if (event.key === 'ArrowDown') {
             event.preventDefault();
+            event.stopPropagation();
             props.onToggle(props.tool);
           }
         }}
@@ -106,6 +128,7 @@ function ToolDropdown(props: {
         role="dialog"
         anchorRef={anchor}
         sideAnchorRef={props.group}
+        layoutRootSelector=".lf-machine-rail"
         className="lf-machine-tool-dropdown"
         open={open}
         closeOnTab={false}
@@ -118,6 +141,7 @@ function ToolDropdown(props: {
             type="button"
             className="lf-btn"
             aria-label={`Close ${props.label}`}
+            title={`Close ${props.label.toLowerCase()} and return to its button.`}
             onClick={() => {
               props.onClose();
               anchor.current?.focus();

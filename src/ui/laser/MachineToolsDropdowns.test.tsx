@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { useLaserStore } from '../state/laser-store';
 import { MachineToolsDropdowns } from './MachineToolsDropdowns';
 
 (
@@ -41,7 +42,22 @@ describe('Machine tool dropdowns', () => {
         return match;
       };
       expect(dialog('Console').hidden).toBe(true);
-      await act(async () => trigger('Origin').click());
+      const shortcut = vi.fn();
+      window.addEventListener('keydown', shortcut);
+      try {
+        await act(async () =>
+          trigger('Origin').dispatchEvent(
+            new KeyboardEvent('keydown', {
+              key: 'ArrowDown',
+              bubbles: true,
+              cancelable: true,
+            }),
+          ),
+        );
+        expect(shortcut).not.toHaveBeenCalled();
+      } finally {
+        window.removeEventListener('keydown', shortcut);
+      }
       const position = dialog('Origin').querySelector('input');
       if (!position) throw new Error('Missing position name');
       position.value = 'Front corner';
@@ -56,6 +72,18 @@ describe('Machine tool dropdowns', () => {
         preparing.dispatchEvent(new FocusEvent('focusout', { relatedTarget: null, bubbles: true })),
       );
       expect(dialog('Console').hidden).toBe(false);
+      for (const composition of [{ isComposing: true }, { keyCode: 229 }]) {
+        await act(async () =>
+          dialog('Console').dispatchEvent(
+            new KeyboardEvent('keydown', {
+              key: 'Escape',
+              bubbles: true,
+              ...composition,
+            }),
+          ),
+        );
+        expect(dialog('Console').hidden).toBe(false);
+      }
       await act(async () =>
         dialog('Console').dispatchEvent(
           new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
@@ -75,12 +103,26 @@ describe('Machine tool dropdowns', () => {
       expect(dialog('Origin').querySelector('input')).toBe(position);
       expect(position.value).toBe('Front corner');
       await act(async () =>
+        useLaserStore.setState({
+          workZZeroEvidence: {
+            source: 'probe',
+            referenceEpoch: 1,
+            probePlateRemoved: false,
+          },
+        }),
+      );
+      expect(dialog('Origin').hidden).toBe(true);
+      // The reminder dismisses the covering popup without preventing later inspection.
+      await act(async () => trigger('Origin').click());
+      expect(dialog('Origin').hidden).toBe(false);
+      await act(async () =>
         document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })),
       );
       expect(dialog('Origin').hidden).toBe(true);
     } finally {
       await act(async () => root.unmount());
       host.remove();
+      useLaserStore.setState({ workZZeroEvidence: null });
     }
   });
 });

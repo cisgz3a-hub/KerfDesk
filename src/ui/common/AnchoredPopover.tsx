@@ -9,6 +9,8 @@ type PopoverProps = {
   readonly anchorRef: RefObject<HTMLElement>;
   /** Use spare space beside this group when a tall form would cover its controls. */
   readonly sideAnchorRef?: RefObject<HTMLElement>;
+  /** Observe sibling sections whose resizing can move the opener. */
+  readonly layoutRootSelector?: string;
   readonly className?: string;
   readonly children: ReactNode;
   /** Retain form state while the popover is closed, without focus or listeners. */
@@ -35,7 +37,7 @@ function usePopoverPosition(
   readonly maxHeight: number;
 } {
   const [position, setPosition] = useState({ left: 8, top: 8, maxHeight: 320 });
-  const { anchorRef, sideAnchorRef, onClose, initialFocus } = props;
+  const { anchorRef, sideAnchorRef, layoutRootSelector, onClose, initialFocus } = props;
   const open = props.open !== false;
   useLayoutEffect(() => {
     if (!open) return;
@@ -62,8 +64,7 @@ function usePopoverPosition(
         ? [...panel.querySelectorAll<HTMLElement>('button:not(:disabled)')].at(-1)
         : panel.querySelector<HTMLElement>(initialFocus ?? 'button:not(:disabled)');
     (firstFocus ?? panel).focus();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reposition);
-    observer?.observe(panel);
+    const observer = observePopoverLayout(panel, anchor, layoutRootSelector, reposition);
     window.addEventListener('resize', reposition);
     window.addEventListener('scroll', reposition, true);
     window.visualViewport?.addEventListener('resize', reposition);
@@ -77,8 +78,26 @@ function usePopoverPosition(
       window.visualViewport?.removeEventListener('scroll', reposition);
       document.removeEventListener('pointerdown', dismissOutside);
     };
-  }, [anchorRef, sideAnchorRef, onClose, initialFocus, open, panelRef]);
+  }, [anchorRef, sideAnchorRef, layoutRootSelector, onClose, initialFocus, open, panelRef]);
   return position;
+}
+
+function observePopoverLayout(
+  panel: HTMLElement,
+  anchor: HTMLElement,
+  layoutRootSelector: string | undefined,
+  reposition: () => void,
+): ResizeObserver | null {
+  if (typeof ResizeObserver === 'undefined') return null;
+  const observer = new ResizeObserver(reposition);
+  observer.observe(panel);
+  observer.observe(anchor);
+  const layoutRoot = layoutRootSelector ? anchor.closest(layoutRootSelector) : null;
+  if (layoutRoot) {
+    observer.observe(layoutRoot);
+    for (const section of layoutRoot.children) observer.observe(section);
+  }
+  return observer;
 }
 
 /** A nonmodal control popover, kept outside clipping toolbar/scroll containers. */
@@ -108,6 +127,10 @@ export function AnchoredPopover(props: PopoverProps): JSX.Element {
           props.onClose();
       }}
       onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
+          event.stopPropagation();
+          return;
+        }
         if (event.key === 'Escape' || (event.key === 'Tab' && props.closeOnTab !== false)) {
           if (event.key === 'Escape') event.preventDefault();
           event.stopPropagation();
@@ -169,7 +192,7 @@ function popoverPosition(
     };
   }
   const openAbove = panel.scrollHeight > below && above > below;
-  const maxHeight = Math.max(0, openAbove ? above : below);
+  const maxHeight = Math.max(0, Math.min(height - 2 * margin, openAbove ? above : below));
   const top = openAbove
     ? bounds.top - Math.min(panel.scrollHeight, maxHeight) - gap
     : bounds.bottom + gap;
@@ -178,7 +201,10 @@ function popoverPosition(
       leftEdge + margin,
       Math.min(bounds.left, leftEdge + width - panel.offsetWidth - margin),
     ),
-    top: Math.max(topEdge + margin, top),
+    top: Math.max(
+      topEdge + margin,
+      Math.min(top, topEdge + height - Math.min(panel.scrollHeight, maxHeight) - margin),
+    ),
     maxHeight,
   };
 }

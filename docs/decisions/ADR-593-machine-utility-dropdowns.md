@@ -16,12 +16,14 @@ the existing placement/output fields and CNC maintenance utilities. Console
 contains communication controls, Super console, machine hours and execution
 history/recovery. No function is deleted. Live-job controls, accessory resets,
 checkpoint notices, probe-plate removal and work-Z recovery remain outside the
-dropdowns. The Frame/Start dock stays in its current location.
+dropdowns. A newly required probe-plate reminder dismisses the covering dropdown.
+The Frame/Start dock stays in its current location.
 
 The current machine state shares the rail heading; full coordinates, work-origin
 identity and feed/power details remain in Origin. On short laptop bodies the
 same three utility buttons use a single horizontal icon/label row so opening a
 tool does not scroll the existing jog and powered-Z controls out of position.
+Narrow short bodies show labels without the decorative icons and chevrons.
 
 The ordinary rail no longer has an independently scrolling lower section.
 Exceptional short windows and expanded live recovery notices retain the outer

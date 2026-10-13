@@ -96,3 +96,11 @@
     padding: 6px 3px;
   }
 }
+
+/* Compact rails have room for labels, not three horizontal icon/label groups. */
+@container machine-rail-body (max-height: 500px) and (max-width: 360px) {
+  .lf-machine-tool-tab > svg,
+  .lf-machine-tool-chevron {
+    display: none;
+  }
+}

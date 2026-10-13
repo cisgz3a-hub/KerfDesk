@@ -81,6 +81,11 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(tabs.getByRole('button')).toHaveCount(3);
     await page.screenshot({ path: info.outputPath(`machine-tabs-${theme}.png`) });
     await page.setViewportSize({ width: 640, height: 450 });
+    for (const tab of await tabs.getByRole('button').all()) {
+      await expect
+        .poll(() => tab.evaluate((element) => element.scrollWidth <= element.clientWidth + 1))
+        .toBe(true);
+    }
     for (const name of ['Origin', 'Placement & output', 'Console'] as const) {
       const panel = await openMachineToolDropdown(page, name);
       const bounds = await panel.boundingBox();
