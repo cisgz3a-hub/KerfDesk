@@ -35,7 +35,10 @@ describe('Machine tool dropdowns', () => {
       if (!launch || !draft) throw new Error('Missing console controls');
       await act(async () => trigger.click());
       draft.value = 'G0 X42';
-      await act(async () => launch.click());
+      await act(async () => {
+        launch.focus();
+        launch.click();
+      });
       const modal = panel.querySelector<HTMLElement>('[aria-modal="true"]');
       if (!modal) throw new Error('Missing expanded console dialog');
       expect(useUiStore.getState().modalDepth).toBe(1);
@@ -61,10 +64,26 @@ describe('Machine tool dropdowns', () => {
       expect(panel.hidden).toBe(false);
       expect(panel.querySelector('input[aria-label="Command draft"]')).toBe(draft);
       expect(draft.value).toBe('G0 X42');
-      await act(async () => launch.click());
+      await act(async () => {
+        launch.focus();
+        launch.click();
+      });
       expect(panel.hidden).toBe(false);
       expect(panel.querySelector('[aria-modal="true"]')).not.toBeNull();
       expect(useUiStore.getState().modalDepth).toBe(1);
+      await act(async () =>
+        panel
+          .querySelector('[aria-modal="true"] input')
+          ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+      );
+      expect(panel.hidden).toBe(false);
+      expect(panel.querySelector('[aria-modal="true"]')).toBeNull();
+      expect(useUiStore.getState().modalDepth).toBe(0);
+      expect(document.activeElement).toBe(launch);
+      await act(async () => {
+        launch.focus();
+        launch.click();
+      });
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -80,19 +99,30 @@ describe('Machine tool dropdowns', () => {
     try {
       await act(async () =>
         root.render(
-          <MachineToolsDropdowns
-            origin={<input aria-label="Saved position name" defaultValue="Corner" />}
-            placement={<button type="button">Placement action</button>}
-            console={(active) => (
-              <div>
-                <span>Console active: {String(active)}</span>
-                <input aria-label="Command draft" />
-                <button type="button" data-async-action>
-                  Prepare preview
-                </button>
-              </div>
-            )}
-          />,
+          <>
+            <MachineToolsDropdowns
+              origin={
+                <>
+                  <input aria-label="Saved position name" defaultValue="Corner" />
+                  <details>
+                    <summary>Saved positions</summary>
+                    <span>Saved position details</span>
+                  </details>
+                </>
+              }
+              placement={<button type="button">Placement action</button>}
+              console={(active) => (
+                <div>
+                  <span>Console active: {String(active)}</span>
+                  <input aria-label="Command draft" />
+                  <button type="button" data-async-action>
+                    Prepare preview
+                  </button>
+                </div>
+              )}
+            />
+            <input aria-label="Artwork setting" />
+          </>,
         ),
       );
       const trigger = (label: string): HTMLButtonElement => {
@@ -106,6 +136,21 @@ describe('Machine tool dropdowns', () => {
         return match;
       };
       expect(dialog('Console').hidden).toBe(true);
+      const wrapper = host.querySelector('.lf-machine-tools');
+      const navigation = host.querySelector('.lf-machine-tool-tabs');
+      expect(navigation?.nextElementSibling).toBe(dialog('Origin'));
+      for (const label of ['Origin', 'Placement & output', 'Console']) {
+        expect(dialog(label).parentElement).toBe(wrapper);
+        expect(dialog(label).getAttribute('role')).toBe('region');
+        expect(dialog(label).getAttribute('aria-labelledby')).toBe(trigger(label).id);
+        expect(trigger(label).hasAttribute('aria-haspopup')).toBe(false);
+      }
+      await act(async () =>
+        trigger('Origin').dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'ArrowDown', isComposing: true, bubbles: true }),
+        ),
+      );
+      expect(dialog('Origin').hidden).toBe(true);
       const shortcut = vi.fn();
       window.addEventListener('keydown', shortcut);
       try {
@@ -125,6 +170,10 @@ describe('Machine tool dropdowns', () => {
       const position = dialog('Origin').querySelector('input');
       if (!position) throw new Error('Missing position name');
       position.value = 'Front corner';
+      const disclosure = dialog('Origin').querySelector('details');
+      if (!disclosure) throw new Error('Missing saved position disclosure');
+      disclosure.open = true;
+      expect(document.activeElement?.getAttribute('aria-label')).toBe('Close Origin');
       await act(async () => trigger('Console').click());
       expect(dialog('Origin').hidden).toBe(true);
       expect(dialog('Console').hidden).toBe(false);
@@ -162,10 +211,16 @@ describe('Machine tool dropdowns', () => {
       await act(async () =>
         command.dispatchEvent(new FocusEvent('focusout', { relatedTarget: null, bubbles: true })),
       );
-      expect(dialog('Console').hidden).toBe(true);
+      expect(dialog('Console').hidden).toBe(false);
+      const artwork = host.querySelector<HTMLInputElement>('input[aria-label="Artwork setting"]');
+      if (!artwork) throw new Error('Missing outside artwork setting');
+      await act(async () => artwork.focus());
+      expect(document.activeElement).toBe(artwork);
+      expect(dialog('Console').hidden).toBe(false);
       await act(async () => trigger('Origin').click());
       expect(dialog('Origin').querySelector('input')).toBe(position);
       expect(position.value).toBe('Front corner');
+      expect(disclosure.open).toBe(true);
       await act(async () =>
         useLaserStore.setState({
           workZZeroEvidence: {
@@ -176,13 +231,18 @@ describe('Machine tool dropdowns', () => {
         }),
       );
       expect(dialog('Origin').hidden).toBe(true);
-      // The reminder dismisses the covering popup without preventing later inspection.
+      // The reminder folds the tools without preventing later inspection.
       await act(async () => trigger('Origin').click());
       expect(dialog('Origin').hidden).toBe(false);
       await act(async () =>
         document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })),
       );
+      expect(dialog('Origin').hidden).toBe(false);
+      await act(async () =>
+        dialog('Origin').querySelector<HTMLButtonElement>('[aria-label="Close Origin"]')?.click(),
+      );
       expect(dialog('Origin').hidden).toBe(true);
+      expect(document.activeElement).toBe(trigger('Origin'));
     } finally {
       await act(async () => root.unmount());
       host.remove();
