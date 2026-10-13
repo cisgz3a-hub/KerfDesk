@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockPlatform } from '../../__fixtures__/file-actions';
 import { createProject, type Project } from '../../core/scene';
 import { deserializeProject, serializeProject } from '../../io/project';
-import { pagedProject } from '../library/personal-artwork-test-fixtures';
+import { assetReader, pagedProject } from '../library/personal-artwork-test-fixtures';
 import { useStore } from '../state';
 import { useProjectSaveDialogStore } from '../state/project-save-dialog-store';
 import { resetStore } from '../state/test-helpers';
@@ -15,14 +15,13 @@ import {
 import { prepareProjectSaveOffThread } from './project-save-preparation-client';
 
 vi.mock('./project-save-preparation-client', () => ({ prepareProjectSaveOffThread: vi.fn() }));
-vi.mock('../import/paged-asset-indexeddb', async () => {
-  const fixture = await import('../library/personal-artwork-test-fixtures');
-  return {
-    IndexedDbPagedAssetRepository: vi.fn(function createReader() {
-      return fixture.assetReader();
-    }),
-  };
-});
+// Resolve the fixture only when constructed: importing it inside this hoisted
+// factory cycles through test-helpers and the store back to this mocked module.
+vi.mock('../import/paged-asset-indexeddb', () => ({
+  IndexedDbPagedAssetRepository: vi.fn(function createReader() {
+    return assetReader();
+  }),
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
