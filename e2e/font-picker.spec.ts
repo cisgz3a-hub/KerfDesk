@@ -44,14 +44,14 @@ for (const height of [600, 768]) {
       'Live preview',
     );
     expect(await list.evaluate((element) => element.scrollTop)).toBe(browsingScroll);
-    const selected = await last.locator('button').getAttribute('data-font-key');
+    const selected = await last.locator('button[data-font-key]').getAttribute('data-font-key');
     if (selected === null) throw new Error('Font key missing');
-    await last.locator('button').click();
+    await last.locator('button[data-font-key]').click();
     await expect(chooser).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await trigger.click();
     await expect(list.locator('[aria-selected="true"]')).toBeInViewport({ ratio: 1 });
-    await expect(list.locator('[aria-selected="true"] button')).toHaveAttribute(
+    await expect(list.locator('[aria-selected="true"] button[data-font-key]')).toHaveAttribute(
       'data-font-key',
       selected,
     );

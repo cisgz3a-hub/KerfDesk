@@ -183,28 +183,28 @@ describe('Workspace job dock', () => {
     expect(labels().filter((label) => label === 'Start')).toHaveLength(1);
     expect(calls.estimate).toHaveBeenCalledOnce();
     expect(labels()).toEqual(
-      expect.arrayContaining([
-        'Set origin here',
-        'Reset origin',
-        'Set up homing',
-        'Set up auto-focus',
-        'Resume from line',
-      ]),
+      expect.arrayContaining(['Set origin here', 'Set up homing', 'Set up auto-focus']),
     );
-    expect(host.querySelector('[aria-label="Start from"]')).not.toBeNull();
-    expect(host.querySelector('[aria-label="Selected artwork only"]')).not.toBeNull();
-    expect(host.querySelector('[aria-label="Execution archive"]')).not.toBeNull();
-    expect(host.querySelector('[aria-label="Console command"]')).not.toBeNull();
+    const origin = toolPanel('Origin');
+    const consolePanel = toolPanel('Console');
+    const placement = toolPanel('Placement & output');
+    expect(origin.textContent).toContain('Reset origin');
+    expect(consolePanel.textContent).toContain('Resume from line');
+    expect(placement.querySelector('[aria-label="Start from"]')).not.toBeNull();
+    expect(placement.querySelector('[aria-label="Selected artwork only"]')).not.toBeNull();
+    expect(consolePanel.querySelector('[aria-label="Execution archive"]')).not.toBeNull();
+    expect(consolePanel.querySelector('[aria-label="Console command"]')).not.toBeNull();
     const dock = host.querySelector('[aria-label="Job actions"]');
     expect(dock?.textContent).toContain('Wait for the controller to reconnect.');
     expect(host.querySelector('aside')?.textContent).not.toMatch(
       /Last (Start|Frame) attempt blocked/,
     );
-    const placement = [...host.querySelectorAll('summary')].find(
-      (summary) => summary.textContent === 'Placement & output',
-    )?.parentElement;
-    expect(placement).toBeInstanceOf(HTMLDetailsElement);
-    expect((placement as HTMLDetailsElement).open).toBe(false);
+    expect(placement.hidden).toBe(true);
+    act(() =>
+      host.querySelector<HTMLButtonElement>('button[aria-label="Placement & output"]')?.click(),
+    );
+    expect(placement.hidden).toBe(false);
+    expect(calls.estimate).toHaveBeenCalledOnce();
   });
 
   it('keeps inline Frame and Start actions in a standalone machine panel by default', () => {
@@ -216,6 +216,13 @@ describe('Workspace job dock', () => {
     expect(host.querySelector('[aria-label="Job actions"]')).toBeNull();
   });
 });
+
+function toolPanel(label: string): HTMLDivElement {
+  const trigger = host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+  const panel = document.getElementById(trigger?.getAttribute('aria-controls') ?? '');
+  if (!(panel instanceof HTMLDivElement)) throw new Error(`Missing utility dropdown: ${label}`);
+  return panel;
+}
 
 function connectIdle(): void {
   useLaserStore.setState({

@@ -94,7 +94,7 @@ export async function createLibraryMixedGroup(
   page.setDefaultTimeout(15_000);
   await page.setViewportSize({ width: 1536, height: 900 });
   await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
-  await expect(applicationHeader(page)).toContainText('KerfDesk');
+  await expect(applicationHeader(page)).toContainText('KerfDesk', { timeout: 60_000 });
   await expect(page.locator('#app-splash')).toHaveCount(0);
   await page.getByRole('button', { name: 'Text', exact: true }).click();
   await page

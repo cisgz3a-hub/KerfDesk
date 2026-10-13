@@ -29,14 +29,16 @@ export function machineJogAction(
     .getByRole('button', { name, exact: true });
 }
 
-/** CNC utilities remain behind their own disclosure below the ordinary actions. */
-export async function expandMachineMaintenance(page: Page): Promise<void> {
-  const summary = page
-    .getByLabel('Router controls', { exact: true })
-    .locator('summary')
-    .filter({ hasText: /^Machine maintenance$/ });
-  if ((await summary.locator('..').getAttribute('open')) === null) await summary.click();
-  await expect(summary.locator('..')).toHaveAttribute('open', '');
+/** Tool dropdowns live outside the rail so their forms are never clipped by it. */
+export async function openMachineToolDropdown(
+  page: Page,
+  name: 'Origin' | 'Placement & output' | 'Console',
+): Promise<Locator> {
+  const button = page.getByRole('button', { name, exact: true });
+  if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();
+  const panel = page.getByRole('dialog', { name, exact: true });
+  await expect(panel).toBeVisible();
+  return panel;
 }
 
 export function applicationHeader(page: Page): Locator {

@@ -2,6 +2,7 @@
 // Canonical live-job actions live in the App-shell LiveMotionBar (ADR-207).
 
 import type { ReactNode } from 'react';
+import type { GrblState } from '../../core/controllers/grbl';
 import { useStore } from '../state';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
@@ -31,6 +32,7 @@ import { JobSetupControls } from './JobSetupControls';
 import { JobStartMarkControl } from './JobStartMarkControl';
 import { jobControlsBusy, jobNeedsRecovery } from './job-controls-busy';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
+import { MachineToolsDropdowns } from './MachineToolsDropdowns';
 import { openMachineSetup } from './device-setup';
 import {
   streamProgressPercent,
@@ -47,6 +49,8 @@ type Props = {
   readonly setupExtras?: ReactNode;
   /** LaserWindow places the ordinary setup and Set-origin actions beside jog. */
   readonly machineActionsInJogPad?: boolean;
+  readonly originExtras?: ReactNode;
+  readonly machineConsole?: (active: boolean) => ReactNode;
 };
 
 // Both setup entries are optional so bare <JobControls> renders standalone;
@@ -72,17 +76,6 @@ export function JobControls(props: Props): JSX.Element {
   // lives in the LiveProgressBar leaf, so a burn re-renders that bar rather
   // than the whole Job section and every control inside it.
   const status = useLaserStore((s) => s.streamer?.status) ?? undefined;
-  const isStreaming = status === 'streaming';
-  const isPaused = status === 'paused';
-  const isToolChange = status === 'tool-change';
-  // 'done' and 'errored' both keep the rail's recovery status mounted. The
-  // App-shell LiveMotionBar independently owns Abort. A finished job stays active
-  // (isActiveJob) until a later Idle status
-  // clears the streamer — laser-store-helpers keeps 'done' busy so the user
-  // can't jog into a head still physically finishing motion — and an errored job
-  // needs an explicit Abort. The Live Motion bar remains mounted through that 'done'
-  // window, and through a tool-change hold, independently of this rail.
-  const needsRecovery = jobNeedsRecovery(status);
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const hasOverrides = useLaserStore((s) => s.capabilities.overrides);
@@ -95,7 +88,7 @@ export function JobControls(props: Props): JSX.Element {
   // origin utilities here while its ordinary actions live beside the jog pad.
   return (
     <div style={containerStyle}>
-      <JobOriginControls {...props} streaming={controlsBusy} />
+      <JobToolControls {...props} streaming={controlsBusy} machineKind={machineKind} />
       {!props.dockedJobActions && (
         <div className="lf-machine-section-heading">
           <span style={sectionCaptionStyle}>Job</span>
@@ -108,12 +101,12 @@ export function JobControls(props: Props): JSX.Element {
         onConfigureHoming={configure.homing}
         onStartJob={onStartJob}
         dockedJobActions={props.dockedJobActions}
-        setupExtras={props.setupExtras}
+        setupExtras={props.machineConsole ? undefined : props.setupExtras}
         setupLabel={machineKind === 'cnc' ? 'Homing & maintenance' : 'Homing & focus'}
         machineActionsInJogPad={props.machineActionsInJogPad}
       />
       {!props.dockedJobActions && <StartBlockerNotice />}
-      <JobStartMarkControl disabled={disabled} />
+      {!props.machineConsole && <JobStartMarkControl disabled={disabled} />}
       <AccessoryResetControls
         accessories={accessoryCache}
         controlsBusy={controlsBusy}
@@ -126,32 +119,104 @@ export function JobControls(props: Props): JSX.Element {
       {controllerOperation !== null && (
         <ControllerOperationControls label={describeControllerOperation(controllerOperation)} />
       )}
-      {needsRecovery && (
-        <RunningControls
-          isStreaming={isStreaming}
-          isPaused={isPaused}
-          isToolChange={isToolChange}
-          isFinishingTail={
-            status === 'done' &&
-            (controllerState === 'Run' || controllerState === 'Hold' || controllerState === 'Door')
-          }
-        />
+      <RunningJobStatus status={status} controllerState={controllerState} />
+      {!props.machineConsole && (
+        <PlacementSection streaming={controlsBusy} collapsed={props.dockedJobActions === true} />
       )}
-      <PlacementSection streaming={controlsBusy} collapsed={props.dockedJobActions === true} />
       <IslandFillRecoveryAction streaming={controlsBusy} />
       <CheckpointResumeBanner busy={controlsBusy} />
       <RunAgainControl disabled={disabled} busy={controlsBusy} />
       <SecondPassControl busy={controlsBusy} machineKind={machineKind} />
-      <CollapsibleRailSection
-        label="History & recovery"
-        title="View stored runs, export a previous execution, or restart an interrupted job."
-      >
-        <ExecutionArchivePanel />
-        <StartFromLineControl disabled={disabled} busy={controlsBusy} machineKind={machineKind} />
-      </CollapsibleRailSection>
-      <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
+      {!props.machineConsole && (
+        <>
+          <HistoryRecoveryControls
+            disabled={disabled}
+            busy={controlsBusy}
+            machineKind={machineKind}
+          />
+          <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
+        </>
+      )}
       <LiveProgressBar />
     </div>
+  );
+}
+
+function JobToolControls(
+  props: Pick<
+    Props,
+    'disabled' | 'machineActionsInJogPad' | 'originExtras' | 'setupExtras' | 'machineConsole'
+  > & { readonly streaming: boolean; readonly machineKind: 'laser' | 'cnc' },
+): JSX.Element {
+  if (!props.machineConsole) return <JobOriginControls {...props} />;
+  return (
+    <MachineToolsDropdowns
+      origin={
+        <>
+          <JobOriginControls {...props} />
+          <JobStartMarkControl disabled={props.disabled} />
+          {props.originExtras}
+          <NoHomingPositionGuide disabled={props.disabled} streaming={props.streaming} />
+        </>
+      }
+      placement={
+        <>
+          <JobPlacementControls streaming={props.streaming} />
+          {props.setupExtras}
+        </>
+      }
+      console={(active) => (
+        <>
+          {props.machineConsole?.(active)}
+          <HistoryRecoveryControls
+            disabled={props.disabled}
+            busy={props.streaming}
+            machineKind={props.machineKind}
+          />
+        </>
+      )}
+    />
+  );
+}
+
+function RunningJobStatus(props: {
+  readonly status: string | undefined;
+  readonly controllerState: GrblState | null;
+}): JSX.Element | null {
+  // 'done' and 'errored' both keep the rail's recovery status mounted. The
+  // App-shell LiveMotionBar independently owns Abort. A finished job stays active
+  // (isActiveJob) until a later Idle status clears the streamer, keeping jog
+  // blocked while the machine finishes motion. Errors need an explicit Abort;
+  // the Live Motion bar remains mounted through that window and tool-change holds.
+  if (!jobNeedsRecovery(props.status)) return null;
+  return (
+    <RunningControls
+      isStreaming={props.status === 'streaming'}
+      isPaused={props.status === 'paused'}
+      isToolChange={props.status === 'tool-change'}
+      isFinishingTail={
+        props.status === 'done' &&
+        (props.controllerState === 'Run' ||
+          props.controllerState === 'Hold' ||
+          props.controllerState === 'Door')
+      }
+    />
+  );
+}
+
+function HistoryRecoveryControls(props: {
+  readonly disabled: boolean;
+  readonly busy: boolean;
+  readonly machineKind: 'laser' | 'cnc';
+}): JSX.Element {
+  return (
+    <CollapsibleRailSection
+      label="History & recovery"
+      title="View stored runs, export a previous execution, or restart an interrupted job."
+    >
+      <ExecutionArchivePanel />
+      <StartFromLineControl {...props} />
+    </CollapsibleRailSection>
   );
 }
 

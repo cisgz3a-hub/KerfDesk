@@ -8,7 +8,9 @@ import { ProbeControls } from './ProbeControls';
 import { ProbePlateRemovalNotice } from './ProbePlateRemovalNotice';
 import { WorkZRecoveryControl } from './WorkZRecoveryControl';
 
-export function ProbePanel(): JSX.Element | null {
+export function ProbePanel({
+  showNotices = true,
+}: { readonly showNotices?: boolean } = {}): JSX.Element | null {
   const isCnc = useStore((s) => machineKindOf(s.project.machine) === 'cnc');
   if (!isCnc) return null;
   return (
@@ -24,8 +26,12 @@ export function ProbePanel(): JSX.Element | null {
       </details>
       {/* Outside the collapsed details: the confirmation gates CNC Start, so it
           must be visible even when the probe section is folded. */}
-      <ProbePlateRemovalNotice />
-      <WorkZRecoveryControl />
+      {showNotices && (
+        <>
+          <ProbePlateRemovalNotice />
+          <WorkZRecoveryControl />
+        </>
+      )}
     </>
   );
 }

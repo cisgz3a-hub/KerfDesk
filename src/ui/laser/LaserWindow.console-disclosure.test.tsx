@@ -39,17 +39,13 @@ describe('LaserWindow Console disclosure', () => {
         );
       });
 
-      const summary = [...host.querySelectorAll('summary')].find(
-        (candidate) => candidate.textContent === 'Console',
-      );
-      const disclosure = summary?.parentElement;
-      expect(summary).toBeInstanceOf(HTMLElement);
-      expect(disclosure).toBeInstanceOf(HTMLDetailsElement);
-      expect((disclosure as HTMLDetailsElement).open).toBe(false);
-      expect(disclosure?.contains(button(host, 'Start'))).toBe(false);
+      const { summary, details: disclosure } = consoleDisclosure(host);
+      expect(summary.getAttribute('aria-expanded')).toBe('false');
+      expect(disclosure.hidden).toBe(true);
+      expect(disclosure.contains(button(host, 'Start'))).toBe(false);
 
       await toggle(summary);
-      expect((disclosure as HTMLDetailsElement).open).toBe(true);
+      expect(disclosure.hidden).toBe(false);
       expect(disclosure?.querySelector('input[aria-label="Console command"]')).toBeInstanceOf(
         HTMLInputElement,
       );
@@ -93,7 +89,7 @@ describe('LaserWindow Console disclosure', () => {
       await toggle(summary);
       expect(details.querySelector('input[aria-label="Console command"]')).toBe(input);
       expect(input.value).toBe('$G');
-      expect(details.contains(button(host, 'Super console'))).toBe(true);
+      expect(details.contains(button(details, 'Super console'))).toBe(true);
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       useLaserStore.setState({ transcript: [] });
@@ -107,7 +103,7 @@ function typeInto(input: HTMLInputElement, value: string): void {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-// The <details> toggle event is queued as a task after the summary click.
+// Dropdown content stays mounted across closes so an unsent command survives.
 async function toggle(summary: HTMLElement | undefined): Promise<void> {
   await act(async () => {
     summary?.click();
@@ -117,13 +113,11 @@ async function toggle(summary: HTMLElement | undefined): Promise<void> {
 
 function consoleDisclosure(host: HTMLElement): {
   readonly summary: HTMLElement;
-  readonly details: HTMLDetailsElement;
+  readonly details: HTMLDivElement;
 } {
-  const summary = [...host.querySelectorAll('summary')].find(
-    (candidate) => candidate.textContent === 'Console',
-  );
-  const details = summary?.parentElement;
-  if (summary === undefined || !(details instanceof HTMLDetailsElement)) {
+  const summary = host.querySelector<HTMLButtonElement>('button[aria-label="Console"]');
+  const details = document.getElementById(summary?.getAttribute('aria-controls') ?? '');
+  if (summary === null || !(details instanceof HTMLDivElement)) {
     throw new Error('Console disclosure not rendered');
   }
   return { summary, details };

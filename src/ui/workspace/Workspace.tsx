@@ -38,6 +38,7 @@ import { TracePartsHint } from './TracePartsHint';
 import { LaserTabHint } from './LaserTabHint';
 import { ExtendShapesHint } from './ExtendShapesHint';
 import { TrimShapesHint } from './TrimShapesHint';
+import { TwoPointHint } from './TwoPointHint';
 import { WarpDeformHint } from './WarpDeformHint';
 import './workspace-preview.css';
 import { WorkspaceCanvasLayers } from './WorkspaceCanvasLayers';
@@ -147,6 +148,7 @@ function WorkspaceDesignChrome(props: {
       <TracePartsHint />
       <LaserTabHint />
       <TrimShapesHint />
+      <TwoPointHint />
       <ExtendShapesHint />
       <WarpDeformHint />
       <ZoomControls />

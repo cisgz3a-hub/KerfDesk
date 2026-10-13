@@ -152,6 +152,7 @@ function Counter(props: {
 const FIELD_BUTTONS = [
   { label: 'Date', source: '{{date}}' },
   { label: 'Time', source: '{{time}}' },
+  { label: 'Custom date', source: '{{date:%d %b %Y}}' },
   { label: 'Serial', source: '{{serial:4}}' },
   { label: 'Power', source: '{{power}}' },
   { label: 'Speed', source: '{{speed}}' },

@@ -12,6 +12,7 @@ import {
   type ColoredPath,
   type CurveSubpath,
   type Polyline,
+  type Vec2,
 } from '../scene';
 import { contourSource } from './trim-contours';
 import type { TrimCrossing } from './trim-crossings';
@@ -33,6 +34,10 @@ export type TrimEdit = {
   /** How many open pieces replace the trimmed contour (0 to 2). */
   readonly pieces: number;
   readonly pathRemoved: boolean;
+  /** The deleted stretch, exact, in the object's local coordinates. */
+  readonly removed: CurveSubpath | null;
+  /** Local points where the kept pieces were cut, for Trim's auto-join. */
+  readonly cutPoints: ReadonlyArray<Vec2>;
 };
 
 type TabAnchorLike = { readonly pathIndex: number; readonly polylineIndex: number };
@@ -46,19 +51,27 @@ export function trimEdit(object: VectorSceneObject, target: TrimTarget): TrimEdi
   if (path === undefined || target.contour.objectId !== object.id) return null;
   const source = contourSource(path, polylineIndex);
   if (source === null || !source.trimmable) return null;
-  const pieces = keptPieces(source.segments, target);
+  const { pieces, removed, cutPoints } = trimmedStretch(source.segments, target);
   const replaced = replaceContour(path, polylineIndex, pieces, source.curved);
   const pathRemoved = replaced.polylines.length === 0;
   const paths = pathRemoved
     ? object.paths.filter((_path, index) => index !== pathIndex)
     : object.paths.map((entry, index) => (index === pathIndex ? replaced : entry));
-  return { paths, pathIndex, polylineIndex, pieces: pieces.length, pathRemoved };
+  return {
+    paths,
+    pathIndex,
+    polylineIndex,
+    pieces: pieces.length,
+    pathRemoved,
+    removed,
+    cutPoints,
+  };
 }
 
 /** Drop the placed tabs of the trimmed contour and renumber the ones after it. */
 export function remapTrimmedAnchors<A extends TabAnchorLike>(
   anchors: ReadonlyArray<A>,
-  edit: TrimEdit,
+  edit: Pick<TrimEdit, 'pathIndex' | 'polylineIndex' | 'pieces' | 'pathRemoved'>,
 ): ReadonlyArray<A> {
   return anchors.flatMap((anchor) => {
     if (anchor.pathIndex > edit.pathIndex && edit.pathRemoved) {
@@ -71,8 +84,18 @@ export function remapTrimmedAnchors<A extends TabAnchorLike>(
   });
 }
 
-function keptPieces(segments: ContourSegments, target: TrimTarget): ReadonlyArray<CurveSubpath> {
-  if (target.whole) return [];
+function trimmedStretch(
+  segments: ContourSegments,
+  target: TrimTarget,
+): {
+  readonly pieces: ReadonlyArray<CurveSubpath>;
+  readonly removed: CurveSubpath | null;
+  readonly cutPoints: ReadonlyArray<Vec2>;
+} {
+  if (target.whole) {
+    const whole = { start: segments.start, segments: segments.segments, closed: segments.closed };
+    return { pieces: [], removed: whole, cutPoints: [] };
+  }
   const end = segments.segments.length;
   const from = target.start === null ? 0 : refine(segments, target, target.start);
   const to = target.end === null ? end : refine(segments, target, target.end);
@@ -82,7 +105,18 @@ function keptPieces(segments: ContourSegments, target: TrimTarget): ReadonlyArra
         ...(target.start === null ? [] : [sliceContour(segments, 0, from)]),
         ...(target.end === null ? [] : [sliceContour(segments, to, end)]),
       ];
-  return pieces.filter((piece) => piece.segments.length > 0);
+  const removed = segments.closed
+    ? sliceClosedContour(segments, from, to)
+    : sliceContour(segments, from, to);
+  const cutPoints = [
+    ...(target.start === null ? [] : [contourPoint(segments, from)]),
+    ...(target.end === null ? [] : [contourPoint(segments, to)]),
+  ];
+  return {
+    pieces: pieces.filter((piece) => piece.segments.length > 0),
+    removed: removed.segments.length > 0 ? removed : null,
+    cutPoints,
+  };
 }
 
 // Bisect along the crossing chord's stretch of the exact curve for the point

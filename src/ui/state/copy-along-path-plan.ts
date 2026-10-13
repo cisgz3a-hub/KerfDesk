@@ -30,6 +30,8 @@ export type CopyAlongPathRequest = CopyAlongPathSpec & {
   readonly guideId?: string;
   /** Leave the artwork where it was, or replace it with the copies. */
   readonly keepOriginal: boolean;
+  /** Give each copy's variable text and barcodes the next serial or record, as an array does. */
+  readonly incrementVariables?: boolean;
 };
 
 export type ReadyCopyAlongPathSelection = Extract<CopyAlongPathSelection, { kind: 'ok' }>;

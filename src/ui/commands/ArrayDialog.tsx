@@ -185,6 +185,7 @@ function ArrayFields(props: {
         form={form}
         onChange={onChange}
         onSpaceBy={(spaceBy) => setForm((current) => withSpaceBy(current, spaceBy, context.bounds))}
+        bounds={context.bounds}
       />
     );
   }

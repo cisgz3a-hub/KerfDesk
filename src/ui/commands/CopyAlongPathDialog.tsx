@@ -36,6 +36,8 @@ export const DEFAULT_COPY_ALONG_PATH_FORM: CopyAlongPathForm = {
   endText: '0',
   rotateCopies: true,
   keepOriginal: true,
+  endScaleText: '100',
+  incrementVariables: false,
 };
 
 /** The first form for a selection: the spacing leaves the default gap between copies. */
@@ -122,6 +124,10 @@ export function requestFromForm(
     rotateCopies: form.rotateCopies,
     keepOriginal: form.keepOriginal,
     ...(guideId === undefined ? {} : { guideId }),
+    ...(numberOr(form.endScaleText, 100) === 100 || numberOr(form.endScaleText, 100) <= 0
+      ? {}
+      : { endScalePercent: numberOr(form.endScaleText, 100) }),
+    ...(form.incrementVariables ? { incrementVariables: true } : {}),
   };
 }
 

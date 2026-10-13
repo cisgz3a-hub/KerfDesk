@@ -3,6 +3,7 @@
 
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import type { CncMachineConfig, MachineConfig } from './machine';
+import type { ProjectGuide } from './guides';
 import { EMPTY_SCENE, type Scene } from './scene';
 import type { ProjectVariableData } from './variable-template';
 import type { PrintAndCutDesignTargets } from './print-and-cut';
@@ -169,6 +170,8 @@ export type Project = {
   readonly notes: string;
   /** LightBurn Show Notes "show on open": the notes dialog opens with the project. */
   readonly showNotesOnOpen?: boolean;
+  /** Guidelines dragged out of the rulers: layout aids only, never output. */
+  readonly guides?: ReadonlyArray<ProjectGuide>;
   readonly sheetBook?: ProjectSheetBook;
   readonly fixtureTemplates?: ReadonlyArray<FixtureTemplate>;
   readonly productionManifest?: ProductionManifest;

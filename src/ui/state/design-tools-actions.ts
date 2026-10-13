@@ -19,6 +19,16 @@ import type { AppState } from './store';
 import { cutShapesActions, type CutShapesActions } from './cut-shapes-actions';
 import { drawOrderActions, type DrawOrderActions } from './draw-order-actions';
 import { variableBakeActions, type VariableBakeActions } from './variable-bake-actions';
+import { pathSegmentActions, type PathSegmentActions } from './path-segment-actions';
+import { pathFilletActions, type PathFilletActions } from './path-fillet-actions';
+import { shearActions, type ShearActions } from './shear-actions';
+import { guideActions, type GuideActions } from './guide-actions';
+import { penContinueActions, type PenContinueActions } from './pen-continue-actions';
+import {
+  pathNodeDragJoinActions,
+  type PathNodeDragJoinActions,
+} from './path-node-drag-join-actions';
+import { mirrorLineActions, type MirrorLineActions } from './mirror-line-actions';
 import { extendShapesActions, type ExtendShapesActions } from './extend-shapes-actions';
 import { trimShapesActions, type TrimShapesActions } from './trim-shapes-actions';
 import { warpDeformActions, type WarpDeformActions } from './warp-deform-actions';
@@ -34,7 +44,14 @@ export type DesignToolsActions = ShapeQueryActions &
   WarpDeformActions &
   OptimizeShapesActions &
   DrawOrderActions &
-  VariableBakeActions;
+  VariableBakeActions &
+  PathSegmentActions &
+  PathFilletActions &
+  ShearActions &
+  GuideActions &
+  PenContinueActions &
+  PathNodeDragJoinActions &
+  MirrorLineActions;
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 type CopySetter = (
@@ -62,5 +79,12 @@ export function designToolsActions(
     ...optimizeShapesActions(set),
     ...drawOrderActions(set),
     ...variableBakeActions(set),
+    ...pathSegmentActions(set),
+    ...pathFilletActions(set),
+    ...shearActions(set),
+    ...guideActions(set),
+    ...penContinueActions(set),
+    ...pathNodeDragJoinActions(set),
+    ...mirrorLineActions(set),
   };
 }

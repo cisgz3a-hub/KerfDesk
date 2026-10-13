@@ -33,6 +33,13 @@ function gridForm(spec: GridArraySpec, form: ArrayForm): ArrayForm {
     reverseRows: spec.reverseRows ?? false,
     mirrorColumns: spec.mirrorColumns ?? 'none',
     mirrorRows: spec.mirrorRows ?? 'none',
+    randomRotation:
+      spec.randomRotation === undefined
+        ? 'off'
+        : spec.randomRotation.stepDeg === 90
+          ? 'quarter'
+          : 'any',
+    randomSeed: String(spec.randomRotation?.seed ?? 1),
   };
 }
 function circularForm(spec: CircularArraySpec, form: ArrayForm): ArrayForm {

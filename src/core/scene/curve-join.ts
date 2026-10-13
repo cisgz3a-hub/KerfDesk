@@ -1,8 +1,6 @@
 import { curveNodeCount, curveNodePoint } from './curve-edit';
 import { assertNever, type CurveSubpath, type PathSegment, type Vec2 } from './scene-object';
 
-const EPSILON = 1e-9;
-
 type CurveEndpointJoinResult =
   | { readonly kind: 'ok'; readonly curve: CurveSubpath }
   | {
@@ -96,7 +94,8 @@ function reverseSegment(segment: PathSegment, to: Vec2): PathSegment {
 }
 
 function samePoint(a: Vec2, b: Vec2): boolean {
-  return Math.abs(a.x - b.x) <= EPSILON && Math.abs(a.y - b.y) <= EPSILON;
+  // Local tolerances can hide a physical gap under scale and change the next curve's start.
+  return a.x === b.x && a.y === b.y;
 }
 
 /**

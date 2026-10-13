@@ -35,6 +35,7 @@ export function gridPlacements(bounds: Bounds, spec: GridArraySpec): ReadonlyArr
   const rowShift = finite(spec.rowShift ?? 0);
   const columnShift = finite(spec.columnShift ?? 0);
   const center = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
+  const turns = spec.randomRotation === undefined ? () => 0 : randomTurns(spec.randomRotation);
   const placements: ArrayPlacement[] = [];
   for (let index = 0; index < copyCount; index += 1) {
     const column = index % columns;
@@ -43,14 +44,23 @@ export function gridPlacements(bounds: Bounds, spec: GridArraySpec): ReadonlyArr
     const oddColumn = column % 2 === 1;
     // Adding the (zero) shift also turns a reversed first column's -0 into 0.
     const mirror = gridMirror(spec, oddColumn, oddRow, center);
+    const dx = column * stepX * signX + (oddRow ? rowShift : 0);
+    const dy = row * stepY * signY + (oddColumn ? columnShift : 0);
     placements.push({
-      dx: column * stepX * signX + (oddRow ? rowShift : 0),
-      dy: row * stepY * signY + (oddColumn ? columnShift : 0),
-      rotationDeg: 0,
+      dx,
+      dy,
+      ...turnAbout(index === 0 ? 0 : turns(), { x: center.x + dx, y: center.y + dy }),
       ...(mirror === undefined ? {} : { mirror }),
     });
   }
   return placements;
+}
+
+function turnAbout(
+  rotationDeg: number,
+  pivot: { readonly x: number; readonly y: number },
+): Pick<ArrayPlacement, 'rotationDeg' | 'pivot'> {
+  return rotationDeg === 0 ? { rotationDeg } : { rotationDeg, pivot };
 }
 
 function gridMirror(
@@ -73,4 +83,20 @@ function mirrorsHorizontally(axes: ArrayMirrorAxes): boolean {
 
 function mirrorsVertically(axes: ArrayMirrorAxes): boolean {
   return axes === 'vertical' || axes === 'both';
+}
+
+// Mulberry32: a small seeded generator, so a seed always gives the same turns.
+function randomTurns(settings: NonNullable<GridArraySpec['randomRotation']>): () => number {
+  let state = Math.trunc(finite(settings.seed)) >>> 0;
+  const step = finiteNonNegative(settings.stepDeg);
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    const unit = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    if (step <= 0) return unit * 360;
+    const slots = Math.max(1, Math.round(360 / step));
+    return (Math.floor(unit * slots) % slots) * step;
+  };
 }

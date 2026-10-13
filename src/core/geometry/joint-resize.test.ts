@@ -259,3 +259,30 @@ describe('bounded joint-opening resizing', () => {
       expect(analyseJointResize([source], { ...request, ...patch }).kind).toBe('error');
   });
 });
+
+describe('outward tabs', () => {
+  // A 20 x 20 panel with a 3 mm deep, 6 mm wide tab standing out of its bottom edge.
+  const tabbed: ReadonlyArray<Vec2> = [
+    { x: 0, y: 0 },
+    { x: 20, y: 0 },
+    { x: 20, y: 20 },
+    { x: 13, y: 20 },
+    { x: 13, y: 23 },
+    { x: 7, y: 23 },
+    { x: 7, y: 20 },
+    { x: 0, y: 20 },
+  ];
+
+  it('resizes a tab depth to the bare material thickness from its root, leaving its width', () => {
+    const source = artwork([tabbed]);
+    const analysis = analyseJointResize([source], request);
+    expect(analysis.kind === 'ok' && analysis.value.candidates.map((c) => c.kind)).toEqual([
+      'outward-tab',
+    ]);
+    const p = resized(source).paths[0]!.polylines[0]!.points;
+    // Depth 3 -> thickness 4 (no fit allowance on a tab), width 6 unchanged.
+    expect(p[4]).toEqual({ x: 13, y: 24 });
+    expect(p[5]).toEqual({ x: 7, y: 24 });
+    for (const i of [0, 1, 2, 3, 6, 7]) expect(p[i]).toEqual(tabbed[i]);
+  });
+});

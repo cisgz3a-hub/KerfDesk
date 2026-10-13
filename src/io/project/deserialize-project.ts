@@ -30,6 +30,8 @@ import {
   type Project,
 } from '../../core/scene';
 import { normalizeProjectStartPoints } from '../../core/scene/start-points';
+import { workspaceAids } from './normalize-workspace-aids';
+import { isObject } from './project-shape-primitives';
 import {
   clampOverlapMergeTolerance,
   DEFAULT_PROJECT_OPTIMIZATION,
@@ -55,10 +57,6 @@ export type DeserializeResult =
   | { readonly kind: 'schema-too-new'; readonly sawVersion: number }
   | { readonly kind: 'schema-too-old'; readonly sawVersion: number }
   | { readonly kind: 'invalid'; readonly reason: string };
-
-function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
 
 export function deserializeProject(jsonText: string): DeserializeResult {
   let raw: unknown;
@@ -133,7 +131,7 @@ function normalizeProject(
     device: normalizeDevice(dev),
     optimization: normalizeOptimization(raw['optimization']),
     jobSetup: normalizeProjectJobSetup(raw['jobSetup']),
-    notes: typeof raw['notes'] === 'string' ? raw['notes'] : '',
+    ...workspaceAids(raw),
     scene: {
       ...scene,
       objects: objects.map((object) => normalizeSceneObject(object, resolvedDocuments)),

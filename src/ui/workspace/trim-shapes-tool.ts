@@ -13,6 +13,7 @@ import {
 } from '../../core/geometry/trim-shapes';
 import type { Project, Scene, Vec2 } from '../../core/scene';
 import { useStore } from '../state';
+import { currentDrawingColor } from './draw-tool';
 import { canvasMouseToScene, pxToMmForCanvas, type ViewState } from './view-transform';
 
 // Canvas bitmap pixels, like the laser tab tool's placement tolerance.
@@ -40,5 +41,9 @@ export function trimAtPointer(args: {
   const point = canvasMouseToScene(args.e, args.canvas, args.project, args.viewState);
   if (point === null) return;
   const pxToMm = pxToMmForCanvas(args.canvas, args.project, args.viewState);
-  useStore.getState().trimShapeAt(point, TRIM_PICK_TOLERANCE_PX * pxToMm);
+  // LightBurn: trims auto-join unless Ctrl/Cmd is held; Shift keeps a copy of the cut piece.
+  useStore.getState().trimShapeAt(point, TRIM_PICK_TOLERANCE_PX * pxToMm, {
+    autoJoin: !(args.e.ctrlKey || args.e.metaKey),
+    ...(args.e.shiftKey ? { keepRemoved: { color: currentDrawingColor(args.project) } } : {}),
+  });
 }

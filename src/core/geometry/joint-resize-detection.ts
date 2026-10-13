@@ -62,22 +62,13 @@ function detectSlot(
     returnSide = subtract(at(3), at(2)),
     after = subtract(at(4), at(3));
   const width = Math.hypot(base.x, base.y);
-  if (
-    Math.abs(width - request.currentWidthMm) > request.detectionToleranceMm ||
-    !perpendicular(side, base) ||
-    !parallel(side, returnSide) ||
-    dot(side, returnSide) >= 0 ||
-    Math.abs(Math.hypot(side.x, side.y) - Math.hypot(returnSide.x, returnSide.y)) > EPS
-  )
-    return [];
-  if (
-    !parallel(before, base) ||
-    !parallel(after, base) ||
-    dot(before, base) <= 0 ||
-    dot(after, base) <= 0
-  )
-    return [];
+  if (!rectangularNotch(before, side, base, returnSide, after)) return [];
   const winding = Math.sign(signedJointArea(contour.points));
+  const outward =
+    Math.sign(cross(side, base)) === winding && Math.sign(cross(base, returnSide)) === winding;
+  if (outward)
+    return detectTab(geometry, contour, start, request, Math.hypot(side.x, side.y), width, side);
+  if (Math.abs(width - request.currentWidthMm) > request.detectionToleranceMm) return [];
   if (Math.sign(cross(side, base)) === winding || Math.sign(cross(base, returnSide)) === winding)
     return [];
   const feature = candidate(
@@ -90,6 +81,52 @@ function detectSlot(
     [0, 1, 2, 3].map((offset) => ({ vertex: (start + offset) % n, sign: offset < 2 ? -1 : 1 })),
   );
   return [{ ...feature, direction: unit(base) }];
+}
+
+// Two equal parallel sides square to a base, on a straight edge running on
+// either side: the outline of a U-slot cut in, or a tab standing out.
+function rectangularNotch(
+  before: Vec2,
+  side: Vec2,
+  base: Vec2,
+  returnSide: Vec2,
+  after: Vec2,
+): boolean {
+  return (
+    perpendicular(side, base) &&
+    parallel(side, returnSide) &&
+    dot(side, returnSide) < 0 &&
+    Math.abs(Math.hypot(side.x, side.y) - Math.hypot(returnSide.x, returnSide.y)) <= EPS &&
+    parallel(before, base) &&
+    parallel(after, base) &&
+    dot(before, base) > 0 &&
+    dot(after, base) > 0
+  );
+}
+
+// A tab sticking out of a straight edge: its depth is the thickness of the
+// part it passes through, so the outer two corners move along its sides.
+function detectTab(
+  geometry: Geometry,
+  contour: Contour,
+  start: number,
+  request: JointResizeRequest,
+  depth: number,
+  width: number,
+  side: Vec2,
+): JointCandidate[] {
+  if (Math.abs(depth - request.currentWidthMm) > request.detectionToleranceMm) return [];
+  const n = contour.points.length;
+  const feature = candidate(
+    geometry,
+    contour,
+    'outward-tab',
+    start,
+    depth,
+    width,
+    [1, 2].map((offset) => ({ vertex: (start + offset) % n, sign: 1 as const })),
+  );
+  return [{ ...feature, direction: unit(side) }];
 }
 
 function candidate(

@@ -20,6 +20,7 @@ import { validateProjectVariables, validateVariableTemplate } from './project-va
 import { validateRasterSourceContract } from './project-paged-raster-validator';
 import { validatePrintAndCutTargets } from './project-print-and-cut-validator';
 import { validatePathText } from './project-path-text-validator';
+import { validateTextStyle } from './project-text-style-validator';
 import { validateEmbeddedFonts } from './project-embedded-font-validator';
 import { validateSceneBudgets, validateSceneIntegrity } from './project-scene-integrity-validator';
 import { validateCncTabAnchors } from './project-cnc-tab-validator';
@@ -298,6 +299,7 @@ function validateTextObject(obj: Record<string, unknown>, path: string): string 
     optionalNumber(obj, `${path}.letterSpacing`),
     optionalNumber(obj, `${path}.bendDeg`),
     optionalBoolean(obj, `${path}.weldOverlaps`),
+    validateTextStyle(obj['textStyle'], `${path}.textStyle`),
     validatePathText(obj['pathText'], `${path}.pathText`),
     validateTextBox(obj['textBox'], obj, `${path}.textBox`),
     validateVariableTemplate(obj['variableTemplate'], `${path}.variableTemplate`),
@@ -391,6 +393,7 @@ function validateShapeSpec(value: unknown, path: string): string | null {
     return firstError([
       requirePositiveInteger(value, `${path}.sides`),
       requirePositiveNumber(value, `${path}.radiusMm`),
+      optionalNumber(value, `${path}.bulge`),
     ]);
   }
   if (kind === 'star') {
@@ -398,6 +401,8 @@ function validateShapeSpec(value: unknown, path: string): string | null {
       requireIntegerInRange(value, `${path}.points`, 3, 64),
       requirePositiveNumber(value, `${path}.outerRadiusMm`),
       requireUnitRatio(value, `${path}.innerRadiusRatio`),
+      optionalNumber(value, `${path}.bulge`),
+      optionalPositiveNumber(value, `${path}.alternateRadiusRatio`),
     ]);
   }
   if (kind === 'polyline') {
