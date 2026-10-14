@@ -74,6 +74,21 @@
   gap: 8px;
   font-size: 12px;
 }
+.lf-start-settings-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lf-start-settings-close {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  margin: 4px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
 .lf-start-settings-panel p {
   margin: 0;
 }
