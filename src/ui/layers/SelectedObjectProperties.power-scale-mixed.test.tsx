@@ -28,7 +28,9 @@ describe('SelectedObjectProperties mixed power scale', () => {
       const root = createRoot(host);
       await act(async () => root.render(<SelectedObjectProperties />));
       try {
-        const input = host.querySelector('input[aria-label="Power scale for selected objects"]');
+        const input = host.querySelector(
+          'input[aria-label="Power multiplier for selected objects"]',
+        );
         if (!(input instanceof HTMLInputElement)) throw new Error('power scale input missing');
         expect(input.value).toBe('');
         expect(input.placeholder).toBe('Mixed');

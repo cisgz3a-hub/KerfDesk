@@ -70,9 +70,10 @@ test('mixed artwork power scale accepts explicit 100 after clearing its blank dr
     .getByRole('tab', { name: 'Artwork', exact: true })
     .click();
   const input = panel.getByRole('spinbutton', {
-    name: 'Power scale for selected objects',
+    name: 'Power multiplier for selected objects',
     exact: true,
   });
+  await panel.locator('summary', { hasText: 'Advanced artwork settings' }).click();
   await expect(input).toHaveAttribute('placeholder', 'Mixed');
   await expect(input).toHaveValue('');
   await input.press('ControlOrMeta+A');

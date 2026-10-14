@@ -23,11 +23,7 @@ import {
   isParametricShapeObject,
   SelectedShapeGeometryFields,
 } from './SelectedShapeGeometryFields';
-import { useMixedOperationNumber } from './mixed-operation-input';
-
-const DEFAULT_POWER_SCALE_PERCENT = 100;
-const MIN_POWER_SCALE_PERCENT = 0;
-const MAX_POWER_SCALE_PERCENT = 100;
+import { AdvancedArtworkSettings } from './AdvancedArtworkSettings';
 
 export function SelectedObjectProperties(): JSX.Element | null {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
@@ -165,9 +161,6 @@ function ArtworkAdjustmentFields(props: ArtworkPropertiesInspectorProps): JSX.El
           setSpec={(spec) => props.setShapeSpec(parametricShape.id, spec)}
         />
       )}
-      {props.isCncMachine ? null : (
-        <PowerScaleInput objects={context.objects} selectionActive={context.selectionActive} />
-      )}
       <SelectedSourceReimportControl
         object={
           context.selectionActive && context.objects.length === 1 ? context.primaryObject : null
@@ -179,6 +172,13 @@ function ArtworkAdjustmentFields(props: ArtworkPropertiesInspectorProps): JSX.El
         }
       />
       {props.isCncMachine ? null : <SelectedImageAdjustments image={rasterImage} />}
+      {props.isCncMachine ? null : (
+        <AdvancedArtworkSettings
+          objects={context.objects}
+          layers={props.layers}
+          selectionActive={context.selectionActive}
+        />
+      )}
     </div>
   );
 }
@@ -250,57 +250,6 @@ function singleParametricShape(objects: ReadonlyArray<SceneObject>) {
   return object?.kind === 'shape' && isParametricShapeObject(object) ? object : null;
 }
 
-function PowerScaleInput(props: {
-  readonly objects: ReadonlyArray<SceneObject>;
-  readonly selectionActive: boolean;
-}): JSX.Element {
-  const setObjectsPowerScale = useStore((s) => s.setObjectsPowerScale);
-  const objectIds = props.objects.map((object) => object.id);
-  const commonValue = commonPowerScale(props.objects);
-  const mixed = commonValue === null;
-  const selectionKey = props.objects
-    .map((object) => `${object.id}:${object.powerScale ?? DEFAULT_POWER_SCALE_PERCENT}`)
-    .join('|');
-  const debounced = useMixedOperationNumber({
-    value: commonValue ?? DEFAULT_POWER_SCALE_PERCENT,
-    mixed,
-    commit: (powerScale) => setObjectsPowerScale(objectIds, powerScale),
-    parse: (input) => clampPowerScale(Number(input)),
-    reconcileKey: selectionKey,
-  });
-  return (
-    <label style={rowStyle}>
-      <span style={labelStyle}>Power scale</span>
-      <span style={controlStyle}>
-        <input
-          type="number"
-          min={MIN_POWER_SCALE_PERCENT}
-          max={MAX_POWER_SCALE_PERCENT}
-          step={1}
-          value={debounced.displayValue}
-          {...debounced.inputProps}
-          aria-invalid={debounced.errorMessage === null ? undefined : true}
-          aria-describedby={
-            debounced.errorMessage === null ? undefined : 'selected-power-scale-error'
-          }
-          lang="en"
-          onChange={debounced.onChange}
-          onBlur={debounced.onBlur}
-          aria-label={`Power scale for ${props.selectionActive ? 'selected objects' : 'inspected artwork'}`}
-          title="100% uses the operation’s power. Reduce it to lower power for only this artwork, without changing the operation."
-          style={inputStyle}
-        />
-        {debounced.errorMessage === null ? null : (
-          <span id="selected-power-scale-error" role="alert" style={unitStyle}>
-            {debounced.errorMessage}
-          </span>
-        )}
-        <span style={unitStyle}>%</span>
-      </span>
-    </label>
-  );
-}
-
 function rasterImageForObject(object: SceneObject): RasterImage | null {
   return object.kind === 'raster-image' ? object : null;
 }
@@ -344,18 +293,6 @@ function selectedSceneObjects(
   return objects.filter((object) => ids.has(object.id));
 }
 
-function commonPowerScale(objects: ReadonlyArray<SceneObject>): number | null {
-  const first = objects[0]?.powerScale ?? DEFAULT_POWER_SCALE_PERCENT;
-  return objects.every((object) => (object.powerScale ?? DEFAULT_POWER_SCALE_PERCENT) === first)
-    ? first
-    : null;
-}
-
-function clampPowerScale(value: number): number {
-  if (!Number.isFinite(value)) return DEFAULT_POWER_SCALE_PERCENT;
-  return Math.max(MIN_POWER_SCALE_PERCENT, Math.min(MAX_POWER_SCALE_PERCENT, value));
-}
-
 const rowStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '100px 1fr',
@@ -364,11 +301,8 @@ const rowStyle: React.CSSProperties = {
   marginBottom: 6,
 };
 const labelStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-muted)' };
-const controlStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
-const inputStyle: React.CSSProperties = { width: 84, boxSizing: 'border-box' };
 const chooserSelectStyle: React.CSSProperties = {
   width: '100%',
   minWidth: 0,
   boxSizing: 'border-box',
 };
-const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };

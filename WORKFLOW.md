@@ -803,6 +803,13 @@ the linked artwork.
   image adjustments and path tools. Operation opens first; switching tabs keeps the editors mounted
   so in-progress numeric edits and undo reconciliation are retained. Both levels of tabs support
   arrow keys, Home and End, with one tab stop per tab list.
+- In laser mode, the Artwork tab keeps **Power multiplier** inside the initially collapsed
+  **Advanced artwork settings** section. 100% leaves each operation's power unchanged; lower
+  values reduce power for this artwork. **Resulting power** shows the operation power multiplied
+  by the artwork percentage for each enabled compatible operation, including sub-operations and
+  artwork overrides. Image operations label maximum power and, for grayscale, minimum power
+  with white pixels off. Mixed selections retain their individual multipliers until edited;
+  artwork without an enabled compatible operation shows an empty-state explanation.
 - Laser settings offer **Line**, **Fill** and **Image**, then show power, speed and passes
   together, followed only by the settings that process needs (ADR-430). Power and Speed use
   full-width sliders with exact numeric entry; Passes remains numeric. Sliders show their endpoints,
