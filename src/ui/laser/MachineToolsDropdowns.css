@@ -3,25 +3,26 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  gap: 8px;
+  gap: 5px;
 }
 
 .lf-machine-tool-tabs {
   display: grid;
   flex: 0 0 auto;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
-  padding: 4px 0;
+  gap: 4px;
+  padding: 0;
 }
 
 .lf-btn.lf-machine-tool-tab {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
-  padding: 9px 3px 5px;
+  min-height: 30px;
+  padding: 4px 3px;
   border-radius: 8px;
   font-size: var(--lf-text-sm);
   box-shadow: 0 0 10px color-mix(in srgb, var(--lf-accent) 9%, transparent);
@@ -29,6 +30,10 @@
     background-color 140ms,
     border-color 140ms,
     box-shadow 140ms;
+}
+
+.lf-machine-tool-tab > svg {
+  flex: 0 0 12px;
 }
 
 .lf-btn.lf-machine-tool-tab[aria-expanded='true'] {
@@ -49,12 +54,14 @@
 }
 
 .lf-machine-tool-dropdown {
+  --lf-console-log-max-height: 104px;
+  --lf-console-log-min-height: 44px;
   flex: 1 1 auto;
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
   min-height: 80px;
-  padding: 8px 10px 10px;
+  padding: 5px 8px 8px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -64,12 +71,16 @@
   border-radius: 9px;
 }
 
+.lf-machine-tool-dropdown > .lf-machine-disclosure {
+  padding-block: 5px !important;
+}
+
 .lf-machine-tool-dropdown[hidden] {
   display: none;
 }
 
 .lf-machine-tool-dropdown > :not(:last-child):not(.lf-dialog-backdrop) {
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .lf-machine-tool-dropdown-heading {
@@ -89,13 +100,39 @@
   font-weight: 600;
 }
 
-.lf-machine-tool-dropdown .lf-origin-heading {
+.lf-machine-tool-dropdown .lf-origin-heading,
+.lf-machine-tool-dropdown .lf-placement-heading {
   display: none !important;
 }
 
 .lf-machine-tool-dropdown .lf-btn {
   min-width: 0;
   white-space: normal;
+}
+
+.lf-machine-tool-dropdown .lf-btn:not([aria-modal='true'] .lf-btn) {
+  padding: 3px 6px;
+  font-size: var(--lf-text-sm);
+}
+
+.lf-machine-tool-dropdown .lf-placement-fields {
+  --lf-placement-display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.lf-machine-tool-dropdown .lf-placement-start {
+  flex-direction: column;
+  align-items: stretch !important;
+}
+
+.lf-machine-tool-dropdown .lf-placement-anchor {
+  flex-direction: column-reverse;
+  gap: 4px !important;
+}
+
+.lf-machine-tool-dropdown .lf-placement-fields > :last-child {
+  grid-column: 1 / -1;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -110,21 +147,10 @@
     gap: 8px;
     padding-block: 8px;
   }
-
-  .lf-machine-tool-tabs {
-    padding: 0;
-  }
-
-  .lf-btn.lf-machine-tool-tab {
-    flex-direction: row;
-    gap: 4px;
-    padding: 6px 3px;
-  }
 }
 
-/* Compact rails have room for labels, not three horizontal icon/label groups. */
-@container machine-rail-body (max-height: 620px) and (max-width: 360px) {
-  .lf-machine-tool-tab > svg,
+/* Keep the small icons beside their labels; omit only the decorative arrow. */
+@container machine-rail-body (max-width: 360px) {
   .lf-machine-tool-chevron {
     display: none;
   }
