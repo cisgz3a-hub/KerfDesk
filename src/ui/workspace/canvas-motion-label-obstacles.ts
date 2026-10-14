@@ -1,6 +1,6 @@
 import { sceneLayerVisibility, transformedBBox, type AABB, type Scene } from '../../core/scene';
 import type { MarkerBox } from './canvas-motion-marker-layout';
-import { ROTATE_HANDLE_OFFSET_MM } from './rotate-handle';
+import { ROTATE_HANDLE_OFFSET_PX } from './rotate-handle';
 import type { ViewTransform } from './view-transform';
 
 const ARTWORK_CLEARANCE_PX = 6;
@@ -33,7 +33,7 @@ export function canvasStartLabelObstacles(
         {
           minX: middle,
           maxX: middle,
-          minY: selection.minY - ROTATE_HANDLE_OFFSET_MM,
+          minY: selection.minY - ROTATE_HANDLE_OFFSET_PX / view.scale,
           maxY: selection.minY,
         },
         view,

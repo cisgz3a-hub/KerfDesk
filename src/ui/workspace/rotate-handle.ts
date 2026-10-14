@@ -1,4 +1,4 @@
-// Rotation handle (F-A6) — sits at a fixed scene-mm offset above the
+// Rotation handle (F-A6) — sits at a fixed screen-pixel offset above the
 // selected object's bbox. Dragging it rotates the object around its
 // bbox center; Shift snaps to 15° increments.
 //
@@ -17,10 +17,9 @@ import {
   type Vec2,
 } from '../../core/scene';
 
-// Distance above the bbox at which the rotation handle sits, in scene mm.
-// Tuned so the handle stays visually separated from the corner handles at
-// the default fit-to-bed scale.
-export const ROTATE_HANDLE_OFFSET_MM = 24;
+// Screen-pixel distance above the bounding box. Keep the control reachable
+// when zooming in or fitting a small selection.
+export const ROTATE_HANDLE_OFFSET_PX = 24;
 export const ROTATE_SNAP_DEG = 15;
 
 export type RotateStartTransform = {
@@ -28,10 +27,10 @@ export type RotateStartTransform = {
   readonly transform: Transform;
 };
 
-export function rotateHandlePosition(object: SceneObject): Vec2 {
+export function rotateHandlePosition(object: SceneObject, pxToMm = 1): Vec2 {
   const bbox = transformedBBox(object);
   const midX = (bbox.minX + bbox.maxX) / 2;
-  return { x: midX, y: bbox.minY - ROTATE_HANDLE_OFFSET_MM };
+  return { x: midX, y: bbox.minY - ROTATE_HANDLE_OFFSET_PX * pxToMm };
 }
 
 export function selectionRotateAnchor(objects: ReadonlyArray<SceneObject>): Vec2 | null {
@@ -40,15 +39,18 @@ export function selectionRotateAnchor(objects: ReadonlyArray<SceneObject>): Vec2
   return { x: (bbox.minX + bbox.maxX) / 2, y: (bbox.minY + bbox.maxY) / 2 };
 }
 
-export function selectionRotateHandlePosition(objects: ReadonlyArray<SceneObject>): Vec2 | null {
+export function selectionRotateHandlePosition(
+  objects: ReadonlyArray<SceneObject>,
+  pxToMm = 1,
+): Vec2 | null {
   const bbox = combinedBBox(objects);
   if (bbox === null) return null;
   const midX = (bbox.minX + bbox.maxX) / 2;
-  return { x: midX, y: bbox.minY - ROTATE_HANDLE_OFFSET_MM };
+  return { x: midX, y: bbox.minY - ROTATE_HANDLE_OFFSET_PX * pxToMm };
 }
 
 export function hitRotateHandle(object: SceneObject, point: Vec2, pxToMm: number): boolean {
-  const pos = rotateHandlePosition(object);
+  const pos = rotateHandlePosition(object, pxToMm);
   // Slightly larger pick radius than the square scale handles since the
   // rotate handle is round and visually smaller.
   const halfMm = 6 * pxToMm;
@@ -60,7 +62,7 @@ export function hitSelectionRotateHandle(
   point: Vec2,
   pxToMm: number,
 ): boolean {
-  const pos = selectionRotateHandlePosition(objects);
+  const pos = selectionRotateHandlePosition(objects, pxToMm);
   if (pos === null) return false;
   const halfMm = 6 * pxToMm;
   return Math.abs(point.x - pos.x) <= halfMm && Math.abs(point.y - pos.y) <= halfMm;
