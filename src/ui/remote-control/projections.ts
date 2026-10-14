@@ -84,12 +84,15 @@ export function workspaceProjection(state: AppState, shareArtwork = false) {
       ...(mode === 'laser' ? { ...operationValues(layer), ...laserDetails(layer) } : {}),
       ...(mode === 'cnc' ? { cnc: cncDetails(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS) } : {}),
     }));
-  const allSelected = selectedIds(state).filter(publicIdentifier);
+  const selected = selectedIds(state);
+  const allSelected = selected.filter(publicIdentifier);
   return {
     mode,
     name: 'Current workspace',
     dirty: state.dirty,
     selection: allSelected.slice(0, LIMIT),
+    totalSelected: selected.length,
+    selectionTruncated: selected.length > Math.min(allSelected.length, LIMIT),
     artwork,
     operations,
     totalArtwork: scene.objects.length,

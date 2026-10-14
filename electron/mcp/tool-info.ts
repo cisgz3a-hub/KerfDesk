@@ -50,7 +50,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   set_selection: {
     title: 'Select existing artwork',
     description:
-      'Select existing artwork IDs, or clear with an empty array. Requires the current expectedRevision and a UUID requestId.',
+      'Select artwork atomically in whole groups. mode defaults to replace; add, remove and toggle accept artworkIds. all and clear omit artworkIds (or use an empty array). all selects every editable group across the document, not only the bounded workspace listing. Hidden or locked groups are excluded from all; explicit additions refuse them. Results above 200 artwork are refused without changing selection. For older desktops without capabilities.selectionModes, omit mode and provide only artworkIds; an empty array clears. Requires the current expectedRevision and a UUID requestId.',
   },
   add_text: {
     title: 'Add text artwork',

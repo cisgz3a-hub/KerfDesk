@@ -10,6 +10,7 @@ import { editableText, prepareTextEdit } from './text-edit';
 import { applyHistory, prepareArrange } from './arrange';
 import { publicIdentifier, selectedIds } from './projections';
 import { prepareRemoteShape } from './touch-shapes';
+import { prepareRemoteSelection } from './selection';
 
 export async function applyRemoteWrite(
   write: RemoteWrite,
@@ -21,12 +22,13 @@ export async function applyRemoteWrite(
   assertCurrent();
   const state = store.getState();
   switch (write.command) {
-    case 'set_selection':
-      editableArtwork(state, write.args.artworkIds);
+    case 'set_selection': {
+      const ids = prepareRemoteSelection(state, write.args);
       return commit(() => {
-        state.selectObjects(write.args.artworkIds);
+        state.selectObjects(ids, { scope: 'document', expandGroups: false });
         return { selection: selectedIds(store.getState()).filter(publicIdentifier).slice(0, 200) };
       });
+    }
     case 'add_rectangle':
       return commit(() => addRectangle(state, write.args));
     case 'add_ellipse':

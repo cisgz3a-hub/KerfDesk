@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { mcpSelectionArgsSchema } from './selection-schemas.js';
 
 const id = z.string().min(1).max(128);
 const revision = z.string().min(1).max(200);
@@ -88,7 +89,7 @@ const createOperationArgs = {
 
 /** Edits that `apply_edits` may combine. Arguments omit the shared admission fields. */
 export const mcpBatchEditSchemas = {
-  set_selection: z.strictObject({ artworkIds: z.array(id).max(200) }),
+  set_selection: mcpSelectionArgsSchema,
   add_text: z.strictObject({
     xMm: coordinate,
     yMm: coordinate,

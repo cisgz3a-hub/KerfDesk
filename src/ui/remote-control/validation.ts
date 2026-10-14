@@ -1,6 +1,7 @@
 import type { RemoteWriteCommand, RemoteReadCommand, RemoteWrite } from './types';
 import { validTextPatch } from './text-validation';
 import { RemoteFault } from './fault';
+import { selectionArgsSchema } from './selection-validation';
 import {
   DESIGN_WRITE_COMMANDS,
   validOperationPatch,
@@ -92,7 +93,7 @@ export function validateCommand(command: string, args: unknown): ValidatedComman
 }
 
 const WRITE_FIELDS: Record<RemoteWriteCommand, readonly string[]> = {
-  set_selection: ['artworkIds'],
+  set_selection: [],
   add_rectangle: ['xMm', 'yMm', 'widthMm', 'heightMm'],
   add_ellipse: ['xMm', 'yMm', 'widthMm', 'heightMm'],
   add_polyline: ['pointsMm', 'closed'],
@@ -114,6 +115,9 @@ function validWrite(command: RemoteWriteCommand, args: RecordValue): boolean {
     !keys(args, [
       ...admissionKeys,
       ...WRITE_FIELDS[command],
+      ...(command === 'set_selection'
+        ? ['mode', 'artworkIds'].filter((field) => Object.hasOwn(args, field))
+        : []),
       ...(command === 'add_text' && Object.hasOwn(args, 'fontId') ? ['fontId'] : []),
     ])
   )
@@ -124,7 +128,8 @@ function writeValues(command: RemoteWriteCommand, args: RecordValue): boolean {
   return WRITE_VALUES[command](args);
 }
 const WRITE_VALUES: Record<RemoteWriteCommand, (args: RecordValue) => boolean> = {
-  set_selection: (args) => ids(args['artworkIds']),
+  set_selection: ({ expectedRevision: _revision, requestId: _requestId, ...args }) =>
+    selectionArgsSchema.safeParse(args).success,
   add_rectangle: (args) => positionAndWidth(args) && size(args['heightMm']),
   add_ellipse: (args) => positionAndWidth(args) && size(args['heightMm']),
   add_polyline: polylineValues,

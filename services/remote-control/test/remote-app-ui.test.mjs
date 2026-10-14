@@ -81,10 +81,13 @@ test('phone canvas: vector artwork, geometry hit selection and a drag that write
     const inside = await scenePoint(page, 30, 25);
     await page.mouse.click(inside.x, inside.y);
     await new Promise((resolve) => setTimeout(resolve, 200));
-    assert.equal(await page.getByRole('toolbar', { name: 'Selection' }).count(), 0);
+    assert.equal(await page.getByRole('toolbar', { name: 'Selection', exact: true }).count(), 0);
     const edge = await scenePoint(page, 10, 25);
     await page.mouse.click(edge.x, edge.y);
-    await page.getByRole('toolbar', { name: 'Selection' }).getByText('1 selected').waitFor();
+    await page
+      .getByRole('toolbar', { name: 'Selection', exact: true })
+      .getByText('1 selected')
+      .waitFor();
     await until(
       () => writes(state).some((item) => item.name === 'set_selection'),
       'selection sent',

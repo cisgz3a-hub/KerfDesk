@@ -52,6 +52,9 @@ export type AppState = {
   recipes: Recipe[];
   tab: Tab;
   tool: Tool;
+  selectionMode: 'replace' | 'toggle';
+  selectionSync: 'desktop' | 'pending' | 'local';
+  connectionGeneration: number;
   selection: string[];
   view: View | null;
   sheet: Sheet;
@@ -83,6 +86,9 @@ const initial: AppState = {
   recipes: [],
   tab: 'design',
   tool: 'select',
+  selectionMode: 'replace',
+  selectionSync: 'desktop',
+  connectionGeneration: 0,
   selection: [],
   view: null,
   sheet: null,
@@ -134,3 +140,10 @@ export const canEdit = (current: AppState): boolean =>
   current.workspace !== null;
 export const canControl = (current: AppState): boolean =>
   current.scopes.includes('control') && current.machine?.permissions.canControl === true;
+
+/** Native selections can exceed the remote projection. Never treat a prefix as the whole set. */
+export const selectionComplete = (current: AppState): boolean =>
+  current.selectionSync === 'local' ||
+  current.workspace?.selectionTruncated !== true ||
+  current.selection.length !== current.workspace.selection.length ||
+  current.selection.some((id, index) => id !== current.workspace?.selection[index]);

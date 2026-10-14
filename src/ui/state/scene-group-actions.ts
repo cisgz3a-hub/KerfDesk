@@ -30,12 +30,17 @@ export function selectionFromIds(
     Partial<Pick<AppState, 'projectDocumentEpoch'>>,
   ids: ReadonlyArray<string>,
   additive: boolean,
+  scope: 'focus' | 'document' = 'focus',
+  expandGroups = true,
 ): SelectionState {
   const current = additive ? currentSelectionIds(state) : [];
   return selectionStateFromIds(
     state.project.scene,
     [...current, ...ids],
-    currentHierarchyFocus(state.project.scene, state.projectDocumentEpoch),
+    scope === 'document'
+      ? null
+      : currentHierarchyFocus(state.project.scene, state.projectDocumentEpoch),
+    expandGroups,
   );
 }
 
@@ -161,8 +166,11 @@ function selectionStateFromIds(
   scene: Scene,
   ids: ReadonlyArray<string>,
   focus: string | null = null,
+  expandGroups = true,
 ): SelectionState {
-  const [primary, ...rest] = expandedObjectIdsForGroups(scene, ids, focus);
+  const [primary, ...rest] = expandGroups
+    ? expandedObjectIdsForGroups(scene, ids, focus)
+    : orderedLiveIds(scene, new Set(ids), focus);
   return {
     selectedObjectId: primary ?? null,
     additionalSelectedIds: new Set(rest),

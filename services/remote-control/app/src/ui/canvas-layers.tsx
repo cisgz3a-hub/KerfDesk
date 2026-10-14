@@ -16,6 +16,7 @@ export function CanvasLayers({
   selBox,
   editable,
   marquee,
+  marqueeCrossing,
   preview,
   draft,
   highlight,
@@ -29,6 +30,7 @@ export function CanvasLayers({
   selBox: Box | null;
   editable: boolean;
   marquee: Box | null;
+  marqueeCrossing?: boolean;
   preview: AppState['preview'];
   draft: AppState['draft'];
   highlight: AppState['highlight'];
@@ -91,20 +93,22 @@ export function CanvasLayers({
         </g>
       ))}
       {showBoxes
-        ? artwork.map((item) => {
-            const box = artworkBox(item);
-            return box === null ? null : (
-              <rect
-                key={item.id}
-                className="art-box"
-                x={box.minX}
-                y={box.minY}
-                width={box.maxX - box.minX}
-                height={box.maxY - box.minY}
-                transform={previewTransform(preview, item.id)}
-              />
-            );
-          })
+        ? artwork
+            .filter((item) => item.visible !== false)
+            .map((item) => {
+              const box = artworkBox(item);
+              return box === null ? null : (
+                <rect
+                  key={item.id}
+                  className="art-box"
+                  x={box.minX}
+                  y={box.minY}
+                  width={box.maxX - box.minX}
+                  height={box.maxY - box.minY}
+                  transform={previewTransform(preview, item.id)}
+                />
+              );
+            })
         : null}
       {draft === null ? null : draft.kind === 'pen' ? (
         <path className="draft-shape" d={pathData(draft.points, false)} fill="none" />
@@ -171,7 +175,7 @@ export function CanvasLayers({
       )}
       {marquee === null ? null : (
         <rect
-          className="marquee"
+          className={`marquee${marqueeCrossing === true ? ' crossing' : ''}`}
           x={marquee.minX}
           y={marquee.minY}
           width={marquee.maxX - marquee.minX}

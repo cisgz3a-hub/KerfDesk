@@ -819,6 +819,54 @@ textarea {
 }
 
 /* ───────── design canvas ───────── */
+.selection-controls {
+  flex: none;
+  padding: 6px 10px 4px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.selection-controls [role='toolbar'] {
+  display: flex;
+  gap: 6px;
+}
+.selection-controls button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1;
+  min-height: 48px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.selection-controls button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-fill);
+  border-color: var(--accent);
+}
+.selection-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.selection-help {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.selection-help span {
+  white-space: nowrap;
+}
+.canvas-wrap:focus-visible {
+  outline: 2px solid var(--selection);
+  outline-offset: -2px;
+}
 .canvas-wrap {
   position: relative;
   flex: 1;
@@ -916,6 +964,8 @@ textarea {
   vector-effect: non-scaling-stroke;
   fill: color-mix(in srgb, var(--selection) 10%, transparent);
   stroke: var(--selection);
+}
+.marquee.crossing {
   stroke-dasharray: 4 3;
 }
 
@@ -1079,6 +1129,30 @@ textarea {
   font-weight: 700;
   color: var(--selection);
   white-space: nowrap;
+}
+.actionbar .count small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+}
+.actionbar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+@media (max-width: 380px) {
+  .actionbar[aria-label='Selection'] {
+    gap: 2px;
+  }
+  .actionbar[aria-label='Selection'] button {
+    flex: 1;
+    min-width: 48px;
+    padding: 0 2px;
+  }
+  .actionbar[aria-label='Selection'] .count {
+    max-width: 56px;
+    padding: 0 2px;
+    white-space: normal;
+  }
 }
 .readonly-chip {
   position: absolute;
