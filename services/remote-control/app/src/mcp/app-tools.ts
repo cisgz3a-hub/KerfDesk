@@ -154,7 +154,12 @@ export function publishModelContext(app: App): () => void {
       .updateModelContext({ content: [{ type: 'text', text: summary }], structuredContent: state })
       .catch(() => undefined);
   };
-  return store.subscribe(() => {
+  const unsubscribe = store.subscribe(() => {
     if (timer === null) timer = setTimeout(send, 700);
   });
+  return () => {
+    unsubscribe();
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  };
 }

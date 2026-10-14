@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import { mcpControlOperationSchema } from '../../../electron/mcp/machine-schemas.js';
+import {
+  MCP_PRIORITY_COMMANDS,
+  type KerfDeskMcpCommand,
+} from '../../../electron/mcp/input-schemas.js';
 import { digest } from './security.js';
 import type { GrantProps } from './protocol.js';
 
@@ -39,6 +43,16 @@ const KINDS: Record<string, z.output<typeof mcpControlOperationSchema>['kind']> 
 function operationKind(command: string): z.output<typeof mcpControlOperationSchema>['kind'] {
   return KINDS[command] ?? 'job';
 }
+function usesAbortReserve(
+  command: KerfDeskMcpCommand,
+  counts: z.output<typeof countSchema> | null,
+): boolean {
+  // Routine hold releases spend ordinary capacity; preserve the Abort reserve until needed.
+  return (
+    command === 'abort_job' ||
+    (MCP_PRIORITY_COMMANDS.has(command) && counts?.ordinary === MAX_ORDINARY_CONTROL_ACTIONS)
+  );
+}
 const clientPrefix = (clientId: string) => `${PREFIX}${clientId}:`;
 const keyFor = (clientId: string, requestId: string) => `${clientPrefix(clientId)}${requestId}`;
 
@@ -48,7 +62,7 @@ export class ControlActions {
 
   async reserve(
     props: GrantProps,
-    command: string,
+    command: KerfDeskMcpCommand,
     args: Record<string, unknown>,
     authorized: () => boolean,
   ): Promise<Admission> {
@@ -66,17 +80,18 @@ export class ControlActions {
       // Corrupt existing metadata must not re-open a previously admitted ID.
       if (this.storage.kv.get(key) !== undefined) return { state: 'conflict' };
       const counts = this.counts(props);
+      const priority = usesAbortReserve(command, counts);
       if (
         !counts ||
-        (command === 'abort_job'
+        (priority
           ? counts.abort >= RESERVED_ABORT_ACTIONS
           : counts.ordinary >= MAX_ORDINARY_CONTROL_ACTIONS)
       )
         return { state: 'limit' };
       this.storage.kv.put(`${COUNT_PREFIX}${props.clientId}`, {
         ...counts,
-        ordinary: counts.ordinary + (command === 'abort_job' ? 0 : 1),
-        abort: counts.abort + (command === 'abort_job' ? 1 : 0),
+        ordinary: counts.ordinary + (priority ? 0 : 1),
+        abort: counts.abort + (priority ? 1 : 0),
       });
       this.storage.kv.put(key, {
         leaseId: props.leaseId,

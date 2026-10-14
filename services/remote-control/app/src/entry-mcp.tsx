@@ -15,6 +15,8 @@ const app = new App(
   { tools: { listChanged: false }, availableDisplayModes: ['inline', 'fullscreen', 'pip'] },
   { autoResize: true },
 );
+let tornDown = false;
+let stopContext: (() => void) | undefined;
 
 function applyContext(context: Partial<NonNullable<HostContext>> | undefined): void {
   if (context === undefined) return;
@@ -44,6 +46,7 @@ export async function requestMode(mode: 'inline' | 'fullscreen' | 'pip'): Promis
 
 registerViewTools(app, () => requestMode('fullscreen'));
 app.ontoolresult = (result) => {
+  if (tornDown) return;
   // The model ran a KerfDesk tool: show its effect live and refresh from the PC.
   const changed = (result.structuredContent as { changedArtworkIds?: unknown } | undefined)
     ?.changedArtworkIds;
@@ -53,6 +56,8 @@ app.ontoolresult = (result) => {
 };
 app.onhostcontextchanged = (context) => applyContext(context);
 app.onteardown = async () => {
+  tornDown = true;
+  stopContext?.();
   controller.stop();
   return {};
 };
@@ -68,8 +73,9 @@ if (element !== null)
 
 void app.connect().then(
   () => {
+    if (tornDown) return;
     applyContext(app.getHostContext());
-    publishModelContext(app);
+    stopContext = publishModelContext(app);
     controller.start(new McpTransport(app));
   },
   () => store.toast('This chat app couldn’t open the KerfDesk panel.', 'error'),

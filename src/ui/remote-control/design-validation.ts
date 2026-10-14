@@ -123,13 +123,18 @@ export const batchItemSchemas = {
     heightMm: size,
   }),
   add_ellipse: z.strictObject({ xMm: coordinate, yMm: coordinate, widthMm: size, heightMm: size }),
-  add_polyline: z.strictObject({
-    pointsMm: z
-      .array(z.strictObject({ xMm: coordinate, yMm: coordinate }))
-      .min(2)
-      .max(512),
-    closed: z.boolean(),
-  }),
+  add_polyline: z
+    .strictObject({
+      pointsMm: z
+        .array(z.strictObject({ xMm: coordinate, yMm: coordinate }))
+        .min(2)
+        .max(512),
+      closed: z.boolean(),
+    })
+    .refine(
+      ({ pointsMm, closed }) =>
+        new Set(pointsMm.map(({ xMm, yMm }) => `${xMm},${yMm}`)).size >= (closed ? 3 : 2),
+    ),
   transform_artwork: z.strictObject({
     artworkIds,
     transform: z.discriminatedUnion('type', [

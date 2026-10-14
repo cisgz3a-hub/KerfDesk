@@ -134,6 +134,84 @@ test('real workerd: independent Abort quota survives ordinary exhaustion and res
   }
 });
 
+test('real workerd: routine held-jog stops preserve the reserved Abort capacity', async () => {
+  const worker = startControlWorker();
+  let desktop;
+  try {
+    desktop = await connectDesktop(worker);
+    const phone = await pairPhone(worker, desktop, ['read', 'control']);
+    await admitControl(
+      desktop,
+      phone,
+      'jog_hold_stop',
+      { requestId: randomUUID(), operationId: randomUUID() },
+      (command) => {
+        const result = operationReceipt(command, 'completed');
+        result.operation.kind = 'hold';
+        return result;
+      },
+    );
+    let records = await controlWitness(worker, desktop.deviceId, 'records');
+    assert.equal(records.counts[0][1].ordinary, 1);
+    assert.equal(records.counts[0][1].abort, 0);
+    await admitControl(desktop, phone, 'abort_job', { requestId: randomUUID() });
+    records = await controlWitness(worker, desktop.deviceId, 'records');
+    assert.equal(records.counts[0][1].ordinary, 1);
+    assert.equal(records.counts[0][1].abort, 1);
+  } finally {
+    close(desktop);
+    await worker.dispose();
+  }
+});
+
+test('real workerd: stopping a held jog uses reserved Abort capacity after ordinary exhaustion', async () => {
+  const worker = startControlWorker();
+  let desktop;
+  try {
+    desktop = await connectDesktop(worker);
+    const phone = await pairPhone(worker, desktop, ['read', 'control']);
+    await controlWitness(worker, desktop.deviceId, 'quota', {
+      clientId: phone.clientId,
+      ordinary: 4096,
+      abort: 0,
+    });
+    desktop.socket.addEventListener('message', (event) => {
+      const command = JSON.parse(event.data);
+      if (command.type !== 'command') return;
+      const result = operationReceipt(command, 'completed');
+      result.operation.kind = 'hold';
+      desktop.send({ type: 'result', requestId: command.requestId, result });
+    });
+    const args = { requestId: randomUUID(), operationId: randomUUID() };
+    const stopped = await phone.post('/api/client/command', { name: 'jog_hold_stop', args });
+    const response = await stopped.json();
+    assert.equal(stopped.status, 200, JSON.stringify(response));
+    assert.equal(response.result.operation.state, 'completed');
+    let records = await controlWitness(worker, desktop.deviceId, 'records');
+    assert.equal(records.counts[0][1].ordinary, 4096);
+    assert.equal(records.counts[0][1].abort, 1);
+    const repeated = await phone.post('/api/client/command', { name: 'jog_hold_stop', args });
+    assert.equal((await repeated.json()).result.operation.state, 'unknown');
+    records = await controlWitness(worker, desktop.deviceId, 'records');
+    assert.equal(records.counts[0][1].abort, 1, 'Replay must not spend reserve capacity again');
+    assert.equal(desktop.inbox.queue.filter((item) => item.type === 'command').length, 1);
+    await controlWitness(worker, desktop.deviceId, 'quota', {
+      clientId: phone.clientId,
+      ordinary: 4096,
+      abort: 256,
+    });
+    const exhausted = await phone.post('/api/client/command', {
+      name: 'jog_hold_stop',
+      args: { ...args, requestId: randomUUID() },
+    });
+    assert.equal((await exhausted.json()).error.code, 'control_limit');
+    assert.equal(desktop.inbox.queue.filter((item) => item.type === 'command').length, 1);
+  } finally {
+    close(desktop);
+    await worker.dispose();
+  }
+});
+
 test('real workerd: persisted action metadata excludes reviewed artwork and a confirmed dispatch stays confirmed on replay', async () => {
   const worker = startControlWorker();
   let desktop;

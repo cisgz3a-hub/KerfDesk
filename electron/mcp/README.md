@@ -96,6 +96,11 @@ response includes both a standard image block and structured preview data;
 the textual block includes metadata without another copy of the image bytes.
 Unsupported artwork is reported rather than silently skipped.
 
+Camera snapshots likewise return a standard JPEG image block alongside the
+structured image used by the app. Text contains image metadata without base64
+pixels, and the complete response still fits the 256 KiB result budget. Disabled
+or unavailable scenes cannot include vector objects or raster image footprints.
+
 `review_job` uses the canonical current prepared-job owner or read-only
 compilation, fenced to document, selection/output scope, placement and current
 machine/camera observations. Summary counts are workspace totals, while time,

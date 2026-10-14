@@ -43,7 +43,7 @@ export class McpRequests {
   attach(
     reservation: McpReservation,
     props: GrantProps,
-    connectionId: string,
+    connectionId: string | null,
     requestId: string,
     stop: (code: StopCode) => void,
   ): boolean {

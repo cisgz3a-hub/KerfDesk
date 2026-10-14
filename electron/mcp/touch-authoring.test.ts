@@ -104,6 +104,35 @@ it.each(invalid)(
   },
 );
 
+it.each([
+  { closed: false, pointsMm: [polyline.pointsMm[0], polyline.pointsMm[0]] },
+  { closed: true, pointsMm: polyline.pointsMm },
+  { closed: true, pointsMm: [...polyline.pointsMm, polyline.pointsMm[0]] },
+])('rejects degenerate polyline geometry inside a batch %#', (args) => {
+  expect(
+    mcpInputSchemas.apply_edits.safeParse({
+      ...admission,
+      edits: [{ command: 'add_polyline', args }],
+    }).success,
+  ).toBe(false);
+});
+
+it('accepts a closed batch polyline with three distinct points', () => {
+  const args = {
+    ...admission,
+    edits: [
+      {
+        command: 'add_polyline',
+        args: {
+          closed: true,
+          pointsMm: [...polyline.pointsMm, { xMm: 50, yMm: 0 }, polyline.pointsMm[0]],
+        },
+      },
+    ],
+  };
+  expect(mcpInputSchemas.apply_edits.parse(args)).toEqual(args);
+});
+
 const png =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6foAAAAASUVORK5CYII=';
 const preview = {

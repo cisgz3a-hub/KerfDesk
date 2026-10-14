@@ -1,9 +1,10 @@
 import { canControl, canEdit, store } from './store';
 import { HeldJogController } from './held-jog';
 import { readCameraSnapshot } from './camera-snapshot';
+import { CoalescedReads } from './coalesced-reads';
+import { followControlOperation } from './control-operation';
 import { RemoteError, uuid, type LiveEvent, type RemoteTransport } from './transport';
 import {
-  TERMINAL_STATES,
   type ControlOperation,
   type Font,
   type MachineStatus,
@@ -17,40 +18,33 @@ import type { Box } from './scene';
 const MACHINE_MIN_INTERVAL_MS = 1000;
 const FALLBACK_POLL_MS = 5000;
 
-type Reader = {
-  running: boolean;
-  again: boolean;
-  last: number;
-  timer: ReturnType<typeof setTimeout> | null;
-};
-const reader = (): Reader => ({ running: false, again: false, last: 0, timer: null });
 /**
- * Owns reads, live sync and every write. Writes always carry the latest revision and a fresh
+ * Owns reads, live sync and every write. Writes carry a known document revision and a fresh
  * UUID; the PC decides. A stale revision refreshes the view and asks the user to try again.
  */
 export class Controller {
   private transport: RemoteTransport | null = null;
   private unsubscribe: (() => void) | null = null;
-  private readers = { workspace: reader(), machine: reader() };
+  private readers = new CoalescedReads();
   private lastSeq = -1;
   private liveMode: 'socket' | 'wait' | 'poll' = 'poll';
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private waitAbort: AbortController | null = null;
   private readonly heldJog = new HeldJogController();
-  private stopped = false;
+  private stopped = true;
+  private generation = 0;
   private sceneSupported = true;
-  private readonly uncertain = new WeakMap<
-    object,
-    { command: string; payload: Record<string, unknown> }
-  >();
+  private uncertain = new WeakMap<object, { command: string; payload: Record<string, unknown> }>();
 
   start(transport: RemoteTransport): void {
     this.stop();
     this.stopped = false;
+    this.readers = new CoalescedReads();
     this.transport = transport;
     this.unsubscribe = transport.subscribe((event) => this.live(event));
     this.liveMode = 'poll';
     this.lastSeq = -1;
+    this.sceneSupported = true;
     store.set({ liveUpdates: false });
     document.addEventListener('visibilitychange', this.visibility);
     window.addEventListener('pagehide', this.pageHidden);
@@ -62,14 +56,25 @@ export class Controller {
 
   stop(): void {
     this.stopped = true;
+    this.generation += 1;
     this.stopHold();
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.waitAbort?.abort();
     this.waitAbort = null;
     if (this.pollTimer !== null) clearTimeout(this.pollTimer);
+    this.pollTimer = null;
+    this.readers.stop();
+    this.uncertain = new WeakMap();
+    this.transport = null;
+    store.set({ pending: 0, socket: false, liveUpdates: false });
     document.removeEventListener('visibilitychange', this.visibility);
     window.removeEventListener('pagehide', this.pageHidden);
+  }
+
+  /** Async work belongs to one connection, even if the same transport is restarted. */
+  private current(generation: number): boolean {
+    return !this.stopped && this.generation === generation;
   }
 
   private get t(): RemoteTransport {
@@ -139,18 +144,18 @@ export class Controller {
     const transport = this.t;
     const controller = new AbortController();
     this.waitAbort = controller;
+    let revision = store.get().workspace?.revision;
     try {
       while (
         !this.stopped &&
         !controller.signal.aborted &&
         document.visibilityState === 'visible'
       ) {
-        const workspace = store.get().workspace;
         const result = await transport
           .call<{ revision: string; machineSeq: number; reason: string }>(
             'wait_for_change',
             {
-              ...(workspace === null ? {} : { sinceRevision: workspace.revision }),
+              ...(revision === undefined ? {} : { sinceRevision: revision }),
               ...(this.lastSeq < 0 ? {} : { sinceMachineSeq: this.lastSeq }),
               timeoutMs: 14_000,
             },
@@ -173,6 +178,9 @@ export class Controller {
           return;
         }
         this.liveMode = 'wait';
+        // A workspace read may still be in flight. Acknowledge this notification now so
+        // the relay waits for a new change instead of immediately returning it again.
+        revision = result.revision;
         store.set({ liveUpdates: true });
         this.scheduleFallback();
         this.applyChange(result.revision, result.machineSeq);
@@ -197,67 +205,40 @@ export class Controller {
     await Promise.all([this.refreshWorkspace(), this.refreshMachine(true)]);
   }
 
-  /** Coalesces overlapping refreshes: at most one in flight plus one queued. */
-  private async coalesce(
-    key: 'workspace' | 'machine',
-    run: () => Promise<void>,
-    minGap = 0,
-  ): Promise<void> {
-    const state = this.readers[key];
-    if (state.running) {
-      state.again = true;
-      return;
-    }
-    const wait = state.last + minGap - Date.now();
-    if (wait > 0) {
-      if (state.timer === null)
-        state.timer = setTimeout(() => {
-          state.timer = null;
-          void this.coalesce(key, run, minGap);
-        }, wait);
-      return;
-    }
-    state.running = true;
-    try {
-      await run();
-    } catch (error) {
-      if (error instanceof RemoteError && error.code === 'offline') store.set({ pcOnline: false });
-    } finally {
-      state.running = false;
-      state.last = Date.now();
-      if (state.again) {
-        state.again = false;
-        void this.coalesce(key, run, minGap);
-      }
-    }
-  }
-
   refreshWorkspace(): Promise<void> {
-    return this.coalesce('workspace', async () => {
-      const workspace = await this.t.call<Workspace>('get_workspace');
+    return this.readers.run('workspace', async () => {
+      const generation = this.generation;
+      const transport = this.t;
+      const workspace = await transport.call<Workspace>('get_workspace');
+      if (!this.current(generation)) return;
       const current = store.get();
       const selection = current.pending > 0 ? current.selection : workspace.selection;
-      store.set({ workspace, selection, pcOnline: true });
+      store.set({
+        workspace,
+        selection,
+        pcOnline: true,
+        ...(current.sceneRevision === workspace.revision
+          ? {}
+          : { scene: null, sceneRevision: null, preview: null }),
+      });
       if (workspace.permissions?.artworkSharingEnabled === false) {
         store.set({ scene: null, sceneRevision: workspace.revision });
         return;
       }
       if (current.sceneRevision === workspace.revision && current.scene !== null) return;
-      await this.refreshScene(workspace.revision);
+      await this.refreshScene(transport, generation);
     });
   }
 
-  private async refreshScene(revision: string): Promise<void> {
+  private async refreshScene(transport: RemoteTransport, generation: number): Promise<void> {
     if (!this.sceneSupported) return;
     try {
-      const scene = await this.t.call<Scene>('get_workspace_scene');
-      if (
-        store.get().workspace?.revision !== revision &&
-        scene.revision !== store.get().workspace?.revision
-      )
-        return;
+      const scene = await transport.call<Scene>('get_workspace_scene');
+      if (!this.current(generation)) return;
+      if (scene.revision !== store.get().workspace?.revision) return;
       store.set({ scene, sceneRevision: scene.revision, preview: null });
     } catch (error) {
+      if (!this.current(generation)) return;
       // Older desktops do not have the vector scene; the canvas falls back to artwork bounds.
       if (error instanceof RemoteError && ['invalid_input', 'failed'].includes(error.code))
         this.sceneSupported = false;
@@ -268,10 +249,12 @@ export class Controller {
   refreshMachine(force = false): Promise<void> {
     if (!store.get().scopes.includes('control') && store.get().tab !== 'machine' && !force)
       return Promise.resolve();
-    return this.coalesce(
+    return this.readers.run(
       'machine',
       async () => {
+        const generation = this.generation;
         const machine = await this.t.call<MachineStatus>('get_machine_status');
+        if (!this.current(generation)) return;
         store.set({ machine });
       },
       force ? 0 : MACHINE_MIN_INTERVAL_MS,
@@ -279,15 +262,21 @@ export class Controller {
   }
 
   private async loadLibraries(): Promise<void> {
+    const generation = this.generation;
+    const transport = this.t;
     const [fonts, recipes] = await Promise.all([
-      this.t.call<{ fonts: Font[] }>('list_fonts').catch(() => ({ fonts: [] })),
-      this.t.call<{ recipes: Recipe[] }>('list_material_recipes').catch(() => ({ recipes: [] })),
+      transport.call<{ fonts: Font[] }>('list_fonts').catch(() => ({ fonts: [] })),
+      transport.call<{ recipes: Recipe[] }>('list_material_recipes').catch(() => ({ recipes: [] })),
     ]);
+    if (!this.current(generation)) return;
     store.set({ fonts: fonts.fonts, recipes: recipes.recipes });
   }
 
   async readText(artworkId: string): Promise<TextDetails> {
-    return this.t.call<TextDetails>('get_text', { artworkId });
+    const generation = this.generation;
+    const result = await this.t.call<TextDetails>('get_text', { artworkId });
+    if (!this.current(generation)) throw new RemoteError('cancelled');
+    return result;
   }
 
   /* ───────────── writes ───────────── */
@@ -299,8 +288,10 @@ export class Controller {
   async write<T extends Record<string, unknown>>(
     command: string,
     args: Record<string, unknown> = {},
-    options: { success?: string; retry?: object } = {},
+    options: { success?: string; retry?: object; expectedRevision?: string } = {},
   ): Promise<T | null> {
+    if (this.stopped) return null;
+    const generation = this.generation;
     const current = store.get();
     if (!canEdit(current) || current.workspace === null) {
       store.toast('Editing isn’t approved for this connection. Allow it on the PC.', 'warning');
@@ -310,16 +301,22 @@ export class Controller {
     const payload =
       earlier?.command === command
         ? earlier.payload
-        : { ...args, expectedRevision: current.workspace.revision, requestId: uuid() };
+        : {
+            ...args,
+            expectedRevision: options.expectedRevision ?? current.workspace.revision,
+            requestId: uuid(),
+          };
     store.set((state) => ({ pending: state.pending + 1 }));
     try {
       const result = await this.t.call<T>(command, payload);
+      if (!this.current(generation)) return null;
       if (options.retry !== undefined) this.uncertain.delete(options.retry);
       if (options.success !== undefined) store.toast(options.success, 'success');
       const changed = (result as { changedArtworkIds?: string[] }).changedArtworkIds;
       if (changed !== undefined && changed.length > 0) this.flash(changed);
       return result;
     } catch (error) {
+      if (!this.current(generation)) return null;
       // A rejected transform snaps back; an unapplied drawing stays so the user can retry.
       store.set({ preview: null });
       const failure = error instanceof RemoteError ? error : new RemoteError('failed');
@@ -334,8 +331,10 @@ export class Controller {
       );
       return null;
     } finally {
-      store.set((state) => ({ pending: state.pending - 1 }));
-      void this.refreshWorkspace();
+      if (this.current(generation)) {
+        store.set((state) => ({ pending: state.pending - 1 }));
+        void this.refreshWorkspace();
+      }
     }
   }
 
@@ -355,8 +354,9 @@ export class Controller {
     });
   }
 
-  /** Resize keeps the dragged-against corner fixed: resize (top-left anchored) then move, as one Undo. */
+  /** Keep the opposite corner fixed; capable desktops apply resize and move in one Undo. */
   async scale(ids: string[], from: Box, to: Box): Promise<void> {
+    const generation = this.generation;
     const widthMm = Math.max(0.01, to.maxX - to.minX);
     const heightMm = Math.max(0.01, to.maxY - to.minY);
     const dxMm = to.minX - from.minX;
@@ -374,8 +374,17 @@ export class Controller {
       await this.write('apply_edits', { edits });
       return;
     }
-    await this.write('transform_artwork', { artworkIds: ids, transform: resize });
-    if (Math.abs(dxMm) > 1e-6 || Math.abs(dyMm) > 1e-6) await this.move(ids, dxMm, dyMm);
+    const result = await this.write<{ revision: string }>('transform_artwork', {
+      artworkIds: ids,
+      transform: resize,
+    });
+    if (result === null || !this.current(generation)) return;
+    if (Math.abs(dxMm) > 1e-6 || Math.abs(dyMm) > 1e-6)
+      await this.write(
+        'transform_artwork',
+        { artworkIds: ids, transform: { type: 'move', dxMm, dyMm } },
+        { expectedRevision: result.revision },
+      );
   }
 
   rotate(ids: string[], angleDeg: number) {
@@ -396,6 +405,9 @@ export class Controller {
     args: Record<string, unknown> = {},
     revision = true,
   ): Promise<ControlOperation | null> {
+    if (this.stopped) return null;
+    const generation = this.generation;
+    const transport = this.t;
     const current = store.get();
     if (!canControl(current)) {
       store.toast('Machine control isn’t approved for this connection.', 'warning');
@@ -403,17 +415,20 @@ export class Controller {
     }
     const requestId = uuid();
     try {
-      const result = await this.t.call<{ operation: ControlOperation }>(command, {
+      const result = await transport.call<{ operation: ControlOperation }>(command, {
         ...args,
         requestId,
         ...(revision && current.workspace !== null
           ? { expectedRevision: current.workspace.revision }
           : {}),
       });
+      // A cancelled held jog still needs its original receipt to release that operation.
+      if (!this.current(generation)) return result.operation;
       store.set({ operation: result.operation });
-      void this.followOperation(result.operation.operationId);
+      void this.followOperation(result.operation.operationId, transport, generation);
       return result.operation;
     } catch (error) {
+      if (!this.current(generation)) return null;
       const failure = error instanceof RemoteError ? error : new RemoteError('failed');
       store.toast(
         failure.ambiguous
@@ -421,38 +436,29 @@ export class Controller {
           : failure.message,
         'error',
       );
-      if (failure.ambiguous) void this.followOperation(requestId);
+      if (failure.ambiguous) void this.followOperation(requestId, transport, generation);
       return null;
     } finally {
-      void this.refreshMachine(true);
+      if (this.current(generation)) void this.refreshMachine(true);
     }
   }
 
-  /** Reads the receipt until it settles. Never re-sends the action. */
-  private async followOperation(operationId: string): Promise<void> {
-    for (let attempt = 0; attempt < 150 && !this.stopped; attempt += 1) {
-      await delay(attempt < 5 ? 600 : 1200);
-      const result = await this.t
-        .call<{ operation: ControlOperation }>('get_control_operation', { operationId })
-        .catch(() => null);
-      if (result === null) continue;
-      if (store.get().operation?.operationId === operationId || store.get().operation === null)
-        store.set({ operation: result.operation });
-      const state = result.operation.state;
-      if (state === 'awaiting_review' && result.operation.review !== undefined) {
-        store.set({ sheet: { kind: 'review' } });
-        return;
-      }
-      if (TERMINAL_STATES.has(state)) {
-        if (state === 'failed' || state === 'unknown')
-          store.toast(result.operation.message ?? 'Check the machine on the PC.', 'warning');
-        void this.refreshMachine(true);
-        return;
-      }
-    }
+  private followOperation(
+    operationId: string,
+    transport: RemoteTransport,
+    generation: number,
+  ): Promise<void> {
+    return followControlOperation(
+      transport,
+      operationId,
+      () => this.current(generation),
+      () => this.refreshMachine(true),
+    );
   }
 
   async reviewPage(reviewId: string, offset: number): Promise<void> {
+    if (this.stopped) return;
+    const generation = this.generation;
     const operationId = store.get().operation?.operationId;
     if (operationId === undefined) return;
     const result = await this.t
@@ -460,7 +466,12 @@ export class Controller {
         operation: ControlOperation;
       }>('get_control_operation', { operationId, reviewPage: { reviewId, offset } })
       .catch(() => null);
-    if (result !== null) store.set({ operation: result.operation });
+    if (
+      result !== null &&
+      this.current(generation) &&
+      store.get().operation?.operationId === operationId
+    )
+      store.set({ operation: result.operation });
   }
 
   abort(): Promise<ControlOperation | null> {
@@ -489,12 +500,10 @@ export class Controller {
   }
 
   cameraSnapshot(): Promise<void> {
-    return readCameraSnapshot(this.t);
+    if (this.stopped) return Promise.resolve();
+    const generation = this.generation;
+    return readCameraSnapshot(this.t, () => this.current(generation));
   }
 }
 
 export const controller = new Controller();
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}

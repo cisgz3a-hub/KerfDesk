@@ -104,13 +104,20 @@ export const mcpBatchEditSchemas = {
     heightMm: size,
   }),
   add_ellipse: z.strictObject({ xMm: coordinate, yMm: coordinate, widthMm: size, heightMm: size }),
-  add_polyline: z.strictObject({
-    pointsMm: z
-      .array(z.strictObject({ xMm: coordinate, yMm: coordinate }))
-      .min(2)
-      .max(512),
-    closed: z.boolean(),
-  }),
+  add_polyline: z
+    .strictObject({
+      pointsMm: z
+        .array(z.strictObject({ xMm: coordinate, yMm: coordinate }))
+        .min(2)
+        .max(512),
+      closed: z.boolean(),
+    })
+    .refine(
+      (value) =>
+        new Set(value.pointsMm.map((point) => `${point.xMm},${point.yMm}`)).size >=
+        (value.closed ? 3 : 2),
+      'Provide distinct drawing points.',
+    ),
   transform_artwork: z.strictObject({
     artworkIds: z.array(id).min(1).max(200),
     transform: z.discriminatedUnion('type', [
@@ -273,7 +280,10 @@ export const mcpSceneOutputSchema = z
       .optional(),
     totalObjects: count.optional(),
   })
-  .refine((value) => value.status === 'ready' || value.objects === undefined);
+  .refine(
+    (value) =>
+      value.status === 'ready' || (value.objects === undefined && value.images === undefined),
+  );
 
 const designWrite = z.object({
   revision,
