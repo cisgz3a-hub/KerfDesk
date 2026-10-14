@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useUiStore } from '../state/ui-store';
 import { commandHelpId, controlHelp } from '../help/help-topics';
+import { handleWorkspaceContextKeyDown } from './workspace-context-keyboard';
 import { runCommand, type AppCommand, type CommandId } from './command-registry';
 import {
   moreWorkspaceContextCommands,
@@ -34,7 +35,7 @@ export function WorkspaceContextBar(props: {
     lastToolMode.current = toolMode;
   }, [close, state, toolMode]);
 
-  const position = useMemo(() => (state === null ? null : clampedPosition(state)), [state]);
+  const position = useContextMenuPosition(state, barRef, moreOpen);
   if (state === null || position === null) return null;
   const primary = commandsForIds(primaryWorkspaceContextCommands(state.context), props.commands);
   const more = commandsForIds(moreWorkspaceContextCommands(state.context), props.commands);
@@ -45,7 +46,8 @@ export function WorkspaceContextBar(props: {
       aria-orientation="vertical"
       aria-label="Workspace quick actions"
       className="lf-menu lf-workspace-context-menu"
-      style={{ ...barStyle, left: position.left, top: position.top }}
+      style={{ ...barStyle, ...position }}
+      onKeyDown={handleWorkspaceContextKeyDown}
     >
       {primary.map((command) => (
         <ContextCommandButton key={command.id} command={command} onCommandRun={close} />
@@ -120,13 +122,70 @@ function commandsForIds(
   });
 }
 
-function clampedPosition(state: { readonly x: number; readonly y: number }): {
+type ContextMenuPosition = {
   readonly left: number;
   readonly top: number;
-} {
+  readonly maxWidth: number;
+  readonly maxHeight: number;
+};
+
+/** Measure the actual rows before paint, including after More expands or the viewport changes. */
+function useContextMenuPosition(
+  state: { readonly x: number; readonly y: number } | null,
+  menuRef: React.RefObject<HTMLDivElement | null>,
+  expanded: boolean,
+): ContextMenuPosition | null {
+  const [position, setPosition] = useState<ContextMenuPosition | null>(null);
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (state === null || menu === null) return;
+    const reposition = (): void => {
+      const next = clampedPosition(state, menu.getBoundingClientRect());
+      setPosition((previous) =>
+        previous?.left === next.left &&
+        previous.top === next.top &&
+        previous.maxWidth === next.maxWidth &&
+        previous.maxHeight === next.maxHeight
+          ? previous
+          : next,
+      );
+    };
+    reposition();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reposition);
+    observer?.observe(menu);
+    window.addEventListener('resize', reposition);
+    window.visualViewport?.addEventListener('resize', reposition);
+    window.visualViewport?.addEventListener('scroll', reposition);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', reposition);
+      window.visualViewport?.removeEventListener('resize', reposition);
+      window.visualViewport?.removeEventListener('scroll', reposition);
+    };
+  }, [state, menuRef, expanded]);
+  return state === null ? null : (position ?? clampedPosition(state));
+}
+
+function clampedPosition(
+  state: { readonly x: number; readonly y: number },
+  bounds?: Pick<DOMRect, 'width' | 'height'>,
+): ContextMenuPosition {
+  const viewport = window.visualViewport ?? {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    offsetLeft: 0,
+    offsetTop: 0,
+  };
+  const maxWidth = Math.max(0, viewport.width - 2 * FLOATING_MARGIN_PX);
+  const maxHeight = Math.max(0, viewport.height - 2 * FLOATING_MARGIN_PX);
+  const size = bounds ?? { width: MENU_WIDTH_PX, height: 0 };
+  const left = viewport.offsetLeft + FLOATING_MARGIN_PX;
+  const top = viewport.offsetTop + FLOATING_MARGIN_PX;
   return {
-    left: clamp(state.x, FLOATING_MARGIN_PX, window.innerWidth - MENU_WIDTH_PX),
-    top: clamp(state.y, FLOATING_MARGIN_PX, window.innerHeight - MENU_HEIGHT_PX),
+    left: clamp(state.x, left, left + maxWidth - Math.min(size.width, maxWidth)),
+    top: clamp(state.y, top, top + maxHeight - Math.min(size.height, maxHeight)),
+    maxWidth,
+    maxHeight,
   };
 }
 
@@ -166,7 +225,6 @@ function closeOnEscape(close: () => void): () => void {
 
 const FLOATING_MARGIN_PX = 8;
 const MENU_WIDTH_PX = 240;
-const MENU_HEIGHT_PX = 260;
 
 const barStyle: React.CSSProperties = {
   position: 'fixed',
@@ -175,14 +233,13 @@ const barStyle: React.CSSProperties = {
   alignItems: 'stretch',
   gap: 1,
   width: MENU_WIDTH_PX,
-  maxWidth: 'calc(100vw - 16px)',
-  maxHeight: 'calc(100vh - 16px)',
   overflowX: 'hidden',
   overflowY: 'auto',
   boxShadow: 'var(--lf-shadow)',
 };
 
 const menuItemStyle: React.CSSProperties = {
+  flexShrink: 0,
   width: '100%',
   minWidth: 0,
   whiteSpace: 'nowrap',
@@ -191,6 +248,7 @@ const menuItemStyle: React.CSSProperties = {
 };
 
 const moreMenuStyle: React.CSSProperties = {
+  flexShrink: 0,
   position: 'static',
   display: 'flex',
   flexDirection: 'column',
