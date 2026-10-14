@@ -93,6 +93,18 @@
   width: 36px;
   padding: 4px;
 }
+.lf-toolbar-shell .lf-toolbar-design-studio {
+  border-color: var(--lf-border);
+}
+.lf-toolbar-pro-badge {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--lf-tint-accent);
+  color: var(--lf-accent-fg);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
 .lf-toolbar-shell .lf-toolbar-command-label,
 .lf-toolbar-overflow .lf-toolbar-command-label {
   display: inline;
@@ -194,7 +206,7 @@
     gap: 4px;
   }
 }
-@media (max-width: 520px) {
+@media (max-width: 700px) {
   .lf-toolbar-shell {
     flex-wrap: wrap;
   }

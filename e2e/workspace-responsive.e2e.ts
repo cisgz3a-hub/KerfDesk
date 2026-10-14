@@ -14,7 +14,7 @@ const viewports = [
 for (const viewport of viewports) {
   test(`workspace fits ${viewport.width}x${viewport.height} without browser zoom`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.setViewportSize(viewport);
@@ -32,6 +32,9 @@ for (const viewport of viewports) {
     await expectNoPageOverflow(page);
     for (const button of await page.locator('.lf-toolbar-shell button:visible').all()) {
       await expectWithinViewport(page, button);
+    }
+    if (viewport.width === 1536 && viewport.height === 864) {
+      await page.screenshot({ path: testInfo.outputPath('design-studio-toolbar.png') });
     }
     if (viewport.layout === 'compact') {
       await page.getByRole('tab', { name: 'Machine', exact: true }).click();
@@ -57,6 +60,23 @@ for (const viewport of viewports) {
     expect(errors).toEqual([]);
   });
 }
+
+test('toolbar keeps Studio and utilities reachable with offline and install indicators', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 540, height: 720 });
+  await page.goto('/');
+  const toolbar = page.getByRole('banner', { name: 'Toolbar' });
+  await expect(toolbar.getByRole('button', { name: 'Open Design Studio' })).toBeVisible();
+  await page.context().setOffline(true);
+  await expect(toolbar.getByRole('status')).toHaveText('Offline');
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeinstallprompt')));
+  await expect(toolbar.getByRole('button', { name: 'Install app', exact: true })).toBeVisible();
+  for (const button of await toolbar.locator('button:visible').all()) {
+    await expectWithinViewport(page, button);
+  }
+  await expectNoPageOverflow(page);
+});
 
 test('machine connection remains reachable when its sidebar is collapsed', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 668 });
@@ -198,13 +218,17 @@ test('overflow commands and all nine anchors remain reachable on a short laptop'
   await expect(anchor).toHaveAttribute('title', /bottom right/);
 });
 
-test('short dark workspace keeps the tool rail scrollable and machine modes accessible', async ({
+test('short dark workspace keeps Design Studio in the toolbar and machine modes accessible', async ({
   page,
 }) => {
   await useThemePreference(page, 'dark');
   await page.setViewportSize({ width: 1024, height: 500 });
   await page.goto('/');
-  const designStudio = page.getByRole('button', { name: 'Open Design Studio', exact: true });
+  const designStudio = page.getByRole('banner', { name: 'Toolbar' }).getByRole('button', {
+    name: 'Open Design Studio',
+    exact: true,
+  });
+  await expect(designStudio).toContainText('Pro');
   await designStudio.focus();
   await expectWithinViewport(page, designStudio);
   await designStudio.click();
