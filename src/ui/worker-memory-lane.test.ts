@@ -2,6 +2,62 @@ import { describe, expect, it, vi } from 'vitest';
 import { WorkerMemoryLane } from './worker-memory-lane';
 
 describe('worker memory lane', () => {
+  it('prioritises interactive work and asks an opt-in background owner to retire first', () => {
+    const lane = new WorkerMemoryLane();
+    const order: string[] = [];
+    let releaseBackground = (): void => undefined;
+    lane.reserve(
+      (release) => {
+        releaseBackground = release;
+        order.push('background:start');
+      },
+      {
+        onPreempt: () => {
+          order.push('background:terminated');
+          releaseBackground();
+        },
+      },
+    );
+    lane.reserve(() => order.push('autosave:start'));
+    const interactive = lane.reserve(() => order.push('interactive:start'), {
+      priority: 'interactive',
+    });
+    expect(order).toEqual(['background:start', 'background:terminated', 'interactive:start']);
+    interactive();
+    expect(order.at(-1)).toBe('autosave:start');
+  });
+
+  it('never interrupts a start callback midway or admits another heap before release', () => {
+    const lane = new WorkerMemoryLane();
+    const events: string[] = [];
+    let releaseBackground = (): void => undefined;
+    const preempt = vi.fn(() => events.push('preempt:requested'));
+    lane.reserve(
+      (release) => {
+        releaseBackground = release;
+        events.push('start:begin');
+        lane.reserve(() => events.push('interactive:first'), { priority: 'interactive' });
+        events.push('start:end');
+      },
+      { onPreempt: preempt },
+    );
+    lane.reserve(() => events.push('interactive:second'), { priority: 'interactive' });
+    expect(events).toEqual(['start:begin', 'start:end', 'preempt:requested']);
+    expect(preempt).toHaveBeenCalledOnce();
+    releaseBackground();
+    expect(events.at(-1)).toBe('interactive:first');
+  });
+
+  it('does not preempt an ordinary non-preemptible recovery owner', () => {
+    const lane = new WorkerMemoryLane();
+    const first = lane.reserve(() => undefined);
+    const interactive = vi.fn();
+    lane.reserve(interactive, { priority: 'interactive' });
+    expect(interactive).not.toHaveBeenCalled();
+    first();
+    expect(interactive).toHaveBeenCalledOnce();
+  });
+
   it('grants immediately, then services existing waiters before reentrant reservations', () => {
     const lane = new WorkerMemoryLane();
     const order: string[] = [];

@@ -1,0 +1,266 @@
+{
+  "format": "kerfdesk.actual-client-project-transfer",
+  "createdAt": "2026-10-14T15:13:39.211Z",
+  "baseline": true,
+  "gitHead": "03f1da57737ebc58d7cf4e240be6c2225270c690",
+  "browser": "155.0.8059.40",
+  "node": "v24.15.0",
+  "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+  "sourceHashes": {
+    "src/ui/laser/output-preparation-worker-client.ts": "f0ef11c075e43997a863269b91e222e0838609869d71fbb7b678fc613392e9e0",
+    "src/ui/workspace/design-scene-worker-client.ts": "a69413c283cf28aa1dabadccc544bfdffe51751b99a4f7135e1b466a0cb6a218"
+  },
+  "moduleHashes": {
+    "main": "a0c1c2f02970b1f40e3507dc1c5d3a560f6c02bac397c8872ca45231eff53684",
+    "worker": "f539cde176fb7ff026eec3621781693ddb7e22e6c361e07d370ace790317803b"
+  },
+  "scope": "Actual output/design clients, native Worker, exact production unpacker. Baseline uses HEAD versions of the two clients. Worker validates every fixture point and canonical segment then returns a tiny receipt, without compiling or rendering. Client call includes packing and synchronous postMessage; roundtrip includes receiver unpack and validation. Worker startup is paid in the first cold sample only. Three warm samples follow. No end-to-end output speed claim.",
+  "cases": [
+    {
+      "client": "output",
+      "points": 50000,
+      "cold": {
+        "clientCallMs": 15.900000002235174,
+        "roundtripMs": 49.900000002235174,
+        "points": 50000,
+        "exact": true,
+        "packed": false,
+        "unpackMs": 0.10000000149011612
+      },
+      "samples": [
+        {
+          "clientCallMs": 18.300000000745058,
+          "roundtripMs": 45.600000001490116,
+          "points": 50000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0.10000000149011612
+        },
+        {
+          "clientCallMs": 14.800000000745058,
+          "roundtripMs": 40.69999999925494,
+          "points": 50000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        },
+        {
+          "clientCallMs": 15,
+          "roundtripMs": 34.600000001490116,
+          "points": 50000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        }
+      ],
+      "medianClientCallMs": 15,
+      "medianRoundtripMs": 40.69999999925494,
+      "medianUnpackMs": 0
+    },
+    {
+      "client": "output",
+      "points": 200000,
+      "cold": {
+        "clientCallMs": 85.29999999701977,
+        "roundtripMs": 208.29999999701977,
+        "points": 200000,
+        "exact": true,
+        "packed": false,
+        "unpackMs": 0.09999999776482582
+      },
+      "samples": [
+        {
+          "clientCallMs": 71.20000000298023,
+          "roundtripMs": 175.70000000298023,
+          "points": 200000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        },
+        {
+          "clientCallMs": 68.89999999850988,
+          "roundtripMs": 147.19999999925494,
+          "points": 200000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        },
+        {
+          "clientCallMs": 67.5,
+          "roundtripMs": 169,
+          "points": 200000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        }
+      ],
+      "medianClientCallMs": 68.89999999850988,
+      "medianRoundtripMs": 169,
+      "medianUnpackMs": 0
+    },
+    {
+      "client": "output",
+      "points": 1000000,
+      "cold": {
+        "clientCallMs": 569,
+        "roundtripMs": 1199.7000000029802,
+        "points": 1000000,
+        "exact": true,
+        "packed": false,
+        "unpackMs": 0.19999999925494194
+      },
+      "samples": [
+        {
+          "clientCallMs": 498.8999999985099,
+          "roundtripMs": 1160.5,
+          "points": 1000000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 17.5
+        },
+        {
+          "clientCallMs": 520.8999999985099,
+          "roundtripMs": 1149.5,
+          "points": 1000000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0.19999999925494194
+        },
+        {
+          "clientCallMs": 505.8999999985099,
+          "roundtripMs": 1067.2999999970198,
+          "points": 1000000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        }
+      ],
+      "medianClientCallMs": 505.8999999985099,
+      "medianRoundtripMs": 1149.5,
+      "medianUnpackMs": 0.19999999925494194
+    },
+    {
+      "client": "design",
+      "points": 50000,
+      "cold": {
+        "clientCallMs": 26.899999998509884,
+        "roundtripMs": 66.59999999776483,
+        "points": 50000,
+        "exact": true,
+        "packed": false,
+        "unpackMs": 0
+      },
+      "samples": [
+        {
+          "clientCallMs": 15.600000001490116,
+          "roundtripMs": 39.30000000074506,
+          "points": 50000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        },
+        {
+          "clientCallMs": 19,
+          "roundtripMs": 46,
+          "points": 50000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        },
+        {
+          "clientCallMs": 14.300000000745058,
+          "roundtripMs": 36.100000001490116,
+          "points": 50000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        }
+      ],
+      "medianClientCallMs": 15.600000001490116,
+      "medianRoundtripMs": 39.30000000074506,
+      "medianUnpackMs": 0
+    },
+    {
+      "client": "design",
+      "points": 200000,
+      "cold": {
+        "clientCallMs": 83.40000000223517,
+        "roundtripMs": 198.20000000298023,
+        "points": 200000,
+        "exact": true,
+        "packed": false,
+        "unpackMs": 0
+      },
+      "samples": [
+        {
+          "clientCallMs": 86.5,
+          "roundtripMs": 196.89999999850988,
+          "points": 200000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        },
+        {
+          "clientCallMs": 64,
+          "roundtripMs": 141.79999999701977,
+          "points": 200000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0.10000000149011612
+        },
+        {
+          "clientCallMs": 64.10000000149012,
+          "roundtripMs": 163,
+          "points": 200000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        }
+      ],
+      "medianClientCallMs": 64.10000000149012,
+      "medianRoundtripMs": 163,
+      "medianUnpackMs": 0
+    },
+    {
+      "client": "design",
+      "points": 1000000,
+      "cold": {
+        "clientCallMs": 541.8999999985099,
+        "roundtripMs": 1161.0999999977648,
+        "points": 1000000,
+        "exact": true,
+        "packed": false,
+        "unpackMs": 0.10000000149011612
+      },
+      "samples": [
+        {
+          "clientCallMs": 489.4000000022352,
+          "roundtripMs": 1151.300000000745,
+          "points": 1000000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 16.099999997764826
+        },
+        {
+          "clientCallMs": 511,
+          "roundtripMs": 1167.699999999255,
+          "points": 1000000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        },
+        {
+          "clientCallMs": 549.1000000014901,
+          "roundtripMs": 1125.6000000014901,
+          "points": 1000000,
+          "exact": true,
+          "packed": false,
+          "unpackMs": 0
+        }
+      ],
+      "medianClientCallMs": 511,
+      "medianRoundtripMs": 1151.300000000745,
+      "medianUnpackMs": 0
+    }
+  ]
+}

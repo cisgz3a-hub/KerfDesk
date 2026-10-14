@@ -88,6 +88,7 @@ export function usePreviewToolpath(
     // NB: no setToolpath(null) here — keep the previous route painted until the
     // new build resolves so a genuine rebuild doesn't blank the preview.
     let cancelled = false;
+    const controller = new AbortController();
     const cancelScheduledBuild = scheduleBuild(() => {
       runScheduledPreviewBuild({
         project,
@@ -97,6 +98,7 @@ export function usePreviewToolpath(
         outputScope,
         initialPosition: headRef.current,
         isCancelled: () => cancelled,
+        signal: controller.signal,
         setToolpath: (next) => {
           setPreview({ toolpath: next, externalOwner: externalGcodePreview });
         },
@@ -105,6 +107,7 @@ export function usePreviewToolpath(
     return () => {
       cancelled = true;
       cancelScheduledBuild();
+      controller.abort();
     };
   }, [
     previewMode,
@@ -132,6 +135,7 @@ function runScheduledPreviewBuild(args: {
   readonly outputScope: NonNullable<LargeJobPreparationOptions['outputScope']>;
   readonly initialPosition: LargeJobPreparationOptions['initialPosition'];
   readonly isCancelled: () => boolean;
+  readonly signal: AbortSignal;
   readonly setToolpath: (toolpath: PreviewToolpath | null) => void;
 }): void {
   if (args.isCancelled()) return;
@@ -177,6 +181,7 @@ function runScheduledPreviewBuild(args: {
       project: args.project,
       options: backgroundOptions,
       isCancelled: args.isCancelled,
+      signal: args.signal,
       setToolpath: args.setToolpath,
     });
   });
@@ -209,12 +214,13 @@ function settleBuiltToolpath(args: {
   readonly project: Project;
   readonly options: LargeJobPreparationOptions;
   readonly isCancelled: () => boolean;
+  readonly signal: AbortSignal;
   readonly setToolpath: (toolpath: PreviewToolpath) => void;
 }): void {
   const { built, setToolpath } = args;
   const offThread =
     built.previewIssue?.kind === 'too-complex'
-      ? prepareLargeJobOffThread(args.project, args.options)
+      ? prepareLargeJobOffThread(args.project, args.options, undefined, args.signal)
       : null;
   if (offThread === null) {
     if (built.previewIssue === undefined)

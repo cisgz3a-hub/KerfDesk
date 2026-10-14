@@ -10,6 +10,7 @@
 // what to do without a worker belongs to the consumer.
 
 import type { OutputScope, Project } from '../../core/scene';
+import { packProjectMessage } from '../packed-project-transfer';
 import type {
   DesignSceneWorkerRequest,
   DesignSceneWorkerRequestPayload,
@@ -104,9 +105,10 @@ function runWorker(
     active = { id, resolve, reject };
     pending = active;
   });
-  const request: DesignSceneWorkerRequest = { ...payload, id };
   try {
-    worker.postMessage(request);
+    const { message, transfer } = packProjectMessage(payload.project);
+    const request: DesignSceneWorkerRequest = { ...payload, project: message, id };
+    worker.postMessage(request, transfer);
   } catch (error) {
     if (pending === active) pending = null;
     retireWorker();

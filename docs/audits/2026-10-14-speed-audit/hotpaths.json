@@ -1,0 +1,815 @@
+{
+  "format": "kerfdesk.browser-hotpath-component-audit",
+  "schemaVersion": 1,
+  "fixtureVersion": 1,
+  "createdAt": "2026-10-14T14:15:05.954Z",
+  "gitHead": "03f1da57737ebc58d7cf4e240be6c2225270c690",
+  "workingTreeDirty": true,
+  "initialGitStatus": "?? scripts/performance-audit/",
+  "browser": "155.0.8059.40",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+  "node": "v24.15.0",
+  "platform": "win32",
+  "architecture": "x64",
+  "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+  "logicalCpuCount": 20,
+  "systemMemoryBytes": 33965383680,
+  "freeSystemMemoryBytesAtStart": 11132444672,
+  "osRelease": "10.0.26200",
+  "warmups": 1,
+  "runs": 3,
+  "moduleHashes": {
+    "/probe.mjs": "7e213b91c525dc50ecf2f11fbdc3f7bd19d7604ce7247e651399361ca334ca03",
+    "/echo-worker.mjs": "ece05ff8e9216e39721580c61c0593edb6ac52f0805b562fde6908e3a551d363"
+  },
+  "requestedModules": ["/", "/probe.mjs", "/echo-worker.mjs"],
+  "scope": "Isolated esbuild production components in headless Chrome with native Canvas2D and Worker. Not a full-app interaction, displayed FPS, hardware, output compilation, or peak-memory measurement. Fixture creation, validation, module loading, and worker startup are outside timed sections. Cases run serially in fresh pages. Sprite paint counts are the main cache evidence; GPU completion is not timed.",
+  "timingNotes": {
+    "sprites": "One warm-up three-pass sequence, then sampled sequences; reset before every sequence. Distinct tiny 32x32-pixel sprites fit far below the pixel budget. Native canvas painting uses 4,000 line segments per key.",
+    "nodeEdits": "One immutable canonical straight-segment curve, edited by the production curve-node function. K anchors are spaced along its N segments. Each sample starts from the same original geometry. Includes production compatibility materialisation, excludes correctness checks.",
+    "transfers": "One project with a polyline and its canonical straight-line curve. Worker echoes the complete payload; packed buffers transfer back. Raw roundtrip includes two structured clones; packed roundtrip excludes packing and includes transfer both ways. Cold packing is recorded from the first warm-up, subsequent samples reuse the production immutable-path cache. No receiver unpacking is included."
+  },
+  "sprites": [
+    {
+      "keys": 8,
+      "passesPerSample": 3,
+      "spritePixelsPerKey": 1024,
+      "paintCallsPerPass": [8, 0, 0],
+      "passMs": [
+        {
+          "median": 2,
+          "min": 1.599999999627471,
+          "max": 3.100000001490116
+        },
+        {
+          "median": 0,
+          "min": 0,
+          "max": 0.10000000149011612
+        },
+        {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        }
+      ],
+      "samples": [
+        {
+          "passes": [
+            {
+              "elapsedMs": 3.100000001490116,
+              "paintCalls": 8
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            }
+          ],
+          "perKeyPaintCalls": [1, 1, 1, 1, 1, 1, 1, 1],
+          "nonBlank": true
+        },
+        {
+          "passes": [
+            {
+              "elapsedMs": 2,
+              "paintCalls": 8
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            }
+          ],
+          "perKeyPaintCalls": [1, 1, 1, 1, 1, 1, 1, 1],
+          "nonBlank": true
+        },
+        {
+          "passes": [
+            {
+              "elapsedMs": 1.599999999627471,
+              "paintCalls": 8
+            },
+            {
+              "elapsedMs": 0.10000000149011612,
+              "paintCalls": 0
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            }
+          ],
+          "perKeyPaintCalls": [1, 1, 1, 1, 1, 1, 1, 1],
+          "nonBlank": true
+        }
+      ]
+    },
+    {
+      "keys": 9,
+      "passesPerSample": 3,
+      "spritePixelsPerKey": 1024,
+      "paintCallsPerPass": [9, 9, 9],
+      "passMs": [
+        {
+          "median": 2,
+          "min": 1.800000000745058,
+          "max": 2.799999998882413
+        },
+        {
+          "median": 1.599999999627471,
+          "min": 1.3999999985098839,
+          "max": 1.900000000372529
+        },
+        {
+          "median": 1.700000001117587,
+          "min": 1.5,
+          "max": 1.700000001117587
+        }
+      ],
+      "samples": [
+        {
+          "passes": [
+            {
+              "elapsedMs": 2,
+              "paintCalls": 9
+            },
+            {
+              "elapsedMs": 1.599999999627471,
+              "paintCalls": 9
+            },
+            {
+              "elapsedMs": 1.700000001117587,
+              "paintCalls": 9
+            }
+          ],
+          "perKeyPaintCalls": [3, 3, 3, 3, 3, 3, 3, 3, 3],
+          "nonBlank": true
+        },
+        {
+          "passes": [
+            {
+              "elapsedMs": 2.799999998882413,
+              "paintCalls": 9
+            },
+            {
+              "elapsedMs": 1.900000000372529,
+              "paintCalls": 9
+            },
+            {
+              "elapsedMs": 1.5,
+              "paintCalls": 9
+            }
+          ],
+          "perKeyPaintCalls": [3, 3, 3, 3, 3, 3, 3, 3, 3],
+          "nonBlank": true
+        },
+        {
+          "passes": [
+            {
+              "elapsedMs": 1.800000000745058,
+              "paintCalls": 9
+            },
+            {
+              "elapsedMs": 1.3999999985098839,
+              "paintCalls": 9
+            },
+            {
+              "elapsedMs": 1.700000001117587,
+              "paintCalls": 9
+            }
+          ],
+          "perKeyPaintCalls": [3, 3, 3, 3, 3, 3, 3, 3, 3],
+          "nonBlank": true
+        }
+      ]
+    },
+    {
+      "keys": 16,
+      "passesPerSample": 3,
+      "spritePixelsPerKey": 1024,
+      "paintCallsPerPass": [16, 16, 16],
+      "passMs": [
+        {
+          "median": 3.400000000372529,
+          "min": 3.300000000745058,
+          "max": 3.5
+        },
+        {
+          "median": 2.800000000745058,
+          "min": 2.699999999254942,
+          "max": 3.699999999254942
+        },
+        {
+          "median": 3.099999999627471,
+          "min": 2.799999998882413,
+          "max": 3.200000001117587
+        }
+      ],
+      "samples": [
+        {
+          "passes": [
+            {
+              "elapsedMs": 3.5,
+              "paintCalls": 16
+            },
+            {
+              "elapsedMs": 3.699999999254942,
+              "paintCalls": 16
+            },
+            {
+              "elapsedMs": 3.200000001117587,
+              "paintCalls": 16
+            }
+          ],
+          "perKeyPaintCalls": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+          "nonBlank": true
+        },
+        {
+          "passes": [
+            {
+              "elapsedMs": 3.400000000372529,
+              "paintCalls": 16
+            },
+            {
+              "elapsedMs": 2.800000000745058,
+              "paintCalls": 16
+            },
+            {
+              "elapsedMs": 2.799999998882413,
+              "paintCalls": 16
+            }
+          ],
+          "perKeyPaintCalls": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+          "nonBlank": true
+        },
+        {
+          "passes": [
+            {
+              "elapsedMs": 3.300000000745058,
+              "paintCalls": 16
+            },
+            {
+              "elapsedMs": 2.699999999254942,
+              "paintCalls": 16
+            },
+            {
+              "elapsedMs": 3.099999999627471,
+              "paintCalls": 16
+            }
+          ],
+          "perKeyPaintCalls": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+          "nonBlank": true
+        }
+      ]
+    }
+  ],
+  "nodeEdits": [
+    {
+      "segments": 10000,
+      "selectedAnchors": 1,
+      "editMs": {
+        "median": 0.5,
+        "min": 0.30000000074505806,
+        "max": 0.5
+      },
+      "samples": [
+        {
+          "elapsedMs": 0.5,
+          "changedAnchors": 1,
+          "segments": 10000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 0.5,
+          "changedAnchors": 1,
+          "segments": 10000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 0.30000000074505806,
+          "changedAnchors": 1,
+          "segments": 10000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 10000,
+      "selectedAnchors": 10,
+      "editMs": {
+        "median": 0.30000000074505806,
+        "min": 0.2999999988824129,
+        "max": 0.30000000074505806
+      },
+      "samples": [
+        {
+          "elapsedMs": 0.2999999988824129,
+          "changedAnchors": 10,
+          "segments": 10000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 0.30000000074505806,
+          "changedAnchors": 10,
+          "segments": 10000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 0.30000000074505806,
+          "changedAnchors": 10,
+          "segments": 10000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 10000,
+      "selectedAnchors": 100,
+      "editMs": {
+        "median": 0.900000000372529,
+        "min": 0.8000000007450581,
+        "max": 1
+      },
+      "samples": [
+        {
+          "elapsedMs": 1,
+          "changedAnchors": 100,
+          "segments": 10000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 0.8000000007450581,
+          "changedAnchors": 100,
+          "segments": 10000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 0.900000000372529,
+          "changedAnchors": 100,
+          "segments": 10000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 50000,
+      "selectedAnchors": 1,
+      "editMs": {
+        "median": 0.8000000007450581,
+        "min": 0.7000000011175871,
+        "max": 1
+      },
+      "samples": [
+        {
+          "elapsedMs": 0.8000000007450581,
+          "changedAnchors": 1,
+          "segments": 50000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 0.7000000011175871,
+          "changedAnchors": 1,
+          "segments": 50000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1,
+          "changedAnchors": 1,
+          "segments": 50000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 50000,
+      "selectedAnchors": 10,
+      "editMs": {
+        "median": 1.3999999985098839,
+        "min": 1,
+        "max": 1.400000000372529
+      },
+      "samples": [
+        {
+          "elapsedMs": 1.3999999985098839,
+          "changedAnchors": 10,
+          "segments": 50000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1.400000000372529,
+          "changedAnchors": 10,
+          "segments": 50000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1,
+          "changedAnchors": 10,
+          "segments": 50000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 50000,
+      "selectedAnchors": 100,
+      "editMs": {
+        "median": 3.200000001117587,
+        "min": 2.900000000372529,
+        "max": 3.700000001117587
+      },
+      "samples": [
+        {
+          "elapsedMs": 3.200000001117587,
+          "changedAnchors": 100,
+          "segments": 50000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 3.700000001117587,
+          "changedAnchors": 100,
+          "segments": 50000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 2.900000000372529,
+          "changedAnchors": 100,
+          "segments": 50000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 100000,
+      "selectedAnchors": 1,
+      "editMs": {
+        "median": 1.800000000745058,
+        "min": 1.6000000014901161,
+        "max": 2.099999999627471
+      },
+      "samples": [
+        {
+          "elapsedMs": 2.099999999627471,
+          "changedAnchors": 1,
+          "segments": 100000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1.6000000014901161,
+          "changedAnchors": 1,
+          "segments": 100000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1.800000000745058,
+          "changedAnchors": 1,
+          "segments": 100000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 100000,
+      "selectedAnchors": 10,
+      "editMs": {
+        "median": 2.099999999627471,
+        "min": 2,
+        "max": 2.599999999627471
+      },
+      "samples": [
+        {
+          "elapsedMs": 2,
+          "changedAnchors": 10,
+          "segments": 100000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 2.599999999627471,
+          "changedAnchors": 10,
+          "segments": 100000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 2.099999999627471,
+          "changedAnchors": 10,
+          "segments": 100000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 100000,
+      "selectedAnchors": 100,
+      "editMs": {
+        "median": 5.599999999627471,
+        "min": 4.900000000372529,
+        "max": 7.199999999254942
+      },
+      "samples": [
+        {
+          "elapsedMs": 4.900000000372529,
+          "changedAnchors": 100,
+          "segments": 100000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 7.199999999254942,
+          "changedAnchors": 100,
+          "segments": 100000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 5.599999999627471,
+          "changedAnchors": 100,
+          "segments": 100000,
+          "sourceUnchanged": true
+        }
+      ]
+    }
+  ],
+  "transfers": [
+    {
+      "points": 50000,
+      "canonicalLineSegments": 49999,
+      "coldPackedWarmup": {
+        "packingMs": 3.199999999254942,
+        "synchronousPostMs": 0.30000000074505806,
+        "roundtripMs": 0.6000000014901161,
+        "packingAndRoundtripMs": 3.800000000745058,
+        "transferredBytes": 800009,
+        "pointsVerified": 50000,
+        "senderBuffersDetached": true
+      },
+      "raw": {
+        "synchronousPostMs": {
+          "median": 13.699999999254942,
+          "min": 13.400000000372529,
+          "max": 14.5
+        },
+        "roundtripMs": {
+          "median": 86.09999999962747,
+          "min": 79.19999999925494,
+          "max": 87
+        },
+        "samples": [
+          {
+            "synchronousPostMs": 13.400000000372529,
+            "roundtripMs": 86.09999999962747,
+            "pointsVerified": 50000
+          },
+          {
+            "synchronousPostMs": 14.5,
+            "roundtripMs": 87,
+            "pointsVerified": 50000
+          },
+          {
+            "synchronousPostMs": 13.699999999254942,
+            "roundtripMs": 79.19999999925494,
+            "pointsVerified": 50000
+          }
+        ]
+      },
+      "packed": {
+        "packingMs": {
+          "median": 0.30000000074505806,
+          "min": 0.2999999988824129,
+          "max": 0.30000000074505806
+        },
+        "synchronousPostMs": {
+          "median": 0,
+          "min": 0,
+          "max": 0.09999999962747097
+        },
+        "roundtripMs": {
+          "median": 0.40000000037252903,
+          "min": 0.30000000074505806,
+          "max": 3.199999999254942
+        },
+        "packingAndRoundtripMs": {
+          "median": 0.7000000011175871,
+          "min": 0.599999999627471,
+          "max": 3.5
+        },
+        "samples": [
+          {
+            "packingMs": 0.30000000074505806,
+            "synchronousPostMs": 0,
+            "roundtripMs": 0.40000000037252903,
+            "packingAndRoundtripMs": 0.7000000011175871,
+            "transferredBytes": 800009,
+            "pointsVerified": 50000,
+            "senderBuffersDetached": true
+          },
+          {
+            "packingMs": 0.2999999988824129,
+            "synchronousPostMs": 0,
+            "roundtripMs": 0.30000000074505806,
+            "packingAndRoundtripMs": 0.599999999627471,
+            "transferredBytes": 800009,
+            "pointsVerified": 50000,
+            "senderBuffersDetached": true
+          },
+          {
+            "packingMs": 0.30000000074505806,
+            "synchronousPostMs": 0.09999999962747097,
+            "roundtripMs": 3.199999999254942,
+            "packingAndRoundtripMs": 3.5,
+            "transferredBytes": 800009,
+            "pointsVerified": 50000,
+            "senderBuffersDetached": true
+          }
+        ]
+      }
+    },
+    {
+      "points": 200000,
+      "canonicalLineSegments": 199999,
+      "coldPackedWarmup": {
+        "packingMs": 8.299999998882413,
+        "synchronousPostMs": 0.10000000149011612,
+        "roundtripMs": 0.40000000037252903,
+        "packingAndRoundtripMs": 8.699999999254942,
+        "transferredBytes": 3200009,
+        "pointsVerified": 200000,
+        "senderBuffersDetached": true
+      },
+      "raw": {
+        "synchronousPostMs": {
+          "median": 62.600000001490116,
+          "min": 61.20000000111759,
+          "max": 67.09999999962747
+        },
+        "roundtripMs": {
+          "median": 349.30000000074506,
+          "min": 331.7000000011176,
+          "max": 378.7999999988824
+        },
+        "samples": [
+          {
+            "synchronousPostMs": 62.600000001490116,
+            "roundtripMs": 349.30000000074506,
+            "pointsVerified": 200000
+          },
+          {
+            "synchronousPostMs": 61.20000000111759,
+            "roundtripMs": 331.7000000011176,
+            "pointsVerified": 200000
+          },
+          {
+            "synchronousPostMs": 67.09999999962747,
+            "roundtripMs": 378.7999999988824,
+            "pointsVerified": 200000
+          }
+        ]
+      },
+      "packed": {
+        "packingMs": {
+          "median": 0.7000000011175871,
+          "min": 0.7000000011175871,
+          "max": 0.7999999988824129
+        },
+        "synchronousPostMs": {
+          "median": 0.09999999962747097,
+          "min": 0,
+          "max": 3.800000000745058
+        },
+        "roundtripMs": {
+          "median": 0.3999999985098839,
+          "min": 0.19999999925494194,
+          "max": 4.200000001117587
+        },
+        "packingAndRoundtripMs": {
+          "median": 1.099999999627471,
+          "min": 0.900000000372529,
+          "max": 5
+        },
+        "samples": [
+          {
+            "packingMs": 0.7000000011175871,
+            "synchronousPostMs": 0,
+            "roundtripMs": 0.3999999985098839,
+            "packingAndRoundtripMs": 1.099999999627471,
+            "transferredBytes": 3200009,
+            "pointsVerified": 200000,
+            "senderBuffersDetached": true
+          },
+          {
+            "packingMs": 0.7000000011175871,
+            "synchronousPostMs": 0.09999999962747097,
+            "roundtripMs": 0.19999999925494194,
+            "packingAndRoundtripMs": 0.900000000372529,
+            "transferredBytes": 3200009,
+            "pointsVerified": 200000,
+            "senderBuffersDetached": true
+          },
+          {
+            "packingMs": 0.7999999988824129,
+            "synchronousPostMs": 3.800000000745058,
+            "roundtripMs": 4.200000001117587,
+            "packingAndRoundtripMs": 5,
+            "transferredBytes": 3200009,
+            "pointsVerified": 200000,
+            "senderBuffersDetached": true
+          }
+        ]
+      }
+    },
+    {
+      "points": 1000000,
+      "canonicalLineSegments": 999999,
+      "coldPackedWarmup": {
+        "packingMs": 44.80000000074506,
+        "synchronousPostMs": 0.19999999925494194,
+        "roundtripMs": 10.5,
+        "packingAndRoundtripMs": 55.30000000074506,
+        "transferredBytes": 16000009,
+        "pointsVerified": 1000000,
+        "senderBuffersDetached": true
+      },
+      "raw": {
+        "synchronousPostMs": {
+          "median": 595.6999999992549,
+          "min": 491.59999999962747,
+          "max": 679.9000000003725
+        },
+        "roundtripMs": {
+          "median": 2626.0999999996275,
+          "min": 2614.2999999988824,
+          "max": 2661.699999999255
+        },
+        "samples": [
+          {
+            "synchronousPostMs": 595.6999999992549,
+            "roundtripMs": 2614.2999999988824,
+            "pointsVerified": 1000000
+          },
+          {
+            "synchronousPostMs": 491.59999999962747,
+            "roundtripMs": 2626.0999999996275,
+            "pointsVerified": 1000000
+          },
+          {
+            "synchronousPostMs": 679.9000000003725,
+            "roundtripMs": 2661.699999999255,
+            "pointsVerified": 1000000
+          }
+        ]
+      },
+      "packed": {
+        "packingMs": {
+          "median": 3.5,
+          "min": 3.5,
+          "max": 4.300000000745058
+        },
+        "synchronousPostMs": {
+          "median": 0.09999999962747097,
+          "min": 0,
+          "max": 0.19999999925494194
+        },
+        "roundtripMs": {
+          "median": 21.90000000037253,
+          "min": 0.40000000037252903,
+          "max": 23.199999999254942
+        },
+        "packingAndRoundtripMs": {
+          "median": 25.40000000037253,
+          "min": 3.900000000372529,
+          "max": 27.5
+        },
+        "samples": [
+          {
+            "packingMs": 3.5,
+            "synchronousPostMs": 0,
+            "roundtripMs": 21.90000000037253,
+            "packingAndRoundtripMs": 25.40000000037253,
+            "transferredBytes": 16000009,
+            "pointsVerified": 1000000,
+            "senderBuffersDetached": true
+          },
+          {
+            "packingMs": 3.5,
+            "synchronousPostMs": 0.09999999962747097,
+            "roundtripMs": 0.40000000037252903,
+            "packingAndRoundtripMs": 3.900000000372529,
+            "transferredBytes": 16000009,
+            "pointsVerified": 1000000,
+            "senderBuffersDetached": true
+          },
+          {
+            "packingMs": 4.300000000745058,
+            "synchronousPostMs": 0.19999999925494194,
+            "roundtripMs": 23.199999999254942,
+            "packingAndRoundtripMs": 27.5,
+            "transferredBytes": 16000009,
+            "pointsVerified": 1000000,
+            "senderBuffersDetached": true
+          }
+        ]
+      }
+    }
+  ]
+}

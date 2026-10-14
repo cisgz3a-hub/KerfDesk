@@ -17,6 +17,7 @@
 /// <reference lib="webworker" />
 
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
+import { unpackProjectMessage } from '../packed-project-transfer';
 import { prepareOutputAsync } from '../../io/gcode/prepare-output-async';
 import {
   acceptCanvasCompilationBridgeConnection,
@@ -37,7 +38,7 @@ self.onmessage = async (e: MessageEvent<DesignSceneWorkerRequest>): Promise<void
     // Hydrate here for the same reason the 2D path does: a page-backed raster
     // keeps its pixels in IndexedDB, and computeDesignSceneSource is
     // synchronous so it cannot fetch them itself.
-    const hydrated = await hydratePagedRasterProject(project);
+    const hydrated = await hydratePagedRasterProject(unpackProjectMessage(project));
     const options = request.kind === 'scene' ? { outputScope: request.outputScope } : {};
     const prepared = await prepareOutputAsync(hydrated, options, {
       jobId: `design-${request.kind}:${id}`,

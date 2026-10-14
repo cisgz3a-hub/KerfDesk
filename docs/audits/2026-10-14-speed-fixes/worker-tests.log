@@ -1,0 +1,70 @@
+Already up to date
+Done in 385ms using pnpm v11.3.0
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0
+
+ ✓ src/ui/workspace/preparation-worker-retention.test.ts (1 test) 6124ms
+     ✓ drops the request before the acknowledged transfer finishes  6123ms
+ ✓ src/ui/workspace/preparation-worker-projection.test.ts (9 tests) 752ms
+ ✓ src/ui/workspace/use-preview-toolpath.test.tsx (16 tests) 73ms
+ ✓ src/ui/laser/use-job-estimate.test.tsx (13 tests) 171ms
+ ✓ src/ui/laser/use-job-estimate-initial.test.tsx (8 tests) 128ms
+stderr | src/ui/laser/use-job-estimate.memo.test.tsx > useJobEstimate memoization > computes one synchronous estimate per project for two mounted consumers
+Warning: An update to Probe inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at Probe (C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/laser/use-job-estimate.memo.test.tsx:24:19)
+Warning: An update to Probe inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at Probe (C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/laser/use-job-estimate.memo.test.tsx:24:19)
+
+stderr | src/ui/laser/use-job-estimate.memo.test.tsx > useJobEstimate memoization > reuses a recent head position but does not keep one estimate per position
+Warning: An update to Probe inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at Probe (C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/laser/use-job-estimate.memo.test.tsx:24:19)
+
+ ✓ src/ui/laser/use-job-estimate.memo.test.tsx (2 tests) 73ms
+ ✓ src/ui/laser/use-job-estimate-head-position.test.tsx (5 tests) 68ms
+ ✓ src/ui/workspace/preparation-worker-memory.test.ts (13 tests) 25ms
+ ✓ src/ui/workspace/idle-canvas-motion-worker-memory.test.ts (14 tests) 22ms
+ ✓ src/ui/workspace/preparation-worker-ownership.test.ts (8 tests) 24ms
+ ✓ src/ui/workspace/preparation-worker-client.test.ts (16 tests) 28ms
+ ✓ src/ui/workspace/preparation-worker-estimate.test.ts (12 tests) 20ms
+ ✓ src/ui/state/autosave-preparation-client.test.ts (9 tests) 34ms
+ ✓ src/ui/workspace/preparation-worker-cache-retention.test.ts (3 tests) 17ms
+ ✓ src/ui/app/project-save-preparation-client.test.ts (9 tests) 32ms
+ ✓ src/ui/workspace/preparation-worker-transfer.test.ts (5 tests) 33ms
+ ✓ src/ui/worker-memory-lane.test.ts (7 tests) 19ms
+ ✓ src/ui/workspace/preparation-packed-transfer.test.ts (2 tests) 258ms
+ ✓ src/ui/workspace/preparation-transfer-ownership.test.ts (1 test) 690ms
+     ✓ releases a fresh raster route without modifying or invalidating its prepared output  687ms
+
+ Test Files  19 passed (19)
+      Tests  153 passed (153)
+   Start at  23:33:49
+   Duration  80.76s (transform 16.64s, setup 194ms, import 47.45s, tests 8.59s, environment 18.55s)
+
+JSON report written to C:/Users/Asus/.codex/tmp/speed-fixes-20261014-2272/workers-final.json

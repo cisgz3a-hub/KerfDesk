@@ -1,0 +1,152 @@
+Already up to date
+Done in 358ms using pnpm v11.3.0
+[WebServer] (node:26396) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9264) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 9 tests using 1 worker
+
+(node:15716) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  ok 1 e2e\canvas-text-worker.spec.ts:4:1 › keeps foreground tasks responsive and cancels an unfinished real text weld worker (51.9s)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  ok 2 e2e\depth-map-relief-worker.e2e.ts:40:1 › production canonical heightfield worker cancels stale work and keeps the UI responsive (9.2s)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  x  3 e2e\heavy-canvas-workers.e2e.ts:9:1 › G-code canvas ownership cancels hidden idle planning without a delayed UI stall (17.5s)
+(node:29480) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  ok 4 e2e\heavy-canvas-workers.e2e.ts:100:1 › CNC Preview removal-grid simulation completes in the shared worker while UI stays responsive (9.3s)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  ok 5 e2e\native-project-large-worker.e2e.ts:16:1 › opens a 24 MiB native project through the production worker while the UI stays responsive (9.6s)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  ok 6 e2e\performance.spec.ts:22:1 › opens and previews a 2,000-object project inside browser budgets (11.0s)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  ok 7 e2e\project-save-worker.e2e.ts:23:1 › large manual Save prepares in a real worker and opens its picker only after Choose file (11.2s)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  ok 8 e2e\project-save-worker.e2e.ts:47:1 › Cancel after large manual Save preparation keeps edits without selecting or writing a file (12.3s)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  ok 9 e2e\svg-large-worker.e2e.ts:7:1 › imports a 24 MiB SVG through the production worker while the UI stays responsive (15.1s)
+
+
+  1) e2e\heavy-canvas-workers.e2e.ts:9:1 › G-code canvas ownership cancels hidden idle planning without a delayed UI stall 
+
+    Error: G-code canvas initial open maximum heartbeat gap
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 1000
+    Received:   1121.9199999999255
+
+       at fixtures\browser-responsiveness.ts:134
+
+      132 |   recordResponsivenessPhase(testInfo, phase, measurement);
+      133 |   expect(measurement.ticks, `${phase} heartbeat ticks`).toBeGreaterThan(10);
+    > 134 |   expect(measurement.maxGapMs, `${phase} maximum heartbeat gap`).toBeLessThan(
+          |                                                                  ^
+      135 |     MAX_ACCEPTABLE_MAIN_THREAD_GAP_MS,
+      136 |   );
+      137 |   if (measurement.longTaskObserverSupported) {
+        at assertResponsivePhase (C:\Users\Asus\.codex\worktrees\2272\LaserForge-2.0\e2e\fixtures\browser-responsiveness.ts:134:66)
+        at C:\Users\Asus\.codex\worktrees\2272\LaserForge-2.0\e2e\heavy-canvas-workers.e2e.ts:69:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\..\tmp\speed-audit-20261014-2272\browser-results\heavy-canvas-workers.e2e.t-b15c8--without-a-delayed-UI-stall\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\..\tmp\speed-audit-20261014-2272\browser-results\heavy-canvas-workers.e2e.t-b15c8--without-a-delayed-UI-stall\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\..\tmp\speed-audit-20261014-2272\browser-results\heavy-canvas-workers.e2e.t-b15c8--without-a-delayed-UI-stall\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\..\tmp\speed-audit-20261014-2272\browser-results\heavy-canvas-workers.e2e.t-b15c8--without-a-delayed-UI-stall\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    e2e\heavy-canvas-workers.e2e.ts:9:1 › G-code canvas ownership cancels hidden idle planning without a delayed UI stall 
+  8 passed (3.0m)

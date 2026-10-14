@@ -140,6 +140,7 @@ describe('useJobEstimate head position', () => {
     expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenLastCalledWith(
       useStore.getState().project,
       expect.objectContaining({ initialPosition: { x: 0, y: 0, z: 0 } }),
+      expect.any(AbortSignal),
     );
 
     // Frame owns the head: Run on each leg, Idle between them, a new position
@@ -172,6 +173,7 @@ describe('useJobEstimate head position', () => {
     expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenLastCalledWith(
       useStore.getState().project,
       expect.objectContaining({ initialPosition: { x: 25, y: 0, z: 0 } }),
+      expect.any(AbortSignal),
     );
 
     await unmount();
@@ -242,6 +244,7 @@ describe('useJobEstimate head position', () => {
       expect.objectContaining({
         jobOrigin: expect.objectContaining({ currentPosition: { x: 0, y: 0 } }),
       }),
+      expect.any(AbortSignal),
     );
 
     await unmount();
@@ -299,6 +302,7 @@ describe('useJobEstimate head position', () => {
       expect.objectContaining({
         jobOrigin: expect.objectContaining({ currentPosition: { x: 0, y: 0 } }),
       }),
+      expect.any(AbortSignal),
     );
 
     await unmount();

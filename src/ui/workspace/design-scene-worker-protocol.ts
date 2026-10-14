@@ -9,20 +9,21 @@ import type { OutputScope, Project } from '../../core/scene';
 import type { DesignCarveSource } from '../design-studio/preview3d/design-carve-source';
 import type { DesignSimulateResult } from '../design-studio/preview3d/design-simulate';
 import type { DesignSceneSource } from './use-cnc-3d-scene';
+import type { ProjectMessage } from '../packed-project-transfer';
 
-export type DesignSceneWorkerRequestPayload =
+export type DesignSceneWorkerRequestPayload<TProject = Project> =
   | {
       readonly kind: 'scene';
-      readonly project: Project;
+      readonly project: TProject;
       readonly outputScope: OutputScope;
     }
   | {
       readonly kind: 'simulation';
-      readonly project: Project;
+      readonly project: TProject;
       readonly source: DesignCarveSource;
     };
 
-export type DesignSceneWorkerRequest = DesignSceneWorkerRequestPayload & {
+export type DesignSceneWorkerRequest = DesignSceneWorkerRequestPayload<ProjectMessage> & {
   readonly id: number;
 };
 

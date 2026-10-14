@@ -1,0 +1,4 @@
+startup 1: welcome=1168.7 ms; maxLongTask=135.0 ms; scripts=1933805 gzip bytes
+startup 2: welcome=1195.9 ms; maxLongTask=170.0 ms; scripts=1933805 gzip bytes
+startup 3: welcome=1131.0 ms; maxLongTask=140.0 ms; scripts=1933805 gzip bytes
+startup 4: welcome=1254.6 ms; maxLongTask=194.0 ms; scripts=1933805 gzip bytes

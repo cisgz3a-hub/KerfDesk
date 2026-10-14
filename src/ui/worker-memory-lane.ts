@@ -1,6 +1,14 @@
 type Reservation = {
   start: ((release: () => void) => void) | null;
+  readonly options: WorkerMemoryReservationOptions;
+  preemptRequested: boolean;
   closed: boolean;
+};
+
+export type WorkerMemoryReservationOptions = {
+  readonly priority?: 'background' | 'interactive';
+  /** Retire the heap before releasing; the owner may then requeue useful work. */
+  readonly onPreempt?: () => void;
 };
 
 /** Serializes worker heaps that share the browser's finite V8 address cage. */
@@ -10,15 +18,19 @@ export class WorkerMemoryLane {
   private draining = false;
 
   /**
-   * Grant synchronously when free, otherwise FIFO. The returned cancel and
+   * Grant synchronously when free, otherwise FIFO within priority. The returned cancel and
    * granted release share one idempotent token. Dispose an active worker
    * before releasing it. Callers settle their own startup errors.
    */
-  reserve(start: (release: () => void) => void): () => void {
-    const reservation: Reservation = { start, closed: false };
+  reserve(
+    start: (release: () => void) => void,
+    options: WorkerMemoryReservationOptions = {},
+  ): () => void {
+    const reservation: Reservation = { start, options, preemptRequested: false, closed: false };
     const release = (): void => this.release(reservation);
     this.queued.push(reservation);
     this.drain();
+    this.preemptForInteractiveWork();
     return release;
   }
 
@@ -39,7 +51,10 @@ export class WorkerMemoryLane {
     this.draining = true;
     try {
       while (this.active === null && this.queued.length > 0) {
-        const reservation = this.queued.shift();
+        const interactive = this.queued.findIndex(
+          (candidate) => candidate.options.priority === 'interactive',
+        );
+        const [reservation] = this.queued.splice(Math.max(0, interactive), 1);
         if (reservation === undefined || reservation.closed) continue;
         this.active = reservation;
         const start = reservation.start;
@@ -54,13 +69,34 @@ export class WorkerMemoryLane {
     } finally {
       this.draining = false;
       if (this.active === null && this.queued.length > 0) this.drain();
+      this.preemptForInteractiveWork();
     }
+  }
+
+  private preemptForInteractiveWork(): void {
+    const active = this.active;
+    // A reentrant reservation must not interrupt a start callback halfway
+    // through construction. The outer drain checks again after it returns.
+    if (
+      this.draining ||
+      active === null ||
+      active.preemptRequested ||
+      active.options.priority === 'interactive' ||
+      active.options.onPreempt === undefined ||
+      !this.queued.some((candidate) => candidate.options.priority === 'interactive')
+    )
+      return;
+    active.preemptRequested = true;
+    active.options.onPreempt();
   }
 }
 
 const workerMemoryLane = new WorkerMemoryLane();
 
 /** One main-realm lane shared by output-derived preparation and autosave. */
-export function reserveWorkerMemory(start: (release: () => void) => void): () => void {
-  return workerMemoryLane.reserve(start);
+export function reserveWorkerMemory(
+  start: (release: () => void) => void,
+  options: WorkerMemoryReservationOptions = {},
+): () => void {
+  return workerMemoryLane.reserve(start, options);
 }

@@ -7,6 +7,7 @@ import { coordinateEntryProject } from './runtime-coordinate.test-support';
 import type {
   PreparationWorkerRequest,
   PreparationWorkerResponse,
+  PreparationPreviewUpgrade,
 } from './preparation-worker-protocol';
 
 const mocks = vi.hoisted(() => ({ preview: vi.fn(), prepare: vi.fn(), snapshot: vi.fn() }));
@@ -56,7 +57,11 @@ const project = {
 const prepared = prepareOutput(project);
 const expectedEstimate = estimateLiveJobFromPrepared(prepared, undefined, { unbounded: true });
 let workerScope: {
-  onmessage: ((event: MessageEvent<PreparationWorkerRequest>) => Promise<void>) | null;
+  onmessage:
+    | ((
+        event: MessageEvent<PreparationWorkerRequest | PreparationPreviewUpgrade>,
+      ) => Promise<void> | undefined)
+    | null;
   postMessage: ReturnType<typeof vi.fn>;
 };
 
@@ -74,6 +79,49 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('preparation worker result projection', () => {
+  it('retains one estimate compilation for an exact Preview upgrade without a second compile', async () => {
+    await workerScope.onmessage?.(
+      new MessageEvent('message', {
+        data: { id: 17, project, projection: 'estimate', allowPreviewUpgrade: true },
+      }),
+    );
+    expect(workerScope.postMessage).toHaveBeenCalledExactlyOnceWith({
+      id: 17,
+      kind: 'estimate-ready',
+      estimate: expectedEstimate,
+    });
+    expect(mocks.prepare).toHaveBeenCalledOnce();
+    expect(mocks.preview).not.toHaveBeenCalled();
+    mocks.preview.mockReturnValue({ steps: [], totalLength: 42 });
+    await workerScope.onmessage?.(
+      new MessageEvent('message', {
+        data: { id: 16, kind: 'preview-after-estimate' },
+      }),
+    );
+    expect(workerScope.postMessage).toHaveBeenCalledTimes(1);
+    await workerScope.onmessage?.(
+      new MessageEvent('message', {
+        data: { id: 17, kind: 'preview-after-estimate' },
+      }),
+    );
+    expect(mocks.prepare).toHaveBeenCalledOnce();
+    expect(mocks.preview).toHaveBeenCalledOnce();
+    expect(workerScope.postMessage).toHaveBeenLastCalledWith({
+      id: 17,
+      kind: 'ok',
+      toolpath: { steps: [], totalLength: 42 },
+      estimate: expectedEstimate,
+      jobOriginOffset: { x: 0, y: 0 },
+    });
+    // The consumed intermediate cannot be reused by a duplicate or late message.
+    await workerScope.onmessage?.(
+      new MessageEvent('message', {
+        data: { id: 17, kind: 'preview-after-estimate' },
+      }),
+    );
+    expect(mocks.preview).toHaveBeenCalledOnce();
+  });
+
   it.each([undefined, {}])(
     'retains runtime contour bounds and absolute translation (snapshot %j)',
     async (snapshot) => {

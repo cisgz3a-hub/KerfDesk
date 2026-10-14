@@ -18,13 +18,16 @@ import {
 } from './canvas-compilation-worker-pool';
 import {
   largeJobPreparationFromPrepared,
+  largeJobEstimateFromPrepared,
   type LargeJobPreparation,
   type LargeJobPreparationOptions,
+  type PreparedPreviewEstimate,
 } from './large-job-preparation';
 import { estimateLiveJobFromPrepared } from '../laser/live-job-estimate';
 import type {
   PreparationWorkerRequest,
   PreparationWorkerResponse,
+  PreparationPreviewUpgrade,
 } from './preparation-worker-protocol';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import { unpackProjectMessage } from '../packed-project-transfer';
@@ -36,6 +39,15 @@ const transferSender = new PreparationTransferSender((response, transfer) => {
   if (transfer === undefined) self.postMessage(response);
   else self.postMessage(response, transfer as Transferable[]);
 });
+
+type UpgradeCandidate = {
+  readonly id: number;
+  readonly project: Project;
+  readonly prepared: PreparedOutput;
+  readonly options: PreparationOptions;
+  readonly estimated: PreparedPreviewEstimate;
+};
+let upgradeCandidate: UpgradeCandidate | null = null;
 
 type PreparationOptions = Pick<
   LargeJobPreparationOptions,
@@ -49,13 +61,26 @@ type PreparationOptions = Pick<
 >;
 
 self.onmessage = (
-  e: MessageEvent<PreparationWorkerRequest | PreparationTransferAcknowledgement>,
+  e: MessageEvent<
+    PreparationWorkerRequest | PreparationTransferAcknowledgement | PreparationPreviewUpgrade
+  >,
 ): Promise<void> | undefined => {
   if (acceptCanvasCompilationBridgeConnection(e.data)) return undefined;
   if (transferSender.acceptAcknowledgement(e.data)) return undefined;
+  if ('kind' in e.data && e.data.kind === 'preview-after-estimate') {
+    const id = e.data.id;
+    if (upgradeCandidate?.id !== id) return undefined;
+    // Empty the only retained intermediate before route construction/transfer.
+    // The helper's synchronous frame releases project/job references before ACKs.
+    return Promise.resolve()
+      .then(() => upgradedPreviewPayload(id))
+      .then((payload) => transferSender.sendOwned(id, payload))
+      .catch((error: unknown) => reportFailure(id, error));
+  }
   if ('kind' in e.data) return undefined;
   const request = e.data;
   const id = request.id;
+  upgradeCandidate = null;
   // Deliberately not an async handler, and the payload is deliberately built
   // in its own frame. Each stage owns the request only while it needs it: this
   // frame returns as soon as the chain is built, and previewPayload's frame
@@ -71,15 +96,30 @@ self.onmessage = (
           self.postMessage(response);
         })
       : previewPayload(request).then((payload) => transferSender.sendOwned(id, payload));
-  return started.catch((err: unknown) => {
-    const response: PreparationWorkerResponse = {
-      id,
-      kind: 'error',
-      message: err instanceof Error ? err.message : String(err),
-    };
-    self.postMessage(response);
-  });
+  return started.catch((error: unknown) => reportFailure(id, error));
 };
+
+function reportFailure(id: number, error: unknown): void {
+  if (upgradeCandidate?.id === id) upgradeCandidate = null;
+  const response: PreparationWorkerResponse = {
+    id,
+    kind: 'error',
+    message: error instanceof Error ? error.message : String(error),
+  };
+  self.postMessage(response);
+}
+
+function upgradedPreviewPayload(id: number): LargeJobPreparation {
+  const candidate = upgradeCandidate;
+  upgradeCandidate = null;
+  if (candidate?.id !== id) throw new Error('Preview upgrade no longer owns its compilation.');
+  return largeJobPreparationFromPrepared(
+    candidate.project,
+    candidate.prepared,
+    candidate.options,
+    candidate.estimated,
+  );
+}
 
 function preparationOptions(request: PreparationWorkerRequest): PreparationOptions {
   return {
@@ -132,6 +172,12 @@ async function estimateResponse(
 ): Promise<PreparationWorkerResponse> {
   const hydrated = await hydratePagedRasterProject(unpackProjectMessage(request.project));
   const prepared = await compile(request, hydrated);
+  if (request.allowPreviewUpgrade === true) {
+    const options = preparationOptions(request);
+    const estimated = largeJobEstimateFromPrepared(prepared, options);
+    upgradeCandidate = { id: request.id, project: hydrated, prepared, options, estimated };
+    return { id: request.id, kind: 'estimate-ready', estimate: estimated.estimate };
+  }
   return {
     id: request.id,
     kind: 'estimate',

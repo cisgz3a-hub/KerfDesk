@@ -13,6 +13,7 @@ import type { EmitRdOptions, EmitRdResult } from '../../io/rd';
 import type { TiledOutputPreparation } from '../app/tiled-output-preparation';
 import type { FrameBoundsPreview } from './frame-bounds-preview';
 import type { LaserPowerScaleSource } from './connected-laser-power-scale';
+import type { ProjectMessage } from '../packed-project-transfer';
 
 export type OutputSnapshotRequest = {
   readonly registration?: SimilarityTransform | null;
@@ -117,6 +118,15 @@ export type OutputPreparationEnvelope = {
   readonly kind: 'prepare';
   readonly requestId: number;
   readonly request: OutputPreparationRequest;
+};
+
+/** Only geometry changes representation on the wire; all snapshot inputs stay exact. */
+type PackedRequest<T> = T extends OutputPreparationRequest
+  ? Omit<T, 'project'> & { readonly project: ProjectMessage }
+  : never;
+
+export type OutputPreparationWireEnvelope = Omit<OutputPreparationEnvelope, 'request'> & {
+  readonly request: PackedRequest<OutputPreparationRequest>;
 };
 
 /** Worker reply, correlated to its originating request by `requestId`. A
