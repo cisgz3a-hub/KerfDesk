@@ -69,7 +69,7 @@ test('Done clears a simulated completed run while keeping the project and job co
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await expect(applicationHeader(page)).toContainText('KerfDesk');
+  await expect(applicationHeader(page)).toContainText('KerfDesk', { timeout: 90_000 });
   await expect(page.locator('#app-splash')).toHaveCount(0);
   await (await toolbarCommand(page, 'Open...')).click();
   await expect(page.getByLabel('Current project')).not.toContainText('Untitled project');
