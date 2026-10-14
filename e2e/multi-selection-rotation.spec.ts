@@ -88,7 +88,7 @@ async function installOverlappingArtwork(page: Page, tool: 'select' | 'trace-par
       scene: {
         ...project.scene,
         objects,
-        layers: [createLayer({ id: 'layer', color, mode: 'cut' })],
+        layers: [createLayer({ id: 'layer', color, mode: 'line' })],
       },
     });
     useStore.getState().selectObjects(['rectangle', 'star']);
