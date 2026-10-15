@@ -7,7 +7,7 @@
 const orderedArrays = new WeakMap<ReadonlyArray<unknown>, ReadonlyArray<unknown>>();
 
 export function orderedRetentionValue(value: unknown): unknown {
-  if (value === null || typeof value !== 'object') return value;
+  if (isRetentionLeaf(value)) return value;
   if (Array.isArray(value)) return orderedArray(value);
   const fields = value as Record<string, unknown>;
   const keys = Object.keys(fields);
@@ -29,6 +29,18 @@ export function orderedRetentionValue(value: unknown): unknown {
     }
   }
   return changed ?? value;
+}
+
+function isRetentionLeaf(value: unknown): boolean {
+  // STL coordinate views already enumerate numeric indices in ascending order.
+  // Keep their exact values/view bounds for native stringify; sorting and
+  // cloning millions of numeric properties adds no canonicalization.
+  return (
+    value === null ||
+    typeof value !== 'object' ||
+    value instanceof Float32Array ||
+    value instanceof Float64Array
+  );
 }
 
 function isOrderedPoint(fields: Record<string, unknown>, keys: ReadonlyArray<string>): boolean {
