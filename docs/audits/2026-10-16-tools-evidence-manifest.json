@@ -1,5 +1,113 @@
 [
   {
+    "file": "evidence/tools-quality-2026-10-16/2026-10-15-tools-image-trace-vitest.json.gz",
+    "sha256": "3f9d1976ca8eab74da28cb2b25d72caac1b70a4200f49391317a93d198823fa4"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-close-fill-contours-with-tolerance-result.png",
+    "sha256": "8242fcf369af0d080179ccc8a70c1a4b0685aab536ba27560751693c56ebf756"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-close-open-fill-contours-result.png",
+    "sha256": "970fc02bea724aabc3fe5add069f9ee327913570f6aa0985e95e8e133338400d"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-close-paths-result.png",
+    "sha256": "5074f0524763fac5318067a0c1461e6009d7aba62941983cbf48796f567d8eca"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-close-paths-with-tolerance-result.png",
+    "sha256": "d68dde32ea657b56104b9abbfc50c60ec297ae45024cce977fa3e8295ea33bf5"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-convert-to-path-result.png",
+    "sha256": "5a812443041f6530da14ef038ab5f2cf83639d1fd2aa089be2460d146797d306"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-cut-shapes-result.png",
+    "sha256": "f4676341e9d8fcf08d9bc5f354f835282c9b4e1a3f703d240a9f39b9fe54484c"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-deform-result.png",
+    "sha256": "59cc4a9744db5c3a3d7b45b40844c2b21f3c9e1438fc5790d055314d1e04cd18"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-exclude-result.png",
+    "sha256": "786edca5a65b34ddd031bdf0863ac6df79145a3d5a598ab3663e207892c5f198"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-extend-shapes-result.png",
+    "sha256": "ee55083e36f4edbd842a3e1318af5998ce6265b6b839c375b11ec74347e0b90e"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-fill-selection-result.png",
+    "sha256": "ecdaa7c2caec5b0fb3d4dab4c8cf465b5f1e68d9f181a8d91355ee0c703e76af"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-generate-path-from-cut-result.png",
+    "sha256": "07ec6518f0fd0f2ed17e5b3cbd1783f740ea2ab2527dfe2f2a37f84e06a18df9"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-intersect-result.png",
+    "sha256": "e45c517f0409a2bcec8c6c3faabf1ace11f7473c5ecf44962803efc6a7e13bce"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-join-paths-result.png",
+    "sha256": "91f7d7e230d222ce97d02f7107dd063a58a0f367e5a16f9eeb9f6eaed06a7a22"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-offset-shapes-result.png",
+    "sha256": "742304d0471952f14704115de9886d81485387c063c6c04d85cd971fc4707fbf"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-optimize-shapes-result.png",
+    "sha256": "c91bd2ab596ba23a5abdf98fa2d54eb311c79e88814ada9db1ccbf1e22f05bf1"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-prepare-stamp-result.png",
+    "sha256": "8037d3580e119e095cb1a8c2705d39a615c0ed69f2e2d2034d1eb405d18879e5"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-radius-fillet-result.png",
+    "sha256": "a6621cfcf5e6128ff256d4e4e57f81788e21fbf13241713cf255e482aa594d39"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-resize-joints-result.png",
+    "sha256": "8b46d3778add855c8900f6c0251f3dcfc637dd59d86ff1ba73a129027b4fe63a"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-reverse-paths-result.png",
+    "sha256": "f220e3ac1b892257165de8fed4cff36eb6b7e2de802ba1aa240e2dd3bf81f4a0"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-rubber-band-outline-result.png",
+    "sha256": "1d6b19d49c51902f4ce17b7818c7237e73ec598ebde9d5280ae07ba35b016704"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-shear-result.png",
+    "sha256": "8c335707f052d51a06b314bd612c6a2ee70b6ee613cd9d20312c486497d8d89f"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-subtract-result.png",
+    "sha256": "87445176effe8b33c9695f6098f4931f25363c975b6c358d43499fec7b6e8039"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-trim-shapes-result.png",
+    "sha256": "a7274f4b3b40b163836c77eda465bf791a4edca19bf817cf56dfe8307157cb93"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-union-silhouette-result.png",
+    "sha256": "0921f146f6d7ffdb661a52482a98871bded702ff3702826126ce7a5e916fd10e"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-warp-result.png",
+    "sha256": "f008a7b07bedeeb38ebd894624098d50b2eed221c1e623265809072eda8bd565"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-weld-result.png",
+    "sha256": "ad2e379b11a32ab43f8bbfb6f3d72b742fbcb388abcc7e6db4028807ec57c92a"
+  },
+  {
     "file": "evidence/tools-quality-2026-10-16/direct-ai.png",
     "sha256": "0df67fca158fc15cc412fd4a1e9626735cf064a18d016cbc44d758b7aded0d6e"
   },
@@ -248,111 +356,55 @@
     "sha256": "5ddfdb97c0ec374be212a6a8bec7a5fa00eeb611662bc07e365e445802015b99"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-weld-result.png",
-    "sha256": "ad2e379b11a32ab43f8bbfb6f3d72b742fbcb388abcc7e6db4028807ec57c92a"
+    "file": "evidence/tools-quality-2026-10-16/pr-browser-merged.json.gz",
+    "sha256": "106d72ff546b05f27bf979002218ca28fd78a41659e97ac5e452c636b17a3862"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-resize-joints-result.png",
-    "sha256": "8b46d3778add855c8900f6c0251f3dcfc637dd59d86ff1ba73a129027b4fe63a"
+    "file": "evidence/tools-quality-2026-10-16/pr-final-vitest.json.gz",
+    "sha256": "1b140e3cecb5f0035fc7c3d37109dccd68aec46240f3ec321d9a327dfbd7ad44"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-join-paths-result.png",
-    "sha256": "91f7d7e230d222ce97d02f7107dd063a58a0f367e5a16f9eeb9f6eaed06a7a22"
+    "file": "evidence/tools-quality-2026-10-16/pr-image-bake-bitmap-retry.json.gz",
+    "sha256": "7cd699b5bf3e78bfbf95e6da14afbc00d2933474830f433511f7472581aa56ca"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-convert-to-path-result.png",
-    "sha256": "5a812443041f6530da14ef038ab5f2cf83639d1fd2aa089be2460d146797d306"
+    "file": "evidence/tools-quality-2026-10-16/pr-image-bake-bitmap.json.gz",
+    "sha256": "925eec9a156a1f3231ce51c5c2aca0fef081281c88826a5fca6984593ee54290"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-generate-path-from-cut-result.png",
-    "sha256": "07ec6518f0fd0f2ed17e5b3cbd1783f740ea2ab2527dfe2f2a37f84e06a18df9"
+    "file": "evidence/tools-quality-2026-10-16/pr-image-final.json.gz",
+    "sha256": "e9778695c580e3abedc1c9dedca3b199ce2e119f0d9ce5bfefb0c34633b75afd"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-union-silhouette-result.png",
-    "sha256": "0921f146f6d7ffdb661a52482a98871bded702ff3702826126ce7a5e916fd10e"
+    "file": "evidence/tools-quality-2026-10-16/pr-image-trace-retry.json.gz",
+    "sha256": "9e40366e6cd1396103f2b88dd2419a266da31479e5b899779e483c7e7c1749dd"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-close-paths-with-tolerance-result.png",
-    "sha256": "d68dde32ea657b56104b9abbfc50c60ec297ae45024cce977fa3e8295ea33bf5"
+    "file": "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-A-33c92-ough-their-dialogs-and-undo-result.png",
+    "sha256": "f74d2e6d7b7cbee7538a6320b41ea003c707dfb4a280a22c25ad7cf74729720c"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-intersect-result.png",
-    "sha256": "e45c517f0409a2bcec8c6c3faabf1ace11f7473c5ecf44962803efc6a7e13bce"
+    "file": "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-A-a41df-ls-reference-rules-and-Undo-result.png",
+    "sha256": "31caa9965e2ba81f1d71a16c1a8ae14bd842653444b72fa6fa57267651deb95e"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-reverse-paths-result.png",
-    "sha256": "f220e3ac1b892257165de8fed4cff36eb6b7e2de802ba1aa240e2dd3bf81f4a0"
+    "file": "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-B-95f5e--Undo-restores-its-template-result.png",
+    "sha256": "c39cecea617f7404eaa0c77303a99863a36ffcefbf093b5320f60f0d262a02dc"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-offset-shapes-result.png",
-    "sha256": "742304d0471952f14704115de9886d81485387c063c6c04d85cd971fc4707fbf"
+    "file": "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-C-b18be-estores-the-original-vector-result.png",
+    "sha256": "734d52eb6be8ddd3e0d5e9e2fe8db17196b641c40790efb5ea70a36020f562c7"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-prepare-stamp-result.png",
-    "sha256": "8037d3580e119e095cb1a8c2705d39a615c0ed69f2e2d2034d1eb405d18879e5"
+    "file": "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-I-34de7--project-Undo-restores-them-result.png",
+    "sha256": "37b11abb5f2894b1d8f3b648240acbec3a0791e29fa993c527f2266059b09b7b"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-warp-result.png",
-    "sha256": "f008a7b07bedeeb38ebd894624098d50b2eed221c1e623265809072eda8bd565"
+    "file": "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-O-b4280-d-leave-the-scene-unchanged-result.png",
+    "sha256": "a0ba63ed461613e442cae577fea0bf5f94fb028543f6a2d0cf9cd48214b10da5"
   },
   {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-radius-fillet-result.png",
-    "sha256": "a6621cfcf5e6128ff256d4e4e57f81788e21fbf13241713cf255e482aa594d39"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-close-paths-result.png",
-    "sha256": "5074f0524763fac5318067a0c1461e6009d7aba62941983cbf48796f567d8eca"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-close-open-fill-contours-result.png",
-    "sha256": "970fc02bea724aabc3fe5add069f9ee327913570f6aa0985e95e8e133338400d"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-optimize-shapes-result.png",
-    "sha256": "c91bd2ab596ba23a5abdf98fa2d54eb311c79e88814ada9db1ccbf1e22f05bf1"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-shear-result.png",
-    "sha256": "8c335707f052d51a06b314bd612c6a2ee70b6ee613cd9d20312c486497d8d89f"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-subtract-result.png",
-    "sha256": "87445176effe8b33c9695f6098f4931f25363c975b6c358d43499fec7b6e8039"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-extend-shapes-result.png",
-    "sha256": "ee55083e36f4edbd842a3e1318af5998ce6265b6b839c375b11ec74347e0b90e"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-trim-shapes-result.png",
-    "sha256": "a7274f4b3b40b163836c77eda465bf791a4edca19bf817cf56dfe8307157cb93"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-cut-shapes-result.png",
-    "sha256": "f4676341e9d8fcf08d9bc5f354f835282c9b4e1a3f703d240a9f39b9fe54484c"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-fill-selection-result.png",
-    "sha256": "ecdaa7c2caec5b0fb3d4dab4c8cf465b5f1e68d9f181a8d91355ee0c703e76af"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-rubber-band-outline-result.png",
-    "sha256": "1d6b19d49c51902f4ce17b7818c7237e73ec598ebde9d5280ae07ba35b016704"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-deform-result.png",
-    "sha256": "59cc4a9744db5c3a3d7b45b40844c2b21f3c9e1438fc5790d055314d1e04cd18"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-close-fill-contours-with-tolerance-result.png",
-    "sha256": "8242fcf369af0d080179ccc8a70c1a4b0685aab536ba27560751693c56ebf756"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/browser-vector-exclude-result.png",
-    "sha256": "786edca5a65b34ddd031bdf0863ac6df79145a3d5a598ab3663e207892c5f198"
-  },
-  {
-    "file": "evidence/tools-quality-2026-10-16/2026-10-15-tools-image-trace-vitest.json.gz",
-    "sha256": "3f9d1976ca8eab74da28cb2b25d72caac1b70a4200f49391317a93d198823fa4"
+    "file": "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-T-8c029-and-write-real-vector-files-result.png",
+    "sha256": "350aa8aa6409873f36f777f3928f318e22edc928365a759add62f8c433ff2956"
   }
 ]

@@ -88,3 +88,9 @@ Built the current working tree using `vite build --mode desktop --outDir artifac
 
 These are bounded representative interactions on synthetic artwork, not a repeated high-load UI soak. The per-command model stress limits above remain the stress evidence. Maximum-size interactive latency, native file-picker handling, licensed batch tracing and physical engraving remain distinct outstanding qualification areas.
 
+
+## Pull-request follow-up verification
+
+Production source `7286cdbb96090993539a72db1489821abb1ac5fc`: all seven image workflows passed across final runs. This supersedes the earlier incomplete browser execution, while retaining its diagnostics. The new Photo Engraving-to-Adjust workflow verifies effective settings, edits isolated to the image, and exact Undo. Batch tracing produces two real SVG files; exported PNG data, mask pixels, variable-text baking and bitmap Undo also pass. The development edition permits batch tracing; the separately observed Free-edition Pro gate remains the direct-computer result. Synthetic file pickers do not certify native desktop file handling.
+
+The batch test exposed an adapter error: missing directory entries were reported as existing, causing endless filename collision probing. The adapter now raises NotFoundError for missing entries and reserves created handles. Three Node regression tests passed. Text creation also now waits for asynchronous font geometry before asserting scene contents. Full run receipts and passing screenshots: [PR browser evidence](2026-10-16-tools-pr-browser.json).

@@ -1,0 +1,517 @@
+{
+  "productionSourceRevision": "7286cdbb96090993539a72db1489821abb1ac5fc",
+  "productionSourceChangedAfterRevision": false,
+  "environment": "Chrome, local desktop-mode development renderer; synthetic files and save adapters; no hardware. Separate from prior direct CUA and installed desktop.",
+  "summary": "21 creation/calibration/settings checks and seven image workflows passed across runs; not one clean full-suite run. Creation includes disabled Focus Test and equipment prerequisites.",
+  "runs": [
+    {
+      "name": "pr-browser-merged",
+      "stats": {
+        "startTime": "2026-10-15T18:14:47.980Z",
+        "duration": 320663.576,
+        "expected": 25,
+        "skipped": 2,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "rawReport": "evidence/tools-quality-2026-10-16/pr-browser-merged.json.gz",
+      "rawSha256": "2567a0fab9d8538a7a9aa4b98d052ca21854de4386ee5f8c1f5ae58910068fc2",
+      "tests": [
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.constrained-sketch reviews 75 mm solved geometry, applies and undoes",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 46463
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.parametric-part previews changed dimensions, applies and undoes",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1930
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.editable-relief creates 128-square CNC relief and opens its editable components",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 3458
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.measure draws a transient measurement without adding artwork",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1733
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.tangent-circle adds a verified fourth circle to three selected circles and undoes",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1974
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.add-text renders text, adds artwork and undoes",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 4639
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.registration-jig creates an outline, closes the panel and undoes",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1796
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.camera exposes source/calibration panel and closes without requesting hardware",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1185
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.place-board explains disconnected capture and closes without motion",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1097
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.rotary-setup switches to chuck, applies and persists without test rotation",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1559
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.print-and-cut opens after explicit Labs opt-in and withholds incomplete registration",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 2358
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.box-generator renders flat and assembled previews, generates panels and undoes",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 2626
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.barcode previews payload, inserts outline and undoes",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1980
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.material-test generates labelled calibration geometry without executing it",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 2127
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.interval-test generates labelled calibration geometry without executing it",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1866
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.scan-offset-test generates labelled calibration geometry without executing it",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1675
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.focus-test remains unavailable and explains missing verified Z generator",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 946
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.optimization-settings applies source order and preserves it on reopening",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1672
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.labs persists explicit opt-in and reset without invoking machine actions",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1889
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.box-fit-test generates a clearance coupon and undoes",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1579
+            }
+          ]
+        },
+        {
+          "file": "tools-create-audit.e2e.ts",
+          "title": "tools.ai-assistant discloses browser connection limitation and closes without a request",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 1197
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Image Studio commits inverted pixels and the project Undo restores them",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 163400
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Adjust Image and Photo engraving apply settings through their dialogs and undo",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 4163
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Apply, Remove, Crop and Flatten masks preserve pixels, reference rules and Undo",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 5035
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Original and Processed save actual PNG data and leave the scene unchanged",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 3952
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Trace, Re-trace and Multi-File Trace retain source/settings and write real vector files",
+          "outcome": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "durationMs": 12215
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Bake Variable Text freezes rendered content and Undo restores its template",
+          "outcome": "skipped",
+          "attempts": []
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Convert to Bitmap produces pixels and Undo restores the original vector",
+          "outcome": "skipped",
+          "attempts": []
+        }
+      ]
+    },
+    {
+      "name": "pr-image-final",
+      "stats": {
+        "startTime": "2026-10-15T18:22:23.598Z",
+        "duration": 55399.502,
+        "expected": 4,
+        "skipped": 2,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "rawReport": "evidence/tools-quality-2026-10-16/pr-image-final.json.gz",
+      "rawSha256": "b49a25391a97fd0568afe41a327455f6c85233ab45c10aa0bd37e8d2838b3706",
+      "tests": [
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Image Studio commits inverted pixels and the project Undo restores them",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 15316
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Adjust Image and Photo engraving apply settings through their dialogs and undo",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 5594
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Apply, Remove, Crop and Flatten masks preserve pixels, reference rules and Undo",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 5055
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Original and Processed save actual PNG data and leave the scene unchanged",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 4043
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Trace and Re-trace retain source/settings and Multi-File Trace respects Pro entry",
+          "outcome": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "durationMs": 17460
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Bake Variable Text freezes rendered content and Undo restores its template",
+          "outcome": "skipped",
+          "attempts": []
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Convert to Bitmap produces pixels and Undo restores the original vector",
+          "outcome": "skipped",
+          "attempts": []
+        }
+      ]
+    },
+    {
+      "name": "pr-image-bake-bitmap",
+      "stats": {
+        "startTime": "2026-10-15T18:29:52.965Z",
+        "duration": 20742.151,
+        "expected": 0,
+        "skipped": 1,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "rawReport": "evidence/tools-quality-2026-10-16/pr-image-bake-bitmap.json.gz",
+      "rawSha256": "a8c5ebb446c4b4f5085c2cf6bb657328cbcbf556c2d37ab6a1ab18b0008a4a46",
+      "tests": [
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Bake Variable Text freezes rendered content and Undo restores its template",
+          "outcome": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "durationMs": 13116
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Convert to Bitmap produces pixels and Undo restores the original vector",
+          "outcome": "skipped",
+          "attempts": []
+        }
+      ]
+    },
+    {
+      "name": "pr-image-bake-bitmap-retry",
+      "stats": {
+        "startTime": "2026-10-15T18:31:10.190Z",
+        "duration": 22191.826,
+        "expected": 2,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "rawReport": "evidence/tools-quality-2026-10-16/pr-image-bake-bitmap-retry.json.gz",
+      "rawSha256": "3615b07938898567d3059701ff1e58be5339aa89f68f99d6c30298aae94aa8b5",
+      "tests": [
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Bake Variable Text freezes rendered content and Undo restores its template",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 16791
+            }
+          ]
+        },
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Convert to Bitmap produces pixels and Undo restores the original vector",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 3468
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pr-image-trace-retry",
+      "stats": {
+        "startTime": "2026-10-15T18:31:43.754Z",
+        "duration": 18081.972,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "rawReport": "evidence/tools-quality-2026-10-16/pr-image-trace-retry.json.gz",
+      "rawSha256": "301e4087679505954c9730528d97f2ae30bea3bf99f1b81564bef9be3af3242b",
+      "tests": [
+        {
+          "file": "tools-image-audit.e2e.ts",
+          "title": "Trace, Re-trace and Multi-File Trace retain source/settings and write real vector files",
+          "outcome": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "durationMs": 16514
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "interruptedAttempt": "pr-image-remaining: batch output adapter reported every filename existed, starving renderer during collision probing. Interrupted; not a product-trace pass. Fixed adapter, three Node semantic regressions passed, final trace workflow passed.",
+  "fixtureRegression": {
+    "command": "node --test scripts/browser-apis-fixture.test.mjs",
+    "passed": 3
+  },
+  "limits": [
+    "Direct CUA remains 53 complete, seven partial, Focus Test unavailable.",
+    "Final vector follow-up fixes have unit/integration evidence; prior 26 vector browser workflows were not repeated after those follow-ups.",
+    "Development batch success does not certify paid-device activation or native desktop pickers."
+  ],
+  "screenshots": [
+    "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-A-33c92-ough-their-dialogs-and-undo-result.png",
+    "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-A-a41df-ls-reference-rules-and-Undo-result.png",
+    "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-I-34de7--project-Undo-restores-them-result.png",
+    "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-O-b4280-d-leave-the-scene-unchanged-result.png",
+    "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-B-95f5e--Undo-restores-its-template-result.png",
+    "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-C-b18be-estores-the-original-vector-result.png",
+    "evidence/tools-quality-2026-10-16/pr-tools-image-audit.e2e.ts-T-8c029-and-write-real-vector-files-result.png"
+  ]
+}

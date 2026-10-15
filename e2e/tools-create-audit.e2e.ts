@@ -23,6 +23,7 @@ const test = fixtureTest.extend({
   },
 });
 test.setTimeout(240_000);
+test.use({ actionTimeout: 30_000 });
 test.afterAll(async () => {
   await sharedPage?.close();
 });
@@ -83,11 +84,11 @@ async function openProject(page: Page, fixture: KerfDeskFixture, name: string, t
 }
 
 async function tool(page: Page, name: string) {
-  await page.getByRole('menuitem', { name: 'Tools', exact: true }).click();
-  const command = page
-    .getByRole('menuitem', { name, exact: true })
-    .or(page.getByRole('menuitemcheckbox', { name, exact: true }));
-  await command.click();
+  const menu = page.locator('details[data-menu-family="tools"]');
+  if ((await menu.getAttribute('open')) === null) await menu.locator('summary').click();
+  // Shortcut text participates in the accessible name (for example Measure Alt+M).
+  const command = menu.locator('button').filter({ has: page.getByText(name, { exact: true }) });
+  await command.click({ timeout: 15_000 });
   if (name !== 'Measure' && name !== 'Text...') {
     await page
       .locator(
@@ -178,9 +179,10 @@ test('tools.measure draws a transient measurement without adding artwork', async
   await page.mouse.up();
   expect(await count(page)).toBe(0);
   await page.getByRole('menuitem', { name: 'Tools', exact: true }).click();
-  await expect(
-    page.getByRole('menuitemcheckbox', { name: 'Measure', exact: true }),
-  ).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('menuitemcheckbox', { name: /^Measure\s/ })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
   await page.keyboard.press('Escape');
 });
 
@@ -358,11 +360,13 @@ test('tools.optimization-settings applies source order and preserves it on reope
 }) => {
   await tool(page, 'Cut Planner...');
   const dialog = page.getByRole('dialog', { name: 'Cut Planner', exact: true });
-  await dialog.getByLabel('Travel policy', { exact: true }).selectOption('source-order');
+  await dialog.getByRole('combobox', { name: /^Travel policy/ }).selectOption('source-order');
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await tool(page, 'Cut Planner...');
-  await expect(dialog.getByLabel('Travel policy', { exact: true })).toHaveValue('source-order');
+  await expect(dialog.getByRole('combobox', { name: /^Travel policy/ })).toHaveValue(
+    'source-order',
+  );
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
 });
 

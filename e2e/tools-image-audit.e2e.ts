@@ -18,6 +18,7 @@ const test = fixtureTest.extend({
   },
 });
 test.setTimeout(600_000);
+test.use({ actionTimeout: 30_000 });
 test.afterAll(async () => {
   await sharedPage?.close();
 });
@@ -119,6 +120,19 @@ test('Adjust Image and Photo engraving apply settings through their dialogs and 
   await expect(photo).toBeHidden();
   expect((await project(page)).scene.objects[0]).toMatchObject({ gamma: 1.2 });
   expect((await project(page)).scene.layers).toEqual(before.scene.layers);
+  await command(page, 'adjust-image');
+  const dither = adjust.getByRole('combobox', { name: 'Adjust image dither', exact: true });
+  await expect(dither).toHaveValue('stucki');
+  await dither.selectOption('jarvis');
+  await adjust.getByRole('button', { name: 'OK', exact: true }).click();
+  expect((await project(page)).scene.layers).toEqual(before.scene.layers);
+  await command(page, 'adjust-image');
+  await expect(dither).toHaveValue('jarvis');
+  await adjust.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await undo(page);
+  await command(page, 'adjust-image');
+  await expect(dither).toHaveValue('stucki');
+  await adjust.getByRole('button', { name: 'Cancel', exact: true }).click();
   await undo(page);
   expect((await project(page)).scene).toEqual(before.scene);
 });
@@ -278,7 +292,7 @@ test('Trace, Re-trace and Multi-File Trace retain source/settings and write real
   const trace = page.getByRole('dialog', { name: 'Trace image', exact: true });
   await trace.getByRole('combobox', { name: 'Trace preset' }).selectOption('Line Art');
   await trace.getByRole('checkbox', { name: 'Delete Image After trace' }).uncheck();
-  await expect(trace.getByText(/Trace ready/)).toBeVisible();
+  await expect(trace.getByText(/Trace ready/)).toBeVisible({ timeout: 90_000 });
   await trace.getByRole('button', { name: 'Trace', exact: true }).click();
   await expect(trace).toBeHidden();
   const first = (await project(page)).scene.objects.find(
@@ -288,7 +302,7 @@ test('Trace, Re-trace and Multi-File Trace retain source/settings and write real
   await command(page, 'retrace-original');
   await expect(trace.getByRole('checkbox', { name: 'Delete Image After trace' })).not.toBeChecked();
   await expect(trace.getByRole('combobox', { name: 'Trace preset' })).toHaveValue('Line Art');
-  await expect(trace.getByText(/Trace ready/)).toBeVisible();
+  await expect(trace.getByText(/Trace ready/)).toBeVisible({ timeout: 90_000 });
   await trace.getByRole('button', { name: 'Trace', exact: true }).click();
   await expect(trace).toBeHidden();
   expect(
@@ -334,6 +348,7 @@ test('Bake Variable Text freezes rendered content and Undo restores its template
   await page.getByRole('checkbox', { name: 'Variable text' }).check();
   await page.getByRole('button', { name: 'Serial', exact: true }).click();
   await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect.poll(async () => (await project(page)).scene.objects.length).toBe(1);
   const before = await project(page);
   expect(before.scene.objects[0]).toHaveProperty('variableTemplate');
   await command(page, 'bake-variable-text');

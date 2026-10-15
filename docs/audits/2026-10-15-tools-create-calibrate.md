@@ -70,3 +70,7 @@ Post-fix verification passed **19 tests in two files** (`autosave-preparation-cl
 The 21-command browser harness was adapted to reuse a loaded page and to reset each document through ordinary File Open. Final cold development-server attempts in the coordinated audit still failed before the app mounted; the coordinator stopped further cold retries. **No completed creation-suite browser pass is claimed.** Root-agent direct computer-use results and screenshots are recorded separately per command in `2026-10-16-tools-quality-register.md`.
 
 The final autosave source and two test files, plus the 21-command creation browser harness, passed targeted ESLint. Prettier was applied to the changed TypeScript files, and `git diff --check` passed. Aggregate TypeScript/static checks are maintained by the integrating audit.
+
+## PR follow-up browser verification
+
+On 16 October the 21-command creation harness passed against the restarted merged-source development renderer. The harness now waits for cold document-worker readiness and matches command labels independently of displayed shortcuts; Cut Planner uses its accessible combobox name. Camera, board capture, incomplete Print and Cut, AI desktop availability and disabled Focus are explicitly prerequisite/unavailable checks, not physical or provider qualification. See the master register and final PR validation receipt.
