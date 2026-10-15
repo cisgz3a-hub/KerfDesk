@@ -1,4 +1,4 @@
-## ADR-599 - Preserve command ownership through controller faults and Abort (2026-10-16)
+## ADR-600 - Preserve command ownership through controller faults and Abort (2026-10-16)
 
 **Status:** Implemented on the audit repair branch; verification recorded in the linked audit.
 **Date:** 2026-10-16

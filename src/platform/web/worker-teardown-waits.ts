@@ -1,6 +1,6 @@
 // Worker handshakes have a deadline; actual transferred-stream cleanup must
 // retain ownership until both locks are released. The connection separately
-// bounds each caller's wait without claiming that cleanup finished (ADR-599).
+// bounds each caller's wait without claiming that cleanup finished (ADR-600).
 
 type PortStreams = {
   readonly readable: ReadableStream<Uint8Array> | null;
