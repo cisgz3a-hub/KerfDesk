@@ -1,12 +1,11 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "c700863a14dfbed71a49e32182ec3b75b989ebb1",
+  "sinceSourceSha": "6abbe396c9176514389ea1114acbaa7cae534d01",
   "highlights": [
-    "Drag Frame and cutting start points on the canvas and save reusable defaults. Saved projects retain their chosen starts; Frame still verifies the exact reviewed job before Start.",
-    "Power and Speed now pair sliders with exact number entry and one-step undo. Refreshed artwork panels, machine tool tabs and compact Origin controls make settings easier to reach.",
-    "Trace-part and node editing respond more quickly on dense artwork, with clearer Done controls. Preview status updates keep the canvas layout steady.",
-    "New layout and selection tools change draw order, match sizes, close gaps and select circles or open Fill shapes. Bake variable text, export original or preview images, and share image presets.",
-    "More text styles, barcode formats, font favourites and array options expand design choices. Saved artwork can be renamed, recategorised or replaced while keeping its library entry.",
-    "Expanded precision editing, material workflows and portable printing accompany faster path indexing. Generated cut paths use the prepared output, including variable text and cutting adjustments."
+    "Machine utilities use compact side-by-side controls, including Placement and Console. Controller recovery notices appear briefly in the toolbar, with details available on demand.",
+    "Design Studio moves to the main toolbar. Artwork settings explain the laser power multiplier, and multi-selection rotation, start settings and context menus have been corrected.",
+    "MCP canvas editing gains group selection, selection boxes, Select all and Deselect, with safer cancellation and synchronisation between remote and desktop selections.",
+    "Large vector projects copy less geometry between workers. Manual Save and trace editing take priority over disposable background work, and matching ETA and Preview requests can share preparation.",
+    "Trace and node editing preserve inner contours and prepare dense paths in a worker. Numbering, keyboard activation and document replacement now keep editing state consistent."
   ]
 }
