@@ -203,8 +203,8 @@ const titleStyle: React.CSSProperties = { fontWeight: 700 };
 const headerButtonsStyle: React.CSSProperties = { display: 'flex', gap: 4 };
 const toggleRowStyle: React.CSSProperties = { display: 'flex', gap: 10, padding: '0 6px' };
 const scrollStyle: React.CSSProperties = {
-  maxHeight: 180,
-  minHeight: 90,
+  maxHeight: 'var(--lf-console-log-max-height, 180px)',
+  minHeight: 'var(--lf-console-log-min-height, 90px)',
   overflowY: 'auto',
   padding: '4px 6px',
   fontFamily: 'ui-monospace, Menlo, monospace',

@@ -38,34 +38,44 @@ export function JobPlacementControls(props: { readonly streaming: boolean }): JS
   const busy = props.streaming;
   return (
     <div style={placementStackStyle}>
-      <span style={sectionCaptionStyle}>Placement</span>
-      <label style={placementLabelStyle}>
-        <span style={fieldNameStyle}>Start from</span>
-        <select
-          aria-label="Start from"
-          className="lf-select"
-          style={startFromSelectStyle}
-          value={placement.startFrom}
+      <span className="lf-placement-heading" style={sectionCaptionStyle}>
+        Placement
+      </span>
+      <div
+        className="lf-placement-fields"
+        style={{ ...placementStackStyle, display: 'var(--lf-placement-display, flex)' }}
+      >
+        <label className="lf-placement-start" style={placementLabelStyle}>
+          <span style={fieldNameStyle}>Start from</span>
+          <select
+            aria-label="Start from"
+            className="lf-select"
+            style={startFromSelectStyle}
+            value={placement.startFrom}
+            disabled={busy}
+            title="Choose whether the job uses absolute machine coordinates, current head position, the saved user origin, or a hand-set verified origin. Every ordinary Start requires the exact completed Frame."
+            onChange={(e) => setJobPlacement({ startFrom: e.currentTarget.value as JobStartMode })}
+          >
+            {Object.entries(START_FROM_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="lf-placement-anchor" style={anchorRowStyle}>
+          <AnchorPicker
+            placement={placement}
+            disabled={busy || placement.startFrom === 'absolute'}
+          />
+          <span style={fieldNameStyle}>Job origin</span>
+        </div>
+        <LineBurnStartField
+          value={lineStartRegion}
           disabled={busy}
-          title="Choose whether the job uses absolute machine coordinates, current head position, the saved user origin, or a hand-set verified origin. Every ordinary Start requires the exact completed Frame."
-          onChange={(e) => setJobPlacement({ startFrom: e.currentTarget.value as JobStartMode })}
-        >
-          {Object.entries(START_FROM_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div style={anchorRowStyle}>
-        <AnchorPicker placement={placement} disabled={busy || placement.startFrom === 'absolute'} />
-        <span style={fieldNameStyle}>Job origin</span>
+          onChange={(value) => setProjectOptimization({ lineStartRegion: value })}
+        />
       </div>
-      <LineBurnStartField
-        value={lineStartRegion}
-        disabled={busy}
-        onChange={(value) => setProjectOptimization({ lineStartRegion: value })}
-      />
       <OutputScopeControls placement={placement} disabled={busy} />
     </div>
   );

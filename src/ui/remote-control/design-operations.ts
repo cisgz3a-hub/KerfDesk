@@ -1,7 +1,8 @@
-import type { Layer } from '../../core/scene';
+import { DEFAULT_CNC_LAYER_SETTINGS, type Layer } from '../../core/scene';
 import { operationProFeature } from '../licensing/pro-operation-policy';
 import { proFeaturesUnlocked } from '../licensing/edition';
 import type { AppState } from '../state/store';
+import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
 import { historyProjection } from './authoring-projections';
 import { RemoteFault } from './fault';
 import { publicIdentifier } from './projections';
@@ -48,6 +49,8 @@ export function createOperation(
   },
 ): Record<string, unknown> {
   const state = store.getState();
+  if (state.project.machine?.kind === 'cnc' && args.mode !== undefined)
+    throw new RemoteFault('unsupported_operation');
   const used = new Set(state.project.scene.layers.map((layer) => layer.color.toLowerCase()));
   const color = args.color ?? OPERATION_COLORS.find((candidate) => !used.has(candidate));
   if (color === undefined || used.has(color)) throw new RemoteFault('unsupported_operation');
@@ -56,8 +59,7 @@ export function createOperation(
     store.getState().createManualLayer(color);
     const created = store.getState().project.scene.layers.find((layer) => !before.has(layer.id));
     if (created === undefined) throw new RemoteFault('failed');
-    if (args.mode !== undefined && store.getState().project.machine?.kind !== 'cnc')
-      store.getState().setLayerParam(created.id, { mode: args.mode });
+    if (args.mode !== undefined) store.getState().setLayerParam(created.id, { mode: args.mode });
     if (args.name !== undefined) store.getState().renameOperation(created.id, args.name);
   });
   const created = store.getState().project.scene.layers.find((layer) => !before.has(layer.id));
@@ -108,6 +110,7 @@ export function applyMaterialRecipe(
 ): Record<string, unknown> {
   const state = store.getState();
   const layer = operationLayer(state, args.operationId);
+  if (state.project.machine?.kind === 'cnc') throw new RemoteFault('unsupported_operation');
   const recipe = state.materialLibrary?.entries.find((entry) => entry.id === args.recipeId);
   if (recipe === undefined || !publicIdentifier(recipe.id)) throw new RemoteFault('not_found');
   const changed = store.getState().assignMaterialPresetToLayer(layer.id, recipe.id);
@@ -161,11 +164,11 @@ function ordinaryUpdates(layer: Layer, patch: RemoteOperationPatchFull) {
 
 /** Merged CNC settings; introducing a Pro strategy keeps the desktop Pro admission. */
 function cncUpdate(layer: Layer, patch: RemoteOperationPatchFull): Layer['cnc'] | undefined {
-  if (patch.cnc === undefined || layer.cnc === undefined) return undefined;
+  if (patch.cnc === undefined) return undefined;
   const defined = Object.fromEntries(
     Object.entries(patch.cnc).filter(([, value]) => value !== undefined),
   ) as Partial<NonNullable<Layer['cnc']>>;
-  const next: NonNullable<Layer['cnc']> = { ...layer.cnc, ...defined };
+  const next = withManualCncFeedPatch(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS, defined);
   const feature = operationProFeature({ cnc: next });
   if (feature !== null && feature !== operationProFeature(layer) && !proFeaturesUnlocked())
     throw new RemoteFault('needs_pro');

@@ -17,7 +17,7 @@ import {
 import { mcpOutputSchemas } from './output-schemas.js';
 import { mcpToolAnnotations, mcpToolInfo } from './tool-info.js';
 import { mcpMachineToolInfo } from './machine-tool-info.js';
-import { workspacePreviewToolResult } from './preview-result.js';
+import { cameraSnapshotToolResult, workspacePreviewToolResult } from './preview-result.js';
 import { KERFDESK_WORKSPACE_UI_MIME } from './workspace-ui.js';
 import {
   KERFDESK_WORKSPACE_APP_HTML as KERFDESK_WORKSPACE_UI_HTML,
@@ -41,6 +41,11 @@ function toolSuccess(command: KerfDeskMcpCommand, raw: Record<string, unknown>):
     const preview = mcpOutputSchemas.get_workspace_preview.safeParse(raw);
     if (!preview.success) throw new KerfDeskMcpError('failed');
     return boundedResult(workspacePreviewToolResult(preview.data));
+  }
+  if (command === 'get_camera_snapshot') {
+    const snapshot = mcpOutputSchemas.get_camera_snapshot.safeParse(raw);
+    if (!snapshot.success) throw new KerfDeskMcpError('failed');
+    return boundedResult(cameraSnapshotToolResult(snapshot.data));
   }
   const output = mcpOutputSchemas[command].safeParse(raw);
   if (!output.success) throw new KerfDeskMcpError('failed');

@@ -80,7 +80,7 @@ function raster(id: string): RasterImage {
 }
 
 const TARGET_SWITCH_CASES = [
-  ['power-scale', '40', 'Power scale for inspected artwork'],
+  ['power-scale', '40', 'Power multiplier for inspected artwork'],
   ['operation', '17', 'Power for inspected artwork'],
   ['shape', '75', 'Rectangle width'],
   ['image', '30', 'Brightness for I1.png'],
@@ -148,7 +148,7 @@ describe('SelectedObjectProperties', () => {
       await act(async () => Simulate.blur(radius));
 
       const powerScale = host.querySelector(
-        'input[aria-label="Power scale for inspected artwork"]',
+        'input[aria-label="Power multiplier for inspected artwork"]',
       );
       if (!(powerScale instanceof HTMLInputElement)) throw new Error('power scale input missing');
       await change(powerScale, '80');
@@ -209,7 +209,7 @@ describe('SelectedObjectProperties', () => {
     useStore.getState().selectObject('O1');
     const { host, root } = await render();
     try {
-      const input = host.querySelector('input[aria-label="Power scale for selected objects"]');
+      const input = host.querySelector('input[aria-label="Power multiplier for selected objects"]');
       if (!(input instanceof HTMLInputElement)) throw new Error('power scale input missing');
       expect(input.value).toBe('100');
     } finally {
@@ -222,7 +222,7 @@ describe('SelectedObjectProperties', () => {
     useStore.getState().selectObject('O1');
     const { host, root } = await render();
     try {
-      const input = host.querySelector('input[aria-label="Power scale for selected objects"]');
+      const input = host.querySelector('input[aria-label="Power multiplier for selected objects"]');
       if (!(input instanceof HTMLInputElement)) throw new Error('power scale input missing');
       await change(input, '50');
       await act(async () => {
@@ -243,7 +243,9 @@ describe('SelectedObjectProperties', () => {
     try {
       expect(host.querySelector('[aria-label="Selected object properties"]')).not.toBeNull();
       expect(host.querySelector('select[aria-label^="Cut type for"]')).not.toBeNull();
-      expect(host.querySelector('input[aria-label="Power scale for selected objects"]')).toBeNull();
+      expect(
+        host.querySelector('input[aria-label="Power multiplier for selected objects"]'),
+      ).toBeNull();
     } finally {
       await cleanup(root, host);
     }
@@ -336,7 +338,9 @@ describe('SelectedObjectProperties', () => {
     const { host, root } = await render();
     try {
       expect(host.querySelector('input[aria-label="Rectangle width"]')).not.toBeNull();
-      expect(host.querySelector('input[aria-label="Power scale for selected objects"]')).toBeNull();
+      expect(
+        host.querySelector('input[aria-label="Power multiplier for selected objects"]'),
+      ).toBeNull();
     } finally {
       await cleanup(root, host);
     }

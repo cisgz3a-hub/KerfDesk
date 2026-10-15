@@ -32,7 +32,7 @@ describe('compact machine connection', () => {
     const trigger = machineTrigger(host);
     expect(trigger?.title).toContain('Creality Falcon A1 Pro (vendor command set)');
     expect(trigger?.getAttribute('aria-expanded')).toBe('false');
-    expect(host.querySelector('[role="status"]')?.textContent).toBe('Not connected');
+    expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe('Not connected');
     expect(document.querySelector('[aria-label="Laser module"]')).toBeNull();
 
     await act(async () => {
@@ -123,7 +123,7 @@ describe('compact machine connection', () => {
     await renderBar({ connection: { kind: 'connected' } }, host);
     expect(trigger?.getAttribute('aria-label')).toBe(name);
     expect(description()).toBe('Connected');
-    expect(host.querySelector('[role="status"]')?.textContent).toBe('Connected');
+    expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe('Connected');
   });
 
   it('shows a failed connection while details are closed', async () => {
@@ -131,7 +131,7 @@ describe('compact machine connection', () => {
       connection: { kind: 'failed', error: 'Failed to open serial port.' },
     });
     expect(document.querySelector('[aria-label="Machine details"]')).toBeNull();
-    expect(host.querySelector('[role="status"]')?.textContent).toBe('Couldn’t connect');
+    expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe('Couldn’t connect');
     expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1);
     expect(host.textContent).toContain('The port is busy or unavailable');
   });
@@ -148,12 +148,18 @@ describe('compact machine connection', () => {
       onReconnectQualification,
     });
     expect(document.querySelector('[aria-label="Machine details"]')).toBeNull();
-    expect(host.querySelector('[role="status"]')?.textContent).toBe('Connected');
-    expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1);
-    expect(host.textContent).toContain('The settings response timed out.');
-    await act(async () => button(host, 'Retry reading controller settings')?.click());
+    expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe('Connected');
+    expect(host.querySelectorAll('[role="alert"]')).toHaveLength(0);
+    await act(async () =>
+      host
+        .querySelector<HTMLButtonElement>('[aria-label="Controller notification"] button')
+        ?.click(),
+    );
+    expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1);
+    expect(document.body.textContent).toContain('The settings response timed out.');
+    await act(async () => button(document.body, 'Retry reading controller settings')?.click());
     expect(onRetryQualification).toHaveBeenCalledOnce();
-    await act(async () => button(host, 'Reconnect controller')?.click());
+    await act(async () => button(document.body, 'Reconnect controller')?.click());
     expect(onReconnectQualification).toHaveBeenCalledOnce();
   });
 

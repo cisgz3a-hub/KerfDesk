@@ -3,6 +3,7 @@ import { MCP_PHONE_ONLY_COMMANDS } from '../../../electron/mcp/input-schemas.js'
 import { json } from './security.js';
 import {
   MAX_BYTES,
+  CONTROL_COMMANDS,
   uuid,
   type GrantProps,
   type McpReservation,
@@ -37,6 +38,26 @@ export function unavailableResponse(
   return receiptId
     ? { result: actions.unknown(props, receiptId), error: null }
     : errorResult('unavailable');
+}
+
+export async function admitControl(
+  actions: ControlActions,
+  props: GrantProps,
+  parsed: Parsed,
+  authorized: () => boolean,
+): Promise<{ controlId?: string; response?: CommandResponse }> {
+  if (!CONTROL_COMMANDS.has(parsed.name)) return {};
+  const admission = await actions.reserve(props, parsed.name, parsed.args, authorized);
+  if (!authorized()) return { response: errorResult('cancelled') };
+  if (admission.state === 'fresh') return { controlId: admission.operationId };
+  if (admission.state === 'replay') return { response: { result: admission.result, error: null } };
+  const code =
+    admission.state === 'conflict'
+      ? 'invalid_input'
+      : admission.state === 'limit'
+        ? 'control_limit'
+        : 'unavailable';
+  return { response: errorResult(code) };
 }
 
 /** ADR-582/583/585: phone sockets, change fan-out, relay-answered waits and job alerts. */
@@ -115,21 +136,14 @@ export abstract class LiveDevice extends DevicePairing {
   }
 
   /**
-   * Commands the relay answers or refuses before contacting the PC. `wait_for_change` resolves
-   * from the desktop's change counters; held jogs need a phone with a live socket.
+   * Held jogs need a phone with a live socket; MCP callers cannot use them.
    */
-  protected async liveCommand(
+  protected liveCommand(
     parsed: Parsed,
-    requestId: string,
     props: GrantProps,
     sessionDigest: string | undefined,
     mcpReservation: McpReservation | undefined,
-    authorized: () => boolean,
-  ): Promise<CommandResponse | null> {
-    if (parsed.name === 'wait_for_change') {
-      const result = await this.live.wait(requestId, parsed.args as Record<string, never>);
-      return authorized() ? { result, error: null } : errorResult('cancelled');
-    }
+  ): CommandResponse | null {
     if (!MCP_PHONE_ONLY_COMMANDS.has(parsed.name)) return null;
     const phone = sessionDigest !== undefined && mcpReservation === undefined;
     if (!phone || (parsed.name === 'jog_hold_start' && !this.live.hasPhone(props.clientId)))

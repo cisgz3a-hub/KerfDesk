@@ -4,7 +4,6 @@ import {
   COMMAND_TIMEOUT_MS,
   MAX_BYTES,
   MAX_METADATA_BYTES,
-  CONTROL_COMMANDS,
   mcpCommandScope,
   parseCommand,
   uuid,
@@ -16,9 +15,10 @@ import { json, sameDigest } from './security.js';
 import { McpRequests } from './mcp-requests.js';
 import { ControlActions } from './control-actions.js';
 import { plainObject, metadataBytes } from './device-envelope.js';
-import { isPhoneAttachment } from './live.js';
+import { isPhoneAttachment, type WaitArgs } from './live.js';
 import {
   LiveDevice,
+  admitControl,
   controlLookupId,
   errorResult,
   unavailableResponse,
@@ -39,7 +39,7 @@ type Pending = {
   sessionDigest?: string;
   mcpReservation?: McpReservation;
   name: keyof typeof mcpOutputSchemas;
-  connectionId: string;
+  connectionId: string | null;
   controlId?: string;
   controlLookupId?: string;
   resolve: (value: CommandResponse) => void;
@@ -125,7 +125,8 @@ export class RemoteDevice extends LiveDevice {
     this.pending.delete(item.requestId);
     if (item.mcpReservation) this.mcpRequests.detach(item.mcpReservation, item.requestId);
     clearTimeout(item.timer);
-    if (cancelDesktop && this.owner()?.connectionId === item.connectionId)
+    if (item.name === 'wait_for_change') this.live.cancelWait(item.requestId);
+    else if (cancelDesktop && this.owner()?.connectionId === item.connectionId)
       this.send({ v: 1, type: 'cancel', requestId: item.requestId });
     item.resolve(this.controlResponse(item, result));
   }
@@ -155,7 +156,6 @@ export class RemoteDevice extends LiveDevice {
   }
 
   async cancelCommand(clientId: string, requestId: string): Promise<void> {
-    this.live.cancelWait(requestId);
     const item = this.pending.get(requestId);
     if (item?.clientId === clientId) this.finish(item, errorResult('cancelled'), true);
   }
@@ -217,34 +217,20 @@ export class RemoteDevice extends LiveDevice {
     if (!parsed || !uuid.safeParse(requestId).success) return errorResult('invalid_input');
     if (!this.commandAuthorized(props, scopes, parsed, sessionDigest))
       return errorResult('unavailable');
-    const relayed = await this.liveCommand(
-      parsed,
-      requestId,
-      props,
-      sessionDigest,
-      mcpReservation,
-      () => this.commandAuthorized(props, scopes, parsed, sessionDigest),
-    );
+    const relayed = this.liveCommand(parsed, props, sessionDigest, mcpReservation);
     if (relayed !== null) return relayed;
-    const control = await this.admitControl(props, scopes, parsed, sessionDigest);
-    if (!this.commandAuthorized(props, scopes, parsed, sessionDigest))
-      return errorResult('cancelled');
-    if (control.response) return control.response;
-    const controlId = control.controlId;
     const lookupId = controlLookupId(parsed);
-    const owner = this.owner();
     const priority = MCP_PRIORITY_COMMANDS.has(parsed.name);
-    if (!owner || this.pending.size >= (priority ? 36 : 32) || this.pending.has(requestId))
-      return unavailableResponse(this.controlActions, props, controlId ?? lookupId);
+    if (this.pending.size >= (priority ? 36 : 32) || this.pending.has(requestId))
+      return unavailableResponse(this.controlActions, props, lookupId);
     return this.dispatch(
       props,
       scopes,
       requestId,
       parsed,
-      owner.connectionId,
+      this.owner()?.connectionId ?? null,
       sessionDigest,
       mcpReservation,
-      controlId,
       lookupId,
     );
   }
@@ -262,39 +248,14 @@ export class RemoteDevice extends LiveDevice {
     );
   }
 
-  private async admitControl(
-    props: GrantProps,
-    scopes: RemoteScope,
-    parsed: NonNullable<ReturnType<typeof parseCommand>>,
-    sessionDigest?: string,
-  ): Promise<{ controlId?: string; response?: CommandResponse }> {
-    if (!CONTROL_COMMANDS.has(parsed.name)) return {};
-    const admission = await this.controlActions.reserve(props, parsed.name, parsed.args, () =>
-      this.commandAuthorized(props, scopes, parsed, sessionDigest),
-    );
-    if (!this.commandAuthorized(props, scopes, parsed, sessionDigest))
-      return { response: errorResult('cancelled') };
-    if (admission.state === 'fresh') return { controlId: admission.operationId };
-    if (admission.state === 'replay')
-      return { response: { result: admission.result, error: null } };
-    const code =
-      admission.state === 'conflict'
-        ? 'invalid_input'
-        : admission.state === 'limit'
-          ? 'control_limit'
-          : 'unavailable';
-    return { response: errorResult(code) };
-  }
-
   private dispatch(
     props: GrantProps,
     scopes: RemoteScope,
     requestId: string,
     parsed: NonNullable<ReturnType<typeof parseCommand>>,
-    connectionId: string,
+    connectionId: string | null,
     sessionDigest?: string,
     mcpReservation?: McpReservation,
-    controlId?: string,
     controlLookupId?: string,
   ): Promise<CommandResponse> {
     return new Promise((resolve) => {
@@ -307,7 +268,6 @@ export class RemoteDevice extends LiveDevice {
         sessionDigest,
         mcpReservation,
         connectionId,
-        controlId,
         controlLookupId,
         resolve,
         timer: setTimeout(() => {
@@ -325,18 +285,43 @@ export class RemoteDevice extends LiveDevice {
         return;
       }
       this.pending.set(requestId, item);
-      if (
-        !this.send({
-          v: 1,
-          type: 'command',
-          requestId,
-          clientId: props.clientId,
-          scopes,
-          command: parsed,
-        })
-      )
-        this.finish(item, errorResult('unavailable'));
+      void this.executeCommand(item, props, parsed).catch(() =>
+        this.finish(item, errorResult('unavailable'), true),
+      );
     });
+  }
+
+  /** Track cancellation before any asynchronous ledger admission or relay-only wait. */
+  private async executeCommand(
+    item: Pending,
+    props: GrantProps,
+    parsed: NonNullable<ReturnType<typeof parseCommand>>,
+  ): Promise<void> {
+    const active = () => this.pending.get(item.requestId) === item && this.resultAuthorized(item);
+    if (parsed.name === 'wait_for_change') {
+      const result = await this.live.wait(item.requestId, parsed.args as WaitArgs);
+      this.finish(item, active() ? { result, error: null } : errorResult('cancelled'));
+      return;
+    }
+    const control = await admitControl(this.controlActions, props, parsed, active);
+    if (!active()) {
+      this.finish(item, errorResult('cancelled'), true);
+      return;
+    }
+    item.controlId = control.controlId;
+    if (control.response) this.finish(item, control.response);
+    else if (
+      this.owner()?.connectionId !== item.connectionId ||
+      !this.send({
+        v: 1,
+        type: 'command',
+        requestId: item.requestId,
+        clientId: item.clientId,
+        scopes: item.scopes,
+        command: parsed,
+      })
+    )
+      this.finish(item, errorResult('unavailable'));
   }
 
   private handleResult(value: Record<string, unknown>): void {
