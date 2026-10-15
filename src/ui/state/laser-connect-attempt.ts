@@ -5,6 +5,9 @@ export type ConnectAttemptOwnershipRefs = {
 
 /** The live connection's identity as the store publishes it (ADR-420). */
 export type ConnectionAttemptState = {
+  /** Retained after loss to prevent a network reconnect silently choosing USB.
+   * Session-only routing intent; contains no target or connection authority. */
+  readonly lastConnectionTransport?: 'serial' | 'tcp' | null;
   /** The baud the live connection opened at; null while disconnected. */
   readonly connectedBaudRate?: number | null;
   /** Revision of the latest connect attempt or intentional disconnect. The live

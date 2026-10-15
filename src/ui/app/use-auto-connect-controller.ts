@@ -62,6 +62,7 @@ export function installAutoConnect(platform: PlatformAdapter): () => void {
 function autoConnectAllowed(): boolean {
   if (!loadAutoConnectPreference(browserLocalStorage())) return false;
   const laser = useLaserStore.getState();
+  if (laser.lastConnectionTransport === 'tcp') return false;
   if (laser.connection.kind === 'connecting' || laser.connection.kind === 'connected') return false;
   if (laser.motionOperation !== null || laser.controllerOperation !== null) return false;
   if (isActiveJob(laser.streamer)) return false;

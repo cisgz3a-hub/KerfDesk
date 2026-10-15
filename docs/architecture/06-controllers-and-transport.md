@@ -132,6 +132,12 @@ file line number, and **the two must not drift**.
 - **Desktop:** Electron with `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, **no
   preload and no `ipcMain` surface** (`PROJECT.md:624`). `setPermissionRequestHandler` returns `false`
   except for `serial`, `fileSystem*`, `media` (video-only), and `screen-wake-lock`.
+- **Desktop network (ADR-601):** explicit FluidNC Telnet and grblHAL raw TCP channels use the native
+  `app://app/api/machine-network/*` bridge. Wi-Fi and Ethernet use the same controller-specific
+  adapter. Raw grblHAL traffic does not pass through the Telnet codec. Targets are entered by the
+  operator, with no discovery or automatic replay. Setup retries retain the chosen protocol;
+  loss does not silently select a remembered USB port. This is software support, not physical
+  controller qualification or background-worker streaming.
 - **Ruida:** `transport: 'file-only'` — no live link. The pure UDP session state machine exists as
   groundwork only (`PROJECT.md:242-244`).
 

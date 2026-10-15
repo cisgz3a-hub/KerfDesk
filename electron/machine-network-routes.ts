@@ -1,6 +1,7 @@
 import { trustedAppRequest } from './app-route-guard.js';
 import type { ProtocolHandler } from './licensing-routes.js';
 import { MachineNetworkBridge } from './machine-network-bridge.js';
+import { validateMachineNetworkProtocol } from './machine-network-protocol.js';
 import { app } from 'electron';
 
 const bridge = new MachineNetworkBridge();
@@ -77,13 +78,11 @@ async function dispatch(
   data: Record<string, unknown>,
 ): Promise<unknown> {
   if (action === 'open') {
-    if (
-      typeof data['host'] !== 'string' ||
-      typeof data['port'] !== 'number' ||
-      data['protocol'] !== 'fluidnc-telnet'
-    )
-      throw new Error('Only the documented FluidNC Telnet channel is supported.');
-    return network.open(data['host'], data['port']);
+    if (typeof data['host'] !== 'string' || typeof data['port'] !== 'number')
+      throw new Error('Enter a machine IP address or hostname and network port.');
+    const protocol = data['protocol'];
+    validateMachineNetworkProtocol(protocol);
+    return network.open(data['host'], data['port'], protocol);
   }
   const id = data['sessionId'];
   if (typeof id !== 'string' || !/^[a-f0-9-]{36}$/.test(id))
