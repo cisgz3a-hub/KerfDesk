@@ -7,6 +7,7 @@ import {
   type JobPlacementSettings,
 } from '../../core/job';
 import { firstSurfaceProcessPoint } from './canvas-first-process-point';
+import { orderedRetentionValue } from './canvas-retention-json';
 import {
   buildMotionManifest,
   type MotionManifest,
@@ -273,18 +274,20 @@ export function canvasPlanRetentionKey(
   });
   const cached = retentionKeyCache.get(project)?.get(optionsKey);
   if (cached !== undefined) return cached;
-  const serialized = JSON.stringify({
-    scene: project.scene,
-    machine: project.machine,
-    cncSetup: project.cncSetup,
-    device: retainedDeviceFields(project.device),
-    optimization: project.optimization,
-    startPoints: project.startPoints,
-    variables: project.variables,
-    outputScope: scope,
-    placement,
-    ...(registration === undefined ? {} : { registration }),
-  });
+  const serialized = JSON.stringify(
+    orderedRetentionValue({
+      scene: project.scene,
+      machine: project.machine,
+      cncSetup: project.cncSetup,
+      device: retainedDeviceFields(project.device),
+      optimization: project.optimization,
+      startPoints: project.startPoints,
+      variables: project.variables,
+      outputScope: scope,
+      placement,
+      ...(registration === undefined ? {} : { registration }),
+    }),
+  );
   const fingerprint = fingerprintGcode(serialized);
   const key = `${fingerprint.fnv1a}:${fingerprint.chars}:${fingerprint.lines}`;
   const byOptions = retentionKeyCache.get(project) ?? new Map<string, string>();

@@ -88,7 +88,12 @@ test('an ordinary raster prepares its estimate, markers and full Preview in real
   const preparationReplies = await page.evaluate(() => window.__rasterPreparationResults);
   expect(preparationReplies.every((reply) => reply.kind !== 'error')).toBe(true);
   expect(preparationReplies.map((reply) => reply.kind)).toEqual(
-    expect.arrayContaining(['estimate', 'transfer-start', 'transfer-chunk', 'transfer-complete']),
+    expect.arrayContaining([
+      'estimate-ready',
+      'transfer-start',
+      'transfer-chunk',
+      'transfer-complete',
+    ]),
   );
   await saveProjectAs(page, kerfdesk, { expectPreparation: true });
   await expect.poll(async () => Object.keys(await kerfdesk.savedFiles()).length).toBeGreaterThan(0);
