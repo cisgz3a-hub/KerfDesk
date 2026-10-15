@@ -203,16 +203,23 @@ test('nesting lifetime proof rejects a live blocked child despite silent heartbe
     record.terminated = true;
   });
   await page.waitForFunction(() => Atomics.load(window.__nestingLifetime.counts, 2) === 1);
-  const rootUrl = await page.evaluate(() => window.__nestingLifetime.roots[0]?.url);
+  // Chromium may report an empty URL for a live blob root. Identify this
+  // isolated context's root by ownership instead of debugger display metadata.
   await expect
     .poll(() => {
       const workers = nestingRuntimeSnapshot(page);
-      const root = workers.find((worker) => worker.url === rootUrl);
+      const root = workers.find(
+        (worker) => !workers.some((parent) => parent.target === worker.parent),
+      );
       return workers.filter((worker) => worker.parent === root?.target && worker.sawContext).length;
     })
     .toBe(1);
   const runtimes = nestingRuntimeSnapshot(page);
-  const root = runtimes.find((worker) => worker.url === rootUrl);
+  const roots = runtimes.filter(
+    (worker) => !runtimes.some((parent) => parent.target === worker.parent),
+  );
+  expect(roots).toHaveLength(1);
+  const root = roots[0];
   const child = runtimes.find((worker) => worker.parent === root?.target);
   expect(child?.destroyed).toBe(false);
   expect(
