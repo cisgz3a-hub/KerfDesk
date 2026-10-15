@@ -73,21 +73,7 @@ for (const theme of ['light', 'dark'] as const) {
     const toolbar = page.getByRole('banner', { name: 'Toolbar' });
     await expect(toolbar.getByRole('button', { name: 'Open Design Studio' })).toBeVisible();
     await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
-    const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
-    expect((await canvas.boundingBox())?.height ?? 0).toBeGreaterThan(200);
-    await toolbar.evaluate((element) => {
-      element.style.fontFamily = 'monospace';
-    });
-    await page.evaluate(
-      () =>
-        new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-        ),
-    );
-    expect((await canvas.boundingBox())?.height ?? 0).toBeGreaterThan(200);
-    await toolbar.evaluate((element) => {
-      element.style.fontFamily = '';
-    });
+    await expectCompactToolbarCanvas(page, toolbar);
     await page.context().setOffline(true);
     await expect(toolbar.getByRole('status')).toHaveText('Offline');
     await page.evaluate(() => window.dispatchEvent(new Event('beforeinstallprompt')));
@@ -126,6 +112,59 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByRole('menu', { name: 'Workspace layout options' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(layout).toBeFocused();
+  });
+}
+
+test('compact toolbar accommodates the native Phone & MCP control', async ({ page }) => {
+  // Exercise the real native-only toolbar component in the HTTP renderer harness.
+  // This replaces only its protocol gate; it does not claim packaged-native coverage.
+  await page.route('**/src/ui/remote-access/desktop-only.ts', (route) =>
+    route.fulfill({
+      contentType: 'text/javascript',
+      body: 'export function isRemoteAccessRenderer() { return true; }',
+    }),
+  );
+  await page.setViewportSize({ width: 640, height: 450 });
+  await page.goto('/');
+  await expect(page.locator('#app-splash')).toHaveCount(0);
+  const toolbar = page.getByRole('banner', { name: 'Toolbar' });
+  await expect(toolbar.getByRole('button', { name: 'Phone & MCP', exact: true })).toBeVisible();
+  await expectCompactToolbarCanvas(page, toolbar);
+});
+
+async function expectCompactToolbarCanvas(page: Page, toolbar: Locator): Promise<void> {
+  const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
+  for (const fontFamily of ['', 'monospace']) {
+    await toolbar.evaluate((element, font) => {
+      element.style.fontFamily = font;
+    }, fontFamily);
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    expect((await canvas.boundingBox())?.height ?? 0).toBeGreaterThan(200);
+    const centres = await toolbar
+      .locator('.lf-toolbar-utilities button:visible')
+      .evaluateAll((buttons) =>
+        buttons.map((button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.y + rect.height / 2;
+        }),
+      );
+    expect(Math.max(...centres) - Math.min(...centres)).toBeLessThanOrEqual(1);
+    for (const button of await toolbar.locator('button:visible').all()) {
+      await expectWithinViewport(page, button);
+    }
+    await expect(
+      toolbar.getByRole('button', { name: 'Workspace layout' }),
+    ).toHaveAccessibleDescription('Auto layout');
+    await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
+    await expectNoPageOverflow(page);
+  }
+  await toolbar.evaluate((element) => {
+    element.style.fontFamily = '';
   });
 }
 
