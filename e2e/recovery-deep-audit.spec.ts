@@ -36,6 +36,7 @@ import {
   connectMachineAndDismissFirstSetup,
   selectWorkspacePanel,
   toolbarCommand,
+  expectToolbarCommandVisible,
 } from './fixtures/workspace-ui';
 import { recoveryExecutionLinesSince } from './fixtures/recovery-execution-lines';
 
@@ -43,7 +44,7 @@ const RECONNECTED_HEAD = { x: 777.7, y: 666.6 };
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await dismissNotifications(page);
 });
@@ -125,7 +126,7 @@ async function secondWindow(page: Page): Promise<{
   const other = await page.context().newPage();
   await other.addInitScript({ content: source });
   await other.goto('/');
-  await other.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(other, 'Open...')).click();
   await expect(other).toHaveTitle(/project-basic\.lf2/);
   await dismissNotifications(other);
   const events = () =>
@@ -317,7 +318,7 @@ test('a page reload mid-job saves a recoverable capsule no older than one checkp
   // Let the queued checkpoint write land, then lose the page as a crash would.
   await page.waitForTimeout(500);
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Open...' })).toBeVisible();
+  await expectToolbarCommandVisible(page, 'Open...');
   await selectWorkspacePanel(page, 'Machine');
   const saved = await savedCapsule(page);
   // A truthful cause: the app closing, when its stop request was saved before

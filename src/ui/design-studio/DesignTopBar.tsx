@@ -46,7 +46,11 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
 
       <span style={dividerStyle} role="presentation" />
 
-      <BarButton label="Fit" title="Frame the bed (Shift+F)" onClick={props.onFit} />
+      <BarButton
+        label="Fit"
+        title="Frame the bed; in 3D, reset to the stock's top view (Shift+F)"
+        onClick={props.onFit}
+      />
       <BarToggle
         label="Snap"
         title="Snap to grid and geometry (Shift+S)"
@@ -88,7 +92,7 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
       />
       <BarButton
         label="Close"
-        title="Close the Studio (Esc). Nothing is applied and your drawing is kept."
+        title="Close the Studio; your drawing is kept without applying it. Esc cancels the current action first."
         onClick={closeStudio}
       />
     </header>

@@ -24,7 +24,7 @@ test('a new raster job after Abort resets leftover overrides and burns its own s
   // Spacious layout: both rails visible, no ambiguous compact panel tabs.
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await dismissNotifications(page);
   await clearCanvas(page);

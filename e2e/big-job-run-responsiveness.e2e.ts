@@ -6,7 +6,12 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { connectMachineAndDismissFirstSetup, machineJogAction } from './fixtures/workspace-ui';
+import {
+  connectMachineAndDismissFirstSetup,
+  machineJogAction,
+  toolbarCommand,
+  expectToolbarCommandVisible,
+} from './fixtures/workspace-ui';
 
 const pacedSerialSource = readFileSync(
   fileURLToPath(new URL('./fixtures/paced-grbl-serial.js', import.meta.url)),
@@ -53,9 +58,9 @@ test('big job streaming keeps the workspace responsive', async ({ page }, testIn
   if (PROJECT_FILE !== undefined) await installProjectPicker(page, PROJECT_FILE);
   if (process.env['BIG_JOB_TRACE_WORKERS'] === '1') await installWorkerTrace(page);
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Open...' })).toBeVisible({ timeout: 60_000 });
+  await expectToolbarCommandVisible(page, 'Open...', { timeout: 60_000 });
   if (PROJECT_FILE !== undefined) {
-    await page.getByRole('button', { name: 'Open...' }).click();
+    await (await toolbarCommand(page, 'Open...')).click();
     await expect(page).toHaveTitle(/big-job\.lf2/, { timeout: 120_000 });
   } else {
     await installBigFillProject(page, GRID);
