@@ -326,13 +326,14 @@ function AdjustDialog(props: {
   readonly onClose: () => void;
 }): JSX.Element | null {
   const layer = useStore((s) => primaryOperationForObject(props.image, s.project.scene.layers));
-  const setLayerParam = useStore((s) => s.setLayerParam);
   const setRasterImageAdjustments = useStore((s) => s.setRasterImageAdjustments);
   if (layer === null) return null;
   const onApply = (patch: AdjustImageApply): void => {
     props.onClose();
-    setRasterImageAdjustments(props.image.id, patch.imagePatch);
-    setLayerParam(layer.id, patch.layerPatch);
+    setRasterImageAdjustments(props.image.id, patch.imagePatch, {
+      id: layer.id,
+      patch: patch.layerPatch,
+    });
   };
   return (
     <AdjustImageDialog

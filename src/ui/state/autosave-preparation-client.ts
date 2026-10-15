@@ -31,8 +31,29 @@ export async function prepareAutosaveRecordOffThread(
     return prepareAutosaveRecord(project, savedAt, sessionId, storageKey);
   }
   const prepared = await new Promise<AutosavePreparation>((resolve) => {
-    reserveWorkerMemory((release) => {
-      prepareWithWorker({ project, savedAt, sessionId, storageKey }, resolve, release);
+    let settled = false;
+    let cancelWorker: ((error: Error) => void) | undefined;
+    const finish = (result: AutosavePreparation): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    // A module worker can remain silent without raising an error. Bound queue
+    // waiting as well: an earlier worker must not block the durable clear tail
+    // forever. Failure retains the previous committed recovery generation.
+    const timer = setTimeout(() => {
+      const error = new Error('Autosave preparation timed out after 60 seconds.');
+      cancelWorker?.(error);
+      cancelReservation();
+      finish(preparationFailure(error));
+    }, 60_000);
+    const cancelReservation = reserveWorkerMemory((release) => {
+      cancelWorker = prepareWithWorker(
+        { project, savedAt, sessionId, storageKey },
+        finish,
+        release,
+      );
     });
   });
   return sealAutosavePreparation(prepared);
@@ -46,7 +67,7 @@ function prepareWithWorker(
   request: LocalAutosavePreparationRequest,
   resolve: (result: AutosavePreparation) => void,
   release: () => void,
-): void {
+): (error: Error) => void {
   let worker: Worker;
   try {
     worker = new Worker(new URL('./autosave-preparation-worker.ts', import.meta.url), {
@@ -55,7 +76,7 @@ function prepareWithWorker(
   } catch (error) {
     resolve(preparationFailure(error));
     release();
-    return;
+    return () => undefined;
   }
   let finished = false;
   const finish = (result: AutosavePreparation): void => {
@@ -88,6 +109,7 @@ function prepareWithWorker(
   } catch (error) {
     finish(preparationFailure(error));
   }
+  return (error) => finish(preparationFailure(error));
 }
 
 function preparationFailure(error: unknown): AutosavePreparation {

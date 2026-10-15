@@ -14,6 +14,8 @@ import {
   formatCalibrationInterval,
   formatCalibrationNumber,
 } from './calibration-labels';
+import { effectiveCalibrationSpeed } from './material-test-axes';
+import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 
 const MIN_STEPS = 1;
 const MAX_STEPS = 20;
@@ -150,18 +152,19 @@ function intervalTestLabelObjects(args: {
 }): ReadonlyArray<ImportedSvg> {
   const intervalLabels = args.cells.map((cell) => {
     const text = formatCalibrationInterval(cell.intervalMm);
+    // Keep every interval digit while fitting the label within its own swatch.
+    const width = calibrationLabelWidthMm(text, args.labelSize);
+    const sizeMm = args.labelSize * Math.min(1, (args.swatchSize * 0.9) / width);
     return createCalibrationLabelObject({
       id: `interval-test-label-${cell.step}`,
       operationId: args.labelLayerId,
       text,
-      x:
-        cell.bounds.minX +
-        centerOffset(args.swatchSize, calibrationLabelWidthMm(text, args.labelSize)),
+      x: cell.bounds.minX + centerOffset(args.swatchSize, calibrationLabelWidthMm(text, sizeMm)),
       y: cell.bounds.maxY + args.labelGap,
-      sizeMm: args.labelSize,
+      sizeMm,
     });
   });
-  const text = formatCalibrationNumber(args.effectiveSpeed);
+  const text = formatGcodeFeedMmPerMin(args.effectiveSpeed);
   return [
     ...intervalLabels,
     createCalibrationLabelObject({
@@ -189,7 +192,7 @@ function intervalLayer(args: {
       name:
         `Interval ${formatCalibrationInterval(args.intervalMm)} mm · ` +
         `${formatCalibrationNumber(args.requestedSpeed)} requested / ` +
-        `${formatCalibrationNumber(args.effectiveSpeed)} effective mm/min`,
+        `${formatGcodeFeedMmPerMin(args.effectiveSpeed)} effective mm/min`,
       color,
       mode: 'fill',
     }),
@@ -272,10 +275,4 @@ function clampFinite(value: number, fallback: number): number {
 
 function roundMm(value: number): number {
   return Number(value.toFixed(6));
-}
-
-function effectiveCalibrationSpeed(requested: number, maxFeedMmPerMin: number | undefined): number {
-  return maxFeedMmPerMin !== undefined && Number.isFinite(maxFeedMmPerMin) && maxFeedMmPerMin > 0
-    ? Math.min(requested, maxFeedMmPerMin)
-    : requested;
 }

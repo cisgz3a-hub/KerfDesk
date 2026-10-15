@@ -1,0 +1,2461 @@
+{
+  "format": "vitest-file-summary-v1",
+  "rawReport": "evidence/tools-quality-2026-10-16/2026-10-15-tools-image-trace-vitest.json.gz",
+  "rawSha256": "2ba0cd206cb9dbf2984ed26e8cdf0af3739e05dc9a616f5cadf327980e806fe3",
+  "numPassedTests": 3306,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTestFiles": 408,
+  "success": true,
+  "startTime": 1792079896630,
+  "testResults": [
+    {
+      "file": "src/core/image-adjust/box-blur.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-adjust/curves.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-adjust/gaussian-blur.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-adjust/halftone.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-adjust/high-pass.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-adjust/histogram.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-adjust/levels.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-adjust/lut.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-adjust/median.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-adjust/remove-white-background.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-adjust/tone-luts.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-adjust/unsharp-mask.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-edit/brush-stamp.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-edit/history.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-edit/rgba-buffer.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-edit/stroke.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-edit/tiles.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-edit/transform-blit.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-layers/composite.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-layers/layer-ops.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-layers/merge-appearance.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-resample/resample-domain.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-resample/resample.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-select/combine-masks.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-select/lasso.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-select/marquee.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-select/mask-morphology.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-select/mask-outline.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-select/region-ops.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-select/selection-mask.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-select/wand.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-retouch/clone-stroke.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-retouch/gradient-fill.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/image-retouch/spot-heal.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/admitted-loop-simplify.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/auto-upscale-arc-restore.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/auto-upscale-pen-width.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/auto-upscale.test.ts",
+      "status": "passed",
+      "tests": 27,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/automatic-detail-light-solid-guards.test.ts",
+      "status": "passed",
+      "tests": 37,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/automatic-detail-light-solids.test.ts",
+      "status": "passed",
+      "tests": 17,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/background-flatten.test.ts",
+      "status": "passed",
+      "tests": 18,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/batch-trace-skip.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/batch-trace-svg-paint.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/batch-trace.test.ts",
+      "status": "passed",
+      "tests": 16,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/canny-edges.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/colour-appearance.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/colour-label-cleanup.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/colour-layer-alpha.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/colour-layer-detail.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/colour-layer-edge-cases.test.ts",
+      "status": "passed",
+      "tests": 15,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/colour-layer-palette.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/colour-layer-power.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/colour-layer-regressions.test.ts",
+      "status": "passed",
+      "tests": 16,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/colour-layer-trace.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/compact-curve-contacts.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/compact-curve-fit-work.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/compact-curve-fit.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/compact-curve-near.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/compact-curve-project.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/compact-curve-shape.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-boundary-parity.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-boundary.test.ts",
+      "status": "passed",
+      "tests": 14,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-box-index.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-chord-band.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-contact-cache.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-corner-field.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-corner-leg-runs.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-corners-measured.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-corners.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-curve-controls.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-deep-notch.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-detail-detector.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-fairing-measured.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-glyph-fidelity.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-input.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-intersections.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-local-threshold.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-membership-cache.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-membership.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-nesting-trace.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-nesting.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-no-orphan-measured.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-no-orphan.test.ts",
+      "status": "passed",
+      "tests": 65,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-orientation.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-pair-cache.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-pixel-details.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-repair.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-roundness.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-spatial.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-straightness.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-subpixel.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-thin-details.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-thin-shapes.test.ts",
+      "status": "passed",
+      "tests": 60,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-tiny-loops.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-topology-cache.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-topology-work.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-topology.test.ts",
+      "status": "passed",
+      "tests": 25,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/contour-trace.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/crack-iso-levels.test.ts",
+      "status": "passed",
+      "tests": 14,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/edge-input-regression.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/edge-input.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/edge-subpixel.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/edge-trace-determinism.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/edge-trace.test.ts",
+      "status": "passed",
+      "tests": 12,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/faint-line-connectors.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/faint-line-recovery.test.ts",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/faint-line-scale.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/fair-chain-closed.test.ts",
+      "status": "passed",
+      "tests": 12,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/fair-chain.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/fill-pinholes-flood.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/fill-pinholes.test.ts",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/fit-cubics.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/flatten-straight-runs-reversals.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/flatten-straight-runs-scale.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/flatten-straight-runs.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/index.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/light-solid-pixels.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/local-contrast-mask.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/paths-to-svg-centerline.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/paths-to-svg-edge.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/paths-to-svg-hybrid.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/paths-to-svg.test.ts",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/photo-local-detail.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/photo-tone.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/photo-trace-dispatch.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/photo-trace.test.ts",
+      "status": "passed",
+      "tests": 35,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/preprocess-auto-median.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/preprocess-auto-structure.test.ts",
+      "status": "passed",
+      "tests": 12,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/preprocess-despeckle-flood.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/preprocess.test.ts",
+      "status": "passed",
+      "tests": 18,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/raster-prep.test.ts",
+      "status": "passed",
+      "tests": 23,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/region-enhance-hybrid.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/region-enhance-seams.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/region-enhance.alpha.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/region-enhance.test.ts",
+      "status": "passed",
+      "tests": 12,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/run-fit.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/saddle-connectivity.test.ts",
+      "status": "passed",
+      "tests": 24,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/sharp-fine-marks.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/small-mark-policy.test.ts",
+      "status": "passed",
+      "tests": 15,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/toned-monochrome.test.ts",
+      "status": "passed",
+      "tests": 12,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-alpha.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-boundary.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-cooperation.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-curves.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-diagonal-hairline.test.ts",
+      "status": "passed",
+      "tests": 50,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-downscale-area.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-downscale-coordinates.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-image-auto-detail.test.ts",
+      "status": "passed",
+      "tests": 14,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-image-guards.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-image-sketch.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-image.test.ts",
+      "status": "passed",
+      "tests": 20,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-independence.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-invert.test.ts",
+      "status": "passed",
+      "tests": 20,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-perceptual.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-progress.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-report.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-source-decisions.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-to-paths.test.ts",
+      "status": "passed",
+      "tests": 15,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-transparency.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-upscale-detail-retention.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-upscale-median.test.ts",
+      "status": "passed",
+      "tests": 19,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-upscale-policy.test.ts",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/trace-work-budget.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/traced-page-box.test.ts",
+      "status": "passed",
+      "tests": 12,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/traced-page-paper.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/ui/app/bake-variable-text.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/app/save-original-image.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/app/save-processed-bitmap.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/ui/commands/bitmap-conversion.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/ui/commands/command-image-mask.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/commands/image-command-actions.test.ts",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/ui/commands/multi-file-trace-action-cancel.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/commands/multi-file-trace-action-density.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/ui/commands/multi-file-trace-action-formats.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/commands/multi-file-trace-action-pages.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/commands/multi-file-trace-action-size.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/commands/multi-file-trace-action-skip.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/commands/multi-file-trace-action-stream.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/commands/multi-file-trace-action.test.ts",
+      "status": "passed",
+      "tests": 19,
+      "failed": []
+    },
+    {
+      "file": "src/ui/commands/multi-file-trace-settings.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/adjust-dialog-store.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/AdjustDialog.test.tsx",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/ColorPickerDialog.test.tsx",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/composite-cache.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-adjust-session.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-adjustments.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-apply-trace.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-canvas-draw.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-color.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-document-history.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-horizontal-mask-repair.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-ink-time.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-kerf-check.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-kerf-output-parity.test.ts",
+      "status": "passed",
+      "tests": 19,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-kerf-thicken-target.test.ts",
+      "status": "passed",
+      "tests": 15,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-layer-clear.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-layer-pixels.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-project-document.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-project-persistence.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-raster-source-mask.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-session-fill.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-session-geometry.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-session-layers.test.ts",
+      "status": "passed",
+      "tests": 17,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-session-resize.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-session-retouch.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-session.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-shortcuts.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-time-travel.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-tools-stress.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-transform-preview-pixels.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-transform-session.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/editor-transform.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/EditorAdjustMenus.test.tsx",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/EditorControls.audit.test.tsx",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/EditorDialogs.audit.test.tsx",
+      "status": "passed",
+      "tests": 20,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/EditorGestures.audit.test.tsx",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/EditorLayers.audit.test.tsx",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/image-editor-decode.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/image-editor-geometry-apply.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/image-editor-lifecycle.test.ts",
+      "status": "passed",
+      "tests": 17,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/image-editor-ownership.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/image-editor-store.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/ImageStudioAccessibility.test.tsx",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/kerf-check-context.test.ts",
+      "status": "passed",
+      "tests": 12,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/kerf-check-worker-client.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/KerfStatus.test.tsx",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/PhotoQuickActions.test.tsx",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/quick-mask-store.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/raster-output-run-loss.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/resize-dialog-store.test.ts",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/text-dialog-store.test.ts",
+      "status": "passed",
+      "tests": 16,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/use-composite-doc.test.tsx",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/use-editor-pointer.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/image-editor/use-kerf-check.test.tsx",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/AdjustImageDialog.preview.test.ts",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/AdjustImageDialog.test.tsx",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/AdjustImageDialog.user-presets.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/bitmap-assembly-curves.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/bitmap-assembly-fidelity.test.ts",
+      "status": "passed",
+      "tests": 14,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/bitmap-assembly-font.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/bitmap-assembly-merge.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/bitmap-assembly-operations.test.ts",
+      "status": "passed",
+      "tests": 12,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/bitmap-assembly-outline-boundary.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/bitmap-conversion-bounds.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/bitmap-conversion-plan.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/bitmap-conversion-resources.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/convert-bitmap-worker-client.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/convert-bitmap-worker.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/ConvertToBitmapDialog.test.tsx",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/crop-image.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/image-pixel-authority.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/luma-bitmap.test.ts",
+      "status": "passed",
+      "tests": 18,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/packed-photo-bitmap.test.ts",
+      "status": "passed",
+      "tests": 12,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/photo-engraving-apply.test.ts",
+      "status": "passed",
+      "tests": 22,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/photo-engraving-output-selection.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/photo-engraving-preview-worker-client.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/photo-engraving-preview-worker.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/photo-engraving-preview.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/photo-engraving-store.test.ts",
+      "status": "passed",
+      "tests": 22,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/processed-bitmap.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/stamp-source.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/stamp-worker-client.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/use-photo-engraving-preview.test.tsx",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/vector-to-bitmap-worker.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/vector-to-bitmap.test.ts",
+      "status": "passed",
+      "tests": 16,
+      "failed": []
+    },
+    {
+      "file": "src/ui/raster/ViewerAndConversionControls.audit.test.tsx",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace-cli/run-trace-cli.test.ts",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace-cli/trace-cli-edges.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/camera-trace-capture.test.tsx",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/centerline-curve-consumers.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/cnc-trace-contacts.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/cnc-trace-fairing.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/cnc-trace-weld-compile.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/colour-layer-commit.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/colour-layer-seams.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/colour-trace-alpha.integration.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ColourLayerTraceSettingsControls.test.tsx",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/DiagonalContactsControl.test.tsx",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/edge-detector-stops.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/edge-number-snap.test.tsx",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/faint-line-options.test.ts",
+      "status": "passed",
+      "tests": 10,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/faint-line-scale-policy.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/fair-traced-image-for-cnc.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/hybrid-stroke-width.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ignore-less-than-snap.test.tsx",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/image-loader-cancellation.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/image-loader-orientation.test.ts",
+      "status": "passed",
+      "tests": 16,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/image-loader.test.ts",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.camera.test.tsx",
+      "status": "passed",
+      "tests": 18,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.cancel.test.tsx",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.cnc-fairing.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.commit-progress.test.tsx",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.debounce.test.tsx",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.diagonal-contacts.test.tsx",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.lifetime.test.tsx",
+      "status": "passed",
+      "tests": 17,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.ownership-workflow.test.tsx",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.preparation.test.tsx",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.preview-navigation.test.tsx",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.preview-settlement.test.tsx",
+      "status": "passed",
+      "tests": 29,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.raster-output.test.ts",
+      "status": "passed",
+      "tests": 20,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.retrace-settings.test.tsx",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.style-switch.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.test.ts",
+      "status": "passed",
+      "tests": 19,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.workflow.test.ts",
+      "status": "passed",
+      "tests": 14,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/jpeg-header.test.ts",
+      "status": "passed",
+      "tests": 28,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/laser-trace-moves.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/laser-trace-topology.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/photo-raster-full.integration.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/photo-trace-alpha.integration.test.ts",
+      "status": "passed",
+      "tests": 19,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/photo-trace-options.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/photo-trace-output.integration.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/photo-worker-compact.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/PhotoTraceSettingsControls.test.tsx",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/raw-image-transparency.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/region-enhance-trace.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-commit-at-grid.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-commit-grid-note.test.tsx",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-commit-grid.test.ts",
+      "status": "passed",
+      "tests": 25,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-commit-ownership.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-commit-transparency.test.tsx",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-machine-conditioning.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-mask-parity.test.ts",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-min-feature-notice.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-options.test.ts",
+      "status": "passed",
+      "tests": 23,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-pipeline.integration.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-point-nodes.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-points-canvas.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-preview-cache.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-preview-facts.test.tsx",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-preview-feedback.test.tsx",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-preview-image-space.test.tsx",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-preview-navigation.test.tsx",
+      "status": "passed",
+      "tests": 14,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-preview-pan.test.tsx",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-preview-view.test.tsx",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-preview-zoom-math.test.ts",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-progress-client.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-raster-output.integration.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-raster-output.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-region.alpha.test.ts",
+      "status": "passed",
+      "tests": 12,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-setting-edits.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-settings-snapshot.ranges.test.tsx",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-settings-snapshot.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-worker-heartbeat.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/trace-worker-source-decisions.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/TraceControls.audit.test.tsx",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/TraceDetectionControls.test.tsx",
+      "status": "passed",
+      "tests": 9,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/TraceFallbackDisclosure.test.tsx",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/TraceJoinGapsControl.test.tsx",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/TracePointsOverlay.test.tsx",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/TracePreview.test.tsx",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/TracePreviewLoading.test.tsx",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/TraceSettingsControls.semantic.test.tsx",
+      "status": "passed",
+      "tests": 20,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/TraceSmallMarkControls.semantic.test.tsx",
+      "status": "passed",
+      "tests": 14,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/TraceWorkflowGuide.test.tsx",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-dialog-settings.test.tsx",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-inline-cooperation.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-preset.test.tsx",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-preview-cache.test.tsx",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-preview-cancel.test.tsx",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-preview-decode-retry.test.tsx",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-preview-paint.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-preview-progress.test.tsx",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-preview-settlement.test.tsx",
+      "status": "passed",
+      "tests": 18,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-preview.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-worker-client-cancel.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-worker-client-report.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-worker-client-timeout.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-worker-client.test.ts",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    },
+    {
+      "file": "src/ui/trace/use-trace-worker-ownership.test.ts",
+      "status": "passed",
+      "tests": 14,
+      "failed": []
+    },
+    {
+      "file": "src/ui/state/image-edit-actions.paged.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/ui/state/image-mask-actions.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/antialiased-branches.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/arc-fairing.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/attachment.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/bend-scan-work.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/bridge-queue.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/centerline-attachments.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/centerline-preset-scale.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/centerline.test.ts",
+      "status": "passed",
+      "tests": 16,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/chain-attachments.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/chain-smoothing.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/corner-rebuilt-once.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/curve-fit.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/curve-refine.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/distance-field-parity.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/erosion-queue.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/gap-distance.test.ts",
+      "status": "passed",
+      "tests": 29,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/graph-bridges.test.ts",
+      "status": "passed",
+      "tests": 4,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/junction-condense.test.ts",
+      "status": "passed",
+      "tests": 20,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/junction-pairing-performance.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/junction-pairing.test.ts",
+      "status": "passed",
+      "tests": 7,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/loop-closure.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/medial-thinning-parity.test.ts",
+      "status": "passed",
+      "tests": 5,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/point-grid.test.ts",
+      "status": "passed",
+      "tests": 2,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/ridge-centering.test.ts",
+      "status": "passed",
+      "tests": 8,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/round-bend-guard.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/seam-repair-performance.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/short-branches.test.ts",
+      "status": "passed",
+      "tests": 20,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/spatial-grid.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/spur-pruning.test.ts",
+      "status": "passed",
+      "tests": 6,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/stroke-curves.test.ts",
+      "status": "passed",
+      "tests": 38,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/thick-blob.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/tip-extension.test.ts",
+      "status": "passed",
+      "tests": 11,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/centerline/weld-foot-finder.test.ts",
+      "status": "passed",
+      "tests": 1,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/hybrid/hybrid-vcarve.test.ts",
+      "status": "passed",
+      "tests": 3,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/hybrid/trace-hybrid-local-width.test.ts",
+      "status": "passed",
+      "tests": 39,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/hybrid/trace-hybrid.test.ts",
+      "status": "passed",
+      "tests": 20,
+      "failed": []
+    },
+    {
+      "file": "src/core/trace/hybrid/wide-stroke-runs.test.ts",
+      "status": "passed",
+      "tests": 13,
+      "failed": []
+    }
+  ]
+}

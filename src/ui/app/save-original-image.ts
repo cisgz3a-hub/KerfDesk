@@ -58,19 +58,26 @@ export async function saveOriginalImage(ctx: SaveOriginalImageCtx): Promise<void
 }
 
 async function encodeInBrowser(source: File, format: OriginalImageFormat): Promise<Blob> {
-  const bitmap = await createImageBitmap(source);
   const canvas = document.createElement('canvas');
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const context = canvas.getContext('2d');
-  if (context === null) throw new Error('This browser cannot draw the image for re-encoding.');
-  if (format === 'jpeg') {
-    // eslint-disable-next-line no-restricted-syntax -- JPEG has no alpha: flatten onto white paper, image data not chrome.
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
+  const bitmap = await createImageBitmap(source);
+  let context: CanvasRenderingContext2D;
+  try {
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const drawingContext = canvas.getContext('2d');
+    if (drawingContext === null)
+      throw new Error('This browser cannot draw the image for re-encoding.');
+    context = drawingContext;
+    if (format === 'jpeg') {
+      // eslint-disable-next-line no-restricted-syntax -- JPEG has no alpha: flatten onto white paper, image data not chrome.
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    context.drawImage(bitmap, 0, 0);
+  } finally {
+    // A failed canvas allocation/draw still owns the decoded bitmap.
+    bitmap.close();
   }
-  context.drawImage(bitmap, 0, 0);
-  bitmap.close();
   if (format === 'bmp') {
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
     return new Blob([encodeBmp24(pixels.data, pixels.width, pixels.height)], { type: 'image/bmp' });

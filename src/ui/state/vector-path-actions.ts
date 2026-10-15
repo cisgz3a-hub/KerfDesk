@@ -16,7 +16,6 @@ import { booleanCompoundActions, type BooleanCompoundActions } from './boolean-c
 import {
   combineVectorObjects,
   isVectorPathObject,
-  materializeVectorObject,
   offsetVectorObjects,
   type VectorBooleanOp,
   type VectorSceneObject,
@@ -46,6 +45,7 @@ import { useToastStore } from './toast-store';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 import { planWeldSelection } from './vector-path-weld-plan';
 import { vectorRepairActions, type VectorRepairActions } from './vector-repair-actions';
+import { convertVectorObjectToPath } from './vector-path-conversion';
 
 export type VectorCombineOptions = {
   readonly keepOperands?: boolean;
@@ -181,7 +181,7 @@ function convertSelectionToPathMutation(
       continue;
     }
     if (isBooleanCompoundObject(object)) continue;
-    const materialized = materializeVectorObject(object, object.id);
+    const materialized = convertVectorObjectToPath(object);
     scene = replaceObject(scene, object.id, materialized);
     changed = true;
   }

@@ -26,7 +26,7 @@ export function RegistrationJigArtworkSizeControls(): JSX.Element | null {
     setHeightDraft(formatDimension(dimensions?.height ?? null));
   }, [dimensions?.height, dimensions?.width]);
 
-  if (dimensions === null || instances.length < 2) return null;
+  if (dimensions === null || instances.length === 0) return null;
   const ratio = dimensions.width / dimensions.height;
   const updateWidth = (value: string): void => {
     setDrivingDimension('width');

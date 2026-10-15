@@ -8,6 +8,23 @@ import {
 } from './similarity-transform';
 
 describe('two-point similarity registration', () => {
+  it.each([NaN, Infinity, -Infinity, Number.MAX_VALUE])(
+    'withholds nonrepresentable transforms for %s coordinates',
+    (value) => {
+      const result = solveTwoPointRegistration({
+        design: [
+          { x: value, y: 0 },
+          { x: -value, y: 0 },
+        ],
+        machine: [
+          { x: 0, y: 0 },
+          { x: 10, y: 0 },
+        ],
+      });
+      expect(result.ok).toBe(false);
+    },
+  );
+
   it('registers an exact chosen cutting start with its artwork and retains frame preferences', () => {
     const project: Project = {
       ...createProject(),

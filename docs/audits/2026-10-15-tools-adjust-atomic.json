@@ -1,0 +1,439 @@
+{
+  "numTotalTestSuites": 7,
+  "numPassedTestSuites": 7,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 39,
+  "numPassedTests": 39,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1792081686955,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["AdjustImageDialog"],
+          "fullName": "AdjustImageDialog stages image and layer changes until OK",
+          "status": "passed",
+          "title": "stages image and layer changes until OK",
+          "duration": 4363.630100000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AdjustImageDialog"],
+          "fullName": "AdjustImageDialog discards staged changes on Cancel and exposes source and processed previews",
+          "status": "passed",
+          "title": "discards staged changes on Cancel and exposes source and processed previews",
+          "duration": 687.2295000000158,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AdjustImageDialog"],
+          "fullName": "AdjustImageDialog labels preview inversion separately from burn negative output",
+          "status": "passed",
+          "title": "labels preview inversion separately from burn negative output",
+          "duration": 484.2210999999661,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AdjustImageDialog"],
+          "fullName": "AdjustImageDialog maps DPI and line interval edits into the submitted lines-per-mm setting",
+          "status": "passed",
+          "title": "maps DPI and line interval edits into the submitted lines-per-mm setting",
+          "duration": 581.5692000000272,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AdjustImageDialog"],
+          "fullName": "AdjustImageDialog keeps a stored density outside the recommended range until a new one is entered",
+          "status": "passed",
+          "title": "keeps a stored density outside the recommended range until a new one is entered",
+          "duration": 865.8015000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AdjustImageDialog"],
+          "fullName": "AdjustImageDialog preserves image density when interval or DPI edits are blank",
+          "status": "passed",
+          "title": "preserves image density when interval or DPI edits are blank",
+          "duration": 363.64650000003166,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AdjustImageDialog"],
+          "fullName": "AdjustImageDialog applies built-in presets to the local draft before OK",
+          "status": "passed",
+          "title": "applies built-in presets to the local draft before OK",
+          "duration": 665.3123999999953,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AdjustImageDialog"],
+          "fullName": "AdjustImageDialog saves, reapplies, and deletes user presets without applying to the scene",
+          "status": "passed",
+          "title": "saves, reapplies, and deletes user presets without applying to the scene",
+          "duration": 1772.7329000000027,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792081961800,
+      "endTime": 1792081971586.733,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/raster/AdjustImageDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore starts with a default-shaped Project and no selection",
+          "status": "passed",
+          "title": "starts with a default-shaped Project and no selection",
+          "duration": 184.60379999998258,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore importSvgObject returns { kind: \"added\" } for a fresh import",
+          "status": "passed",
+          "title": "importSvgObject returns { kind: \"added\" } for a fresh import",
+          "duration": 89.46040000001085,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore importSvgObject creates path operations with automatic presentation colors",
+          "status": "passed",
+          "title": "importSvgObject creates path operations with automatic presentation colors",
+          "duration": 54.35420000000158,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore importSvgObject auto-selects the new object (F-A3 step 5)",
+          "status": "passed",
+          "title": "importSvgObject auto-selects the new object (F-A3 step 5)",
+          "duration": 26.702499999984866,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore multi-import staggers subsequent objects by 10mm per batch index",
+          "status": "passed",
+          "title": "multi-import staggers subsequent objects by 10mm per batch index",
+          "duration": 105.74900000001071,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore keeps operations independent when a second artwork reuses a source color",
+          "status": "passed",
+          "title": "keeps operations independent when a second artwork reuses a source color",
+          "duration": 95.37919999999576,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore removeSceneObject deletes the object and clears matching selection",
+          "status": "passed",
+          "title": "removeSceneObject deletes the object and clears matching selection",
+          "duration": 72.46630000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore removeSceneObject prunes orphan layers — last consumer of a color leaves no row behind",
+          "status": "passed",
+          "title": "removeSceneObject prunes orphan layers — last consumer of a color leaves no row behind",
+          "duration": 51.11210000002757,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore removeSceneObject keeps every operation owned by the remaining artwork",
+          "status": "passed",
+          "title": "removeSceneObject keeps every operation owned by the remaining artwork",
+          "duration": 61.04170000000158,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore setLayerParam patches the matching layer",
+          "status": "passed",
+          "title": "setLayerParam patches the matching layer",
+          "duration": 43.08389999999781,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore moveLayer updates layer order and is undoable",
+          "status": "passed",
+          "title": "moveLayer updates layer order and is undoable",
+          "duration": 70.79380000001402,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore setRasterImageAdjustments patches a raster image and pushes undo",
+          "status": "passed",
+          "title": "setRasterImageAdjustments patches a raster image and pushes undo",
+          "duration": 84.0966999999946,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore Adjust Image commits image and operation settings in one Undo step",
+          "status": "passed",
+          "title": "Adjust Image commits image and operation settings in one Undo step",
+          "duration": 47.22479999999632,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore newProject resets state",
+          "status": "passed",
+          "title": "newProject resets state",
+          "duration": 93.47270000001299,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore newProject preserves the configured machine profile (DEV-01 / F-A13)",
+          "status": "passed",
+          "title": "newProject preserves the configured machine profile (DEV-01 / F-A13)",
+          "duration": 19.645199999999022,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore"],
+          "fullName": "useStore setJobPlacement persists the project-owned setup and marks the project dirty",
+          "status": "passed",
+          "title": "setJobPlacement persists the project-owned setup and marks the project dirty",
+          "duration": 21.91359999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — explicit selected-target SVG re-import"],
+          "fullName": "useStore — explicit selected-target SVG re-import fresh same-name imports append instead of replacing by filename",
+          "status": "passed",
+          "title": "fresh same-name imports append instead of replacing by filename",
+          "duration": 28.04780000000028,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — explicit selected-target SVG re-import"],
+          "fullName": "useStore — explicit selected-target SVG re-import returns replacement facts only when an exact target id is explicit",
+          "status": "passed",
+          "title": "returns replacement facts only when an exact target id is explicit",
+          "duration": 46.8469000000041,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — explicit selected-target SVG re-import"],
+          "fullName": "useStore — explicit selected-target SVG re-import re-import preserves the existing object id (so selection / refs stay valid)",
+          "status": "passed",
+          "title": "re-import preserves the existing object id (so selection / refs stay valid)",
+          "duration": 19.94649999999092,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — explicit selected-target SVG re-import"],
+          "fullName": "useStore — explicit selected-target SVG re-import re-import preserves the existing object transform (user-chosen position survives)",
+          "status": "passed",
+          "title": "re-import preserves the existing object transform (user-chosen position survives)",
+          "duration": 30.06369999999879,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — explicit selected-target SVG re-import"],
+          "fullName": "useStore — explicit selected-target SVG re-import re-import preserves layer settings for surviving colors",
+          "status": "passed",
+          "title": "re-import preserves layer settings for surviving colors",
+          "duration": 29.285700000007637,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — explicit selected-target SVG re-import"],
+          "fullName": "useStore — explicit selected-target SVG re-import re-import adds layers for genuinely new colors",
+          "status": "passed",
+          "title": "re-import adds layers for genuinely new colors",
+          "duration": 52.79999999998836,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — explicit selected-target SVG re-import"],
+          "fullName": "useStore — explicit selected-target SVG re-import different sources still add as new (no false re-import)",
+          "status": "passed",
+          "title": "different sources still add as new (no false re-import)",
+          "duration": 1.3558999999950174,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — undo / redo (F-A14)"],
+          "fullName": "useStore — undo / redo (F-A14) importSvgObject pushes the prior project onto undoStack",
+          "status": "passed",
+          "title": "importSvgObject pushes the prior project onto undoStack",
+          "duration": 0.822199999995064,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — undo / redo (F-A14)"],
+          "fullName": "useStore — undo / redo (F-A14) undo restores the previous project",
+          "status": "passed",
+          "title": "undo restores the previous project",
+          "duration": 17.154300000023795,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — undo / redo (F-A14)"],
+          "fullName": "useStore — undo / redo (F-A14) undo drops stale multi-selection ids but keeps the still-present primary (CNV-13)",
+          "status": "passed",
+          "title": "undo drops stale multi-selection ids but keeps the still-present primary (CNV-13)",
+          "duration": 27.215100000001257,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — undo / redo (F-A14)"],
+          "fullName": "useStore — undo / redo (F-A14) redo replays an undone action",
+          "status": "passed",
+          "title": "redo replays an undone action",
+          "duration": 3.6260000000183936,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — undo / redo (F-A14)"],
+          "fullName": "useStore — undo / redo (F-A14) redo clears stale multi-selection ids along with the primary selection",
+          "status": "passed",
+          "title": "redo clears stale multi-selection ids along with the primary selection",
+          "duration": 34.83379999999306,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — undo / redo (F-A14)"],
+          "fullName": "useStore — undo / redo (F-A14) a new mutation after undo clears the redo stack",
+          "status": "passed",
+          "title": "a new mutation after undo clears the redo stack",
+          "duration": 19.480200000019977,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — undo / redo (F-A14)"],
+          "fullName": "useStore — undo / redo (F-A14) undo on empty history is a no-op",
+          "status": "passed",
+          "title": "undo on empty history is a no-op",
+          "duration": 0.4357000000018161,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useStore — preview toggle (F-A8)"],
+          "fullName": "useStore — preview toggle (F-A8) togglePreview flips the previewMode flag",
+          "status": "passed",
+          "title": "togglePreview flips the previewMode flag",
+          "duration": 22.224600000015926,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792081877999,
+      "endTime": 1792081879526.2246,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/state/store.test.ts"
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import {
 } from '../../__fixtures__/vector-repair-fixtures';
 import { createLayer, IDENTITY_TRANSFORM, type ImportedSvg } from '../scene';
 import { joinOpenVectorPaths } from './vector-path-join';
+import { cncTabAnchorPosition } from '../cnc/cnc-tab-anchors';
 
 const cut = createLayer({ id: 'cut', color: '#000000' });
 const line = (id: string, x1: number, x2: number) =>
@@ -18,6 +19,29 @@ function join(objects: ReadonlyArray<ImportedSvg>, tolerance = 0.05) {
 }
 
 describe('join open artwork paths', () => {
+  it('keeps untouched manual tabs physically fixed when baking a nonuniform transform', () => {
+    const a = line('a', 0, 30);
+    const anchor = { layerColor: '#000000', pathIndex: 1, polylineIndex: 0, pathT: 0.125 };
+    const b: ImportedSvg = {
+      ...line('b', 10, 20),
+      transform: { ...IDENTITY_TRANSFORM, scaleX: 3 },
+      paths: [
+        line('b', 10, 20).paths[0]!,
+        { color: '#000000', polylines: [repairRectangle(50, 50, 10, 10)] },
+      ],
+      cncTabAnchors: [anchor],
+      laserTabAnchors: [anchor],
+    };
+    const before = cncTabAnchorPosition(b, anchor)!;
+    const result = join([a, b]);
+    expect(result.joins).toBe(1);
+    const after = result.objects.find((object) => object.id === b.id)!;
+    for (const key of ['cncTabAnchors', 'laserTabAnchors'] as const) {
+      const position = cncTabAnchorPosition(after, after[key]![0]!)!;
+      expect(position.x).toBeCloseTo(before.x, 9);
+      expect(position.y).toBeCloseTo(before.y, 9);
+    }
+  });
   it('uses physical gap after scale/mirror/rotation and preserves every source segment plus the short bridge', () => {
     const a = { ...line('a', 0, 5), transform: { ...IDENTITY_TRANSFORM, x: 10, scaleX: 2 } };
     const b = {

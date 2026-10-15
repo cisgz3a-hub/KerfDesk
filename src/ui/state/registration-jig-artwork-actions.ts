@@ -115,7 +115,9 @@ export function applyCenterArtworkInRegistrationJigSet(
       : { artworkOrder: state.project.scene.artworkOrder.filter((id) => !replacedIds.has(id)) }),
     groups: [
       ...(state.project.scene.groups ?? []).filter(
-        (group) => !copiedGroupPrefixes.some((prefix) => group.id.startsWith(prefix)),
+        (group) =>
+          !copiedGroupPrefixes.some((prefix) => group.id.startsWith(prefix)) ||
+          !group.objectIds.some((id) => replacedIds.has(id)),
       ),
       ...copiedGroups,
     ],

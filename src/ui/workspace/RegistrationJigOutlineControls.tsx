@@ -1,10 +1,19 @@
-import { useState } from 'react';
-import { findRegistrationBoxes, transformedBBox, type ShapeObject } from '../../core/scene';
+import { useMemo, useState } from 'react';
+import {
+  findRegistrationBoxes,
+  transformedBBox,
+  type Scene,
+  type ShapeObject,
+} from '../../core/scene';
 import {
   registrationJigSetIssue,
   type RegistrationJigSetSpec,
 } from '../state/registration-jig-set-actions';
 import { Button } from '../kit';
+import {
+  removedJigArtworkIds,
+  type RemovedJigArtworkPolicy,
+} from '../state/registration-jig-layout';
 import { useStore } from '../state';
 import {
   LockRegistrationJigSetControl,
@@ -55,7 +64,11 @@ export function RegistrationJigOutlineControls(): JSX.Element {
   const [columns, setColumns] = useState(initialGrid.columns);
   const [spacingX, setSpacingX] = useState(initialGrid.spacingX);
   const [spacingY, setSpacingY] = useState(initialGrid.spacingY);
-  const spec = jigSetSpec(shape, widthMm, heightMm, diameterMm, rows, columns, spacingX, spacingY);
+  const [removedArtwork, setRemovedArtwork] = useState<RemovedJigArtworkPolicy>('keep');
+  const spec = {
+    ...jigSetSpec(shape, widthMm, heightMm, diameterMm, rows, columns, spacingX, spacingY),
+    removedArtwork,
+  };
   const issue = registrationJigSetIssue(spec, scene);
   const requestedCount = spec.rows * spec.columns;
 
@@ -81,26 +94,24 @@ export function RegistrationJigOutlineControls(): JSX.Element {
         onSpacingXChange={setSpacingX}
         onSpacingYChange={setSpacingY}
       />
-      <p style={setSummaryStyle}>
-        {issue !== null
-          ? issue
-          : boxes.length === 0
-            ? `${requestedCount} ${jigWord(requestedCount)} requested`
-            : `${boxes.length} ${jigWord(boxes.length)} on canvas`}
-      </p>
+      <JigLayoutSummary
+        scene={scene}
+        issue={issue}
+        requestedCount={requestedCount}
+        outlineCount={boxes.length}
+        removedArtwork={removedArtwork}
+        onPolicyChange={setRemovedArtwork}
+      />
       <div style={actionRowStyle}>
-        <Button
-          variant="primary"
-          disabled={isCapturedBoard || issue !== null}
-          title={
-            isCapturedBoard
-              ? 'This outline is a captured board — Remove it or re-capture with Place Board.'
-              : (issue ?? 'Create one registered outline for every row and column in the jig set')
-          }
-          onClick={() => replaceSet(spec)}
-        >
-          {createButtonLabel(initial.hasOutline, requestedCount)}
-        </Button>
+        <ReplaceJigButton
+          capturedBoard={isCapturedBoard}
+          issue={issue}
+          label={createButtonLabel(initial.hasOutline, requestedCount)}
+          onClick={() => {
+            replaceSet(spec);
+            setRemovedArtwork('keep');
+          }}
+        />
         <RemoveRegistrationJigSetButton
           show={initial.hasOutline}
           outlineCount={boxes.length}
@@ -114,7 +125,86 @@ export function RegistrationJigOutlineControls(): JSX.Element {
         outlineCount={boxes.length}
         onChange={setLocked}
       />
-      <CapturedBoardWarning show={isCapturedBoard} />
+    </>
+  );
+}
+
+function ReplaceJigButton(props: {
+  readonly capturedBoard: boolean;
+  readonly issue: string | null;
+  readonly label: string;
+  readonly onClick: () => void;
+}): JSX.Element {
+  return (
+    <Button
+      variant="primary"
+      disabled={props.capturedBoard || props.issue !== null}
+      title={
+        props.capturedBoard
+          ? 'This outline is a captured board — Remove it or re-capture with Place Board.'
+          : (props.issue ?? 'Create one registered outline for every row and column in the jig set')
+      }
+      onClick={props.onClick}
+    >
+      {props.label}
+    </Button>
+  );
+}
+
+function JigLayoutSummary(props: {
+  readonly scene: Scene;
+  readonly issue: string | null;
+  readonly requestedCount: number;
+  readonly outlineCount: number;
+  readonly removedArtwork: RemovedJigArtworkPolicy;
+  readonly onPolicyChange: (policy: RemovedJigArtworkPolicy) => void;
+}): JSX.Element {
+  const removedCount = useMemo(
+    () =>
+      Number.isSafeInteger(props.requestedCount) && props.requestedCount >= 1
+        ? removedJigArtworkIds(props.scene, props.requestedCount).size
+        : 0,
+    [props.scene, props.requestedCount],
+  );
+  return (
+    <>
+      <p style={setSummaryStyle}>
+        {props.issue ??
+          (props.outlineCount === 0
+            ? `${props.requestedCount} ${jigWord(props.requestedCount)} requested`
+            : `${props.outlineCount} ${jigWord(props.outlineCount)} on canvas`)}
+      </p>
+      {props.outlineCount > 0 && (
+        <p style={setSummaryStyle}>
+          Replacing this grid moves linked artwork with its slots, keeping size and offset. New
+          slots start empty.
+        </p>
+      )}
+      {removedCount > 0 && (
+        <label style={setSummaryStyle}>
+          {removedCount} artwork object{removedCount === 1 ? '' : 's'} in removed slots
+          <select
+            aria-label="Artwork in removed jig slots"
+            title="Choose whether to keep or remove artwork belonging to slots removed by this grid edit"
+            value={props.removedArtwork}
+            onChange={(event) =>
+              props.onPolicyChange(event.target.value === 'remove' ? 'remove' : 'keep')
+            }
+            style={{ width: '100%', marginTop: 4 }}
+          >
+            <option value="keep">Keep as ordinary artwork</option>
+            <option value="remove">Remove with their slots</option>
+          </select>
+          <span>
+            {props.removedArtwork === 'keep'
+              ? 'Kept artwork stays in place and can still output on its enabled operations.'
+              : 'This edit removes that artwork and its slot membership. Undo restores both.'}
+          </span>
+        </label>
+      )}
+      <CapturedBoardWarning
+        show={findRegistrationBoxes(props.scene).some((box) => box.provenance === 'captured-board')}
+      />
     </>
   );
 }

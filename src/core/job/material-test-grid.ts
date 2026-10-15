@@ -250,7 +250,7 @@ function materialTestLayerName(
     case 'speed':
       return (
         `Material test ${formatCalibrationNumber(value)} requested / ` +
-        `${formatCalibrationNumber(effectiveValue)} effective mm/min`
+        `${materialTestValueLabel('speed', effectiveValue)} effective mm/min`
       );
     case 'power':
       return `Material test ${formatCalibrationNumber(value)}% power`;

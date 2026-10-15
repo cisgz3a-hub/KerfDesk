@@ -118,6 +118,25 @@ describe('generateIntervalTestGrid', () => {
     expect(fillLayers.map((layer) => layer.hatchSpacingMm)).toEqual([0.2, 0.16, 0.12, 0.08]);
   });
 
+  it('labels fractional interval steps with the actual hatch spacing', () => {
+    const grid = generateIntervalTestGrid({
+      steps: 3,
+      speed: 1800,
+      power: 30,
+      intervalMinMm: 0.1,
+      intervalMaxMm: 0.15,
+      swatchSizeMm: 8,
+    });
+    expect(grid.cells.map((cell) => cell.intervalMm)).toEqual([0.15, 0.125, 0.1]);
+    expect(grid.scene.layers[1]?.hatchSpacingMm).toBe(0.125);
+    expect(grid.scene.layers[1]?.name).toContain('Interval 0.125 mm');
+    expect(
+      grid.scene.objects.find((object) => object.id === 'interval-test-label-1'),
+    ).toMatchObject({
+      source: 'calibration-label:0.125',
+    });
+  });
+
   it('clamps invalid counts and intervals into a usable one-swatch scene', () => {
     const grid = generateIntervalTestGrid({
       steps: 0,

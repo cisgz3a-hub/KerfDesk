@@ -31,7 +31,6 @@ const HANDLE_MATCH_MM = 1e-9;
 const CORNER_MATCH_RATIO = 1e-6;
 const STRETCH_SAMPLES = 9;
 const STRETCH_STEP = 1e-4;
-const MAX_STRETCH = 1000;
 
 /**
  * The box the handles start on: the selection bounds, with a side that has no
@@ -189,7 +188,7 @@ export function warpDeformStretch(map: PointMap, box: Bounds): number {
       stretch = Math.max(stretch, localStretch(map, { x, y }, stepX, stepY));
     }
   }
-  return Number.isFinite(stretch) ? Math.min(stretch, MAX_STRETCH) : MAX_STRETCH;
+  return Number.isFinite(stretch) ? stretch : Number.POSITIVE_INFINITY;
 }
 
 // The largest singular value of the finite-difference Jacobian at `point`.
