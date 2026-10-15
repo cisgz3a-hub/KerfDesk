@@ -1,7 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { saveOriginalImage } from './save-original-image';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 const image: RasterImage = {
   kind: 'raster-image',
@@ -23,6 +28,39 @@ function platformWith(target: SaveTarget | null) {
 }
 
 describe('saveOriginalImage', () => {
+  it.each(['missing-context', 'draw-failure'])(
+    'releases the decoded bitmap when re-encoding fails (%s)',
+    async (failure) => {
+      const close = vi.fn();
+      vi.stubGlobal(
+        'createImageBitmap',
+        vi.fn(async () => ({ width: 2, height: 2, close })),
+      );
+      if (failure === 'missing-context') {
+        vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+      } else {
+        vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+          drawImage: () => {
+            throw new Error('Canvas draw failed');
+          },
+        } as unknown as CanvasRenderingContext2D);
+      }
+      const write = vi.fn(async () => undefined);
+      const { platform } = platformWith({ displayName: 'dog.png', write });
+      const pushToast = vi.fn();
+      await saveOriginalImage({
+        platform,
+        image,
+        format: 'png',
+        pushToast,
+        readSource: async () => new File(['jpeg'], 'dog.jpeg', { type: 'image/jpeg' }),
+      });
+      expect(close).toHaveBeenCalledOnce();
+      expect(write).not.toHaveBeenCalled();
+      expect(pushToast).toHaveBeenCalledWith(expect.stringContaining('Could not save'), 'error');
+    },
+  );
+
   it('writes the source bytes unchanged when they already have the chosen format', async () => {
     const write = vi.fn(async () => undefined);
     const { platform, pickFileForSave } = platformWith({ displayName: 'dog.jpg', write });

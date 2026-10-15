@@ -3,6 +3,7 @@
 // lowest-risk value to its highest, so the first cell burned is the gentlest:
 // fastest speed, lowest power, fewest passes, widest hatch spacing.
 
+import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { LAYER_DEFAULTS } from '../scene';
 import { formatCalibrationNumber } from './calibration-labels';
 
@@ -89,6 +90,7 @@ export function fixedMaterialTestValue(
 
 /** Burned label text: speeds show the feed the job runs. */
 export function materialTestValueLabel(parameter: MaterialTestParameter, value: number): string {
+  if (parameter === 'speed') return formatGcodeFeedMmPerMin(value);
   if (parameter !== 'interval') return formatCalibrationNumber(value);
   return value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
 }
@@ -97,9 +99,11 @@ export function effectiveCalibrationSpeed(
   requested: number,
   maxFeedMmPerMin: number | undefined,
 ): number {
-  return maxFeedMmPerMin !== undefined && Number.isFinite(maxFeedMmPerMin) && maxFeedMmPerMin > 0
-    ? Math.min(requested, maxFeedMmPerMin)
-    : requested;
+  const capped =
+    maxFeedMmPerMin !== undefined && Number.isFinite(maxFeedMmPerMin) && maxFeedMmPerMin > 0
+      ? Math.min(requested, maxFeedMmPerMin)
+      : requested;
+  return effectiveGcodeFeedMmPerMin(capped);
 }
 
 function axisValues(

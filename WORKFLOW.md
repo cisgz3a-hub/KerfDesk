@@ -7291,6 +7291,10 @@ as the pane's design record.
    discloses that the newest state is not autosaved. Manual Save validates and
    writes the self-contained in-memory project; no relief authority exists only as
    a local ID.
+   Autosave preparation also fails if its queued or active worker has not completed
+   within 60 seconds. It releases its own worker reservation and retains committed
+   recovery for a later retry. An explicit discard still clears recovery in order
+   and still checks that the document has not changed (ADR-598 Amendment 1).
 2. Project load rejects corrupt schema/encoding/endian/length/digest declarations
    before allocation or CAM. The original file remains untouched and the error
    identifies the invalid field.

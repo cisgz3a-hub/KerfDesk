@@ -1,0 +1,506 @@
+{
+  "numTotalTestSuites": 9,
+  "numPassedTestSuites": 9,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 43,
+  "numPassedTests": 43,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1792080203218,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance Offset Shapes outward, 0.5 mm",
+          "status": "passed",
+          "title": "Offset Shapes outward, 0.5 mm",
+          "duration": 10.447100000000319,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance Offset Shapes outward, 1 mm",
+          "status": "passed",
+          "title": "Offset Shapes outward, 1 mm",
+          "duration": 2.2130999999999403,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance Offset Shapes outward, 5 mm",
+          "status": "passed",
+          "title": "Offset Shapes outward, 5 mm",
+          "duration": 2.4365999999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance Offset Shapes outward, 25 mm",
+          "status": "passed",
+          "title": "Offset Shapes outward, 25 mm",
+          "duration": 2.0114000000003216,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance Offset Shapes outward, 50 mm",
+          "status": "passed",
+          "title": "Offset Shapes outward, 50 mm",
+          "duration": 2.153899999999794,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance Offset Shapes outward, 200 mm",
+          "status": "passed",
+          "title": "Offset Shapes outward, 200 mm",
+          "duration": 2.861399999999776,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance the quick offset outward, 0.5 mm",
+          "status": "passed",
+          "title": "the quick offset outward, 0.5 mm",
+          "duration": 2.246099999999842,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance the quick offset outward, 1 mm",
+          "status": "passed",
+          "title": "the quick offset outward, 1 mm",
+          "duration": 0.9024999999996908,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance the quick offset outward, 5 mm",
+          "status": "passed",
+          "title": "the quick offset outward, 5 mm",
+          "duration": 0.7476000000001477,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance the quick offset outward, 25 mm",
+          "status": "passed",
+          "title": "the quick offset outward, 25 mm",
+          "duration": 0.8993999999997868,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance the quick offset outward, 50 mm",
+          "status": "passed",
+          "title": "the quick offset outward, 50 mm",
+          "duration": 0.8428999999996449,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance the quick offset outward, 200 mm",
+          "status": "passed",
+          "title": "the quick offset outward, 200 mm",
+          "duration": 1.5150000000003274,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance Offset Shapes inward rounds the corners it moves away from just as closely",
+          "status": "passed",
+          "title": "Offset Shapes inward rounds the corners it moves away from just as closely",
+          "duration": 3.2390000000000327,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance the quick offset inward rounds the window corners just as closely",
+          "status": "passed",
+          "title": "the quick offset inward rounds the window corners just as closely",
+          "duration": 1.2395999999998821,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance round end caps around an open line stay within the tolerance",
+          "status": "passed",
+          "title": "round end caps around an open line stay within the tolerance",
+          "duration": 1.1122000000000298,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance a small 0.5 mm offset keeps its fine chords, not the coarse ones",
+          "status": "passed",
+          "title": "a small 0.5 mm offset keeps its fine chords, not the coarse ones",
+          "duration": 1.294800000000123,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance a small 1 mm offset keeps its fine chords, not the coarse ones",
+          "status": "passed",
+          "title": "a small 1 mm offset keeps its fine chords, not the coarse ones",
+          "duration": 6.127500000000055,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offset round corners stay within the machine curve tolerance"],
+          "fullName": "offset round corners stay within the machine curve tolerance a small 5 mm offset keeps its fine chords, not the coarse ones",
+          "status": "passed",
+          "title": "a small 5 mm offset keeps its fine chords, not the coarse ones",
+          "duration": 0.8727999999996428,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792080206662,
+      "endTime": 1792080206705.8728,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/core/geometry/offset-round-chord-error.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "matches independent rectangle set areas for 100 translated boolean cases",
+          "status": "passed",
+          "title": "matches independent rectangle set areas for 100 translated boolean cases",
+          "duration": 48.94830000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "unions a 1000-object overlapping chain without gaps or duplicated area",
+          "status": "passed",
+          "title": "unions a 1000-object overlapping chain without gaps or duplicated area",
+          "duration": 84.59270000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "builds the enclosing hull for 10000 rectangles with collinear duplicate corners",
+          "status": "passed",
+          "title": "builds the enclosing hull for 10000 rectangles with collinear duplicate corners",
+          "duration": 62.103200000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "offsets 250 separated squares with independently known corner-join area",
+          "status": "passed",
+          "title": "offsets 250 separated squares with independently known corner-join area",
+          "duration": 51.76090000000022,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792080230428,
+      "endTime": 1792080230675.761,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/core/geometry/tools-vector-audit-stress.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["usable silhouette and path repair controls"],
+          "fullName": "usable silhouette and path repair controls lets the operator choose the result operation and commits the actual silhouette",
+          "status": "passed",
+          "title": "lets the operator choose the result operation and commits the actual silhouette",
+          "duration": 84.2468000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usable silhouette and path repair controls"],
+          "fullName": "usable silhouette and path repair controls shows updated counts as tolerance changes and joins across artwork when applied",
+          "status": "passed",
+          "title": "shows updated counts as tolerance changes and joins across artwork when applied",
+          "duration": 30.22309999999925,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usable silhouette and path repair controls"],
+          "fullName": "usable silhouette and path repair controls rechecks whole-selection eligibility while the union dialog is open",
+          "status": "passed",
+          "title": "rechecks whole-selection eligibility while the union dialog is open",
+          "duration": 11.33770000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usable silhouette and path repair controls"],
+          "fullName": "usable silhouette and path repair controls rejects blank/negative tolerance and explains mismatched operations without mutation",
+          "status": "passed",
+          "title": "rejects blank/negative tolerance and explains mismatched operations without mutation",
+          "duration": 7.688399999999092,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usable silhouette and path repair controls"],
+          "fullName": "usable silhouette and path repair controls routes each new menu action and gates Join on a wholly unlocked open-vector selection",
+          "status": "passed",
+          "title": "routes each new menu action and gates Join on a wholly unlocked open-vector selection",
+          "duration": 9.838299999999435,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792080234773,
+      "endTime": 1792080234916.8384,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/commands/VectorRepairDialogHost.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["node tool Start keeps tabs placed by hand where they were"],
+          "fullName": "node tool Start keeps tabs placed by hand where they were moves no laser or CNC tab on a polyline part and leaves other contours alone",
+          "status": "passed",
+          "title": "moves no laser or CNC tab on a polyline part and leaves other contours alone",
+          "duration": 9.337900000002264,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Start keeps tabs placed by hand where they were"],
+          "fullName": "node tool Start keeps tabs placed by hand where they were moves no tab on a curved outline",
+          "status": "passed",
+          "title": "moves no tab on a curved outline",
+          "duration": 10.597399999998743,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Start keeps tabs placed by hand where they were"],
+          "fullName": "node tool Start keeps tabs placed by hand where they were moves no tab on a part closed by an implied line",
+          "status": "passed",
+          "title": "moves no tab on a part closed by an implied line",
+          "duration": 2.668099999998958,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Break re-measures tabs placed by hand from the break"],
+          "fullName": "node tool Break re-measures tabs placed by hand from the break holds no tab while open and puts every tab back when the path is closed again",
+          "status": "passed",
+          "title": "holds no tab while open and puts every tab back when the path is closed again",
+          "duration": 4.14429999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Break re-measures tabs placed by hand from the break"],
+          "fullName": "node tool Break re-measures tabs placed by hand from the break puts every tab back when the open path is reversed before it is closed again",
+          "status": "passed",
+          "title": "puts every tab back when the open path is reversed before it is closed again",
+          "duration": 2.2921000000023923,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Break re-measures tabs placed by hand from the break"],
+          "fullName": "node tool Break re-measures tabs placed by hand from the break puts every tab back on a curved part reversed and closed again after Break",
+          "status": "passed",
+          "title": "puts every tab back on a curved part reversed and closed again after Break",
+          "duration": 6.249400000000605,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Break re-measures tabs placed by hand from the break"],
+          "fullName": "node tool Break re-measures tabs placed by hand from the break puts back every tab the outline keeps after Break at curve end 1 (reversed: false)",
+          "status": "passed",
+          "title": "puts back every tab the outline keeps after Break at curve end 1 (reversed: false)",
+          "duration": 3.61620000000039,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Break re-measures tabs placed by hand from the break"],
+          "fullName": "node tool Break re-measures tabs placed by hand from the break puts back every tab the outline keeps after Break at curve end 1 (reversed: true)",
+          "status": "passed",
+          "title": "puts back every tab the outline keeps after Break at curve end 1 (reversed: true)",
+          "duration": 2.3804999999993015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Break re-measures tabs placed by hand from the break"],
+          "fullName": "node tool Break re-measures tabs placed by hand from the break puts back every tab the outline keeps after Break at curve end 2 (reversed: false)",
+          "status": "passed",
+          "title": "puts back every tab the outline keeps after Break at curve end 2 (reversed: false)",
+          "duration": 1.699399999997695,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Break re-measures tabs placed by hand from the break"],
+          "fullName": "node tool Break re-measures tabs placed by hand from the break puts back every tab the outline keeps after Break at curve end 2 (reversed: true)",
+          "status": "passed",
+          "title": "puts back every tab the outline keeps after Break at curve end 2 (reversed: true)",
+          "duration": 2.4808000000011816,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Break re-measures tabs placed by hand from the break"],
+          "fullName": "node tool Break re-measures tabs placed by hand from the break moves a tab on the dropped curve to the same share of the closing line (reversed: false)",
+          "status": "passed",
+          "title": "moves a tab on the dropped curve to the same share of the closing line (reversed: false)",
+          "duration": 1.9447000000000116,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Break re-measures tabs placed by hand from the break"],
+          "fullName": "node tool Break re-measures tabs placed by hand from the break moves a tab on the dropped curve to the same share of the closing line (reversed: true)",
+          "status": "passed",
+          "title": "moves a tab on the dropped curve to the same share of the closing line (reversed: true)",
+          "duration": 2.0349999999998545,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Break re-measures tabs placed by hand from the break"],
+          "fullName": "node tool Break re-measures tabs placed by hand from the break puts back every tab the outline keeps when Join closes a part broken after a curve",
+          "status": "passed",
+          "title": "puts back every tab the outline keeps when Join closes a part broken after a curve",
+          "duration": 3.9174999999995634,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["node tool Break re-measures tabs placed by hand from the break"],
+          "fullName": "node tool Break re-measures tabs placed by hand from the break puts back every tab the outline keeps after Break at a start a curve reaches",
+          "status": "passed",
+          "title": "puts back every tab the outline keeps after Break at a start a curve reaches",
+          "duration": 5.274900000000343,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792080228090,
+      "endTime": 1792080228149.275,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/state/path-node-curve-command-tabs.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "Convert to Path retains placed tabs with open=false and one undo",
+          "status": "passed",
+          "title": "Convert to Path retains placed tabs with open=false and one undo",
+          "duration": 5.566600000000108,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "Convert to Path retains placed tabs with open=true and one undo",
+          "status": "passed",
+          "title": "Convert to Path retains placed tabs with open=true and one undo",
+          "duration": 1.2166999999999462,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792080236219,
+      "endTime": 1792080236226.2168,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/state/vector-path-conversion-tabs.test.ts"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-/* global atob, Blob, document, Event, EventTarget, File, MediaStream, navigator, queueMicrotask, ReadableStream, setTimeout, TextDecoder, TextEncoder, window, WritableStream */
+/* global atob, Blob, document, DOMException, Event, EventTarget, File, MediaStream, navigator, queueMicrotask, ReadableStream, setTimeout, TextDecoder, TextEncoder, window, WritableStream */
 
 const BASIC_PROJECT = '__KERFDESK_E2E_PROJECT_FIXTURE__';
 
@@ -130,6 +130,7 @@ function respondToSerialWrite(text, emitLine, currentStatus, settings) {
 }
 
 function installFilePickers() {
+  const directoryEntries = new Set();
   window.showOpenFilePicker = async (options) => {
     record('picker-open', { multiple: options?.multiple === true });
     return state.openFiles.map(fileHandle);
@@ -146,6 +147,11 @@ function installFilePickers() {
       name: 'e2e-output',
       getFileHandle: async (name, options) => {
         record('picker-directory-file', { name, create: options?.create === true });
+        const exists = directoryEntries.has(name) || Object.hasOwn(state.savedFiles, name);
+        if (!exists && options?.create !== true)
+          throw new DOMException('The requested file does not exist.', 'NotFoundError');
+        // Creating a handle reserves the entry even before its first write.
+        directoryEntries.add(name);
         return saveHandle(name);
       },
     };

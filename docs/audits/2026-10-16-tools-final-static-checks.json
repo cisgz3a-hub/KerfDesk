@@ -1,0 +1,22 @@
+{
+  "e2e": {
+    "command": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit -p e2e/tsconfig.json --pretty false",
+    "exitCode": 0,
+    "result": "passed",
+    "diagnostics": []
+  },
+  "source": {
+    "command": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit --pretty false",
+    "exitCode": 0,
+    "result": "passed",
+    "note": "After final autosave source freeze",
+    "diagnostics": []
+  },
+  "catchallLint": {
+    "result": "passed",
+    "command": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js . --ignore-pattern 'src/core/**' --ignore-pattern 'src/ui/state/**' --ignore-pattern 'src/ui/laser/**' --ignore-pattern 'artifacts/tools-audit/**' --ignore-pattern '.audit-*/**' --ignore-pattern '.tools-audit-*.config.ts'",
+    "priorAttempt": "Stopped audit-owned lint process after detecting generated renderer bundles were included. Exit -1; not a pass. Repository lint configuration unchanged.",
+    "exitCode": 0,
+    "diagnostics": []
+  }
+}
