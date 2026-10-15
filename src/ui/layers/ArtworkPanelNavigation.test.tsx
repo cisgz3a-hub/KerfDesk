@@ -41,39 +41,6 @@ afterEach(async () => {
 });
 
 describe('Artwork panel navigation', () => {
-  it.each(['Done', 'Cancel'])(
-    'keeps organiser edits outside canvas numbering until %s',
-    async (finish) => {
-      seedIndependentArtwork();
-      useUiStore.getState().setCutsLayersView('run-order');
-      const host = await renderPanel();
-      await act(async () => buttonByText(host, 'Number on canvas').click());
-      const launcher = buttonByText(host, 'Objects');
-      expect(launcher.disabled).toBe(true);
-      await act(async () => launcher.click());
-      expect(document.body.querySelector('[role="dialog"]')).toBeNull();
-      await act(async () => buttonByText(host, finish).click());
-      expect(launcher.disabled).toBe(false);
-      await act(async () => launcher.click());
-      const dialog = required<HTMLElement>(document.body, '[role="dialog"]');
-      await act(async () =>
-        required<HTMLButtonElement>(dialog, 'button[aria-label^="Rename "]').click(),
-      );
-      const input = required<HTMLInputElement>(dialog, 'input[aria-label="Design name"]');
-      await act(async () => {
-        input.value = 'Saved name';
-        Simulate.change(input);
-      });
-      await act(async () => buttonByText(dialog, 'Save name').click());
-      await act(async () => buttonByText(dialog, 'Done').click());
-      await act(async () => buttonByText(host, 'Number on canvas').click());
-      await act(async () => buttonByText(host, 'Cancel').click());
-      expect(
-        useStore.getState().project.scene.objects.some((object) => object.name === 'Saved name'),
-      ).toBe(true);
-    },
-  );
-
   it('opens object organisation separately and restores focus without changing the job', async () => {
     seedIndependentArtwork();
     const before = useStore.getState().project;

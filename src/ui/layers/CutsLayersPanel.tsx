@@ -47,11 +47,7 @@ export function CutsLayersPanel(): JSX.Element {
         <h2>Artwork</h2>
         <Button
           data-artwork-organise
-          title={
-            numberingActive
-              ? 'Finish or cancel canvas numbering before organising artwork'
-              : 'Find, rename and organise artwork and groups'
-          }
+          title={artworkOrganiserTitle(numberingActive)}
           disabled={!hasObjects || numberingActive}
           onClick={() => setObjectsOpen(true)}
         >
@@ -99,6 +95,12 @@ export function CutsLayersPanel(): JSX.Element {
         : null}
     </aside>
   );
+}
+
+function artworkOrganiserTitle(numberingActive: boolean): string {
+  return numberingActive
+    ? 'Finish or cancel canvas numbering before organising artwork'
+    : 'Find, rename and organise artwork and groups';
 }
 
 function LayersView({ layers }: { readonly layers: ReadonlyArray<Layer> }): JSX.Element {
