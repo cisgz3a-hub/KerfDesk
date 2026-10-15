@@ -6,7 +6,10 @@
 // the exact-curve data dropped; closed contours stay closed and end on the
 // point they start from.
 
-import { flattenColoredPathCurvesForTransform } from '../scene/curve-path';
+import {
+  flattenColoredPathCurvesForTransform,
+  MAX_FLATTENED_CURVE_SEGMENTS,
+} from '../scene/curve-path';
 import { withClosingPoint } from '../scene/polyline-closure';
 import {
   IDENTITY_TRANSFORM,
@@ -23,11 +26,18 @@ export const WARP_DEFORM_TOLERANCE_MM = 0.05;
 // Split budget for a bent straight piece; flattening gets what remains, less a margin.
 const SPLIT_TOLERANCE_MM = 0.02;
 const TOLERANCE_MARGIN_MM = 0.005;
-const MIN_FLATTEN_TOLERANCE_MM = 0.001;
 const MAX_SPLIT_DEPTH = 12;
 const MIN_TEST_POINTS = 3;
 const MAX_TEST_POINTS = 32;
 const TEST_POINTS_PER_FEATURE = 3;
+
+export class WarpDeformGeometryError extends Error {}
+
+function geometryLimit(): never {
+  throw new WarpDeformGeometryError(
+    'The bend needs more geometry than can be prepared accurately. Reduce the bend or simplify the artwork; nothing changed.',
+  );
+}
 
 export type WarpedPaths = {
   readonly paths: ReadonlyArray<ColoredPath>;
@@ -56,13 +66,18 @@ export function warpObjectPaths(
     : (point: Vec2) => point;
   const toleranceMm = flattenToleranceMm(map, stretch);
   let curvesFlattened = false;
+  let remainingSegments = MAX_FLATTENED_CURVE_SEGMENTS;
   const warped = paths.map((path): ColoredPath => {
     if (hasExactCurves(path)) curvesFlattened = true;
     const { curves: _curves, ...rest } = path;
     return {
       ...rest,
-      polylines: sourcePolylines(path, transform, toleranceMm).map((polyline) =>
-        warpLocalPolyline(polyline, transform, map, toOutput),
+      polylines: sourcePolylines(path, transform, toleranceMm, remainingSegments).map(
+        (polyline) => {
+          const result = warpLocalPolyline(polyline, transform, map, toOutput, remainingSegments);
+          remainingSegments -= Math.max(0, result.points.length - 1);
+          return result;
+        },
       ),
     };
   });
@@ -79,18 +94,27 @@ export function warpWorldPoints(
   closed: boolean,
   map: PointMap,
   toleranceMm = SPLIT_TOLERANCE_MM,
+  segmentBudget = MAX_FLATTENED_CURVE_SEGMENTS,
 ): ReadonlyArray<Vec2> {
   const source = withClosingPoint(points, closed);
   const first = source[0];
   if (first === undefined) return [];
-  const out: Vec2[] = [map.apply(first)];
+  const out: Vec2[] = [];
+  appendPoint(out, map.apply(first), segmentBudget);
   for (let index = 1; index < source.length; index += 1) {
     const from = source[index - 1] as Vec2;
     const to = source[index] as Vec2;
     const mappedTo = map.apply(to);
-    if (map.keepsLinesStraight) out.push(mappedTo);
+    if (map.keepsLinesStraight) appendPoint(out, mappedTo, segmentBudget);
     else
-      splitPiece({ from, to, mappedFrom: out.at(-1) as Vec2, mappedTo }, map, toleranceMm, 0, out);
+      splitPiece(
+        { from, to, mappedFrom: out.at(-1) as Vec2, mappedTo },
+        map,
+        toleranceMm,
+        0,
+        out,
+        segmentBudget,
+      );
   }
   if (closed && out.length > 1) out[out.length - 1] = out[0] as Vec2;
   return out;
@@ -109,24 +133,40 @@ function splitPiece(
   toleranceMm: number,
   depth: number,
   out: Vec2[],
+  segmentBudget: number,
 ): void {
-  if (depth >= MAX_SPLIT_DEPTH || !pieceBends(piece, map, toleranceMm)) {
-    out.push(piece.mappedTo);
+  if (!pieceBends(piece, map, toleranceMm)) {
+    appendPoint(out, piece.mappedTo, segmentBudget);
     return;
   }
+  if (depth >= MAX_SPLIT_DEPTH) geometryLimit();
   const middle = {
     x: (piece.from.x + piece.to.x) / 2,
     y: (piece.from.y + piece.to.y) / 2,
   };
   const mappedMiddle = map.apply(middle);
-  splitPiece({ ...piece, to: middle, mappedTo: mappedMiddle }, map, toleranceMm, depth + 1, out);
+  splitPiece(
+    { ...piece, to: middle, mappedTo: mappedMiddle },
+    map,
+    toleranceMm,
+    depth + 1,
+    out,
+    segmentBudget,
+  );
   splitPiece(
     { ...piece, from: middle, mappedFrom: mappedMiddle },
     map,
     toleranceMm,
     depth + 1,
     out,
+    segmentBudget,
   );
+}
+
+function appendPoint(out: Vec2[], point: Vec2, segmentBudget: number): void {
+  if (out.length > segmentBudget || !Number.isFinite(point.x) || !Number.isFinite(point.y))
+    geometryLimit();
+  out.push(point);
 }
 
 // A long piece gets more test points than a short one, so a bend narrower
@@ -144,6 +184,7 @@ function pieceBends(piece: Piece, map: PointMap, toleranceMm: number): boolean {
       x: piece.from.x + (piece.to.x - piece.from.x) * t,
       y: piece.from.y + (piece.to.y - piece.from.y) * t,
     });
+    if (!Number.isFinite(mapped.x) || !Number.isFinite(mapped.y)) geometryLimit();
     if (distanceToSegment(mapped, piece.mappedFrom, piece.mappedTo) > toleranceMm) return true;
   }
   return false;
@@ -166,19 +207,26 @@ function flattenToleranceMm(map: PointMap, stretch: number): number {
     WARP_DEFORM_TOLERANCE_MM -
     TOLERANCE_MARGIN_MM -
     (map.keepsLinesStraight ? 0 : SPLIT_TOLERANCE_MM);
-  return Math.max(MIN_FLATTEN_TOLERANCE_MM, budget / Math.max(1, stretch));
+  const tolerance = budget / Math.max(1, stretch);
+  if (!Number.isFinite(tolerance) || tolerance <= 0) geometryLimit();
+  return tolerance;
 }
 
 // The path's exact curves flattened in its own space so the flattening error
 // is `toleranceMm` in world millimetres, or its polylines when it has no curves
-// or they are too many to flatten that finely.
+// without silently substituting cached coarse geometry when the budget is exceeded.
 function sourcePolylines(
   path: ColoredPath,
   transform: Transform,
   toleranceMm: number,
+  segmentBudget: number,
 ): ReadonlyArray<Polyline> {
-  const flattened = flattenColoredPathCurvesForTransform(path, transform, { toleranceMm });
-  return flattened.kind === 'ok' ? flattened.polylines : path.polylines;
+  const flattened = flattenColoredPathCurvesForTransform(path, transform, {
+    toleranceMm,
+    segmentBudget,
+  });
+  if (flattened.kind !== 'ok' || flattened.segmentCount > segmentBudget) geometryLimit();
+  return flattened.polylines;
 }
 
 function warpLocalPolyline(
@@ -186,9 +234,20 @@ function warpLocalPolyline(
   transform: Transform,
   map: PointMap,
   toOutput: (point: Vec2) => Vec2,
+  segmentBudget: number,
 ): Polyline {
   const world = polyline.points.map((point) => applyTransform(point, transform));
-  const points = warpWorldPoints(world, polyline.closed, map).map(toOutput);
+  const points = warpWorldPoints(
+    world,
+    polyline.closed,
+    map,
+    SPLIT_TOLERANCE_MM,
+    segmentBudget,
+  ).map((point) => {
+    const output = toOutput(point);
+    if (!Number.isFinite(output.x) || !Number.isFinite(output.y)) geometryLimit();
+    return output;
+  });
   if (polyline.closed && points.length > 1) points[points.length - 1] = points[0] as Vec2;
   return { closed: polyline.closed, points };
 }

@@ -13,6 +13,7 @@ import {
 import { joinCurveEndpointsWithin, type JoinableCurve } from './path-endpoint-join';
 import { materializedStrokeFields } from './stroke-transform';
 import { transformVectorCurve } from './vector-curve-transform';
+import { materializedTabAnchors } from './materialized-tab-anchors';
 import { type VectorOpError, type VectorSceneObject } from './vector-path-tools';
 
 export type VectorPathJoinPlan = {
@@ -169,7 +170,7 @@ function repairObject(
     kind: 'imported-svg',
     id: object.id,
     source: 'source' in object ? object.source : 'Joined paths',
-    ...repairMetadata(object, anchorMap),
+    ...repairMetadata(object, anchorMap, paths),
     transform: IDENTITY_TRANSFORM,
     bounds,
     paths,
@@ -179,6 +180,7 @@ function repairObject(
 function repairMetadata(
   object: VectorSceneObject,
   anchorMap: AnchorMap,
+  paths: ReadonlyArray<ColoredPath>,
 ): Pick<
   ImportedSvg,
   | 'operationIds'
@@ -199,22 +201,9 @@ function repairMetadata(
     ...(object.kind === 'imported-svg' && object.libraryProvenance !== undefined
       ? { libraryProvenance: object.libraryProvenance }
       : {}),
-    ...(object.cncTabAnchors === undefined
-      ? {}
-      : {
-          cncTabAnchors: object.cncTabAnchors.flatMap((anchor) => {
-            const position = anchorMap.get(curveKey(anchor.pathIndex, anchor.polylineIndex));
-            return position === undefined ? [] : [{ ...anchor, ...position }];
-          }),
-        }),
-    ...(object.laserTabAnchors === undefined
-      ? {}
-      : {
-          laserTabAnchors: object.laserTabAnchors.flatMap((anchor) => {
-            const position = anchorMap.get(curveKey(anchor.pathIndex, anchor.polylineIndex));
-            return position === undefined ? [] : [{ ...anchor, ...position }];
-          }),
-        }),
+    ...materializedTabAnchors(object, paths, (anchor) =>
+      anchorMap.get(curveKey(anchor.pathIndex, anchor.polylineIndex)),
+    ),
   };
 }
 

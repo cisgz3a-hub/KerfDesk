@@ -86,7 +86,7 @@ function TangentCircleDialog(): JSX.Element {
       }}
     >
       {solutions.length === 0 ? (
-        <p>No circle touches all three selected circles.</p>
+        <p>No tangent-circle solutions found for this selection.</p>
       ) : (
         <fieldset>
           <legend>Circles tangent to all three ({solutions.length})</legend>
@@ -116,7 +116,7 @@ function TangentCircleDialog(): JSX.Element {
 
 function describe(circle: TangentCircle): string {
   const enclosed = circle.contact.filter((contact) => contact === 'inside').length;
-  const how = enclosed === 0 ? 'outside all' : enclosed === 3 ? 'around all' : `around ${enclosed}`;
+  const how = enclosed === 0 ? 'outside all' : `internal contact with ${enclosed}`;
   return `Ø ${(circle.radius * 2).toFixed(2)} mm at (${circle.center.x.toFixed(2)}, ${circle.center.y.toFixed(2)}), ${how}`;
 }
 

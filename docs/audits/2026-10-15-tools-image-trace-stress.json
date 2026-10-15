@@ -1,0 +1,218 @@
+{
+  "numTotalTestSuites": 6,
+  "numPassedTestSuites": 6,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 16,
+  "numPassedTests": 16,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1792079577265,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["bakeSelectedVariableText"],
+          "fullName": "bakeSelectedVariableText fixes the current values as plain text in one undo step",
+          "status": "passed",
+          "title": "fixes the current values as plain text in one undo step",
+          "duration": 11.764499999997497,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["bakeSelectedVariableText"],
+          "fullName": "bakeSelectedVariableText bakes 1000 selected variable objects atomically and restores every template on undo",
+          "status": "passed",
+          "title": "bakes 1000 selected variable objects atomically and restores every template on undo",
+          "duration": 24.19670000000042,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["bakeSelectedVariableText"],
+          "fullName": "bakeSelectedVariableText changes nothing when one field fails or the project changes while rendering",
+          "status": "passed",
+          "title": "changes nothing when one field fails or the project changes while rendering",
+          "duration": 3.7265000000006694,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792079602141,
+      "endTime": 1792079602180.7266,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/app/bake-variable-text.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Multi-File Trace writes as it goes (rank 21)"],
+          "fullName": "Multi-File Trace writes as it goes (rank 21) keeps writer backpressure and file identity across 1000 inputs",
+          "status": "passed",
+          "title": "keeps writer backpressure and file identity across 1000 inputs",
+          "duration": 93.88290000000052,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Multi-File Trace writes as it goes (rank 21)"],
+          "fullName": "Multi-File Trace writes as it goes (rank 21) writes each file in order before tracing the next, holding one export",
+          "status": "passed",
+          "title": "writes each file in order before tracing the next, holding one export",
+          "duration": 1.470299999999952,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Multi-File Trace writes as it goes (rank 21)"],
+          "fullName": "Multi-File Trace writes as it goes (rank 21) writes nothing more after Cancel and reports the count written",
+          "status": "passed",
+          "title": "writes nothing more after Cancel and reports the count written",
+          "duration": 2.102100000000064,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Multi-File Trace writes as it goes (rank 21)"],
+          "fullName": "Multi-File Trace writes as it goes (rank 21) does not write a file that finished tracing after Cancel",
+          "status": "passed",
+          "title": "does not write a file that finished tracing after Cancel",
+          "duration": 0.8078999999997905,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792079583418,
+      "endTime": 1792079583516.8079,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/commands/multi-file-trace-action-stream.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["cropMaskedRasterImage"],
+          "fullName": "cropMaskedRasterImage crops a 2 megapixel image without losing row registration or source pixels",
+          "status": "passed",
+          "title": "crops a 2 megapixel image without losing row registration or source pixels",
+          "duration": 2751.9446,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cropMaskedRasterImage"],
+          "fullName": "cropMaskedRasterImage recovers embedded pixels when luma is missing or corrupt (undefined)",
+          "status": "passed",
+          "title": "recovers embedded pixels when luma is missing or corrupt (undefined)",
+          "duration": 3.048700000000281,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cropMaskedRasterImage"],
+          "fullName": "cropMaskedRasterImage recovers embedded pixels when luma is missing or corrupt (bad base64)",
+          "status": "passed",
+          "title": "recovers embedded pixels when luma is missing or corrupt (bad base64)",
+          "duration": 1.1010000000005675,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cropMaskedRasterImage"],
+          "fullName": "cropMaskedRasterImage recovers embedded pixels when luma is missing or corrupt (AA==)",
+          "status": "passed",
+          "title": "recovers embedded pixels when luma is missing or corrupt (AA==)",
+          "duration": 1.1994000000004235,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cropMaskedRasterImage"],
+          "fullName": "cropMaskedRasterImage rejects missing source pixels instead of publishing a white crop",
+          "status": "passed",
+          "title": "rejects missing source pixels instead of publishing a white crop",
+          "duration": 3.6598000000003594,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cropMaskedRasterImage"],
+          "fullName": "cropMaskedRasterImage crops a legacy turned-JPEG raster on the grid it was saved with",
+          "status": "passed",
+          "title": "crops a legacy turned-JPEG raster on the grid it was saved with",
+          "duration": 2.719999999999345,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cropMaskedRasterImage"],
+          "fullName": "cropMaskedRasterImage rejects an embedded source with inconsistent dimensions instead of misregistering the crop",
+          "status": "passed",
+          "title": "rejects an embedded source with inconsistent dimensions instead of misregistering the crop",
+          "duration": 0.9926000000004933,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cropMaskedRasterImage"],
+          "fullName": "cropMaskedRasterImage bakes the image mask into source pixels and shrinks bounds to the covered pixels",
+          "status": "passed",
+          "title": "bakes the image mask into source pixels and shrinks bounds to the covered pixels",
+          "duration": 1.5949000000000524,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cropMaskedRasterImage"],
+          "fullName": "cropMaskedRasterImage rejects a mask that does not overlap the selected image",
+          "status": "passed",
+          "title": "rejects a mask that does not overlap the selected image",
+          "duration": 0.5468000000000757,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792079582761,
+      "endTime": 1792079585527.595,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/raster/crop-image.test.ts"
+    }
+  ]
+}

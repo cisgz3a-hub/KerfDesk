@@ -6,6 +6,59 @@ import type { FileSaveRequest, PlatformAdapter, SaveTarget } from '../../platfor
 import { handleSaveProcessedBitmap } from './save-processed-bitmap';
 
 describe('handleSaveProcessedBitmap', () => {
+  it.each(['missing', 'invalid base64', 'AA==', 'AB=='])(
+    'reports %s processing pixels instead of saving blank or partial output',
+    async (cachedLuma) => {
+      const base = rasterProject();
+      const raster = base.scene.objects[0];
+      if (raster?.kind !== 'raster-image') throw new Error('missing raster');
+      const { lumaBase64: _luma, ...withoutLuma } = raster;
+      const project: Project = {
+        ...base,
+        scene: {
+          ...base.scene,
+          objects: [
+            cachedLuma === 'missing' ? withoutLuma : { ...withoutLuma, lumaBase64: cachedLuma },
+          ],
+        },
+      };
+      const write = vi.fn(async () => undefined);
+      const pushToast = vi.fn();
+      const encodePng = vi.fn();
+      await handleSaveProcessedBitmap({
+        platform: mockPlatform(async () => ({ displayName: 'x.png', write })),
+        project,
+        selectedObjectId: 'R1',
+        pushToast,
+        encodePng,
+      });
+      expect(write).not.toHaveBeenCalled();
+      expect(encodePng).not.toHaveBeenCalled();
+      expect(pushToast).toHaveBeenCalledWith(expect.stringContaining('Image Studio'), 'error');
+    },
+  );
+
+  it('reports unrecoverable source pixels without writing a successful blank export', async () => {
+    const base = rasterProject();
+    const raster = base.scene.objects[0];
+    if (raster?.kind !== 'raster-image') throw new Error('missing raster');
+    const { lumaBase64: _luma, dataUrl: _url, ...missingPixels } = raster;
+    const write = vi.fn(async () => undefined);
+    const pushToast = vi.fn();
+    await handleSaveProcessedBitmap({
+      platform: mockPlatform(async () => ({ displayName: 'x.png', write })),
+      project: { ...base, scene: { ...base.scene, objects: [missingPixels] } },
+      selectedObjectId: 'R1',
+      pushToast,
+      encodePng: vi.fn(),
+    });
+    expect(write).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringContaining('Could not save processed bitmap'),
+      'error',
+    );
+  });
+
   it('exports pass-through greys using the power range while ignoring image preparation', async () => {
     const base = rasterProject();
     const raster = base.scene.objects[0];

@@ -50,6 +50,37 @@ function decode(base64: string): ReadonlyArray<number> {
 }
 
 describe('cropMaskedRasterImage', () => {
+  it('crops a 2 megapixel image without losing row registration or source pixels', async () => {
+    const width = 2048;
+    const height = 1024;
+    const luma = Uint8Array.from({ length: width * height }, (_, index) => index % 251);
+    const input = raster({
+      pixelWidth: width,
+      pixelHeight: height,
+      bounds: { minX: 0, minY: 0, maxX: width, maxY: height },
+      lumaBase64: lumaToBase64(luma),
+    });
+    const mask = createRectangle({
+      id: 'mask-1',
+      color: input.color,
+      spec: { widthMm: 1024, heightMm: height, cornerRadiusMm: 0 },
+      transform: { ...IDENTITY_TRANSFORM, x: 512 },
+    });
+    const encoder = vi.fn(encode);
+    const cropped = await cropMaskedRasterImage(input, mask, encoder);
+    expect([cropped.pixelWidth, cropped.pixelHeight]).toEqual([1024, 1024]);
+    expect(cropped.bounds).toEqual({ minX: 512, minY: 0, maxX: 1536, maxY: 1024 });
+    const output = encoder.mock.calls[0]?.[0].luma;
+    expect(output).toBeDefined();
+    for (let y = 0; y < height; y += 1) {
+      expect(output?.subarray(y * 1024, (y + 1) * 1024)).toEqual(
+        luma.subarray(y * width + 512, y * width + 1536),
+      );
+    }
+    expect(input.imageMaskId).toBe('mask-1');
+    expect(input.lumaBase64).toBe(lumaToBase64(luma));
+  });
+
   it.each([undefined, 'bad base64', 'AA=='])(
     'recovers embedded pixels when luma is missing or corrupt (%s)',
     async (lumaBase64) => {

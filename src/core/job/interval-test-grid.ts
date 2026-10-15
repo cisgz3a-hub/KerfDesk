@@ -14,6 +14,8 @@ import {
   formatCalibrationInterval,
   formatCalibrationNumber,
 } from './calibration-labels';
+import { effectiveCalibrationSpeed } from './material-test-axes';
+import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 
 const MIN_STEPS = 1;
 const MAX_STEPS = 20;
@@ -161,7 +163,7 @@ function intervalTestLabelObjects(args: {
       sizeMm: args.labelSize,
     });
   });
-  const text = formatCalibrationNumber(args.effectiveSpeed);
+  const text = formatGcodeFeedMmPerMin(args.effectiveSpeed);
   return [
     ...intervalLabels,
     createCalibrationLabelObject({
@@ -189,7 +191,7 @@ function intervalLayer(args: {
       name:
         `Interval ${formatCalibrationInterval(args.intervalMm)} mm · ` +
         `${formatCalibrationNumber(args.requestedSpeed)} requested / ` +
-        `${formatCalibrationNumber(args.effectiveSpeed)} effective mm/min`,
+        `${formatGcodeFeedMmPerMin(args.effectiveSpeed)} effective mm/min`,
       color,
       mode: 'fill',
     }),
@@ -272,10 +274,4 @@ function clampFinite(value: number, fallback: number): number {
 
 function roundMm(value: number): number {
   return Number(value.toFixed(6));
-}
-
-function effectiveCalibrationSpeed(requested: number, maxFeedMmPerMin: number | undefined): number {
-  return maxFeedMmPerMin !== undefined && Number.isFinite(maxFeedMmPerMin) && maxFeedMmPerMin > 0
-    ? Math.min(requested, maxFeedMmPerMin)
-    : requested;
 }

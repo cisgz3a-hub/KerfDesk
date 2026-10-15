@@ -1,0 +1,358 @@
+[
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-ai.png",
+    "sha256": "0df67fca158fc15cc412fd4a1e9626735cf064a18d016cbc44d758b7aded0d6e"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-barcode.png",
+    "sha256": "e5b64b17819b396d4f62a8c03609d9e59e35e710fe17aa6bb533687e958e2baa"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-box-fit.png",
+    "sha256": "b72e4b6ed5499333176b40407c6bcb992bc9c91a378438dd3b24e6ea2f88db65"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-box-generated.png",
+    "sha256": "d5d1a30f71f5123debfa25d9bc295c7602f5f9b2cb4f4a5cba4ca913606329b8"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-camera.png",
+    "sha256": "12a5e3337adc27fb2d8a3362e2212b367db22c51794cbc5211e239b2f9c73906"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-close-fill-tolerance.png",
+    "sha256": "16863a6448d943f0963d75e884e5d9d82fc580c50834eb190b79e6ad10fc400a"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-close-fill.png",
+    "sha256": "b81bac34557d879c6f0c0e1490070453c0e7b582d0ec18c891687fa67fd3bd65"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-close-path-tolerance.png",
+    "sha256": "cf1bb721de01ce93f2e3a485d5902556b86bd15e98a4782cc07315e8494c4a84"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-close-path.png",
+    "sha256": "7ee928a9611c777789545935b4c36bd04077e8f473e6bf4fe2aa3c1e250b1bff"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-convert-path.png",
+    "sha256": "e78d7c7cf30532848a982fde4af7b6a733f433f398f47961f949998c6ae51390"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-cut-planner.png",
+    "sha256": "bdef18ed21c1841aecc290c49ab9af0ce012390d3ff93e8b7bbb78a2a843d346"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-cut-shapes.png",
+    "sha256": "3fc0bdb34abf95412c5da2b96f254ce75c66388bb8182aecc9d0fb2d961d15e8"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-deform.png",
+    "sha256": "3b9fa0bf997bdf1f0cb652ae81ea9aa07a73352d31ddadbce2277a4aace3e4ae"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-exclude.png",
+    "sha256": "ec6682f1f90e56b4f3e6df16dbf8332972e8901598051e19c82283120b12256d"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-extend.png",
+    "sha256": "07134d554caa91ad012dbae2c0b37798b7b111f28532b61f6db07f0e77243fdb"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-fill.png",
+    "sha256": "505ac69044179ca191d198dc5b81e697247c1b772c79110417a07cd925cb4199"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-fillet.png",
+    "sha256": "ddba23f56a255fb6c0f500eef9daffa68cedaf0c98f1f1904fa65a1bb7fd9131"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-generate-cut-path.png",
+    "sha256": "7c0c5f13e6d19f5b5e0096c24df9111ef0bcc936c0d7c60e5dfa2a0d060cf1d3"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-adjust-one-undo.jpg",
+    "sha256": "9375cf0ea8115af575c2f267a87e896bd5b6bd08058a215edd12b7c3c31a0fee"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-bake-fixed-value.jpg",
+    "sha256": "46c53f7ada87c52fa18b8ab8c275c11666d8fcb155668c5d12e4525f786eb5ac"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-bake-undo-restores-fields.jpg",
+    "sha256": "25000a6728450a8a14ae31b4f145007dd5447099452ca0e1b7e4f773aa47c746"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-convert-dialog.jpg",
+    "sha256": "a83ae5567835cc3b5dc7bfc95181a072903e0c60d791709ed54efbe74c7f7714"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-convert-result.jpg",
+    "sha256": "51d1c3b01954c92cb6425c5b757098e5161530aad41251854b6e30d708314723"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-crop-result.jpg",
+    "sha256": "84deac8b28afa3d085f9104cc6f5d5b7a9c412eb0976ca0535387700ec5000d7"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-flatten-result.jpg",
+    "sha256": "91e1ca13c3cc242f83c472898f84fa9db5ad5de9cc7791aaba1300e8ed5acfcf"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-mask-applied.jpg",
+    "sha256": "0d3135e5dbc895eb645ac25d25acdffaa016bf0a0c57e5a4d3903c14329026dc"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-multifile-pro-gate.jpg",
+    "sha256": "3dddadf31d684a5a94d0d63fe3ea5335f771f3a26001cb768f3dc83e05d54c02"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-photo-applied.jpg",
+    "sha256": "28eb58e46549dba2133a68c8663900848adc1f8a1c1231b10a76bbfd832bbfea"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-remove-mask-result.jpg",
+    "sha256": "0d3135e5dbc895eb645ac25d25acdffaa016bf0a0c57e5a4d3903c14329026dc"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-retrace-result.jpg",
+    "sha256": "33eadcf221e4209b324e4120e2e44be3a238ca35b1183001a0eb932d730dc74d"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-save-original-picker-unavailable.jpg",
+    "sha256": "eeb4270215fbc652cd030efcfa98b1083361fcd04de0df45f3d175207c3a1feb"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-save-processed-picker-unavailable.jpg",
+    "sha256": "b30fb791f10f3752694d5f1aedcfb5bab0731564ab6cc8f34b6f373fc03f6326"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-studio-invert-applied.jpg",
+    "sha256": "79468bb84509674a156b2b2648558400410d22c6e58f916f5c5b71d1738d9520"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-image-trace-result.jpg",
+    "sha256": "f8ccc6830276c85b64029081d9fa1f0cc1c7fe25c4f135483119dc01b82ee3d2"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-intersect.png",
+    "sha256": "0ccd607af1a5b38c91ea5234a0ba84ebbdf4cab851d0f3e5c0e6f52740ca16a4"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-interval.png",
+    "sha256": "e4bcafd443a49894b5da9eacfe46ec9a811f6f6f14a365acf540d6f2094b338e"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-join.png",
+    "sha256": "933cacd35da9cb673c212742d94b22d7f0d2aa4c2390675bde5a54188f592f90"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-labs.png",
+    "sha256": "0b36c73483da5c12e2adf7954422d16eb494d36bee81eac5676c0c3309ff4c9c"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-material.png",
+    "sha256": "040f79d7b59b50bd6820bc5a80821914f5ba6a1c20cf7d8f0db2eddc04a99d81"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-measure.png",
+    "sha256": "32bbd1c28f74391d984ae721276271eca39f0c8e3e371ae4ba2c5491f8a1701e"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-offset.png",
+    "sha256": "6c3b279e300e3374c2dd33c7fa777fec134cdbdd72f08ce4f288d3ffd684b810"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-optimize.png",
+    "sha256": "6dff02c7b592f40da9ebe131c1a7211b86d0df7467ca15c398d09b6f4cc0c89b"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-place-board.png",
+    "sha256": "78ec3b4e2e618dc164c90508db33f46dc7a3193a73b9562b1b0e103771975466"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-registration.png",
+    "sha256": "64bee82e6dfb45cfe478d2152690fceebb37de336c43bc6b7bffcb55a8fa2b20"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-relief.png",
+    "sha256": "9f5d03a88cf59a7caf9e129f3c010fdcf546c16100625f64999c028fdab76929"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-resize-joint-verified.png",
+    "sha256": "21043308be6bc8835e755e74ab8f65a2a2af1a7e678e4a86a3320f13b43cb81d"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-resize-joint.png",
+    "sha256": "619a2fa453de02c448797ddeae1093eaa0dc56004fa720866fa842e9fed1dd91"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-rotary-persistence.png",
+    "sha256": "011ecfe9f3c84eeb12bfd9ae42dd5ddb47b4ca038d5676cee392f8bbbd5fb17f"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-rotary.png",
+    "sha256": "ca6369cbbd3765ef1679c0193eaa03633f875e0693b0175af561372b2e7a2107"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-scan-offset.png",
+    "sha256": "95a027716ed32c5aefbb02a8b414d804f3124aea4e25a6673e016e4e3a15de41"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-shear.png",
+    "sha256": "23c739903150d446db8f1a5260f58b447314e959e3c8ba0015dd063c8efa02bc"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-stamp-timeout.png",
+    "sha256": "03d35236fb060c9de44a6106c688614c9c15f7476d509a82cb4b250af0af8a91"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-stamp.png",
+    "sha256": "9e691feca88444ea2d0d8f81bc76688ac2528e473f0ef47d0c3ba40ae42ad245"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-subtract.png",
+    "sha256": "e309ee3567a950119e5e7e531e0f85d28f35656a55ea053c9f2c94854783d20e"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-tangent.png",
+    "sha256": "c1908718b7c60f6b5f7a149b393417aada7d47073e58826b1c061c1cd4a7582e"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-text.png",
+    "sha256": "3ba9faacdae183ed200e277b3d084dadc88813c64436e96248ee96a066cfcfe3"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-trim.png",
+    "sha256": "07134d554caa91ad012dbae2c0b37798b7b111f28532b61f6db07f0e77243fdb"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-union.png",
+    "sha256": "526f270912ea2b276d29c23a26a9342d7d84e95a399961194ca14ff64ef27632"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-warp.png",
+    "sha256": "8e173551a66c02a398a9363679eb22e5b57265a87a80693359f64c29cb5db6a5"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/direct-weld.png",
+    "sha256": "93760fb95fd8766ceae9681e0ebc5aaf704656d53ce96eea137f9c61ea2b90f8"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/image-studio-menu.png",
+    "sha256": "617409dee02eda6c44df0563b56f787bc820ee5958045323369717d4954a6bbb"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/image-studio-result.png",
+    "sha256": "5ddfdb97c0ec374be212a6a8bec7a5fa00eeb611662bc07e365e445802015b99"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-weld-result.png",
+    "sha256": "ad2e379b11a32ab43f8bbfb6f3d72b742fbcb388abcc7e6db4028807ec57c92a"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-resize-joints-result.png",
+    "sha256": "8b46d3778add855c8900f6c0251f3dcfc637dd59d86ff1ba73a129027b4fe63a"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-join-paths-result.png",
+    "sha256": "91f7d7e230d222ce97d02f7107dd063a58a0f367e5a16f9eeb9f6eaed06a7a22"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-convert-to-path-result.png",
+    "sha256": "5a812443041f6530da14ef038ab5f2cf83639d1fd2aa089be2460d146797d306"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-generate-path-from-cut-result.png",
+    "sha256": "07ec6518f0fd0f2ed17e5b3cbd1783f740ea2ab2527dfe2f2a37f84e06a18df9"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-union-silhouette-result.png",
+    "sha256": "0921f146f6d7ffdb661a52482a98871bded702ff3702826126ce7a5e916fd10e"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-close-paths-with-tolerance-result.png",
+    "sha256": "d68dde32ea657b56104b9abbfc50c60ec297ae45024cce977fa3e8295ea33bf5"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-intersect-result.png",
+    "sha256": "e45c517f0409a2bcec8c6c3faabf1ace11f7473c5ecf44962803efc6a7e13bce"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-reverse-paths-result.png",
+    "sha256": "f220e3ac1b892257165de8fed4cff36eb6b7e2de802ba1aa240e2dd3bf81f4a0"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-offset-shapes-result.png",
+    "sha256": "742304d0471952f14704115de9886d81485387c063c6c04d85cd971fc4707fbf"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-prepare-stamp-result.png",
+    "sha256": "8037d3580e119e095cb1a8c2705d39a615c0ed69f2e2d2034d1eb405d18879e5"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-warp-result.png",
+    "sha256": "f008a7b07bedeeb38ebd894624098d50b2eed221c1e623265809072eda8bd565"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-radius-fillet-result.png",
+    "sha256": "a6621cfcf5e6128ff256d4e4e57f81788e21fbf13241713cf255e482aa594d39"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-close-paths-result.png",
+    "sha256": "5074f0524763fac5318067a0c1461e6009d7aba62941983cbf48796f567d8eca"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-close-open-fill-contours-result.png",
+    "sha256": "970fc02bea724aabc3fe5add069f9ee327913570f6aa0985e95e8e133338400d"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-optimize-shapes-result.png",
+    "sha256": "c91bd2ab596ba23a5abdf98fa2d54eb311c79e88814ada9db1ccbf1e22f05bf1"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-shear-result.png",
+    "sha256": "8c335707f052d51a06b314bd612c6a2ee70b6ee613cd9d20312c486497d8d89f"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-subtract-result.png",
+    "sha256": "87445176effe8b33c9695f6098f4931f25363c975b6c358d43499fec7b6e8039"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-extend-shapes-result.png",
+    "sha256": "ee55083e36f4edbd842a3e1318af5998ce6265b6b839c375b11ec74347e0b90e"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-trim-shapes-result.png",
+    "sha256": "a7274f4b3b40b163836c77eda465bf791a4edca19bf817cf56dfe8307157cb93"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-cut-shapes-result.png",
+    "sha256": "f4676341e9d8fcf08d9bc5f354f835282c9b4e1a3f703d240a9f39b9fe54484c"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-fill-selection-result.png",
+    "sha256": "ecdaa7c2caec5b0fb3d4dab4c8cf465b5f1e68d9f181a8d91355ee0c703e76af"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-rubber-band-outline-result.png",
+    "sha256": "1d6b19d49c51902f4ce17b7818c7237e73ec598ebde9d5280ae07ba35b016704"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-deform-result.png",
+    "sha256": "59cc4a9744db5c3a3d7b45b40844c2b21f3c9e1438fc5790d055314d1e04cd18"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-close-fill-contours-with-tolerance-result.png",
+    "sha256": "8242fcf369af0d080179ccc8a70c1a4b0685aab536ba27560751693c56ebf756"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/browser-vector-exclude-result.png",
+    "sha256": "786edca5a65b34ddd031bdf0863ac6df79145a3d5a598ab3663e207892c5f198"
+  },
+  {
+    "file": "evidence/tools-quality-2026-10-16/2026-10-15-tools-image-trace-vitest.json.gz",
+    "sha256": "3f9d1976ca8eab74da28cb2b25d72caac1b70a4200f49391317a93d198823fa4"
+  }
+]

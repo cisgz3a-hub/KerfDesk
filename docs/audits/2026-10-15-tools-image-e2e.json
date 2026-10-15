@@ -1,0 +1,287 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "e2e/tools-image-audit.e2e.ts",
+      "--workers=1",
+      "--max-failures=1",
+      "--reporter=list,json",
+      "--output=.audit-image-e2e-restart"
+    ],
+    "configFile": "C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\playwright.config.ts",
+    "rootDir": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 1,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/.audit-image-e2e-restart",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/e2e",
+        "testIgnore": ["**/production-bundle.spec.ts"],
+        "testMatch": ["**/*.e2e.ts", "**/*.spec.ts"],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [["list"], ["json"]],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm exec vite . --mode desktop --host 127.0.0.1 --port 5198 --strictPort",
+      "cwd": "C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\",
+      "url": "http://127.0.0.1:5198",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "tools-image-audit.e2e.ts",
+      "file": "tools-image-audit.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "Image Studio commits inverted pixels and the project Undo restores them",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 600000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 484404,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('menubar', { name: 'Application menu' })\nExpected: visible\nTimeout: 480000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 480000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('menubar', { name: 'Application menu' })\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('menubar', { name: 'Application menu' })\nExpected: visible\nTimeout: 480000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 480000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('menubar', { name: 'Application menu' })\u001b[22m\n\n    at openWorkspace (C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\e2e\\tools-image-audit.e2e.ts:27:73)\n    at importedImage (C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\e2e\\tools-image-audit.e2e.ts:59:3)\n    at C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\e2e\\tools-image-audit.e2e.ts:76:18",
+                    "location": {
+                      "file": "C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\e2e\\tools-image-audit.e2e.ts",
+                      "column": 73,
+                      "line": 27
+                    },
+                    "snippet": "  25 | async function openWorkspace(page: Page): Promise<void> {\n  26 |   if (page.url() === 'about:blank') await page.goto('/', { waitUntil: 'commit' });\n> 27 |   await expect(page.getByRole('menubar', { name: 'Application menu' })).toBeVisible({\n     |                                                                         ^\n  28 |     timeout: 480_000,\n  29 |   });\n  30 |   await page.evaluate(async () => {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\e2e\\tools-image-audit.e2e.ts",
+                        "column": 73,
+                        "line": 27
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('menubar', { name: 'Application menu' })\nExpected: visible\nTimeout: 480000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 480000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('menubar', { name: 'Application menu' })\u001b[22m\n\n\n  25 | async function openWorkspace(page: Page): Promise<void> {\n  26 |   if (page.url() === 'about:blank') await page.goto('/', { waitUntil: 'commit' });\n> 27 |   await expect(page.getByRole('menubar', { name: 'Application menu' })).toBeVisible({\n     |                                                                         ^\n  28 |     timeout: 480_000,\n  29 |   });\n  30 |   await page.evaluate(async () => {\n    at openWorkspace (C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\e2e\\tools-image-audit.e2e.ts:27:73)\n    at importedImage (C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\e2e\\tools-image-audit.e2e.ts:59:3)\n    at C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\e2e\\tools-image-audit.e2e.ts:76:18"
+                    },
+                    {
+                      "message": "\u001b[31mFixture \"trace recording\" timeout of 60000ms exceeded during teardown.\u001b[39m"
+                    },
+                    {
+                      "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-15T17:12:00.992Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\.audit-image-e2e-restart\\tools-image-audit.e2e.ts-I-34de7--project-Undo-restores-them\\test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\.audit-image-e2e-restart\\tools-image-audit.e2e.ts-I-34de7--project-Undo-restores-them\\error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\.audit-image-e2e-restart\\tools-image-audit.e2e.ts-I-34de7--project-Undo-restores-them\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Asus\\.codex\\worktrees\\dbe6\\LaserForge-2.0\\e2e\\tools-image-audit.e2e.ts",
+                    "column": 73,
+                    "line": 27
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "b781d057c196b2d12262-af9bc7a4cecfeace576e",
+          "file": "tools-image-audit.e2e.ts",
+          "line": 72,
+          "column": 1
+        },
+        {
+          "title": "Adjust Image and Photo engraving apply settings through their dialogs and undo",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 600000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b781d057c196b2d12262-a8725b38a68ce482fc3c",
+          "file": "tools-image-audit.e2e.ts",
+          "line": 98,
+          "column": 1
+        },
+        {
+          "title": "Apply, Remove, Crop and Flatten masks preserve pixels, reference rules and Undo",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 600000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b781d057c196b2d12262-5ce901c89c4d34488e1f",
+          "file": "tools-image-audit.e2e.ts",
+          "line": 126,
+          "column": 1
+        },
+        {
+          "title": "Original and Processed save actual PNG data and leave the scene unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 600000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b781d057c196b2d12262-c861a61541f57d721a1a",
+          "file": "tools-image-audit.e2e.ts",
+          "line": 199,
+          "column": 1
+        },
+        {
+          "title": "Trace, Re-trace and Multi-File Trace retain source/settings and write real vector files",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 600000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b781d057c196b2d12262-8b9babe8ccc5815735de",
+          "file": "tools-image-audit.e2e.ts",
+          "line": 272,
+          "column": 1
+        },
+        {
+          "title": "Bake Variable Text freezes rendered content and Undo restores its template",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 600000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b781d057c196b2d12262-fe6d7082d1a4866207f7",
+          "file": "tools-image-audit.e2e.ts",
+          "line": 325,
+          "column": 1
+        },
+        {
+          "title": "Convert to Bitmap produces pixels and Undo restores the original vector",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 600000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b781d057c196b2d12262-6c9c0891076c20686e1e",
+          "file": "tools-image-audit.e2e.ts",
+          "line": 348,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "message": "\u001b[31mTesting stopped early after 1 maximum allowed failures.\u001b[39m"
+    }
+  ],
+  "stats": {
+    "startTime": "2026-10-15T17:09:25.732Z",
+    "duration": 832060.029,
+    "expected": 0,
+    "skipped": 6,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

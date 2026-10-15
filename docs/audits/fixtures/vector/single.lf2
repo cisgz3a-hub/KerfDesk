@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "device": {
+    "name": "E2E GRBL 300x300",
+    "bedWidth": 300,
+    "bedHeight": 300,
+    "maxFeed": 6000,
+    "maxPowerS": 1000,
+    "capabilities": [
+      "grbl",
+      "wcs",
+      "verified-origin",
+      "rotary"
+    ],
+    "origin": "front-left",
+    "homing": {
+      "enabled": true,
+      "direction": "front-left"
+    },
+    "autofocusCommand": ""
+  },
+  "workspace": {
+    "width": 300,
+    "height": 300,
+    "units": "mm"
+  },
+  "notes": "Synthetic vector audit fixture; no hardware operation",
+  "scene": {
+    "objects": [
+      {
+        "id": "a",
+        "transform": {
+          "x": 0,
+          "mirrorX": false,
+          "rotationDeg": 0,
+          "y": 0,
+          "mirrorY": false,
+          "scaleX": 1,
+          "scaleY": 1
+        },
+        "kind": "imported-svg",
+        "paths": [
+          {
+            "polylines": [
+              {
+                "points": [
+                  {
+                    "y": 40,
+                    "x": 40
+                  },
+                  {
+                    "y": 40,
+                    "x": 60
+                  },
+                  {
+                    "y": 60,
+                    "x": 60
+                  },
+                  {
+                    "y": 60,
+                    "x": 40
+                  },
+                  {
+                    "y": 40,
+                    "x": 40
+                  }
+                ],
+                "closed": true
+              }
+            ],
+            "color": "#ff0000"
+          }
+        ],
+        "bounds": {
+          "maxX": 60.0,
+          "minX": 40.0,
+          "minY": 40.0,
+          "maxY": 60.0
+        },
+        "source": "a.svg",
+        "operationIds": [
+          "e2e-red"
+        ]
+      }
+    ],
+    "layers": [
+      {
+        "id": "e2e-red",
+        "color": "#ff0000",
+        "mode": "line",
+        "minPower": 0,
+        "power": 30,
+        "speed": 1500,
+        "passes": 1,
+        "visible": true,
+        "output": true,
+        "airAssist": false,
+        "kerfOffsetMm": 0,
+        "tabsEnabled": false,
+        "tabSizeMm": 0.5,
+        "tabsPerShape": 4,
+        "tabSkipInnerShapes": true,
+        "hatchAngleDeg": 0,
+        "hatchSpacingMm": 0.1,
+        "fillOverscanMm": 5,
+        "fillStyle": "scanline",
+        "fillBidirectional": true,
+        "fillCrossHatch": false,
+        "ditherAlgorithm": "floyd-steinberg",
+        "linesPerMm": 10,
+        "imageBidirectional": true,
+        "negativeImage": false,
+        "passThrough": false,
+        "dotWidthCorrectionMm": 0,
+        "subLayers": []
+      }
+    ]
+  }
+}

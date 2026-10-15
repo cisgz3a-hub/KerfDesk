@@ -15,7 +15,7 @@ import {
   type PointMap,
   type WarpDeformGrid,
 } from '../../core/geometry/warp-deform-map';
-import { warpObjectPaths } from '../../core/geometry/warp-deform-paths';
+import { WarpDeformGeometryError, warpObjectPaths } from '../../core/geometry/warp-deform-paths';
 import {
   boundsForPaths,
   isVectorPathObject,
@@ -35,6 +35,7 @@ export type WarpDeformPlan = {
   readonly convertedText: number;
   readonly convertedShapes: number;
   readonly curvesFlattened: boolean;
+  readonly failure?: string;
 };
 
 type WarpedObject = {
@@ -77,6 +78,22 @@ export function warpDeformRequestForSelection(
 }
 
 export function planWarpDeform(scene: Scene, request: WarpDeformRequest): WarpDeformPlan {
+  try {
+    return prepareWarpDeform(scene, request);
+  } catch (error) {
+    if (!(error instanceof WarpDeformGeometryError)) throw error;
+    return {
+      objects: scene.objects,
+      warped: 0,
+      convertedText: 0,
+      convertedShapes: 0,
+      curvesFlattened: false,
+      failure: error.message,
+    };
+  }
+}
+
+function prepareWarpDeform(scene: Scene, request: WarpDeformRequest): WarpDeformPlan {
   const map = warpDeformMap(request.grid, request.box, request.handles);
   const stretch = warpDeformStretch(map, request.box);
   const ids = new Set(request.objectIds);
@@ -133,17 +150,16 @@ function warpSceneObject(object: VectorSceneObject, map: PointMap, stretch: numb
 // Convert to Path's object with the warped world polylines in place of its own
 // flattening. Both keep one path per source path in the same order.
 function convertAndWarp(object: VectorSceneObject, map: PointMap, stretch: number): WarpedObject {
-  const converted = materializeVectorObject(object, object.id);
+  // Reuse the bounded world geometry; conversion must not flatten the source again.
   const result = warpObjectPaths(object.paths, object.transform, map, stretch, 'world');
-  const paths = converted.paths.map((path, index) => ({
-    ...path,
-    polylines: result.paths[index]?.polylines ?? path.polylines,
-  }));
+  const converted = materializeVectorObject(
+    object,
+    object.id,
+    result.paths.map((path) => path.polylines),
+  );
   return {
     object: {
       ...converted,
-      paths,
-      bounds: boundsForPaths(paths) ?? converted.bounds,
       ...(object.cncTabAnchors === undefined ? {} : { cncTabAnchors: object.cncTabAnchors }),
       ...(object.laserTabAnchors === undefined ? {} : { laserTabAnchors: object.laserTabAnchors }),
     },

@@ -1,0 +1,248 @@
+{
+  "numTotalTestSuites": 9,
+  "numPassedTestSuites": 9,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 19,
+  "numPassedTests": 19,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1792079865702,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Photo engraving command"],
+          "fullName": "Photo engraving command requires a raster selection and dispatches only when the image is eligible",
+          "status": "passed",
+          "title": "requires a raster selection and dispatches only when the image is eligible",
+          "duration": 9.484199999998964,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Photo engraving command"],
+          "fullName": "Photo engraving command remains inert when a host has not supplied its opening callback",
+          "status": "passed",
+          "title": "remains inert when a host has not supplied its opening callback",
+          "duration": 1.5005000000019209,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Photo engraving command"],
+          "fullName": "Photo engraving command appears in laser mode and is absent from CNC command surfaces",
+          "status": "passed",
+          "title": "appears in laser mode and is absent from CNC command surfaces",
+          "duration": 2.7682999999997264,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792079885230,
+      "endTime": 1792079885243.7683,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/commands/command-photo-engraving.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Re-trace Original command"],
+          "fullName": "Re-trace Original command is disabled unless the selected trace still has its source raster",
+          "status": "passed",
+          "title": "is disabled unless the selected trace still has its source raster",
+          "duration": 10.037899999999354,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Re-trace Original command"],
+          "fullName": "Re-trace Original command runs the retrace action when the original raster is available",
+          "status": "passed",
+          "title": "runs the retrace action when the original raster is available",
+          "duration": 1.877599999999802,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792079888957,
+      "endTime": 1792079888968.8777,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/commands/command-retrace-original.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Create Rubber-Band Outline"],
+          "fullName": "Create Rubber-Band Outline adds one closed outline around the selection, selected alone, in one undo step",
+          "status": "passed",
+          "title": "adds one closed outline around the selection, selected alone, in one undo step",
+          "duration": 8.381100000002334,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Create Rubber-Band Outline"],
+          "fullName": "Create Rubber-Band Outline cuts the outline with a copy of the first selected Line operation",
+          "status": "passed",
+          "title": "cuts the outline with a copy of the first selected Line operation",
+          "duration": 1.5165999999990163,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Create Rubber-Band Outline"],
+          "fullName": "Create Rubber-Band Outline gives the outline a new Line operation when nothing selected is cut as a line",
+          "status": "passed",
+          "title": "gives the outline a new Line operation when nothing selected is cut as a line",
+          "duration": 0.9857999999985623,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Create Rubber-Band Outline"],
+          "fullName": "Create Rubber-Band Outline refuses a selection that lies on one straight line",
+          "status": "passed",
+          "title": "refuses a selection that lies on one straight line",
+          "duration": 0.7007999999987078,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Create Rubber-Band Outline"],
+          "fullName": "Create Rubber-Band Outline does nothing without a selection",
+          "status": "passed",
+          "title": "does nothing without a selection",
+          "duration": 0.6242999999994936,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Select Contained"],
+          "fullName": "Select Contained adds only the artwork lying fully inside the selected closed shape",
+          "status": "passed",
+          "title": "adds only the artwork lying fully inside the selected closed shape",
+          "duration": 2.3858000000000175,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Select Contained"],
+          "fullName": "Select Contained never picks locked artwork or artwork on a hidden operation",
+          "status": "passed",
+          "title": "never picks locked artwork or artwork on a hidden operation",
+          "duration": 1.0985000000000582,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Select Contained"],
+          "fullName": "Select Contained explains when no closed shape is selected or nothing lies inside",
+          "status": "passed",
+          "title": "explains when no closed shape is selected or nothing lies inside",
+          "duration": 1.1052999999992608,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Select Smaller Shapes"],
+          "fullName": "Select Smaller Shapes adds artwork no wider and no taller than the selection and keeps the selection",
+          "status": "passed",
+          "title": "adds artwork no wider and no taller than the selection and keeps the selection",
+          "duration": 1.1097999999983585,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Select Smaller Shapes"],
+          "fullName": "Select Smaller Shapes says when nothing is selected or nothing is as small",
+          "status": "passed",
+          "title": "says when nothing is selected or nothing is as small",
+          "duration": 0.7288000000007742,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Flatten Image Mask"],
+          "fullName": "Flatten Image Mask bakes the mask into the image and deletes the mask shape in one undo step",
+          "status": "passed",
+          "title": "bakes the mask into the image and deletes the mask shape in one undo step",
+          "duration": 2.3460999999988417,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Flatten Image Mask"],
+          "fullName": "Flatten Image Mask keeps a locked mask shape",
+          "status": "passed",
+          "title": "keeps a locked mask shape",
+          "duration": 0.7322999999996682,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Flatten Image Mask"],
+          "fullName": "Flatten Image Mask keeps a mask shape that another image still uses",
+          "status": "passed",
+          "title": "keeps a mask shape that another image still uses",
+          "duration": 0.6836000000002969,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Flatten Image Mask"],
+          "fullName": "Flatten Image Mask changes nothing for an image without a mask",
+          "status": "passed",
+          "title": "changes nothing for an image without a mask",
+          "duration": 0.3786999999974796,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792079884578,
+      "endTime": 1792079884601.3787,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/state/design-tools-actions.test.ts"
+    }
+  ]
+}

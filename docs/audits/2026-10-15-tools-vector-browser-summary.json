@@ -1,0 +1,340 @@
+[
+  {
+    "command": "tools.weld",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-weld-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.resize-joints",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-resize-joints-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.join-paths",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-join-paths-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.convert-to-path",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-convert-to-path-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.generate-path-from-cut",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-generate-path-from-cut-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.union-silhouette",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-union-silhouette-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.close-paths-with-tolerance",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-close-paths-with-tolerance-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.intersect",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-intersect-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.reverse-paths",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-reverse-paths-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.offset-shapes",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-offset-shapes-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.prepare-stamp",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-prepare-stamp-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.warp",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-warp-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.radius-fillet",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-radius-fillet-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.close-paths",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-close-paths-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.close-open-fill-contours",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-close-open-fill-contours-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.optimize-shapes",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-optimize-shapes-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.shear",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-shear-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.subtract",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-subtract-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.extend-shapes",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-extend-shapes-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.trim-shapes",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-trim-shapes-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.cut-shapes",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-cut-shapes-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.fill-selection",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-fill-selection-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.rubber-band-outline",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-rubber-band-outline-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.deform",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-deform-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.close-fill-contours-with-tolerance",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-close-fill-contours-with-tolerance-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  },
+  {
+    "command": "tools.exclude",
+    "screenshot": "evidence/tools-quality-2026-10-16/browser-vector-exclude-result.png",
+    "result": "passed",
+    "checks": [
+      "actual menu/control input",
+      "scene changed",
+      "one Undo entry",
+      "exact scene restoration",
+      "no page errors",
+      "no serial events"
+    ]
+  }
+]

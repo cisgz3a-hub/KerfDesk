@@ -172,6 +172,36 @@ describe('useStore', () => {
     expect(useStore.getState().dirty).toBe(true);
   });
 
+  it('Adjust Image commits image and operation settings in one Undo step', () => {
+    useStore.getState().importRasterImage(rasterObj('R1'));
+    const before = useStore.getState().project;
+    const layer = before.scene.layers[0]!;
+    const undoBefore = useStore.getState().undoStack.length;
+    useStore.getState().setRasterImageAdjustments(
+      'R1',
+      { brightness: 17 },
+      {
+        id: layer.id,
+        patch: {
+          ditherAlgorithm: 'stucki',
+          minPower: 7,
+          linesPerMm: 12,
+          dotWidthCorrectionMm: 0.1,
+          negativeImage: true,
+          passThrough: false,
+        },
+      },
+    );
+    const applied = useStore.getState().project;
+    expect(applied.scene.objects[0]).toMatchObject({ brightness: 17 });
+    expect(applied.scene.layers[0]).toMatchObject({ ditherAlgorithm: 'stucki', minPower: 7 });
+    expect(useStore.getState().undoStack).toHaveLength(undoBefore + 1);
+    useStore.getState().undo();
+    expect(useStore.getState().project.scene).toEqual(before.scene);
+    useStore.getState().redo();
+    expect(useStore.getState().project.scene).toEqual(applied.scene);
+  });
+
   it('newProject resets state', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setJobPlacement({ startFrom: 'current-position', anchor: 'center' });

@@ -38,6 +38,10 @@ function applyWarpDeformMutation(
   }
   const scene = state.project.scene;
   const plan = planWarpDeform(scene, request);
+  if (plan.failure !== undefined) {
+    toast(plan.failure);
+    return state;
+  }
   toast(warpDeformNotice(request.grid, plan, leftAlone(scene, selectedObjectIds(state))));
   if (plan.warped === 0) return state;
   return {

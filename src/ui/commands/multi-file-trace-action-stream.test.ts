@@ -29,6 +29,29 @@ function namedFile(name: string): MultiFileTraceFile {
 const FILES = ['a.png', 'b.png', 'c.png'].map(namedFile);
 
 describe('Multi-File Trace writes as it goes (rank 21)', () => {
+  it('keeps writer backpressure and file identity across 1000 inputs', async () => {
+    const files = Array.from({ length: 1000 }, (_, index) => namedFile(`input-${index}.png`));
+    let decoded = 0;
+    let written = 0;
+    const toast = vi.fn();
+    await runMultiFileTrace(files, toast, {
+      loadImage: async () => {
+        expect(decoded).toBe(written);
+        decoded += 1;
+        return rawImage(4, 4);
+      },
+      trace: async () => [SQUARE_PATH],
+      write: async (file) => {
+        await Promise.resolve();
+        expect(file.filename).toBe(`input-${written}-trace.svg`);
+        written += 1;
+        return true;
+      },
+    });
+    expect(written).toBe(1000);
+    expect(decoded).toBe(1000);
+  });
+
   it('writes each file in order before tracing the next, holding one export', async () => {
     const events: string[] = [];
     const progress: number[] = [];

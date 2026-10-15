@@ -12,6 +12,7 @@ import { buildProcessedRasterBitmap, processedRasterDimensions } from '../raster
 import { rgbaToPngBlob } from '../raster/luma-bitmap';
 import type { ToastVariant } from '../state/toast-store';
 import { hydratePagedRasterImage } from '../import/paged-raster-hydration';
+import { validateRasterLumaBase64 } from '../../io/project/project-raster-luma-validator';
 
 const FORBIDDEN_FILENAME_CHARS = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
 
@@ -64,6 +65,7 @@ export async function handleSaveProcessedBitmap(ctx: SaveProcessedBitmapCtx): Pr
   if (target === null) return;
   try {
     const preparationImage = await hydratePagedRasterImage(selected);
+    assertProcessedBitmapPixels(preparationImage);
     const bitmap = buildProcessedRasterBitmap(preparationImage, layer, ctx.project.device, {
       maskObject: imageMaskObjectFor(ctx.project, selected),
     });
@@ -76,6 +78,20 @@ export async function handleSaveProcessedBitmap(ctx: SaveProcessedBitmapCtx): Pr
     ctx.pushToast(`Saved processed bitmap to ${target.displayName}`, 'success');
   } catch (err) {
     ctx.pushToast(`Could not save processed bitmap: ${errMsg(err)}`, 'error');
+  }
+}
+
+function assertProcessedBitmapPixels(image: RasterImage): void {
+  if (
+    image.lumaBase64 === undefined ||
+    validateRasterLumaBase64(image.lumaBase64, image.pixelWidth * image.pixelHeight, 'image') !==
+      null
+  ) {
+    // Recovering only the export would disagree with the current project's
+    // executable output. Studio Apply restores both sources in one undo step.
+    throw new Error(
+      'The image processing pixels are missing or malformed. Open the image in Image Studio and Apply before exporting.',
+    );
   }
 }
 

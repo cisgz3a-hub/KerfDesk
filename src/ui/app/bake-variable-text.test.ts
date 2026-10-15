@@ -27,6 +27,26 @@ describe('bakeSelectedVariableText', () => {
     expect(textValues(useStore.getState().project)).toEqual(['old', 'old', 'Fixed']);
   });
 
+  it('bakes 1000 selected variable objects atomically and restores every template on undo', async () => {
+    const initial = useStore.getState();
+    const template = initial.project.scene.objects[0];
+    if (template?.kind !== 'text') throw new Error('missing variable text fixture');
+    const objects = Array.from({ length: 1000 }, (_, index) => ({
+      ...template,
+      id: `variable-${index}`,
+    }));
+    useStore.setState({
+      project: { ...initial.project, scene: { ...initial.project.scene, objects } },
+      selectedObjectId: 'variable-0',
+      additionalSelectedIds: new Set(objects.slice(1).map((object) => object.id)),
+    });
+    await bakeSelectedVariableText({ render: renderFixture, now: () => NOW });
+    expect(textValues(useStore.getState().project)).toEqual(Array<string>(1000).fill('A-010'));
+    expect(useStore.getState().undoStack).toHaveLength(1);
+    useStore.getState().undo();
+    expect(useStore.getState().project.scene.objects).toEqual(objects);
+  });
+
   it('changes nothing when one field fails or the project changes while rendering', async () => {
     const failing: VariableTextRenderer = async () => {
       throw new Error('font missing');

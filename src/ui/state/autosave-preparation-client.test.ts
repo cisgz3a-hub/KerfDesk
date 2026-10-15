@@ -40,8 +40,86 @@ describe('off-thread autosave preparation', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it('retires a silent worker after one minute and releases waiting work', async () => {
+    vi.useFakeTimers();
+    const preparing = prepareAutosaveRecordOffThread(createProject(), 123, SESSION_ID, STORAGE_KEY);
+    const worker = FakeWorker.instances[0]!;
+    const lateReply = worker.onmessage!;
+    let nextStarted = false;
+    const cancelNext = reserveWorkerMemory((release) => {
+      nextStarted = true;
+      release();
+    });
+    try {
+      await vi.advanceTimersByTimeAsync(60_000);
+      expectReleased(worker);
+      expect(nextStarted).toBe(true);
+      await expect(preparing).resolves.toMatchObject({ kind: 'failed', reason: 'storage-error' });
+      lateReply({
+        data: records.prepareAutosaveRecord(createProject(), 123, SESSION_ID, STORAGE_KEY),
+      } as MessageEvent<AutosavePreparation>);
+      expect(worker.terminate).toHaveBeenCalledTimes(1);
+    } finally {
+      worker.respond({ kind: 'failed', reason: 'storage-error', error: new Error('test cleanup') });
+      cancelNext();
+    }
+  });
+
+  it('keeps a healthy active autosave non-preemptible before starting interactive work', async () => {
+    const project = createProject();
+    const expected = records.prepareAutosaveRecord(project, 123, SESSION_ID, STORAGE_KEY);
+    const preparing = prepareAutosaveRecordOffThread(project, 123, SESSION_ID, STORAGE_KEY);
+    const worker = FakeWorker.instances[0]!;
+    let startedAfterTermination = false;
+    const cancelNext = reserveWorkerMemory(
+      (release) => {
+        startedAfterTermination = worker.terminate.mock.calls.length === 1;
+        release();
+      },
+      { priority: 'interactive' },
+    );
+    try {
+      expect(worker.terminate).not.toHaveBeenCalled();
+      expect(startedAfterTermination).toBe(false);
+      worker.respond(expected);
+      expectReleased(worker);
+      expect(startedAfterTermination).toBe(true);
+      await expect(preparing).resolves.toEqual(expected);
+      expectLaneReleased();
+    } finally {
+      worker.respond({ kind: 'failed', reason: 'storage-error', error: new Error('test cleanup') });
+      cancelNext();
+    }
+  });
+
+  it('expires a queued autosave without starting a worker or retiring another owner', async () => {
+    vi.useFakeTimers();
+    const releaseOwner = reserveWorkerMemory(() => undefined);
+    const preparing = prepareAutosaveRecordOffThread(createProject(), 123, SESSION_ID, STORAGE_KEY);
+    let settled = false;
+    void preparing.then(() => {
+      settled = true;
+    });
+    try {
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(settled).toBe(true);
+      expect(FakeWorker.instances).toHaveLength(0);
+      releaseOwner();
+      expect(FakeWorker.instances).toHaveLength(0);
+      await expect(preparing).resolves.toMatchObject({ kind: 'failed', reason: 'storage-error' });
+    } finally {
+      releaseOwner();
+      FakeWorker.instances[0]?.respond({
+        kind: 'failed',
+        reason: 'storage-error',
+        error: new Error('test cleanup'),
+      });
+    }
   });
 
   it('returns the validated record and releases the request worker without preparing on the UI thread', async () => {

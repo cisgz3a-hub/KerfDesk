@@ -82,7 +82,9 @@ export function formatCalibrationNumber(value: number): string {
 }
 
 export function formatCalibrationInterval(value: number): string {
-  return value.toFixed(2);
+  // Interval Test interpolates to six decimal places. Retain that precision
+  // while keeping two places for familiar labels such as 0.10 and 0.20.
+  return value.toFixed(6).replace(/(\.\d{2,}?)0+$/, '$1');
 }
 
 function renderCalibrationLabel(

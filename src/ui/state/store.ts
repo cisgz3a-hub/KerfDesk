@@ -53,6 +53,7 @@ import { tracePartActions, type TracePartActions } from './trace-part-actions';
 import {
   rasterAdjustmentActions,
   type RasterImageAdjustmentPatch,
+  type RasterImageAdjustmentOperation,
 } from './raster-adjustment-actions';
 import { reliefParamActions, type ReliefParamPatch } from './relief-param-actions';
 import {
@@ -359,7 +360,11 @@ export type AppState = PartGeneratorActions &
     readonly makeLayerDefaultForAll: (layerId: string) => void;
     readonly resetLayerToDefault: (layerId: string) => void;
     readonly setLayerDefaults: (layerDefaults: LayerDefaultsState) => void;
-    readonly setRasterImageAdjustments: (id: string, patch: RasterImageAdjustmentPatch) => void;
+    readonly setRasterImageAdjustments: (
+      id: string,
+      patch: RasterImageAdjustmentPatch,
+      operation?: RasterImageAdjustmentOperation,
+    ) => void;
     readonly setReliefParams: (id: string, patch: ReliefParamPatch) => void;
     /** ADR-580: replace an STL relief with its side A and side B reliefs. */
     readonly splitReliefForTwoSides: (
@@ -428,7 +433,7 @@ export const useStore = create<AppState>((rawSet, get) => {
     ...imageImportActions(set, get),
     ...breakApartActions(proOperationMutationSetter(set, get)),
     ...tracePartActions(proOperationMutationSetter(set, get, newlyIntroducedProOperationFeature)),
-    ...rasterAdjustmentActions(set),
+    ...rasterAdjustmentActions(set, proOperationMutationSetter(set, get)),
     ...reliefParamActions(set),
     ...reliefTwoSidedActions(set),
     ...reliefAuthoringActions(set, get),

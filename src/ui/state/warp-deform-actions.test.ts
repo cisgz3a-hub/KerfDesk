@@ -23,7 +23,7 @@ import { useStore } from './store';
 import { resetStore } from './test-helpers';
 import { useToastStore } from './toast-store';
 import { warpDeformNotice } from './warp-deform-actions';
-import { warpDeformRequestForSelection } from './warp-deform-plan';
+import { planWarpDeform, warpDeformRequestForSelection } from './warp-deform-plan';
 import type { WarpDeformRequest } from './warp-deform-session';
 
 function closedRect(x: number, y: number, width: number, height: number): Polyline {
@@ -150,6 +150,39 @@ beforeEach(() => {
 });
 
 describe('applyWarpDeform', () => {
+  it('leaves the whole scene and Undo unchanged when one selected object exceeds the geometry budget', () => {
+    const large = art('large', [closedRect(0, 0, 100, 50)], {
+      paths: [
+        {
+          color: '#000000',
+          polylines: [],
+          curves: [
+            {
+              start: { x: 0, y: 0 },
+              closed: false,
+              segments: Array.from({ length: 200001 }, (_, index) => ({
+                kind: 'line' as const,
+                to: { x: index + 1, y: 0 },
+              })),
+            },
+          ],
+        },
+      ],
+    });
+    load([art('a', [closedRect(0, 0, 100, 50)]), large], ['a', 'large']);
+    const before = project();
+    const bend = request('warp', (handles) =>
+      handles.map((point) => ({ x: point.x + 5, y: point.y })),
+    );
+    const preview = planWarpDeform(before.scene, bend);
+    expect(preview.objects).toBe(before.scene.objects);
+    expect(preview.warped).toBe(0);
+    expect(preview.failure).toContain('nothing changed');
+    useStore.getState().applyWarpDeform(bend);
+    expect(project()).toBe(before);
+    expect(useStore.getState().undoStack).toEqual([]);
+    expect(lastToast()).toContain('nothing changed');
+  });
   it('warps a rectangle onto the handles as one undo step, keeping id, bindings and selection', () => {
     load([art('a', [closedRect(0, 0, 100, 50)])], ['a']);
     const before = project();
