@@ -261,6 +261,7 @@ describe('useJobEstimate debounce (H16)', () => {
       expect.objectContaining({
         jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
       }),
+      expect.any(AbortSignal),
     );
 
     await unmount();
@@ -286,6 +287,7 @@ describe('useJobEstimate debounce (H16)', () => {
       expect.objectContaining({
         jobOrigin: { startFrom: 'verified-origin', anchor: 'front-left' },
       }),
+      expect.any(AbortSignal),
     );
 
     await unmount();

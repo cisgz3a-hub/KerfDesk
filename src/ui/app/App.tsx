@@ -17,7 +17,7 @@ import { BoardCapturePanel } from '../laser/board-capture';
 import { JobReviewDialog } from '../laser/job-review';
 import { SecondPassHost } from '../laser/second-pass/SecondPassHost';
 import { AddTextDialog } from '../text/AddTextDialog';
-import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
+import { DesignLibraryHost } from '../library/DesignLibraryHost';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { PagedImportDialog } from '../import/PagedImportDialog';
 import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
@@ -96,7 +96,7 @@ export function App(): JSX.Element {
       <PwaUpdateWatcherGate />
       <ArtworkCreationHost />
       <AddTextDialog />
-      <DesignLibraryDialog />
+      <DesignLibraryHost />
       <ImportImageDialog />
       <PagedImportDialog />
       <ConfirmSaveDialog />

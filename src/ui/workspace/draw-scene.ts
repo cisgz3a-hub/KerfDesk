@@ -60,6 +60,7 @@ import { drawLargeSceneNotice, strokePolylinesBatched } from './draw-vector-stro
 import { drawArtworkRunFocus } from './draw-artwork-run-focus';
 import { drawBed, drawGrid, drawOriginMarker } from './draw-bed-chrome';
 import { objectIntersectsCanvas } from './object-viewport';
+import { beginArtworkSpriteFrame } from './artwork-sprite-cache';
 
 export type DrawOpts = {
   readonly selectedId: string | null;
@@ -307,6 +308,7 @@ function drawObjects(
   displayPolylineCache?: DisplayPolylineCache,
   artworkRunFocus?: ArtworkRunFocus,
 ): boolean {
+  beginArtworkSpriteFrame();
   const layerByColor = sceneLayerVisibility.lookup(project.scene.layers);
   scheduleReliefPreviews(project.scene.objects, layerByColor, onRasterBitmapReady);
   let simplified = false;

@@ -1,0 +1,113 @@
+{
+  "receipts": [
+    {
+      "file": "audit-lint.log",
+      "bytes": 54,
+      "sha256": "cf02b87e2cc789ca2311845dc71ac5869920ff440162226fd021e7d56c1066ee"
+    },
+    {
+      "file": "audit-typecheck.log",
+      "bytes": 54,
+      "sha256": "783213f2b20832e4791017cb93c227e0e58970d427c0000e24e026907ef4ff76"
+    },
+    {
+      "file": "browser-baseline.json",
+      "bytes": 20006,
+      "sha256": "9400858c923121f0e01a7f0416be53d6066e4791ec25b81305fc8e02cb2b9a97"
+    },
+    {
+      "file": "browser-baseline.log",
+      "bytes": 12385,
+      "sha256": "3d06e7bace1a10773b8f888fe1cab7025fa3a2aa82ab295a57878382d98ae85e"
+    },
+    {
+      "file": "browser-pipeline.json",
+      "bytes": 20842,
+      "sha256": "64291727b8ae07da4b204b98ca45141f466ec27bff56e70e5d6417db31329988"
+    },
+    {
+      "file": "build.log",
+      "bytes": 36622,
+      "sha256": "d2b986a4c592a58418f7189defb8eb3a2c569c5aede7b9a40dbb9c56e606e48b"
+    },
+    {
+      "file": "core-tests.json",
+      "bytes": 18265,
+      "sha256": "7bba29a7efc88576755e8d9443a9696dc032390dd73cd85e0d2952820d316476"
+    },
+    {
+      "file": "core-tests.log",
+      "bytes": 4388,
+      "sha256": "cd8404500db5bf715ccf983ec2a3fed4bb9c7798be51da1c7e63bfe8e503a362"
+    },
+    {
+      "file": "hotpaths.json",
+      "bytes": 22688,
+      "sha256": "ead4be270504f03e1ef66034bf4740cea7ea680b3451422a58f7ae285a53c4ce"
+    },
+    {
+      "file": "interaction-final.json",
+      "bytes": 16717,
+      "sha256": "dde5dfa4f0730182a40993ca410bf5f00cbd6411346246808efe15c4bb78a59d"
+    },
+    {
+      "file": "interaction-profile-summary.json",
+      "bytes": 2838,
+      "sha256": "272ffbafe2c12edc8ee4badcde2ab9ce47934b7ec15b3c5d46d2b85e6b7f7a61"
+    },
+    {
+      "file": "interaction.cpuprofile",
+      "bytes": 223799,
+      "sha256": "ca0ada81dd00eb7ad9389c1d6ba56c81e840530a2a94e2a182f39b4c03eab5f4"
+    },
+    {
+      "file": "interaction.png",
+      "bytes": 181645,
+      "sha256": "991e79735ccd971c8efb0cb9ed2cb2fd8a2d7014bf6534f8e2950be273e2e9fa"
+    },
+    {
+      "file": "nesting.json",
+      "bytes": 2029,
+      "sha256": "eef5984a9f61f7a0c1fdb6fac840568a7639532faa17f862baee59c5e130b3c7"
+    },
+    {
+      "file": "scheduling.json",
+      "bytes": 3087,
+      "sha256": "deeea140cacf4b1aab1c49df5d274b3d31e43860ce380e7254ec87c649f188e8"
+    },
+    {
+      "file": "scheduling.log",
+      "bytes": 464,
+      "sha256": "91c960d8d99f0ca150bf2ca2aa4564732922c6d430a1eddb8e794cb1cdb1b1e7"
+    },
+    {
+      "file": "startup.aria.txt",
+      "bytes": 6188,
+      "sha256": "9a522933b475aeddb6d1173249e575f3eb8149f23694e1dba411792707407ffd"
+    },
+    {
+      "file": "startup.cpuprofile",
+      "bytes": 110834,
+      "sha256": "128be7e3d6eb6a717e3c50e20c684e42746879f0ebf5d0f6461fb1e27616378e"
+    },
+    {
+      "file": "startup.json",
+      "bytes": 58335,
+      "sha256": "39de7db3f5fb9aed8dba260e7f70ee33a283d6d8862fde3e22b7651a5d343dfc"
+    },
+    {
+      "file": "startup.log",
+      "bytes": 320,
+      "sha256": "35148b828d0e4b8ac206f9e81bd9d867547b18bc0276541ba37d5fd38f7a1e4c"
+    },
+    {
+      "file": "startup.png",
+      "bytes": 135216,
+      "sha256": "7ac29be6471c243a913e0903fde4de6de64221d4995bcc1386982558527012bc"
+    }
+  ],
+  "sourceAppDiff": null,
+  "rawEvidence": "C:\\Users\\Asus\\.codex\\tmp\\speed-audit-20261014-2272",
+  "sourceHead": "03f1da57737ebc58d7cf4e240be6c2225270c690",
+  "evidenceNote": "JSON whitespace was normalised with repository Prettier; original tool outputs remain in rawEvidence. Application source was not changed."
+}

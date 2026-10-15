@@ -85,6 +85,14 @@ export class PreparationResultCache {
     this.settled.length = 0;
   }
 
+  discard(project: Project, key: string): void {
+    this.byProject.get(project)?.delete(key);
+    for (let index = this.settled.length - 1; index >= 0; index--) {
+      const item = this.settled[index];
+      if (item?.project === project && item.key === key) this.settled.splice(index, 1);
+    }
+  }
+
   private delete({ project, key, entry }: SettledEntry): void {
     const cache = this.byProject.get(project);
     if (cache?.get(key) === entry) cache.delete(key);

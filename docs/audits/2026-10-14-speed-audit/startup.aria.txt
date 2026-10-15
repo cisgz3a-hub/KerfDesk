@@ -1,0 +1,178 @@
+- banner:
+  - strong: KerfDesk
+  - menubar "Application menu":
+    - group:
+      - menuitem "File"
+    - group:
+      - menuitem "Edit"
+    - group:
+      - menuitem "Tools"
+    - group:
+      - menuitem "Arrange"
+    - group:
+      - menuitem "Laser"
+    - group:
+      - menuitem "Window"
+    - group:
+      - menuitem "Help"
+  - group "Edit history":
+    - button "Undo" [disabled]
+    - button "Undo list" [disabled]
+    - button "Redo" [disabled]
+  - text: v0.1.3446
+- banner "Toolbar":
+  - button "Open...": Open
+  - button "Import...": Import
+  - button "Import Image..."
+  - button "Save"
+  - separator
+  - button "Preview"
+  - button "More commands": More
+  - group "Current project": Not saved to file Untitled project
+  - button "Learn"
+  - button "Workspace layout": Auto layout
+  - button "Keyboard Shortcuts"
+- region "Numeric Edits Toolbar":
+  - button "Choose transform anchor" [disabled]: Anchor
+  - text: X
+  - textbox "Selection X position" [disabled]
+  - text: "Y"
+  - textbox "Selection Y position" [disabled]
+  - text: mm W
+  - textbox "Selection width" [disabled]
+  - button "Lock aspect ratio" [disabled]
+  - text: H
+  - textbox "Selection height" [disabled]
+  - text: mm R
+  - textbox "Selection rotation" [disabled]
+  - text: °
+- region "Machine toolbar":
+  - region "Machine connection":
+    - group "Machine type":
+      - button "Laser" [pressed]
+      - button "CNC"
+    - 'button "Machine details: Default 400×400"':
+      - strong: Default 400×400
+      - text: Not connected
+    - status: Not connected
+    - button "Connect"
+    - button "Machine Setup"
+    - button "More connection options"
+- main:
+  - complementary "Drawing tools":
+    - button "Create artwork"
+    - button "Select / transform" [pressed]
+    - button "Edit trace parts"
+    - button "Edit nodes"
+    - button "Measure"
+    - button "Text"
+    - button "Draw rectangle"
+    - button "Draw ellipse"
+    - button "Draw polygon"
+    - button "Draw star"
+    - button "Draw polyline"
+    - button "Move laser here"
+    - button "Open design library"
+    - button "Open Design Studio"
+  - tabpanel "Active project sheet workspace":
+    - group "Canvas view":
+      - button "Design" [pressed]
+      - button "G-code 3D"
+    - button "Start points"
+    - group "Zoom":
+      - button "Toggle snapping" [pressed]
+      - button "Snap settings"
+      - button "Show frame and job start markers" [pressed]
+      - button "Zoom out"
+      - button "100%"
+      - button "Zoom in"
+      - button "Fit to selection"
+      - button "Fit to bed"
+    - status "Machine not set up":
+      - strong: Generic 400 × 400 mm machine.
+      - text: The bed, power and speeds are guesses until you set up your machine. You can design now and set it up later.
+      - button "Set up machine"
+      - button "Not now"
+    - navigation "Project sheets":
+      - tablist "Project sheets":
+        - tab "Sheet 1" [selected]
+      - button "Add blank project sheet"
+      - button "Manage project sheets": Manage sheets…
+  - region "Workspace side panels":
+    - button "Layers" [pressed]
+    - button "Machine" [pressed]
+    - complementary "Artwork / Operations panel":
+      - heading "Artwork" [level=2]
+      - button "Objects" [disabled]
+      - button "Collapse Artwork / Operations panel"
+      - tablist "Artwork panel view":
+        - tab "Settings" [selected]
+        - tab "Run order"
+        - tab "Materials"
+      - tabpanel "Settings":
+        - region "Start with artwork":
+          - heading "Your artwork starts here" [level=3]
+          - paragraph: Import or draw artwork to create its first operation.
+          - paragraph: Then choose how to cut, engrave or carve it.
+    - complementary "Laser controls":
+      - heading "Laser" [level=2]
+      - button "Collapse Laser panel"
+      - text: "State: —"
+      - region "Jog and positioning":
+        - text: Position the head
+        - button "Jog -X +Y 10 mm" [disabled]
+        - button "Jog +Y 10 mm" [disabled]
+        - button "Jog +X +Y 10 mm" [disabled]
+        - button "Jog -X 10 mm" [disabled]
+        - button "Set up homing"
+        - button "Jog +X 10 mm" [disabled]
+        - button "Jog -X -Y 10 mm" [disabled]
+        - button "Jog -Y 10 mm" [disabled]
+        - button "Jog +X -Y 10 mm" [disabled]
+        - button "Turn manual air assist on (no air output)": Manual Air OFF No air output
+        - button "Set up auto-focus"
+        - button "Set origin here" [disabled]
+        - text: Step
+        - combobox "Jog step size" [disabled]:
+          - option "0.1 mm"
+          - option "0.5 mm"
+          - option "1 mm"
+          - option "2 mm"
+          - option "5 mm"
+          - option "10 mm" [selected]
+          - option "25 mm"
+          - option "50 mm"
+          - option "100 mm"
+        - text: Speed
+        - combobox "Jog speed" [disabled]:
+          - option "100 mm/min"
+          - option "500 mm/min"
+          - option "1000 mm/min"
+          - option "3000 mm/min" [selected]
+          - option "6000 mm/min"
+        - paragraph: "Manual focus: adjust the laser head by hand."
+      - region "Machine tools":
+        - group "Machine tool dropdowns":
+          - button "Origin"
+          - button "Placement & output": Placement
+          - button "Console"
+    - region "Job actions":
+      - status "Frame this job first. The completed Frame remains valid while its footprint and placement stay unchanged.": Not framed — Frame this job to unlock Start
+      - button "Frame job" [disabled]
+      - button "Start" [disabled]
+- contentinfo "Status bar":
+  - group "Workspace status details": "Cursor: — Nothing selected Objects: 0 Layers: 0 (0 output) Device: Default 400×400 Bed: 400 × 400 mm Zoom: 100%"
+  - navigation "KerfDesk pricing and policies":
+    - link "Pricing":
+      - /url: https://kerfdesk.com/pricing/
+    - link "Terms":
+      - /url: https://kerfdesk.com/terms/
+    - link "Privacy":
+      - /url: https://kerfdesk.com/privacy/
+    - link "Refunds":
+      - /url: https://kerfdesk.com/refunds/
+  - 'button "Edition: Free · Pro in the desktop app. See the Pro features"': Free · Pro in the desktop app
+  - status
+  - status
+  - status
+- region "Notifications"

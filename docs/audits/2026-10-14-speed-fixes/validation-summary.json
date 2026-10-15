@@ -1,0 +1,91 @@
+{
+  "createdAt": "2026-10-14T15:51:53.940Z",
+  "testTotals": {
+    "uniqueFiles": 61,
+    "passed": 375,
+    "skipped": 1,
+    "browserPassed": 13
+  },
+  "suites": [
+    {
+      "name": "regression-tests",
+      "files": 32,
+      "passed": 186,
+      "skipped": 0
+    },
+    {
+      "name": "workers-final",
+      "files": 19,
+      "passed": 153,
+      "skipped": 0
+    },
+    {
+      "name": "core-tests",
+      "files": 9,
+      "passed": 32,
+      "skipped": 1
+    },
+    {
+      "name": "scheduling-final",
+      "files": 1,
+      "passed": 4,
+      "skipped": 0
+    }
+  ],
+  "testCommands": [
+    "Focused transfer/output/nesting/library/sprite/Start-Frame regression runs: exact suite and assertion names in regression-tests.json.",
+    "Focused preparation/lane/idle/ETA/Preview/save/autosave runs: exact suite and assertion names in worker-tests.json.",
+    "pnpm exec vitest run src/io/gcode/connected-script-compile-performance.test.ts src/core/job/fill-hatching.perf.test.ts src/core/raster/image-mask.perf.test.ts src/__fixtures__/perceptual/centerline-perf.test.ts src/core/cnc/strict-contour-nesting-performance.test.ts src/core/cnc/vcarve-region-order-performance.test.ts src/core/cnc/vcarve-source-boundary-coverage-performance.test.ts src/core/trace/centerline/junction-pairing-performance.test.ts src/core/trace/centerline/seam-repair-performance.test.ts --maxWorkers=1 --no-file-parallelism",
+    "pnpm exec vitest run --config scripts/performance-audit/vitest.config.ts",
+    "pnpm exec playwright test e2e/heavy-canvas-workers.e2e.ts e2e/performance.spec.ts e2e/svg-large-worker.e2e.ts e2e/native-project-large-worker.e2e.ts e2e/project-save-worker.e2e.ts e2e/canvas-text-worker.spec.ts e2e/depth-map-relief-worker.e2e.ts --workers=1",
+    "pnpm exec playwright test --config scripts/performance-audit/playwright.config.ts"
+  ],
+  "checksVerifiedFromCommandResults": [
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm exec tsc --noEmit --project scripts/performance-audit/tsconfig.json",
+      "exitCode": 0
+    },
+    {
+      "command": "node node_modules/eslint/bin/eslint.js <all changed/new .ts, .tsx, .mjs paths>",
+      "exitCode": 0,
+      "scope": "Full repository lint was run earlier; its reported implementation violations were fixed. Final changed-code run passed; the later screenshot-option edit was then checked separately."
+    },
+    {
+      "command": "node node_modules/prettier/bin/prettier.cjs --check <all changed/new .ts, .tsx, .mjs paths>",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/check-file-size-policy.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/check-adr-numbers.mjs",
+      "exitCode": 0,
+      "nextFreeNumber": 598
+    },
+    {
+      "command": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build",
+      "exitCode": 0,
+      "warnings": ["Existing HarfBuzz module externalisation", "Large production chunks"]
+    }
+  ],
+  "independentlyCheckedReceiptInvariants": {
+    "connectedScriptGcodeSha256": "6213711b652de729c1d4c57f905817bf39eab2ef86e8d8a1627f37ba20a6dbc6",
+    "connectedScriptGcodeBytes": 1100098,
+    "browserPipelineFixturesIdentical": true,
+    "browserPipelineCompiledModulesIdentical": true,
+    "browserPipelineAllOutputHashesIdentical": true,
+    "startupRepeatsServedIdenticalBundleHashes": true,
+    "startupPageErrors": 0,
+    "deferredLibraryOpenRenderCloseFocus": true
+  },
+  "limitations": "Targeted software tests and local benchmarks, not a full release gate, full repository suite, packaged Electron, field performance, or hardware qualification."
+}

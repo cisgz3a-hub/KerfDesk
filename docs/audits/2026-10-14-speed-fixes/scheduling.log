@@ -1,0 +1,22 @@
+Already up to date
+Done in 1.1s using pnpm v11.3.0
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0
+
+stdout | scripts/performance-audit/worker-scheduling.test.ts > worker scheduling improvements against the audit baseline > starts manual Save immediately by retiring Preview, then resumes its original consumers
+{"case":"manual-save-queue","baselineBlockedThroughFakeMs":120000,"afterFakeQueueMs":0,"peakLiveWorkers":1}
+
+stdout | scripts/performance-audit/worker-scheduling.test.ts > worker scheduling improvements against the audit baseline > starts trace-part editing immediately, keeping the one-heap budget and resuming Preview afterwards
+{"case":"trace-part-queue","baselineBlockedThroughFakeMs":120000,"afterFakeQueueMs":0,"peakLiveWorkers":1}
+
+stdout | scripts/performance-audit/worker-scheduling.test.ts > worker scheduling improvements against the audit baseline > uses one compilation dispatch when Preview joins an active estimate, versus two in the baseline
+{"case":"active-estimate-preview","baselineCompilationDispatches":2,"afterCompilationDispatches":1,"peakLiveWorkers":1}
+
+ ✓ scripts/performance-audit/worker-scheduling.test.ts (4 tests) 38ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  23:44:45
+   Duration  7.70s (transform 3.44s, setup 82ms, import 4.09s, tests 38ms, environment 2.87s)
+
+JSON report written to C:/Users/Asus/.codex/tmp/speed-fixes-20261014-2272/scheduling-final.json

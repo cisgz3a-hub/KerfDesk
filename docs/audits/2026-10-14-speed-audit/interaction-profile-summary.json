@@ -1,0 +1,106 @@
+{
+  "file": "C:\\Users\\Asus\\.codex\\tmp\\speed-audit-20261014-2272\\interaction-final-results\\interaction.e2e.ts-mixed-c-fb0c7-pen-and-Refresh-telemetry-4\\mixed-canvas.cpuprofile",
+  "elapsedMs": 4809.379,
+  "top": [
+    {
+      "frame": "(idle) :0",
+      "selfMs": 3087.178000000001
+    },
+    {
+      "frame": "(program) :0",
+      "selfMs": 1054.607
+    },
+    {
+      "frame": "onFirstUse http://127.0.0.1:5186/node_modules/.vite/deps/chunk-D5SH7N4G.js?v=fe4ea3b8:35313",
+      "selfMs": 61.385
+    },
+    {
+      "frame": "(garbage collector) :0",
+      "selfMs": 43.757000000000005
+    },
+    {
+      "frame": "getContext :0",
+      "selfMs": 19.769000000000002
+    },
+    {
+      "frame": "isElementHiddenForAria :3176",
+      "selfMs": 18.008
+    },
+    {
+      "frame": "getCSSContent :3248",
+      "selfMs": 17.996000000000002
+    },
+    {
+      "frame": "getBoundingClientRect :0",
+      "selfMs": 17.352
+    },
+    {
+      "frame": " :27",
+      "selfMs": 14.882
+    },
+    {
+      "frame": "getExtension http://127.0.0.1:5186/node_modules/.vite/deps/chunk-D5SH7N4G.js?v=fe4ea3b8:33727",
+      "selfMs": 14.772000000000002
+    },
+    {
+      "frame": "checkVisibility :0",
+      "selfMs": 14.689000000000002
+    },
+    {
+      "frame": "worker.onmessage http://127.0.0.1:5186/src/ui/workspace/bounded-compilation-worker-pool.ts:117",
+      "selfMs": 13.524999999999999
+    },
+    {
+      "frame": "query :5141",
+      "selfMs": 9.817
+    },
+    {
+      "frame": "now :0",
+      "selfMs": 9.421
+    },
+    {
+      "frame": "visit :3907",
+      "selfMs": 9.391
+    },
+    {
+      "frame": "getElementComputedStyle :2786",
+      "selfMs": 9.062000000000001
+    },
+    {
+      "frame": "WebGLRenderer.forceContextLoss http://127.0.0.1:5186/node_modules/.vite/deps/chunk-D5SH7N4G.js?v=fe4ea3b8:40107",
+      "selfMs": 8.481
+    },
+    {
+      "frame": "WebGLRenderer.setSize http://127.0.0.1:5186/node_modules/.vite/deps/chunk-D5SH7N4G.js?v=fe4ea3b8:40126",
+      "selfMs": 8.012
+    },
+    {
+      "frame": "getTextAlternativeInternal :3404",
+      "selfMs": 7.898
+    },
+    {
+      "frame": "renderWithHooks http://127.0.0.1:5186/node_modules/.vite/deps/chunk-FJNGW34F.js?v=fe4ea3b8:11576",
+      "selfMs": 7.258
+    },
+    {
+      "frame": "getComputedStyle :0",
+      "selfMs": 7.063000000000001
+    },
+    {
+      "frame": "belongsToDisplayNoneOrAriaHiddenOrNonSlotted :3195",
+      "selfMs": 6.396
+    },
+    {
+      "frame": "memoizedSelector http://127.0.0.1:5186/node_modules/.vite/deps/chunk-SZOI4X5J.js?v=fe4ea3b8:102",
+      "selfMs": 5.792999999999999
+    },
+    {
+      "frame": "jsxWithValidation http://127.0.0.1:5186/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=fe4ea3b8:809",
+      "selfMs": 4.921
+    },
+    {
+      "frame": "isElementStyleVisibilityVisible :2794",
+      "selfMs": 4.855
+    }
+  ]
+}

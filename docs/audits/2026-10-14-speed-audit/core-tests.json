@@ -1,0 +1,441 @@
+{
+  "numTotalTestSuites": 18,
+  "numPassedTestSuites": 18,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 33,
+  "numPassedTests": 32,
+  "numFailedTests": 0,
+  "numPendingTests": 1,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 1,
+    "total": 1,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791987314989,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["strict contour nesting work reuse"],
+          "fullName": "strict contour nesting work reuse preserves the original source layout for 600 disconnected dense contours",
+          "status": "passed",
+          "title": "preserves the original source layout for 600 disconnected dense contours",
+          "duration": 833.0655000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["strict contour nesting work reuse"],
+          "fullName": "strict contour nesting work reuse preserves the original source layout for 64 concentric dense contours",
+          "status": "passed",
+          "title": "preserves the original source layout for 64 concentric dense contours",
+          "duration": 282.36270000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["strict contour nesting work reuse"],
+          "fullName": "strict contour nesting work reuse preserves the original source layout for 240 overlapping dense contours",
+          "status": "passed",
+          "title": "preserves the original source layout for 240 overlapping dense contours",
+          "duration": 148.74039999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791987340398,
+      "endTime": 1791987341662.7405,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/cnc/strict-contour-nesting-performance.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["indexed V-carve source ranking and ring assignment"],
+          "fullName": "indexed V-carve source ranking and ring assignment retains source ranks and first-layout ties for overlapping and nested roots",
+          "status": "passed",
+          "title": "retains source ranks and first-layout ties for overlapping and nested roots",
+          "duration": 4.760400000000118,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed V-carve source ranking and ring assignment"],
+          "fullName": "indexed V-carve source ranking and ring assignment matches vertex, edge, near-boundary and nonfinite witness semantics",
+          "status": "passed",
+          "title": "matches vertex, edge, near-boundary and nonfinite witness semantics",
+          "duration": 1.0614999999997963,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed V-carve source ranking and ring assignment"],
+          "fullName": "indexed V-carve source ranking and ring assignment keeps the original ray predicate for extreme coordinates and malformed direct layouts",
+          "status": "passed",
+          "title": "keeps the original ray predicate for extreme coordinates and malformed direct layouts",
+          "duration": 0.5671999999995023,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed V-carve source ranking and ring assignment"],
+          "fullName": "indexed V-carve source ranking and ring assignment matches the old rank and ring oracle for arbitrary roots and witness order",
+          "status": "passed",
+          "title": "matches the old rank and ring oracle for arbitrary roots and witness order",
+          "duration": 45.480500000000575,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed V-carve source ranking and ring assignment"],
+          "fullName": "indexed V-carve source ranking and ring assignment ranks and assigns 600 dense disconnected witnesses with local polygon tests",
+          "status": "passed",
+          "title": "ranks and assigns 600 dense disconnected witnesses with local polygon tests",
+          "duration": 639.6176999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791987335016,
+      "endTime": 1791987335707.6177,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/cnc/vcarve-region-order-performance.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation prepares radii and chord geometry once per unique cutting chord",
+          "status": "passed",
+          "title": "prepares radii and chord geometry once per unique cutting chord",
+          "duration": 9.05779999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 0 chords",
+          "status": "passed",
+          "title": "matches the original dense measurement with 0 chords",
+          "duration": 1.322999999999979,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 1 chords",
+          "status": "passed",
+          "title": "matches the original dense measurement with 1 chords",
+          "duration": 0.9759999999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 64 chords",
+          "status": "passed",
+          "title": "matches the original dense measurement with 64 chords",
+          "duration": 9.527899999999931,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 4096 chords",
+          "status": "passed",
+          "title": "matches the original dense measurement with 4096 chords",
+          "duration": 94.22430000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the original dense measurement with 5000 chords",
+          "status": "passed",
+          "title": "matches the original dense measurement with 5000 chords",
+          "duration": 97.57269999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation rejects distant sweeps before the scalar distance without changing the result",
+          "status": "passed",
+          "title": "rejects distant sweeps before the scalar distance without changing the result",
+          "duration": 75.85299999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation retains duplicate-chord replacement order, zero-depth rounding and vertical sweeps",
+          "status": "passed",
+          "title": "retains duplicate-chord replacement order, zero-depth rounding and vertical sweeps",
+          "duration": 3.0878000000000156,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation retains degenerate, empty and non-finite input results",
+          "status": "passed",
+          "title": "retains degenerate, empty and non-finite input results",
+          "duration": 2.1463999999998578,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation preserves boundary equality and rounding-scale separation with a preceding close sweep",
+          "status": "passed",
+          "title": "preserves boundary equality and rounding-scale separation with a preceding close sweep",
+          "duration": 3.9827000000000226,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation keeps scalar overflow evidence after a preceding ordinary sweep",
+          "status": "passed",
+          "title": "keeps scalar overflow evidence after a preceding ordinary sweep",
+          "duration": 0.6292000000000826,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["source-boundary coverage preparation"],
+          "fullName": "source-boundary coverage preparation matches the scalar oracle across deterministic varied source boundaries and depths",
+          "status": "passed",
+          "title": "matches the scalar oracle across deterministic varied source boundaries and depths",
+          "duration": 35.19219999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "reports matched dense coverage timing",
+          "status": "skipped",
+          "title": "reports matched dense coverage timing",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791987329523,
+      "endTime": 1791987329857.1921,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/cnc/vcarve-source-boundary-coverage-performance.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["fillHatching — performance (big-image freeze regression)"],
+          "fullName": "fillHatching — performance (big-image freeze regression) fills tens of thousands of contours without freezing",
+          "status": "passed",
+          "title": "fills tens of thousands of contours without freezing",
+          "duration": 372.0146,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791987344355,
+      "endTime": 1791987344727.0146,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/job/fill-hatching.perf.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["applyImageMaskToLuma — performance (mask compile blowup)"],
+          "fullName": "applyImageMaskToLuma — performance (mask compile blowup) masks a large grid under a many-point contour without stalling",
+          "status": "passed",
+          "title": "masks a large grid under a many-point contour without stalling",
+          "duration": 41.997100000000046,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791987342590,
+      "endTime": 1791987342631.997,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/raster/image-mask.perf.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["multi-artwork connected-script compilation"],
+          "fullName": "multi-artwork connected-script compilation stays byte-exact and measurable",
+          "status": "passed",
+          "title": "stays byte-exact and measurable",
+          "duration": 6064.936199999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791987322470,
+      "endTime": 1791987328534.9363,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/io/gcode/connected-script-compile-performance.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["centerline trace performance on a big image"],
+          "fullName": "centerline trace performance on a big image traces a ~1.9MP thick-stroke grid within the regression budget",
+          "status": "passed",
+          "title": "traces a ~1.9MP thick-stroke grid within the regression budget",
+          "duration": 956.6877,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791987338361,
+      "endTime": 1791987339317.6877,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/__fixtures__/perceptual/centerline-perf.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["gap search work and selection order"],
+          "fullName": "gap search work and selection order avoids quadratic distance work on separated strokes",
+          "status": "passed",
+          "title": "avoids quadratic distance work on separated strokes",
+          "duration": 5.6743999999999915,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["gap search work and selection order"],
+          "fullName": "gap search work and selection order keeps chain order when equally near ends occupy different cells, offset=-100",
+          "status": "passed",
+          "title": "keeps chain order when equally near ends occupy different cells, offset=-100",
+          "duration": 1.4990999999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["gap search work and selection order"],
+          "fullName": "gap search work and selection order keeps chain order when equally near ends occupy different cells, offset=0",
+          "status": "passed",
+          "title": "keeps chain order when equally near ends occupy different cells, offset=0",
+          "duration": 0.31730000000004566,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["gap search work and selection order"],
+          "fullName": "gap search work and selection order keeps chain order when equally near ends occupy different cells, offset=100",
+          "status": "passed",
+          "title": "keeps chain order when equally near ends occupy different cells, offset=100",
+          "duration": 0.2861000000000331,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["gap search work and selection order"],
+          "fullName": "gap search work and selection order recomputes an outer tangent after joining a chain shorter than the tangent probe",
+          "status": "passed",
+          "title": "recomputes an outer tangent after joining a chain shorter than the tangent probe",
+          "duration": 1.0661999999999807,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791987345604,
+      "endTime": 1791987345613.0662,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/trace/centerline/junction-pairing-performance.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["seam repair search work"],
+          "fullName": "seam repair search work does not scan every chain point for distant junction landmarks",
+          "status": "passed",
+          "title": "does not scan every chain point for distant junction landmarks",
+          "duration": 3.878099999999904,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["seam repair search work"],
+          "fullName": "seam repair search work indexes changed weld segments without repeatedly indexing the whole drawing",
+          "status": "passed",
+          "title": "indexes changed weld segments without repeatedly indexing the whole drawing",
+          "duration": 4.695299999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["seam repair search work"],
+          "fullName": "seam repair search work lets later endpoints land on a segment moved by an earlier weld",
+          "status": "passed",
+          "title": "lets later endpoints land on a segment moved by an earlier weld",
+          "duration": 0.4774999999999636,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791987343440,
+      "endTime": 1791987343448.4775,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/trace/centerline/seam-repair-performance.test.ts"
+    }
+  ]
+}

@@ -11,6 +11,7 @@ import { hitTestSketch } from './design-hit-test';
 import type { DesignView } from './design-session';
 import { mmToPx } from './design-view';
 import { createDesignVectorPainter } from './design-project-vectors';
+import { beginArtworkSpriteFrame } from '../workspace/artwork-sprite-cache';
 
 export type DesignPhotoActions = {
   readonly selectedPhotoId?: string | null;
@@ -27,6 +28,7 @@ export function paintDesignProjectArtwork(
   onReady?: () => void,
   draftObjectIds: ReadonlySet<string> = new Set(),
 ): void {
+  beginArtworkSpriteFrame();
   const layers = sceneLayerVisibilityLookup(scene.layers);
   const rasterView = {
     scale: view.pxPerMm,

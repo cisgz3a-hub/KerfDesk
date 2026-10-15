@@ -1,0 +1,259 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\Asus\\.codex\\worktrees\\2272\\LaserForge-2.0\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "--config",
+      "scripts/performance-audit/playwright.config.ts",
+      "--reporter=list,json",
+      "--output",
+      "C:\\Users\\Asus\\.codex\\tmp\\speed-audit-20261014-2272\\interaction-final-results"
+    ],
+    "configFile": "C:\\Users\\Asus\\.codex\\worktrees\\2272\\LaserForge-2.0\\scripts\\performance-audit\\playwright.config.ts",
+    "rootDir": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/scripts/performance-audit",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Asus/.codex/tmp/speed-audit-20261014-2272/interaction-final-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/scripts/performance-audit",
+        "testIgnore": ["**/production-bundle.spec.ts"],
+        "testMatch": ["interaction.e2e.ts"],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [["list"], ["json"]],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm exec vite . --mode desktop --host 127.0.0.1 --port 5186 --strictPort",
+      "cwd": "C:\\Users\\Asus\\.codex\\worktrees\\2272\\LaserForge-2.0\\",
+      "url": "http://127.0.0.1:5186",
+      "reuseExistingServer": false,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "interaction.e2e.ts",
+      "file": "interaction.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "mixed canvas G-code open and Refresh telemetry 1",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [
+                {
+                  "type": "measurement",
+                  "description": "{\"trial\":1,\"profiled\":false,\"readyMs\":2301,\"renderedReadyMs\":2315,\"refreshReadyMs\":347,\"refreshRenderedReadyMs\":358,\"open\":{\"ticks\":275,\"maxGapMs\":102.67500000074506,\"elapsedMs\":3073.789999999106,\"longTaskCount\":3,\"maxLongTaskMs\":79,\"longTaskObserverSupported\":true},\"refresh\":{\"ticks\":103,\"maxGapMs\":59.78000000119209,\"elapsedMs\":1121.699999999255,\"longTaskCount\":0,\"maxLongTaskMs\":0,\"longTaskObserverSupported\":true},\"workers\":[\"http://127.0.0.1:5186/src/ui/workspace/idle-canvas-motion-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/laser/output-preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/gcode-inspector/gcode-inspector-worker.ts?worker_file&type=module\"]}"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 22730,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T14:13:09.704Z",
+                  "annotations": [
+                    {
+                      "type": "measurement",
+                      "description": "{\"trial\":1,\"profiled\":false,\"readyMs\":2301,\"renderedReadyMs\":2315,\"refreshReadyMs\":347,\"refreshRenderedReadyMs\":358,\"open\":{\"ticks\":275,\"maxGapMs\":102.67500000074506,\"elapsedMs\":3073.789999999106,\"longTaskCount\":3,\"maxLongTaskMs\":79,\"longTaskObserverSupported\":true},\"refresh\":{\"ticks\":103,\"maxGapMs\":59.78000000119209,\"elapsedMs\":1121.699999999255,\"longTaskCount\":0,\"maxLongTaskMs\":0,\"longTaskObserverSupported\":true},\"workers\":[\"http://127.0.0.1:5186/src/ui/workspace/idle-canvas-motion-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/laser/output-preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/gcode-inspector/gcode-inspector-worker.ts?worker_file&type=module\"]}"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8a1a0726643d4eeee6a8-a7baa4c37c3a2218dac1",
+          "file": "interaction.e2e.ts",
+          "line": 14,
+          "column": 3
+        },
+        {
+          "title": "mixed canvas G-code open and Refresh telemetry 2",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [
+                {
+                  "type": "measurement",
+                  "description": "{\"trial\":2,\"profiled\":false,\"readyMs\":2225,\"renderedReadyMs\":2228,\"refreshReadyMs\":361,\"refreshRenderedReadyMs\":371,\"open\":{\"ticks\":272,\"maxGapMs\":98.9199999999255,\"elapsedMs\":2988.4000000003725,\"longTaskCount\":1,\"maxLongTaskMs\":72,\"longTaskObserverSupported\":true},\"refresh\":{\"ticks\":102,\"maxGapMs\":65.5800000000745,\"elapsedMs\":1126.8850000016391,\"longTaskCount\":0,\"maxLongTaskMs\":0,\"longTaskObserverSupported\":true},\"workers\":[\"http://127.0.0.1:5186/src/ui/workspace/idle-canvas-motion-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/laser/output-preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/gcode-inspector/gcode-inspector-worker.ts?worker_file&type=module\"]}"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12724,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T14:13:32.699Z",
+                  "annotations": [
+                    {
+                      "type": "measurement",
+                      "description": "{\"trial\":2,\"profiled\":false,\"readyMs\":2225,\"renderedReadyMs\":2228,\"refreshReadyMs\":361,\"refreshRenderedReadyMs\":371,\"open\":{\"ticks\":272,\"maxGapMs\":98.9199999999255,\"elapsedMs\":2988.4000000003725,\"longTaskCount\":1,\"maxLongTaskMs\":72,\"longTaskObserverSupported\":true},\"refresh\":{\"ticks\":102,\"maxGapMs\":65.5800000000745,\"elapsedMs\":1126.8850000016391,\"longTaskCount\":0,\"maxLongTaskMs\":0,\"longTaskObserverSupported\":true},\"workers\":[\"http://127.0.0.1:5186/src/ui/workspace/idle-canvas-motion-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/laser/output-preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/gcode-inspector/gcode-inspector-worker.ts?worker_file&type=module\"]}"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8a1a0726643d4eeee6a8-663c92f18eb289db217d",
+          "file": "interaction.e2e.ts",
+          "line": 14,
+          "column": 3
+        },
+        {
+          "title": "mixed canvas G-code open and Refresh telemetry 3",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [
+                {
+                  "type": "measurement",
+                  "description": "{\"trial\":3,\"profiled\":false,\"readyMs\":2219,\"renderedReadyMs\":2222,\"refreshReadyMs\":306,\"refreshRenderedReadyMs\":457,\"open\":{\"ticks\":277,\"maxGapMs\":89.59999999962747,\"elapsedMs\":2984.1500000003725,\"longTaskCount\":1,\"maxLongTaskMs\":59,\"longTaskObserverSupported\":true},\"refresh\":{\"ticks\":112,\"maxGapMs\":52.600000001490116,\"elapsedMs\":1214.25,\"longTaskCount\":0,\"maxLongTaskMs\":0,\"longTaskObserverSupported\":true},\"workers\":[\"http://127.0.0.1:5186/src/ui/workspace/idle-canvas-motion-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/laser/output-preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/gcode-inspector/gcode-inspector-worker.ts?worker_file&type=module\"]}"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11381,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T14:13:45.436Z",
+                  "annotations": [
+                    {
+                      "type": "measurement",
+                      "description": "{\"trial\":3,\"profiled\":false,\"readyMs\":2219,\"renderedReadyMs\":2222,\"refreshReadyMs\":306,\"refreshRenderedReadyMs\":457,\"open\":{\"ticks\":277,\"maxGapMs\":89.59999999962747,\"elapsedMs\":2984.1500000003725,\"longTaskCount\":1,\"maxLongTaskMs\":59,\"longTaskObserverSupported\":true},\"refresh\":{\"ticks\":112,\"maxGapMs\":52.600000001490116,\"elapsedMs\":1214.25,\"longTaskCount\":0,\"maxLongTaskMs\":0,\"longTaskObserverSupported\":true},\"workers\":[\"http://127.0.0.1:5186/src/ui/workspace/idle-canvas-motion-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/laser/output-preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/gcode-inspector/gcode-inspector-worker.ts?worker_file&type=module\"]}"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8a1a0726643d4eeee6a8-22f9cf55c77110d3a95c",
+          "file": "interaction.e2e.ts",
+          "line": 14,
+          "column": 3
+        },
+        {
+          "title": "mixed canvas G-code open and Refresh telemetry 4",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [
+                {
+                  "type": "measurement",
+                  "description": "{\"trial\":4,\"profiled\":true,\"readyMs\":2336,\"renderedReadyMs\":2350,\"refreshReadyMs\":331,\"refreshRenderedReadyMs\":376,\"open\":{\"ticks\":279,\"maxGapMs\":109.74000000022352,\"elapsedMs\":3117.3650000002235,\"longTaskCount\":2,\"maxLongTaskMs\":76,\"longTaskObserverSupported\":true},\"refresh\":{\"ticks\":103,\"maxGapMs\":62.06000000052154,\"elapsedMs\":1140.1699999999255,\"longTaskCount\":0,\"maxLongTaskMs\":0,\"longTaskObserverSupported\":true},\"workers\":[\"http://127.0.0.1:5186/src/ui/workspace/idle-canvas-motion-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/laser/output-preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/gcode-inspector/gcode-inspector-worker.ts?worker_file&type=module\"]}"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13493,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T14:13:56.830Z",
+                  "annotations": [
+                    {
+                      "type": "measurement",
+                      "description": "{\"trial\":4,\"profiled\":true,\"readyMs\":2336,\"renderedReadyMs\":2350,\"refreshReadyMs\":331,\"refreshRenderedReadyMs\":376,\"open\":{\"ticks\":279,\"maxGapMs\":109.74000000022352,\"elapsedMs\":3117.3650000002235,\"longTaskCount\":2,\"maxLongTaskMs\":76,\"longTaskObserverSupported\":true},\"refresh\":{\"ticks\":103,\"maxGapMs\":62.06000000052154,\"elapsedMs\":1140.1699999999255,\"longTaskCount\":0,\"maxLongTaskMs\":0,\"longTaskObserverSupported\":true},\"workers\":[\"http://127.0.0.1:5186/src/ui/workspace/idle-canvas-motion-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/laser/output-preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/preparation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/workspace/canvas-compilation-worker.ts?worker_file&type=module\",\"http://127.0.0.1:5186/src/ui/gcode-inspector/gcode-inspector-worker.ts?worker_file&type=module\"]}"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8a1a0726643d4eeee6a8-7ba10d037c9e12715790",
+          "file": "interaction.e2e.ts",
+          "line": 14,
+          "column": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-14T14:13:00.414Z",
+    "duration": 70702.88100000001,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

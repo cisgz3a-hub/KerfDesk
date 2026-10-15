@@ -3,12 +3,12 @@ import {
   obstacleState,
   collides,
   inside,
-  rectanglesOverlap,
   placementBounds,
   validOutline,
   finiteNonNegative,
   type PlacedState,
 } from './nest-outline-geometry';
+import { nestOutlinesAreClear, nestRectanglesAreClear } from './nest-collision-validation';
 import {
   quickNest,
   allowedNestRotations,
@@ -251,13 +251,7 @@ function validateNestUnsafe(
       maxX: rect.maxX + options.padding / 2,
       maxY: rect.maxY + options.padding / 2,
     }));
-    return rectangles.every(
-      (rect, index) =>
-        inside(bin, rect) &&
-        ![...rectangles.slice(index + 1), ...obstacles].some((other) =>
-          rectanglesOverlap(rect, other),
-        ),
-    );
+    return nestRectanglesAreClear(bin, rectangles, obstacles);
   }
   const states = placements.flatMap((placement) => {
     const item = byId.get(placement.id);
@@ -267,14 +261,7 @@ function validateNestUnsafe(
     return false;
   }
   const obstacles = (options.obstacles ?? []).map((rect) => obstacleState(rect, options.padding));
-  return states.every(
-    (state, index) =>
-      !collides(
-        state,
-        states.filter((_other, other) => other !== index),
-        obstacles,
-      ),
-  );
+  return nestOutlinesAreClear(states, obstacles);
 }
 function validNestDomain(bin: NestRect, options: NestOptions): boolean {
   if (![bin.minX, bin.minY, bin.maxX, bin.maxY, options.padding].every(Number.isFinite))

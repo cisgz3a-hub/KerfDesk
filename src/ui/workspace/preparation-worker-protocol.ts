@@ -21,6 +21,13 @@ export type PreparationWorkerRequest = LargeJobPreparationOptions & {
   readonly project: ProjectMessage;
   /** Omitted preserves the full Preview API. */
   readonly projection?: PreparationProjection;
+  /** Keep one compiled intermediate until main selects estimate completion or Preview. */
+  readonly allowPreviewUpgrade?: boolean;
+};
+
+export type PreparationPreviewUpgrade = {
+  readonly id: number;
+  readonly kind: 'preview-after-estimate';
 };
 
 /**
@@ -39,6 +46,7 @@ export type PreparationWorkerResponse =
   | PreparationTransferResponse
   | PreparationPackedResponse
   | { readonly id: number; readonly kind: 'progress'; readonly progress: OutputCompilationProgress }
+  | ({ readonly id: number; readonly kind: 'estimate-ready' } & LargeJobEstimate)
   | ({
       readonly id: number;
       readonly kind: 'ok';

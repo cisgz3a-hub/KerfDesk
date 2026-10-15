@@ -25,10 +25,20 @@ const INITIAL_LIBRARY_ENTRY_ID =
 
 export function DesignLibraryDialog(): JSX.Element | null {
   const open = useUiStore((state) => state.libraryDialogOpen);
-  return open ? <OpenDesignLibraryDialog /> : null;
+  const setOpen = useUiStore((state) => state.setLibraryDialogOpen);
+  return open ? (
+    <Dialog
+      title="Design Library"
+      size="xl"
+      panelClassName="lf-library-dialog"
+      onClose={() => setOpen(false)}
+    >
+      <DesignLibraryContents />
+    </Dialog>
+  ) : null;
 }
 
-function OpenDesignLibraryDialog(): JSX.Element {
+export function DesignLibraryContents(): JSX.Element {
   const [collection, setCollection] = useState<'bundled' | 'personal'>('bundled');
   const setOpen = useUiStore((state) => state.setLibraryDialogOpen);
   const owner = useRef({ mounted: true, revision: 0 });
@@ -52,7 +62,7 @@ function OpenDesignLibraryDialog(): JSX.Element {
       useUiStore.getState().libraryDialogOpen;
   }, []);
   return (
-    <Dialog title="Design Library" size="xl" panelClassName="lf-library-dialog" onClose={close}>
+    <>
       <div className="lf-library-dialog__close">
         <IconButton icon="close" label="Close Design Library" onClick={close} size="sm" />
       </div>
@@ -91,7 +101,7 @@ function OpenDesignLibraryDialog(): JSX.Element {
       ) : (
         <BundledDesignLibrary close={close} captureInsertOwner={captureInsertOwner} />
       )}
-    </Dialog>
+    </>
   );
 }
 
