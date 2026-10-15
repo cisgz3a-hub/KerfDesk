@@ -15,6 +15,8 @@ export const PRO_COMMAND_FEATURES: ReadonlyMap<CommandId, ProFeature> = new Map<
   ['file.open-gcode', 'gcode-inspector'],
   ['file.import-height-map', 'relief'],
   ['tools.box-generator', 'box-generator'],
+  ['tools.registration-jig', 'registration-jig'],
+  ['tools.place-board', 'place-board'],
   ['tools.multi-file-trace', 'advanced-trace'],
 ]);
 
@@ -24,6 +26,10 @@ export function gateCommandsForEdition(
   return commands.map((command) => {
     const feature = PRO_COMMAND_FEATURES.get(command.id);
     if (feature === undefined) return command;
+    // Closing a tool that was already admitted is not a new Pro choice.
+    if (command.active && (feature === 'registration-jig' || feature === 'place-board')) {
+      return command;
+    }
     const invoke = command.invoke;
     return { ...command, invoke: () => void requestProFeature(feature, invoke) };
   });
