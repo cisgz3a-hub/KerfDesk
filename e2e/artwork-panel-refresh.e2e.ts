@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test } from './fixtures/kerfdesk-test';
 import { createLayer } from '../src/core/scene';
 import { captureMaterialRecipe } from '../src/core/material-library';
@@ -5,7 +6,7 @@ import { captureMaterialRecipe } from '../src/core/material-library';
 test('panel tasks stay separate and fit a narrow rail', async ({ page, kerfdesk }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/, { timeout: 30_000 });
   const panel = page.getByRole('complementary', {
     name: 'Artwork / Operations panel',

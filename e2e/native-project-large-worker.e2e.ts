@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
@@ -62,7 +63,7 @@ test(`opens a ${FIXTURE_MIB} MiB native project through the production worker wh
     state.__projectHeartbeat = 0;
     delete state.__projectHeartbeatAtOpen;
   });
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
 
   await expect(page).toHaveTitle(/large-streamed\.lf2/, { timeout: 120_000 });
   await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();

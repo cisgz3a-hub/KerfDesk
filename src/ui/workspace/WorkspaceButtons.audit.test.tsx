@@ -18,6 +18,7 @@ import { ZoomControls } from './overlays';
 import { PreviewControlsPanel, PreviewRouteControls } from './preview-overlays';
 import { RegistrationJigPanel } from './RegistrationJigPanel';
 import { ToolStrip } from './ToolStrip';
+import { Toolbar } from '../common/Toolbar';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -92,7 +93,7 @@ describe('drawing palette individual outcomes', () => {
 
   it('Open Design Studio creates a resumable session', async () => {
     useDesignStudioStore.setState({ session: null, stash: null });
-    await mount(<ToolStrip />);
+    await mount(<Toolbar commands={[]} machineKind="laser" />);
     await click('Open Design Studio');
     expect(useDesignStudioStore.getState().session).not.toBeNull();
   });

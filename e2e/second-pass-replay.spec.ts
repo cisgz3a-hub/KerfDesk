@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { test, expect } from './fixtures/kerfdesk-test';
 import { recoveryExecutionLinesSince } from './fixtures/recovery-execution-lines';
 import {
@@ -21,7 +22,7 @@ test('a new painted pass seals writer 3 and resumes its exact interrupted progra
   test.setTimeout(180_000);
   const refusals = collectRefusals(page);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await dismissNotifications(page);
   await connectAndHome(page, kerfdesk);
