@@ -75,6 +75,19 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
     const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
     expect((await canvas.boundingBox())?.height ?? 0).toBeGreaterThan(200);
+    await toolbar.evaluate((element) => {
+      element.style.fontFamily = 'monospace';
+    });
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    expect((await canvas.boundingBox())?.height ?? 0).toBeGreaterThan(200);
+    await toolbar.evaluate((element) => {
+      element.style.fontFamily = '';
+    });
     await page.context().setOffline(true);
     await expect(toolbar.getByRole('status')).toHaveText('Offline');
     await page.evaluate(() => window.dispatchEvent(new Event('beforeinstallprompt')));
