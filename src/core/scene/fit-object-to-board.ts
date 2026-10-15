@@ -31,7 +31,7 @@ export function fitObjectToBoard(
   const width = size.width - 2 * options.marginMm;
   const height = size.height - 2 * options.marginMm;
   // Keep-size is a placement operation: report exhausted clearance as an overrun.
-  if (options.mode === 'fit' && (width <= 0 || height <= 0)) {
+  if (options.mode === 'fit' && Math.min(width, height) <= 0) {
     return { kind: 'error', message: 'The edge margin leaves no room for artwork.' };
   }
   const footprint = transformedBounds(object.bounds, { ...object.transform, x: 0, y: 0 });
