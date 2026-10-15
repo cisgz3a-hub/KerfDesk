@@ -248,6 +248,7 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     log: [],
     transcript: [],
     homingState: 'unknown',
+    positionEvidenceSuppressed: false,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     workZZeroEvidence: null,
@@ -309,6 +310,10 @@ async function runDisconnect(
         refs,
         retainedUnavailableTransportSafetyNotice(get()),
       );
+    } else if (get().connection.kind === 'connecting') {
+      // A picker/open may still resolve later, but its cancelled attempt no
+      // longer owns the UI. Leave Connect available while it retires itself.
+      set(disconnectedStatePatch);
     }
     return;
   }

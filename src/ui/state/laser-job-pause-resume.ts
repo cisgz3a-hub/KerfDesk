@@ -23,6 +23,7 @@ import {
   hasCurrentPauseResumeTransportFence,
   ownsPauseResumeTransition,
   isPauseResumeDeadlineError,
+  PauseResumeTransitionError,
   type PauseResumeTransitionAction,
   type PauseResumeTransitionToken,
 } from './laser-pause-resume-transition';
@@ -42,7 +43,7 @@ import {
 } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
-import type { SerialConnection } from '../../platform/types';
+import type { ConnectionTeardownOwnershipRefs } from './laser-connection-teardown';
 import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 import {
@@ -67,7 +68,8 @@ type SafeWriteFn = (
 type PauseResumeContext = {
   readonly set: SetFn;
   readonly get: GetFn;
-  readonly refs: PostJobSettleRefs & { readonly connection?: SerialConnection | null };
+  readonly refs: PostJobSettleRefs &
+    Partial<Pick<ConnectionTeardownOwnershipRefs, 'intentionalDisconnects'>>;
   readonly safeWrite: SafeWriteFn;
   readonly driver: () => ControllerDriver;
   readonly failDarkStop: () => Promise<void>;
@@ -89,6 +91,7 @@ const CNC_RESUME_CONFIRMATION_TIMEOUT_MESSAGE =
   'Resume did not confirm within the controller safety deadline. The job is kept and the stream stays frozen — no controller reset was requested. Press Resume again, or use ABORT JOB if the machine state is uncertain.';
 
 export async function runConfirmedPauseJob(context: PauseResumeContext): Promise<void> {
+  const assertCurrentConnection = capturePauseConnectionOwner(context);
   assertNoPauseResumeTransition(context);
   if (alreadyLifted(context)) return;
   // Pause is about to change the stream's status, so this side takes the
@@ -98,6 +101,7 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
   // handshake runs before the transition owner starts, so it cannot eat the
   // confirmation deadline and turn a slow handover into a fail-dark reset.
   await releaseHostedRefill(context.refs);
+  assertCurrentConnection();
   const activeDriver = context.driver();
   const laserJob = context.get().activeJobMachineKind !== 'cnc';
   // ADR-180 amendment 2 (2026-07-25): CNC Pause now takes the same safety-door
@@ -128,7 +132,16 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
     const message =
       plan === null ? PAUSE_UNSUPPORTED_MESSAGE : streamSidePauseMessage(plan.offLines);
     context.get().pushSystemNotice(`[lf2] ${message}`);
-    await queueStreamPauseBeamOff(context, plan);
+    await queueStreamPauseBeamOff(
+      {
+        ...context,
+        safeWrite: (line, action) => {
+          assertCurrentConnection();
+          return context.safeWrite(line, action);
+        },
+      },
+      plan,
+    );
     return;
   }
   await runOwnedPauseResumeTransition(context, 'pause', timeoutMessage, async (token) => {
@@ -155,11 +168,13 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
   });
   // ADR-411: with the hold settled, lift the bit out of the cut so Resume
   // never restarts the spindle in the wood.
+  assertCurrentConnection();
   if (!laserJob) await liftPausedCncJob(context);
 }
 
 export async function runConfirmedResumeJob(context: PauseResumeContext): Promise<void> {
   assertResumeCommandOwnership(context);
+  const connection = context.refs.connection;
   assertNoPauseResumeTransition(context);
   // A Pause that left the bit in the cut tries the lift again first: its door
   // may have been open, or its hold not yet settled (ADR-411 Amendment 1).
@@ -167,6 +182,10 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
     currentCncPauseLift(context.get()) === null && cncPauseLiftSkipReason(context.get()) !== null;
   if (retryLift) {
     await liftPausedCncJob(context, { retry: true });
+    assertResumeCommandOwnership(context);
+    if (context.refs.connection !== connection) {
+      throw new Error('The controller connection changed before Resume could begin.');
+    }
     // A lift that failed after its reset, or an Abort meanwhile, ended the job.
     if (context.get().streamer?.status !== 'paused') return;
   }
@@ -238,6 +257,7 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
     resumeWork,
     doorHold?.isHeld,
   );
+  assertResumeCommandOwnership(context);
   if (finishedWithoutRefill) {
     beginPostJobSettle(context.set, context.get, context.refs, context.safeWrite);
   }
@@ -354,6 +374,7 @@ function assertCurrentResumeConfirmation(context: PauseResumeContext): void {
 }
 
 function assertResumeCommandOwnership(context: PauseResumeContext): void {
+  assertNotDisconnecting(context);
   const state = context.get();
   const blocked = mpgCommandBlockMessage(state);
   if (blocked === null) return;
@@ -362,6 +383,35 @@ function assertResumeCommandOwnership(context: PauseResumeContext): void {
     log: pushLog(state, `[lf2] Resume blocked: ${blocked}`),
   });
   throw new Error(blocked);
+}
+
+function assertNotDisconnecting(context: PauseResumeContext): void {
+  const connection = context.refs.connection;
+  if (
+    context.get().controllerOperation?.kind === 'disconnect' ||
+    (connection != null && context.refs.intentionalDisconnects?.has(connection) === true)
+  ) {
+    // The claim is synchronous; its stop continuation may not have cancelled
+    // this transition yet. Disconnect already owns the physical stop request.
+    throw new PauseResumeTransitionError(
+      'The controller is disconnecting. Pause and Resume are unavailable.',
+      true,
+    );
+  }
+}
+
+/** A release can outlive Disconnect, reconnect, or a controller reset before
+ * Pause has a transition token. It must not acquire the replacement session. */
+function capturePauseConnectionOwner(context: PauseResumeContext): () => void {
+  assertNotDisconnecting(context);
+  const connection = context.refs.connection;
+  const writeEpoch = context.refs.writeEpoch ?? 0;
+  return () => {
+    assertNotDisconnecting(context);
+    if (context.refs.connection !== connection || (context.refs.writeEpoch ?? 0) !== writeEpoch) {
+      throw new Error('The controller session changed before Pause could complete.');
+    }
+  };
 }
 
 function clearPauseResumeTransitionState(

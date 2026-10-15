@@ -56,6 +56,11 @@ describe('Falcon A1 Pro Console air settings', () => {
 
     await settle(send('$152=100', { confirmed: true }));
     expect(sim.outbound()).toContain('$152=100\n');
+    expect(sim.outbound()).not.toContain('$$\n');
+    expect(useLaserStore.getState().controllerQualification).toMatchObject({
+      kind: 'qualified',
+      settings: 'not-required',
+    });
 
     await expect(send('$110=36000', { confirmed: true })).rejects.toThrow(
       /does not send numeric \$ setting writes other than \$150, \$151 and \$152/,

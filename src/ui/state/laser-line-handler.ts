@@ -453,6 +453,7 @@ function controllerResetBoundaryPolicy(state: LaserState): {
   return {
     preserveOperation:
       probeRecovering ||
+      operation?.kind === 'disconnect' ||
       operation?.kind === 'recovery' ||
       operation?.kind === 'connection-handshake',
     cancellationReason: probeRebooted

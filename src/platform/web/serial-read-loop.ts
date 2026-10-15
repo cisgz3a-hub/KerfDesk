@@ -155,8 +155,9 @@ function dispatchLines(
   slice: ReadSlice,
   isOpen: () => boolean,
   from: number,
-): true | Promise<boolean> {
+): boolean | Promise<boolean> {
   for (let index = from; index < lines.length; index += 1) {
+    if (!isOpen()) return false;
     if (slice.spent()) return dispatchAfterYield(lineSubs, lines, slice, isOpen, index);
     dispatchLine(lineSubs, lines[index] ?? '');
   }

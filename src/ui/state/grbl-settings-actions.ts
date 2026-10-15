@@ -23,7 +23,8 @@ import type { TranscriptSource } from './laser-transcript';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import { machineSettingsWriteBlockReason } from './machine-settings-write-readiness';
-import { beginReportUnitsWrite, retainControllerReportUnits } from './controller-report-units';
+import { retainControllerReportUnits } from './controller-report-units';
+import { grblSettingWriteEvidencePatch } from './grbl-settings-evidence';
 import { requalifyWithoutSettingsDump } from './laser-module-probe';
 import {
   emptyControllerBuildInfoState,
@@ -224,8 +225,8 @@ async function writeGrblSettingAction(
   const qualificationEpoch = get().controllerSessionEpoch;
   const trimmed = encoded.value;
   set({
+    ...grblSettingWriteEvidencePatch(get(), refs.driver, id, trimmed),
     controllerOperation: settingsControllerOperation(`Writing $${id}`),
-    ...(id === 13 ? beginReportUnitsWrite() : {}),
   });
   try {
     await writeAndVerifySetting(set, get, refs, write, qualificationEpoch, id, trimmed);

@@ -129,7 +129,9 @@ async function connectSerialController(
   refs.driver = driver;
   set((state) => ({ ...connectingPatch(state, refs), ...connectionScopedEvidenceReset() }));
   try {
-    const portRef = await resolveSerialPort(adapter, options.portSelection);
+    const portRef = await resolveSerialPort(adapter, options.portSelection, () =>
+      connectAttemptIsCurrent(refs, attempt),
+    );
     requestedPort = portRef;
     if (!connectAttemptIsCurrent(refs, attempt)) {
       await releaseCancelledPermission();
@@ -156,21 +158,27 @@ async function connectSerialController(
       await releaseCancelledPermission().catch(() => undefined);
       return;
     }
-    const message = error instanceof Error ? error.message : String(error);
-    set((state) => ({
-      ...publishControllerIncident(
-        refs,
-        {
-          ...state,
-          connectedBaudRate: attemptedBaudRate,
-          serialPortInfo: requestedPort?.info ?? null,
-        },
-        `[lf2] Controller connection failed: ${message}`,
-      ),
-      connection: { kind: 'failed', error: message },
-      controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch),
-    }));
+    reportConnectionFailure(set, refs, attemptedBaudRate, requestedPort?.info ?? null, error);
   }
+}
+
+function reportConnectionFailure(
+  set: SetFn,
+  refs: LiveRefs,
+  baudRate: number,
+  portInfo: SerialPortIdentity | null,
+  error: unknown,
+): void {
+  const message = error instanceof Error ? error.message : String(error);
+  set((state) => ({
+    ...publishControllerIncident(
+      refs,
+      { ...state, connectedBaudRate: baudRate, serialPortInfo: portInfo },
+      `[lf2] Controller connection failed: ${message}`,
+    ),
+    connection: { kind: 'failed', error: message },
+    controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch),
+  }));
 }
 
 function beginTransportConnectAttempt(
@@ -197,9 +205,11 @@ function selectedTransport(port: SerialPortRef, adapter: PlatformAdapter): 'seri
 async function resolveSerialPort(
   adapter: PlatformAdapter,
   selection: ConnectControllerOptions['portSelection'] = 'remembered',
+  isCurrent: () => boolean,
 ): Promise<SerialPortRef | null> {
   if (selection !== 'choose' && adapter.serial.grantedPorts !== undefined) {
     const granted = await adapter.serial.grantedPorts();
+    if (!isCurrent()) return null;
     const choice = chooseGrantedPort(granted, loadRememberedSerialPort(browserLocalStorage()));
     if (choice.kind === 'use') return choice.port;
   }

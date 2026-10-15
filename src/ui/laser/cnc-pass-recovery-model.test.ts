@@ -75,7 +75,7 @@ function exactCapsule(options?: {
     prepared,
     outputScope: DEFAULT_OUTPUT_SCOPE,
     canvasPlan: { retentionKey: 'archived-cnc-signature' } as CanvasMotionPlan,
-    controllerSettings: null,
+    controllerSettings: { reportInches: false },
     ...(options?.archiveWco === false
       ? {}
       : { controllerObservation: { wco: { x: 0, y: 0, z: 0 } } }),
@@ -138,7 +138,7 @@ describe('buildCncPassRecoveryModel', () => {
   });
 
   it('lists every pass with labels and preselects the computed boundary', () => {
-    const model = buildCncPassRecoveryModel(exactCapsule(), { x: 0, y: 0, z: 0 });
+    const model = buildCncPassRecoveryModel(exactCapsule(), { x: 0, y: 0, z: 0 }, false);
     expect(model.kind).toBe('ready');
     if (model.kind !== 'ready') return;
     expect(model.passes).toHaveLength(3);

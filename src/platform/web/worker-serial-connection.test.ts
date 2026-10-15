@@ -263,6 +263,17 @@ describe('worker serial connection (ADR-334)', () => {
     expect(h.closedPort()).toBe(1);
   });
 
+  it('does not deliver lines queued behind the beginning of close', async () => {
+    const h = harness();
+    const lines: string[] = [];
+    h.connection.onLine((line) => lines.push(line));
+    const closing = h.connection.close();
+    h.emit({ kind: 'line', line: 'ok' });
+    h.emit({ kind: 'closed' });
+    await closing;
+    expect(lines).toEqual([]);
+  });
+
   it('treats an unsolicited close as a dropped cable', async () => {
     const h = harness();
     const closed: number[] = [];
@@ -399,6 +410,27 @@ describe('worker serial connection: line errors (audit connect-1)', () => {
 // port's own writable is still sending Disconnect's M5/M9 until the pipe that
 // holds it finishes (audit transport-4).
 describe('worker serial connection: port drain before close (audit transport-4)', () => {
+  it('bounds the final native port close after the worker has released ownership', async () => {
+    vi.useFakeTimers();
+    const close = vi.fn(() => new Promise<void>(() => undefined));
+    const terminate = vi.fn();
+    const connection = createWorkerSerialConnection({
+      bridge: { postMessage: () => undefined, onMessage: () => () => undefined, terminate },
+      port: { readable: null, writable: null, close },
+      start: () => undefined,
+      timeoutMs: 25,
+    });
+    const closed = vi.fn();
+    connection.onClose(closed);
+    const closing = expect(connection.close()).rejects.toThrow('Serial shutdown timed out');
+    await vi.advanceTimersByTimeAsync(5_000);
+    await closing;
+    expect(terminate).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(closed).toHaveBeenCalledTimes(1);
+    await expect(connection.write('G1 X1\n')).rejects.toThrow('not writable');
+  });
+
   it('waits for the port writable to finish before closing the port', async () => {
     const h = harness();
     const writable = new WritableStream<Uint8Array>();
