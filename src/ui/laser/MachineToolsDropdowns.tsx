@@ -118,7 +118,15 @@ function ToolTrigger(
       aria-controls={props.id}
       onClick={() => props.onToggle(props.open ? null : props.tool)}
       onKeyDown={(event) => {
-        if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+        if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
+          event.stopPropagation();
+          return;
+        }
+        if (event.key === 'Enter' || event.key === ' ') {
+          // Native button activation owns these keys, including an unfinished pen draft.
+          event.stopPropagation();
+          return;
+        }
         if (event.key !== 'ArrowDown') return;
         event.preventDefault();
         event.stopPropagation();

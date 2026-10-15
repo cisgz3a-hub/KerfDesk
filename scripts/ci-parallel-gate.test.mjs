@@ -79,6 +79,26 @@ test('CI runs every release:check command in a job its gate waits for', async ()
   assert.ok(!commands.includes('pnpm release:check'));
 });
 
+test('Windows upgrade menu regression runs automatically and belongs to release integrity', async () => {
+  const regression = 'scripts/installed-upgrade-menu.test.mjs';
+  const packageJson = JSON.parse(await readFile('package.json', 'utf8'));
+  assert.ok(packageJson.scripts['test:release-integrity'].split(/\s+/u).includes(regression));
+
+  const ci = await readWorkflow('.github/workflows/ci.yml');
+  assert.ok(Object.hasOwn(ci.on, 'pull_request'));
+  assert.ok(ci.on.push.branches.includes('main'));
+  const windowsJobs = Object.values(ci.jobs).filter((job) =>
+    commandsOf(job).includes(`node --test ${regression}`),
+  );
+  assert.equal(windowsJobs.length, 1);
+  const [job] = windowsJobs;
+  assert.equal(job['runs-on'], 'windows-latest');
+  assert.equal(job.if, undefined);
+  const invocation = job.steps.find((step) => step.run === `node --test ${regression}`);
+  assert.equal(invocation.if, undefined);
+  gateOf(ci, 'Lint, typecheck, license, test, build');
+});
+
 test('CI splits the unit tests into shards', async () => {
   const ci = await readWorkflow('.github/workflows/ci.yml');
 

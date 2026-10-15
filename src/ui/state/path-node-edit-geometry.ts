@@ -215,9 +215,12 @@ function materializeCurvePath(
   curves: ReadonlyArray<CurveSubpath>,
 ): ColoredPath | null {
   const polylines: Polyline[] = [];
+  // Unequal arrays are an unpaired compatibility view, so an existing index
+  // cannot identify the unchanged curve that it represents.
+  const paired = path.polylines.length === path.curves?.length;
   for (const [index, curve] of curves.entries()) {
     const existing = path.polylines[index];
-    if (curve === path.curves?.[index] && existing !== undefined) {
+    if (paired && curve === path.curves?.[index] && existing !== undefined) {
       polylines.push(existing);
       continue;
     }

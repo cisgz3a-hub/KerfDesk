@@ -44,8 +44,10 @@ export function tracePartPathWork(path: ColoredPath): number {
   if (cached !== undefined) return cached;
   const contours = path.curves ?? path.polylines;
   let work = contours.length * 16;
-  for (const contour of contours)
-    work += 'segments' in contour ? contour.segments.length : contour.points.length;
+  // Bounds consume canonical curves, while fill grouping can consume their
+  // aligned compatibility samples. Count both representations conservatively.
+  for (const curve of path.curves ?? []) work += curve.segments.length;
+  for (const polyline of path.polylines) work += polyline.points.length;
   workCache.set(path, work);
   return work;
 }

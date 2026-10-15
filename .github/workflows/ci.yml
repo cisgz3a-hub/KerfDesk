@@ -119,6 +119,23 @@ jobs:
       - name: Check index exports
         run: pnpm check:index-exports
 
+  windows-native-tests:
+    name: Windows native upgrade controls
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+
+      - name: Check native upgrade menu invocation
+        # This Node/PowerShell regression is skipped on the Linux release gate.
+        # It uses Windows UI Automation types and needs no package installation.
+        run: node --test scripts/installed-upgrade-menu.test.mjs
+
   unit-tests:
     name: Unit tests (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
@@ -171,7 +188,7 @@ jobs:
 
   ci:
     name: Lint, typecheck, license, test, build
-    needs: [static-checks, policy-and-build, unit-tests, remote-control]
+    needs: [static-checks, policy-and-build, windows-native-tests, unit-tests, remote-control]
     # Runs whatever the jobs above did, so a failed or cancelled job fails
     # this check instead of skipping it: GitHub counts a skipped required
     # check as passed.

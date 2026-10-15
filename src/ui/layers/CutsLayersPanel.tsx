@@ -21,6 +21,7 @@ import './artwork-inspector.css';
 export function CutsLayersPanel(): JSX.Element {
   const [objectsOpen, setObjectsOpen] = useState(false);
   const hasObjects = useStore((s) => s.project.scene.objects.length > 0);
+  const numberingActive = useUiStore((s) => s.artworkNumbering.kind === 'active');
   const panelVisible = useUiStore((s) => s.railPanelVisibility.layers);
   const togglePanel = useUiStore((s) => s.toggleRailPanel);
   const requestedView = useUiStore((s) => s.cutsLayersView);
@@ -46,8 +47,8 @@ export function CutsLayersPanel(): JSX.Element {
         <h2>Artwork</h2>
         <Button
           data-artwork-organise
-          title="Find, rename and organise artwork and groups"
-          disabled={!hasObjects}
+          title={artworkOrganiserTitle(numberingActive)}
+          disabled={!hasObjects || numberingActive}
           onClick={() => setObjectsOpen(true)}
         >
           Objects
@@ -94,6 +95,12 @@ export function CutsLayersPanel(): JSX.Element {
         : null}
     </aside>
   );
+}
+
+function artworkOrganiserTitle(numberingActive: boolean): string {
+  return numberingActive
+    ? 'Finish or cancel canvas numbering before organising artwork'
+    : 'Find, rename and organise artwork and groups';
 }
 
 function LayersView({ layers }: { readonly layers: ReadonlyArray<Layer> }): JSX.Element {
