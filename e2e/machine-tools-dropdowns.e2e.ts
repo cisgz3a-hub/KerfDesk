@@ -156,3 +156,44 @@ for (const theme of ['light', 'dark'] as const) {
     expect((await kerfdesk.events()).filter((event) => event.kind === 'serial-write')).toEqual([]);
   });
 }
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`machine tool labels fit wider font metrics in ${theme} theme`, async ({ page }, info) => {
+    await page.addInitScript((value) => localStorage.setItem('kerfdesk.theme.v1', value), theme);
+    await page.goto('/');
+    // Linux and Windows system fonts differ. A wider monospace face reproduces
+    // the pressure on Placement without changing the product's font size.
+    await page.addStyleTag({
+      content: '.lf-machine-tool-tab { font-family: "Courier New", monospace !important; }',
+    });
+    for (const viewport of [
+      { width: 1536, height: 900, layout: 'spacious' },
+      { width: 1366, height: 900, layout: 'compact' },
+      { width: 640, height: 450, layout: 'compact' },
+    ]) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await expect(
+        page.getByRole('region', { name: 'Workspace side panels', exact: true }),
+      ).toHaveAttribute('data-layout', viewport.layout);
+      await selectWorkspacePanel(page, 'Machine');
+      const tabs = page.getByRole('group', { name: 'Machine tool dropdowns', exact: true });
+      await tabs.scrollIntoViewIfNeeded();
+      await expect
+        .poll(() => tabs.evaluate((element) => element.scrollWidth <= element.clientWidth + 1))
+        .toBe(true);
+      for (const [name, label] of [
+        ['Origin', 'Origin'],
+        ['Placement & output', 'Placement'],
+        ['Console', 'Console'],
+      ] as const) {
+        const tab = tabs.getByRole('button', { name, exact: true });
+        await expect(tab.getByText(label, { exact: true })).toBeVisible();
+        await expect(tab.locator('svg')).toBeVisible();
+        await expect
+          .poll(() => tab.evaluate((element) => element.scrollWidth <= element.clientWidth + 1))
+          .toBe(true);
+      }
+      await tabs.screenshot({ path: info.outputPath(`wide-font-${theme}-${viewport.width}.png`) });
+    }
+  });
+}

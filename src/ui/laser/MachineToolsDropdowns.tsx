@@ -126,7 +126,7 @@ function ToolTrigger(
         if (props.open) focusToolPanel(props.id);
       }}
     >
-      <Icon name={props.icon} size={16} />
+      <Icon name={props.icon} size={12} />
       <span>{props.shortLabel ?? props.label}</span>
       <span className="lf-machine-tool-chevron" aria-hidden="true">
         ⌄
@@ -174,7 +174,7 @@ function ToolPanel(props: {
       }}
     >
       <div className="lf-machine-tool-dropdown-heading">
-        {props.label === 'Origin' && <span className="lf-machine-tool-caption">Origin</span>}
+        <span className="lf-machine-tool-caption">{props.label}</span>
         <button
           type="button"
           className="lf-btn"
