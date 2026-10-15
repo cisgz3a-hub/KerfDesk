@@ -9,7 +9,7 @@
 .lf-machine-tool-tabs {
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(max-content, 1fr));
   gap: 4px;
   padding: 0;
 }
@@ -153,5 +153,13 @@
 @container machine-rail-body (max-width: 360px) {
   .lf-machine-tool-chevron {
     display: none;
+  }
+}
+
+/* Reclaim spacing before labels or icons in the narrowest machine panels. */
+@container machine-rail-body (max-width: 280px) {
+  .lf-btn.lf-machine-tool-tab {
+    gap: 2px;
+    padding-inline: 0;
   }
 }
