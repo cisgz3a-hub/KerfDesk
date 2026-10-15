@@ -4,9 +4,9 @@
 export const SERIAL_PORT_CLOSE_TIMEOUT_MS = 5_000;
 
 type ClosablePort = { readonly close: () => Promise<void> };
-const closingPorts = new WeakMap<ClosablePort, Promise<void>>();
+const closingPorts = new WeakMap<object, Promise<void>>();
 
-export function requireSerialPortReleased(port: ClosablePort): void {
+export function requireSerialPortReleased(port: object): void {
   if (closingPorts.has(port))
     throw new Error('The previous serial connection is still closing. Reconnect after it closes.');
 }
@@ -22,14 +22,15 @@ export function closeSerialPort(
 export function startSerialPortClose(
   port: ClosablePort,
   releaseStreams: () => Promise<void>,
+  ownershipKey: object = port,
 ): Promise<void> {
-  let operation = closingPorts.get(port);
+  let operation = closingPorts.get(ownershipKey);
   if (operation === undefined) {
     operation = Promise.resolve().then(async () => {
       await releaseStreams();
       await port.close();
     });
-    retainSerialPort(port, operation);
+    retainSerialPort(ownershipKey, operation);
   }
   return operation;
 }
@@ -39,13 +40,14 @@ export function startSerialPortClose(
 export function startSerialPortForget(
   port: ClosablePort & { readonly forget?: () => Promise<void> },
   closed: Promise<void>,
+  ownershipKey: object = port,
 ): Promise<void> {
   const operation = closed.then(() => port.forget?.());
-  retainSerialPort(port, operation);
+  retainSerialPort(ownershipKey, operation);
   return operation;
 }
 
-function retainSerialPort(port: ClosablePort, operation: Promise<void>): void {
+function retainSerialPort(port: object, operation: Promise<void>): void {
   closingPorts.set(port, operation);
   const release = (): void => {
     // An earlier close must not release ownership extended through Forget.

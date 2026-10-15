@@ -98,7 +98,9 @@ function openedConnection(
       terminate: bridge.terminate,
     },
     // The worker closes its own native port before acknowledging close. The
-    // original picker handle remains the exact authority for Forget only.
+    // original picker handle is both the Forget authority and the ownership key
+    // checked by window reconnect, even though operations use this proxy.
+    ownershipKey: port,
     port: {
       readable: null,
       writable: null,

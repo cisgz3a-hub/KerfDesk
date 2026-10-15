@@ -75,6 +75,7 @@ type Session = {
 type Link = {
   readonly bridge: SerialWorkerBridge;
   readonly port: WorkerSerialPort;
+  readonly ownershipKey: object;
   readonly timeoutMs: number;
   readonly session: Session;
   unsubscribe: () => void;
@@ -88,6 +89,8 @@ type Link = {
 export function createWorkerSerialConnection(args: {
   readonly bridge: SerialWorkerBridge;
   readonly port: WorkerSerialPort;
+  /** Original picker handle when port operations are supplied by a native proxy. */
+  readonly ownershipKey?: object;
   readonly timeoutMs?: number;
   /** A native worker already owns the port; start its reader after subscribing. */
   readonly start?: () => void;
@@ -95,6 +98,7 @@ export function createWorkerSerialConnection(args: {
   const link: Link = {
     bridge: args.bridge,
     port: args.port,
+    ownershipKey: args.ownershipKey ?? args.port,
     timeoutMs: args.timeoutMs ?? WORKER_HANDSHAKE_TIMEOUT_MS,
     session: createSession(),
     unsubscribe: () => undefined,
@@ -169,7 +173,7 @@ function connectionApi(
     // port open for the next Connect (audit transport-3).
     close: () => endSession(link),
     forget: () => {
-      forgetting ??= startSerialPortForget(link.port, startEndSession(link));
+      forgetting ??= startSerialPortForget(link.port, startEndSession(link), link.ownershipKey);
       return boundedSerialClose(forgetting);
     },
     hostedStreaming,
@@ -222,7 +226,7 @@ function startEndSession(link: Link): Promise<void> {
     // Register ownership before the handshake or any close subscriber can
     // try Connect again. The operation starts in a microtask, so synchronous
     // worker replies and reentrant close calls join this same cleanup.
-    link.ending = startSerialPortClose(link.port, () => runEndSession(link));
+    link.ending = startSerialPortClose(link.port, () => runEndSession(link), link.ownershipKey);
   }
   // A caller deadline does not replace the actual cleanup promise. A later
   // Forget can wait for its completion without opening or closing twice.
