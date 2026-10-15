@@ -107,7 +107,12 @@ async function render(platform: PlatformAdapter, machineKind: 'laser' | 'cnc' = 
       </PlatformProvider>,
     );
   });
-  return host;
+  await act(async () =>
+    host
+      ?.querySelector<HTMLButtonElement>('[aria-label="Controller notification"] button')
+      ?.click(),
+  );
+  return document.body;
 }
 
 function retryButton(container: HTMLElement): HTMLButtonElement | undefined {

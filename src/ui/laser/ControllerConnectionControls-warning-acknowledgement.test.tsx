@@ -104,7 +104,7 @@ function CurrentControls(): JSX.Element {
 }
 
 function button(label: string): HTMLButtonElement {
-  const result = [...host!.querySelectorAll('button')].find(
+  const result = [...document.body.querySelectorAll('button')].find(
     (candidate) => candidate.textContent === label,
   );
   if (!(result instanceof HTMLButtonElement)) throw new Error(`Missing button: ${label}`);
@@ -161,6 +161,11 @@ it.each([false, true])(
         </PlatformProvider>,
       );
     });
+    await act(async () =>
+      host
+        ?.querySelector<HTMLButtonElement>('[aria-label="Controller notification"] button')
+        ?.click(),
+    );
     await act(async () => {
       button('Reconnect controller').click();
       await vi.advanceTimersByTimeAsync(1_000);
