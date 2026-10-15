@@ -29,13 +29,29 @@ export function startSerialPortClose(
       await releaseStreams();
       await port.close();
     });
-    closingPorts.set(port, operation);
-    void operation.then(
-      () => closingPorts.delete(port),
-      () => closingPorts.delete(port),
-    );
+    retainSerialPort(port, operation);
   }
   return operation;
+}
+
+/** Forget outlives caller deadlines and owns the port until revocation settles.
+ * The connection caches this actual operation, so repeated callers cannot revoke twice. */
+export function startSerialPortForget(
+  port: ClosablePort & { readonly forget?: () => Promise<void> },
+  closed: Promise<void>,
+): Promise<void> {
+  const operation = closed.then(() => port.forget?.());
+  retainSerialPort(port, operation);
+  return operation;
+}
+
+function retainSerialPort(port: ClosablePort, operation: Promise<void>): void {
+  closingPorts.set(port, operation);
+  const release = (): void => {
+    // An earlier close must not release ownership extended through Forget.
+    if (closingPorts.get(port) === operation) closingPorts.delete(port);
+  };
+  void operation.then(release, release);
 }
 
 /** A timeout is a failed close, not confirmation that outstanding bytes sent. */

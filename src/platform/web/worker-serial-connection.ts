@@ -21,7 +21,11 @@
 import type { HostedStreamRefill, SerialConnection } from '../types';
 import { createWorkerRefillHandover } from './worker-refill-handover';
 import { portStreamsReleased, settleWithin } from './worker-teardown-waits';
-import { boundedSerialClose, startSerialPortClose } from './serial-port-close';
+import {
+  boundedSerialClose,
+  startSerialPortClose,
+  startSerialPortForget,
+} from './serial-port-close';
 import {
   isSerialWorkerResponse,
   type SerialWorkerRequest,
@@ -143,6 +147,7 @@ function connectionApi(
   fail: () => void,
 ): SerialConnection {
   const { session } = link;
+  let forgetting: Promise<void> | null = null;
   return {
     write: async (data) => {
       if (session.closed || session.closing) throw new Error('Serial port not writable.');
@@ -163,12 +168,9 @@ function connectionApi(
     // session itself: returning early there leaked the worker and left the
     // port open for the next Connect (audit transport-3).
     close: () => endSession(link),
-    forget: async () => {
-      await hostedStreaming.release();
-      await endSession(link);
-      await link.port.forget?.().catch((err: unknown) => {
-        console.warn('port.forget() rejected:', err);
-      });
+    forget: () => {
+      forgetting ??= startSerialPortForget(link.port, startEndSession(link));
+      return boundedSerialClose(forgetting);
     },
     hostedStreaming,
   };
@@ -213,7 +215,7 @@ function attachStreams(
   }
 }
 
-function endSession(link: Link): Promise<void> {
+function startEndSession(link: Link): Promise<void> {
   if (link.ending === null) {
     link.session.closing = true;
     link.session.handover?.close();
@@ -224,7 +226,11 @@ function endSession(link: Link): Promise<void> {
   }
   // A caller deadline does not replace the actual cleanup promise. A later
   // Forget can wait for its completion without opening or closing twice.
-  return boundedSerialClose(link.ending);
+  return link.ending;
+}
+
+function endSession(link: Link): Promise<void> {
+  return boundedSerialClose(startEndSession(link));
 }
 
 function endSessionInBackground(link: Link): void {
