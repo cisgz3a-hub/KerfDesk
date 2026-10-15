@@ -7,7 +7,7 @@ test('New and a renderer restart retain committed machine setup while new artwor
 }) => {
   await page.setViewportSize({ width: 1536, height: 864 });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const setup = page.getByRole('dialog', { name: 'Machine Setup', exact: true });

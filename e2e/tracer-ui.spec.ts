@@ -23,7 +23,7 @@ test.beforeEach(async ({ page }) => {
     });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
 });
 
@@ -163,7 +163,7 @@ async function openTrace(page: Page, fixture: KerfDeskFixture) {
   await expect(page.getByText('Objects: 2', { exact: true })).toBeVisible();
   const notifications = page.getByRole('button', { name: /^Dismiss .* notification:/ });
   while (await notifications.count()) await notifications.first().click();
-  await page.getByRole('button', { name: 'Trace Image...', exact: true }).click();
+  await (await toolbarCommand(page, 'Trace Image...')).click();
   const dialog = page.getByRole('dialog', { name: 'Trace image' });
   await expect(dialog).toBeVisible();
   return dialog;

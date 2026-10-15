@@ -100,7 +100,7 @@ test('computer preferences survive reload, Open and New without entering the sav
     }),
   ).toHaveValue('2.5');
   await restored.getByRole('button', { name: 'Done', exact: true }).click();
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await expect(page.getByRole('button', { name: 'Toggle snapping', exact: true })).toHaveAttribute(
     'aria-pressed',
@@ -145,7 +145,7 @@ test('Save As immediately after operation edits persists all newly typed setting
 }) => {
   await page.setViewportSize({ width: 1536, height: 864 });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   const panel = page.getByRole('complementary', {
     name: 'Artwork / Operations panel',
@@ -170,7 +170,7 @@ test('actual autosave recovery restores job settings without replacing computer 
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1536, height: 864 });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   const panel = page.getByRole('complementary', {
     name: 'Artwork / Operations panel',

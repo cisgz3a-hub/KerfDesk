@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { test, expect, type Locator, type Page } from './fixtures/kerfdesk-test';
 import type { PlatformAdapter } from '../src/platform/types';
 import type { AppState } from '../src/ui/state';
@@ -14,7 +15,7 @@ const viewports = [
 for (const viewport of viewports) {
   test(`workspace fits ${viewport.width}x${viewport.height} without browser zoom`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.setViewportSize(viewport);
@@ -32,6 +33,9 @@ for (const viewport of viewports) {
     await expectNoPageOverflow(page);
     for (const button of await page.locator('.lf-toolbar-shell button:visible').all()) {
       await expectWithinViewport(page, button);
+    }
+    if (viewport.width === 1536 && viewport.height === 864) {
+      await page.screenshot({ path: testInfo.outputPath('design-studio-toolbar.png') });
     }
     if (viewport.layout === 'compact') {
       await page.getByRole('tab', { name: 'Machine', exact: true }).click();
@@ -55,6 +59,128 @@ for (const viewport of viewports) {
       await expectWithinViewport(page, dock);
     }
     expect(errors).toEqual([]);
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`toolbar keeps optional controls reachable across compact widths in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await useThemePreference(page, theme);
+    await page.setViewportSize({ width: 640, height: 450 });
+    await page.goto('/');
+    await expect(page.locator('#app-splash')).toHaveCount(0);
+    const toolbar = page.getByRole('banner', { name: 'Toolbar' });
+    await expect(toolbar.getByRole('button', { name: 'Open Design Studio' })).toBeVisible();
+    await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
+    await expectCompactToolbarCanvas(page, toolbar);
+    await expect(toolbar.locator('.lf-workspace-layout-select > span')).toBeVisible();
+    await page.context().setOffline(true);
+    await expect(toolbar.getByRole('status')).toHaveText('Offline');
+    await page.evaluate(() => window.dispatchEvent(new Event('beforeinstallprompt')));
+    await expect(toolbar.getByRole('button', { name: 'Install app', exact: true })).toBeVisible();
+    for (const wideFont of [false, true]) {
+      await toolbar.evaluate((element, wide) => {
+        element.style.fontFamily = wide ? 'monospace' : '';
+      }, wideFont);
+      for (const width of [650, 640, 620, 601, 540]) {
+        await page.setViewportSize({ width, height: 720 });
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+            ),
+        );
+        for (const button of await toolbar.locator('button:visible').all()) {
+          await expectWithinViewport(page, button);
+          const size = await button.evaluate((element) => ({
+            width: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+          }));
+          expect(size.scrollWidth).toBeLessThanOrEqual(size.width + 1);
+        }
+        await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
+        await expectWithinViewport(page, toolbar.getByRole('status'));
+        await expectNoPageOverflow(page);
+        if (wideFont && width === 640) {
+          await page.screenshot({ path: testInfo.outputPath(`toolbar-optional-${theme}.png`) });
+        }
+      }
+    }
+    const layout = toolbar.getByRole('button', { name: 'Workspace layout', exact: true });
+    await layout.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menu', { name: 'Workspace layout options' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(layout).toBeFocused();
+  });
+}
+
+test('compact toolbar accommodates the native Phone & MCP control', async ({ page }, testInfo) => {
+  // Exercise the real native-only toolbar component in the HTTP renderer harness.
+  // This replaces only its protocol gate; it does not claim packaged-native coverage.
+  await page.route('**/src/ui/remote-access/desktop-only.ts', (route) =>
+    route.fulfill({
+      contentType: 'text/javascript',
+      body: 'export function isRemoteAccessRenderer() { return true; }',
+    }),
+  );
+  await page.setViewportSize({ width: 640, height: 450 });
+  await page.goto('/');
+  await expect(page.locator('#app-splash')).toHaveCount(0);
+  const toolbar = page.getByRole('banner', { name: 'Toolbar' });
+  await expect(toolbar.getByRole('button', { name: 'Phone & MCP', exact: true })).toBeVisible();
+  await expectCompactToolbarCanvas(page, toolbar);
+  // Reserve for wider platform font metrics as well as the local default font.
+  await toolbar.evaluate((element) => {
+    element.style.letterSpacing = '1px';
+  });
+  await expectCompactToolbarCanvas(page, toolbar);
+  const layout = toolbar.getByRole('button', { name: 'Workspace layout', exact: true });
+  await expect(layout.locator('span')).toBeHidden();
+  await layout.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menu', { name: 'Workspace layout options' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(layout).toBeFocused();
+  await page.screenshot({ path: testInfo.outputPath('native-toolbar-compact.png') });
+  await page.setViewportSize({ width: 1000, height: 720 });
+  await expect(layout.locator('span')).toBeVisible();
+});
+
+async function expectCompactToolbarCanvas(page: Page, toolbar: Locator): Promise<void> {
+  const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
+  for (const fontFamily of ['', 'monospace']) {
+    await toolbar.evaluate((element, font) => {
+      element.style.fontFamily = font;
+    }, fontFamily);
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    expect((await canvas.boundingBox())?.height ?? 0).toBeGreaterThan(200);
+    const centres = await toolbar
+      .locator('.lf-toolbar-utilities button:visible')
+      .evaluateAll((buttons) =>
+        buttons.map((button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.y + rect.height / 2;
+        }),
+      );
+    expect(Math.max(...centres) - Math.min(...centres)).toBeLessThanOrEqual(1);
+    for (const button of await toolbar.locator('button:visible').all()) {
+      await expectWithinViewport(page, button);
+    }
+    await expect(
+      toolbar.getByRole('button', { name: 'Workspace layout' }),
+    ).toHaveAccessibleDescription('Auto layout');
+    await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
+    await expectNoPageOverflow(page);
+  }
+  await toolbar.evaluate((element) => {
+    element.style.fontFamily = '';
   });
 }
 
@@ -183,7 +309,7 @@ test('overflow commands and all nine anchors remain reachable on a short laptop'
   await expect(menu.getByRole('menuitem', { name: 'Save G-code...' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(more).toBeFocused();
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();
   await page.keyboard.press('Control+a');
   const anchor = page.getByRole('button', { name: 'Choose transform anchor' });
@@ -198,13 +324,17 @@ test('overflow commands and all nine anchors remain reachable on a short laptop'
   await expect(anchor).toHaveAttribute('title', /bottom right/);
 });
 
-test('short dark workspace keeps the tool rail scrollable and machine modes accessible', async ({
+test('short dark workspace keeps Design Studio in the toolbar and machine modes accessible', async ({
   page,
 }) => {
   await useThemePreference(page, 'dark');
   await page.setViewportSize({ width: 1024, height: 500 });
   await page.goto('/');
-  const designStudio = page.getByRole('button', { name: 'Open Design Studio', exact: true });
+  const designStudio = page.getByRole('banner', { name: 'Toolbar' }).getByRole('button', {
+    name: 'Open Design Studio',
+    exact: true,
+  });
+  await expect(designStudio).toContainText('Pro');
   await designStudio.focus();
   await expectWithinViewport(page, designStudio);
   await designStudio.click();

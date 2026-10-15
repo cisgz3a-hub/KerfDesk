@@ -93,6 +93,18 @@
   width: 36px;
   padding: 4px;
 }
+.lf-toolbar-shell .lf-toolbar-design-studio {
+  border-color: var(--lf-border);
+}
+.lf-toolbar-pro-badge {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--lf-tint-accent);
+  color: var(--lf-accent-fg);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
 .lf-toolbar-shell .lf-toolbar-command-label,
 .lf-toolbar-overflow .lf-toolbar-command-label {
   display: inline;
@@ -185,16 +197,28 @@
   }
 }
 @media (max-width: 700px) {
+  /* Extra native controls need room; the layout name remains its ARIA description. */
+  .lf-toolbar-shell:has(.lf-remote-toolbar-button) .lf-workspace-layout-select > span {
+    display: none;
+  }
+  .lf-toolbar-project-name {
+    flex-basis: 0;
+    flex-grow: 1;
+  }
   .lf-toolbar-shell {
     min-height: 46px;
     gap: 4px;
     padding: 5px 7px;
   }
   .lf-toolbar-utilities {
+    min-width: 0;
+    flex-shrink: 1;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 4px;
   }
 }
-@media (max-width: 520px) {
+@media (max-width: 600px) {
   .lf-toolbar-shell {
     flex-wrap: wrap;
   }
