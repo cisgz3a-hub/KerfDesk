@@ -81,7 +81,8 @@ describe('exact board fitting', () => {
       },
     };
     const plan = fitObjectToBoard(source, board, { mode: 'keep-size', marginMm });
-    if (plan.kind !== 'ok') throw new Error('expected keep-size placement');
+    if (plan.kind !== 'ok' || plan.object.kind !== 'shape')
+      throw new Error('expected keep-size shape placement');
     expect(plan.scale).toBe(1);
     expect(plan.fits).toBe(false);
     expect(plan.object.transform).toMatchObject({
