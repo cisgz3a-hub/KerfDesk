@@ -1,14 +1,14 @@
 import { useEffect } from 'react';
 import { controller } from '../core/controller';
 import { selectableIds } from '../core/scene';
-import { canEdit, selectionComplete, store } from '../core/store';
+import { canEdit, hasSelection, selectionComplete, store } from '../core/store';
 import { cancelCanvasGesture, typingTarget } from './canvas-gesture-types';
 import { useApp } from './hooks';
 import { Icon } from './icons';
 
 export function SelectionControls() {
   const mode = useApp((state) => state.selectionMode);
-  const selection = useApp((state) => state.selection);
+  const selected = useApp(hasSelection);
   const workspace = useApp((state) => state.workspace);
   return (
     <div className="selection-controls">
@@ -38,7 +38,7 @@ export function SelectionControls() {
         </button>
         <button
           type="button"
-          disabled={selection.length === 0}
+          disabled={!selected}
           onClick={() => {
             cancelCanvasGesture();
             void controller.select([]);
@@ -67,7 +67,7 @@ export function useDesignKeyboard(): void {
         else if (draft !== null) {
           event.preventDefault();
           store.set({ draft: null, preview: null });
-        } else if (selection.length > 0) {
+        } else if (hasSelection(state)) {
           event.preventDefault();
           void controller.select([]);
         }

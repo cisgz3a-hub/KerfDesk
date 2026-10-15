@@ -25,7 +25,11 @@ export async function applyRemoteWrite(
     case 'set_selection': {
       const ids = prepareRemoteSelection(state, write.args);
       return commit(() => {
-        state.selectObjects(ids, { scope: 'document', expandGroups: false });
+        state.selectObjects(ids, {
+          scope: 'document',
+          expandGroups: false,
+          preserveExisting: true,
+        });
         return { selection: selectedIds(store.getState()).filter(publicIdentifier).slice(0, 200) };
       });
     }

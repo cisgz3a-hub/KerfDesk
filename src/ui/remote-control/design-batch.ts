@@ -154,7 +154,11 @@ const ITEM_RUNNERS: Record<BatchItem['command'], ItemRunner> = {
     ),
   set_selection: ({ store, args }) => {
     const ids = prepareRemoteSelection(store.getState(), args as RemoteSelectionArgs);
-    store.getState().selectObjects(ids, { scope: 'document', expandGroups: false });
+    store.getState().selectObjects(ids, {
+      scope: 'document',
+      expandGroups: false,
+      preserveExisting: true,
+    });
     return {};
   },
   arrange_artwork: ({ store, args, ownedUndo }) =>

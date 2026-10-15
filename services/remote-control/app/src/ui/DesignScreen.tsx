@@ -187,6 +187,9 @@ function HistoryBar() {
 }
 
 function ZoomBar() {
+  const actions = useApp((state) =>
+    state.draft !== null ? 'drawing' : state.selection.length > 0 ? 'selection' : undefined,
+  );
   const view = useApp((state) => state.view);
   const content = useContentBox();
   const zoomBy = (factor: number) => {
@@ -206,12 +209,7 @@ function ZoomBar() {
     store.set({ view: fitView(content, width, height, 28, RAIL_INSET) });
   };
   return (
-    <div
-      className="zoom"
-      style={{
-        bottom: useApp((state) => state.selection.length > 0 || state.draft !== null) ? 86 : 10,
-      }}
-    >
+    <div className="zoom" data-actions={actions}>
       <button type="button" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.4)}>
         <Icon name="minus" size={18} />
       </button>

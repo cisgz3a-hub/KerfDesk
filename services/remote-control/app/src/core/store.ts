@@ -147,3 +147,10 @@ export const selectionComplete = (current: AppState): boolean =>
   current.workspace?.selectionTruncated !== true ||
   current.selection.length !== current.workspace.selection.length ||
   current.selection.some((id, index) => id !== current.workspace?.selection[index]);
+
+/** A filtered ID list can be empty while the PC still has selected artwork. */
+export const hasSelection = (current: AppState): boolean =>
+  current.selection.length > 0 ||
+  (!selectionComplete(current) &&
+    ((current.workspace?.totalSelected ?? 0) > 0 ||
+      current.workspace?.selectionTruncated === true));

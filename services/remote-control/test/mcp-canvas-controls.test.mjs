@@ -51,7 +51,7 @@ test('mouse modifiers toggle complete groups and ordinary selected clicks retain
   }
 });
 
-for (const width of [320, 390, 900]) {
+for (const width of [320, 390, 480, 900]) {
   test(`touch controls at ${width}px toggle, select all and deselect without overflow`, async () => {
     const { page, context, state, errors } = await loadCanvas(browser, canvasFixture(), width);
     try {
@@ -90,6 +90,15 @@ for (const width of [320, 390, 900]) {
           });
         });
       assert.equal(actionsFit, true, 'Every selection action must fit inside the toolbar');
+      assert.equal(
+        await page.evaluate(
+          () =>
+            document.querySelector('.zoom').getBoundingClientRect().bottom <=
+            document.querySelector('.actionbar').getBoundingClientRect().top,
+        ),
+        true,
+        'The selection actions must not cover zoom controls',
+      );
       if (process.env.KERFDESK_CANVAS_SCREENSHOTS) {
         await mkdir(process.env.KERFDESK_CANVAS_SCREENSHOTS, { recursive: true });
         await page.screenshot({
@@ -424,6 +433,79 @@ test('a native selection larger than its projection shows the total and cannot t
       .getByRole('button', { name: 'Deselect' })
       .click();
     await expect.poll(() => selected(page)).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
+
+for (const action of ['button', 'escape', 'empty-canvas']) {
+  test('clears a private-ID-only PC selection through ' + action, async () => {
+    const state = canvasFixture();
+    state.workspace.selection = [];
+    state.workspace.totalSelected = 1;
+    state.workspace.selectionTruncated = true;
+    const { page, context } = await loadCanvas(browser, state);
+    try {
+      const clear = page
+        .getByRole('toolbar', { name: 'Selection controls' })
+        .getByRole('button', { name: 'Deselect', exact: true });
+      await expect(clear).toBeEnabled();
+      if (action === 'button') await clear.click();
+      else if (action === 'escape') {
+        await page.locator('.canvas-wrap').focus();
+        await page.keyboard.press('Escape');
+      } else {
+        const empty = await point(page, 110, 100);
+        await page.mouse.click(empty.x, empty.y);
+      }
+      await expect
+        .poll(() => state.commands.filter((item) => item.name === 'set_selection').length)
+        .toBe(1);
+      assert.deepEqual(
+        state.commands.find((item) => item.name === 'set_selection').args.artworkIds,
+        [],
+      );
+      state.workspace.totalSelected = 0;
+      state.workspace.selectionTruncated = false;
+      await page.evaluate(() => window.subject.controller.refreshWorkspace());
+      await expect(clear).toBeDisabled();
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+test('390px selection actions remain visible with wider system-font metrics', async () => {
+  const { page, context } = await loadCanvas(browser, canvasFixture(), 390);
+  try {
+    await clickItem(page, 'a1', true);
+    await page.addStyleTag({
+      content: '.actionbar button, .actionbar .count { font-family: monospace; font-size: 13px; }',
+    });
+    const bounds = await page
+      .getByRole('toolbar', { name: 'Selection', exact: true })
+      .evaluate((bar) => {
+        const bounds = bar.getBoundingClientRect();
+        return {
+          overflow: bar.scrollWidth > bar.clientWidth,
+          actionsFit: [...bar.querySelectorAll('button')].every((button) => {
+            const box = button.getBoundingClientRect();
+            return (
+              box.width >= 48 &&
+              box.height >= 48 &&
+              box.left >= bounds.left &&
+              box.right <= bounds.right
+            );
+          }),
+        };
+      });
+    assert.deepEqual(bounds, { overflow: false, actionsFit: true });
+    if (process.env.KERFDESK_CANVAS_SCREENSHOTS) {
+      await mkdir(process.env.KERFDESK_CANVAS_SCREENSHOTS, { recursive: true });
+      await page.screenshot({
+        path: join(process.env.KERFDESK_CANVAS_SCREENSHOTS, 'selection-390-wide-font.png'),
+      });
+    }
   } finally {
     await context.close();
   }

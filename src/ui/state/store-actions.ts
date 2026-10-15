@@ -304,7 +304,7 @@ export function viewActions(
       set((s) => ({
         ...scopedSelectionProjectPatch(
           s,
-          selectionFromIds(s, ids, options.additive === true, options.scope, options.expandGroups),
+          selectionFromIds(s, ids, options.additive === true, options),
         ),
         selectedPathNode: null,
         selectedPathNodes: [],

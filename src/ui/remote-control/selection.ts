@@ -27,7 +27,11 @@ export function prepareRemoteSelection(state: AppState, args: RemoteSelectionArg
   }
   // Target units are already expanded. Keep untouched partial selections from local group
   // focus intact, so removing one unit cannot accidentally add another unit's siblings.
-  const selection = selectionFromIds(state, [...next], false, 'document', false);
+  const selection = selectionFromIds(state, [...next], false, {
+    scope: 'document',
+    expandGroups: false,
+    preserveExisting: true,
+  });
   const ids = [
     ...(selection.selectedObjectId === null ? [] : [selection.selectedObjectId]),
     ...selection.additionalSelectedIds,

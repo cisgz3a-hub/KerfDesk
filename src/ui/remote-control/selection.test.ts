@@ -294,3 +294,60 @@ describe('atomic remote selection modes', () => {
     expect(useStore.getState().undoStack).toBe(before.undoStack);
   });
 });
+
+for (const kind of ['locked', 'hidden'] as const) {
+  for (const batch of [false, true]) {
+    it.each(['add', 'remove', 'toggle'] as const)(
+      'preserves untargeted ' +
+        kind +
+        ' selection and output scope during %s (' +
+        (batch ? 'batch' : 'single') +
+        ')',
+      async (mode) => {
+        const ids = await fixture(3, []);
+        useStore.getState().setOutputScopeSettings({ cutSelectedGraphics: true });
+        await select('replace', ids.slice(0, 2));
+        const state = useStore.getState();
+        useStore.setState({
+          project: {
+            ...state.project,
+            scene: {
+              ...state.project.scene,
+              objects: state.project.scene.objects.map((object, index) =>
+                index !== 0
+                  ? object
+                  : {
+                      ...object,
+                      ...(kind === 'locked' ? { locked: true } : { operationIds: ['hidden'] }),
+                    },
+              ),
+              layers: [
+                ...state.project.scene.layers,
+                {
+                  ...state.project.scene.layers[0]!,
+                  id: 'hidden',
+                  visible: false,
+                },
+              ],
+            },
+          },
+        });
+        const artworkIds = [ids[mode === 'add' ? 2 : 1]!];
+        const expected = mode === 'add' ? ids : [ids[0]];
+        const result = batch
+          ? await adapter.execute(
+              'apply_edits',
+              writeArgs(adapter, {
+                edits: [{ command: 'set_selection', args: { mode, artworkIds } }],
+              }),
+            )
+          : await select(mode, artworkIds);
+        expect(result).toMatchObject({ ok: true, data: { selection: expected } });
+        expect(selectedIds(useStore.getState())).toEqual(expected);
+        expect(useStore.getState().project.jobSetup?.outputScope.selectedObjectIds).toEqual(
+          expected,
+        );
+      },
+    );
+  }
+}

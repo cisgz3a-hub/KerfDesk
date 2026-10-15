@@ -1017,6 +1017,9 @@ textarea {
   border-radius: 14px;
   box-shadow: var(--shadow);
 }
+.zoom[data-actions] {
+  bottom: 86px;
+}
 .zoom button {
   width: 40px;
   height: 40px;
@@ -1139,18 +1142,21 @@ textarea {
   opacity: 0.4;
   cursor: default;
 }
-@media (max-width: 380px) {
+@media (max-width: 480px) {
+  .zoom[data-actions='selection'] {
+    bottom: 126px;
+  }
   .actionbar[aria-label='Selection'] {
-    gap: 2px;
+    flex-wrap: wrap;
   }
   .actionbar[aria-label='Selection'] button {
-    flex: 1;
+    flex: 1 1 0;
     min-width: 48px;
     padding: 0 2px;
   }
   .actionbar[aria-label='Selection'] .count {
-    max-width: 56px;
-    padding: 0 2px;
+    flex: 1 0 100%;
+    padding: 2px 4px;
     white-space: normal;
   }
 }

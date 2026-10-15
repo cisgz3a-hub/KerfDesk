@@ -344,7 +344,9 @@ test('Select All uses the new desktop capability and refuses an incomplete old-d
   try {
     await page.evaluate(() => {
       const { store } = window.subject;
-      store.set({ workspace: { ...store.get().workspace, truncated: true, capabilities: {} } });
+      store.set({
+        workspace: { ...store.get().workspace, totalArtwork: 2, truncated: true, capabilities: {} },
+      });
       void window.control.selectAll();
     });
     assert.equal(await page.evaluate(() => window.server.writes.length), 0);
@@ -388,3 +390,46 @@ test('model context reports the full count and explicit truncation instead of a 
     await page.close();
   }
 });
+
+for (const readOnly of [false, true]) {
+  test(
+    'Select All ignores operation-only truncation (' +
+      (readOnly ? 'read-only' : 'legacy editing') +
+      ')',
+    async () => {
+      const page = await setup(readOnly);
+      try {
+        await page.evaluate(() => {
+          const { store } = window.subject;
+          const workspace = store.get().workspace;
+          store.set({
+            workspace: {
+              ...workspace,
+              totalArtwork: workspace.artwork.length,
+              totalOperations: 201,
+              truncated: true,
+              capabilities: {},
+            },
+          });
+          void window.control.selectAll();
+        });
+        if (readOnly) {
+          assert.equal(await page.evaluate(() => window.server.writes.length), 0);
+          assert.equal(
+            await page.evaluate(() => window.subject.store.get().selectionSync),
+            'local',
+          );
+        } else {
+          assert.deepEqual(await page.evaluate(() => window.server.writes[0].args.artworkIds), [
+            'a1',
+          ]);
+          await page.evaluate(() => window.server.writes[0].finish());
+        }
+        assert.deepEqual(await page.evaluate(() => window.subject.store.get().selection), ['a1']);
+        assert.deepEqual(await page.evaluate(() => window.subject.store.get().toasts), []);
+      } finally {
+        await page.close();
+      }
+    },
+  );
+}

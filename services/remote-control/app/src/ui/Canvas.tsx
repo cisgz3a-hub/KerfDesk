@@ -18,7 +18,7 @@ import {
   type Box,
   type Point,
 } from '../core/scene';
-import { canEdit, selectionComplete, store } from '../core/store';
+import { canEdit, hasSelection, selectionComplete, store } from '../core/store';
 import { CanvasLayers } from './canvas-layers';
 import { handleAt, type Gesture } from './canvas-gesture-types';
 import { useGestureLifecycle } from './canvas-gesture-lifecycle';
@@ -284,7 +284,7 @@ export function Canvas({ interactive = true }: { interactive?: boolean }) {
               view: fitView(content, size.width, size.height, 28, interactive ? RAIL_INSET : 0),
             });
           lastTap.current = now;
-          if (!g.add && selection.length > 0) void controller.select([]);
+          if (!g.add && hasSelection(store.get())) void controller.select([]);
         }
         break;
       }

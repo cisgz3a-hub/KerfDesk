@@ -64,7 +64,10 @@ export class SelectionSync {
     if (this.stopped) return Promise.resolve();
     const current = store.get();
     if (!canEdit(current) || current.workspace?.capabilities?.selectionModes !== true) {
-      if (current.workspace?.truncated === true) {
+      if (
+        current.workspace !== null &&
+        current.workspace.artwork.length < current.workspace.totalArtwork
+      ) {
         store.toast(
           'The PC has more artwork than this view can list. Select a smaller area.',
           'warning',
