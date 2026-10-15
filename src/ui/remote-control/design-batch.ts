@@ -17,6 +17,8 @@ import { publicIdentifier, selectedIds } from './projections';
 import { prepareRemoteText } from './text';
 import type { RemoteAppStore, RemoteWrite } from './types';
 import { applyRemoteWrite } from './writes';
+import { prepareRemoteSelection } from './selection';
+import type { RemoteSelectionArgs } from './selection-validation';
 
 type Prepared = {
   readonly text?: Awaited<ReturnType<typeof prepareRemoteText>>;
@@ -150,7 +152,15 @@ const ITEM_RUNNERS: Record<BatchItem['command'], ItemRunner> = {
     pick(
       updateOperationFull(store, String(args.operationId), args.patch as RemoteOperationPatchFull),
     ),
-  set_selection: ordinary,
+  set_selection: ({ store, args }) => {
+    const ids = prepareRemoteSelection(store.getState(), args as RemoteSelectionArgs);
+    store.getState().selectObjects(ids, {
+      scope: 'document',
+      expandGroups: false,
+      preserveExisting: true,
+    });
+    return {};
+  },
   arrange_artwork: ({ store, args, ownedUndo }) =>
     pick(
       prepareArrange(

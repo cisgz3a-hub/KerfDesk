@@ -378,7 +378,14 @@ export type AppState = PartGeneratorActions &
     readonly selectAllObjects: () => void;
     readonly selectObjects: (
       ids: ReadonlyArray<string>,
-      options?: { readonly additive?: boolean },
+      options?: {
+        readonly additive?: boolean;
+        readonly scope?: 'focus' | 'document';
+        /** False only when the caller has already resolved group units. */
+        readonly expandGroups?: boolean;
+        /** Keep already-selected locked/hidden IDs when supplied in the next selection. */
+        readonly preserveExisting?: boolean;
+      },
     ) => void;
     readonly selectObjectsOnLayer: (layerId: string) => void;
     readonly togglePreview: () => void;

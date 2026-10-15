@@ -30,7 +30,7 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `get_workspace_preview` | None | Opt-in bounded PNG design preview; standard image content and MCP Apps panel. |
 | `list_fonts` | None | Bundled font IDs, names, styles and outline/single-line geometry; no native font files. |
 | `get_text` | `artworkId` | Opt-in ordinary text wording and six editable text fields. |
-| `set_selection` | `artworkIds` | Empty array clears selection. |
+| `set_selection` | Optional `mode`: `replace` (default), `add`, `remove`, `toggle`, `all`, `clear`; `artworkIds` for the first four | Atomic whole-group selection. `all`/`clear` omit IDs or accept an empty array. Legacy empty-array replacement still clears. |
 | `add_text` | `xMm`, `yMm`, `widthMm`, `text`, `fontSizeMm`, optional `fontId` | Text is 1–4096 characters; chosen bundled font or regular default. |
 | `add_rectangle` | `xMm`, `yMm`, `widthMm`, `heightMm` | Add normal rectangle artwork. |
 | `add_ellipse`           | `xMm`, `yMm`, `widthMm`, `heightMm` | Add ordinary Laser ellipse artwork. |
@@ -63,6 +63,20 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `set_work_origin` | Machine write admission, `axes` xy/z | Desktop Set origin here / Zero Z; no motion. |
 | `pause_job`, `resume_job` | `requestId` UUID | Desktop Pause/Resume with controller confirmation; no artwork revision required. |
 | `get_camera_snapshot` | None | Control scope plus artwork sharing: one JPEG still ≤1024 px and ≤240000 base64 characters of the live PC camera. |
+
+Selection modes are advertised by `get_workspace.capabilities.selectionModes`.
+Without that capability, omit `mode` and use the original `artworkIds` replacement.
+They use the complete document, independently of local Edit-inside-group focus.
+Additions expand nested and overlapping groups and refuse missing, locked or
+hidden members before any change. `all` excludes an entire group if any member
+cannot be edited; it never selects only the bounded workspace listing. `remove`
+can deselect locked or hidden members, and repeated siblings toggle their group
+once. Untouched partial selections from local group editing remain intact. The
+final selection must fit 200 IDs or the request leaves it unchanged.
+`get_workspace.totalSelected` and `selectionTruncated` disclose selections made
+locally that cannot fit the bounded response. Clients must not replace a
+truncated selection with its visible subset. Selection remains an edit with the
+usual revision and UUID replay protection, including inside `apply_edits`.
 
 `jog_hold_start` and `jog_hold_stop` exist in the shared schemas for the phone
 app only. The server never registers them as MCP tools, and the relay refuses

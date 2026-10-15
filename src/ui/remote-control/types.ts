@@ -2,6 +2,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import type { AppState } from '../state/store';
 import type { MachineAuthority, RemoteCaller } from './machine-types';
 import type { RemoteOperationPatchFull } from './design-validation';
+import type { RemoteSelectionArgs } from './selection-validation';
 
 export type RemoteReadCommand =
   | 'get_workspace'
@@ -58,7 +59,7 @@ export type RemoteArrangeAction =
 export type RemoteWrite =
   | {
       readonly command: 'set_selection';
-      readonly args: WriteAdmission & { readonly artworkIds: readonly string[] };
+      readonly args: WriteAdmission & RemoteSelectionArgs;
     }
   | {
       readonly command: 'add_text';
