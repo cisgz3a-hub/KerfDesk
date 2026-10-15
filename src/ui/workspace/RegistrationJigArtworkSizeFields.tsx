@@ -19,7 +19,9 @@ export function RegistrationJigArtworkSizeFields(props: {
     : 'Set the shared artwork height independently';
   return (
     <fieldset aria-label="Jig artwork size" style={fieldsetStyle}>
-      <legend style={legendStyle}>Artwork size — all {props.count} copies</legend>
+      <legend style={legendStyle}>
+        {props.count === 1 ? 'Artwork size' : `Artwork size — all ${props.count} copies`}
+      </legend>
       <div style={fieldsStyle}>
         <label style={fieldStyle}>
           <span>W</span>
@@ -66,7 +68,9 @@ export function RegistrationJigArtworkSizeFields(props: {
               : 'W and H are independent'}
         </span>
       </div>
-      <Button onClick={props.onApply}>Apply size to all {props.count}</Button>
+      <Button onClick={props.onApply}>
+        {props.count === 1 ? 'Apply artwork size' : `Apply size to all ${props.count}`}
+      </Button>
     </fieldset>
   );
 }

@@ -13,6 +13,11 @@ import {
 } from '../../core/shapes';
 import type { AppState } from './store';
 import {
+  relayoutRegistrationJigArtwork,
+  removedJigArtworkIssue,
+  type RemovedJigArtworkPolicy,
+} from './registration-jig-layout';
+import {
   applyReplaceRegistrationBoxes,
   registrationBoxDefaultPosition,
 } from './registration-box-actions';
@@ -32,6 +37,7 @@ export type RegistrationJigSetSpec = {
   readonly columns: number;
   readonly spacingX: number;
   readonly spacingY: number;
+  readonly removedArtwork?: RemovedJigArtworkPolicy;
 };
 
 export type RegistrationJigSetActions = {
@@ -82,9 +88,19 @@ export function applyReplaceRegistrationJigSet(
     idFactory,
   );
   const [firstBox, ...additionalBoxes] = boxes;
-  return firstBox === undefined
-    ? state
-    : applyReplaceRegistrationBoxes(state, firstBox, additionalBoxes);
+  if (firstBox === undefined) return state;
+  const replaced = applyReplaceRegistrationBoxes(state, firstBox, additionalBoxes);
+  return {
+    ...replaced,
+    project: {
+      ...replaced.project,
+      scene: relayoutRegistrationJigArtwork(
+        state.project.scene,
+        replaced.project.scene,
+        spec.removedArtwork ?? 'keep',
+      ),
+    },
+  };
 }
 
 export function createRegistrationJigOutlines(
@@ -144,6 +160,8 @@ export function registrationJigSetIssue(
   }
   const capacityIssue = jigSceneCapacityIssue(scene, count);
   if (capacityIssue !== null) return capacityIssue;
+  const removalIssue = jigRemovalIssue(scene, spec);
+  if (removalIssue !== null) return removalIssue;
   const dimensionIssue = jigDimensionsIssue(spec);
   if (dimensionIssue !== null) return dimensionIssue;
   const size = outlineDimensions(spec.outline);
@@ -154,6 +172,12 @@ export function registrationJigSetIssue(
     return 'The jig footprint cannot be represented as finite coordinates.';
   }
   return null;
+}
+
+function jigRemovalIssue(scene: Scene | undefined, spec: RegistrationJigSetSpec): string | null {
+  return scene !== undefined && spec.removedArtwork === 'remove'
+    ? removedJigArtworkIssue(scene, spec.rows * spec.columns)
+    : null;
 }
 
 function jigSceneCapacityIssue(scene: Scene | undefined, count: number): string | null {

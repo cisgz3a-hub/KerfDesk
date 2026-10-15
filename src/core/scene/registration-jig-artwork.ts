@@ -183,7 +183,7 @@ export function registrationJigArtworkInstances(
   scene: Scene,
 ): ReadonlyArray<RegistrationJigArtworkInstance> {
   const boxes = findRegistrationBoxes(scene);
-  if (boxes.length < 2) return [];
+  if (boxes.length === 0) return [];
   const boxIds = new Set(boxes.map((box) => box.id));
   const members = scene.objects.flatMap((object) => {
     const identity = registrationJigObjectIdentity(object);
