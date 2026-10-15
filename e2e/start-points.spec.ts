@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 import type { Project } from '../src/core/scene';
 
@@ -5,7 +6,7 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto('/');
   await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 20_000 });
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await page.getByRole('button', { name: 'Fit to selection', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Job start', exact: true })).toHaveAttribute(
@@ -54,7 +55,7 @@ test('drags both starts, saves and reopens exact selections, and applies relativ
   await page.keyboard.press('Control+n');
   await expect.poll(async () => (await currentProject(page)).startPoints).toBeUndefined();
   await kerfdesk.setOpenFiles([{ name: 'chosen-starts.lf2', text: saved }]);
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect
     .poll(async () => (await currentProject(page)).startPoints)
     .toEqual(selected.startPoints);
@@ -133,7 +134,7 @@ test('disabled rotary starts let canvas pointer input through and remain keyboar
     },
   };
   await kerfdesk.setOpenFiles([{ name: 'rotary-starts.lf2', text: JSON.stringify(rotaryProject) }]);
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/rotary-starts\.lf2/);
   await page.getByRole('button', { name: 'Fit to selection', exact: true }).click();
   for (const name of ['Frame start', 'Job start']) {

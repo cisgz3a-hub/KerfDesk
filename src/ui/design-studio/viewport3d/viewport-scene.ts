@@ -113,8 +113,8 @@ export async function createDesignViewportScene(
       disposeViewer3dRenderer(renderer);
     },
   });
-  handle.setPreset('top');
   handle.resize(canvas.clientWidth, canvas.clientHeight);
+  handle.setPreset('top');
   return { kind: 'ok', handle };
 }
 
@@ -180,14 +180,18 @@ function buildViewportHandle(deps: HandleDeps): DesignViewportHandle {
     },
     setPreset: (preset) => {
       stopViewer3dGlide(controls);
-      const placement = cameraPlacement(preset, {
-        minX: -frame.widthMm / 2,
-        maxX: frame.widthMm / 2,
-        minY: -frame.heightMm / 2,
-        maxY: frame.heightMm / 2,
-        minZ: -frame.thicknessMm,
-        maxZ: 0,
-      });
+      const placement = cameraPlacement(
+        preset,
+        {
+          minX: -frame.widthMm / 2,
+          maxX: frame.widthMm / 2,
+          minY: -frame.heightMm / 2,
+          maxY: frame.heightMm / 2,
+          minZ: -frame.thicknessMm,
+          maxZ: 0,
+        },
+        camera.aspect,
+      );
       camera.position.set(placement.position.x, placement.position.y, placement.position.z);
       camera.up.set(placement.up.x, placement.up.y, placement.up.z);
       controls.target.set(placement.target.x, placement.target.y, placement.target.z);

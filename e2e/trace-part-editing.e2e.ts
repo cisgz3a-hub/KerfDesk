@@ -19,7 +19,7 @@ test('edits only picked trace parts, preserves holes, and saves the edited artwo
   await kerfdesk.setOpenFiles([
     { name: 'trace-parts.lf2', text: JSON.stringify({ ...blank, scene: { objects: [] } }) },
   ]);
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/trace-parts\.lf2/);
   const base64 = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
@@ -195,7 +195,7 @@ test('picks one part of a 4096-shape bitmap trace without expanding every shape'
   await kerfdesk.setOpenFiles([
     { name: 'dense-trace.lf2', text: JSON.stringify({ ...blank, scene: { objects: [] } }) },
   ]);
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/dense-trace\.lf2/);
   const base64 = await page.evaluate(() => {
     const canvas = document.createElement('canvas');

@@ -10,6 +10,7 @@ import { ShortcutsDialog } from './ShortcutsDialog';
 import { shortcutHint } from './shortcut-list';
 import { ToolbarIcon } from './ToolbarIcon';
 import { ToolbarCommands } from './ToolbarCommands';
+import { DesignStudioButton } from './DesignStudioButton';
 import { WorkspaceLayoutSelect } from './WorkspaceLayoutSelect';
 import { TutorialButton } from '../tutorials/TutorialButton';
 import { RemoteToolbarButton } from '../remote-access/RemoteToolbarButton';
@@ -24,6 +25,7 @@ export function Toolbar(props: {
   return (
     <header aria-label="Toolbar" className="lf-toolbar-shell">
       <ToolbarCommands commands={props.commands} />
+      <DesignStudioButton />
       <ToolbarProjectName />
       <div className="lf-toolbar-utilities">
         <RemoteToolbarButton />

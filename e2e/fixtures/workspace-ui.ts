@@ -71,3 +71,30 @@ export async function selectWorkspacePanel(page: Page, name: 'Artwork' | 'Machin
     .getByRole('tab', { name, exact: true });
   if (await tab.isVisible()) await tab.click();
 }
+
+/** Inspect responsive command availability without leaving More over the next action. */
+export async function expectToolbarCommandEnabled(page: Page, name: string): Promise<void> {
+  const menu = page.getByRole('menu', { name: 'More commands', exact: true });
+  const wasOpen = await menu.isVisible();
+  await expect(await toolbarCommand(page, name)).toBeEnabled();
+  if (!wasOpen && (await menu.isVisible())) {
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+  }
+}
+
+/** Wait for a command without leaving its overflow menu over later interactions. */
+export async function expectToolbarCommandVisible(
+  page: Page,
+  name: string,
+  options?: { timeout?: number },
+): Promise<void> {
+  await expect(page.getByRole('banner', { name: 'Toolbar', exact: true })).toBeVisible(options);
+  const menu = page.getByRole('menu', { name: 'More commands', exact: true });
+  const wasOpen = await menu.isVisible();
+  await expect(await toolbarCommand(page, name)).toBeVisible(options);
+  if (!wasOpen && (await menu.isVisible())) {
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+  }
+}
