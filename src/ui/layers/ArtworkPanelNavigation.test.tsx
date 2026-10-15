@@ -134,7 +134,7 @@ describe('Artwork panel navigation', () => {
       const ariaLabel =
         editorView === 'operation'
           ? 'Power for selected objects'
-          : 'Power scale for selected objects';
+          : 'Power multiplier for selected objects';
       const input = required<HTMLInputElement>(host, `input[aria-label="${ariaLabel}"]`);
       const sourcePanel = input.closest('[role="tabpanel"]');
       if (!(sourcePanel instanceof HTMLElement)) throw new Error('Editor panel missing');

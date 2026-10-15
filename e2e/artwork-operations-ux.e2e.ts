@@ -22,7 +22,8 @@ test('laser line and fill edits survive artwork navigation, output changes and s
   await page.keyboard.press('End');
   await expect(editorTabs.getByRole('tab', { name: 'Artwork', exact: true })).toBeFocused();
   await expect(panel.getByRole('heading', { name: 'Artwork adjustments' })).toBeVisible();
-  await setNumber(panel, /^Power scale for/, '80');
+  await openSection(panel, /^Advanced artwork settings$/);
+  await setNumber(panel, /^Power multiplier for/, '80');
   await editorTabs.getByRole('tab', { name: 'Artwork', exact: true }).press('Home');
   await expect(editorTabs.getByRole('tab', { name: 'Operation', exact: true })).toBeFocused();
   await expect(panel.getByRole('spinbutton', { name: /^Power for/ })).toHaveValue('37');
