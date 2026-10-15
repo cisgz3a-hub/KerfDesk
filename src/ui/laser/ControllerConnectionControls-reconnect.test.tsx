@@ -120,7 +120,7 @@ function CurrentControllerControls(): JSX.Element {
   );
 }
 
-async function render(platform: PlatformAdapter): Promise<HTMLDivElement> {
+async function render(platform: PlatformAdapter): Promise<HTMLElement> {
   host = document.createElement('div');
   document.body.appendChild(host);
   await act(async () => {
@@ -131,7 +131,11 @@ async function render(platform: PlatformAdapter): Promise<HTMLDivElement> {
       </PlatformProvider>,
     );
   });
-  return host;
+  const notice = host.querySelector<HTMLButtonElement>('[role="status"] button');
+  expect(notice).not.toBeNull();
+  await act(async () => notice?.click());
+  // Recovery details are explicitly requested and portaled outside the toolbar.
+  return document.body;
 }
 
 function button(container: HTMLElement, label: string): HTMLButtonElement {

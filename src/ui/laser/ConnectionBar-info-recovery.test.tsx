@@ -26,6 +26,7 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  vi.useRealTimers();
 });
 
 async function render(props: Partial<Props>): Promise<HTMLDivElement> {
@@ -44,7 +45,74 @@ function findButton(container: HTMLElement, label: string): HTMLButtonElement | 
   );
 }
 
+function briefNotice(): HTMLElement | null {
+  return document.querySelector('[role="status"][aria-label="Controller notification"]');
+}
+
+function details(): HTMLElement | null {
+  return document.querySelector('[role="dialog"][aria-label="Controller information"]');
+}
+
+async function openDetails(): Promise<void> {
+  const button = briefNotice()?.querySelector('button');
+  expect(button).not.toBeNull();
+  await act(async () => button?.click());
+  expect(details()).not.toBeNull();
+}
+
+async function expireNotice(): Promise<void> {
+  await act(async () => vi.advanceTimersByTime(6000));
+  expect(briefNotice()).toBeNull();
+}
+
 describe('ConnectionBar controller information recovery', () => {
+  it('preserves the next control when keyboard focus leaves requested details', async () => {
+    const container = await render({});
+    await openDetails();
+    const next = findButton(container, 'Disconnect');
+    await act(async () => next?.focus());
+    expect(details()).toBeNull();
+    expect(document.activeElement).toBe(next);
+  });
+
+  it('preserves an outside pointer target when requested details close', async () => {
+    const container = await render({});
+    await openDetails();
+    const next = findButton(container, 'Disconnect');
+    await act(async () => {
+      next?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      next?.focus();
+    });
+    expect(details()).toBeNull();
+    expect(document.activeElement).toBe(next);
+  });
+
+  it.each([
+    { qualification: { kind: 'qualifying', epoch: 4, phase: 'settings-read' } },
+    { qualification: { kind: 'qualified', epoch: 4, settings: 'verified' } },
+    { connection: { kind: 'disconnected' } },
+  ] satisfies Partial<Props>[])(
+    'returns focus to connection options when a state transition removes focused details: %j',
+    async (patch) => {
+      const container = await render({});
+      await openDetails();
+      expect(details()?.contains(document.activeElement)).toBe(true);
+      await render(patch);
+      expect(details()).toBeNull();
+      expect(document.activeElement).toBe(findButton(container, 'More connection options'));
+    },
+  );
+
+  it('does not take outside focus when a later qualification update removes the notice', async () => {
+    const container = await render({});
+    await openDetails();
+    const next = findButton(container, 'Disconnect');
+    await act(async () => next?.focus());
+    await render({ qualification: { kind: 'qualified', epoch: 4, settings: 'verified' } });
+    expect(details()).toBeNull();
+    expect(document.activeElement).toBe(next);
+  });
+
   it('dismisses and reopens the notification without invoking a controller action', async () => {
     const onRetry = vi.fn();
     const onReconnect = vi.fn();
@@ -54,98 +122,118 @@ describe('ConnectionBar controller information recovery', () => {
       onReconnectQualification: onReconnect,
     });
     const trigger = findButton(container, 'More connection options');
-    expect(container.querySelector('[role="alert"]')).not.toBeNull();
-    const dismiss = container.querySelector<HTMLButtonElement>(
+    expect(briefNotice()).not.toBeNull();
+    expect(details()).toBeNull();
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+    await openDetails();
+    const dismiss = document.querySelector<HTMLButtonElement>(
       '[aria-label="Dismiss controller notification"]',
     );
     await act(async () => dismiss?.click());
-    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(details()).toBeNull();
     expect(document.activeElement).toBe(trigger);
     expect(onRetry).not.toHaveBeenCalled();
     expect(onReconnect).not.toHaveBeenCalled();
 
     await act(async () => trigger?.click());
     await act(async () => findButton(document.body, 'Controller info')?.click());
-    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(details()).not.toBeNull();
     expect(document.activeElement?.getAttribute('aria-label')).toBe(
       'Dismiss controller notification',
     );
-    const retry = findButton(container, 'Retry reading controller settings');
+    const retry = findButton(document.body, 'Retry reading controller settings');
     await act(async () => {
       retry?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     });
-    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(details()).toBeNull();
     expect(document.activeElement).toBe(trigger);
   });
 
-  it('focuses the existing toast when Controller info is selected while it is visible', async () => {
+  it('keeps controller info reachable from the menu after the brief notice expires', async () => {
+    vi.useFakeTimers();
     const container = await render({});
+    await expireNotice();
     await act(async () => findButton(container, 'More connection options')?.click());
     await act(async () => findButton(document.body, 'Controller info')?.click());
-    expect(document.activeElement).toBe(findButton(container, 'Dismiss controller notification'));
+    expect(document.activeElement).toBe(
+      findButton(document.body, 'Dismiss controller notification'),
+    );
+    expect(details()).not.toBeNull();
     expect(document.querySelector('[role="menu"]')).toBeNull();
   });
 
-  it('keeps a dismissed failure hidden through status updates and opens a new session failure', async () => {
+  it('keeps an expired failure hidden through status updates and announces a new session failure', async () => {
+    vi.useFakeTimers();
     const container = await render({});
-    await act(async () => findButton(container, 'Dismiss controller notification')?.click());
+    await expireNotice();
     await render({ qualificationReadBlockReason: 'Controller is in Alarm.' });
-    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(briefNotice()).toBeNull();
+    expect(details()).toBeNull();
 
     await render({
       qualification: { kind: 'failed', epoch: 5, message: 'The settings response was empty.' },
     });
-    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(briefNotice()).not.toBeNull();
+    expect(details()).toBeNull();
 
     await render({ qualification: { kind: 'qualified', epoch: 5, settings: 'verified' } });
-    expect(container.querySelector('[role="alert"]')).toBeNull();
-    expect(findButton(container, 'Controller info')).toBeUndefined();
+    expect(briefNotice()).toBeNull();
+    expect(details()).toBeNull();
+    await act(async () => findButton(container, 'More connection options')?.click());
+    expect(findButton(document.body, 'Controller info')).toBeUndefined();
   });
 
-  it('opens a changed failure and resets dismissal after a retry or disconnect', async () => {
-    const container = await render({});
-    const dismiss = async () => {
-      await act(async () => findButton(container, 'Dismiss controller notification')?.click());
-      expect(container.querySelector('[role="alert"]')).toBeNull();
-    };
-    await dismiss();
+  it('announces changed failures and retry phases without automatically opening details', async () => {
+    vi.useFakeTimers();
+    await render({});
+    await expireNotice();
     await render({ qualification: { kind: 'failed', epoch: 4, message: 'A new timeout.' } });
-    expect(container.textContent).toContain('A new timeout.');
-    await dismiss();
+    expect(briefNotice()?.querySelector('button')?.title).toContain('A new timeout.');
+    expect(details()).toBeNull();
+    await expireNotice();
+    await render({ qualification: { kind: 'qualifying', epoch: 4, phase: 'controller-response' } });
+    expect(briefNotice()?.textContent).toContain('Waiting for controller response');
+    await expireNotice();
     await render({ qualification: { kind: 'qualifying', epoch: 4, phase: 'settings-read' } });
+    expect(briefNotice()?.textContent).toContain('Reading controller settings');
+    expect(details()).toBeNull();
+    await expireNotice();
     await render({ qualification: { kind: 'failed', epoch: 4, message: 'A new timeout.' } });
-    expect(container.querySelector('[role="alert"]')).not.toBeNull();
-    await dismiss();
+    expect(briefNotice()).not.toBeNull();
     await render({ connection: { kind: 'disconnected' } });
+    expect(briefNotice()).toBeNull();
     await render({ qualification: { kind: 'failed', epoch: 4, message: 'A new timeout.' } });
-    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(briefNotice()).not.toBeNull();
+    expect(details()).toBeNull();
   });
 
   it('disables Retry until the authoritative read readiness clears', async () => {
     const onRetry = vi.fn();
     const reason =
       'Wait for the previous controller write and acknowledgement before reading machine settings.';
-    const container = await render({
+    await render({
       qualificationReadBlockReason: reason,
       onRetryQualification: onRetry,
     });
-    const retry = findButton(container, 'Retry reading controller settings');
+    await openDetails();
+    const retry = findButton(document.body, 'Retry reading controller settings');
     expect(retry?.disabled).toBe(true);
-    expect(container.textContent).toContain(`Waiting to retry: ${reason}`);
+    expect(details()?.textContent).toContain(`Waiting to retry: ${reason}`);
     await act(async () => retry?.click());
     expect(onRetry).not.toHaveBeenCalled();
 
     await render({ qualificationReadBlockReason: null, onRetryQualification: onRetry });
     expect(retry?.disabled).toBe(false);
-    expect(container.textContent).not.toContain('Waiting to retry:');
+    expect(details()?.textContent).not.toContain('Waiting to retry:');
     await act(async () => retry?.click());
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
   it('does not enable Retry without a readiness result', async () => {
     const onRetry = vi.fn();
-    const container = await render({ onRetryQualification: onRetry });
-    const retry = findButton(container, 'Retry reading controller settings');
+    await render({ onRetryQualification: onRetry });
+    await openDetails();
+    const retry = findButton(document.body, 'Retry reading controller settings');
     expect(retry?.disabled).toBe(true);
     await act(async () => retry?.click());
     expect(onRetry).not.toHaveBeenCalled();
@@ -158,14 +246,15 @@ describe('ConnectionBar controller information recovery', () => {
       onReconnectQualification: onReconnect,
     });
     expect(container.textContent).toContain('Controller connection needs recovery');
-    const reconnect = findButton(container, 'Reconnect controller');
+    await openDetails();
+    const reconnect = findButton(document.body, 'Reconnect controller');
     expect(reconnect?.title).toContain('ends any paused job');
     await act(async () => reconnect?.click());
     expect(onReconnect).toHaveBeenCalledOnce();
 
     await render({ reconnectRecommended: false, onReconnectQualification: onReconnect });
-    expect(container.textContent).toContain('Controller information unavailable');
-    expect(findButton(container, 'Reconnect controller')).toBeUndefined();
+    expect(details()?.textContent).toContain('Controller information unavailable');
+    expect(findButton(document.body, 'Reconnect controller')).toBeUndefined();
   });
 
   it('shows the actual waiting state after reset and hides stale info when disconnected', async () => {
@@ -174,9 +263,11 @@ describe('ConnectionBar controller information recovery', () => {
       qualificationReadBlockReason:
         'Controller is in Alarm. Unlock or Home before reading settings.',
     });
-    expect(
-      container.querySelector('[role="status"]:not(.lf-connection-status-live)')?.textContent,
-    ).toContain('Controller is in Alarm');
+    expect(briefNotice()?.textContent).toContain('Waiting to read controller settings…');
+    expect(briefNotice()?.textContent).not.toContain('Controller is in Alarm');
+    expect(briefNotice()?.querySelector('button')?.title).toContain('Controller is in Alarm');
+    await openDetails();
+    expect(details()?.textContent).toContain('Controller is in Alarm');
     expect(container.textContent).not.toContain('Waiting for fresh Idle');
     expect(findButton(container, 'Reconnect controller')).toBeUndefined();
 
@@ -187,10 +278,14 @@ describe('ConnectionBar controller information recovery', () => {
     });
     expect(container.textContent).toContain('Waiting to read controller settings…');
     expect(container.textContent).not.toContain('Waiting for controller response…');
+    expect(details()).toBeNull();
+    await openDetails();
 
     await render({ connection: { kind: 'disconnected' } });
     expect(container.textContent).not.toContain('Controller information unavailable');
     expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(briefNotice()).toBeNull();
+    expect(details()).toBeNull();
   });
 
   it('shows an active settings read without its own busy reason', async () => {
@@ -198,8 +293,10 @@ describe('ConnectionBar controller information recovery', () => {
       qualification: { kind: 'qualifying', epoch: 4, phase: 'settings-read' },
       qualificationReadBlockReason: 'Machine settings are already being read.',
     });
-    expect(
-      container.querySelector('[role="status"]:not(.lf-connection-status-live)')?.textContent,
-    ).toBe('Reading controller settings…');
+    expect(briefNotice()?.textContent).toContain('Reading controller settings…');
+    expect(container.textContent).not.toContain('Machine settings are already being read.');
+    await openDetails();
+    expect(details()?.textContent).toContain('Reading controller settings…');
+    expect(details()?.textContent).not.toContain('Machine settings are already being read.');
   });
 });

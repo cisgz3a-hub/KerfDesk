@@ -3,13 +3,16 @@ import { expect, test, type Page } from './fixtures/kerfdesk-test';
 type Phase = 'controller-response' | 'reset-cleanup' | 'settings-read';
 
 for (const viewport of [
+  { width: 1920, height: 1080 },
   { width: 1280, height: 800 },
+  { width: 1240, height: 800 },
   { width: 640, height: 450 },
   { width: 600, height: 450 },
   { width: 560, height: 450 },
   { width: 420, height: 600 },
+  { width: 360, height: 640 },
 ]) {
-  test(`controller recovery floats without shifting the connection bar at ${viewport.width}px`, async ({
+  test(`controller notices stay in the toolbar without shifting controls at ${viewport.width}px`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
@@ -32,20 +35,26 @@ for (const viewport of [
     };
 
     await setQualification(page, 'failed');
+    const brief = page.getByRole('status', { name: 'Controller notification', exact: true });
     const toast = page.getByRole('alert', { name: 'Controller information', exact: true });
-    await expect(toast).toBeVisible();
-    await expect(toast).toHaveCSS('position', 'fixed');
+    await expect(brief).toBeVisible();
+    await expect(toast).toHaveCount(0);
     await unchanged();
-    const bounds = await toast.boundingBox();
-    if (bounds === null) throw new Error('Recovery toast must have visible bounds');
+    const bounds = await brief.boundingBox();
+    const mode = await page.locator('.lf-machine-toolbar .lf-machine-mode').boundingBox();
+    if (bounds === null || mode === null || toolbarBefore === null)
+      throw new Error('Toolbar notice must have visible bounds');
     expect(bounds.x).toBeGreaterThanOrEqual(0);
-    expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
-    expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(mode.x);
+    expect(bounds.y).toBeGreaterThanOrEqual(toolbarBefore.y);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(toolbarBefore.y + toolbarBefore.height);
+    await expect(page.getByRole('button', { name: 'Disconnect', exact: true })).toBeInViewport();
 
     await page.screenshot({ path: test.info().outputPath('controller-recovery-toast.png') });
-    await page.getByRole('button', { name: 'Dismiss controller notification' }).click();
-    await expect(toast).toHaveCount(0);
+    // Expiry never moves focus from the user's current control.
     const trigger = page.getByRole('button', { name: 'More connection options', exact: true });
+    await trigger.focus();
+    await expect(brief).toHaveCount(0, { timeout: 8000 });
     await expect(trigger).toBeFocused();
     await unchanged();
     await page.keyboard.press('Enter');
@@ -62,21 +71,36 @@ for (const viewport of [
     await expect(trigger).toBeFocused();
     await unchanged();
 
+    await trigger.click();
+    await info.click();
+    const disconnect = page.getByRole('button', { name: 'Disconnect', exact: true });
+    await disconnect.focus();
+    await expect(toast).toHaveCount(0);
+    await expect(disconnect).toBeFocused();
+
     for (const phase of ['controller-response', 'reset-cleanup', 'settings-read'] as const) {
       await setQualification(page, 'qualifying', phase);
-      const progress = page.getByRole('status', { name: 'Controller information', exact: true });
+      const progress = page.getByRole('status', { name: 'Controller notification', exact: true });
       await expect(progress).toBeVisible();
-      await expect(progress).toHaveCSS('position', 'fixed');
       await expect(progress).toContainText(
         phase === 'settings-read'
           ? 'Reading controller settings…'
-          : 'Wait for the previous controller write and acknowledgement before reading machine settings.',
+          : 'Waiting to read controller settings…',
       );
+      await expect(
+        page.getByRole('dialog', { name: 'Controller information', exact: true }),
+      ).toHaveCount(0);
       await unchanged();
     }
-    await setQualification(page, 'qualified');
+    await page.screenshot({ path: test.info().outputPath('controller-waiting-toolbar.png') });
+    await brief.getByRole('button').click();
     await expect(
-      page.getByRole('status', { name: 'Controller information', exact: true }),
+      page.getByRole('dialog', { name: 'Controller information', exact: true }),
+    ).toContainText('Reading controller settings…');
+    await setQualification(page, 'qualified');
+    await expect(trigger).toBeFocused();
+    await expect(
+      page.getByRole('status', { name: 'Controller notification', exact: true }),
     ).toHaveCount(0);
     await trigger.click();
     await expect(info).toHaveCount(0);

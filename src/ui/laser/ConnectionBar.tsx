@@ -13,17 +13,22 @@
 // the action that fits the state. machineNoun keeps the hover copy
 // machine-aware ("laser" / "router", ADR-101 §7).
 
-import { useId, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { assertNever } from '../../core/scene';
 import { Icon } from '../kit/icons';
 import { AnchoredPopover, movePopoverFocus } from '../common/AnchoredPopover';
 import type { ControllerQualification } from '../state/laser-controller-qualification';
 import type { ConnectionState } from '../state/laser-store';
 import { CompactConnectionControls } from './CompactConnectionControls';
-import { ControllerRecoveryToast } from './ControllerRecoveryToast';
+import {
+  BriefQualificationNotice,
+  QualificationNotice,
+  useControllerNotice,
+  type ControllerNotice,
+} from './controller-notice';
 import './ConnectionBar.css';
 
-type Props = {
+export type ConnectionBarProps = {
   readonly connection: ConnectionState;
   readonly machineNoun: string;
   readonly onConnect: () => void;
@@ -53,6 +58,8 @@ type Props = {
   readonly mode?: ReactNode;
 };
 
+type Props = ConnectionBarProps;
+
 export function ConnectionBar(props: Props): JSX.Element {
   const { connection } = props;
   const notice = useControllerNotice(props);
@@ -62,18 +69,25 @@ export function ConnectionBar(props: Props): JSX.Element {
       aria-label="Machine connection"
       data-state={connection.kind}
     >
-      <CompactConnectionControls
-        machineName={props.machineName ?? 'Unnamed machine'}
-        status={connectionStatusLabel(connection)}
-        statusDot={<StatusDot connection={connection} />}
-        machine={props.machine}
-        details={props.details}
-        leading={props.mode}
-      >
-        <PrimaryAction {...props} />
-        {props.setup}
-        <ConnectionMenu {...props} notice={notice} />
-      </CompactConnectionControls>
+      <div className="lf-connection-toolbar-layout">
+        <div className="lf-controller-notice-slot">
+          <BriefQualificationNotice {...props} notice={notice} />
+        </div>
+        <div className="lf-connection-toolbar-controls">
+          <CompactConnectionControls
+            machineName={props.machineName ?? 'Unnamed machine'}
+            status={connectionStatusLabel(connection)}
+            statusDot={<StatusDot connection={connection} />}
+            machine={props.machine}
+            details={props.details}
+            leading={props.mode}
+          >
+            <PrimaryAction {...props} />
+            {props.setup}
+            <ConnectionMenu {...props} notice={notice} />
+          </CompactConnectionControls>
+        </div>
+      </div>
       <QualificationNotice
         connection={connection}
         qualification={props.qualification}
@@ -270,110 +284,6 @@ export function connectionFailureText(error: string, machineNoun: string): strin
     return `The port is busy or unavailable. Close any other program using the ${machineNoun} (another sender, a serial monitor, another KerfDesk window), then Connect again.`;
   }
   return error;
-}
-
-type ControllerNotice = {
-  readonly triggerRef: RefObject<HTMLButtonElement>;
-  readonly toastCloseRef: RefObject<HTMLButtonElement>;
-  readonly open: boolean;
-  readonly focusOnOpen: boolean;
-  readonly show: (() => void) | undefined;
-  readonly dismiss: () => void;
-};
-
-function useControllerNotice(props: Props): ControllerNotice {
-  const qualification = props.qualification;
-  const key =
-    props.connection.kind === 'connected' && qualification?.kind === 'failed'
-      ? JSON.stringify([qualification.epoch, qualification.message])
-      : null;
-  const [notice, setNotice] = useState({ key, dismissed: false, focusOnOpen: false });
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const toastCloseRef = useRef<HTMLButtonElement>(null);
-  // A new failure or a completed retry starts a fresh notice; readiness updates
-  // for the same failure leave the user's dismissal intact.
-  if (notice.key !== key) setNotice({ key, dismissed: false, focusOnOpen: false });
-  return {
-    triggerRef,
-    toastCloseRef,
-    open: key !== null && !notice.dismissed,
-    focusOnOpen: notice.focusOnOpen,
-    show:
-      key === null
-        ? undefined
-        : () => {
-            setNotice({ key, dismissed: false, focusOnOpen: true });
-            toastCloseRef.current?.focus();
-          },
-    dismiss: () => {
-      setNotice({ key, dismissed: true, focusOnOpen: false });
-      triggerRef.current?.focus();
-    },
-  };
-}
-
-type QualificationNoticeProps = {
-  readonly notice: ControllerNotice;
-  readonly connection: ConnectionState;
-  readonly qualification: ControllerQualification | undefined;
-  readonly readBlockReason: string | null | undefined;
-  readonly reconnectRecommended: boolean;
-  readonly onRetry: (() => void) | undefined;
-  readonly onReconnect: (() => void) | undefined;
-  readonly disabled: boolean;
-};
-
-function QualificationNotice(props: QualificationNoticeProps): JSX.Element | null {
-  const qualification = props.qualification;
-  if (props.connection.kind !== 'connected') return null;
-  if (qualification === undefined || qualification.kind === 'disconnected') return null;
-  if (qualification.kind === 'qualified') return null;
-  if (qualification.kind === 'qualifying') {
-    return (
-      <span
-        role="status"
-        className="lf-controller-recovery-toast lf-controller-qualification-progress"
-        aria-label="Controller information"
-        title={props.readBlockReason ?? qualificationMessage(qualification.phase)}
-      >
-        {qualification.phase !== 'settings-read' && props.readBlockReason != null
-          ? 'Waiting to read controller settings…'
-          : qualificationMessage(qualification.phase)}
-        {qualification.phase !== 'settings-read' && props.readBlockReason != null ? (
-          <span> {props.readBlockReason}</span>
-        ) : null}
-      </span>
-    );
-  }
-  if (!props.notice.open) return null;
-  return (
-    <ControllerRecoveryToast
-      closeRef={props.notice.toastCloseRef}
-      onDismiss={props.notice.dismiss}
-      focusOnOpen={props.notice.focusOnOpen}
-      message={qualification.message}
-      readBlockReason={props.readBlockReason}
-      reconnectRecommended={props.reconnectRecommended}
-      onRetry={props.onRetry}
-      onReconnect={props.onReconnect}
-      disabled={props.disabled}
-    />
-  );
-}
-
-function qualificationMessage(
-  phase: Extract<ControllerQualification, { readonly kind: 'qualifying' }>['phase'],
-): string {
-  switch (phase) {
-    case 'controller-response':
-      return 'Waiting for controller response…';
-    case 'reset-cleanup':
-      return 'Controller reset detected. Waiting to read controller settings…';
-    case 'settings-read':
-      return 'Reading controller settings…';
-    default:
-      return assertNever(phase, 'ControllerQualificationPhase');
-  }
 }
 
 function StatusDot({ connection }: { readonly connection: ConnectionState }): JSX.Element {

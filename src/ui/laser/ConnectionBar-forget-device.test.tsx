@@ -148,18 +148,21 @@ describe('ConnectionBar device permission actions', () => {
     };
 
     expect(host.textContent).toContain('Controller information unavailable');
-    expect(host.textContent).toContain('The settings response timed out');
-    // A recoverable failure wears the shared warning banner instead of bare
-    // red text, and its actions use the standard button chrome.
-    const banner = host.querySelector('[role="alert"]');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    await openMenu(host);
+    await act(async () => menuItem('Controller info')?.click());
+    const dialog = document.querySelector('[role="dialog"][aria-label="Controller information"]');
+    expect(dialog?.textContent).toContain('The settings response timed out');
+    // Requested recovery details retain the shared warning and button styles.
+    const banner = dialog?.querySelector('[role="alert"]');
     expect(banner?.className).toContain('lf-banner--warning');
     expect(banner?.querySelector('button')?.className).toContain('lf-btn');
-    const retry = [...host.querySelectorAll('button')].find((button) =>
+    const retry = [...document.body.querySelectorAll('button')].find((button) =>
       button.textContent?.includes('Retry reading controller settings'),
     );
     await act(async () => retry?.click());
     expect(onRetry).toHaveBeenCalledOnce();
-    const reconnect = [...host.querySelectorAll('button')].find(
+    const reconnect = [...document.body.querySelectorAll('button')].find(
       (button) => button.textContent === 'Reconnect controller',
     );
     expect(reconnect).toBeUndefined();
