@@ -6,6 +6,7 @@
 import { findRegistrationBoxes } from '../../../core/scene';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
+import { selectedBoardArrayDesign } from '../../state/board-tile-actions';
 
 export function useBoardPlacement() {
   const scene = useStore((s) => s.project.scene);
@@ -21,11 +22,18 @@ export function useBoardPlacement() {
   const nonBoxSelectedCount = [selectedObjectId, ...additionalSelectedIds].filter(
     (id): id is string => id !== null && !boxIds.has(id),
   ).length;
+  const arrayDesign = selectedBoardArrayDesign({
+    project: { scene },
+    selectedObjectId,
+    additionalSelectedIds,
+  });
 
   return {
     canAlign: boxIds.size > 0 && nonBoxSelectedCount > 0,
     // Fit/array scale or tile ONE design; several would pile up, so require one.
-    canFit: boxIds.size > 0 && nonBoxSelectedCount === 1,
+    canFit: boxIds.size > 0 && arrayDesign !== undefined,
+    arrayBoard: findRegistrationBoxes(scene)[0],
+    arrayDesign,
     alignToBox,
     fitToBoard,
     arrayToBoard,

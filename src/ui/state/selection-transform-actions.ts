@@ -42,6 +42,7 @@ import { pushUndo } from './scene-mutations';
 import { applyCenterArtworkInRegistrationJigSet } from './registration-jig-artwork-actions';
 import { selectionReferenceId, type SelectionReferenceState } from './selection-reference';
 import { useToastStore } from './toast-store';
+import { fitObjectToBoard, type BoardFitOptions } from '../../core/scene/fit-object-to-board';
 
 export type SelectionTransformEdit = {
   readonly id: string;
@@ -76,7 +77,7 @@ export type SelectionTransformActions = SelectionReferenceState & {
   readonly alignSelectionToRegistrationBox: (anchor: BoardAnchor) => void;
   // ADR-125 A1: scale + center the single selected design so it fills the placed
   // board (the registration box) with a margin.
-  readonly fitSelectionToBoard: () => void;
+  readonly fitSelectionToBoard: (options?: BoardFitOptions) => void;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -133,7 +134,8 @@ export function selectionTransformActions(set: Setter): SelectionTransformAction
       set((state) => applyCenterArtworkInRegistrationJigSet(state)),
     alignSelectionToRegistrationBox: (anchor) =>
       set((state) => applyAnchorToRegistrationBoxToState(state, anchor)),
-    fitSelectionToBoard: () => set((state) => applyFitSelectionToBoardToState(state)),
+    fitSelectionToBoard: (options) =>
+      set((state) => applyFitSelectionToBoardToState(state, options)),
   };
 }
 
@@ -162,7 +164,10 @@ function applyAnchorToRegistrationBoxToState(
 // no-op (the UI disables Fit-to-board unless exactly one design is selected).
 const BOARD_FIT_MARGIN_FRACTION = 0.9;
 
-function applyFitSelectionToBoardToState(state: AppState): AppState | Partial<AppState> {
+function applyFitSelectionToBoardToState(
+  state: AppState,
+  options?: BoardFitOptions,
+): AppState | Partial<AppState> {
   const box = findRegistrationBoxes(state.project.scene)[0];
   if (box === undefined) return state;
   const objects = selectedObjects(
@@ -171,6 +176,16 @@ function applyFitSelectionToBoardToState(state: AppState): AppState | Partial<Ap
   );
   const target = objects[0];
   if (target === undefined || objects.length !== 1) return state;
+  if (options !== undefined) {
+    const plan = fitObjectToBoard(target, box, options);
+    if (plan.kind === 'error') {
+      useToastStore.getState().pushToast(plan.message, 'warning');
+      return state;
+    }
+    return applySelectionTransformsToState(state, [
+      { id: target.id, transform: plan.object.transform },
+    ]);
+  }
   const fitted = fitObjectToRegion(target, boardFitRegion(box), {
     marginFraction: BOARD_FIT_MARGIN_FRACTION,
     grow: true,

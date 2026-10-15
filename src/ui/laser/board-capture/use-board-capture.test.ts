@@ -110,6 +110,44 @@ describe('boardCaptureReducer rectangle', () => {
     expect(committed.corners).toEqual([P(10, 20), P(110, 20), P(110, 80), P(10, 80)]);
     expect(commit(capture(INITIAL_BOARD_CAPTURE, P(10, 20)), geometry).committed).toBe(true);
   });
+
+  it.each([2, 3])(
+    'uses typed dimensions after %i captured corners and retains the first origin',
+    (count) => {
+      const samples = [P(10, 20), P(90, 21), P(91, 65)].slice(0, count);
+      const state = capture(INITIAL_BOARD_CAPTURE, ...samples);
+      const geometry: CapturedBoardGeometry = {
+        kind: 'rect',
+        origin: P(10, 20),
+        widthMm: 120,
+        heightMm: 80,
+      };
+      const committed = commit(state, geometry);
+      expect(committed).toMatchObject({ committed: true, geometry, registrationEpoch: EPOCH });
+      expect(committed.corners).toEqual([P(10, 20), P(130, 20), P(130, 100), P(10, 100)]);
+    },
+  );
+
+  it.each(['controllerSessionEpoch', 'trustedPositionEpoch', 'workOriginVersion'] as const)(
+    'rejects typed dimensions after partial measurement when %s changes',
+    (key) => {
+      const geometry: CapturedBoardGeometry = {
+        kind: 'rect',
+        origin: P(10, 20),
+        widthMm: 120,
+        heightMm: 80,
+      };
+      for (const count of [2, 3]) {
+        const state = capture(
+          INITIAL_BOARD_CAPTURE,
+          ...[P(10, 20), P(90, 20), P(90, 65)].slice(0, count),
+        );
+        const changed = { ...EPOCH, [key]: EPOCH[key] + 1 };
+        expect(boardCaptureCanCommit(state, geometry, changed)).toBe(false);
+        expect(commit(state, geometry, changed)).toBe(state);
+      }
+    },
+  );
 });
 
 describe('boardCaptureReducer circle', () => {

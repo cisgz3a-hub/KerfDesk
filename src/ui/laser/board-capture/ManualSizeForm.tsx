@@ -22,7 +22,10 @@ export function ManualSizeForm({
   const valid = isValidDimension(widthMm) && isValidDimension(heightMm);
   return (
     <div style={formStyle}>
-      <p style={hintStyle}>Or type the board size — bottom-left is the corner you just captured:</p>
+      <p style={hintStyle}>
+        Know the size? Enter it below. The first captured corner stays the bottom-left origin; these
+        dimensions replace the other corner measurements.
+      </p>
       <div style={rowStyle}>
         <NumberInput
           aria-label="Board width in mm"

@@ -19,6 +19,26 @@ const ART_SIDE_MM = 10; // svgObj bounds are 0..10 in both axes
 describe('fitSelectionToBoard', () => {
   beforeEach(() => resetStore());
 
+  it('applies exact margin fitting as one undoable edit and keeps actual size when requested', () => {
+    useStore.getState().importSvgObject(svgObj('A', ['#ff0000']));
+    useStore.getState().addCapturedBoardBox(100, 60);
+    useStore.setState({ selectedObjectId: 'A', additionalSelectedIds: new Set(), undoStack: [] });
+    const before = useStore.getState().project;
+    useStore.getState().fitSelectionToBoard({ mode: 'fit', marginMm: 8 });
+    const fitted = useStore.getState().project.scene.objects.find((object) => object.id === 'A');
+    if (fitted === undefined) throw new Error('missing fitted artwork');
+    const bounds = transformedBBox(fitted);
+    expect(bounds.maxX - bounds.minX).toBeCloseTo(44);
+    expect(bounds.maxY - bounds.minY).toBeCloseTo(44);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+    useStore.getState().undo();
+    expect(useStore.getState().project).toEqual(before);
+    useStore.getState().fitSelectionToBoard({ mode: 'keep-size', marginMm: 8 });
+    const kept = useStore.getState().project.scene.objects.find((object) => object.id === 'A');
+    expect(kept?.transform.scaleX).toBe(1);
+    expect(kept?.transform.scaleY).toBe(1);
+  });
+
   it('fits resized artwork proportionally and restores its complete transform on undo', () => {
     useStore.getState().importSvgObject(svgObj('A', ['#ff0000']));
     useStore.getState().addCapturedBoardBox(100, 100);

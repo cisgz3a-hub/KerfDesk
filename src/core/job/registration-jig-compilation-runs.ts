@@ -1,6 +1,12 @@
 import { orderedArtworkObjects } from '../artwork-order';
 import { registrationJigArtworkInstances } from '../scene/registration-jig-artwork';
-import { sceneObjectUsesOperation, type Layer, type Scene, type SceneObject } from '../scene';
+import {
+  findRegistrationBoxes,
+  sceneObjectUsesOperation,
+  type Layer,
+  type Scene,
+  type SceneObject,
+} from '../scene';
 
 export type RegistrationJigCompilationRun = {
   readonly layer: Layer;
@@ -13,6 +19,9 @@ export type RegistrationJigCompilationRun = {
 export function registrationJigCompilationRuns(
   scene: Scene,
 ): ReadonlyArray<RegistrationJigCompilationRun> | null {
+  // Single-slot artwork is editable as a linked instance, but does not need
+  // multi-fixture scheduling. Keep its ordinary operation ordering unchanged.
+  if (findRegistrationBoxes(scene).length < 2) return null;
   const instances = registrationJigArtworkInstances(scene);
   if (instances.length === 0) return null;
   const jigObjectIds = new Set(

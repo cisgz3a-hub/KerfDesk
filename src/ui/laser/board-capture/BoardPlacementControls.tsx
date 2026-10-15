@@ -6,6 +6,8 @@ import { BoardArrayForm } from './BoardArrayForm';
 import { BoardVerificationControls } from './BoardVerificationControls';
 import { useBoardPlacement } from './use-board-placement';
 import type { BoardVerificationController } from './use-board-verification';
+import type { BoardFitOptions } from '../../../core/scene/fit-object-to-board';
+import { BoardFitControls } from './BoardFitControls';
 
 const ANCHORS: ReadonlyArray<{ readonly anchor: BoardAnchor; readonly label: string }> = [
   { anchor: 'center', label: 'Center' },
@@ -81,24 +83,12 @@ function boardSessionIsLocked(verification: BoardVerificationController): boolea
 
 export function FillBoardControls(props: {
   readonly canFit: boolean;
-  readonly onFit: () => void;
+  readonly onFit: (options: BoardFitOptions) => void;
   readonly onArray: (layout: TileLayout) => void;
 }): JSX.Element {
   return (
     <>
-      <AnchorRow label="Fill board">
-        <Button
-          disabled={!props.canFit}
-          title={
-            props.canFit
-              ? 'Scale the selected design to fill the board'
-              : 'Select exactly one design to fit to the board'
-          }
-          onClick={props.onFit}
-        >
-          Fit to board
-        </Button>
-      </AnchorRow>
+      <BoardFitControls disabled={!props.canFit} onFit={props.onFit} />
       <BoardArrayForm disabled={!props.canFit} onArray={props.onArray} />
     </>
   );

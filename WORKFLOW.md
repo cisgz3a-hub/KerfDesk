@@ -2664,6 +2664,12 @@ authorization, Frame proof, controller command, or safety boundary.
 7. An explicitly selected layout can include both an original and an edited generated
    copy. Both selected objects become artwork in the first outline; each gets a distinct
    copy in the remaining outlines. Repeating the action replaces those copies once.
+8. Changing the jig grid carries linked artwork with each surviving outline, retaining
+   its size, rotation and local offset. New positions start empty. When reducing the
+   count, choose **Keep as ordinary artwork** or **Remove with their slots**. Kept
+   artwork stays in place and can still output; removed artwork and group/order edits
+   are restored together by Undo. A retained relief's linked source cannot be silently
+   removed. Exact artwork-size controls also appear for a single fitted jig (ADR-599).
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 
@@ -4249,6 +4255,9 @@ form: enter width × height and **Draw board at this size** instead of jogging
 to the other three corners. The outline draws from the captured corner at that
 size — the same result as a four-corner capture, faster for material you've
 already measured. Blocked below 3 mm like the measured path.
+The form remains usable after two or three captures: entered dimensions replace
+those partial measurements and retain the first corner as the origin. Changing
+machine coordinate identity still requires recapture (ADR-599).
 
 **Why button-jog only.** GRBL is open-loop — pushing the head by hand does
 not update the reported position, so a hand-jog capture would record the
@@ -4326,18 +4335,24 @@ selected.
 
 **The happy path.**
 1. Place a board (F-BC1); add and select one design.
-2. **Fit to board** → the design scales to fill the outline with a ~10% margin,
-   centered (rotation-safe: a rotated design still centers).
+2. Under **Artwork fit**, choose **Fit inside board** and enter the edge margin
+   in millimetres. The size preview shows the resulting dimensions and scale;
+   **Fit to board** applies the proportional centred fit. **Keep actual size**
+   centres without resizing and reports when the margin is exceeded (ADR-599).
 3. Or set the array: leave **Fit as many as fit** checked to auto-count how many
-   fit, or uncheck it and type **rows × cols**; set the **mm spacing**.
+   fit, or uncheck it and type **rows × cols**. Set the edge margin and shared
+   spacing, or turn off **Same X / Y spacing** for independent gaps. The live
+   footprint diagram and count show the exact draft before it is applied.
 4. **Array on board** → copies tile the board, the block centered, as one undo
    step. Copies inherit the design's layer/settings.
 5. Undo restores the single design. After arraying, the whole grid is selected, so Array/Fit disable until you undo (or reselect one design) - this stops a re-click from silently stacking a doubled burn.
 
 **Edge / empty / error.** No board, or zero/several designs selected → both
 controls are disabled ("Select exactly one design…"). A design larger than the
-board tiles as a single centered copy. A runaway count (huge rows, or a tiny
-design under "fit as many as fit") is capped per axis. An array that would take
+usable board produces zero copies and leaves the scene unchanged. A fixed count
+that does not fit shows the fitting count alongside the request. A runaway count
+(huge rows, or a tiny design under "fit as many as fit") is capped at 100 per
+axis and 500 copies, with a notice in the preview. An array that would take
 the project past its limit of 10,000 objects is refused with a notice, and
 nothing changes (F-A11).
 
@@ -4378,7 +4393,11 @@ mode. Switching shape or circle method clears the in-progress capture. Verify
 and confirm controls stay unavailable while motion is active or the live machine
 position is unavailable. Reconnect, Home/manual-position, work-origin, or
 outline/Undo changes invalidate stale physical targets and require recapture.
-Fit/Array fill the circle's inscribed square, so a design stays inside the arc.
+Fit uses the circle's actual radius and explicit edge clearance, with conservative
+artwork bounds; a verified parametric ellipse can use its major radius. Array
+offers **Use the round boundary**, which centres rows and checks every footprint
+corner against the usable circle, or the conservative inscribed square. The
+preview and applied copies use the same plan; this is not optimal nesting (ADR-599).
 
 ---
 
