@@ -233,8 +233,11 @@ export async function expectNestingStopped(page: Page, completed: boolean): Prom
   // Positive runtime destruction or target destruction is required. No heartbeat,
   // protocol timeout, or detached parent session can stand in for that evidence.
   await expect.poll(() => observer.pending(), { timeout: 2_000 }).toEqual([]);
+  // Worker.terminate() requests asynchronous teardown. Heartbeats may advance
+  // before the browser confirms destruction, but must stop after that barrier.
+  const stopped = await snapshot();
   await page.waitForTimeout(100);
-  expect(await snapshot()).toEqual(before);
+  expect(await snapshot()).toEqual(stopped);
   expect(observer.pending()).toEqual([]);
 }
 
