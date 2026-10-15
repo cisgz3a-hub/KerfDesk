@@ -62,6 +62,54 @@ describe('exact board fitting', () => {
     expect((bounds.minY + bounds.maxY) / 2).toBeCloseTo(60);
   });
 
+  it.each([
+    { board: rect, marginMm: 30 },
+    { board: rect, marginMm: 40 },
+    { board: circle, marginMm: 50 },
+    { board: circle, marginMm: 60 },
+  ])('centres unchanged artwork when margin $marginMm leaves no room', ({ board, marginMm }) => {
+    const source = {
+      ...artwork,
+      transform: {
+        ...IDENTITY_TRANSFORM,
+        x: -90,
+        y: 120,
+        scaleX: -3,
+        scaleY: 2,
+        rotationDeg: 37,
+        mirrorY: true,
+      },
+    };
+    const plan = fitObjectToBoard(source, board, { mode: 'keep-size', marginMm });
+    if (plan.kind !== 'ok') throw new Error('expected keep-size placement');
+    expect(plan.scale).toBe(1);
+    expect(plan.fits).toBe(false);
+    expect(plan.object.transform).toMatchObject({
+      scaleX: -3,
+      scaleY: 2,
+      rotationDeg: 37,
+      mirrorY: true,
+    });
+    expect(plan.object.bounds).toEqual(source.bounds);
+    expect(plan.object.paths).toBe(source.paths);
+    const before = transformedBBox(source);
+    const after = transformedBBox(plan.object);
+    const boardBounds = transformedBBox(board);
+    expect(after.maxX - after.minX).toBeCloseTo(before.maxX - before.minX);
+    expect(after.maxY - after.minY).toBeCloseTo(before.maxY - before.minY);
+    expect((after.minX + after.maxX) / 2).toBeCloseTo((boardBounds.minX + boardBounds.maxX) / 2);
+    expect((after.minY + after.maxY) / 2).toBeCloseTo((boardBounds.minY + boardBounds.maxY) / 2);
+    expect(fitObjectToBoard(source, board, { mode: 'fit', marginMm }).kind).toBe('error');
+  });
+
+  it.each([NaN, Infinity, -Infinity, -1])('rejects invalid margin %s in both modes', (marginMm) => {
+    for (const board of [rect, circle]) {
+      for (const mode of ['fit', 'keep-size'] as const) {
+        expect(fitObjectToBoard(artwork, board, { mode, marginMm }).kind).toBe('error');
+      }
+    }
+  });
+
   it('uses the circle diameter for a round shape rather than its inscribed square', () => {
     const plan = fitObjectToBoard(circle, circle, { mode: 'fit', marginMm: 5 });
     if (plan.kind !== 'ok') throw new Error('expected circular fit');

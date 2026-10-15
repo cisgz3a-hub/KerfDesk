@@ -9,6 +9,7 @@ import {
   registrationJigObjectIdentity,
 } from '../../core/scene/registration-jig-artwork';
 import { reliefAuthoringLinkIds } from '../../core/relief/relief-authoring-link-ids';
+import { pruneOrphanLayers } from './scene-mutations';
 import { removeObjectIdsFromGroups } from './scene-group-actions';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
 
@@ -73,6 +74,7 @@ export function relayoutRegistrationJigArtwork(
   const nextBoxes = new Map(findRegistrationBoxes(after).map((box) => [box.id, box]));
   const slots = artworkSlots(before);
   const removedIds = new Set<string>();
+  const retiredSlots = new Map<string, string>();
   const objects = after.objects.flatMap((object): SceneObject[] => {
     const boxId = slots.get(object.id);
     if (boxId === undefined) return [object];
@@ -83,9 +85,13 @@ export function relayoutRegistrationJigArtwork(
         removedIds.add(object.id);
         return [];
       }
-      // Keep IDs and external references stable. An explicit, ancestry-free identity
-      // for the retired slot prevents old encoded IDs from being re-inferred as copies.
-      return [{ ...object, registrationJig: { objectId: object.id, boxId, ancestors: [] } }];
+      // Keep artwork IDs and external references stable while retiring membership.
+      // A fresh slot identity cannot reconnect when registration-box is reused.
+      const retiredId = retiredSlots.get(boxId) ?? `retired-jig:${crypto.randomUUID()}`;
+      retiredSlots.set(boxId, retiredId);
+      return [
+        { ...object, registrationJig: { objectId: object.id, boxId: retiredId, ancestors: [] } },
+      ];
     }
     if (oldBox === undefined) return [object];
     const oldBounds = transformedBBox(oldBox);
@@ -116,5 +122,5 @@ export function relayoutRegistrationJigArtwork(
   if (removedIds.size === 0) return scene;
   const repaired = repairDanglingObjectDependencies(removeObjectIdsFromGroups(scene, removedIds));
   reportDependencyRepairs(repaired);
-  return repaired.scene;
+  return pruneOrphanLayers(repaired.scene);
 }

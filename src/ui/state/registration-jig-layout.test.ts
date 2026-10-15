@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { findRegistrationBoxes, isRegistrationBox, transformedBBox } from '../../core/scene';
+import {
+  createLayer,
+  findRegistrationBoxes,
+  isRegistrationBox,
+  transformedBBox,
+} from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
 import {
   registrationJigArtworkInstances,
@@ -209,5 +214,138 @@ describe('fixture grid edits preserve linked artwork placement', () => {
     expect(scene().objects.find((object) => object.id === relief.id)).toMatchObject({
       reliefAuthoring: { clip: { linkedObjectId: source.id } },
     });
+  });
+});
+
+describe('retired jig lifecycle', () => {
+  it.each(['jig', 'captured'] as const)(
+    'does not reattach removed single-slot artwork to a new %s',
+    (replacement) => {
+      useStore
+        .getState()
+        .replaceRegistrationJigSet({ ...GRID, columns: 1, removedArtwork: 'remove' });
+      const before = useStore.getState().project;
+      const undoCount = useStore.getState().undoStack.length;
+      const original = art()[0]!;
+      useStore.getState().removeRegistrationBox();
+      expect(useStore.getState().undoStack).toHaveLength(undoCount + 1);
+      expect(art()[0]!.id).toBe(original.id);
+      expect(art()[0]!.transform).toEqual(original.transform);
+      reopen();
+      if (replacement === 'jig')
+        useStore.getState().replaceRegistrationJigSet({ ...GRID, columns: 1 });
+      else useStore.getState().addCapturedBoardBox(100, 80);
+      expect(registrationJigArtworkInstances(scene())).toEqual([]);
+      expect(outputIds()).toContain(original.id);
+      useStore.getState().undo();
+      useStore.getState().undo();
+      expect(useStore.getState().project).toEqual(before);
+    },
+  );
+
+  it('detaches legacy encoded copy identities when removing the fixture', () => {
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...scene(),
+          objects: scene().objects.map((object) => {
+            const { registrationJig: _identity, ...legacy } = object;
+            return legacy;
+          }),
+        },
+      },
+    }));
+    const ids = art().map((object) => object.id);
+    const outputGeometry = () =>
+      compileJob(scene(), useStore.getState().project.device)
+        .groups.flatMap((group) =>
+          group.kind === 'cut'
+            ? group.segments.map((segment) => JSON.stringify(segment.polyline))
+            : [],
+        )
+        .sort();
+    const beforeOutput = outputGeometry();
+    useStore.getState().removeRegistrationBox();
+    useStore.getState().replaceRegistrationJigSet({ ...GRID, columns: 1 });
+    expect(registrationJigArtworkInstances(scene())).toEqual([]);
+    expect(art().map((object) => object.id)).toEqual(ids);
+    expect(
+      art().every((object) => registrationJigObjectIdentity(object)?.ancestors.length === 0),
+    ).toBe(true);
+    expect(outputGeometry()).toEqual(beforeOutput);
+  });
+
+  it('keeps retired copied groups through a later source Auto-fit and save/reopen', () => {
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'art-right',
+        color: '#0000ff',
+        spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+      }),
+    );
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...scene(),
+          groups: [{ id: 'source-group', name: 'Source', objectIds: ['art', 'art-right'] }],
+        },
+      },
+      selectedObjectId: 'art',
+      additionalSelectedIds: new Set(['art-right']),
+    }));
+    useStore.getState().centerSelectionInRegistrationBox();
+    const retiredId = registrationJigArtworkInstances(scene())[2]!.objects[0]!.id;
+    const retiredGroup = scene().groups!.find((group) => group.objectIds.includes(retiredId))!;
+    expect(retiredGroup).toBeDefined();
+    useStore.getState().replaceRegistrationJigSet({ ...GRID, columns: 2, removedArtwork: 'keep' });
+    reopen();
+    const beforeRefit = useStore.getState().project;
+    useStore.setState({ selectedObjectId: 'art', additionalSelectedIds: new Set(['art-right']) });
+    useStore.getState().centerSelectionInRegistrationBox();
+    expect(scene().groups).toContainEqual(retiredGroup);
+    expect(outputIds()).toContain(retiredId);
+    reopen();
+    expect(scene().groups).toContainEqual(retiredGroup);
+    useStore.getState().undo();
+    expect(useStore.getState().project).toEqual(beforeRefit);
+    useStore.getState().replaceRegistrationJigSet(GRID);
+    useStore.setState({ selectedObjectId: 'art', additionalSelectedIds: new Set(['art-right']) });
+    useStore.getState().centerSelectionInRegistrationBox();
+    expect(scene().groups).toContainEqual(retiredGroup);
+    expect(new Set(scene().groups!.map((group) => group.id)).size).toBe(scene().groups!.length);
+    expect(
+      registrationJigArtworkInstances(scene()).flatMap((instance) =>
+        instance.objects.map((object) => object.id),
+      ),
+    ).not.toContain(retiredId);
+  });
+
+  it('prunes operations orphaned by removed-slot artwork while retaining live work and undo', () => {
+    const removed = art()[2]!;
+    const unique = createLayer({ id: 'retired-only', color: '#abcdef' });
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...scene(),
+          layers: [...scene().layers, unique],
+          objects: scene().objects.map((object) =>
+            object.id === removed.id ? { ...object, operationIds: [unique.id] } : object,
+          ),
+        },
+      },
+    }));
+    const before = useStore.getState().project;
+    const previousIds = outputIds();
+    expect(previousIds).toContain(removed.id);
+    useStore
+      .getState()
+      .replaceRegistrationJigSet({ ...GRID, columns: 2, removedArtwork: 'remove' });
+    expect(scene().layers.some((operation) => operation.id === unique.id)).toBe(false);
+    expect(outputIds()).toEqual(new Set([...previousIds].filter((id) => id !== removed.id)));
+    useStore.getState().undo();
+    expect(useStore.getState().project).toEqual(before);
   });
 });
