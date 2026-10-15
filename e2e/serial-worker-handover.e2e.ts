@@ -46,13 +46,17 @@ for (const scenario of ['before-prepare', 'at-barrier', 'across-release'] as con
   });
 }
 
-test('real serial Worker timeout closes uncertain ownership without fallback writes', async ({
+test('real serial Worker timeout retains uncertain ownership without fallback writes', async ({
   page,
 }) => {
   const result = await page.evaluate(runWorkerScenario, { scenario: 'timeout' } as const);
   expect(result.writes).toEqual(result.programLines.slice(0, 2));
   expect(result.delivered).toEqual(['ok']);
-  expect(result.closed && result.terminated && result.portClosed).toBe(true);
+  expect(result.closed && result.terminated).toBe(true);
+  expect(result.portClosed).toBe(false);
+  expect(result.shutdownError).toContain('Serial shutdown timed out');
+  expect(result.lockedAfterTimeout).toEqual({ readable: true, writable: true });
+  expect(result.reopenError).toContain('still closing');
   expect(result.writeRejectedAfterClose).toBe(true);
 });
 
@@ -86,6 +90,10 @@ async function runWorkerScenario(args: {
   readonly invalidation?: string;
 }) {
   const connectionPath = '/src/platform/web/worker-serial-connection.ts';
+  const ownershipPath = '/src/platform/web/serial-port-close.ts';
+  const { requireSerialPortReleased } = (await import(
+    /* @vite-ignore */ ownershipPath
+  )) as typeof import('../src/platform/web/serial-port-close');
   const streamerPath = '/src/core/controllers/grbl/streamer.ts';
   const pumpPath = '/src/core/controllers/grbl/stream-pump.ts';
   const { createWorkerSerialConnection } = (await import(
@@ -158,6 +166,13 @@ async function runWorkerScenario(args: {
     writeErrors.push(event.message);
     changed();
   };
+  const port = {
+    readable,
+    writable,
+    close: async () => {
+      portClosed = true;
+    },
+  };
   const connection = createWorkerSerialConnection({
     timeoutMs: args.scenario === 'timeout' ? 500 : 5_000,
     bridge: {
@@ -187,13 +202,7 @@ async function runWorkerScenario(args: {
         worker.terminate();
       },
     },
-    port: {
-      readable,
-      writable,
-      close: async () => {
-        portClosed = true;
-      },
-    },
+    port,
   });
   const streamsLockedAfterTransfer = readable.locked && writable.locked;
   connection.onClose(() => {
@@ -243,6 +252,9 @@ async function runWorkerScenario(args: {
   let blockedLineCount = 0;
   let writeRejectedAfterClose = false;
   let armedAfterInvalidation = false;
+  let shutdownError: string | null = null;
+  let reopenError: string | null = null;
+  let lockedAfterTimeout: { readable: boolean; writable: boolean } | null = null;
   try {
     await connection.write(first.toSend);
     if (args.scenario === 'before-prepare') {
@@ -309,9 +321,25 @@ async function runWorkerScenario(args: {
       while (main.completed < main.total) await nextAck();
     }
   } finally {
-    await connection.close();
-    worker.terminate();
+    try {
+      await connection.close();
+    } catch (error) {
+      shutdownError = String(error);
+      lockedAfterTimeout = { readable: readable.locked, writable: writable.locked };
+      try {
+        requireSerialPortReleased(port);
+      } catch (reopenFailure) {
+        reopenError = String(reopenFailure);
+      }
+    } finally {
+      // The timeout intentionally kills a worker before it closes its transferred
+      // fixture streams. Chromium retains their transfer-pipe locks. The page's
+      // disposal releases this fixture; the live transport must retain ownership
+      // meanwhile, report the timeout and refuse another writer.
+      worker.terminate();
+    }
   }
+  if (args.scenario !== 'timeout' && shutdownError !== null) throw new Error(shutdownError);
   return {
     programLines,
     writes: written.filter((value) => value !== '?'),
@@ -330,6 +358,9 @@ async function runWorkerScenario(args: {
     blockedLineCount,
     writeRejectedAfterClose,
     armedAfterInvalidation,
+    shutdownError,
+    lockedAfterTimeout,
+    reopenError,
     closed,
     terminated,
     portClosed,
