@@ -110,7 +110,9 @@ export async function loadCanvas(browser, state = canvasFixture(), width = 900) 
     window.subject.controller.start(window.transport);
     window.subject.render();
   }, state.scopes);
-  await page.locator('.art-path').last().waitFor();
+  if (state.workspace.permissions.artworkSharingEnabled === false)
+    await page.waitForFunction(() => window.subject.store.get().workspace !== null);
+  else await page.locator('.art-path').last().waitFor();
   return { page, context, state, errors };
 }
 

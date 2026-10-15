@@ -30,6 +30,12 @@ export class SelectionSync {
     this.version += 1;
   }
 
+  /** A dependent edit belongs to the selection intent that was current when it began. */
+  owner(current: () => boolean): () => boolean {
+    const version = this.version;
+    return () => current() && this.version === version;
+  }
+
   wait(): Promise<boolean> {
     return this.running ?? Promise.resolve(true);
   }

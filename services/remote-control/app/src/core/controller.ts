@@ -304,8 +304,9 @@ export class Controller {
   ): Promise<T | null> {
     if (this.stopped) return null;
     const generation = this.generation;
+    const owns = this.selections.owner(() => this.current(generation));
     if (command !== 'set_selection' && this.selections.pending) {
-      if (!(await this.selections.wait()) || !this.current(generation)) return null;
+      if (!(await this.selections.wait()) || !owns()) return null;
     }
     const current = store.get();
     if (!canEdit(current) || current.workspace === null) {
@@ -376,18 +377,16 @@ export class Controller {
 
   async move(ids: string[], dxMm: number, dyMm: number): Promise<void> {
     const generation = this.generation;
+    const owns = this.selections.owner(() => this.current(generation));
     if (this.selections.pending && !(await this.selections.wait())) return;
-    if (!this.current(generation)) return;
-    await moveArtwork(this.write.bind(this), ids, dxMm, dyMm, this.designControl(), () =>
-      this.current(generation),
-    );
+    if (!owns()) return;
+    await moveArtwork(this.write.bind(this), ids, dxMm, dyMm, this.designControl(), owns);
   }
 
   scale(ids: string[], from: Box, to: Box): Promise<void> {
     const generation = this.generation;
-    return resizeArtwork(this.write.bind(this), ids, from, to, this.designControl(), () =>
-      this.current(generation),
-    );
+    const owns = this.selections.owner(() => this.current(generation));
+    return resizeArtwork(this.write.bind(this), ids, from, to, this.designControl(), owns);
   }
 
   rotate(ids: string[], angleDeg: number) {

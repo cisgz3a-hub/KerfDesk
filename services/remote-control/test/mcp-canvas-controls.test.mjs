@@ -510,3 +510,86 @@ test('390px selection actions remain visible with wider system-font metrics', as
     await context.close();
   }
 });
+
+for (const shared of [true, false])
+  test(`ineligible group stays unselectable when hidden members are omitted, sharing=${shared}`, async () => {
+    const data = canvasFixture();
+    data.workspace.artwork = data.workspace.artwork.map((item) =>
+      item.id === 'a1' || item.id === 'a2'
+        ? { ...item, editable: false, ...(item.id === 'a2' ? { visible: false } : {}) }
+        : item,
+    );
+    data.scene.objects = data.scene.objects.filter(
+      (item) => item.id !== 'a2' && (shared || item.id === 'b'),
+    );
+    data.workspace.permissions.artworkSharingEnabled = shared;
+    const { page, context, state } = await loadCanvas(browser, data);
+    try {
+      await clickItem(page, 'a1');
+      assert.deepEqual(await selected(page), []);
+      await drag(page, [10, 20], [90, 60]);
+      assert.deepEqual(await selected(page), []);
+      await page.getByRole('button', { name: 'Select all', exact: true }).click();
+      await expect.poll(() => selected(page)).toEqual(['b']);
+      assert.equal(
+        state.commands.some(
+          (item) => item.name === 'set_selection' && item.args.artworkIds?.includes('a1'),
+        ),
+        false,
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+test('truncated Multi-select still permits two-finger navigation without selection writes', async () => {
+  const data = canvasFixture();
+  data.workspace.selection = ['a1', 'a2'];
+  data.workspace.selectionTruncated = true;
+  data.workspace.totalSelected = 300;
+  const { page, context, state } = await loadCanvas(browser, data, 390);
+  const cdp = await context.newCDPSession(page);
+  try {
+    await page.getByRole('button', { name: 'Multi-select', exact: true }).click();
+    const center = await point(page, 150, 110);
+    const before = await page.evaluate(() => window.subject.store.get().view);
+    const fingers = (distance) => [
+      { id: 1, x: center.x - distance, y: center.y },
+      { id: 2, x: center.x + distance, y: center.y },
+    ];
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: fingers(30) });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: fingers(50) });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    assert.ok((await page.evaluate(() => window.subject.store.get().view)).scale > before.scale);
+    assert.deepEqual(await selected(page), ['a1', 'a2']);
+    assert.deepEqual(mutations(state), []);
+    assert.equal(
+      state.commands.some((item) => item.name === 'set_selection'),
+      false,
+    );
+  } finally {
+    await cdp.detach();
+    await context.close();
+  }
+});
+
+for (const batch of [true, false])
+  test(`unselected replacement drag can replace a truncated selection, batch=${batch}`, async () => {
+    const data = canvasFixture();
+    data.workspace.selection = ['a1', 'a2'];
+    data.workspace.totalSelected = 300;
+    data.workspace.selectionTruncated = true;
+    data.workspace.capabilities = { ...data.workspace.capabilities, designControl: batch };
+    const { page, context, state } = await loadCanvas(browser, data);
+    try {
+      await drag(page, [140, 40], [150, 45]);
+      await expect.poll(() => mutations(state).length).toBe(1);
+      const sent = mutations(state)[0];
+      const transformed = batch ? sent.args.edits[1].args : sent.args;
+      assert.deepEqual(transformed.artworkIds, ['b']);
+      assert.ok(Math.abs(transformed.transform.dxMm - 10) < 0.01);
+      assert.ok(Math.abs(transformed.transform.dyMm - 5) < 0.01);
+    } finally {
+      await context.close();
+    }
+  });

@@ -433,3 +433,43 @@ for (const readOnly of [false, true]) {
     },
   );
 }
+
+for (const kind of ['move', 'scale', 'rotate'])
+  test(`newer selection cancels an older waiting ${kind}`, async () => {
+    const page = await setup();
+    try {
+      await page.evaluate(() => {
+        window.server.holdReads = true;
+        void window.control.select(['a1']);
+      });
+      await page.evaluate((kind) => {
+        window.edit =
+          kind === 'move'
+            ? window.control.move(['a1'], 2, 0)
+            : kind === 'rotate'
+              ? window.control.rotate(['a1'], 30)
+              : window.control.scale(
+                  ['a1'],
+                  { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+                  { minX: 0, minY: 0, maxX: 20, maxY: 20 },
+                );
+        void window.control.select(['b']);
+        window.server.writes[0].finish();
+      }, kind);
+      await page.waitForFunction(() => window.server.writes.length === 2);
+      await page.evaluate(() => window.server.writes[1].finish());
+      await page.evaluate(() => window.edit);
+      assert.deepEqual(
+        await page.evaluate(() =>
+          window.server.calls.filter((call) =>
+            ['transform_artwork', 'apply_edits'].includes(call.name),
+          ),
+        ),
+        [],
+      );
+      assert.equal(await page.evaluate(() => window.server.writes.length), 2);
+      assert.deepEqual(await page.evaluate(() => window.subject.store.get().selection), ['b']);
+    } finally {
+      await page.close();
+    }
+  });

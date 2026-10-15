@@ -112,10 +112,6 @@ export function Canvas({ interactive = true }: { interactive?: boolean }) {
     if (!interactive) return;
     if (event.pointerType === 'mouse' && event.button > 2) return;
     const toggle = event.shiftKey || event.ctrlKey || event.metaKey || selectionMode === 'toggle';
-    if (tool === 'select' && event.button === 0 && toggle && !completeSelection) {
-      store.toast('Clear the selection or select one item first.', 'info');
-      return;
-    }
     event.currentTarget.focus({ preventScroll: true });
     (event.currentTarget as HTMLDivElement).setPointerCapture(event.pointerId);
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -139,6 +135,12 @@ export function Canvas({ interactive = true }: { interactive?: boolean }) {
       return;
     }
     if (pointers.current.size > 2) return;
+    // Keep touch pointers registered so a second finger can still start navigation.
+    if (tool === 'select' && event.button === 0 && toggle && !completeSelection) {
+      gesture.current = null;
+      store.toast('Clear the selection or select one item first.', 'info');
+      return;
+    }
     const point = toScene(event.clientX, event.clientY);
     if (tool === 'pan' || event.button === 1 || event.button === 2) {
       gesture.current = {
@@ -203,7 +205,12 @@ export function Canvas({ interactive = true }: { interactive?: boolean }) {
     }
     const point = toScene(event.clientX, event.clientY);
     updateGesture(g, point, event, {
-      editable: canTransform,
+      editable:
+        canTransform ||
+        (g.kind === 'move' &&
+          editable &&
+          g.ids.length > 0 &&
+          g.ids.every((id) => allowed.has(id) && !selection.includes(id))),
       scale: current.scale,
       pointers: pointers.current,
       rect: wrap.current?.getBoundingClientRect(),

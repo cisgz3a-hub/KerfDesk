@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { useStore } from '../state/store';
 import { focusDesignHierarchy } from '../state/design-hierarchy-store';
 import { addTestRectangle, resultCode, testAdapter, writeArgs } from './authoring-test-support';
-import { selectedIds } from './projections';
+import { selectedIds, workspaceProjection } from './projections';
 import type { RemoteControlAdapter } from './types';
 
 let adapter: RemoteControlAdapter;
@@ -162,6 +162,60 @@ describe('atomic remote selection modes', () => {
       );
       expect(useStore.getState()).toBe(before);
       expect(adapter.getRevision()).toBe(revision);
+    },
+  );
+
+  it.each(['locked', 'hidden', 'private', 'missing'] as const)(
+    'projects whole connected-unit eligibility with a %s member',
+    async (kind) => {
+      await fixture(4, [
+        [0, 1],
+        [1, 2],
+      ]);
+      const state = useStore.getState();
+      const privateId = 'C:/private/source.svg';
+      useStore.setState({
+        project: {
+          ...state.project,
+          scene: {
+            ...state.project.scene,
+            objects: state.project.scene.objects
+              .map((object) =>
+                object.id === 'item-2'
+                  ? {
+                      ...object,
+                      ...(kind === 'locked'
+                        ? { locked: true }
+                        : kind === 'hidden'
+                          ? { operationIds: ['hidden'] }
+                          : kind === 'private'
+                            ? { id: privateId }
+                            : {}),
+                    }
+                  : object,
+              )
+              .filter((object) => kind !== 'missing' || object.id !== 'item-2'),
+            groups: state.project.scene.groups!.map((group) => ({
+              ...group,
+              objectIds: group.objectIds.map((id) =>
+                kind === 'private' && id === 'item-2' ? privateId : id,
+              ),
+            })),
+            layers: [
+              ...state.project.scene.layers,
+              { ...state.project.scene.layers[0]!, id: 'hidden', visible: false },
+            ],
+          },
+        },
+      });
+      for (const sharing of [true, false]) {
+        const projected = workspaceProjection(useStore.getState(), sharing);
+        expect(
+          projected.artwork.filter((item) => item.id !== 'item-3').every((item) => !item.editable),
+        ).toBe(true);
+        expect(projected.artwork.find((item) => item.id === 'item-3')?.editable).toBe(true);
+        expect(JSON.stringify(projected)).not.toContain(privateId);
+      }
     },
   );
 
