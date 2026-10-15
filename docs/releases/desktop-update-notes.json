@@ -6,6 +6,7 @@
     "Design Studio moves to the main toolbar. Artwork settings explain the laser power multiplier, and multi-selection rotation, start settings and context menus have been corrected.",
     "MCP canvas editing gains group selection, selection boxes, Select all and Deselect, with safer cancellation and synchronisation between remote and desktop selections.",
     "Large vector projects copy less geometry between workers. Manual Save and trace editing take priority over disposable background work, and matching ETA and Preview requests can share preparation.",
-    "Trace and node editing preserve inner contours and prepare dense paths in a worker. Numbering, keyboard activation and document replacement now keep editing state consistent."
+    "Trace and node editing preserve inner contours and prepare dense paths in a worker. Numbering, keyboard activation and document replacement now keep editing state consistent.",
+    "Registration Jig and Place Board now use the existing Pro tool prompt when opened."
   ]
 }
