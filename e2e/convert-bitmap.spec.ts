@@ -1,7 +1,7 @@
 import type { RasterImage } from '../src/core/scene';
 import type { AppState } from '../src/ui/state/store';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
-import { toolbarCommand } from './fixtures/workspace-ui';
+import { toolbarCommand, expectToolbarCommandEnabled } from './fixtures/workspace-ui';
 
 declare global {
   interface Window {
@@ -78,7 +78,7 @@ test('native conversion preserves nonzero overlap and PNG pixels through Undo an
   const dialog = await openDialog(page);
   await dialog.getByRole('button', { name: 'Convert', exact: true }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Trace Image...', exact: true })).toBeEnabled();
+  await expectToolbarCommandEnabled(page, 'Trace Image...');
   const result = await page.evaluate(async () => {
     const raster = window.__bitmapConversionTest.results[0];
     if (!raster?.lumaBase64 || !raster.dataUrl)
@@ -116,7 +116,7 @@ test('native conversion preserves nonzero overlap and PNG pixels through Undo an
   await page.keyboard.press('Control+z');
   await expectBitmapAvailable(page);
   await page.keyboard.press('Control+Shift+z');
-  await expect(page.getByRole('button', { name: 'Trace Image...', exact: true })).toBeEnabled();
+  await expectToolbarCommandEnabled(page, 'Trace Image...');
   expect(errors).toEqual([]);
 });
 
@@ -150,7 +150,7 @@ test('busy conversion prevents duplicate work, cancels with Escape, and can be r
   const retry = await openDialog(page);
   await retry.getByRole('button', { name: 'Convert', exact: true }).click();
   await expect(retry).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Trace Image...', exact: true })).toBeEnabled();
+  await expectToolbarCommandEnabled(page, 'Trace Image...');
   expect(await page.evaluate(() => window.__bitmapConversionTest.requests)).toBe(2);
 });
 

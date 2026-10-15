@@ -163,7 +163,7 @@ test('transform expressions commit exact independent arithmetic after clearing a
 async function openProject(page: Page): Promise<Locator> {
   await page.setViewportSize({ width: 1536, height: 864 });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/, { timeout: 30_000 });
   const panel = page.getByRole('complementary', {
     name: 'Artwork / Operations panel',

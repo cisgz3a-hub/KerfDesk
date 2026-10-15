@@ -4,7 +4,7 @@
 // runs through the SAME gesture machine as the flat canvas via the surface
 // adapter, so precision behavior cannot drift between the two.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useMemo, useState, type Ref } from 'react';
 import { steppedSurfaceMesh } from '../../../core/heightfield';
 import type { ViewerContentInput } from '../../cnc-viewer3d/viewer3d-content';
 import { buildViewportOverlay } from './viewport-overlay';
@@ -18,7 +18,11 @@ import { DesignViewportToolbar } from './DesignViewportToolbar';
 import { useDesignViewportScene } from './use-design-viewport-scene';
 import type { ViewportFrame } from './viewport-scene';
 
-export function DesignViewport3D(): JSX.Element {
+export type DesignViewportActions = { readonly fit: () => void };
+
+export function DesignViewport3D({
+  actionsRef,
+}: { readonly actionsRef?: Ref<DesignViewportActions> } = {}): JSX.Element {
   const carve = useDesignCarveContent();
   const frame = useViewportFrame(carve);
   const tiers = useCarveTiers(carve);
@@ -26,6 +30,11 @@ export function DesignViewport3D(): JSX.Element {
   const surface = useViewportSurface(scene);
   const pointer = useDesignPointer(surface, () => crypto.randomUUID());
   useOverlaySync(scene, frame);
+  useImperativeHandle(
+    actionsRef,
+    () => ({ fit: () => scene.handleRef.current?.setPreset('top') }),
+    [scene.handleRef],
+  );
 
   return (
     <div style={hostStyle}>

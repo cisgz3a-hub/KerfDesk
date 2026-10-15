@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 import type { AppState } from '../src/ui/state/store';
 
@@ -96,7 +97,7 @@ test('an externally restored power value clears the native invalid flag while th
 }) => {
   await page.setViewportSize({ width: 1536, height: 864 });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   const input = page.getByRole('spinbutton', { name: /^Power for/ });
   await input.fill('1e2');

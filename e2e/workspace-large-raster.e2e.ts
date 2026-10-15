@@ -1,5 +1,5 @@
 import { saveProjectAs } from './fixtures/project-save';
-import { toolbarCommand } from './fixtures/workspace-ui';
+import { toolbarCommand, expectToolbarCommandEnabled } from './fixtures/workspace-ui';
 import type { Project } from '../src/core/scene';
 import { expect, test } from './fixtures/kerfdesk-test';
 import { checkWorkspaceHover } from './fixtures/workspace-responsiveness';
@@ -53,7 +53,7 @@ test('an ordinary raster prepares its estimate, markers and full Preview in real
     { name: 'canvas-raster.png', kind: 'png-fixture', width: 600, height: 2400 },
   ]);
   await (await toolbarCommand(page, 'Import...')).click();
-  await expect(page.getByRole('button', { name: 'Trace Image...', exact: true })).toBeEnabled();
+  await expectToolbarCommandEnabled(page, 'Trace Image...');
   await expect.poll(() => workers.some((url) => url.includes('preparation-worker'))).toBe(true);
   await expect
     .poll(() => workers.some((url) => url.includes('idle-canvas-motion-worker')))

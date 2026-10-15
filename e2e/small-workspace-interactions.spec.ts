@@ -177,7 +177,7 @@ for (const viewport of [
 async function openBasic(page: Page): Promise<void> {
   await page.setViewportSize({ width: 1536, height: 864 });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/, { timeout: 30_000 });
   await expect(page.getByRole('spinbutton', { name: /^Power for/ })).toBeVisible();
 }

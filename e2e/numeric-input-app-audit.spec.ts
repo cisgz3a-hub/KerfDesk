@@ -53,7 +53,7 @@ test('mixed artwork power scale accepts explicit 100 after clearing its blank dr
   await page.setViewportSize({ width: 1536, height: 864 });
   await page.goto('/');
   await kerfdesk.setOpenFiles([{ name: 'numeric-mixed.lf2', text: JSON.stringify(project) }]);
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/numeric-mixed\.lf2/, { timeout: 30_000 });
   const menu = page.getByRole('menubar', { name: 'Application menu', exact: true });
   await menu.getByRole('menuitem', { name: 'Edit', exact: true }).click();
@@ -150,7 +150,7 @@ async function clearEachDigit(input: Locator): Promise<void> {
 async function openBasicProject(page: Page): Promise<Locator> {
   await page.setViewportSize({ width: 1536, height: 864 });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/, { timeout: 30_000 });
   const sideTab = page
     .getByRole('tablist', { name: 'Side panel', exact: true })

@@ -21,7 +21,7 @@ import { DesignStatusBar } from './DesignStatusBar';
 import { DesignToolRails } from './DesignToolRails';
 import { DesignTopBar } from './DesignTopBar';
 import { DesignSidePanel } from './preview3d/DesignSidePanel';
-import { DesignViewport3D } from './viewport3d/DesignViewport3D';
+import { DesignViewport3D, type DesignViewportActions } from './viewport3d/DesignViewport3D';
 import { handleDesignStudioKey } from './design-shortcuts';
 import { useDesignStudioStore } from './design-studio-store';
 import { fitView } from './design-view';
@@ -32,6 +32,7 @@ import { handleEditorKeyDown, handleEditorKeyUp } from '../image-editor/editor-s
 
 export function DesignStudioOverlay(): JSX.Element | null {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const viewport3dRef = useRef<DesignViewportActions | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<'vectors' | 'photos'>('vectors');
   const session = useDesignStudioStore((state) => state.session);
   const closeStudio = useDesignStudioStore((state) => state.closeStudio);
@@ -52,6 +53,10 @@ export function DesignStudioOverlay(): JSX.Element | null {
   useDialogA11y(rootRef, closeWorkspace, { closeOnEscape: false, initialFocus: 'surface' });
 
   const handleFit = useCallback(() => {
+    if (useDesignStudioStore.getState().session?.surface3d) {
+      viewport3dRef.current?.fit();
+      return;
+    }
     const host = rootRef.current?.querySelector('canvas')?.parentElement;
     const rect = host?.getBoundingClientRect();
     if (rect === undefined || rect.width <= 0 || rect.height <= 0) return;
@@ -92,7 +97,11 @@ export function DesignStudioOverlay(): JSX.Element | null {
           <div style={bodyStyle}>
             <DesignToolRails />
             <div style={mainColumnStyle}>
-              {session.surface3d ? <DesignViewport3D /> : <DesignCanvas {...photoActions} />}
+              {session.surface3d ? (
+                <DesignViewport3D actionsRef={viewport3dRef} />
+              ) : (
+                <DesignCanvas {...photoActions} />
+              )}
             </div>
             <DesignSidePanel {...photoActions} />
           </div>
