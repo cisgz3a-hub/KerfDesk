@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fileCommands } from '../commands/command-families';
 import type { AppCommandContext } from '../commands/command-types';
 import { Toolbar } from './Toolbar';
@@ -10,7 +10,7 @@ import { Toolbar } from './Toolbar';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 // The packaged desktop smoke (electron/native-smoke.ts) drives the real app
-// by accessible name: it clicks "Import..." and "Save As...", opening
+// by accessible name: it clicks Open, Import and Save As, opening
 // "More commands" first when a command is not a primary toolbar button. That
 // smoke runs weekly on a packaged build, so a relabel or a regrouping that
 // hides one of these commands used to surface only there, a week later (it
@@ -18,6 +18,7 @@ import { Toolbar } from './Toolbar';
 // same contract in the fast suite, with the real command registry.
 
 const SMOKE_COMMANDS = [
+  ['Open...', 'openProject'],
   ['Import...', 'importArtwork'],
   ['Save As...', 'saveProjectAs'],
 ] as const;
@@ -27,12 +28,23 @@ let cleanup: (() => Promise<void>) | null = null;
 afterEach(async () => {
   await cleanup?.();
   cleanup = null;
+  vi.restoreAllMocks();
 });
 
-describe('toolbar commands the packaged desktop smoke drives', () => {
+describe.each([900, 100])('packaged file commands with %i px of toolbar space', (available) => {
   it.each(SMOKE_COMMANDS)(
     'reaches %s by accessible name, through More when it is not primary',
     async (label, handler) => {
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+        this: HTMLElement,
+      ) {
+        const width = this.classList.contains('lf-toolbar-command-groups')
+          ? available
+          : this.hasAttribute('data-measure-more')
+            ? 70
+            : 60;
+        return DOMRect.fromRect({ width, height: 30 });
+      });
       const calls: string[] = [];
       const context = new Proxy(
         {},
@@ -48,7 +60,11 @@ describe('toolbar commands the packaged desktop smoke drives', () => {
       ) as AppCommandContext;
       await renderToolbar(fileCommands(context));
 
+      if (available === 100) {
+        expect(document.querySelector(`button[aria-label="${label}"]`)).toBeNull();
+      }
       const button = await smokeCommandButton(label);
+      if (available === 100) expect(button.getAttribute('role')).toBe('menuitem');
       await act(async () => button.click());
 
       expect(calls).toContain(handler);
