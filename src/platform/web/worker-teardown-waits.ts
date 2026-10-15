@@ -7,10 +7,10 @@ type PortStreams = {
   readonly writable: WritableStream<Uint8Array> | null;
 };
 
-// How often teardown looks again for the port's streams to come free. There is
-// no event for a stream being unlocked, and the drain it waits on is the
-// serial sink sending a few short lines.
-const PORT_RELEASE_POLL_MS = 10;
+// Check normal short drains promptly, then reduce wakeups for a wedged sink.
+// Stream unlock has no event; retain a bounded polling delay until real release.
+const PORT_RELEASE_INITIAL_POLL_MS = 10;
+const PORT_RELEASE_MAX_POLL_MS = 1_000;
 
 /** Run `begin`, then resolve on its callback or on the deadline — whichever
  * comes first. Never rejects: a silent worker is handled by the caller's own
@@ -41,10 +41,12 @@ export async function settleWithin(
 // Wait for the actual release. A caller timeout is handled by
 // boundedSerialClose; it must not turn a still-locked port into a new owner.
 export async function portStreamsReleased(port: PortStreams): Promise<void> {
+  let pollMs = PORT_RELEASE_INITIAL_POLL_MS;
   while (portStreamLocked(port)) {
     await new Promise<void>((resolve) => {
-      setTimeout(resolve, PORT_RELEASE_POLL_MS);
+      setTimeout(resolve, pollMs);
     });
+    pollMs = Math.min(pollMs * 2, PORT_RELEASE_MAX_POLL_MS);
   }
 }
 

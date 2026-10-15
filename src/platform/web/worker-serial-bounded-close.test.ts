@@ -91,7 +91,9 @@ it.each(['transferred writer lock', 'native close'] as const)(
       expect(port.close).toHaveBeenCalledTimes(1);
       releaseClose();
     }
-    await vi.advanceTimersByTimeAsync(10);
+    // A long-stalled transfer backs off polling, but actual release must still
+    // finish cleanup within its capped polling delay before ownership is reused.
+    await vi.advanceTimersByTimeAsync(1_000);
     await connection.forget?.();
     expect(port.forget).toHaveBeenCalledTimes(1);
     expect(port.close).toHaveBeenCalledTimes(1);
