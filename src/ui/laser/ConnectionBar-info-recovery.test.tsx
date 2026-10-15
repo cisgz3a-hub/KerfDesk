@@ -46,7 +46,7 @@ function findButton(container: HTMLElement, label: string): HTMLButtonElement | 
 }
 
 function briefNotice(): HTMLElement | null {
-  return document.querySelector('[role="status"][aria-label="Controller notification"]');
+  return document.querySelector('[role="group"][aria-label="Controller notification"]');
 }
 
 function details(): HTMLElement | null {
@@ -66,6 +66,54 @@ async function expireNotice(): Promise<void> {
 }
 
 describe('ConnectionBar controller information recovery', () => {
+  it('dismisses the brief explicitly and does not revive it when reconnect becomes available', async () => {
+    await render({ reconnectRecommended: false });
+    await openDetails();
+    await act(async () => findButton(document.body, 'Dismiss controller notification')?.click());
+    expect(briefNotice()).toBeNull();
+    await render({ reconnectRecommended: true });
+    expect(briefNotice()).toBeNull();
+  });
+
+  it('announces newly available recovery after expiry', async () => {
+    vi.useFakeTimers();
+    await render({ reconnectRecommended: false });
+    await expireNotice();
+    await render({ reconnectRecommended: true });
+    expect(briefNotice()?.textContent).toContain('Controller connection needs recovery');
+  });
+
+  it('closes requested details before opening the connection menu', async () => {
+    const container = await render({});
+    await openDetails();
+    await act(async () => findButton(container, 'More connection options')?.click());
+    expect(details()).toBeNull();
+    expect(document.querySelector('[role="menu"]')).not.toBeNull();
+  });
+
+  it.each([
+    { qualification: { kind: 'qualifying', epoch: 4, phase: 'settings-read' } },
+    { qualification: { kind: 'qualified', epoch: 4, settings: 'verified' } },
+    { connection: { kind: 'disconnected' } },
+  ] satisfies Partial<Props>[])(
+    'preserves focus when replacing a focused brief: %j',
+    async (patch) => {
+      const container = await render({});
+      await act(async () => briefNotice()?.querySelector('button')?.focus());
+      await render(patch);
+      expect(document.activeElement).toBe(findButton(container, 'More connection options'));
+    },
+  );
+
+  it('keeps an empty announcement region mounted before qualification begins', async () => {
+    const container = await render({ connection: { kind: 'disconnected' } });
+    const region = container.querySelector('[aria-label="Controller updates"]');
+    expect(region?.textContent).toBe('');
+    await render({});
+    expect(container.querySelector('[aria-label="Controller updates"]')).toBe(region);
+    expect(region?.textContent).toContain('Controller information unavailable');
+  });
+
   it('preserves the next control when keyboard focus leaves requested details', async () => {
     const container = await render({});
     await openDetails();

@@ -131,7 +131,7 @@ async function render(platform: PlatformAdapter): Promise<HTMLElement> {
       </PlatformProvider>,
     );
   });
-  const notice = host.querySelector<HTMLButtonElement>('[role="status"] button');
+  const notice = host.querySelector<HTMLButtonElement>('.lf-controller-toolbar-notice button');
   expect(notice).not.toBeNull();
   await act(async () => notice?.click());
   // Recovery details are explicitly requested and portaled outside the toolbar.

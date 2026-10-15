@@ -35,7 +35,7 @@ for (const viewport of [
     };
 
     await setQualification(page, 'failed');
-    const brief = page.getByRole('status', { name: 'Controller notification', exact: true });
+    const brief = page.getByRole('group', { name: 'Controller notification', exact: true });
     const toast = page.getByRole('alert', { name: 'Controller information', exact: true });
     await expect(brief).toBeVisible();
     await expect(toast).toHaveCount(0);
@@ -80,7 +80,7 @@ for (const viewport of [
 
     for (const phase of ['controller-response', 'reset-cleanup', 'settings-read'] as const) {
       await setQualification(page, 'qualifying', phase);
-      const progress = page.getByRole('status', { name: 'Controller notification', exact: true });
+      const progress = page.getByRole('group', { name: 'Controller notification', exact: true });
       await expect(progress).toBeVisible();
       await expect(progress).toContainText(
         phase === 'settings-read'
@@ -100,7 +100,7 @@ for (const viewport of [
     await setQualification(page, 'qualified');
     await expect(trigger).toBeFocused();
     await expect(
-      page.getByRole('status', { name: 'Controller notification', exact: true }),
+      page.getByRole('group', { name: 'Controller notification', exact: true }),
     ).toHaveCount(0);
     await trigger.click();
     await expect(info).toHaveCount(0);

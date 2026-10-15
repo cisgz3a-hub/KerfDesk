@@ -93,3 +93,7 @@
   color: var(--lf-text-muted);
   border: 1px solid var(--lf-border);
 }
+
+.lf-controller-toolbar-notice > button:focus-visible {
+  outline-offset: -3px;
+}

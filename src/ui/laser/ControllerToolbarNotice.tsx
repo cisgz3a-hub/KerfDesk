@@ -1,12 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 
 /** A brief notice stays inside the reserved toolbar space, never over the canvas. */
 export function ControllerToolbarNotice(props: {
+  readonly focusFallbackRef?: RefObject<HTMLButtonElement>;
   readonly message: string;
   readonly detail: string;
   readonly onShow: () => void;
 }): JSX.Element | null {
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => setVisible(true), []);
+  useLayoutEffect(() => {
+    const button = buttonRef.current;
+    const fallback = props.focusFallbackRef?.current;
+    return () => {
+      if (button !== null && document.activeElement === button) fallback?.focus();
+    };
+  }, [props.focusFallbackRef, visible]);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const held = hovered || focused;
@@ -17,12 +27,9 @@ export function ControllerToolbarNotice(props: {
   }, [held]);
   if (!visible) return null;
   return (
-    <div
-      className="lf-controller-toolbar-notice"
-      role="status"
-      aria-label="Controller notification"
-    >
+    <div className="lf-controller-toolbar-notice" role="group" aria-label="Controller notification">
       <button
+        ref={buttonRef}
         type="button"
         className="lf-btn lf-btn--ghost"
         title={`${props.message} ${props.detail} Show controller info.`}

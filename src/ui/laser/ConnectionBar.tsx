@@ -70,7 +70,12 @@ export function ConnectionBar(props: Props): JSX.Element {
       data-state={connection.kind}
     >
       <div className="lf-connection-toolbar-layout">
-        <div className="lf-controller-notice-slot">
+        <div
+          className="lf-controller-notice-slot"
+          role="status"
+          aria-label="Controller updates"
+          aria-atomic="true"
+        >
           <BriefQualificationNotice {...props} notice={notice} />
         </div>
         <div className="lf-connection-toolbar-controls">
@@ -182,7 +187,10 @@ function ConnectionMenu(props: Props & { readonly notice: ControllerNotice }): J
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         title="Show controller info, choose another port, connect automatically, or forget this controller"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          props.notice.close();
+          setOpen((value) => !value);
+        }}
       >
         <Icon name="more" size={18} />
       </button>

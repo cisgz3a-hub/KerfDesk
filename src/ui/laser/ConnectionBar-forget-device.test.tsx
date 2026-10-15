@@ -53,7 +53,7 @@ describe('ConnectionBar device permission actions', () => {
       onAutoConnectChange,
     });
 
-    expect(host.querySelector('[role="status"]')?.textContent).toBe('Not connected');
+    expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe('Not connected');
     const connect = [...host.querySelectorAll('button')].find(
       (button) => button.textContent === 'Connect',
     );
@@ -109,7 +109,7 @@ describe('ConnectionBar device permission actions', () => {
         error: 'Failed to execute open on SerialPort: Failed to open serial port.',
       },
     });
-    expect(host.querySelector('[role="status"]')?.textContent).toBe('Couldn’t connect');
+    expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe('Couldn’t connect');
     expect(host.querySelector('[role="alert"]')?.textContent).toContain(
       'The port is busy or unavailable',
     );

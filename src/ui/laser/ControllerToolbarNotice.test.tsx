@@ -59,9 +59,9 @@ describe('ControllerToolbarNotice', () => {
       await render({ onShow });
       expect(document.activeElement).toBe(editor);
       await advance(5999);
-      expect(host.querySelector('[role="status"]')).not.toBeNull();
+      expect(host.querySelector('[role="group"]')).not.toBeNull();
       await advance(1);
-      expect(host.querySelector('[role="status"]')).toBeNull();
+      expect(host.querySelector('[role="group"]')).toBeNull();
       expect(document.activeElement).toBe(editor);
       expect(onShow).not.toHaveBeenCalled();
     } finally {
@@ -74,7 +74,7 @@ describe('ControllerToolbarNotice', () => {
     await advance(4000);
     await render({ onShow: vi.fn() });
     await advance(2000);
-    expect(host.querySelector('[role="status"]')).toBeNull();
+    expect(host.querySelector('[role="group"]')).toBeNull();
   });
 
   it('keeps a hovered notice available, then expires after the pointer leaves', async () => {
@@ -87,7 +87,7 @@ describe('ControllerToolbarNotice', () => {
     await advance(5999);
     expect(host.querySelector('button')).toBe(button);
     await advance(1);
-    expect(host.querySelector('[role="status"]')).toBeNull();
+    expect(host.querySelector('[role="group"]')).toBeNull();
   });
 
   it('keeps keyboard focus through pointer departure and opens info only when activated', async () => {
@@ -104,7 +104,7 @@ describe('ControllerToolbarNotice', () => {
     expect(onShow).toHaveBeenCalledOnce();
     await act(async () => button.blur());
     await advance(6000);
-    expect(host.querySelector('[role="status"]')).toBeNull();
+    expect(host.querySelector('[role="group"]')).toBeNull();
   });
 
   it('keeps a hovered notice available after keyboard focus leaves', async () => {
@@ -116,7 +116,7 @@ describe('ControllerToolbarNotice', () => {
     expect(host.querySelector('button')).toBe(button);
     await hover(button, false);
     await advance(6000);
-    expect(host.querySelector('[role="status"]')).toBeNull();
+    expect(host.querySelector('[role="group"]')).toBeNull();
   });
 
   it('cancels the expiry timer when the notice is removed', async () => {

@@ -9,6 +9,7 @@ import { ControllerToolbarNotice } from './ControllerToolbarNotice';
 
 export type ControllerNotice = {
   readonly key: string | null;
+  readonly briefHidden: boolean;
   readonly triggerRef: RefObject<HTMLButtonElement>;
   readonly toastCloseRef: RefObject<HTMLButtonElement>;
   readonly open: boolean;
@@ -30,6 +31,8 @@ export function useControllerNotice(props: Props): ControllerNotice {
         ])
       : null;
   const [notice, setNotice] = useState({ key, dismissed: true, focusOnOpen: false });
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+  if (dismissedKey !== null && dismissedKey !== key) setDismissedKey(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const toastCloseRef = useRef<HTMLButtonElement>(null);
   // A new failure or a completed retry starts a fresh notice; readiness updates
@@ -39,11 +42,13 @@ export function useControllerNotice(props: Props): ControllerNotice {
     setNotice({ key, dismissed: true, focusOnOpen: false });
   }, [key]);
   const dismiss = useCallback(() => {
+    setDismissedKey(key);
     close();
     triggerRef.current?.focus();
-  }, [close]);
+  }, [close, key]);
   return {
     key,
+    briefHidden: dismissedKey === key,
     triggerRef,
     toastCloseRef,
     open: key !== null && !notice.dismissed,
@@ -75,7 +80,12 @@ export function BriefQualificationNotice(
   props: Props & { readonly notice: ControllerNotice },
 ): JSX.Element | null {
   const qualification = props.qualification;
-  if (props.notice.key === null || props.notice.show === undefined || qualification === undefined)
+  if (
+    props.notice.key === null ||
+    props.notice.briefHidden ||
+    props.notice.show === undefined ||
+    qualification === undefined
+  )
     return null;
   const message =
     qualification.kind === 'failed'
@@ -93,7 +103,8 @@ export function BriefQualificationNotice(
       : (props.qualificationReadBlockReason ?? '');
   return (
     <ControllerToolbarNotice
-      key={props.notice.key}
+      key={`${props.notice.key}:${props.reconnectRecommended === true}`}
+      focusFallbackRef={props.notice.triggerRef}
       message={message}
       detail={detail}
       onShow={props.notice.show}
