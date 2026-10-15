@@ -74,6 +74,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(toolbar.getByRole('button', { name: 'Open Design Studio' })).toBeVisible();
     await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
     await expectCompactToolbarCanvas(page, toolbar);
+    await expect(toolbar.locator('.lf-workspace-layout-select > span')).toBeVisible();
     await page.context().setOffline(true);
     await expect(toolbar.getByRole('status')).toHaveText('Offline');
     await page.evaluate(() => window.dispatchEvent(new Event('beforeinstallprompt')));
@@ -115,7 +116,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('compact toolbar accommodates the native Phone & MCP control', async ({ page }) => {
+test('compact toolbar accommodates the native Phone & MCP control', async ({ page }, testInfo) => {
   // Exercise the real native-only toolbar component in the HTTP renderer harness.
   // This replaces only its protocol gate; it does not claim packaged-native coverage.
   await page.route('**/src/ui/remote-access/desktop-only.ts', (route) =>
@@ -130,6 +131,21 @@ test('compact toolbar accommodates the native Phone & MCP control', async ({ pag
   const toolbar = page.getByRole('banner', { name: 'Toolbar' });
   await expect(toolbar.getByRole('button', { name: 'Phone & MCP', exact: true })).toBeVisible();
   await expectCompactToolbarCanvas(page, toolbar);
+  // Reserve for wider platform font metrics as well as the local default font.
+  await toolbar.evaluate((element) => {
+    element.style.letterSpacing = '1px';
+  });
+  await expectCompactToolbarCanvas(page, toolbar);
+  const layout = toolbar.getByRole('button', { name: 'Workspace layout', exact: true });
+  await expect(layout.locator('span')).toBeHidden();
+  await layout.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menu', { name: 'Workspace layout options' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(layout).toBeFocused();
+  await page.screenshot({ path: testInfo.outputPath('native-toolbar-compact.png') });
+  await page.setViewportSize({ width: 1000, height: 720 });
+  await expect(layout.locator('span')).toBeVisible();
 });
 
 async function expectCompactToolbarCanvas(page: Page, toolbar: Locator): Promise<void> {
