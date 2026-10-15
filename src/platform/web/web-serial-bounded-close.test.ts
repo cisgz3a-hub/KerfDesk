@@ -16,11 +16,15 @@ it.each(['reader cancellation', 'writer drain', 'native close'] as const)(
     const blocked = new Promise<void>((resolve) => {
       release = resolve;
     });
+    let releaseForget: () => void = () => undefined;
+    const revoking = new Promise<void>((resolve) => {
+      releaseForget = resolve;
+    });
     const port = Object.assign(new EventTarget(), {
       readable: null as ReadableStream<Uint8Array> | null,
       writable: null as WritableStream<Uint8Array> | null,
       getInfo: () => ({}),
-      forget: vi.fn(async () => undefined),
+      forget: vi.fn(() => revoking),
       open: vi.fn(async () => {
         port.readable = new ReadableStream<Uint8Array>({
           cancel: () => (stage === 'reader cancellation' ? blocked : undefined),
@@ -43,10 +47,11 @@ it.each(['reader cancellation', 'writer drain', 'native close'] as const)(
     const connection = await ref.open({ baudRate: 115200 });
     const closed = vi.fn();
     connection.onClose(closed);
-    const closing = stage === 'writer drain' ? connection.forget!() : connection.close();
+    const closing = connection.forget!();
     const result = expect(closing).rejects.toThrow('shutdown timed out');
     await vi.advanceTimersByTimeAsync(SERIAL_PORT_CLOSE_TIMEOUT_MS);
     await result;
+    expect(port.forget).not.toHaveBeenCalled();
     expect(closed).toHaveBeenCalledTimes(1);
     await expect(connection.write('G1 X2\n')).rejects.toThrow('not writable');
     await expect(ref.open({ baudRate: 115200, hostedStreaming: true })).rejects.toThrow(
@@ -57,7 +62,14 @@ it.each(['reader cancellation', 'writer drain', 'native close'] as const)(
     release();
     await vi.advanceTimersByTimeAsync(0);
     expect(port.close).toHaveBeenCalledTimes(1);
-    await connection.forget?.();
+    // The original Forget survives its caller deadline; no second call drives revocation.
+    expect(port.forget).toHaveBeenCalledTimes(1);
+    // The close finalizer cannot release a port still owned by revocation.
+    await expect(ref.open({ baudRate: 115200 })).rejects.toThrow('still closing');
+    const duplicate = connection.forget!();
+    expect(port.forget).toHaveBeenCalledTimes(1);
+    releaseForget();
+    await duplicate;
     expect(port.forget).toHaveBeenCalledTimes(1);
     expect(port.close).toHaveBeenCalledTimes(1);
     const replacement = await ref.open({ baudRate: 115200 });

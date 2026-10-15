@@ -38,6 +38,7 @@ import {
   closeSerialPort,
   requireSerialPortReleased,
   startSerialPortClose,
+  startSerialPortForget,
 } from './serial-port-close';
 import { runSerialReadLoop, type SerialReadTarget } from './serial-read-loop';
 import { encodeWireBytes, extractSerialLines } from './serial-wire';
@@ -267,29 +268,17 @@ function makeConnection(port: SerialPort): SerialConnection {
 
   void runSerialReadLoop(ctx, lineSubs, handleDroppedConnection, lineErrorSubs);
 
-  const closeConnection = (): Promise<void> => {
+  const startCloseConnection = (): Promise<void> => {
     ctx.closed = true;
     port.removeEventListener('disconnect', handleDroppedConnection);
     closing ??= startSerialPortClose(port, closeStreamsOnce);
-    return boundedSerialClose(closing).finally(fireClose);
+    return closing;
   };
 
   let forgetPromise: Promise<void> | null = null;
   const forgetConnection = (): Promise<void> => {
-    forgetPromise ??= (async () => {
-      await closeConnection();
-      // Revocation follows confirmed cleanup, including a prior normal close.
-      try {
-        await port.forget?.();
-      } catch (err) {
-        console.warn('port.forget() rejected:', err);
-      }
-    })();
-    const pending = forgetPromise;
-    void pending.catch(() => {
-      if (forgetPromise === pending) forgetPromise = null;
-    });
-    return pending;
+    forgetPromise ??= startSerialPortForget(port, startCloseConnection());
+    return boundedSerialClose(forgetPromise).finally(fireClose);
   };
 
   return {
@@ -307,7 +296,7 @@ function makeConnection(port: SerialPort): SerialConnection {
       return () => closeSubs.delete(handler);
     },
     onLineError: (handler) => subscribe(lineErrorSubs, handler),
-    close: closeConnection,
+    close: () => boundedSerialClose(startCloseConnection()).finally(fireClose),
     forget: async () => {
       // A2 audit finding: revoke the in-page permission for this port on
       // explicit Forget Device so a long-running tab doesn't accumulate

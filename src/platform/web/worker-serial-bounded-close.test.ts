@@ -24,11 +24,15 @@ it.each(['transferred writer lock', 'native close'] as const)(
     // A real WHATWG stream lock represents the transfer pipe still draining
     // after its worker has replied and terminated (ADR-599).
     const writer = stage === 'transferred writer lock' ? writable.getWriter() : null;
+    let releaseForget: () => void = () => undefined;
+    const revoking = new Promise<void>((resolve) => {
+      releaseForget = resolve;
+    });
     const port = Object.assign(new EventTarget(), {
       readable: readable as ReadableStream<Uint8Array> | null,
       writable: writable as WritableStream<Uint8Array> | null,
       getInfo: () => ({}),
-      forget: vi.fn(async () => undefined),
+      forget: vi.fn(() => revoking),
       open: vi.fn(async () => {
         port.readable = new ReadableStream<Uint8Array>();
         port.writable = new WritableStream<Uint8Array>();
@@ -94,7 +98,14 @@ it.each(['transferred writer lock', 'native close'] as const)(
     // A long-stalled transfer backs off polling, but actual release must still
     // finish cleanup within its capped polling delay before ownership is reused.
     await vi.advanceTimersByTimeAsync(1_000);
-    await connection.forget?.();
+    // The original Forget must finish without a retry from the retired store owner.
+    expect(port.forget).toHaveBeenCalledTimes(1);
+    // The close finalizer cannot release a port still owned by revocation.
+    await expect(ref.open({ baudRate: 115200 })).rejects.toThrow('still closing');
+    const duplicate = connection.forget!();
+    expect(port.forget).toHaveBeenCalledTimes(1);
+    releaseForget();
+    await duplicate;
     expect(port.forget).toHaveBeenCalledTimes(1);
     expect(port.close).toHaveBeenCalledTimes(1);
     const replacement = await ref.open({ baudRate: 115200 });
