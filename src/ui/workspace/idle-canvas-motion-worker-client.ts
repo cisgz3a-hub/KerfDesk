@@ -29,6 +29,7 @@ type Pending = {
   worker: Worker | null;
   cancelReservation: (() => void) | null;
   releaseReservation: (() => void) | null;
+  reservationVersion: number;
 };
 
 let pending: Pending | null = null;
@@ -65,6 +66,7 @@ export function prepareIdleCanvasMotionPlanOffThread(
       worker: null,
       cancelReservation: null,
       releaseReservation: null,
+      reservationVersion: 0,
     };
     const stale = pending;
     // Install the new owner before releasing the previous reservation. Its
@@ -72,18 +74,34 @@ export function prepareIdleCanvasMotionPlanOffThread(
     pending = active;
     if (stale !== null) retireSuperseded(stale);
     if (pending !== active) return;
-    active.cancelReservation = reserveWorkerMemory((release) => {
-      if (pending !== active) {
+    reserveIdleWorker(active);
+  });
+}
+
+function reserveIdleWorker(active: Pending): void {
+  const version = ++active.reservationVersion;
+  const cancel = reserveWorkerMemory(
+    (release) => {
+      if (pending !== active || active.reservationVersion !== version) {
         release();
         return;
       }
       active.releaseReservation = release;
-      startWorker(active, request);
-    });
-    // A free grant may fail or finish before reserve returns. Its token is
-    // local to this request and must never release a replacement's lane.
-    if (pending !== active) active.cancelReservation();
-  });
+      startWorker(active, active.request);
+    },
+    {
+      onPreempt: () => {
+        if (pending !== active || active.reservationVersion !== version) return;
+        retireWorker(active);
+        reserveIdleWorker(active);
+      },
+    },
+  );
+  // A free grant may finish or be preempted before reserve returns. Never
+  // overwrite a replacement reservation with this old cancellation token.
+  if (pending === active && active.reservationVersion === version)
+    active.cancelReservation = cancel;
+  else cancel();
 }
 
 export function cancelIdleCanvasMotionPlanOffThread(): void {
@@ -107,10 +125,12 @@ function startWorker(active: Pending, request: IdleCanvasMotionPlanRequest): voi
       handleMessage(active, event.data);
     };
     created.onerror = (): void => {
-      failRequest(active, new Error('idle canvas motion worker errored'));
+      if (active.worker === created)
+        failRequest(active, new Error('idle canvas motion worker errored'));
     };
     created.onmessageerror = (): void => {
-      failRequest(active, new Error('idle canvas motion worker response was not cloneable'));
+      if (active.worker === created)
+        failRequest(active, new Error('idle canvas motion worker response was not cloneable'));
     };
     // Dense geometry crosses as transferred buffers rather than a structured
     // clone of the whole object graph (packed-project-transfer.ts).

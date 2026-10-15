@@ -94,6 +94,68 @@ export function expandUnits(ids: readonly string[], scene: Scene | null): string
   return [...new Set([...ids, ...expanded])];
 }
 
+/** Hidden and locked members never become a partial editable group. */
+export function selectableIds(artwork: readonly Artwork[], scene: Scene | null): string[] {
+  const members = [...(scene?.objects ?? []), ...(scene?.images ?? [])];
+  const allowed = new Set(
+    artwork
+      .filter((item) => item.visible !== false && item.editable !== false)
+      .map((item) => item.id),
+  );
+  const blockedUnits = new Set(
+    members.filter((item) => !item.editable || !allowed.has(item.id)).map((item) => item.unitId),
+  );
+  for (const item of members) if (blockedUnits.has(item.unitId)) allowed.delete(item.id);
+  return artwork.filter((item) => allowed.has(item.id)).map((item) => item.id);
+}
+
+export function selectUnits(
+  ids: readonly string[],
+  artwork: readonly Artwork[],
+  scene: Scene | null,
+): string[] {
+  const allowed = new Set(selectableIds(artwork, scene));
+  return expandUnits(
+    ids.filter((id) => allowed.has(id)),
+    scene,
+  ).filter((id) => allowed.has(id));
+}
+
+/** Left-to-right encloses whole groups; right-to-left selects intersecting groups. */
+export function marqueeSelection(
+  start: Point,
+  end: Point,
+  artwork: readonly Artwork[],
+  scene: Scene | null,
+): string[] {
+  const allowed = new Set(selectableIds(artwork, scene));
+  const members = [...(scene?.objects ?? []), ...(scene?.images ?? [])];
+  const units = new Map<string, Artwork[]>();
+  for (const item of artwork) {
+    if (!allowed.has(item.id)) continue;
+    const key = members.find((member) => member.id === item.id)?.unitId ?? item.id;
+    units.set(key, [...(units.get(key) ?? []), item]);
+  }
+  const area = {
+    minX: Math.min(start.x, end.x),
+    minY: Math.min(start.y, end.y),
+    maxX: Math.max(start.x, end.x),
+    maxY: Math.max(start.y, end.y),
+  };
+  return [...units.values()].flatMap((items) => {
+    const box = unionBox(items.flatMap((item) => artworkBox(item) ?? []));
+    if (box === null) return [];
+    const contains =
+      area.minX <= box.minX &&
+      area.minY <= box.minY &&
+      area.maxX >= box.maxX &&
+      area.maxY >= box.maxY;
+    return (end.x >= start.x ? contains : boxesIntersect(area, box))
+      ? items.map((item) => item.id)
+      : [];
+  });
+}
+
 /** Topmost hit wins. Filled closed shapes hit inside; strokes hit within `tolerance` mm. */
 export function hitTest(
   decoded: readonly DecodedObject[],

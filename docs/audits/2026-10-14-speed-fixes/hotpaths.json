@@ -1,0 +1,815 @@
+{
+  "format": "kerfdesk.browser-hotpath-component-audit",
+  "schemaVersion": 1,
+  "fixtureVersion": 1,
+  "createdAt": "2026-10-14T15:31:39.631Z",
+  "gitHead": "03f1da57737ebc58d7cf4e240be6c2225270c690",
+  "workingTreeDirty": true,
+  "initialGitStatus": "M src/core/nesting/outline-compact-nest.ts\n M src/ui/app/App.tsx\n M src/ui/app/lazy-overlay-load-failure.test.tsx\n M src/ui/app/project-save-preparation-client.ts\n M src/ui/design-studio/design-project-photos.ts\n M src/ui/design-studio/design-project-vectors.ts\n M src/ui/laser/output-preparation-protocol.ts\n M src/ui/laser/output-preparation-worker-client.ts\n M src/ui/laser/output-preparation-worker.ts\n M src/ui/laser/use-job-estimate-head-position.test.tsx\n M src/ui/laser/use-job-estimate-initial.test.tsx\n M src/ui/laser/use-job-estimate.test.tsx\n M src/ui/laser/use-job-estimate.ts\n M src/ui/library/DesignLibraryDialog.tsx\n M src/ui/worker-memory-lane.test.ts\n M src/ui/worker-memory-lane.ts\n M src/ui/workspace/artwork-sprite-cache.ts\n M src/ui/workspace/design-scene-worker-client.ts\n M src/ui/workspace/design-scene-worker-protocol.ts\n M src/ui/workspace/design-scene-worker.ts\n M src/ui/workspace/draw-preview.ts\n M src/ui/workspace/draw-scene.ts\n M src/ui/workspace/idle-canvas-motion-worker-client.ts\n M src/ui/workspace/idle-canvas-motion-worker-memory.test.ts\n M src/ui/workspace/large-job-preparation.ts\n M src/ui/workspace/preparation-result-cache.ts\n M src/ui/workspace/preparation-worker-client.ts\n M src/ui/workspace/preparation-worker-estimate.test.ts\n M src/ui/workspace/preparation-worker-projection.test.ts\n M src/ui/workspace/preparation-worker-protocol.ts\n M src/ui/workspace/preparation-worker.ts\n M src/ui/workspace/trace-part-worker-client.ts\n M src/ui/workspace/use-preview-toolpath.test.tsx\n M src/ui/workspace/use-preview-toolpath.ts\n?? docs/audits/2026-10-14-speed-audit.md\n?? docs/audits/2026-10-14-speed-audit/\n?? docs/audits/2026-10-14-speed-fixes.md\n?? docs/decisions/ADR-597-performance-worker-and-cache-budgets.md\n?? scripts/performance-audit/\n?? src/core/nesting/nest-collision-validation.test.ts\n?? src/core/nesting/nest-collision-validation.ts\n?? src/core/nesting/nest-validation-brute-force.test-support.ts\n?? src/ui/library/DesignLibraryHost.test.tsx\n?? src/ui/library/DesignLibraryHost.tsx\n?? src/ui/worker-project-transfer.test.ts\n?? src/ui/workspace/artwork-sprite-cache-budget.test.ts\n?? src/ui/workspace/preparation-consumers.ts\n?? src/ui/workspace/preparation-request.ts\n?? src/ui/workspace/preparation-worker-ownership.test.ts\n?? src/ui/workspace/preparation-worker-response.ts",
+  "browser": "155.0.8059.40",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+  "node": "v24.15.0",
+  "platform": "win32",
+  "architecture": "x64",
+  "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+  "logicalCpuCount": 20,
+  "systemMemoryBytes": 33965383680,
+  "freeSystemMemoryBytesAtStart": 16272125952,
+  "osRelease": "10.0.26200",
+  "warmups": 1,
+  "runs": 3,
+  "moduleHashes": {
+    "/probe.mjs": "09ba47821660f6984d7c01489e99ddefd0d654075ca1ad856ad35743d58d5d4b",
+    "/echo-worker.mjs": "ece05ff8e9216e39721580c61c0593edb6ac52f0805b562fde6908e3a551d363"
+  },
+  "requestedModules": ["/", "/probe.mjs", "/echo-worker.mjs"],
+  "scope": "Isolated esbuild production components in headless Chrome with native Canvas2D and Worker. Not a full-app interaction, displayed FPS, hardware, output compilation, or peak-memory measurement. Fixture creation, validation, module loading, and worker startup are outside timed sections. Cases run serially in fresh pages. Sprite paint counts are the main cache evidence; GPU completion is not timed.",
+  "timingNotes": {
+    "sprites": "One warm-up three-pass sequence, then sampled sequences; reset before every sequence. Distinct tiny 32x32-pixel sprites fit far below the pixel budget. Native canvas painting uses 4,000 line segments per key.",
+    "nodeEdits": "One immutable canonical straight-segment curve, edited by the production curve-node function. K anchors are spaced along its N segments. Each sample starts from the same original geometry. Includes production compatibility materialisation, excludes correctness checks.",
+    "transfers": "One project with a polyline and its canonical straight-line curve. Worker echoes the complete payload; packed buffers transfer back. Raw roundtrip includes two structured clones; packed roundtrip excludes packing and includes transfer both ways. Cold packing is recorded from the first warm-up, subsequent samples reuse the production immutable-path cache. No receiver unpacking is included."
+  },
+  "sprites": [
+    {
+      "keys": 8,
+      "passesPerSample": 3,
+      "spritePixelsPerKey": 1024,
+      "paintCallsPerPass": [8, 0, 0],
+      "passMs": [
+        {
+          "median": 3.199999999254942,
+          "min": 3,
+          "max": 3.300000000745058
+        },
+        {
+          "median": 0,
+          "min": 0,
+          "max": 0.10000000149011612
+        },
+        {
+          "median": 0,
+          "min": 0,
+          "max": 0.10000000149011612
+        }
+      ],
+      "samples": [
+        {
+          "passes": [
+            {
+              "elapsedMs": 3.300000000745058,
+              "paintCalls": 8
+            },
+            {
+              "elapsedMs": 0.10000000149011612,
+              "paintCalls": 0
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            }
+          ],
+          "perKeyPaintCalls": [1, 1, 1, 1, 1, 1, 1, 1],
+          "nonBlank": true
+        },
+        {
+          "passes": [
+            {
+              "elapsedMs": 3,
+              "paintCalls": 8
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            },
+            {
+              "elapsedMs": 0.10000000149011612,
+              "paintCalls": 0
+            }
+          ],
+          "perKeyPaintCalls": [1, 1, 1, 1, 1, 1, 1, 1],
+          "nonBlank": true
+        },
+        {
+          "passes": [
+            {
+              "elapsedMs": 3.199999999254942,
+              "paintCalls": 8
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            }
+          ],
+          "perKeyPaintCalls": [1, 1, 1, 1, 1, 1, 1, 1],
+          "nonBlank": true
+        }
+      ]
+    },
+    {
+      "keys": 9,
+      "passesPerSample": 3,
+      "spritePixelsPerKey": 1024,
+      "paintCallsPerPass": [9, 0, 0],
+      "passMs": [
+        {
+          "median": 3.100000001490116,
+          "min": 2.100000001490116,
+          "max": 3.899999998509884
+        },
+        {
+          "median": 0,
+          "min": 0,
+          "max": 0.09999999776482582
+        },
+        {
+          "median": 0.09999999776482582,
+          "min": 0,
+          "max": 0.10000000149011612
+        }
+      ],
+      "samples": [
+        {
+          "passes": [
+            {
+              "elapsedMs": 3.100000001490116,
+              "paintCalls": 9
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            },
+            {
+              "elapsedMs": 0.09999999776482582,
+              "paintCalls": 0
+            }
+          ],
+          "perKeyPaintCalls": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "nonBlank": true
+        },
+        {
+          "passes": [
+            {
+              "elapsedMs": 3.899999998509884,
+              "paintCalls": 9
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            },
+            {
+              "elapsedMs": 0.10000000149011612,
+              "paintCalls": 0
+            }
+          ],
+          "perKeyPaintCalls": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "nonBlank": true
+        },
+        {
+          "passes": [
+            {
+              "elapsedMs": 2.100000001490116,
+              "paintCalls": 9
+            },
+            {
+              "elapsedMs": 0.09999999776482582,
+              "paintCalls": 0
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            }
+          ],
+          "perKeyPaintCalls": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "nonBlank": true
+        }
+      ]
+    },
+    {
+      "keys": 16,
+      "passesPerSample": 3,
+      "spritePixelsPerKey": 1024,
+      "paintCallsPerPass": [16, 0, 0],
+      "passMs": [
+        {
+          "median": 5,
+          "min": 4.900000002235174,
+          "max": 6.600000001490116
+        },
+        {
+          "median": 0.10000000149011612,
+          "min": 0,
+          "max": 0.19999999925494194
+        },
+        {
+          "median": 0.10000000149011612,
+          "min": 0,
+          "max": 0.10000000149011612
+        }
+      ],
+      "samples": [
+        {
+          "passes": [
+            {
+              "elapsedMs": 5,
+              "paintCalls": 16
+            },
+            {
+              "elapsedMs": 0.10000000149011612,
+              "paintCalls": 0
+            },
+            {
+              "elapsedMs": 0.10000000149011612,
+              "paintCalls": 0
+            }
+          ],
+          "perKeyPaintCalls": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "nonBlank": true
+        },
+        {
+          "passes": [
+            {
+              "elapsedMs": 6.600000001490116,
+              "paintCalls": 16
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            },
+            {
+              "elapsedMs": 0.10000000149011612,
+              "paintCalls": 0
+            }
+          ],
+          "perKeyPaintCalls": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "nonBlank": true
+        },
+        {
+          "passes": [
+            {
+              "elapsedMs": 4.900000002235174,
+              "paintCalls": 16
+            },
+            {
+              "elapsedMs": 0.19999999925494194,
+              "paintCalls": 0
+            },
+            {
+              "elapsedMs": 0,
+              "paintCalls": 0
+            }
+          ],
+          "perKeyPaintCalls": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "nonBlank": true
+        }
+      ]
+    }
+  ],
+  "nodeEdits": [
+    {
+      "segments": 10000,
+      "selectedAnchors": 1,
+      "editMs": {
+        "median": 0.6000000014901161,
+        "min": 0.5999999977648258,
+        "max": 1.5
+      },
+      "samples": [
+        {
+          "elapsedMs": 1.5,
+          "changedAnchors": 1,
+          "segments": 10000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 0.5999999977648258,
+          "changedAnchors": 1,
+          "segments": 10000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 0.6000000014901161,
+          "changedAnchors": 1,
+          "segments": 10000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 10000,
+      "selectedAnchors": 10,
+      "editMs": {
+        "median": 1.2000000029802322,
+        "min": 1.1000000014901161,
+        "max": 1.300000000745058
+      },
+      "samples": [
+        {
+          "elapsedMs": 1.300000000745058,
+          "changedAnchors": 10,
+          "segments": 10000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1.2000000029802322,
+          "changedAnchors": 10,
+          "segments": 10000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1.1000000014901161,
+          "changedAnchors": 10,
+          "segments": 10000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 10000,
+      "selectedAnchors": 100,
+      "editMs": {
+        "median": 1.2000000029802322,
+        "min": 1,
+        "max": 1.3999999985098839
+      },
+      "samples": [
+        {
+          "elapsedMs": 1.3999999985098839,
+          "changedAnchors": 100,
+          "segments": 10000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1.2000000029802322,
+          "changedAnchors": 100,
+          "segments": 10000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1,
+          "changedAnchors": 100,
+          "segments": 10000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 50000,
+      "selectedAnchors": 1,
+      "editMs": {
+        "median": 1.199999999254942,
+        "min": 0.8999999985098839,
+        "max": 1.3999999985098839
+      },
+      "samples": [
+        {
+          "elapsedMs": 0.8999999985098839,
+          "changedAnchors": 1,
+          "segments": 50000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1.199999999254942,
+          "changedAnchors": 1,
+          "segments": 50000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1.3999999985098839,
+          "changedAnchors": 1,
+          "segments": 50000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 50000,
+      "selectedAnchors": 10,
+      "editMs": {
+        "median": 2.2999999970197678,
+        "min": 1.699999999254942,
+        "max": 3.300000000745058
+      },
+      "samples": [
+        {
+          "elapsedMs": 2.2999999970197678,
+          "changedAnchors": 10,
+          "segments": 50000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 3.300000000745058,
+          "changedAnchors": 10,
+          "segments": 50000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1.699999999254942,
+          "changedAnchors": 10,
+          "segments": 50000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 50000,
+      "selectedAnchors": 100,
+      "editMs": {
+        "median": 7.899999998509884,
+        "min": 4.300000000745058,
+        "max": 8.400000002235174
+      },
+      "samples": [
+        {
+          "elapsedMs": 8.400000002235174,
+          "changedAnchors": 100,
+          "segments": 50000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 7.899999998509884,
+          "changedAnchors": 100,
+          "segments": 50000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 4.300000000745058,
+          "changedAnchors": 100,
+          "segments": 50000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 100000,
+      "selectedAnchors": 1,
+      "editMs": {
+        "median": 2.900000002235174,
+        "min": 1.800000000745058,
+        "max": 3.100000001490116
+      },
+      "samples": [
+        {
+          "elapsedMs": 3.100000001490116,
+          "changedAnchors": 1,
+          "segments": 100000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 1.800000000745058,
+          "changedAnchors": 1,
+          "segments": 100000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 2.900000002235174,
+          "changedAnchors": 1,
+          "segments": 100000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 100000,
+      "selectedAnchors": 10,
+      "editMs": {
+        "median": 3.2000000029802322,
+        "min": 2.7999999970197678,
+        "max": 3.5
+      },
+      "samples": [
+        {
+          "elapsedMs": 2.7999999970197678,
+          "changedAnchors": 10,
+          "segments": 100000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 3.5,
+          "changedAnchors": 10,
+          "segments": 100000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 3.2000000029802322,
+          "changedAnchors": 10,
+          "segments": 100000,
+          "sourceUnchanged": true
+        }
+      ]
+    },
+    {
+      "segments": 100000,
+      "selectedAnchors": 100,
+      "editMs": {
+        "median": 13.399999998509884,
+        "min": 12.699999999254942,
+        "max": 14.800000000745058
+      },
+      "samples": [
+        {
+          "elapsedMs": 13.399999998509884,
+          "changedAnchors": 100,
+          "segments": 100000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 14.800000000745058,
+          "changedAnchors": 100,
+          "segments": 100000,
+          "sourceUnchanged": true
+        },
+        {
+          "elapsedMs": 12.699999999254942,
+          "changedAnchors": 100,
+          "segments": 100000,
+          "sourceUnchanged": true
+        }
+      ]
+    }
+  ],
+  "transfers": [
+    {
+      "points": 50000,
+      "canonicalLineSegments": 49999,
+      "coldPackedWarmup": {
+        "packingMs": 4.899999998509884,
+        "synchronousPostMs": 0.20000000298023224,
+        "roundtripMs": 0.6000000014901161,
+        "packingAndRoundtripMs": 5.5,
+        "transferredBytes": 800009,
+        "pointsVerified": 50000,
+        "senderBuffersDetached": true
+      },
+      "raw": {
+        "synchronousPostMs": {
+          "median": 19.399999998509884,
+          "min": 18.800000000745058,
+          "max": 23.5
+        },
+        "roundtripMs": {
+          "median": 109.39999999850988,
+          "min": 92.30000000074506,
+          "max": 123.69999999925494
+        },
+        "samples": [
+          {
+            "synchronousPostMs": 19.399999998509884,
+            "roundtripMs": 109.39999999850988,
+            "pointsVerified": 50000
+          },
+          {
+            "synchronousPostMs": 23.5,
+            "roundtripMs": 123.69999999925494,
+            "pointsVerified": 50000
+          },
+          {
+            "synchronousPostMs": 18.800000000745058,
+            "roundtripMs": 92.30000000074506,
+            "pointsVerified": 50000
+          }
+        ]
+      },
+      "packed": {
+        "packingMs": {
+          "median": 0.29999999701976776,
+          "min": 0.29999999701976776,
+          "max": 0.5
+        },
+        "synchronousPostMs": {
+          "median": 0.10000000149011612,
+          "min": 0,
+          "max": 0.10000000149011612
+        },
+        "roundtripMs": {
+          "median": 0.30000000074505806,
+          "min": 0.19999999925494194,
+          "max": 4.700000002980232
+        },
+        "packingAndRoundtripMs": {
+          "median": 0.6999999992549419,
+          "min": 0.5999999977648258,
+          "max": 5
+        },
+        "samples": [
+          {
+            "packingMs": 0.29999999701976776,
+            "synchronousPostMs": 0.10000000149011612,
+            "roundtripMs": 0.30000000074505806,
+            "packingAndRoundtripMs": 0.5999999977648258,
+            "transferredBytes": 800009,
+            "pointsVerified": 50000,
+            "senderBuffersDetached": true
+          },
+          {
+            "packingMs": 0.5,
+            "synchronousPostMs": 0,
+            "roundtripMs": 0.19999999925494194,
+            "packingAndRoundtripMs": 0.6999999992549419,
+            "transferredBytes": 800009,
+            "pointsVerified": 50000,
+            "senderBuffersDetached": true
+          },
+          {
+            "packingMs": 0.29999999701976776,
+            "synchronousPostMs": 0.10000000149011612,
+            "roundtripMs": 4.700000002980232,
+            "packingAndRoundtripMs": 5,
+            "transferredBytes": 800009,
+            "pointsVerified": 50000,
+            "senderBuffersDetached": true
+          }
+        ]
+      }
+    },
+    {
+      "points": 200000,
+      "canonicalLineSegments": 199999,
+      "coldPackedWarmup": {
+        "packingMs": 6.799999997019768,
+        "synchronousPostMs": 0.10000000149011612,
+        "roundtripMs": 0.3999999985098839,
+        "packingAndRoundtripMs": 7.199999995529652,
+        "transferredBytes": 3200009,
+        "pointsVerified": 200000,
+        "senderBuffersDetached": true
+      },
+      "raw": {
+        "synchronousPostMs": {
+          "median": 83.10000000149012,
+          "min": 79.39999999850988,
+          "max": 88.30000000074506
+        },
+        "roundtripMs": {
+          "median": 439.69999999925494,
+          "min": 417.30000000074506,
+          "max": 600.7000000029802
+        },
+        "samples": [
+          {
+            "synchronousPostMs": 83.10000000149012,
+            "roundtripMs": 439.69999999925494,
+            "pointsVerified": 200000
+          },
+          {
+            "synchronousPostMs": 79.39999999850988,
+            "roundtripMs": 417.30000000074506,
+            "pointsVerified": 200000
+          },
+          {
+            "synchronousPostMs": 88.30000000074506,
+            "roundtripMs": 600.7000000029802,
+            "pointsVerified": 200000
+          }
+        ]
+      },
+      "packed": {
+        "packingMs": {
+          "median": 0.8000000007450581,
+          "min": 0.8000000007450581,
+          "max": 1.5
+        },
+        "synchronousPostMs": {
+          "median": 0.09999999776482582,
+          "min": 0,
+          "max": 7.300000000745058
+        },
+        "roundtripMs": {
+          "median": 0.3999999985098839,
+          "min": 0.19999999925494194,
+          "max": 8.599999997764826
+        },
+        "packingAndRoundtripMs": {
+          "median": 1.199999999254942,
+          "min": 1,
+          "max": 10.099999997764826
+        },
+        "samples": [
+          {
+            "packingMs": 0.8000000007450581,
+            "synchronousPostMs": 0,
+            "roundtripMs": 0.3999999985098839,
+            "packingAndRoundtripMs": 1.199999999254942,
+            "transferredBytes": 3200009,
+            "pointsVerified": 200000,
+            "senderBuffersDetached": true
+          },
+          {
+            "packingMs": 0.8000000007450581,
+            "synchronousPostMs": 0.09999999776482582,
+            "roundtripMs": 0.19999999925494194,
+            "packingAndRoundtripMs": 1,
+            "transferredBytes": 3200009,
+            "pointsVerified": 200000,
+            "senderBuffersDetached": true
+          },
+          {
+            "packingMs": 1.5,
+            "synchronousPostMs": 7.300000000745058,
+            "roundtripMs": 8.599999997764826,
+            "packingAndRoundtripMs": 10.099999997764826,
+            "transferredBytes": 3200009,
+            "pointsVerified": 200000,
+            "senderBuffersDetached": true
+          }
+        ]
+      }
+    },
+    {
+      "points": 1000000,
+      "canonicalLineSegments": 999999,
+      "coldPackedWarmup": {
+        "packingMs": 110.90000000223517,
+        "synchronousPostMs": 0.10000000149011612,
+        "roundtripMs": 16.300000000745058,
+        "packingAndRoundtripMs": 127.20000000298023,
+        "transferredBytes": 16000009,
+        "pointsVerified": 1000000,
+        "senderBuffersDetached": true
+      },
+      "raw": {
+        "synchronousPostMs": {
+          "median": 1502.300000000745,
+          "min": 1273.699999999255,
+          "max": 1522.5999999977648
+        },
+        "roundtripMs": {
+          "median": 7063,
+          "min": 6923.5,
+          "max": 7730.300000000745
+        },
+        "samples": [
+          {
+            "synchronousPostMs": 1273.699999999255,
+            "roundtripMs": 6923.5,
+            "pointsVerified": 1000000
+          },
+          {
+            "synchronousPostMs": 1522.5999999977648,
+            "roundtripMs": 7063,
+            "pointsVerified": 1000000
+          },
+          {
+            "synchronousPostMs": 1502.300000000745,
+            "roundtripMs": 7730.300000000745,
+            "pointsVerified": 1000000
+          }
+        ]
+      },
+      "packed": {
+        "packingMs": {
+          "median": 7.099999997764826,
+          "min": 6,
+          "max": 8.599999997764826
+        },
+        "synchronousPostMs": {
+          "median": 0.3999999985098839,
+          "min": 0.10000000149011612,
+          "max": 11.699999999254942
+        },
+        "roundtripMs": {
+          "median": 12.400000002235174,
+          "min": 0.4000000022351742,
+          "max": 55
+        },
+        "packingAndRoundtripMs": {
+          "median": 21,
+          "min": 7.5,
+          "max": 61
+        },
+        "samples": [
+          {
+            "packingMs": 8.599999997764826,
+            "synchronousPostMs": 11.699999999254942,
+            "roundtripMs": 12.400000002235174,
+            "packingAndRoundtripMs": 21,
+            "transferredBytes": 16000009,
+            "pointsVerified": 1000000,
+            "senderBuffersDetached": true
+          },
+          {
+            "packingMs": 7.099999997764826,
+            "synchronousPostMs": 0.10000000149011612,
+            "roundtripMs": 0.4000000022351742,
+            "packingAndRoundtripMs": 7.5,
+            "transferredBytes": 16000009,
+            "pointsVerified": 1000000,
+            "senderBuffersDetached": true
+          },
+          {
+            "packingMs": 6,
+            "synchronousPostMs": 0.3999999985098839,
+            "roundtripMs": 55,
+            "packingAndRoundtripMs": 61,
+            "transferredBytes": 16000009,
+            "pointsVerified": 1000000,
+            "senderBuffersDetached": true
+          }
+        ]
+      }
+    }
+  ]
+}

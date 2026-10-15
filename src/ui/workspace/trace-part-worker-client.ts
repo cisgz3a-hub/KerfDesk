@@ -44,36 +44,40 @@ export function prepareTracePartPathOffThread(
       send(current, active, path, mode);
       return;
     }
-    const reservation = reserveWorkerMemory((release) => {
-      current.release = release;
-      if (session !== current) {
-        release();
-        return;
-      }
-      try {
-        const worker = new Worker(new URL('./trace-part-worker.ts', import.meta.url), {
-          type: 'module',
-        });
-        current.worker = worker;
-        worker.onmessage = (event: MessageEvent<TracePartWorkerResponse>): void => {
-          const waiting = current.pending;
-          if (session !== current || waiting === null || event.data.id !== waiting.id) return;
-          const response = event.data;
-          if (response.kind === 'error') retire(current, new Error(response.message));
-          else {
-            current.pending = null;
-            if (waiting.timer !== null) clearTimeout(waiting.timer);
-            waiting.resolve(response);
-          }
-        };
-        worker.onerror = (): void => retire(current, new Error('Trace preparation worker failed.'));
-        worker.onmessageerror = (): void =>
-          retire(current, new Error('Trace preparation response could not be read.'));
-        send(current, active, path, mode);
-      } catch (error) {
-        retire(current, error instanceof Error ? error : new Error(String(error)));
-      }
-    });
+    const reservation = reserveWorkerMemory(
+      (release) => {
+        current.release = release;
+        if (session !== current) {
+          release();
+          return;
+        }
+        try {
+          const worker = new Worker(new URL('./trace-part-worker.ts', import.meta.url), {
+            type: 'module',
+          });
+          current.worker = worker;
+          worker.onmessage = (event: MessageEvent<TracePartWorkerResponse>): void => {
+            const waiting = current.pending;
+            if (session !== current || waiting === null || event.data.id !== waiting.id) return;
+            const response = event.data;
+            if (response.kind === 'error') retire(current, new Error(response.message));
+            else {
+              current.pending = null;
+              if (waiting.timer !== null) clearTimeout(waiting.timer);
+              waiting.resolve(response);
+            }
+          };
+          worker.onerror = (): void =>
+            retire(current, new Error('Trace preparation worker failed.'));
+          worker.onmessageerror = (): void =>
+            retire(current, new Error('Trace preparation response could not be read.'));
+          send(current, active, path, mode);
+        } catch (error) {
+          retire(current, error instanceof Error ? error : new Error(String(error)));
+        }
+      },
+      { priority: 'interactive' },
+    );
     if (current.release === null) current.release = reservation;
     if (session !== current) reservation();
   });

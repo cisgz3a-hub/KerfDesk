@@ -27,9 +27,11 @@
 // remain distinct; costly callers never retry compilation on the main thread.
 
 import type { OutputScope, Project } from '../../core/scene';
+import { packProjectMessage } from '../packed-project-transfer';
 import type { StartJobPreparation } from './start-job-readiness';
 import type {
   OutputPreparationEnvelope,
+  OutputPreparationWireEnvelope,
   OutputPreparationRequest,
   OutputPreparationResponse,
   OutputPreparationResult,
@@ -230,7 +232,13 @@ function dispatchRequest(worker: Worker, requestId: number): void {
   if (pending === undefined) return;
   activeRequestId = requestId;
   try {
-    worker.postMessage(pending.envelope);
+    // Pack at dispatch, so a queued/aborted request holds no extra geometry buffers.
+    const { message, transfer } = packProjectMessage(pending.envelope.request.project);
+    const envelope: OutputPreparationWireEnvelope = {
+      ...pending.envelope,
+      request: { ...pending.envelope.request, project: message },
+    };
+    worker.postMessage(envelope, transfer);
   } catch (error) {
     if (isNamedOutputPreparationError(error, 'DataCloneError')) {
       // An uncloneable request never entered the worker; only its owner

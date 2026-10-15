@@ -284,6 +284,8 @@ describe('usePreviewToolpath', () => {
     expect(workerMocks.prepareLargeJobOffThread).toHaveBeenCalledWith(
       project,
       expect.objectContaining({ initialPosition: { x: 300, y: 0, z: 0 } }),
+      undefined,
+      expect.any(AbortSignal),
     );
 
     expect(
@@ -322,6 +324,33 @@ describe('usePreviewToolpath', () => {
     expect(workerMocks.prepareLargeJobOffThread).toHaveBeenCalledOnce();
     const [, options] = workerMocks.prepareLargeJobOffThread.mock.calls[0] ?? [];
     expect(options).not.toHaveProperty('initialPosition');
+  });
+
+  it('releases its worker ownership on exit and ignores a late completed route', async () => {
+    let scheduled: (() => void) | null = null;
+    const scheduleBuild: PreviewBuildScheduler = (work) => {
+      scheduled = work;
+      return () => undefined;
+    };
+    previewMocks.buildPreviewToolpath.mockReturnValue({
+      totalLength: 0,
+      steps: [],
+      previewIssue: { kind: 'too-complex' as const },
+    });
+    let resolveWorker: (value: { toolpath: unknown; estimate: unknown }) => void = () => undefined;
+    workerMocks.prepareLargeJobOffThread.mockReturnValue(
+      new Promise((resolve) => {
+        resolveWorker = resolve;
+      }),
+    );
+    await renderHarness(true, scheduleBuild);
+    await act(async () => scheduled?.());
+    const signal = workerMocks.prepareLargeJobOffThread.mock.calls[0]?.[3] as AbortSignal;
+    expect(signal.aborted).toBe(false);
+    await renderHarness(false, scheduleBuild);
+    expect(signal.aborted).toBe(true);
+    await act(async () => resolveWorker({ toolpath: builtToolpath, estimate: { kind: 'empty' } }));
+    expect(probe.current).toBeNull();
   });
 
   it('keeps the paused banner when workers are unavailable', async () => {

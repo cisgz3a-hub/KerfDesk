@@ -1,6 +1,8 @@
 import { deepStrictEqual } from 'node:assert/strict';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
+import { deserializeProject } from '../io/project/deserialize-project';
+import { serializeProject } from '../io/project/serialize-project';
 import {
   createLayer,
   createProject,
@@ -118,6 +120,31 @@ const dense = vectorObject('dense', [
 ]);
 
 describe('packed project transfer', () => {
+  it.each([false, true])(
+    'preserves wrapper-shaped document extensions with packing %s',
+    (packed) => {
+      const source = {
+        ...projectWith(packed ? [dense] : []),
+        kind: 'packed-project',
+        project: createProject(),
+        geometry: [{ index: 0, paths: [] }],
+      };
+      const loaded = deserializeProject(serializeProject(source));
+      if (loaded.kind !== 'ok') throw new Error('Expected a valid extended project');
+      const before = structuredClone(loaded.project);
+      const transfer = packProjectMessage(loaded.project);
+      expect(isPackedProjectMessage(loaded.project)).toBe(false);
+      expect(isPackedProjectMessage(transfer.message)).toBe(packed);
+      const received = unpackProjectMessage(
+        structuredClone(transfer.message, { transfer: transfer.transfer }),
+      );
+      deepStrictEqual(received, before);
+      const reopened = deserializeProject(serializeProject(received));
+      if (reopened.kind !== 'ok') throw new Error('Expected the received project to reopen');
+      deepStrictEqual(reopened.project, before);
+    },
+  );
+
   it('round-trips individual path geometry through fresh transferable buffers without detaching the source', () => {
     fc.assert(
       fc.property(coloredPath, (path) => {

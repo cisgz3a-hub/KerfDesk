@@ -1,0 +1,57 @@
+{
+  "format": "kerfdesk.nesting-validation-audit",
+  "schemaVersion": 1,
+  "fixtureVersion": 1,
+  "createdAt": "2026-10-14T15:31:57.950Z",
+  "gitHead": "03f1da57737ebc58d7cf4e240be6c2225270c690",
+  "workingTreeDirty": true,
+  "engineSha256": "3c7c246b3c223790a08e6ddcc73434cecffc7f07cdb3655fc252dfc2406ac6a8",
+  "node": "v24.15.0",
+  "platform": "win32",
+  "architecture": "x64",
+  "osRelease": "10.0.26200",
+  "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+  "logicalCpuCount": 20,
+  "systemMemoryBytes": 33965383680,
+  "warmups": 1,
+  "runs": 3,
+  "scope": "Pure production rectangle validator only. Excludes planning, workers, browser input latency, sheet materialisation and hardware. RSS observations are not peak memory.",
+  "results": [
+    {
+      "count": 1000,
+      "fixtureSha256": "e938fc69fb4dd052a28022fe5fab60139298fe5f730d01b51a68059b9e3cd989",
+      "potentialRectanglePairs": 499500,
+      "samplesMs": [5.919099999999958, 3.078800000000001, 2.1902000000000044],
+      "medianMs": 3.078800000000001,
+      "minMs": 2.1902000000000044,
+      "maxMs": 5.919099999999958,
+      "rssBefore": 67854336,
+      "rssAfter": 69201920,
+      "allValid": true
+    },
+    {
+      "count": 5000,
+      "fixtureSha256": "ae61a1b69fd022c065de53c5c7c1d3f07fc5d5ab63447b8d581fcbb8ace3771d",
+      "potentialRectanglePairs": 12497500,
+      "samplesMs": [12.688999999999965, 10.969899999999996, 6.044199999999989],
+      "medianMs": 10.969899999999996,
+      "minMs": 6.044199999999989,
+      "maxMs": 12.688999999999965,
+      "rssBefore": 75833344,
+      "rssAfter": 87441408,
+      "allValid": true
+    },
+    {
+      "count": 10000,
+      "fixtureSha256": "370dd58cb617af63ad09782bce8e2dcbbd22181794c9643af1d8555f2f9f80c0",
+      "potentialRectanglePairs": 49995000,
+      "samplesMs": [20.009600000000034, 19.567099999999982, 21.030699999999968],
+      "medianMs": 20.009600000000034,
+      "minMs": 19.567099999999982,
+      "maxMs": 21.030699999999968,
+      "rssBefore": 94412800,
+      "rssAfter": 108793856,
+      "allValid": true
+    }
+  ]
+}

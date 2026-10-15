@@ -10,6 +10,7 @@ import {
 import type {
   PreparationWorkerRequest,
   PreparationWorkerResponse,
+  PreparationPreviewUpgrade,
 } from './preparation-worker-protocol';
 import { isCanvasCompilationBridgeConnection } from './canvas-compilation-worker-protocol';
 
@@ -17,13 +18,18 @@ class FakeWorker {
   static instances: FakeWorker[] = [];
   onmessage: ((event: MessageEvent<PreparationWorkerResponse>) => void) | null = null;
   posted: PreparationWorkerRequest[] = [];
+  upgrades: PreparationPreviewUpgrade[] = [];
   terminated = false;
   constructor() {
     FakeWorker.instances.push(this);
   }
   postMessage(data: unknown): void {
-    if (!isCanvasCompilationBridgeConnection(data))
-      this.posted.push(data as PreparationWorkerRequest);
+    if (isCanvasCompilationBridgeConnection(data)) return;
+    if (typeof data === 'object' && data !== null && 'kind' in data) {
+      this.upgrades.push(data as PreparationPreviewUpgrade);
+      return;
+    }
+    this.posted.push(data as PreparationWorkerRequest);
   }
   terminate(): void {
     this.terminated = true;
@@ -105,18 +111,23 @@ describe('estimate-only preparation client', () => {
     expect(prepareJobEstimateOffThread(project)).toBe(full);
   });
 
-  it('finishes an active estimate before a newly requested full Preview without downgrading its cache', async () => {
+  it('upgrades an active estimate to Preview using the same worker and compilation', async () => {
     const project = createProject();
     const small = prepareJobEstimateOffThread(project);
     const full = prepareLargeJobOffThread(project);
     expect(worker().posted).toHaveLength(1);
-    worker().respond();
+    worker().send({ id: worker().posted[0]?.id ?? -1, kind: 'estimate-ready', estimate });
     await expect(small).resolves.toEqual({ estimate });
-    expect(requests()).toHaveLength(2);
+    expect(requests()).toHaveLength(1);
+    expect(worker().upgrades).toEqual([
+      { id: worker().posted[0]?.id, kind: 'preview-after-estimate' },
+    ]);
+    expect(worker().terminated).toBe(false);
     expect(prepareLargeJobOffThread(project)).toBe(full);
     expect(prepareJobEstimateOffThread(project)).toBe(full);
     worker().respond('preview');
     await expect(full).resolves.toEqual({ toolpath, estimate });
+    expect(worker().terminated).toBe(true);
   });
 
   it('promotes a held estimate to full Preview and settles both consumers from one response', async () => {

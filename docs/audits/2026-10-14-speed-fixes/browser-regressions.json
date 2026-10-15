@@ -1,0 +1,504 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\Asus\\.codex\\worktrees\\2272\\LaserForge-2.0\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "e2e/heavy-canvas-workers.e2e.ts",
+      "e2e/performance.spec.ts",
+      "e2e/svg-large-worker.e2e.ts",
+      "e2e/native-project-large-worker.e2e.ts",
+      "e2e/project-save-worker.e2e.ts",
+      "e2e/canvas-text-worker.spec.ts",
+      "e2e/depth-map-relief-worker.e2e.ts",
+      "--workers=1",
+      "--reporter=list,json",
+      "--output=C:/Users/Asus/.codex/tmp/speed-fixes-20261014-2272/browser-regression-results"
+    ],
+    "configFile": "C:\\Users\\Asus\\.codex\\worktrees\\2272\\LaserForge-2.0\\playwright.config.ts",
+    "rootDir": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Asus/.codex/tmp/speed-fixes-20261014-2272/browser-regression-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/e2e",
+        "testIgnore": ["**/production-bundle.spec.ts"],
+        "testMatch": ["**/*.e2e.ts", "**/*.spec.ts"],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [["list"], ["json"]],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm exec vite . --mode desktop --host 127.0.0.1 --port 5197 --strictPort",
+      "cwd": "C:\\Users\\Asus\\.codex\\worktrees\\2272\\LaserForge-2.0\\",
+      "url": "http://127.0.0.1:5197",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "canvas-text-worker.spec.ts",
+      "file": "canvas-text-worker.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "keeps foreground tasks responsive and cancels an unfinished real text weld worker",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 26414,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T15:40:37.871Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3801cea4833a23f651d6-d7bb2b7f5d189cd0597a",
+          "file": "canvas-text-worker.spec.ts",
+          "line": 4,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "depth-map-relief-worker.e2e.ts",
+      "file": "depth-map-relief-worker.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "production canonical heightfield worker cancels stale work and keeps the UI responsive",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [
+                {
+                  "type": "measurement",
+                  "description": "heightfield relief worker: elapsedMs=4483.4; ticks=132; maxGapMs=585.4; longTasks=0; maxLongTaskMs=0.0; longTaskObserver=yes"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10061,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T15:41:05.192Z",
+                  "annotations": [
+                    {
+                      "type": "measurement",
+                      "description": "heightfield relief worker: elapsedMs=4483.4; ticks=132; maxGapMs=585.4; longTasks=0; maxLongTaskMs=0.0; longTaskObserver=yes"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ea5d8d9507d1aac94d8c-39afec06e146b11822b8",
+          "file": "depth-map-relief-worker.e2e.ts",
+          "line": 40,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "heavy-canvas-workers.e2e.ts",
+      "file": "heavy-canvas-workers.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "G-code canvas ownership cancels hidden idle planning without a delayed UI stall",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [
+                {
+                  "type": "measurement",
+                  "description": "31-region V-carve: compileMs=2707; hardwareThreads=20; parallelLanes=3; plannerWorkersCreated=3"
+                },
+                {
+                  "type": "measurement",
+                  "description": "G-code canvas initial open: elapsedMs=7251.5; ticks=358; maxGapMs=706.5; longTasks=2; maxLongTaskMs=74.0; longTaskObserver=yes"
+                },
+                {
+                  "type": "measurement",
+                  "description": "G-code canvas Refresh: elapsedMs=1180.2; ticks=104; maxGapMs=52.6; longTasks=0; maxLongTaskMs=0.0; longTaskObserver=yes"
+                },
+                {
+                  "type": "measurement",
+                  "description": "explicit G-code Inspector open: elapsedMs=1777.6; ticks=145; maxGapMs=66.3; longTasks=1; maxLongTaskMs=51.0; longTaskObserver=yes"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15038,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T15:41:15.287Z",
+                  "annotations": [
+                    {
+                      "type": "measurement",
+                      "description": "31-region V-carve: compileMs=2707; hardwareThreads=20; parallelLanes=3; plannerWorkersCreated=3"
+                    },
+                    {
+                      "type": "measurement",
+                      "description": "G-code canvas initial open: elapsedMs=7251.5; ticks=358; maxGapMs=706.5; longTasks=2; maxLongTaskMs=74.0; longTaskObserver=yes"
+                    },
+                    {
+                      "type": "measurement",
+                      "description": "G-code canvas Refresh: elapsedMs=1180.2; ticks=104; maxGapMs=52.6; longTasks=0; maxLongTaskMs=0.0; longTaskObserver=yes"
+                    },
+                    {
+                      "type": "measurement",
+                      "description": "explicit G-code Inspector open: elapsedMs=1777.6; ticks=145; maxGapMs=66.3; longTasks=1; maxLongTaskMs=51.0; longTaskObserver=yes"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "55a77b29b5be30661d22-09ba7212f2151798b2b3",
+          "file": "heavy-canvas-workers.e2e.ts",
+          "line": 9,
+          "column": 1
+        },
+        {
+          "title": "CNC Preview removal-grid simulation completes in the shared worker while UI stays responsive",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [
+                {
+                  "type": "measurement",
+                  "description": "direct removal grid: gridMs=1086.7; cells=1000000"
+                },
+                {
+                  "type": "measurement",
+                  "description": "direct CNC removal grid: elapsedMs=5636.1; ticks=86; maxGapMs=963.1; longTasks=0; maxLongTaskMs=0.0; longTaskObserver=yes"
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13572,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T15:41:30.338Z",
+                  "annotations": [
+                    {
+                      "type": "measurement",
+                      "description": "direct removal grid: gridMs=1086.7; cells=1000000"
+                    },
+                    {
+                      "type": "measurement",
+                      "description": "direct CNC removal grid: elapsedMs=5636.1; ticks=86; maxGapMs=963.1; longTasks=0; maxLongTaskMs=0.0; longTaskObserver=yes"
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "55a77b29b5be30661d22-4da504d086d33d5dc758",
+          "file": "heavy-canvas-workers.e2e.ts",
+          "line": 100,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "native-project-large-worker.e2e.ts",
+      "file": "native-project-large-worker.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "opens a 24 MiB native project through the production worker while the UI stays responsive",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10753,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T15:41:43.951Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8835763ec38a00bede9b-5d8d3caef3514605949a",
+          "file": "native-project-large-worker.e2e.ts",
+          "line": 16,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "performance.spec.ts",
+      "file": "performance.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "opens and previews a 2,000-object project inside browser budgets",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10731,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T15:41:54.743Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b15d6361b2fc38288977-0fb4f694679dfe2c5d00",
+          "file": "performance.spec.ts",
+          "line": 22,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "project-save-worker.e2e.ts",
+      "file": "project-save-worker.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "large manual Save prepares in a real worker and opens its picker only after Choose file",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9315,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T15:42:05.502Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3b65c302307d9f8dc4bf-51ab430a6dac102594b8",
+          "file": "project-save-worker.e2e.ts",
+          "line": 23,
+          "column": 1
+        },
+        {
+          "title": "Cancel after large manual Save preparation keeps edits without selecting or writing a file",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9648,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T15:42:14.826Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3b65c302307d9f8dc4bf-dbb474190bfcafc66705",
+          "file": "project-save-worker.e2e.ts",
+          "line": 47,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "svg-large-worker.e2e.ts",
+      "file": "svg-large-worker.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "imports a 24 MiB SVG through the production worker while the UI stays responsive",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8746,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-14T15:42:24.507Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "089a9bdf8179394d9e1a-8f4e8bd695eca45927d1",
+          "file": "svg-large-worker.e2e.ts",
+          "line": 7,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-14T15:40:28.221Z",
+    "duration": 126018.924,
+    "expected": 9,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

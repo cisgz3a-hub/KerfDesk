@@ -302,7 +302,10 @@ export function viewActions(
       }),
     selectObjects: (ids, options = {}) =>
       set((s) => ({
-        ...scopedSelectionProjectPatch(s, selectionFromIds(s, ids, options.additive === true)),
+        ...scopedSelectionProjectPatch(
+          s,
+          selectionFromIds(s, ids, options.additive === true, options),
+        ),
         selectedPathNode: null,
         selectedPathNodes: [],
       })),

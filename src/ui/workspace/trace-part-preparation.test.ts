@@ -159,6 +159,46 @@ describe('trace-part worker preparation', () => {
     expect(path).toEqual(original);
   });
 
+  it('prepares dense compatibility samples off-thread even with few canonical segments', async () => {
+    vi.stubGlobal('Worker', FakeWorker);
+    const base = fixture(false);
+    const points = Array.from({ length: 20_000 }, (_, index) => {
+      const angle = (index * 2 * Math.PI) / 20_000;
+      return { x: 100 + 90 * Math.cos(angle), y: 100 + 90 * Math.sin(angle) };
+    });
+    const path: ColoredPath = {
+      color: '#000000',
+      polylines: [{ points, closed: true }],
+      curves: [
+        {
+          start: { x: 190, y: 100 },
+          closed: true,
+          segments: [10, 190].map((x) => ({
+            kind: 'elliptical-arc' as const,
+            radiusX: 90,
+            radiusY: 90,
+            rotationDeg: 0,
+            largeArc: false,
+            sweep: true,
+            to: { x, y: 100 },
+          })),
+        },
+      ],
+    };
+    const object = { ...base.object, paths: [path] };
+    const scene = { ...base.scene, objects: [object] };
+    expect(isPreparedSingleTracePart(object, scene.layers)).toBe(false);
+    expect(cachedTracePartGroups(path, 'fill')).toBeUndefined();
+    expect(ensureTracePartSceneReady(scene, 1)).toBe(false);
+    expect(FakeWorker.instances).toHaveLength(1);
+    expect(cachedTracePartGroups(path, 'fill')).toBeUndefined();
+    FakeWorker.instances[0]?.reply();
+    await settle();
+    expect(ensureTracePartSceneReady(scene, 1)).toBe(true);
+    expect(isPreparedSingleTracePart(object, scene.layers)).toBe(true);
+    expect(cachedTracePartGroups(path, 'fill')).toEqual([[0]]);
+  });
+
   it('discards a late reply after document replacement and never prepares its original path', async () => {
     vi.stubGlobal('Worker', FakeWorker);
     const first = fixture();

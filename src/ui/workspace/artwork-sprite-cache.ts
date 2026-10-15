@@ -33,7 +33,9 @@ export const SPRITE_MIN_DISPLAY_SEGMENTS = 4_000;
 export const SPRITE_SETTLE_MS = 150;
 /** Bitmap margin around the geometry: half the widest stroke plus antialiasing. */
 export const SPRITE_PAD_PX = 3;
-const SPRITE_MAX_ENTRIES = 8;
+// Pixels are the primary budget. This separate backstop bounds the metadata
+// and canvas/context objects even when each bitmap is only a few pixels.
+const SPRITE_MAX_ENTRIES = 256;
 const SPRITE_MAX_SIDE_PX = 8192;
 const SPRITE_MIN_PIXEL_CAP = 4_000_000;
 const SPRITE_VIEWPORT_CAP_FACTOR = 2.25;
@@ -59,6 +61,7 @@ type Entry = {
   pendingScale: number | null;
   pendingAt: number;
   lastUsed: number;
+  lastFrame: number;
   evicted: boolean;
 };
 
@@ -81,7 +84,13 @@ export type SpriteRequest = {
 const entries = new WeakMap<object, Entry>();
 let recent: Entry[] = [];
 let useCounter = 0;
+let frame = 0;
 let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Start one artwork draw, including Design Studio and the Preview underlay. */
+export function beginArtworkSpriteFrame(): void {
+  frame += 1;
+}
 
 /**
  * Draw an object from its sprite, rendering or refreshing the sprite first
@@ -95,8 +104,11 @@ export function drawArtworkSprite(request: SpriteRequest): boolean {
   const linearKey = linearTransformKey(request.transform);
   const entry = liveEntry(request.key);
   useCounter += 1;
-  if (entry !== undefined && matchesContent(entry, linearKey, request.styleKey, alpha)) {
+  if (entry !== undefined) {
     entry.lastUsed = useCounter;
+    entry.lastFrame = frame;
+  }
+  if (entry !== undefined && matchesContent(entry, linearKey, request.styleKey, alpha)) {
     if (entry.scale === view.scale) {
       entry.pendingScale = null;
       if (showsViewport(entry, request)) {
@@ -120,6 +132,7 @@ export function resetArtworkSpritesForTests(): void {
   for (const entry of recent) drop(entry);
   recent = [];
   useCounter = 0;
+  frame = 0;
   if (settleTimer !== null) clearTimeout(settleTimer);
   settleTimer = null;
 }
@@ -194,11 +207,22 @@ function render(
   const { view, transform } = request;
   const bounds = request.measure();
   const chosen = chooseRegion(bounds, request);
-  if (chosen === null) return null;
+  if (chosen === null) {
+    // A usable zoom placeholder already returned before render was called.
+    // An unrenderable current region must not pin an obsolete bitmap forever.
+    if (existing !== undefined) remove(existing);
+    return null;
+  }
   const width =
     Math.ceil((chosen.region.maxX - chosen.region.minX) * view.scale) + 2 * SPRITE_PAD_PX;
   const height =
     Math.ceil((chosen.region.maxY - chosen.region.minY) * view.scale) + 2 * SPRITE_PAD_PX;
+  if (!reserveBudget(existing, width * height, request.ctx.canvas)) {
+    // A resized/restyled sprite that cannot fit must not retain obsolete pixels
+    // indefinitely. The caller paints the exact current geometry directly.
+    if (existing !== undefined) remove(existing);
+    return null;
+  }
   const entry = existing ?? createEntry();
   if (entry === null) return null;
   if (entry.canvas.width !== width || entry.canvas.height !== height) {
@@ -230,11 +254,11 @@ function render(
   entry.subpixelY = subpixelY;
   entry.pendingScale = null;
   entry.lastUsed = useCounter;
+  entry.lastFrame = frame;
   if (existing === undefined) {
     entries.set(request.key, entry);
     recent.push(entry);
   }
-  enforceBudget(entry, request.ctx.canvas);
   return entry;
 }
 
@@ -257,6 +281,7 @@ function createEntry(): Entry | null {
     pendingScale: null,
     pendingAt: 0,
     lastUsed: 0,
+    lastFrame: frame,
     evicted: false,
   };
 }
@@ -344,17 +369,43 @@ function blit(
   ctx.restore();
 }
 
-function enforceBudget(keep: Entry, target: HTMLCanvasElement): void {
+// A stable scan larger than the budget must retain a useful subset instead of
+// evicting every sprite just before its next use. Protect the current and prior
+// draw's sprites; overflow uses the existing direct painter without allocating
+// another canvas. Once artwork is absent for a complete draw it can be evicted.
+function reserveBudget(
+  existing: Entry | undefined,
+  nextPixels: number,
+  target: HTMLCanvasElement,
+): boolean {
   const budget = pixelCap(target) * SPRITE_BUDGET_FACTOR;
-  const byAge = [...recent].sort((a, b) => a.lastUsed - b.lastUsed);
-  let pixels = recent.reduce((sum, entry) => sum + entry.canvas.width * entry.canvas.height, 0);
+  let count = recent.length + (existing === undefined ? 1 : 0);
+  let pixels =
+    nextPixels +
+    recent.reduce(
+      (sum, entry) => sum + (entry === existing ? 0 : entry.canvas.width * entry.canvas.height),
+      0,
+    );
+  if (count <= SPRITE_MAX_ENTRIES && pixels <= budget) return true;
+  const byAge = recent
+    .filter((entry) => entry !== existing && entry.lastFrame < frame - 1)
+    .sort((a, b) => a.lastUsed - b.lastUsed);
+  const evictions: Entry[] = [];
   for (const entry of byAge) {
-    if (recent.length <= SPRITE_MAX_ENTRIES && pixels <= budget) return;
-    if (entry === keep) continue;
     pixels -= entry.canvas.width * entry.canvas.height;
-    drop(entry);
-    recent = recent.filter((candidate) => candidate !== entry);
+    count -= 1;
+    evictions.push(entry);
+    if (count <= SPRITE_MAX_ENTRIES && pixels <= budget) {
+      for (const candidate of evictions) remove(candidate);
+      return true;
+    }
   }
+  return false;
+}
+
+function remove(entry: Entry): void {
+  drop(entry);
+  recent = recent.filter((candidate) => candidate !== entry);
 }
 
 function drop(entry: Entry): void {

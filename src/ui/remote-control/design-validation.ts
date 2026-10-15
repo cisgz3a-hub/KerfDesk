@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { RemoteFault } from './fault';
+import { selectionArgsSchema } from './selection-validation';
 
 // Renderer-side copy of the wire contract (electron/mcp/design-schemas.ts). The renderer never
 // trusts that the relay or main process validated arguments.
@@ -107,7 +108,7 @@ const designArgs = {
 
 /** Batch items: the existing single-edit argument shapes without admission fields. */
 export const batchItemSchemas = {
-  set_selection: z.strictObject({ artworkIds: z.array(id).max(200) }),
+  set_selection: selectionArgsSchema,
   add_text: z.strictObject({
     xMm: coordinate,
     yMm: coordinate,

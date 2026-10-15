@@ -30,12 +30,21 @@ export function selectionFromIds(
     Partial<Pick<AppState, 'projectDocumentEpoch'>>,
   ids: ReadonlyArray<string>,
   additive: boolean,
+  options: {
+    readonly scope?: 'focus' | 'document';
+    readonly expandGroups?: boolean;
+    readonly preserveExisting?: boolean;
+  } = {},
 ): SelectionState {
   const current = additive ? currentSelectionIds(state) : [];
   return selectionStateFromIds(
     state.project.scene,
     [...current, ...ids],
-    currentHierarchyFocus(state.project.scene, state.projectDocumentEpoch),
+    options.scope === 'document'
+      ? null
+      : currentHierarchyFocus(state.project.scene, state.projectDocumentEpoch),
+    options.expandGroups ?? true,
+    options.preserveExisting ? new Set(currentSelectionIds(state)) : undefined,
   );
 }
 
@@ -161,8 +170,12 @@ function selectionStateFromIds(
   scene: Scene,
   ids: ReadonlyArray<string>,
   focus: string | null = null,
+  expandGroups = true,
+  preservedIds?: ReadonlySet<string>,
 ): SelectionState {
-  const [primary, ...rest] = expandedObjectIdsForGroups(scene, ids, focus);
+  const [primary, ...rest] = expandGroups
+    ? expandedObjectIdsForGroups(scene, ids, focus, preservedIds)
+    : orderedLiveIds(scene, new Set(ids), focus, preservedIds);
   return {
     selectedObjectId: primary ?? null,
     additionalSelectedIds: new Set(rest),
@@ -173,6 +186,7 @@ function expandedObjectIdsForGroups(
   scene: Scene,
   ids: ReadonlyArray<string>,
   focus: string | null = null,
+  preservedIds?: ReadonlySet<string>,
 ): ReadonlyArray<string> {
   const selected = new Set(ids);
   const groupsByMember = new Map<string, SceneGroup[]>();
@@ -196,13 +210,14 @@ function expandedObjectIdsForGroups(
       }
     }
   }
-  return orderedLiveIds(scene, selected, focus);
+  return orderedLiveIds(scene, selected, focus, preservedIds);
 }
 
 function orderedLiveIds(
   scene: Scene,
   ids: ReadonlySet<string>,
   focus: string | null,
+  preservedIds?: ReadonlySet<string>,
 ): ReadonlyArray<string> {
   const scope =
     focus === null
@@ -210,11 +225,21 @@ function orderedLiveIds(
       : new Set(scene.groups?.find((group) => group.id === focus)?.objectIds ?? []);
   const out: string[] = [];
   for (const object of scene.objects) {
-    if (object.locked === true) continue;
-    if (!sceneObjectHasVisibleLayer(scene, object)) continue;
+    if (!selectionCandidate(scene, object, preservedIds)) continue;
     if (ids.has(object.id) && (scope === null || scope.has(object.id))) out.push(object.id);
   }
   return out;
+}
+
+function selectionCandidate(
+  scene: Scene,
+  object: Scene['objects'][number],
+  preservedIds: ReadonlySet<string> | undefined,
+): boolean {
+  return (
+    preservedIds?.has(object.id) === true ||
+    (object.locked !== true && sceneObjectHasVisibleLayer(scene, object))
+  );
 }
 
 function pruneGroups(groups: ReadonlyArray<SceneGroup>, scene: Scene): ReadonlyArray<SceneGroup> {

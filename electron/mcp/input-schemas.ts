@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { MCP_ARRANGE_ACTIONS, mcpTextPatchSchema } from './authoring-schemas.js';
 import { mcpMachineInputSchemas } from './machine-schemas.js';
 import { mcpDesignInputSchemas, mcpOperationPatchSchema } from './design-schemas.js';
+import { mcpSelectionFields, validSelectionFields } from './selection-schemas.js';
 
 export const MCP_MAX_ITEMS = 200;
 export const MCP_MAX_RESULT_BYTES = 256 * 1024;
@@ -28,7 +29,9 @@ export const mcpInputSchemas = {
   get_workspace_preview: z.strictObject({}),
   list_fonts: z.strictObject({}),
   get_text: z.strictObject({ artworkId: id }),
-  set_selection: z.strictObject({ ...writeAdmission, artworkIds }),
+  set_selection: z
+    .strictObject({ ...writeAdmission, ...mcpSelectionFields })
+    .refine(validSelectionFields, 'Provide artworkIds, or use all/clear without target IDs.'),
   add_text: z.strictObject({
     ...writeAdmission,
     xMm: coordinate,

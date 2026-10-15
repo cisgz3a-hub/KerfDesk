@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
 import { controller } from '../core/controller';
-import { canEdit, store, type Tool } from '../core/store';
+import { selectableIds } from '../core/scene';
+import { canEdit, selectionComplete, store, type Tool } from '../core/store';
 import { Canvas, fitView, useContentBox } from './Canvas';
 import { RAIL_INSET } from './canvas-view';
 import { useApp } from './hooks';
 import { Icon, type IconName } from './icons';
 import { ArrangeSheet, ImportSheet, PropertiesSheet, ShapeSheet, TextSheet } from './design-sheets';
+import { SelectionControls, useDesignKeyboard } from './selection-controls';
 
 const TOOLS: { tool: Tool; icon: IconName; label: string; edit: boolean }[] = [
   { tool: 'select', icon: 'select', label: 'Select and move', edit: false },
@@ -22,12 +23,13 @@ export function DesignScreen() {
   const scene = useApp((state) => state.scene);
   const workspace = useApp((state) => state.workspace);
   const sheet = useApp((state) => state.sheet);
-  useKeyboard(editable);
+  useDesignKeyboard();
 
   const sharingOff = workspace?.permissions?.artworkSharingEnabled === false;
   const empty = workspace !== null && workspace.totalArtwork === 0;
   return (
     <div className="main">
+      <SelectionControls />
       <div
         style={{
           position: 'relative',
@@ -185,6 +187,9 @@ function HistoryBar() {
 }
 
 function ZoomBar() {
+  const actions = useApp((state) =>
+    state.draft !== null ? 'drawing' : state.selection.length > 0 ? 'selection' : undefined,
+  );
   const view = useApp((state) => state.view);
   const content = useContentBox();
   const zoomBy = (factor: number) => {
@@ -204,12 +209,7 @@ function ZoomBar() {
     store.set({ view: fitView(content, width, height, 28, RAIL_INSET) });
   };
   return (
-    <div
-      className="zoom"
-      style={{
-        bottom: useApp((state) => state.selection.length > 0 || state.draft !== null) ? 86 : 10,
-      }}
-    >
+    <div className="zoom" data-actions={actions}>
       <button type="button" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.4)}>
         <Icon name="minus" size={18} />
       </button>
@@ -227,7 +227,11 @@ function ZoomBar() {
 function ActionBar() {
   const selection = useApp((state) => state.selection);
   const draft = useApp((state) => state.draft);
-  const editable = useApp(canEdit);
+  const complete = useApp(selectionComplete);
+  const workspace = useApp((state) => state.workspace);
+  const allowed = useApp((state) => state.scene);
+  const available = new Set(selectableIds(workspace?.artwork ?? [], allowed));
+  const editable = useApp(canEdit) && complete && selection.every((id) => available.has(id));
   if (draft !== null) {
     const apply = async () => {
       // The draft object is the retry key: an uncertain Apply re-sends the identical request.
@@ -269,8 +273,15 @@ function ActionBar() {
     controller.write('arrange_artwork', { artworkIds: selection, action });
   return (
     <div className="actionbar" role="toolbar" aria-label="Selection">
-      <span className="count">{selection.length} selected</span>
-      <button type="button" onClick={() => store.set({ sheet: { kind: 'properties' } })}>
+      <span className="count">
+        {complete ? selection.length : (workspace?.totalSelected ?? selection.length)} selected
+        {complete ? null : <small>Select fewer items to edit</small>}
+      </span>
+      <button
+        type="button"
+        disabled={!complete}
+        onClick={() => store.set({ sheet: { kind: 'properties' } })}
+      >
         <Icon name="props" />
         Properties
       </button>
@@ -302,49 +313,6 @@ function ActionBar() {
           </button>
         </>
       ) : null}
-      <button
-        type="button"
-        className="icon-only"
-        aria-label="Clear selection"
-        title="Clear selection"
-        onClick={() => void controller.select([])}
-      >
-        <Icon name="close" />
-      </button>
     </div>
   );
-}
-
-function useKeyboard(editable: boolean) {
-  useEffect(() => {
-    const key = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target !== null && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
-      const { selection, sheet } = store.get();
-      if (sheet !== null || !editable) return;
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
-        event.preventDefault();
-        void controller.write(event.shiftKey ? 'redo' : 'undo');
-        return;
-      }
-      if (selection.length === 0) return;
-      const step = event.shiftKey ? 10 : 1;
-      const moves: Record<string, [number, number]> = {
-        ArrowLeft: [-step, 0],
-        ArrowRight: [step, 0],
-        ArrowUp: [0, -step],
-        ArrowDown: [0, step],
-      };
-      const move = moves[event.key];
-      if (move !== undefined) {
-        event.preventDefault();
-        void controller.move(selection, move[0], move[1]);
-      } else if (event.key === 'Delete' || event.key === 'Backspace') {
-        event.preventDefault();
-        void controller.write('arrange_artwork', { artworkIds: selection, action: 'delete' });
-      }
-    };
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
-  }, [editable]);
 }
