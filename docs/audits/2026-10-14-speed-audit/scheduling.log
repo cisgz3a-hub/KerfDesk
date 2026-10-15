@@ -1,0 +1,13 @@
+Already up to date
+Done in 392ms using pnpm v11.3.0
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0
+
+ ✓ scripts/performance-audit/worker-scheduling.test.ts (4 tests) 20ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  22:15:10
+   Duration  2.66s (transform 1.32s, setup 36ms, import 1.68s, tests 20ms, environment 694ms)
+
+JSON report written to C:/Users/Asus/.codex/tmp/speed-audit-20261014-2272/scheduling.json

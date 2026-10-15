@@ -49,6 +49,8 @@ export type Workspace = {
   name: string;
   dirty: boolean;
   selection: string[];
+  totalSelected?: number;
+  selectionTruncated?: boolean;
   artwork: Artwork[];
   operations: Operation[];
   totalArtwork: number;
@@ -61,6 +63,7 @@ export type Workspace = {
     groupTransformBounds?: boolean;
     scene?: boolean;
     designControl?: boolean;
+    selectionModes?: boolean;
   };
   saved?: { hasFile: boolean };
 };

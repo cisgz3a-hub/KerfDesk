@@ -30,7 +30,6 @@
 //   - Environments without Worker (vitest/jsdom) get null: callers keep the
 //     paused fallback behavior.
 
-import { PackedToolpathSteps } from '../../core/job/packed-toolpath-steps';
 import type { Project } from '../../core/scene';
 import { packProjectMessage } from '../packed-project-transfer';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
@@ -49,6 +48,15 @@ import {
   retireCanvasCompilationMainBridge,
 } from './canvas-compilation-main-bridge';
 import { PreparationResultCache } from './preparation-result-cache';
+import { PreparationConsumers } from './preparation-consumers';
+import {
+  PreparationSupersededError,
+  mergePreparationRequest,
+  requestKey,
+  type ActiveRequest,
+  type QueuedRequest,
+} from './preparation-request';
+import { isTransferResponse, settleWorkerResponse } from './preparation-worker-response';
 import { PreparationTransferAssembler } from './preparation-transfer-assembler';
 import { reserveWorkerMemory } from '../worker-memory-lane';
 import type {
@@ -61,6 +69,11 @@ export type {
   LargeJobPreparation,
   LargeJobPreparationOptions,
 } from './large-job-preparation';
+export {
+  PreparationSupersededError,
+  isPreparationSuperseded,
+  type PreparationSupersedeReason,
+} from './preparation-request';
 
 // An over-budget prepare legitimately runs minutes; restarting it on every
 // edit of a rapid burst means it never finishes (and structured-clones the
@@ -75,48 +88,6 @@ export const MAX_SETTLED_PREPARATIONS = 4;
 
 const WORKER_UNAVAILABLE_MESSAGE = 'preparation worker unavailable';
 
-/** Why this client dropped a request in favour of a newer one. */
-export type PreparationSupersedeReason = 'newer-project' | 'newer-request';
-
-const SUPERSEDE_MESSAGES: Record<PreparationSupersedeReason, string> = {
-  'newer-project': 'superseded by a newer project',
-  'newer-request': 'superseded by a newer request',
-};
-
-/**
- * Rejection reason for a request this client itself replaced. It is a
- * scheduling outcome, never a failure: nothing broke, and the operator did
- * nothing to fix. Consumers MUST treat it as "stale, ignore" — rendering it
- * as an error pinned a false "Background estimate failed" badge for the whole
- * of a jog, because current-position placement re-keys on every head move and
- * every re-key supersedes the request held for the previous one.
- */
-export class PreparationSupersededError extends Error {
-  override readonly name = 'PreparationSupersededError';
-  readonly reason: PreparationSupersedeReason;
-
-  constructor(reason: PreparationSupersedeReason) {
-    super(SUPERSEDE_MESSAGES[reason]);
-    this.reason = reason;
-  }
-}
-
-/** True for a request this client superseded; false for every real failure. */
-export function isPreparationSuperseded(error: unknown): boolean {
-  return error instanceof PreparationSupersededError;
-}
-
-type QueuedRequest = {
-  readonly project: Project;
-  readonly key: string;
-  readonly options: LargeJobPreparationOptions;
-  readonly projection: PreparationProjection;
-  readonly resolve: (result: LargeJobPreparation | LargeJobEstimate) => void;
-  readonly reject: (err: Error) => void;
-  readonly onProgress?: (progress: OutputCompilationProgress) => void;
-};
-
-type ActiveRequest = QueuedRequest & { readonly id: number };
 type MemoryReservation = {
   cancel: (() => void) | null;
   release: (() => void) | null;
@@ -130,6 +101,10 @@ let queuedRequests: ReadonlyArray<QueuedRequest> = [];
 let quietWindowTimer: ReturnType<typeof setTimeout> | null = null;
 let memoryReservation: MemoryReservation | null = null;
 const preparationCache = new PreparationResultCache(MAX_SETTLED_PREPARATIONS);
+const preparationConsumers = new PreparationConsumers(
+  cancelUnownedPreparation,
+  () => new PreparationSupersededError('consumer-cancelled'),
+);
 
 /**
  * Prepare a large job off the main thread. Returns null when workers are
@@ -141,10 +116,14 @@ export function prepareLargeJobOffThread(
   project: Project,
   options: LargeJobPreparationOptions = {},
   onProgress?: (progress: OutputCompilationProgress) => void,
+  signal?: AbortSignal,
 ): Promise<LargeJobPreparation> | null {
+  if (signal?.aborted === true)
+    return Promise.reject(new PreparationSupersededError('consumer-cancelled'));
   const key = requestKey(options);
   const cached = preparationCache.get(project, key);
-  if (cached?.projection === 'preview') return cached.promise;
+  if (cached?.projection === 'preview')
+    return preparationConsumers.attach(project, key, 'preview', cached.promise, signal);
   preparationCache.discardSettledPreviews();
   const requested = requestPreparation(project, options, 'preview', onProgress);
   if (requested === null) return null;
@@ -154,20 +133,28 @@ export function prepareLargeJobOffThread(
     return result;
   });
   preparationCache.set(project, key, { projection: 'preview', promise });
-  return promise;
+  return preparationConsumers.attach(project, key, 'preview', promise, signal);
 }
 
 /** Return only the exact ETA, reusing a full Preview request when already present. */
 export function prepareJobEstimateOffThread(
   project: Project,
   options: LargeJobPreparationOptions = {},
+  signal?: AbortSignal,
 ): Promise<LargeJobEstimate> | null {
+  if (signal?.aborted === true)
+    return Promise.reject(new PreparationSupersededError('consumer-cancelled'));
   const key = requestKey(options);
   const cached = preparationCache.get(project, key);
-  if (cached !== undefined) return cached.promise;
+  if (cached !== undefined)
+    // A Preview promise validates its full result before exposing the ETA.
+    // Keep that capability alive even if its original Preview owner closes.
+    return preparationConsumers.attach(project, key, cached.projection, cached.promise, signal);
   const promise = requestPreparation(project, options, 'estimate');
   if (promise !== null) preparationCache.set(project, key, { projection: 'estimate', promise });
-  return promise;
+  return promise === null
+    ? null
+    : preparationConsumers.attach(project, key, 'estimate', promise, signal);
 }
 
 function requestPreparation(
@@ -186,27 +173,28 @@ function requestPreparation(
   }
   if (typeof Worker === 'undefined') return null;
   const promise = new Promise<LargeJobPreparation | LargeJobEstimate>((resolve, reject) => {
-    const held = queuedRequests.find((request) => request.key === key);
-    const progress = onProgress ?? held?.onProgress;
-    const next: QueuedRequest = {
-      project,
-      key,
-      options,
-      projection,
-      resolve: (result) => {
-        held?.resolve(result);
-        resolve(result);
+    const running =
+      activeRequest?.project === project && activeRequest.key === key ? activeRequest : null;
+    const held = running ?? queuedRequests.find((request) => request.key === key);
+    const next = mergePreparationRequest(
+      {
+        project,
+        key,
+        options,
+        projection,
+        resolve,
+        reject,
+        ...(onProgress === undefined ? {} : { onProgress }),
       },
-      reject: (error) => {
-        held?.reject(error);
-        reject(error);
-      },
-      ...(progress === undefined ? {} : { onProgress: progress }),
-    };
-    queuedRequests =
-      held === undefined
-        ? [...queuedRequests, next]
-        : queuedRequests.map((request) => (request === held ? next : request));
+      held,
+      running,
+    );
+    if (running !== null) activeRequest = { ...next, id: running.id };
+    else
+      queuedRequests =
+        held === undefined
+          ? [...queuedRequests, next]
+          : queuedRequests.map((request) => (request === held ? next : request));
   });
   dispatchNextRequest();
   return promise;
@@ -217,20 +205,36 @@ export function resetPreparationWorkerForTests(): void {
   preparationCache.clear();
 }
 
-function requestKey(options: LargeJobPreparationOptions): string {
-  return JSON.stringify({
-    jobOrigin: options.jobOrigin ?? null,
-    outputScope: options.outputScope ?? null,
-    contourEntryBounds: options.contourEntryBounds,
-    absoluteProgramOffset: options.absoluteProgramOffset,
-    workZeroBedPosition: options.workZeroBedPosition,
-    laserMaxPowerS: options.laserMaxPowerS,
-    snapshot: options.snapshot ?? null,
-    initialPosition:
-      options.initialPosition === undefined
-        ? null
-        : [options.initialPosition.x, options.initialPosition.y, options.initialPosition.z ?? null],
-  });
+function cancelUnownedPreparation(project: Project, key: string): void {
+  preparationCache.discard(project, key);
+  const cancelled = new PreparationSupersededError('consumer-cancelled');
+  const held = queuedRequests.filter(
+    (request) => request.project === project && request.key === key,
+  );
+  queuedRequests = queuedRequests.filter((request) => !held.includes(request));
+  for (const request of held) request.reject(cancelled);
+  if (activeRequest?.project === project && activeRequest.key === key) {
+    const active = activeRequest;
+    activeRequest = null;
+    retireWorker();
+    active.reject(cancelled);
+  } else if (queuedRequests.length === 0 && activeRequest === null) retireWorker();
+  if (queuedRequests.length === 0 && quietWindowTimer !== null) {
+    clearTimeout(quietWindowTimer);
+    quietWindowTimer = null;
+  }
+  dispatchNextRequest();
+}
+
+function yieldPreparationToInteractiveWork(): void {
+  const active = activeRequest;
+  if (active === null) return;
+  activeRequest = null;
+  // Preserve exact input and consumer promises, but no worker heap. Interactive
+  // work is already queued, so retirement grants it before this restart.
+  queuedRequests = [active, ...queuedRequests];
+  retireWorker();
+  dispatchNextRequest();
 }
 
 function hasWorkForOtherProject(project: Project): boolean {
@@ -303,6 +307,10 @@ function handleWorkerMessage(e: MessageEvent<PreparationWorkerResponse>): void {
     }
     return;
   }
+  if (e.data.kind === 'estimate-ready') {
+    handleEstimateReady(activeRequest, { estimate: e.data.estimate });
+    return;
+  }
   if (isTransferResponse(e.data)) {
     handleTransferMessage(e.data);
     return;
@@ -318,47 +326,28 @@ function handleWorkerMessage(e: MessageEvent<PreparationWorkerResponse>): void {
   dispatchNextRequest();
 }
 
-type SettledResponse = Exclude<
-  PreparationWorkerResponse,
-  PreparationTransferResponse | { readonly kind: 'progress' }
->;
-
-function settleWorkerResponse(settled: ActiveRequest, response: SettledResponse): void {
-  if (response.kind === 'error') {
-    settled.reject(new Error(response.message));
+function handleEstimateReady(settled: ActiveRequest, estimate: LargeJobEstimate): void {
+  settled.resolveEstimate?.(estimate);
+  if (preparationConsumers.hasPreview(settled.project, settled.key)) {
+    try {
+      workerInstance?.postMessage({ id: settled.id, kind: 'preview-after-estimate' });
+    } catch (error) {
+      rejectAllPendingAndRetireWorker(error instanceof Error ? error.message : String(error));
+    }
     return;
   }
-  if (response.kind === 'estimate') {
-    settled.resolve({ estimate: response.estimate });
-    return;
-  }
-  if (response.kind === 'packed') {
-    // The buffers arrived by transfer; the route is read out of them one step
-    // at a time and never becomes an array of objects on this side either.
-    const { kind: _kind, id: _id, toolpath, packed, ...prepared } = response;
-    settled.resolve({
-      ...prepared,
-      toolpath: { ...toolpath, steps: new PackedToolpathSteps(packed) },
+  activeRequest = null;
+  // A cancelled Preview upgrade may have replaced the ETA cache entry.
+  // Retain the exact scalar result without retaining the compiled geometry.
+  // Publish it before release can synchronously request the same Preview.
+  if (settled.projection === 'preview')
+    preparationCache.set(settled.project, settled.key, {
+      projection: 'estimate',
+      promise: Promise.resolve(estimate),
     });
-    return;
-  }
-  settled.resolve({
-    toolpath: response.toolpath,
-    estimate: response.estimate,
-    ...(response.jobOriginOffset === undefined
-      ? {}
-      : { jobOriginOffset: response.jobOriginOffset }),
-  });
-}
-
-function isTransferResponse(
-  response: PreparationWorkerResponse,
-): response is PreparationTransferResponse {
-  return (
-    response.kind === 'transfer-start' ||
-    response.kind === 'transfer-chunk' ||
-    response.kind === 'transfer-complete'
-  );
+  settled.resolve(estimate);
+  retireWorker();
+  dispatchNextRequest();
 }
 
 function handleTransferMessage(packet: PreparationTransferResponse): void {
@@ -400,14 +389,17 @@ function dispatchNextRequest(): void {
     return;
   const reservation: MemoryReservation = { cancel: null, release: null };
   memoryReservation = reservation;
-  reservation.cancel = reserveWorkerMemory((release) => {
-    if (memoryReservation !== reservation) {
-      release();
-      return;
-    }
-    reservation.release = release;
-    dispatchReservedRequest();
-  });
+  reservation.cancel = reserveWorkerMemory(
+    (release) => {
+      if (memoryReservation !== reservation) {
+        release();
+        return;
+      }
+      reservation.release = release;
+      dispatchReservedRequest();
+    },
+    { onPreempt: yieldPreparationToInteractiveWork },
+  );
   // A free grant can fail or even complete synchronously before reserve
   // returns. Its old token must never overwrite or release a newer owner.
   if (memoryReservation !== reservation) reservation.cancel();
@@ -430,16 +422,23 @@ function dispatchReservedRequest(): void {
   nextRequestId += 1;
   const active: ActiveRequest = { ...next, id: nextRequestId };
   activeRequest = active;
+  // A queued Preview upgrade may have lost its last dependent owner while
+  // another lane held the heap. Keep the shared resolvers/cache capability so
+  // a later Preview can still upgrade after ETA. An immediately dispatched
+  // caller has not attached its ownership token yet, so preserve its request.
+  const estimateOnly =
+    active.projection === 'estimate' ||
+    preparationConsumers.hasOnlyEstimateConsumers(active.project, active.key);
   // Geometry crosses as transferred buffers: structured-cloning a dense
   // trace's object graph cost ~0.5-1.2 s of UI-thread time per request.
-  const packed = packProjectMessage(active.project);
-  const request: PreparationWorkerRequest = {
-    id: active.id,
-    project: packed.message,
-    ...active.options,
-    ...(active.projection === 'estimate' ? { projection: 'estimate' as const } : {}),
-  };
   try {
+    const packed = packProjectMessage(active.project);
+    const request: PreparationWorkerRequest = {
+      id: active.id,
+      project: packed.message,
+      ...active.options,
+      ...(estimateOnly ? { projection: 'estimate' as const, allowPreviewUpgrade: true } : {}),
+    };
     if (packed.transfer.length === 0) worker.postMessage(request);
     else worker.postMessage(request, packed.transfer);
   } catch (err) {

@@ -8,7 +8,7 @@
 // the badge fresh ~a quarter second after the user stops moving, while a
 // drag costs zero recompiles.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import type { JobOriginPlacement } from '../../core/job';
 import type { OutputScope, Project } from '../../core/scene';
 import { useOutputScope, useStore } from '../state';
@@ -228,18 +228,7 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
   } = inputs;
   // Compute cheap jobs synchronously; background jobs begin pending.
   const [settled, setSettled] = useState<Settled>(() => initialSettledEstimate(inputs));
-  // The ADR-244 worker follow-up must survive the settle-triggered effect
-  // cleanup (settling changes the deps and re-runs the effect), so it is
-  // cancelled by GENERATION — newer inputs or unmount — not by the effect's
-  // own cancelled flag. Invalidate on input change before the next debounce
-  // fires, and on cleanup so StrictMode's replay starts a fresh generation.
-  const workerGeneration = useRef(0);
-  useEffect(
-    () => () => {
-      workerGeneration.current += 1;
-    },
-    [project, outputScopeKey, registrationKey, placementKey, coordinateOptions, initialPosition],
-  );
+  const { workerGeneration, workerController } = useEstimateWorkerOwner(inputs);
   useEffect(() => {
     if (
       frozen ||
@@ -248,24 +237,17 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
         settled.registrationKey === registrationKey &&
         settled.placementKey === placementKey &&
         settled.coordinateOptions === coordinateOptions &&
-        settled.initialPosition === initialPosition)
-    ) {
+        settled.initialPosition === initialPosition &&
+        (settled.estimate.kind !== 'too-large' || workerController.current !== null))
+    )
       return undefined;
-    }
     let cancelled = false;
     const handle = setTimeout(() => {
       workerGeneration.current += 1;
       const generation = workerGeneration.current;
-      const settleAt = (value: LiveJobEstimate): void =>
-        setSettled({
-          project,
-          outputScopeKey,
-          registrationKey,
-          placementKey,
-          coordinateOptions,
-          initialPosition,
-          estimate: value,
-        });
+      workerController.current?.abort();
+      const controller = new AbortController();
+      workerController.current = controller;
       recomputeEstimate({
         project,
         outputScope,
@@ -274,7 +256,17 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
         initialPosition,
         isCancelled: () => cancelled,
         isFollowUpStale: () => workerGeneration.current !== generation,
-        settleAt,
+        signal: controller.signal,
+        settleAt: (estimate) =>
+          setSettled({
+            project,
+            outputScopeKey,
+            registrationKey,
+            placementKey,
+            coordinateOptions,
+            initialPosition,
+            estimate,
+          }),
       });
     }, JOB_ESTIMATE_DEBOUNCE_MS);
     return () => {
@@ -291,14 +283,44 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
     settled.placementKey,
     settled.coordinateOptions,
     settled.initialPosition,
+    settled.estimate.kind,
     registrationKey,
     placementKey,
     coordinateOptions,
     jobOrigin,
     initialPosition,
     frozen,
+    workerController,
+    workerGeneration,
   ]);
   return settled.estimate;
+}
+
+function useEstimateWorkerOwner(inputs: EstimateInputs): {
+  readonly workerGeneration: MutableRefObject<number>;
+  readonly workerController: MutableRefObject<AbortController | null>;
+} {
+  // Settling re-runs the estimate effect, but only changed inputs or unmount
+  // cancel worker ownership. StrictMode cleanup also invalidates the generation.
+  const workerGeneration = useRef(0);
+  const workerController = useRef<AbortController | null>(null);
+  useEffect(
+    () => () => {
+      workerGeneration.current += 1;
+      workerController.current?.abort();
+      workerController.current = null;
+    },
+    [
+      inputs.project,
+      inputs.outputScopeKey,
+      inputs.registrationKey,
+      inputs.placementKey,
+      inputs.coordinateOptions,
+      inputs.initialPosition,
+      inputs.frozen,
+    ],
+  );
+  return { workerGeneration, workerController };
 }
 
 function initialEstimate(inputs: EstimateInputs, asyncSnapshot: boolean): LiveJobEstimate {
@@ -322,6 +344,7 @@ type RecomputeEstimateArgs = {
   readonly initialPosition: LiveJobEstimateOptions['initialPosition'];
   readonly isCancelled: () => boolean;
   readonly isFollowUpStale: () => boolean;
+  readonly signal: AbortSignal;
   readonly settleAt: (value: LiveJobEstimate) => void;
 };
 
@@ -365,19 +388,23 @@ function followUpWithWorkerEstimate(
 ): void {
   if (value.kind !== 'too-large') return;
   const registration = currentPrintCutOutputRegistration(args.project);
-  const offThread = prepareJobEstimateOffThread(args.project, {
-    ...args.coordinateOptions,
-    outputScope: args.outputScope,
-    ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
-    ...(usesSnapshot
-      ? {
-          snapshot: {
-            ...(registration === undefined ? {} : { registration }),
-          },
-        }
-      : {}),
-    ...(args.initialPosition === undefined ? {} : { initialPosition: args.initialPosition }),
-  });
+  const offThread = prepareJobEstimateOffThread(
+    args.project,
+    {
+      ...args.coordinateOptions,
+      outputScope: args.outputScope,
+      ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
+      ...(usesSnapshot
+        ? {
+            snapshot: {
+              ...(registration === undefined ? {} : { registration }),
+            },
+          }
+        : {}),
+      ...(args.initialPosition === undefined ? {} : { initialPosition: args.initialPosition }),
+    },
+    args.signal,
+  );
   if (offThread === null) return;
   offThread.then(
     (prepared) => {

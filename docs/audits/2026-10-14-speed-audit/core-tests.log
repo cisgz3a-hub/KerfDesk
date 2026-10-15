@@ -1,0 +1,36 @@
+Already up to date
+Done in 454ms using pnpm v11.3.0
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0
+
+stdout | src/io/gcode/connected-script-compile-performance.test.ts > multi-artwork connected-script compilation > stays byte-exact and measurable
+{"artworkCount":4,"regionCount":12,"stagesMs":{"preTask":72.47810000000027,"regionPlanning":5668.3913,"finalize":8.330299999999625,"emit":254.70830000000024,"total":6003.908},"regionsMs":[{"taskId":"vcarve:0:0","geometryMs":134.46339999999964,"passesMs":245.1223,"coverageMs":17.1266999999998},{"taskId":"vcarve:0:1","geometryMs":346.1794,"passesMs":699.3029000000006,"coverageMs":43.59770000000026},{"taskId":"vcarve:0:2","geometryMs":3.73070000000007,"passesMs":22.26560000000063,"coverageMs":1.2286999999996624},{"taskId":"vcarve:1:0","geometryMs":96.36579999999958,"passesMs":212.32470000000103,"coverageMs":11.836699999999837},{"taskId":"vcarve:1:1","geometryMs":324.0094999999983,"passesMs":687.9969000000001,"coverageMs":44.88800000000083},{"taskId":"vcarve:1:2","geometryMs":2.4822000000003754,"passesMs":19.792199999999866,"coverageMs":1.312900000000809},{"taskId":"vcarve:2:0","geometryMs":88.35889999999927,"passesMs":224.15769999999975,"coverageMs":12.018500000000131},{"taskId":"vcarve:2:1","geometryMs":350.6399999999994,"passesMs":658.7759999999998,"coverageMs":42.22110000000066},{"taskId":"vcarve:2:2","geometryMs":2.4528000000009342,"passesMs":19.443900000000212,"coverageMs":1.0092999999997119},{"taskId":"vcarve:3:0","geometryMs":85.33859999999913,"passesMs":210.8648000000012,"coverageMs":10.988299999999072},{"taskId":"vcarve:3:1","geometryMs":342.15209999999934,"passesMs":638.0514000000003,"coverageMs":44.983400000000984},{"taskId":"vcarve:3:2","geometryMs":2.5342000000000553,"passesMs":18.89760000000024,"coverageMs":0.9746999999988475}],"gcodeCodeUnits":1100098,"gcodeSha256":"6213711b652de729c1d4c57f905817bf39eab2ef86e8d8a1627f37ba20a6dbc6","gcodeUtf8Bytes":1100098}
+
+ ✓ src/io/gcode/connected-script-compile-performance.test.ts (1 test) 6066ms
+     ✓ stays byte-exact and measurable  6065ms
+ ✓ src/core/cnc/vcarve-source-boundary-coverage-performance.test.ts (13 tests | 1 skipped) 335ms
+{"fixture":"600 dense disconnected source witnesses","baselineRankMs":413.0003999999999,"indexedRankMs":6.592200000000048,"baselineRankPolygonCalls":360000,"indexedRankPolygonCalls":600,"baselineBucketsMs":194.91919999999936,"indexedBucketsMs":1.3153999999994994,"baselineBucketPolygonCalls":180300,"indexedBucketPolygonCalls":600}
+ ✓ src/core/cnc/vcarve-region-order-performance.test.ts (5 tests) 693ms
+     ✓ ranks and assigns 600 dense disconnected witnesses with local polygon tests  640ms
+stdout | src/__fixtures__/perceptual/centerline-perf.test.ts > centerline trace performance on a big image > traces a ~1.9MP thick-stroke grid within the regression budget
+[centerline-perf] 1600x1200 stroke24: 944ms, paths=1
+
+ ✓ src/__fixtures__/perceptual/centerline-perf.test.ts (1 test) 959ms
+     ✓ traces a ~1.9MP thick-stroke grid within the regression budget  957ms
+{"fixture":"600 disconnected dense contours","baselineMs":817.6093000000001,"optimizedMs":10.454600000000028,"baselineBoundaryBuilds":0,"optimizedBoundaryBuilds":0}
+{"fixture":"64 concentric dense contours","baselineMs":216.63069999999993,"optimizedMs":65.1233000000002,"baselineBoundaryBuilds":2016,"optimizedBoundaryBuilds":63}
+{"fixture":"240 overlapping dense contours","baselineMs":142.02309999999989,"optimizedMs":5.114500000000135,"baselineBoundaryBuilds":0,"optimizedBoundaryBuilds":0}
+ ✓ src/core/cnc/strict-contour-nesting-performance.test.ts (3 tests) 1266ms
+     ✓ preserves the original source layout for 600 disconnected dense contours  833ms
+ ✓ src/core/raster/image-mask.perf.test.ts (1 test) 43ms
+ ✓ src/core/trace/centerline/seam-repair-performance.test.ts (3 tests) 10ms
+ ✓ src/core/job/fill-hatching.perf.test.ts (1 test) 374ms
+     ✓ fills tens of thousands of contours without freezing  372ms
+ ✓ src/core/trace/centerline/junction-pairing-performance.test.ts (5 tests) 10ms
+
+ Test Files  9 passed (9)
+      Tests  32 passed | 1 skipped (33)
+   Start at  22:15:15
+   Duration  30.36s (transform 6.44s, setup 78ms, import 13.25s, tests 9.76s, environment 5.46s)
+
+JSON report written to C:/Users/Asus/.codex/tmp/speed-audit-20261014-2272/core-tests.json

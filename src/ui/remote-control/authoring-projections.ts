@@ -24,6 +24,7 @@ export function workspaceReadProjection(state: AppState, options: RemoteControlO
     capabilities: {
       touchEditing: true,
       groupTransformBounds: true,
+      selectionModes: true,
       scene: true,
       designControl: true,
     },

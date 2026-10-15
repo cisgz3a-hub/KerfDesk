@@ -2,6 +2,8 @@ import { canControl, canEdit, store } from './store';
 import { HeldJogController } from './held-jog';
 import { readCameraSnapshot } from './camera-snapshot';
 import { CoalescedReads } from './coalesced-reads';
+import { SelectionSync } from './selection-sync';
+import { moveArtwork, resizeArtwork } from './artwork-transforms';
 import { followControlOperation } from './control-operation';
 import { RemoteError, uuid, type LiveEvent, type RemoteTransport } from './transport';
 import {
@@ -26,6 +28,7 @@ export class Controller {
   private transport: RemoteTransport | null = null;
   private unsubscribe: (() => void) | null = null;
   private readers = new CoalescedReads();
+  private selections = this.selectionSync();
   private lastSeq = -1;
   private liveMode: 'socket' | 'wait' | 'poll' = 'poll';
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -40,6 +43,7 @@ export class Controller {
     this.stop();
     this.stopped = false;
     this.readers = new CoalescedReads();
+    this.selections = this.selectionSync();
     this.transport = transport;
     this.unsubscribe = transport.subscribe((event) => this.live(event));
     this.liveMode = 'poll';
@@ -65,9 +69,16 @@ export class Controller {
     if (this.pollTimer !== null) clearTimeout(this.pollTimer);
     this.pollTimer = null;
     this.readers.stop();
+    this.selections.stop();
     this.uncertain = new WeakMap();
     this.transport = null;
-    store.set({ pending: 0, socket: false, liveUpdates: false });
+    store.set({
+      pending: 0,
+      socket: false,
+      liveUpdates: false,
+      selectionSync: 'desktop',
+      connectionGeneration: this.generation,
+    });
     document.removeEventListener('visibilitychange', this.visibility);
     window.removeEventListener('pagehide', this.pageHidden);
   }
@@ -209,13 +220,14 @@ export class Controller {
     return this.readers.run('workspace', async () => {
       const generation = this.generation;
       const transport = this.t;
+      const selectionVersion = this.selections.version;
+      const selectionPending = this.selections.pending;
       const workspace = await transport.call<Workspace>('get_workspace');
       if (!this.current(generation)) return;
       const current = store.get();
-      const selection = current.pending > 0 ? current.selection : workspace.selection;
       store.set({
         workspace,
-        selection,
+        ...this.selections.reconcile(workspace, selectionVersion, selectionPending),
         pcOnline: true,
         ...(current.sceneRevision === workspace.revision
           ? {}
@@ -292,6 +304,10 @@ export class Controller {
   ): Promise<T | null> {
     if (this.stopped) return null;
     const generation = this.generation;
+    const owns = this.selections.owner(() => this.current(generation));
+    if (command !== 'set_selection' && this.selections.pending) {
+      if (!(await this.selections.wait()) || !owns()) return null;
+    }
     const current = store.get();
     if (!canEdit(current) || current.workspace === null) {
       store.toast('Editing isn’t approved for this connection. Allow it on the PC.', 'warning');
@@ -303,13 +319,15 @@ export class Controller {
         ? earlier.payload
         : {
             ...args,
-            expectedRevision: options.expectedRevision ?? current.workspace.revision,
+            expectedRevision:
+              options.expectedRevision ?? this.selections.revision(current.workspace.revision),
             requestId: uuid(),
           };
     store.set((state) => ({ pending: state.pending + 1 }));
     try {
       const result = await this.t.call<T>(command, payload);
       if (!this.current(generation)) return null;
+      if (command !== 'set_selection') this.selections.forgetRevision();
       if (options.retry !== undefined) this.uncertain.delete(options.retry);
       if (options.success !== undefined) store.toast(options.success, 'success');
       const changed = (result as { changedArtworkIds?: string[] }).changedArtworkIds;
@@ -342,49 +360,33 @@ export class Controller {
     store.set({ highlight: { ids, until: Date.now() + 1600 } });
   }
 
-  async select(ids: string[]): Promise<void> {
-    store.set({ selection: ids });
-    if (canEdit(store.get())) await this.write('set_selection', { artworkIds: ids.slice(0, 200) });
+  private selectionSync(): SelectionSync {
+    return new SelectionSync(
+      (args, expectedRevision) => this.write('set_selection', args, { expectedRevision }),
+      () => this.refreshWorkspace(),
+    );
   }
 
-  move(ids: string[], dxMm: number, dyMm: number) {
-    return this.write('transform_artwork', {
-      artworkIds: ids,
-      transform: { type: 'move', dxMm, dyMm },
-    });
+  select(ids: string[]): Promise<void> {
+    return this.selections.select(ids);
   }
 
-  /** Keep the opposite corner fixed; capable desktops apply resize and move in one Undo. */
-  async scale(ids: string[], from: Box, to: Box): Promise<void> {
+  selectAll(): Promise<void> {
+    return this.selections.all();
+  }
+
+  async move(ids: string[], dxMm: number, dyMm: number): Promise<void> {
     const generation = this.generation;
-    const widthMm = Math.max(0.01, to.maxX - to.minX);
-    const heightMm = Math.max(0.01, to.maxY - to.minY);
-    const dxMm = to.minX - from.minX;
-    const dyMm = to.minY - from.minY;
-    const resize = { type: 'resize', widthMm, heightMm };
-    if (this.designControl()) {
-      const edits: Record<string, unknown>[] = [
-        { command: 'transform_artwork', args: { artworkIds: ids, transform: resize } },
-      ];
-      if (Math.abs(dxMm) > 1e-6 || Math.abs(dyMm) > 1e-6)
-        edits.push({
-          command: 'transform_artwork',
-          args: { artworkIds: ids, transform: { type: 'move', dxMm, dyMm } },
-        });
-      await this.write('apply_edits', { edits });
-      return;
-    }
-    const result = await this.write<{ revision: string }>('transform_artwork', {
-      artworkIds: ids,
-      transform: resize,
-    });
-    if (result === null || !this.current(generation)) return;
-    if (Math.abs(dxMm) > 1e-6 || Math.abs(dyMm) > 1e-6)
-      await this.write(
-        'transform_artwork',
-        { artworkIds: ids, transform: { type: 'move', dxMm, dyMm } },
-        { expectedRevision: result.revision },
-      );
+    const owns = this.selections.owner(() => this.current(generation));
+    if (this.selections.pending && !(await this.selections.wait())) return;
+    if (!owns()) return;
+    await moveArtwork(this.write.bind(this), ids, dxMm, dyMm, this.designControl(), owns);
+  }
+
+  scale(ids: string[], from: Box, to: Box): Promise<void> {
+    const generation = this.generation;
+    const owns = this.selections.owner(() => this.current(generation));
+    return resizeArtwork(this.write.bind(this), ids, from, to, this.designControl(), owns);
   }
 
   rotate(ids: string[], angleDeg: number) {
@@ -419,7 +421,7 @@ export class Controller {
         ...args,
         requestId,
         ...(revision && current.workspace !== null
-          ? { expectedRevision: current.workspace.revision }
+          ? { expectedRevision: this.selections.revision(current.workspace.revision) }
           : {}),
       });
       // A cancelled held jog still needs its original receipt to release that operation.

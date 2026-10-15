@@ -1,0 +1,80 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 4,
+  "numPassedTests": 4,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791992685446,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["worker scheduling improvements against the audit baseline"],
+          "fullName": "worker scheduling improvements against the audit baseline starts manual Save immediately by retiring Preview, then resumes its original consumers",
+          "status": "passed",
+          "title": "starts manual Save immediately by retiring Preview, then resumes its original consumers",
+          "duration": 17.61239999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker scheduling improvements against the audit baseline"],
+          "fullName": "worker scheduling improvements against the audit baseline starts trace-part editing immediately, keeping the one-heap budget and resuming Preview afterwards",
+          "status": "passed",
+          "title": "starts trace-part editing immediately, keeping the one-heap budget and resuming Preview afterwards",
+          "duration": 7.998499999999694,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker scheduling improvements against the audit baseline"],
+          "fullName": "worker scheduling improvements against the audit baseline uses one compilation dispatch when Preview joins an active estimate, versus two in the baseline",
+          "status": "passed",
+          "title": "uses one compilation dispatch when Preview joins an active estimate, versus two in the baseline",
+          "duration": 6.110899999999674,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker scheduling improvements against the audit baseline"],
+          "fullName": "worker scheduling improvements against the audit baseline shares one preparation when Preview starts before the matching estimate (control case)",
+          "status": "passed",
+          "title": "shares one preparation when Preview starts before the matching estimate (control case)",
+          "duration": 2.78650000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791992693113,
+      "endTime": 1791992693146.7866,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/scripts/performance-audit/worker-scheduling.test.ts"
+    }
+  ]
+}

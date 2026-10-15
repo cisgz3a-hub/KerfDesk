@@ -1,0 +1,2179 @@
+{
+  "numTotalTestSuites": 64,
+  "numPassedTestSuites": 64,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 186,
+  "numPassedTests": 186,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791991082866,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["coalesced packed geometry transfer"],
+          "fullName": "coalesced packed geometry transfer round-trips thousands of paths through a native worker with one aligned transferable",
+          "status": "passed",
+          "title": "round-trips thousands of paths through a native worker with one aligned transferable",
+          "duration": 230.10069999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["coalesced packed geometry transfer"],
+          "fullName": "coalesced packed geometry transfer isolates outbound edits and detachment from immutable source geometry and the cached next send",
+          "status": "passed",
+          "title": "isolates outbound edits and detachment from immutable source geometry and the cached next send",
+          "duration": 98.17190000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991142156,
+      "endTime": 1791991142484.1719,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/packed-project-transfer-buffer.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["packed project transfer"],
+          "fullName": "packed project transfer round-trips individual path geometry through fresh transferable buffers without detaching the source",
+          "status": "passed",
+          "title": "round-trips individual path geometry through fresh transferable buffers without detaching the source",
+          "duration": 32.960000000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["packed project transfer"],
+          "fullName": "packed project transfer round-trips random vector geometry exactly through a transferred message",
+          "status": "passed",
+          "title": "round-trips random vector geometry exactly through a transferred message",
+          "duration": 214.85320000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["packed project transfer"],
+          "fullName": "packed project transfer sends small projects untouched, without a transfer list",
+          "status": "passed",
+          "title": "sends small projects untouched, without a transfer list",
+          "duration": 0.6574000000000524,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["packed project transfer"],
+          "fullName": "packed project transfer sends canonical straight-line curves as a flag and rebuilds them exactly",
+          "status": "passed",
+          "title": "sends canonical straight-line curves as a flag and rebuilds them exactly",
+          "duration": 43.360800000000154,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["packed project transfer"],
+          "fullName": "packed project transfer keeps an absent curves field absent and leaves non-vector objects as the same objects",
+          "status": "passed",
+          "title": "keeps an absent curves field absent and leaves non-vector objects as the same objects",
+          "duration": 0.625,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["packed project transfer"],
+          "fullName": "packed project transfer transfers fresh copies each time, so a detached message does not break the next send",
+          "status": "passed",
+          "title": "transfers fresh copies each time, so a detached message does not break the next send",
+          "duration": 7.062799999999925,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991133588,
+      "endTime": 1791991133888.0627,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/packed-project-transfer.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["manufacturing layout goals"],
+          "fullName": "manufacturing layout goals keeps every tidy layout inside stock with independently checked clearances",
+          "status": "passed",
+          "title": "keeps every tidy layout inside stock with independently checked clearances",
+          "duration": 6.838399999999979,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["manufacturing layout goals"],
+          "fullName": "manufacturing layout goals keeps every compact layout inside stock with independently checked clearances",
+          "status": "passed",
+          "title": "keeps every compact layout inside stock with independently checked clearances",
+          "duration": 3.124900000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["manufacturing layout goals"],
+          "fullName": "manufacturing layout goals keeps every grid layout inside stock with independently checked clearances",
+          "status": "passed",
+          "title": "keeps every grid layout inside stock with independently checked clearances",
+          "duration": 1.7707000000000335,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["manufacturing layout goals"],
+          "fullName": "manufacturing layout goals places grid cells at a uniform pitch even around an obstacle",
+          "status": "passed",
+          "title": "places grid cells at a uniform pitch even around an obstacle",
+          "duration": 0.675200000000018,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["manufacturing layout goals"],
+          "fullName": "manufacturing layout goals uses an explicitly required half-turn and validates its physical dimensions",
+          "status": "passed",
+          "title": "uses an explicitly required half-turn and validates its physical dimensions",
+          "duration": 0.7576999999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["manufacturing layout goals"],
+          "fullName": "manufacturing layout goals cannot quarter-turn grain-restricted parts just to fit a narrower bin",
+          "status": "passed",
+          "title": "cannot quarter-turn grain-restricted parts just to fit a narrower bin",
+          "duration": 0.19899999999995543,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["manufacturing layout goals"],
+          "fullName": "manufacturing layout goals retains a monotonically improving complete best result in every search update",
+          "status": "passed",
+          "title": "retains a monotonically improving complete best result in every search update",
+          "duration": 26.7894,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["manufacturing layout goals"],
+          "fullName": "manufacturing layout goals interlocks triangles without a positive-area intersection by an independent separating-axis oracle",
+          "status": "passed",
+          "title": "interlocks triangles without a positive-area intersection by an independent separating-axis oracle",
+          "duration": 16.78359999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["manufacturing layout goals"],
+          "fullName": "manufacturing layout goals rejects incomplete, duplicate and non-finite drafts",
+          "status": "passed",
+          "title": "rejects incomplete, duplicate and non-finite drafts",
+          "duration": 0.7979000000000269,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991135515,
+      "endTime": 1791991135573.7979,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/nesting/layout-nest.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["indexed nest collision validation"],
+          "fullName": "indexed nest collision validation matches all-pairs validation across seeded rectangles, outlines, rotations and obstacles",
+          "status": "passed",
+          "title": "matches all-pairs validation across seeded rectangles, outlines, rotations and obstacles",
+          "duration": 75.53539999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed nest collision validation"],
+          "fullName": "indexed nest collision validation keeps touching, sub-tolerance overlap and exact padding decisions in both input orders",
+          "status": "passed",
+          "title": "keeps touching, sub-tolerance overlap and exact padding decisions in both input orders",
+          "duration": 50.878099999999904,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed nest collision validation"],
+          "fullName": "indexed nest collision validation retains holes and complementary outlines with overlapping bounding boxes",
+          "status": "passed",
+          "title": "retains holes and complementary outlines with overlapping bounding boxes",
+          "duration": 1.302599999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed nest collision validation"],
+          "fullName": "indexed nest collision validation uses transformed artwork bounds instead of declared width and ignores obstacle/obstacle overlap",
+          "status": "passed",
+          "title": "uses transformed artwork bounds instead of declared width and ignores obstacle/obstacle overlap",
+          "duration": 2.0551000000000386,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed nest collision validation"],
+          "fullName": "indexed nest collision validation retains invalid input and extreme-coordinate outcomes",
+          "status": "passed",
+          "title": "retains invalid input and extreme-coordinate outcomes",
+          "duration": 1.5417999999999665,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["indexed nest collision validation"],
+          "fullName": "indexed nest collision validation avoids all-pairs exact checks for 10000 separate rectangles without a timing threshold",
+          "status": "passed",
+          "title": "avoids all-pairs exact checks for 10000 separate rectangles without a timing threshold",
+          "duration": 27.90969999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991136810,
+      "endTime": 1791991136969.9097,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/nesting/nest-collision-validation.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["actual contour spacing"],
+          "fullName": "actual contour spacing prunes dense separated contours without visiting every segment pair",
+          "status": "passed",
+          "title": "prunes dense separated contours without visiting every segment pair",
+          "duration": 204.55250000000024,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["actual contour spacing"],
+          "fullName": "actual contour spacing rejects the measured 1.999 mm triangle gap despite rounded offset polygons",
+          "status": "passed",
+          "title": "rejects the measured 1.999 mm triangle gap despite rounded offset polygons",
+          "duration": 23.112099999999828,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["actual contour spacing"],
+          "fullName": "actual contour spacing uses exact clearance bounds for a rounded triangle corner",
+          "status": "passed",
+          "title": "uses exact clearance bounds for a rounded triangle corner",
+          "duration": 1.7692999999999302,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["actual contour spacing"],
+          "fullName": "actual contour spacing does not compact two triangles below their declared spacing",
+          "status": "passed",
+          "title": "does not compact two triangles below their declared spacing",
+          "duration": 53.23149999999987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["actual contour spacing"],
+          "fullName": "actual contour spacing checks sloping edges and crossing segments independently of rounded offsets",
+          "status": "passed",
+          "title": "checks sloping edges and crossing segments independently of rounded offsets",
+          "duration": 1.171100000000024,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991155523,
+      "endTime": 1791991155807.1711,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/nesting/outline-clearance.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["outlineNest third-party failure boundary"],
+          "fullName": "outlineNest third-party failure boundary retains the supplied conservative placements when Clipper rejects compaction",
+          "status": "passed",
+          "title": "retains the supplied conservative placements when Clipper rejects compaction",
+          "duration": 20.610100000000102,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991162827,
+      "endTime": 1791991162847.61,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/nesting/outline-compact-nest-op-failure.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["compactOutlineNest"],
+          "fullName": "compactOutlineNest interlocks complementary triangles that rectangular packing keeps apart",
+          "status": "passed",
+          "title": "interlocks complementary triangles that rectangular packing keeps apart",
+          "duration": 8.584699999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compactOutlineNest"],
+          "fullName": "compactOutlineNest succeeds when the parts bounding rectangles cannot both fit",
+          "status": "passed",
+          "title": "succeeds when the parts bounding rectangles cannot both fit",
+          "duration": 14.396200000000022,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compactOutlineNest"],
+          "fullName": "compactOutlineNest places a small part inside a ring while preserving the ring hole",
+          "status": "passed",
+          "title": "places a small part inside a ring while preserving the ring hole",
+          "duration": 2.1287999999999556,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compactOutlineNest"],
+          "fullName": "compactOutlineNest is deterministic and respects padding, rotation, and locked obstacles",
+          "status": "passed",
+          "title": "is deterministic and respects padding, rotation, and locked obstacles",
+          "duration": 5.992200000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compactOutlineNest"],
+          "fullName": "compactOutlineNest keeps the requested edge-to-edge clearance after compaction",
+          "status": "passed",
+          "title": "keeps the requested edge-to-edge clearance after compaction",
+          "duration": 3.890899999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compactOutlineNest"],
+          "fullName": "compactOutlineNest uses conservative rectangles for missing or invalid outlines",
+          "status": "passed",
+          "title": "uses conservative rectangles for missing or invalid outlines",
+          "duration": 0.7758999999999787,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compactOutlineNest"],
+          "fullName": "compactOutlineNest falls back without expensive outline work above the bounded corpus size",
+          "status": "passed",
+          "title": "falls back without expensive outline work above the bounded corpus size",
+          "duration": 1.4694999999999254,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compactOutlineNest"],
+          "fullName": "compactOutlineNest rejects outline corpora whose point-weighted work exceeds the interactive budget",
+          "status": "passed",
+          "title": "rejects outline corpora whose point-weighted work exceeds the interactive budget",
+          "duration": 0.6244999999998981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compactOutlineNest"],
+          "fullName": "compactOutlineNest retains the rectangular draft when dense contour segment pairs exceed the search budget",
+          "status": "passed",
+          "title": "retains the rectangular draft when dense contour segment pairs exceed the search budget",
+          "duration": 3.419200000000046,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compactOutlineNest"],
+          "fullName": "compactOutlineNest packs a deterministic forty-part production corpus within its budget",
+          "status": "passed",
+          "title": "packs a deterministic forty-part production corpus within its budget",
+          "duration": 0.83299999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991134482,
+      "endTime": 1791991134524.833,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/nesting/outline-compact-nest.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary exports declared spacing, stock copies and discrete rotations without mirroring",
+          "status": "passed",
+          "title": "exports declared spacing, stock copies and discrete rotations without mirroring",
+          "duration": 5.765099999999848,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary preserves holes and disconnected components in one rigid part",
+          "status": "passed",
+          "title": "preserves holes and disconnected components in one rigid part",
+          "duration": 2.108699999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary translates the solver origin convention and recomputes all quantities",
+          "status": "passed",
+          "title": "translates the solver origin convention and recomputes all quantities",
+          "duration": 2.3076999999998407,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary rejects overlap independently of solver totals",
+          "status": "passed",
+          "title": "rejects overlap independently of solver totals",
+          "duration": 0.4416000000001077,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary rejects short spacing independently of solver totals",
+          "status": "passed",
+          "title": "rejects short spacing independently of solver totals",
+          "duration": 0.2778000000000702,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary rejects outside independently of solver totals",
+          "status": "passed",
+          "title": "rejects outside independently of solver totals",
+          "duration": 0.30130000000008295,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary rejects mirrored independently of solver totals",
+          "status": "passed",
+          "title": "rejects mirrored independently of solver totals",
+          "duration": 0.1610000000000582,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary rejects unknown part independently of solver totals",
+          "status": "passed",
+          "title": "rejects unknown part independently of solver totals",
+          "duration": 0.12329999999997199,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary rejects unknown stock independently of solver totals",
+          "status": "passed",
+          "title": "rejects unknown stock independently of solver totals",
+          "duration": 0.12079999999991742,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary rejects extra stock copies independently of solver totals",
+          "status": "passed",
+          "title": "rejects extra stock copies independently of solver totals",
+          "duration": 0.18229999999994106,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary rejects non-finite coordinate independently of solver totals",
+          "status": "passed",
+          "title": "rejects non-finite coordinate independently of solver totals",
+          "duration": 0.17809999999985848,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary rejects forbidden grain rotations, excess copies, duplicate sheets and malformed certificates",
+          "status": "passed",
+          "title": "rejects forbidden grain rotations, excess copies, duplicate sheets and malformed certificates",
+          "duration": 0.46280000000001564,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary retains the standard draft for unsupported declarations and larger work budgets",
+          "status": "passed",
+          "title": "retains the standard draft for unsupported declarations and larger work budgets",
+          "duration": 0.19630000000006476,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary does not replace a complete draft with an empty or less complete timeout result",
+          "status": "passed",
+          "title": "does not replace a complete draft with an empty or less complete timeout result",
+          "duration": 1.3096000000000458,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanced nesting boundary"],
+          "fullName": "advanced nesting boundary ranks complete valid certificates by sheet count before total stock area",
+          "status": "passed",
+          "title": "ranks complete valid certificates by sheet count before total stock area",
+          "duration": 0.9045000000000982,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991138116,
+      "endTime": 1791991138130.9045,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/nesting/packing-solver-adapter.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["quantity and grain aware production placement"],
+          "fullName": "quantity and grain aware production placement conserves quantities across declared sheets and remnants with deterministic gap and area accounting",
+          "status": "passed",
+          "title": "conserves quantities across declared sheets and remnants with deterministic gap and area accounting",
+          "duration": 16.82380000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quantity and grain aware production placement"],
+          "fullName": "quantity and grain aware production placement accounts for every unplaced copy and distinguishes missing artwork, stock compatibility, grain and fit",
+          "status": "passed",
+          "title": "accounts for every unplaced copy and distinguishes missing artwork, stock compatibility, grain and fit",
+          "duration": 0.7730000000001382,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quantity and grain aware production placement"],
+          "fullName": "quantity and grain aware production placement turns only where part and stock grain agree and verifies the actual turn independently",
+          "status": "passed",
+          "title": "turns only where part and stock grain agree and verifies the actual turn independently",
+          "duration": 0.7627999999999702,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quantity and grain aware production placement"],
+          "fullName": "quantity and grain aware production placement rejects invented totals, duplicate copy identity, overlaps and boundary escapes",
+          "status": "passed",
+          "title": "rejects invented totals, duplicate copy identity, overlaps and boundary escapes",
+          "duration": 0.7798000000000229,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quantity and grain aware production placement"],
+          "fullName": "quantity and grain aware production placement retains the best valid draft during a bounded deterministic search",
+          "status": "passed",
+          "title": "retains the best valid draft during a bounded deterministic search",
+          "duration": 11.59530000000018,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quantity and grain aware production placement"],
+          "fullName": "quantity and grain aware production placement bounds quantities and rejects duplicate source or output identities at persistence boundaries",
+          "status": "passed",
+          "title": "bounds quantities and rejects duplicate source or output identities at persistence boundaries",
+          "duration": 5.3271000000002005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991139352,
+      "endTime": 1791991139388.3271,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/nesting/production-nest.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["subtractUsedFreeRects"],
+          "fullName": "subtractUsedFreeRects matches the all-pairs prune, order included, over random packings",
+          "status": "passed",
+          "title": "matches the all-pairs prune, order included, over random packings",
+          "duration": 154.26330000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quickNest at scale"],
+          "fullName": "quickNest at scale nests 16,000 parts without the all-pairs prune",
+          "status": "passed",
+          "title": "nests 16,000 parts without the all-pairs prune",
+          "duration": 635.5275000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991157377,
+      "endTime": 1791991158167.5276,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/nesting/quick-nest-free-rects.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["quickNest"],
+          "fullName": "quickNest is deterministic, padded, and non-overlapping",
+          "status": "passed",
+          "title": "is deterministic, padded, and non-overlapping",
+          "duration": 4.7971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quickNest"],
+          "fullName": "quickNest uses 90 degree rotation when it is the only fit",
+          "status": "passed",
+          "title": "uses 90 degree rotation when it is the only fit",
+          "duration": 0.8053999999999633,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quickNest"],
+          "fullName": "quickNest respects locked obstacles and fails atomically when an item cannot fit",
+          "status": "passed",
+          "title": "respects locked obstacles and fails atomically when an item cannot fit",
+          "duration": 0.27640000000019427,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991159624,
+      "endTime": 1791991159630.2764,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/core/nesting/quick-nest.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["an overlay whose chunk is gone after an update in another window"],
+          "fullName": "an overlay whose chunk is gone after an update in another window 'Design Library' fails on its own and Close shuts it",
+          "status": "passed",
+          "title": "'Design Library' fails on its own and Close shuts it",
+          "duration": 205.73779999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["an overlay whose chunk is gone after an update in another window"],
+          "fullName": "an overlay whose chunk is gone after an update in another window 'The visual tutorials' fails on its own and Close shuts it",
+          "status": "passed",
+          "title": "'The visual tutorials' fails on its own and Close shuts it",
+          "duration": 95.51389999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["an overlay whose chunk is gone after an update in another window"],
+          "fullName": "an overlay whose chunk is gone after an update in another window 'Image Studio' fails on its own and Close shuts it",
+          "status": "passed",
+          "title": "'Image Studio' fails on its own and Close shuts it",
+          "duration": 75.58569999999963,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["an overlay whose chunk is gone after an update in another window"],
+          "fullName": "an overlay whose chunk is gone after an update in another window 'Design Studio' fails on its own and Close shuts it",
+          "status": "passed",
+          "title": "'Design Studio' fails on its own and Close shuts it",
+          "duration": 61.18299999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991146581,
+      "endTime": 1791991147019.183,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/app/lazy-overlay-load-failure.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["project photos in the design composition"],
+          "fullName": "project photos in the design composition uses the production raster renderer with the exact project object and matching pan/zoom",
+          "status": "passed",
+          "title": "uses the production raster renderer with the exact project object and matching pan/zoom",
+          "duration": 3.7053000000000793,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["project photos in the design composition"],
+          "fullName": "project photos in the design composition hides bound invisible photos but renders orphan and locked photos",
+          "status": "passed",
+          "title": "hides bound invisible photos but renders orphan and locked photos",
+          "duration": 1.396800000000212,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["project photos in the design composition"],
+          "fullName": "project photos in the design composition outlines the true rotated and mirrored corners rather than an untransformed bounding box",
+          "status": "passed",
+          "title": "outlines the true rotated and mirrored corners rather than an untransformed bounding box",
+          "duration": 1.3359000000000378,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["project photos in the design composition"],
+          "fullName": "project photos in the design composition picks only the transformed area and the last visible unlocked photo",
+          "status": "passed",
+          "title": "picks only the transformed area and the last visible unlocked photo",
+          "duration": 0.7193999999999505,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["project photos in the design composition"],
+          "fullName": "project photos in the design composition keeps vector geometry above the photo selectable instead of opening the background photo",
+          "status": "passed",
+          "title": "keeps vector geometry above the photo selectable instead of opening the background photo",
+          "duration": 0.9493999999999687,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "keeps saved photo/vector stacking order while excluding the live draft objects",
+          "status": "passed",
+          "title": "keeps saved photo/vector stacking order while excluding the live draft objects",
+          "duration": 0.9998000000000502,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991140943,
+      "endTime": 1791991140951.9998,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/design-studio/design-project-photos.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "draws persisted vectors with production curve/fill resolution in the same coordinate frame",
+          "status": "passed",
+          "title": "draws persisted vectors with production curve/fill resolution in the same coordinate frame",
+          "duration": 6.866000000000213,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "does not double draw the live draft or show hidden project vectors",
+          "status": "passed",
+          "title": "does not double draw the live draft or show hidden project vectors",
+          "duration": 0.6538000000000466,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991161583,
+      "endTime": 1791991161590.6538,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/design-studio/design-project-vectors.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: design library navigation"],
+          "fullName": "artwork control audit: design library navigation filters a collection returns to All designs and clears search and all facets",
+          "status": "passed",
+          "title": "filters a collection returns to All designs and clears search and all facets",
+          "duration": 884.5865999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: design library navigation"],
+          "fullName": "artwork control audit: design library navigation returns focus from details to the selected card without inserting artwork",
+          "status": "passed",
+          "title": "returns focus from details to the selected card without inserting artwork",
+          "duration": 184.8829999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: design library navigation"],
+          "fullName": "artwork control audit: design library navigation exposes exact source and license destinations as native new-tab links",
+          "status": "passed",
+          "title": "exposes exact source and license destinations as native new-tab links",
+          "duration": 211.64030000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991153888,
+      "endTime": 1791991155169.6404,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/library/DesignLibraryControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog uses the shared modal contract and derives only populated facets",
+          "status": "passed",
+          "title": "uses the shared modal contract and derives only populated facets",
+          "duration": 169.28720000000249,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog closes on Escape, unregisters the modal, and restores opener focus",
+          "status": "passed",
+          "title": "closes on Escape, unregisters the modal, and restores opener focus",
+          "duration": 70.79809999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog silently abandons a deferred insertion after Close button closes the dialog",
+          "status": "passed",
+          "title": "silently abandons a deferred insertion after Close button closes the dialog",
+          "duration": 97.3705000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog silently abandons a deferred insertion after Escape closes the dialog",
+          "status": "passed",
+          "title": "silently abandons a deferred insertion after Escape closes the dialog",
+          "duration": 67.24529999999868,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog retains exact insertion ownership after a StrictMode close and reopen",
+          "status": "passed",
+          "title": "retains exact insertion ownership after a StrictMode close and reopen",
+          "duration": 167.8273999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog does not let an old deferred completion close a same-document reopened dialog",
+          "status": "passed",
+          "title": "does not let an old deferred completion close a same-document reopened dialog",
+          "duration": 119.67120000000068,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog selects a card without inserting, then adds from exact provenance details",
+          "status": "passed",
+          "title": "selects a card without inserting, then adds from exact provenance details",
+          "duration": 75.45880000000034,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog adds the exact visible design from the separate quick action",
+          "status": "passed",
+          "title": "adds the exact visible design from the separate quick action",
+          "duration": 39.7586999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog lazily loads and inserts a pinned Tabler asset with exact provenance",
+          "status": "passed",
+          "title": "lazily loads and inserts a pinned Tabler asset with exact provenance",
+          "duration": 70.2580999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog searches pinned creator and license provenance and exposes exact detail",
+          "status": "passed",
+          "title": "searches pinned creator and license provenance and exposes exact detail",
+          "duration": 49.46730000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog keeps a filter fallback selected when results broaden again",
+          "status": "passed",
+          "title": "keeps a filter fallback selected when results broaden again",
+          "duration": 110.0560000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog uses unique titles and curated collection labels for sighted and screen-reader users",
+          "status": "passed",
+          "title": "uses unique titles and curated collection labels for sighted and screen-reader users",
+          "duration": 47.68279999999868,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog keeps exact provenance URLs readable when desktop security blocks external windows",
+          "status": "passed",
+          "title": "keeps exact provenance URLs readable when desktop security blocks external windows",
+          "duration": 49.32890000000043,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog keeps a zero-result query visible and recovers through Clear filters",
+          "status": "passed",
+          "title": "keeps a zero-result query visible and recovers through Clear filters",
+          "duration": 89.28329999999914,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog isolates a failed add and keeps the Library usable",
+          "status": "passed",
+          "title": "isolates a failed add and keeps the Library usable",
+          "duration": 47.333599999998114,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog isolates a rejected lazy geometry load and re-enables add actions",
+          "status": "passed",
+          "title": "isolates a rejected lazy geometry load and re-enables add actions",
+          "duration": 52.494699999999284,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog shows an accessible fallback when a preview cannot load",
+          "status": "passed",
+          "title": "shows an accessible fallback when a preview cannot load",
+          "duration": 39.92559999999867,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesignLibraryDialog"],
+          "fullName": "DesignLibraryDialog isolates a broken detail preview to the selected design",
+          "status": "passed",
+          "title": "isolates a broken detail preview to the selected design",
+          "duration": 62.7458000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991102158,
+      "endTime": 1791991103584.7458,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/library/DesignLibraryDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "loads only on open and keeps one dismissible modal through deferred loading",
+          "status": "passed",
+          "title": "loads only on open and keeps one dismissible modal through deferred loading",
+          "duration": 83.72809999999981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991156960,
+      "endTime": 1791991157043.728,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/library/DesignLibraryHost.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Ruida background output preparation"],
+          "fullName": "Ruida background output preparation matches direct bytes and advisories for a valid costly line job",
+          "status": "passed",
+          "title": "matches direct bytes and advisories for a valid costly line job",
+          "duration": 2929.7082,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Ruida background output preparation"],
+          "fullName": "Ruida background output preparation encodes with the request placement and preflight frame",
+          "status": "passed",
+          "title": "encodes with the request placement and preflight frame",
+          "duration": 3.669499999999971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991150606,
+      "endTime": 1791991153539.6694,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/laser/output-preparation-rd.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["packing a Start preparation for the worker handoff"],
+          "fullName": "packing a Start preparation for the worker handoff packs a manifest past the archive budget instead of refusing it",
+          "status": "passed",
+          "title": "packs a manifest past the archive budget instead of refusing it",
+          "duration": 609.0186999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["packing a Start preparation for the worker handoff"],
+          "fullName": "packing a Start preparation for the worker handoff still refuses the same manifest when it is genuinely being archived",
+          "status": "passed",
+          "title": "still refuses the same manifest when it is genuinely being archived",
+          "duration": 7.366500000000087,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991158498,
+      "endTime": 1791991159114.3665,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/laser/output-preparation-transfer-budget.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepareStartOutputOffThread early outline relay"],
+          "fullName": "prepareStartOutputOffThread early outline relay delivers the outline to the requesting caller before the program settles",
+          "status": "passed",
+          "title": "delivers the outline to the requesting caller before the program settles",
+          "duration": 5.491800000000694,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartOutputOffThread early outline relay"],
+          "fullName": "prepareStartOutputOffThread early outline relay drops an outline addressed to a request that is no longer pending",
+          "status": "passed",
+          "title": "drops an outline addressed to a request that is no longer pending",
+          "duration": 0.8356000000003405,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartOutputOffThread early outline relay"],
+          "fullName": "prepareStartOutputOffThread early outline relay keeps the exact program when the outline listener throws",
+          "status": "passed",
+          "title": "keeps the exact program when the outline listener throws",
+          "duration": 1.391700000000128,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991146970,
+      "endTime": 1791991146977.3916,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/laser/output-preparation-worker-client-frame-bounds.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Ruida output preparation worker client"],
+          "fullName": "Ruida output preparation worker client sends and resolves the typed rd request/result",
+          "status": "passed",
+          "title": "sends and resolves the typed rd request/result",
+          "duration": 13.628000000000156,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991161360,
+      "endTime": 1791991161373.628,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/laser/output-preparation-worker-client-rd.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["output preparation worker payload"],
+          "fullName": "output preparation worker payload preserves a failed Save preparation as a distinct worker result",
+          "status": "passed",
+          "title": "preserves a failed Save preparation as a distinct worker result",
+          "duration": 4.34099999999944,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["output preparation worker payload"],
+          "fullName": "output preparation worker payload returns cloneable rotary raster output without a permission field",
+          "status": "passed",
+          "title": "returns cloneable rotary raster output without a permission field",
+          "duration": 17.139900000000125,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["output preparation worker payload"],
+          "fullName": "output preparation worker payload returns an exact cloneable large Start result without a function-valued raster",
+          "status": "passed",
+          "title": "returns an exact cloneable large Start result without a function-valued raster",
+          "duration": 588.6702999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["output preparation worker payload"],
+          "fullName": "output preparation worker payload rehydrates each angle of a cross-hatched streamed image to the sealed bytes",
+          "status": "passed",
+          "title": "rehydrates each angle of a cross-hatched streamed image to the sealed bytes",
+          "duration": 1974.6794999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["output preparation worker payload"],
+          "fullName": "output preparation worker payload uses the same verified plan for calculated bounds without changing emitted bytes",
+          "status": "passed",
+          "title": "uses the same verified plan for calculated bounds without changing emitted bytes",
+          "duration": 14.006500000000415,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["output preparation worker payload"],
+          "fullName": "output preparation worker payload hydrates page-backed luma before the production Save preparation emits G-code",
+          "status": "passed",
+          "title": "hydrates page-backed luma before the production Save preparation emits G-code",
+          "duration": 19.424199999999473,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991116525,
+      "endTime": 1791991119143.4243,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/laser/output-preparation.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["preparation controller position identity"],
+          "fullName": "preparation controller position identity accepts a first zero WCO and subsequent omitted WCO with no custom origin",
+          "status": "passed",
+          "title": "accepts a first zero WCO and subsequent omitted WCO with no custom origin",
+          "duration": 7.923700000000281,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation controller position identity"],
+          "fullName": "preparation controller position identity accepts equivalent MPos and WPos in either direction with a stable custom offset",
+          "status": "passed",
+          "title": "accepts equivalent MPos and WPos in either direction with a stable custom offset",
+          "duration": 1.4018999999998414,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation controller position identity"],
+          "fullName": "preparation controller position identity allows one 'mm' reporting tick only for MPos/WCO conversion",
+          "status": "passed",
+          "title": "allows one 'mm' reporting tick only for MPos/WCO conversion",
+          "duration": 1.1690000000007785,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation controller position identity"],
+          "fullName": "preparation controller position identity allows one 'inch' reporting tick only for MPos/WCO conversion",
+          "status": "passed",
+          "title": "allows one 'inch' reporting tick only for MPos/WCO conversion",
+          "duration": 0.8186999999998079,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation controller position identity"],
+          "fullName": "preparation controller position identity rejects movement when conversion has no offset rounding or an extra field disagrees",
+          "status": "passed",
+          "title": "rejects movement when conversion has no offset rounding or an extra field disagrees",
+          "duration": 0.731499999999869,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation controller position identity"],
+          "fullName": "preparation controller position identity rejects changed offset XYZ even when WPos is kept unchanged",
+          "status": "passed",
+          "title": "rejects changed offset XYZ even when WPos is kept unchanged",
+          "duration": 0.6517999999996391,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation controller position identity"],
+          "fullName": "preparation controller position identity does not assume a missing custom-origin offset is zero",
+          "status": "passed",
+          "title": "does not assume a missing custom-origin offset is zero",
+          "duration": 0.7121999999999389,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation controller position identity"],
+          "fullName": "preparation controller position identity keeps session, origin provenance, unit interpretation and CNC Z evidence bound",
+          "status": "passed",
+          "title": "keeps session, origin provenance, unit interpretation and CNC Z evidence bound",
+          "duration": 1.1512999999995372,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["equivalent position reports during owned background preparation"],
+          "fullName": "equivalent position reports during owned background preparation finishes the original worker across first zero WCO and equivalent WPos reports",
+          "status": "passed",
+          "title": "finishes the original worker across first zero WCO and equivalent WPos reports",
+          "duration": 13.433500000000095,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["equivalent position reports during owned background preparation"],
+          "fullName": "equivalent position reports during owned background preparation retires the worker after a real offset change",
+          "status": "passed",
+          "title": "retires the worker after a real offset change",
+          "duration": 2.4155000000000655,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991124524,
+      "endTime": 1791991124555.4155,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/laser/start-job-authorization-position.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation preserves small-job bytes, saved selection and frozen origin without a new Frame",
+          "status": "passed",
+          "title": "preserves small-job bytes, saved selection and frozen origin without a new Frame",
+          "duration": 52.801400000000285,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation treats an absent saved origin as Absolute even if live placement changed",
+          "status": "passed",
+          "title": "treats an absent saved origin as Absolute even if live placement changed",
+          "duration": 10.33179999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation keeps current canvas placement for manual start-from-line preparation",
+          "status": "passed",
+          "title": "keeps current canvas placement for manual start-from-line preparation",
+          "duration": 6.532200000001467,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation qualifies exact archived recovery after reconnect with no retained Frame",
+          "status": "passed",
+          "title": "qualifies exact archived recovery after reconnect with no retained Frame",
+          "duration": 8.0666999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation compiles costly recovery in the worker with the exact saved scope and origin",
+          "status": "passed",
+          "title": "compiles costly recovery in the worker with the exact saved scope and origin",
+          "duration": 27.129499999999098,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation reports a unavailable worker failure without blocking fallback compilation",
+          "status": "passed",
+          "title": "reports a unavailable worker failure without blocking fallback compilation",
+          "duration": 3.698100000001432,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation reports a crash worker failure without blocking fallback compilation",
+          "status": "passed",
+          "title": "reports a crash worker failure without blocking fallback compilation",
+          "duration": 2.1774999999979627,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation reports a compiler worker failure without blocking fallback compilation",
+          "status": "passed",
+          "title": "reports a compiler worker failure without blocking fallback compilation",
+          "duration": 2.5031999999991967,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation cancels pending recovery when its project changes",
+          "status": "passed",
+          "title": "cancels pending recovery when its project changes",
+          "duration": 5.809600000000501,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation cancels pending recovery when its placement changes",
+          "status": "passed",
+          "title": "cancels pending recovery when its placement changes",
+          "duration": 3.285599999999249,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation cancels pending recovery when its scope changes",
+          "status": "passed",
+          "title": "cancels pending recovery when its scope changes",
+          "duration": 2.1497999999992317,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation cancels pending recovery when its session changes",
+          "status": "passed",
+          "title": "cancels pending recovery when its session changes",
+          "duration": 1.4902000000001863,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation cancels pending recovery when its position changes",
+          "status": "passed",
+          "title": "cancels pending recovery when its position changes",
+          "duration": 1.4019000000007509,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation preserves background preparation across UI-only changes and unchanged status reports",
+          "status": "passed",
+          "title": "preserves background preparation across UI-only changes and unchanged status reports",
+          "duration": 9.919099999999162,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation rejects a refreshed controller settings observation instead of adopting it after the worker",
+          "status": "passed",
+          "title": "rejects a refreshed controller settings observation instead of adopting it after the worker",
+          "duration": 5.645300000000134,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation rejects a refreshed controller observation observation instead of adopting it after the worker",
+          "status": "passed",
+          "title": "rejects a refreshed controller observation observation instead of adopting it after the worker",
+          "duration": 5.353900000001886,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation requires current-session controller qualification before dispatching recovery",
+          "status": "passed",
+          "title": "requires current-session controller qualification before dispatching recovery",
+          "duration": 1.3178999999981897,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recovery source preparation"],
+          "fullName": "recovery source preparation requires controller qualification to remain complete when the worker finishes",
+          "status": "passed",
+          "title": "requires controller qualification to remain complete when the worker finishes",
+          "duration": 4.774300000000949,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991101754,
+      "endTime": 1791991101908.7744,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/laser/start-job-source-recovery.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["R1: current Frame/Start preparation owns its worker lifetime"],
+          "fullName": "R1: current Frame/Start preparation owns its worker lifetime retires an active worker when completed controller observations change Absolute coordinates",
+          "status": "passed",
+          "title": "retires an active worker when completed controller observations change Absolute coordinates",
+          "duration": 11.895000000000437,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["R1: current Frame/Start preparation owns its worker lifetime"],
+          "fullName": "R1: current Frame/Start preparation owns its worker lifetime cancels a stale active Frame, dispatches the queued Save, and issues no Frame permit",
+          "status": "passed",
+          "title": "cancels a stale active Frame, dispatches the queued Save, and issues no Frame permit",
+          "duration": 59.35360000000037,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["R1: current Frame/Start preparation owns its worker lifetime"],
+          "fullName": "R1: current Frame/Start preparation owns its worker lifetime removes only a stale queued Start and allows an explicit retry after Save",
+          "status": "passed",
+          "title": "removes only a stale queued Start and allows an explicit retry after Save",
+          "duration": 5.471999999999753,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["R1: current Frame/Start preparation owns its worker lifetime"],
+          "fullName": "R1: current Frame/Start preparation owns its worker lifetime preserves healthy preparation across advisory settings and UI-only changes",
+          "status": "passed",
+          "title": "preserves healthy preparation across advisory settings and UI-only changes",
+          "duration": 2.4661999999998443,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["R1: current Frame/Start preparation owns its worker lifetime"],
+          "fullName": "R1: current Frame/Start preparation owns its worker lifetime cancels on a controller session change without touching another queued owner",
+          "status": "passed",
+          "title": "cancels on a controller session change without touching another queued owner",
+          "duration": 2.415299999999661,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["R1: current Frame/Start preparation owns its worker lifetime"],
+          "fullName": "R1: current Frame/Start preparation owns its worker lifetime keeps caller cancellation as AbortError and rejects an already-stale captured source",
+          "status": "passed",
+          "title": "keeps caller cancellation as AbortError and rejects an already-stale captured source",
+          "duration": 3.0697000000000116,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991133414,
+      "endTime": 1791991133499.0696,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/laser/start-preparation-owner.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Frame preparation ownership"],
+          "fullName": "Frame preparation ownership shares one compilation and Frame across repeated calls, then allows a completed Frame retry",
+          "status": "passed",
+          "title": "shares one compilation and Frame across repeated calls, then allows a completed Frame retry",
+          "duration": 279.2371999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame preparation ownership"],
+          "fullName": "Frame preparation ownership releases failed compilation ownership so a new Frame can prepare and succeed",
+          "status": "passed",
+          "title": "releases failed compilation ownership so a new Frame can prepare and succeed",
+          "duration": 183.20269999999982,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame preparation ownership"],
+          "fullName": "Frame preparation ownership releases stale compilation ownership and retries against the current edited job",
+          "status": "passed",
+          "title": "releases stale compilation ownership and retries against the current edited job",
+          "duration": 185.28370000000086,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame preparation ownership"],
+          "fullName": "Frame preparation ownership shows the owned compilation's progress and clears it with the Frame",
+          "status": "passed",
+          "title": "shows the owned compilation's progress and clears it with the Frame",
+          "duration": 136.78980000000047,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991111210,
+      "endTime": 1791991111994.7898,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/laser/use-frame-action.single-flight.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork sprite cache admission"],
+          "fullName": "artwork sprite cache admission retains all 8 small dense objects across stable draws",
+          "status": "passed",
+          "title": "retains all 8 small dense objects across stable draws",
+          "duration": 9.522899999999936,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork sprite cache admission"],
+          "fullName": "artwork sprite cache admission retains all 9 small dense objects across stable draws",
+          "status": "passed",
+          "title": "retains all 9 small dense objects across stable draws",
+          "duration": 2.186200000000099,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork sprite cache admission"],
+          "fullName": "artwork sprite cache admission retains all 16 small dense objects across stable draws",
+          "status": "passed",
+          "title": "retains all 16 small dense objects across stable draws",
+          "duration": 4.061500000000251,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork sprite cache admission"],
+          "fullName": "artwork sprite cache admission keeps a stable pixel-budget subset instead of cycling through every object",
+          "status": "passed",
+          "title": "keeps a stable pixel-budget subset instead of cycling through every object",
+          "duration": 2.172399999999925,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork sprite cache admission"],
+          "fullName": "artwork sprite cache admission bounds canvas metadata even when a scan contains hundreds of tiny sprites",
+          "status": "passed",
+          "title": "bounds canvas metadata even when a scan contains hundreds of tiny sprites",
+          "duration": 28.7166000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork sprite cache admission"],
+          "fullName": "artwork sprite cache admission reclaims absent sprites after one complete draw and zeroes evicted canvases",
+          "status": "passed",
+          "title": "reclaims absent sprites after one complete draw and zeroes evicted canvases",
+          "duration": 0.8845000000001164,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork sprite cache admission"],
+          "fullName": "artwork sprite cache admission does not allocate beyond the pixel budget when an existing sprite grows",
+          "status": "passed",
+          "title": "does not allocate beyond the pixel budget when an existing sprite grows",
+          "duration": 0.6857999999997446,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork sprite cache admission"],
+          "fullName": "artwork sprite cache admission reclaims an old scene after an empty full Preview artwork pass",
+          "status": "passed",
+          "title": "reclaims an old scene after an empty full Preview artwork pass",
+          "duration": 3.896400000000085,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork sprite cache admission"],
+          "fullName": "artwork sprite cache admission keeps a useful zoom placeholder only until an unrenderable region must paint directly",
+          "status": "passed",
+          "title": "keeps a useful zoom placeholder only until an unrenderable region must paint directly",
+          "duration": 3.490400000000136,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991140579,
+      "endTime": 1791991140635.4905,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/workspace/artwork-sprite-cache-budget.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["G-code 3D readiness for connected script TextObjects"],
+          "fullName": "G-code 3D readiness for connected script TextObjects completes Dancing Script and Pacifico production preparation for the G-code 3D pane",
+          "status": "passed",
+          "title": "completes Dancing Script and Pacifico production preparation for the G-code 3D pane",
+          "duration": 6317.696100000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["G-code 3D readiness for connected script TextObjects"],
+          "fullName": "G-code 3D readiness for connected script TextObjects finishes Dancing Script and Pacifico production preparation within a bounded time",
+          "status": "passed",
+          "title": "finishes Dancing Script and Pacifico production preparation within a bounded time",
+          "duration": 0.3396000000011554,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["G-code 3D readiness for connected script TextObjects"],
+          "fullName": "G-code 3D readiness for connected script TextObjects keeps Pacifico output byte-deterministic and every emitted V-carve chord contained",
+          "status": "passed",
+          "title": "keeps Pacifico output byte-deterministic and every emitted V-carve chord contained",
+          "duration": 4018.2461000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["G-code 3D readiness for connected script TextObjects"],
+          "fullName": "G-code 3D readiness for connected script TextObjects removes Pacifico overlap lenses instead of dropping connected letter joins",
+          "status": "passed",
+          "title": "removes Pacifico overlap lenses instead of dropping connected letter joins",
+          "duration": 245.80729999999858,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991104649,
+      "endTime": 1791991115230.8074,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/workspace/design-scene-connected-script.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["computeDesignSceneSource"],
+          "fullName": "computeDesignSceneSource maps physical stock into the relative pane frame after resolved placement",
+          "status": "passed",
+          "title": "maps physical stock into the relative pane frame after resolved placement",
+          "duration": 614.5169000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeDesignSceneSource"],
+          "fullName": "computeDesignSceneSource retains the request and discloses the bounded pane display resolution",
+          "status": "passed",
+          "title": "retains the request and discloses the bounded pane display resolution",
+          "duration": 3334.4386,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeDesignSceneSource"],
+          "fullName": "computeDesignSceneSource stamps each tool section of a two-bit job with its own bit kernel",
+          "status": "passed",
+          "title": "stamps each tool section of a two-bit job with its own bit kernel",
+          "duration": 3103.16,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeDesignSceneSource"],
+          "fullName": "computeDesignSceneSource resolves a single-bit job to the layer bit even when it is not the active bit",
+          "status": "passed",
+          "title": "resolves a single-bit job to the layer bit even when it is not the active bit",
+          "duration": 2942.2204999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeDesignSceneSource"],
+          "fullName": "computeDesignSceneSource returns null for a laser project",
+          "status": "passed",
+          "title": "returns null for a laser project",
+          "duration": 0.686200000000099,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeDesignSceneSource"],
+          "fullName": "computeDesignSceneSource keeps costly V-carve out of the synchronous canvas fallback",
+          "status": "passed",
+          "title": "keeps costly V-carve out of the synchronous canvas fallback",
+          "duration": 0.4765000000006694,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991122111,
+      "endTime": 1791991132107.4766,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/workspace/design-scene-source.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["quickNestSelection"],
+          "fullName": "quickNestSelection packs unlocked selection around locked obstacles as one undo step",
+          "status": "passed",
+          "title": "packs unlocked selection around locked obstacles as one undo step",
+          "duration": 6.973100000000159,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quickNestSelection"],
+          "fullName": "quickNestSelection keeps overlapping legacy groups in one rigid connected unit",
+          "status": "passed",
+          "title": "keeps overlapping legacy groups in one rigid connected unit",
+          "duration": 4.01549999999952,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quickNestSelection"],
+          "fullName": "quickNestSelection does not split a partially selected/locked group and honours rotation off",
+          "status": "passed",
+          "title": "does not split a partially selected/locked group and honours rotation off",
+          "duration": 0.9117999999998574,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quickNestSelection"],
+          "fullName": "quickNestSelection discloses units that need conservative bounds in outline mode",
+          "status": "passed",
+          "title": "discloses units that need conservative bounds in outline mode",
+          "duration": 30.596300000000156,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quickNestSelection"],
+          "fullName": "quickNestSelection keeps a selected group rigid and refuses bins that cannot fit it",
+          "status": "passed",
+          "title": "keeps a selected group rigid and refuses bins that cannot fit it",
+          "duration": 1.310099999999693,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quickNestSelection"],
+          "fullName": "quickNestSelection uses closed outlines when bounding rectangles cannot fit the workspace",
+          "status": "passed",
+          "title": "uses closed outlines when bounding rectangles cannot fit the workspace",
+          "duration": 15.685699999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quickNestSelection"],
+          "fullName": "quickNestSelection leaves the scene untouched until a worker draft is accepted, and rejects a changed owner",
+          "status": "passed",
+          "title": "leaves the scene untouched until a worker draft is accepted, and rejects a changed owner",
+          "duration": 1.717399999999543,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quickNestSelection"],
+          "fullName": "quickNestSelection rejects forged overlapping placements before an undo or scene mutation",
+          "status": "passed",
+          "title": "rejects forged overlapping placements before an undo or scene mutation",
+          "duration": 1.1962000000003172,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quickNestSelection"],
+          "fullName": "quickNestSelection rotates a rigid group by an explicitly permitted half-turn without changing operations or relative distances",
+          "status": "passed",
+          "title": "rotates a rigid group by an explicitly permitted half-turn without changing operations or relative distances",
+          "duration": 2.2373999999999796,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991119451,
+      "endTime": 1791991119515.2373,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/state/nest-actions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["quantity production sheets"],
+          "fullName": "quantity production sheets copies attached artwork, holes, machining and retained templates into reopenable sheets in one undo action",
+          "status": "passed",
+          "title": "copies attached artwork, holes, machining and retained templates into reopenable sheets in one undo action",
+          "duration": 104.4027000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quantity production sheets"],
+          "fullName": "quantity production sheets requires explicit partial acceptance and rejects stale or invalid drafts without mutations",
+          "status": "passed",
+          "title": "requires explicit partial acceptance and rejects stale or invalid drafts without mutations",
+          "duration": 11.042299999999614,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quantity production sheets"],
+          "fullName": "quantity production sheets retains requested quantity and exposes missing sources after reopen rather than dropping parts",
+          "status": "passed",
+          "title": "retains requested quantity and exposes missing sources after reopen rather than dropping parts",
+          "duration": 5.747499999999945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["quantity production sheets"],
+          "fullName": "quantity production sheets refuses amplification of large attached artwork and locked dependencies before producing copies",
+          "status": "passed",
+          "title": "refuses amplification of large attached artwork and locked dependencies before producing copies",
+          "duration": 2.061200000000099,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991137712,
+      "endTime": 1791991137836.0613,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/state/production-nest-actions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["production nesting linked setups and relief copies"],
+          "fullName": "production nesting linked setups and relief copies maps side assignments and projection layers to each output sheet’s own copied relief and artwork",
+          "status": "passed",
+          "title": "maps side assignments and projection layers to each output sheet’s own copied relief and artwork",
+          "duration": 64.56529999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["production nesting linked setups and relief copies"],
+          "fullName": "production nesting linked setups and relief copies creates distinct reopenable projected operations when multiple copies share one sheet",
+          "status": "passed",
+          "title": "creates distinct reopenable projected operations when multiple copies share one sheet",
+          "duration": 14.950500000000375,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["production nesting linked setups and relief copies"],
+          "fullName": "production nesting linked setups and relief copies finds and remaps vector boundaries, open rails, masks and stroke regions without carrying source IDs",
+          "status": "passed",
+          "title": "finds and remaps vector boundaries, open rails, masks and stroke regions without carrying source IDs",
+          "duration": 4.0306000000000495,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791991127515,
+      "endTime": 1791991127599.0305,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/2272/LaserForge-2.0/src/ui/state/production-nest-linked-copy.test.ts"
+    }
+  ]
+}

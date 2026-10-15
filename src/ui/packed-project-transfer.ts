@@ -92,7 +92,10 @@ type VectorObject = Extract<SceneObject, { readonly paths: ReadonlyArray<Colored
 const packedPaths = new WeakMap<ReadonlyArray<ColoredPath>, ReadonlyArray<PackedColoredPath>>();
 
 export function isPackedProjectMessage(message: ProjectMessage): message is PackedProjectMessage {
-  return 'kind' in message && message.kind === 'packed-project';
+  // A loaded project can retain arbitrary extension fields, including the
+  // transport's kind, project and geometry names. Its required schema version
+  // distinguishes the document itself from our wrapper at every packing size.
+  return !('schemaVersion' in message) && 'kind' in message && message.kind === 'packed-project';
 }
 
 export function packProjectMessage(project: Project): ProjectTransfer {

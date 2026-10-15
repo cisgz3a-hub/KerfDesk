@@ -97,6 +97,32 @@ afterEach(() => {
 });
 
 describe('idle canvas worker memory ownership', () => {
+  it('resumes useful idle work after interactive preemption and ignores callbacks from its old heap', async () => {
+    const pending = request();
+    for (let index = 0; index < 3; index++) {
+      const retired = worker();
+      const lateError = retired.onerror;
+      const lateMessageError = retired.onmessageerror;
+      const release = reserveWorkerMemory(() => events.push('manual-save:start'), {
+        priority: 'interactive',
+      });
+      cancellations.push(release);
+      expect(retired.terminate).toHaveBeenCalledOnce();
+      expect(events.slice(-2)).toEqual(['idle:terminate', 'manual-save:start']);
+      expect(FakeWorker.instances).toHaveLength(index + 1);
+      release();
+      const resumed = worker();
+      expect(resumed).not.toBe(retired);
+      expect(resumed.requests[0]?.request).toMatchObject(REQUEST);
+      lateError?.();
+      lateMessageError?.();
+      expect(resumed.terminate).not.toHaveBeenCalled();
+    }
+    worker().complete();
+    await expect(pending).resolves.toBeNull();
+    expect(FakeWorker.instances).toHaveLength(4);
+  });
+
   it('waits before constructing or cloning, then retires before the next memory owner starts', async () => {
     const preparation = competingWorker();
     const pending = request();

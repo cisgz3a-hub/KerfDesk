@@ -41,31 +41,34 @@ export function prepareProjectSaveOffThread(
     };
     const abort = (): void => finish(null);
     signal.addEventListener('abort', abort, { once: true });
-    const reservation = reserveWorkerMemory((releaseActive) => {
-      release = releaseActive;
-      try {
-        worker = new Worker(new URL('./project-save-preparation-worker.ts', import.meta.url), {
-          type: 'module',
-        });
-        worker.onmessage = (event: MessageEvent<ProjectSavePreparation>) => finish(event.data);
-        worker.onerror = (event) => finish(failed(event.message));
-        worker.onmessageerror = () =>
-          finish(failed('The project worker response could not be read.'));
-        const packed =
-          mode === 'recovery' || !projectSaveGeometryCanPack(project)
-            ? { message: project, transfer: [] }
-            : packProjectMessage(project);
-        const message: ProjectSavePreparationMessage = {
-          project: packed.message,
-          mode,
-          representation: packed.transfer.length === 0 ? 'original' : 'packed',
-        };
-        if (packed.transfer.length === 0) worker.postMessage(message);
-        else worker.postMessage(message, packed.transfer);
-      } catch (error) {
-        finish(failed(errorMessage(error)));
-      }
-    });
+    const reservation = reserveWorkerMemory(
+      (releaseActive) => {
+        release = releaseActive;
+        try {
+          worker = new Worker(new URL('./project-save-preparation-worker.ts', import.meta.url), {
+            type: 'module',
+          });
+          worker.onmessage = (event: MessageEvent<ProjectSavePreparation>) => finish(event.data);
+          worker.onerror = (event) => finish(failed(event.message));
+          worker.onmessageerror = () =>
+            finish(failed('The project worker response could not be read.'));
+          const packed =
+            mode === 'recovery' || !projectSaveGeometryCanPack(project)
+              ? { message: project, transfer: [] }
+              : packProjectMessage(project);
+          const message: ProjectSavePreparationMessage = {
+            project: packed.message,
+            mode,
+            representation: packed.transfer.length === 0 ? 'original' : 'packed',
+          };
+          if (packed.transfer.length === 0) worker.postMessage(message);
+          else worker.postMessage(message, packed.transfer);
+        } catch (error) {
+          finish(failed(errorMessage(error)));
+        }
+      },
+      { priority: 'interactive' },
+    );
     if (worker === null && !finished) release = reservation;
   });
 }

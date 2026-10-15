@@ -12,6 +12,7 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { useFramePreparationStore } from '../state/frame-preparation-store';
 import type * as PreparationWorkerClient from '../workspace/preparation-worker-client';
 import type { LiveJobEstimate } from './live-job-estimate';
 import { JOB_ESTIMATE_DEBOUNCE_MS, useJobEstimate } from './use-job-estimate';
@@ -155,13 +156,17 @@ describe('initial large-job estimate (TIME-08)', () => {
         jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
         initialPosition: { x: 300, y: 0, z: 4 },
       }),
+      expect.any(AbortSignal),
     );
+    const firstSignal = workerMocks.prepareJobEstimateOffThread.mock.calls[0]?.[2] as AbortSignal;
+    expect(firstSignal.aborted).toBe(false);
     const pendingEstimate = probe.estimate;
     await act(async () => {
       useLaserStore.setState({
         statusReport: { ...report, mPos: { ...report.mPos, x: 650 } },
       });
     });
+    expect(firstSignal.aborted).toBe(true);
     await act(async () => oldRequest.resolve(workerResult()));
     expect(probe.estimate).toBe(pendingEstimate);
     await settleDebounce();
@@ -169,9 +174,33 @@ describe('initial large-job estimate (TIME-08)', () => {
       2,
       useStore.getState().project,
       expect.objectContaining({ initialPosition: { x: 600, y: 0, z: 4 } }),
+      expect.any(AbortSignal),
     );
     expect(probe.estimate).toBe(latest.estimate);
     await unmount();
+    expect(
+      (workerMocks.prepareJobEstimateOffThread.mock.calls[1]?.[2] as AbortSignal).aborted,
+    ).toBe(true);
+  });
+
+  it('releases a pending ETA during Frame preparation and resumes unchanged input afterwards', async () => {
+    workerMocks.prepareJobEstimateOffThread.mockReturnValue(new Promise(() => undefined));
+    useStore.setState({ project: largeRasterProject(), previewMode: false });
+    const unmount = await renderProbe();
+    await settleDebounce();
+    const firstSignal = workerMocks.prepareJobEstimateOffThread.mock.calls[0]?.[2] as AbortSignal;
+    expect(firstSignal.aborted).toBe(false);
+    await act(async () => useFramePreparationStore.setState({ pending: true }));
+    expect(firstSignal.aborted).toBe(true);
+    await settleDebounce();
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledOnce();
+    await act(async () => useFramePreparationStore.setState({ pending: false }));
+    await settleDebounce();
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledTimes(2);
+    const secondSignal = workerMocks.prepareJobEstimateOffThread.mock.calls[1]?.[2] as AbortSignal;
+    expect(secondSignal.aborted).toBe(false);
+    await unmount();
+    expect(secondSignal.aborted).toBe(true);
   });
 
   it.each([false, true])(

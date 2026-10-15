@@ -18,6 +18,9 @@ vi.mock('../image-editor/ImageEditorOverlay', () => {
 vi.mock('../design-studio/DesignStudioOverlay', () => {
   throw new TypeError('Failed to fetch dynamically imported module: DesignStudioOverlay-0ld.js');
 });
+vi.mock('../library/DesignLibraryDialog', () => {
+  throw new TypeError('Failed to fetch dynamically imported module: DesignLibraryDialog-0ld.js');
+});
 
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { DesignStudioHost } from '../design-studio/DesignStudioHost';
@@ -26,6 +29,7 @@ import { createEditorTestBuffer } from '../image-editor/create-editor-test-buffe
 import { createSession } from '../image-editor/editor-session';
 import { ImageEditorHost } from '../image-editor/ImageEditorHost';
 import { useImageEditorStore } from '../image-editor/image-editor-store';
+import { DesignLibraryHost } from '../library/DesignLibraryHost';
 import { useUiStore } from '../state/ui-store';
 import { TutorialHost } from '../tutorials/TutorialHost';
 import { useTutorialStore } from '../tutorials/tutorial-store';
@@ -43,6 +47,12 @@ type OverlayCase = {
 };
 
 const CASES: ReadonlyArray<OverlayCase> = [
+  {
+    tool: 'Design Library',
+    open: () => useUiStore.getState().setLibraryDialogOpen(true),
+    isOpen: () => useUiStore.getState().libraryDialogOpen,
+    kept: () => true,
+  },
   {
     tool: 'The visual tutorials',
     open: () => useTutorialStore.getState().openTutorial(),
@@ -78,7 +88,7 @@ function resetOverlays(): void {
   useTutorialStore.getState().closeTutorial();
   useImageEditorStore.setState({ session: null, sessionOwner: null, stash: {} });
   useDesignStudioStore.setState({ session: null, stash: null });
-  useUiStore.setState({ modalDepth: 0 });
+  useUiStore.setState({ modalDepth: 0, libraryDialogOpen: false });
 }
 
 beforeEach(() => {
@@ -113,6 +123,7 @@ async function renderApp(): Promise<void> {
         <ImageEditorHost />
         <DesignStudioHost />
         <TutorialHost />
+        <DesignLibraryHost />
       </ErrorBoundary>,
     );
   });

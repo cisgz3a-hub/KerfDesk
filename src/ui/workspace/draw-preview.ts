@@ -50,6 +50,7 @@ import type { ViewTransform } from './view-transform';
 import { preparePreviewFrame } from './preview-route-frame';
 import { renderPreviewFrame } from './preview-route-render';
 import { objectIntersectsCanvas } from './object-viewport';
+import { beginArtworkSpriteFrame } from './artwork-sprite-cache';
 
 type FaintVectorObject = Extract<
   SceneObject,
@@ -63,6 +64,7 @@ export function drawObjectsFaint(
   displayPolylineCache?: DisplayPolylineCache,
   requestRedraw?: () => void,
 ): void {
+  beginArtworkSpriteFrame();
   ctx.save();
   ctx.globalAlpha = 0.3;
   const layerByColor = sceneLayerVisibility.lookup(project.scene.layers);

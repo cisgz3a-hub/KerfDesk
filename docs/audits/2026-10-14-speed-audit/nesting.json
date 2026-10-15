@@ -1,0 +1,57 @@
+{
+  "format": "kerfdesk.nesting-validation-audit",
+  "schemaVersion": 1,
+  "fixtureVersion": 1,
+  "createdAt": "2026-10-14T14:15:07.822Z",
+  "gitHead": "03f1da57737ebc58d7cf4e240be6c2225270c690",
+  "workingTreeDirty": true,
+  "engineSha256": "bfc45f9fba7237c0dbbd9fbe91e378ef6f1c78f018f446fd224a7ede6f07737c",
+  "node": "v24.15.0",
+  "platform": "win32",
+  "architecture": "x64",
+  "osRelease": "10.0.26200",
+  "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+  "logicalCpuCount": 20,
+  "systemMemoryBytes": 33965383680,
+  "warmups": 1,
+  "runs": 3,
+  "scope": "Pure production rectangle validator only. Excludes planning, workers, browser input latency, sheet materialisation and hardware. RSS observations are not peak memory.",
+  "results": [
+    {
+      "count": 1000,
+      "fixtureSha256": "e938fc69fb4dd052a28022fe5fab60139298fe5f730d01b51a68059b9e3cd989",
+      "potentialRectanglePairs": 499500,
+      "samplesMs": [5.699799999999982, 5.212599999999981, 5.837299999999971],
+      "medianMs": 5.699799999999982,
+      "minMs": 5.212599999999981,
+      "maxMs": 5.837299999999971,
+      "rssBefore": 65687552,
+      "rssAfter": 68972544,
+      "allValid": true
+    },
+    {
+      "count": 5000,
+      "fixtureSha256": "ae61a1b69fd022c065de53c5c7c1d3f07fc5d5ab63447b8d581fcbb8ace3771d",
+      "potentialRectanglePairs": 12497500,
+      "samplesMs": [103.55020000000002, 60.795799999999986, 61.83190000000002],
+      "medianMs": 61.83190000000002,
+      "minMs": 60.795799999999986,
+      "maxMs": 103.55020000000002,
+      "rssBefore": 81219584,
+      "rssAfter": 84045824,
+      "allValid": true
+    },
+    {
+      "count": 10000,
+      "fixtureSha256": "370dd58cb617af63ad09782bce8e2dcbbd22181794c9643af1d8555f2f9f80c0",
+      "potentialRectanglePairs": 49995000,
+      "samplesMs": [259.8541999999999, 234.1676, 243.2249999999999],
+      "medianMs": 243.2249999999999,
+      "minMs": 234.1676,
+      "maxMs": 259.8541999999999,
+      "rssBefore": 104136704,
+      "rssAfter": 106119168,
+      "allValid": true
+    }
+  ]
+}

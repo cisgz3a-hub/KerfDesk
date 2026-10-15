@@ -116,6 +116,7 @@ it.each(commands)(
       groupTransformBounds: true,
       scene: true,
       designControl: true,
+      selectionModes: true,
     });
     expect(workspace.ok && workspace.data.permissions).toMatchObject({ canEdit: false });
     expect(resultCode(await adapter.execute(command, writeArgs(adapter, values)))).toBe(

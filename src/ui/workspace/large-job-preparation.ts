@@ -84,7 +84,33 @@ export function largeJobPreparationFromPrepared(
   project: Project,
   prepared: PreparedOutput,
   options: LargeJobPreparationOptions,
+  estimated: PreparedPreviewEstimate = largeJobEstimateFromPrepared(prepared, options),
 ): LargeJobPreparation {
+  const { estimate, emittedProgram } = estimated;
+  const toolpath = buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin, {
+    executablePlan: true,
+    // Optional sidecars may consume the bounded source retained above. Never
+    // emit a second complete program just to decorate this full preview route.
+    allowPlanEmission: false,
+    ...(emittedProgram === undefined ? {} : { emittedProgram }),
+  });
+  const serializedToolpath = serializeExecutablePlanPreviewRoute(toolpath);
+  const jobOriginOffset = prepared.ok ? prepared.jobOriginOffset : { x: 0, y: 0 };
+  registerPreviewJobOriginOffset(serializedToolpath, jobOriginOffset);
+  return {
+    toolpath: serializedToolpath,
+    jobOriginOffset,
+    estimate,
+  };
+}
+
+export type PreparedPreviewEstimate = LargeJobEstimate & { readonly emittedProgram?: string };
+
+/** Bounded ETA sidecar reusable by a later Preview of this exact compilation. */
+export function largeJobEstimateFromPrepared(
+  prepared: PreparedOutput,
+  options: LargeJobPreparationOptions,
+): PreparedPreviewEstimate {
   // Finish the planner's temporary allocations before retaining a complete
   // multi-million-step preview route. Both use this exact prepared output.
   let emittedProgram: string | undefined;
@@ -105,19 +131,5 @@ export function largeJobPreparationFromPrepared(
         }
       : {}),
   });
-  const toolpath = buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin, {
-    executablePlan: true,
-    // Optional sidecars may consume the bounded source retained above. Never
-    // emit a second complete program just to decorate this full preview route.
-    allowPlanEmission: false,
-    ...(emittedProgram === undefined ? {} : { emittedProgram }),
-  });
-  const serializedToolpath = serializeExecutablePlanPreviewRoute(toolpath);
-  const jobOriginOffset = prepared.ok ? prepared.jobOriginOffset : { x: 0, y: 0 };
-  registerPreviewJobOriginOffset(serializedToolpath, jobOriginOffset);
-  return {
-    toolpath: serializedToolpath,
-    jobOriginOffset,
-    estimate,
-  };
+  return { estimate, ...(emittedProgram === undefined ? {} : { emittedProgram }) };
 }

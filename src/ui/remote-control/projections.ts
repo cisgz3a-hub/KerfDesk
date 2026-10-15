@@ -8,6 +8,7 @@ import { transformedBBox } from '../../core/scene/hit-test';
 import type { AppState } from '../state/store';
 import type { RemoteBounds } from './types';
 import { finite, identifier } from './validation';
+import { selectionUnits } from './selection-units';
 import { RemoteFault } from './fault';
 
 const LIMIT = 200;
@@ -48,6 +49,26 @@ export function workspaceProjection(state: AppState, shareArtwork = false) {
   const { scene } = state.project;
   const mode = state.project.machine?.kind ?? 'laser';
   const visibility = sceneLayerVisibility.lookup(scene.layers);
+  const unitFor = selectionUnits(scene);
+  const eligible = new Set(
+    scene.objects
+      .filter(
+        (object) =>
+          publicIdentifier(object.id) &&
+          object.locked !== true &&
+          sceneLayerVisibility.hasObject(object, visibility),
+      )
+      .map((object) => object.id),
+  );
+  const unitEligibility = new Map<readonly string[], boolean>();
+  const unitEditable = (id: string): boolean => {
+    const unit = unitFor(id);
+    const cached = unitEligibility.get(unit);
+    if (cached !== undefined) return cached;
+    const editable = unit.every((member) => eligible.has(member));
+    unitEligibility.set(unit, editable);
+    return editable;
+  };
   const artwork = scene.objects
     .filter((object) => publicIdentifier(object.id))
     .slice(0, LIMIT)
@@ -59,8 +80,9 @@ export function workspaceProjection(state: AppState, shareArtwork = false) {
         id: object.id,
         type: object.kind,
         visible,
-        // Target-level hint only; caller permission and revision are checked on every write.
-        editable: visible && object.locked !== true,
+        // Whole-unit hint includes members omitted from shared scene geometry.
+        // Caller permission and revision are still checked on every write.
+        editable: unitEditable(object.id),
         ...(bounds === undefined ? {} : { bounds }),
         ...(operationId === undefined ? {} : { operationId }),
       };
@@ -84,12 +106,15 @@ export function workspaceProjection(state: AppState, shareArtwork = false) {
       ...(mode === 'laser' ? { ...operationValues(layer), ...laserDetails(layer) } : {}),
       ...(mode === 'cnc' ? { cnc: cncDetails(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS) } : {}),
     }));
-  const allSelected = selectedIds(state).filter(publicIdentifier);
+  const selected = selectedIds(state);
+  const allSelected = selected.filter(publicIdentifier);
   return {
     mode,
     name: 'Current workspace',
     dirty: state.dirty,
     selection: allSelected.slice(0, LIMIT),
+    totalSelected: selected.length,
+    selectionTruncated: selected.length > Math.min(allSelected.length, LIMIT),
     artwork,
     operations,
     totalArtwork: scene.objects.length,

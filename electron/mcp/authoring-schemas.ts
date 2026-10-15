@@ -56,6 +56,7 @@ export const mcpPermissionsSchema = z.object({
 export const mcpTouchCapabilitiesSchema = z.object({
   touchEditing: z.boolean(),
   groupTransformBounds: z.boolean().optional(),
+  selectionModes: z.boolean().optional(),
   scene: z.boolean().optional(),
   designControl: z.boolean().optional(),
 });

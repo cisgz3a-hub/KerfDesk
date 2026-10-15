@@ -4,6 +4,7 @@ import {
   sceneObjectHasVisibleLayerFromMap,
 } from '../../core/scene/visibility';
 import { createDisplayPolylineCache } from '../workspace/display-polylines';
+import { beginArtworkSpriteFrame } from '../workspace/artwork-sprite-cache';
 import {
   drawObjectDisplay,
   isVectorSceneObject,
@@ -21,6 +22,7 @@ export function paintDesignProjectVectors(
   draftObjectIds: ReadonlySet<string>,
   onReady?: () => void,
 ): void {
+  beginArtworkSpriteFrame();
   const paintVector = createDesignVectorPainter(scene, view, draftObjectIds, onReady);
   for (const object of scene.objects) paintVector(ctx, object);
 }

@@ -69,6 +69,8 @@ export const mcpOutputSchemas = {
     name: label,
     dirty: z.boolean(),
     selection: z.array(id).max(MCP_MAX_ITEMS),
+    totalSelected: count.optional(),
+    selectionTruncated: z.boolean().optional(),
     artwork: z
       .array(
         z.object({

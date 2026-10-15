@@ -1,0 +1,57 @@
+Already up to date
+Done in 452ms using pnpm v11.3.0
+[WebServer] (node:35012) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:37612) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 4 tests using 1 worker
+
+(node:24932) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  ok 1 scripts\performance-audit\interaction.e2e.ts:14:3 › mixed canvas G-code open and Refresh telemetry 1 (26.8s)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  ok 2 scripts\performance-audit\interaction.e2e.ts:14:3 › mixed canvas G-code open and Refresh telemetry 2 (11.8s)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  ok 3 scripts\performance-audit\interaction.e2e.ts:14:3 › mixed canvas G-code open and Refresh telemetry 3 (11.3s)
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-windows-download.mjs, use /desktop-windows-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-release-manifest.mjs, use /desktop-release-manifest.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-commercial-catalog.mjs, use /desktop-commercial-catalog.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/desktop-manual-download.mjs, use /desktop-manual-download.mjs.
+[WebServer] Files in the public directory are served at the root path.
+[WebServer] Instead of /public/licence-key-text.mjs, use /licence-key-text.mjs.
+  ok 4 scripts\performance-audit\interaction.e2e.ts:14:3 › mixed canvas G-code open and Refresh telemetry 4 (13.6s)
+
+  4 passed (1.2m)
