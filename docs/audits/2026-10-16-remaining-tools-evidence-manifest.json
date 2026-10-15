@@ -1,0 +1,102 @@
+[
+  {
+    "file": "evidence/remaining-tools-2026-10-16/ai-desktop-unit.json.gz",
+    "bytes": 1502,
+    "sha256": "55673367b8a7cd091f9e7083ac464ea2e17235510cc2d926f576399d62f03b84"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/automated-board.png",
+    "bytes": 108785,
+    "sha256": "ac39e336144f8be77b11a116d34db90ed55f6b53851db47b3480f2d4e43e446c"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/automated-camera.png",
+    "bytes": 42925,
+    "sha256": "977e151a89186f538dad224efc2a04b3227d5489ea9d8454be8bed3b461a607a"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/automated-focus-inspector.png",
+    "bytes": 204914,
+    "sha256": "bdda396166e261c9ec3f224a5ec5f6e7ff35fb1af3caa13f0fc08dbd437fac51"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/automated-print-cut.png",
+    "bytes": 42143,
+    "sha256": "30b14feda718792523397f063c2f2b37fd9f57aed82d30ff585cc01aae8fcc91"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/automated-visible-export-receipts.png",
+    "bytes": 219643,
+    "sha256": "08d4fcdf11cbf65f6271f1f4d24a7eee82cb9653463eefe2958d92434512502b"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/batch-cancel-final.json.gz",
+    "bytes": 703,
+    "sha256": "89726c903daaa7605c5c35eea8df14e19876af98213b4979a94dc6e029c5766a"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/batch-unit.json.gz",
+    "bytes": 4457,
+    "sha256": "72e1050231970ddbc25f1b4291b0e63ca8297ab3f0f5c729c942bc07e2fc74d7"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/bundled-collision-final.json.gz",
+    "bytes": 1186,
+    "sha256": "370aa5d2b27e2ed727053bc8697943a4061f16eb1841724553c12170f8cab14a"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/bundled-files-final.json.gz",
+    "bytes": 1269,
+    "sha256": "924297df00bc4d06739a7a5f65a2acdb0ff46b3f400fe6f0c6dacb16bcde4225"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/camera-audit-fixture-vitest.json.gz",
+    "bytes": 512,
+    "sha256": "7f8a1f00f7a6ccf02c76b3655a757a1eae1fd319e72045f954cb2853a8172d90"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/final-browser.json.gz",
+    "bytes": 182378,
+    "sha256": "a4ee10fce0c8ff0dac865cf4b8ad09e4a62fa568ec19ba45cab5724190cb0507"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/final-bundle-source.json.gz",
+    "bytes": 1743,
+    "sha256": "04be8deaec3afcb230abcff964558baf031449b751ec3d17da3fb33356ae889c"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/final-regressions.json.gz",
+    "bytes": 2947,
+    "sha256": "476ef981f4cda852baf7bef77018805b1e55f67e64f56e182b1a9280c7688795"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/focus-browser-rendered.json.gz",
+    "bytes": 365361,
+    "sha256": "ec76b79ca64de98babb60ccb6b919b874ed7772339c8156041c89cd14c625268"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/focus-browser.json.gz",
+    "bytes": 458117,
+    "sha256": "ff02e400bec284c42ef348cd86445b01e521f14bc3ef3312b2dc62175c466774"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/focus-integration-vitest.json.gz",
+    "bytes": 1264,
+    "sha256": "fd2458502140ef58df4d88e834eadaefd174ce4d5148c6e07e9bed8d0f300088"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/image-ai-browser.json.gz",
+    "bytes": 1310,
+    "sha256": "39113a4da33611c24e7f4057fa6620459c665f39b6622e692b2f86807ec7c2fb"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/image-ai-unit.json.gz",
+    "bytes": 3013,
+    "sha256": "8288c2af8878bd453a264ee45a93adda6365efabd941bf6dfc0aeafa276b33f9"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/integration-vitest.json.gz",
+    "bytes": 47590,
+    "sha256": "aef4869d65aa375e0f5c2ecf4a5a2f57f74551cf38125f2f1b8ce9f0d427ab0c"
+  }
+]

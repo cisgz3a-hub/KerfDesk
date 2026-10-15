@@ -237,30 +237,20 @@ describe('buildAppCommands', () => {
     expect(scanOffsetTest).toHaveBeenCalled();
   });
 
-  it('keeps Focus Test disabled until the Z-motion generator exists', () => {
-    const focusTest = vi.fn();
-    const commands = buildAppCommands(baseCtx({ focusTest }));
-    const command = commandById(commands, 'tools.focus-test');
-
-    expect(command.enabled).toBe(false);
-    expect(command.disabledReason).toContain('dedicated, hardware-verified Z-motion generator');
-    expect(runCommand(command)).toBe(false);
-    expect(focusTest).not.toHaveBeenCalled();
-  });
-
-  it('does not run Focus Test even when a profile advertises verified Z support', () => {
+  it('opens Focus Test through the existing discard guard without a Z qualification gate', async () => {
     const confirmDiscard = vi.fn(async () => true);
     const focusTest = vi.fn();
-    const commands = buildAppCommands(
-      baseCtx({ dirty: true, confirmDiscard, focusTestAvailable: true, focusTest }),
+    const command = commandById(
+      buildAppCommands(
+        baseCtx({ dirty: true, confirmDiscard, focusTestAvailable: false, focusTest }),
+      ),
+      'tools.focus-test',
     );
-    const command = commandById(commands, 'tools.focus-test');
-
-    expect(command.enabled).toBe(false);
-    expect(command.disabledReason).toContain('dedicated, hardware-verified Z-motion generator');
-    expect(runCommand(command)).toBe(false);
-    expect(confirmDiscard).not.toHaveBeenCalled();
-    expect(focusTest).not.toHaveBeenCalled();
+    expect(command.enabled).toBe(true);
+    expect(runCommand(command)).toBe(true);
+    await flushMicrotasks();
+    expect(confirmDiscard).toHaveBeenCalled();
+    expect(focusTest).toHaveBeenCalledOnce();
   });
 
   it('runs Optimization Settings without the destructive dirty-project guard', () => {

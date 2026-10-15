@@ -53,6 +53,7 @@ import { redoSteps, undoSteps } from '../state/undo-history';
 import { JointResizeDialogHost } from './JointResizeDialogHost';
 import { StampPreparationDialogHost } from './StampPreparationDialogHost';
 import { AiAssistantDialogHost } from '../ai/AiAssistantDialog';
+import { FocusTestDialog } from '../calibration/FocusTestDialog';
 
 type SettingsDialogKind =
   | 'optimization'
@@ -67,6 +68,7 @@ type SettingsDialogKind =
   | 'labs'
   | 'rotary'
   | 'multi-file-trace'
+  | 'focus'
   | null;
 
 export function CommandShell(): JSX.Element {
@@ -97,7 +99,7 @@ export function CommandShell(): JSX.Element {
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
     requestIntervalTest: () => setIntervalTestDialogOpen(true),
     requestScanOffsetTest: () => setScanOffsetTestDialogOpen(true),
-    requestFocusTest: () => jobAwareAlert(FOCUS_TEST_UNAVAILABLE_MESSAGE),
+    requestFocusTest: () => setSettingsDialog('focus'),
     requestOptimizationSettings: () => setSettingsDialog('optimization'),
     requestArray: () => setSettingsDialog('array'),
     requestQuickNest: () => setSettingsDialog('nest'),
@@ -203,6 +205,7 @@ const SETTINGS_DIALOG_HOSTS: Record<
   Exclude<SettingsDialogKind, 'union' | 'join' | null>,
   ComponentType<{ readonly onClose: () => void }>
 > = {
+  focus: FocusTestDialog,
   optimization: OptimizationDialog,
   array: ArrayDialogHost,
   nest: QuickNestDialogHost,
@@ -214,8 +217,6 @@ const SETTINGS_DIALOG_HOSTS: Record<
   rotary: RotarySetupHost,
   'multi-file-trace': MultiFileTraceDialogHost,
 };
-const FOCUS_TEST_UNAVAILABLE_MESSAGE =
-  'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.';
 
 // The four scene-generator dialog mounts, grouped so CommandShell itself
 // stays inside the complexity cap.

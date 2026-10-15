@@ -694,7 +694,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   staged v1 manual 4-point overlay → v2 lens calibration → v3 fiducial /
   print-and-cut → v4 capture-to-trace) — no longer out of scope.
 - ~~Rotary attachment.~~ **Scoped and shipped software-side by ADR-127/160/315/373**; hardware remains CLAIMED. Rotary G-code output is independent of workstation-local Labs state, while exact active-rotary raster jobs disclose the still-unqualified physical factors in Job Review. A roller may scale Y from its measured roller diameter, Rotary Setup can turn the part one revolution with the laser off to check the setup, and a Rotary switch beside Frame and Start shows and toggles the active mapping (ADR-373).
-- Auto-focus, Z-axis control beyond initial homing — **laser mode only**.
+- General auto-focus remains out of scope. **Tools → Focus Test** now generates relative-Z laser comparison samples through ordinary output and Frame/Start (ADR-602, explicitly requested 2026-10-16); it does not autofocus or establish physical clearance. Other Z-axis control beyond the existing supported controls remains out of scope in **laser mode**.
   Phase H CNC router mode is inherently Z-aware (plunges, depth passes,
   safe-Z retracts) — ADR-098.
 - Manufacturer setting profile packs, LightBurn `.clb` export, and LightBurn

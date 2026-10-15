@@ -25,6 +25,20 @@ export function buildLaserResumeProgram(
   device: LaserResumeDevice,
   transform: LaserResumeTransformVersion = LASER_RESUME_TRANSFORM_VERSION,
 ) {
+  // A Focus Test has no absolute Z datum in its program. After an interruption,
+  // even replay from line 1 would use the interrupted height as starting focus.
+  // The emitted marker travels with the sealed artifact, unlike current UI state.
+  if (
+    /(?:^|\n)\s*; Focus Test Z offset -?\d+(?:\.\d+)? mm from starting focus(?:\r?\n|$)/.test(
+      sourceGcode,
+    )
+  ) {
+    return {
+      kind: 'error' as const,
+      reason:
+        'Focus Test recovery cannot reconstruct the original starting Z focus after interruption, including restart from line 1. Restore the physical starting focus, then review the whole job through ordinary Frame and Start.',
+    };
+  }
   return buildResumeProgram(sourceGcode, fromLine, {
     ...LASER_RESUME_OPTIONS,
     laserTransform: transform,

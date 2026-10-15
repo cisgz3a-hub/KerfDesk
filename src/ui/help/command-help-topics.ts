@@ -139,7 +139,8 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'tools.focus-test': {
     family: 'tools',
-    tooltip: 'Create a Z-axis focus test pattern for verified controllable-Z profiles.',
+    tooltip:
+      'Create laser lines at relative Z offsets; completed samples return to starting focus. Requires controllable Z. Frame checks XY only.',
   },
   'tools.optimization-settings': {
     family: 'tools',

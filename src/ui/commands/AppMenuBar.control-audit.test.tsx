@@ -81,7 +81,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.material-test': { callback: 'materialTest', guard: 'create a material test' },
   'tools.interval-test': { callback: 'intervalTest', guard: 'create an interval test' },
   'tools.scan-offset-test': { callback: 'scanOffsetTest', guard: 'create a scan offset test' },
-  'tools.focus-test': { special: 'unavailable' },
+  'tools.focus-test': { callback: 'focusTest', guard: 'create a focus test' },
   'tools.optimization-settings': { callback: 'optimizationSettings' },
   'tools.rotary-setup': { callback: 'rotarySetup' },
   'tools.print-and-cut': { callback: 'printAndCut' },

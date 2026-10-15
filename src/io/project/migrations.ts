@@ -53,6 +53,8 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   15: (raw) => ({ ...raw, schemaVersion: 16 }),
   // Missing starts retain automatic entry; preserve any existing selections.
   16: (raw) => ({ ...raw, schemaVersion: 17 }),
+  // Schema 18 protects Z-moving focus samples from readers that ignore them.
+  17: (raw) => ({ ...raw, schemaVersion: 18 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

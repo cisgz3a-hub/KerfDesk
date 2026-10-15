@@ -31,7 +31,8 @@ export function unmountCnc3DPaneHarness(): void {
   host = null;
   if (preferenceCaptured && previousPreference === null)
     localStorage.removeItem(PANE_PREFERENCE_KEY);
-  else if (preferenceCaptured) localStorage.setItem(PANE_PREFERENCE_KEY, previousPreference);
+  else if (preferenceCaptured && previousPreference !== null)
+    localStorage.setItem(PANE_PREFERENCE_KEY, previousPreference);
   previousPreference = null;
   preferenceCaptured = false;
 }

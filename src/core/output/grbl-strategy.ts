@@ -64,6 +64,7 @@ import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
 import { jobWritesArcMoves } from '../job/cut-arc-moves';
 import { arcSegmentBurns } from './grbl-laser-arc-moves';
 import { operationProvenanceComment } from './operation-provenance-comment';
+import { emitFocusTestGroup } from './focus-test-emission';
 import {
   powerScaleVersionForDevice,
   type LaserPowerScaleVersion,
@@ -338,7 +339,7 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
 function emitAnyGroup(group: Group, context: GroupEmissionContext): string {
   switch (group.kind) {
     case 'cut':
-      return emitGroup(group, context);
+      return emitFocusTestGroup(group, context, () => emitGroup(group, context));
     case 'fill':
       return (group.fillStyle ?? 'scanline') === 'offset'
         ? emitOffsetFillGroup(group, context)

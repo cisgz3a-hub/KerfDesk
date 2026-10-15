@@ -159,6 +159,9 @@ function spatialLayer(layer: Layer, isCnc: boolean): Layer {
   const cnc = layer.cnc ?? (isCnc ? DEFAULT_CNC_LAYER_SETTINGS : undefined);
   return {
     ...base,
+    ...(layer.focusTest === undefined
+      ? {}
+      : { focusTest: { ...layer.focusTest, travelFeedMmPerMin: 1 } }),
     name: '',
     subLayers: layer.subLayers.map((subLayer) => ({
       ...subLayer,

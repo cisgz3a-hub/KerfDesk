@@ -1,4 +1,5 @@
 import { cncProgramReachWarnings } from '../../../io/cnc/cnc-program-reach';
+import { focusTestWarnings } from '../../../core/job/focus-test';
 // buildJobReviewModel maps one successful Start preparation and its store
 // snapshots into the Job Review display model (ADR-224). Live editable sections
 // still read stores directly; compiled facts come from the prepared job.
@@ -118,6 +119,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
     // was previously only a transient toast, so it joins the review here.
     // The M7 check runs against the exact prepared program, not the settings.
     warnings: uniqueReviewWarnings([
+      ...focusTestWarnings(args.project.scene.layers, args.project.device),
       ...args.prepared.warnings,
       ...detectM7AirAssistWarnings(
         args.prepared.gcode,
@@ -264,10 +266,7 @@ function commandedMotionSeconds(estimate: PreparedCurrentStart['metrics']['durat
 }
 
 function buildInfoObservationIsCurrent(snapshot: LaserModeStartSnapshot): boolean {
-  return (
-    snapshot.buildInfoObservation !== null &&
-    snapshot.buildInfoObservation.sessionEpoch === snapshot.controllerSessionEpoch
-  );
+  return snapshot.buildInfoObservation?.sessionEpoch === snapshot.controllerSessionEpoch;
 }
 
 function buildStatTiles(

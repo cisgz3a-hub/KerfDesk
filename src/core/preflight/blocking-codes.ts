@@ -37,6 +37,8 @@ export const COMPILE_INTEGRITY_PREFLIGHT_CODES: ReadonlySet<PreflightCode> = new
     'cnc-tool-geometry-invalid',
     'empty-output',
     'relief-needs-cnc',
+    // Relative laser-focus Z samples cannot be reinterpreted as CNC cutting depths.
+    'focus-test-needs-laser',
     'no-output-layer',
     'program-materialization-failed',
     'relief-materialization-failed',

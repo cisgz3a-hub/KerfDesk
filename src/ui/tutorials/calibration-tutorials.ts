@@ -145,42 +145,43 @@ export const CALIBRATION_TUTORIALS: readonly Tutorial[] = [
   },
   {
     id: 'focus-test',
-    title: 'Focus the laser with the available controls',
+    title: 'Compare focus with a Z sweep',
     summary:
-      'Understand why Focus Test is unavailable and use the machine’s supported focus method.',
+      'Generate lines at known relative Z offsets and compare their width on sample material.',
     category: 'Laser',
     machine: 'laser',
-    minutes: 2,
-    location:
-      'Tools → Focus Test (currently unavailable); machine controls → Focus / Z when supported',
-    prerequisites: 'The machine manufacturer’s focusing instructions and any required gauge.',
+    minutes: 4,
+    location: 'Tools / Focus Test',
+    prerequisites:
+      'A controllable Z axis, GRBL-family controller, known starting focus and clearance in both Z directions.',
     visual: 'machine',
     steps: [
       {
-        title: 'Recognise the unavailable feature',
+        title: 'Set the sweep',
         instruction:
-          'Focus Test is currently disabled. The app does not provide a hardware-verified automated Z-motion focus-test generator, so this command cannot create or run a focus sweep.',
-        focus: 'Focus Test: unavailable',
-        result: 'There is no automated test to start from this menu item.',
+          'Open Focus Test. Enter minimum and maximum Z offsets, samples, spacing, line length, cut settings and Z travel feed. Offsets are relative to starting focus; positive follows the controller axis direction. Confirm physical clearance before machining.',
+        focus: 'Relative Z offsets',
+        result: 'The dialog lists every represented sample offset.',
       },
       {
-        title: 'Use the supported focusing method',
+        title: 'Generate and inspect',
         instruction:
-          'With the beam off, follow the manufacturer’s procedure and gauge to set the head-to-material distance. Manual-focus machines require hand adjustment. Supported, configured Z axes can expose Focus / Z with Step, Z+ and Z− controls.',
-        focus: 'Gauge or supported Focus / Z',
-        result: 'The head is focused using the method appropriate to the actual machine.',
-      },
-      {
-        title: 'Check a separate sample job',
-        instruction:
-          'Use a small, suitable piece of known artwork on sample material to inspect the result. Preview it, complete Frame for that exact job, and open Start for Job Review before running the sample.',
-        focus: 'Check the focused result',
-        result: 'You can evaluate a real mark without assuming an automated focus sweep exists.',
+          'Generate creates named Line operations. Keep Line mode, inspect their order, and open Preview or the G-code Inspector. Each completed sample returns to starting Z with the laser off. Saving and reopening retains the offsets.',
+        focus: 'Focus samples',
+        result: 'The ordinary document and exact emitted program contain the focus test.',
         visual: 'preview',
       },
+      {
+        title: 'Frame, review and compare',
+        instruction:
+          'Complete Frame for the unchanged placement, then Start opens Job Review. Frame checks XY only. After an authorised machine run, compare the narrowest line and set focus using the supported controls. An interrupted test can leave Z at an offset; establish the actual position before another run.',
+        focus: 'Frame and Job Review',
+        result:
+          'Measured material results guide focus; software checks alone do not qualify hardware.',
+      },
     ],
-    tip: 'Focus / Z controls perform real motion. Their availability depends on the machine profile’s supported Z axis and confirmed travel.',
-    keywords: ['focus', 'focus test', 'unavailable', 'z axis', 'manual focus', 'gauge'],
+    tip: 'This is a relative focus comparison, not autofocus. Machines without powered Z must use the manufacturer manual focus method.',
+    keywords: ['focus', 'focus test', 'z axis', 'relative', 'sweep'],
     related: ['jog', 'machine-setup', 'material-test', 'frame-start'],
   },
 ];

@@ -8,6 +8,7 @@ import { registrationJigCompilationRuns } from './registration-jig-compilation-r
 import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
 import type { Group, Job, JobDiagnostic } from './job';
 import { compileVectorGroupsForLayer } from './compile-vector-operation';
+import { focusTestProfileIssue } from './focus-test';
 
 export function compileJob(
   scene: Scene,
@@ -67,6 +68,7 @@ function appendOperationCompilation(
   laserPowerScaleVersion: LaserPowerScaleVersion,
 ): void {
   for (const operationLayer of outputOperationLayers(layer)) {
+    assertFocusOperation(operationLayer, device);
     if (operationLayer.mode !== 'image') {
       const vector = compileVectorGroupsForLayer(
         vectorObjects,
@@ -75,14 +77,33 @@ function appendOperationCompilation(
         priorityObjectId,
         `vector:${output.vectorRun++}:${operationLayer.id}`,
       );
-      for (const group of vector.groups) output.groups.push(group);
+      for (const group of vector.groups) output.groups.push(withFocusMotion(group, operationLayer));
       for (const diagnostic of vector.diagnostics) output.diagnostics.push(diagnostic);
     }
     const raster = compileRasterGroupsForLayer(rasterObjects, operationLayer, device, {
       sceneObjects: completeSceneObjects,
       laserPowerScaleVersion,
     });
+    if (operationLayer.focusTest !== undefined && raster.groups.length > 0)
+      throw new Error(
+        'Focus Test operations require vector Line artwork; raster output cannot retain their Z-motion meaning.',
+      );
     for (const group of raster.groups) output.groups.push(group);
     for (const diagnostic of raster.diagnostics) output.diagnostics.push(diagnostic);
   }
+}
+
+function assertFocusOperation(layer: Layer, device: DeviceProfile): void {
+  if (layer.focusTest === undefined) return;
+  const issue = focusTestProfileIssue(device);
+  if (issue !== null) throw new Error(issue);
+  if (layer.mode !== 'line')
+    throw new Error('Focus Test samples require Line mode to retain their Z-motion meaning.');
+}
+
+function withFocusMotion(group: Group, layer: Layer): Group {
+  if (layer.focusTest === undefined) return group;
+  if (group.kind !== 'cut')
+    throw new Error('Focus Test artwork overrides must retain vector Line mode.');
+  return { ...group, focusTest: layer.focusTest };
 }

@@ -9,7 +9,7 @@
 // valid included angle.
 // Pure-core: no clock, no random, no I/O.
 
-import type { Project } from '../scene';
+import { sceneObjectUsesOperation, type Project } from '../scene';
 import type { PreflightIssue, PreflightResult } from './preflight';
 import { findInvalidCncToolGeometry } from './cnc-tool-geometry';
 import { controlledLaserOffTravelFeedIssue } from './laser-off-motion-policy';
@@ -19,6 +19,19 @@ import { cncMachineParamIssues } from './cnc-machine-params';
 export function runPreEmitPreflight(project: Project): PreflightResult {
   const issues: PreflightIssue[] = [];
   if (project.machine?.kind === 'cnc') {
+    if (
+      project.scene.layers.some(
+        (layer) =>
+          layer.output &&
+          layer.focusTest !== undefined &&
+          project.scene.objects.some((object) => sceneObjectUsesOperation(object, layer)),
+      )
+    )
+      issues.push({
+        code: 'focus-test-needs-laser',
+        message:
+          'Focus Test samples contain relative laser Z motion that cannot be compiled as CNC cutting depths. Switch back to Laser mode, or exclude the focus samples from this output.',
+      });
     issues.push(...cncMachineParamIssues(project.machine));
     issues.push(...findInvalidCncToolGeometry(project.scene, project.machine, project.device));
     // The laser-off seek feed and the raster scan-offset table shape laser
