@@ -6,7 +6,7 @@ import { expect, test, type Page } from './fixtures/kerfdesk-test';
 test.use({ trace: 'off', viewport: { width: 3840, height: 2160 } });
 test.skip(process.env['KERFDESK_DENSE_CANVAS_AUDIT'] !== '1', 'Opt-in full-renderer canvas audit');
 
-test('a completed dense trace uses bitmap draws while panning and zooming a large canvas', async ({
+test('a completed dense trace uses bitmap draws while panning, zooming and moving on a large canvas', async ({
   page,
 }, info) => {
   test.setTimeout(240_000);
@@ -51,12 +51,74 @@ test('a completed dense trace uses bitmap draws while panning and zooming a larg
   expect(zoom.imageDraws).toBeGreaterThanOrEqual(4);
   expect(zoom.lineCommands).toBeLessThan(12_000);
   expect(await geometryHash(page)).toBe(initial.geometryHash);
+  await positionDenseTrace(page);
+  await page.waitForTimeout(400);
+  const target = await traceDragTarget(page);
+  await page.mouse.move(target.x, target.y);
+  await page.mouse.down();
+  await startPaintProbe(page);
+  for (let step = 1; step <= 12; step += 1) {
+    const before = (await readPaintProbe(page)).imageDraws;
+    await page.mouse.move(target.x + step * 5, target.y + step * 2);
+    await expect.poll(async () => (await readPaintProbe(page)).imageDraws).toBeGreaterThan(before);
+  }
+  await page.mouse.up();
+  const move = await readPaintProbe(page);
+  expect(move.imageDraws).toBeGreaterThanOrEqual(10);
+  expect(move.lineCommands).toBeLessThan(12_000);
+  const moved = await traceDragTarget(page);
+  expect(
+    Math.hypot(moved.transform.x - target.transform.x, moved.transform.y - target.transform.y),
+  ).toBeGreaterThan(0.1);
+  expect(await geometryHash(page)).toBe(initial.geometryHash);
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await traceDragTarget(page)).transform).toEqual(target.transform);
   await info.attach('dense-trace-navigation.json', {
-    body: JSON.stringify({ initial, pan, zoom }, null, 2),
+    body: JSON.stringify(
+      { initial, pan, zoom, move, before: target.transform, after: moved.transform },
+      null,
+      2,
+    ),
     contentType: 'application/json',
   });
   await canvas.screenshot({ path: info.outputPath('dense-trace-after-navigation.png') });
 });
+
+async function traceDragTarget(page: Page) {
+  return page.evaluate(async () => {
+    const storePath = '/src/ui/state/store.ts';
+    const uiPath = '/src/ui/state/ui-store.ts';
+    const viewPath = '/src/ui/workspace/view-transform.ts';
+    const { useStore } = (await import(/* @vite-ignore */ storePath)) as {
+      useStore: { getState: () => { project: Project } };
+    };
+    const { useUiStore } = (await import(/* @vite-ignore */ uiPath)) as {
+      useUiStore: { getState: () => { zoomFactor: number; panX: number; panY: number } };
+    };
+    const { computeView } = (await import(
+      /* @vite-ignore */ viewPath
+    )) as typeof import('../src/ui/workspace/view-transform');
+    const project = useStore.getState().project;
+    const trace = project.scene.objects.find((object) => object.kind === 'traced-image');
+    const canvas = document.querySelector<HTMLCanvasElement>('canvas[aria-label$=" workspace"]');
+    if (trace === undefined || canvas === null) throw new Error('Missing trace or canvas');
+    const view = computeView(
+      canvas.width,
+      canvas.height,
+      project.device.bedWidth,
+      project.device.bedHeight,
+      useUiStore.getState(),
+    );
+    const rect = canvas.getBoundingClientRect();
+    // Inside rounded contour 775, away from handles. The fixture uses identity
+    // scale/rotation; movement changes only its translation.
+    return {
+      x: rect.x + (153 + trace.transform.x) * view.scale + view.offsetX,
+      y: rect.y + (155 + trace.transform.y) * view.scale + view.offsetY,
+      transform: trace.transform,
+    };
+  });
+}
 
 async function installDenseTrace(page: Page): Promise<void> {
   await page.evaluate(async () => {
