@@ -422,6 +422,13 @@ function dispatchReservedRequest(): void {
   nextRequestId += 1;
   const active: ActiveRequest = { ...next, id: nextRequestId };
   activeRequest = active;
+  // A queued Preview upgrade may have lost its last dependent owner while
+  // another lane held the heap. Keep the shared resolvers/cache capability so
+  // a later Preview can still upgrade after ETA. An immediately dispatched
+  // caller has not attached its ownership token yet, so preserve its request.
+  const estimateOnly =
+    active.projection === 'estimate' ||
+    preparationConsumers.hasOnlyEstimateConsumers(active.project, active.key);
   // Geometry crosses as transferred buffers: structured-cloning a dense
   // trace's object graph cost ~0.5-1.2 s of UI-thread time per request.
   try {
@@ -430,9 +437,7 @@ function dispatchReservedRequest(): void {
       id: active.id,
       project: packed.message,
       ...active.options,
-      ...(active.projection === 'estimate'
-        ? { projection: 'estimate' as const, allowPreviewUpgrade: true }
-        : {}),
+      ...(estimateOnly ? { projection: 'estimate' as const, allowPreviewUpgrade: true } : {}),
     };
     if (packed.transfer.length === 0) worker.postMessage(request);
     else worker.postMessage(request, packed.transfer);

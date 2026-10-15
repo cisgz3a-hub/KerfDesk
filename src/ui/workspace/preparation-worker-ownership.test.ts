@@ -127,6 +127,65 @@ describe('shared preparation consumer ownership', () => {
     expect(FakeWorker.instances).toHaveLength(1);
   });
 
+  it('dispatches only ETA when a queued Preview upgrade loses its last dependent owner', async () => {
+    const release = interactive();
+    const project = createProject();
+    const estimate = prepareJobEstimateOffThread(project);
+    const previewOwner = new AbortController();
+    const preview = prepareLargeJobOffThread(project, {}, undefined, previewOwner.signal);
+    previewOwner.abort();
+    await expect(preview).rejects.toMatchObject({ reason: 'consumer-cancelled' });
+    expect(FakeWorker.instances).toHaveLength(0);
+    release();
+    const original = worker();
+    expect(original.requests[0]?.projection).toBe('estimate');
+    original.send('estimate-ready');
+    await expect(estimate).resolves.toEqual({ estimate: result.estimate });
+    expect(original.upgrades).toEqual([]);
+    expect(original.terminated).toBe(true);
+    await expect(prepareJobEstimateOffThread(project)).resolves.toEqual({
+      estimate: result.estimate,
+    });
+    expect(FakeWorker.instances).toHaveLength(1);
+  });
+
+  it('allows a new Preview to join after a queued request was downgraded to ETA', async () => {
+    const release = interactive();
+    const project = createProject();
+    const estimate = prepareJobEstimateOffThread(project);
+    const owner = new AbortController();
+    const cancelledPreview = prepareLargeJobOffThread(project, {}, undefined, owner.signal);
+    owner.abort();
+    await expect(cancelledPreview).rejects.toMatchObject({ reason: 'consumer-cancelled' });
+    release();
+    expect(worker().requests[0]?.projection).toBe('estimate');
+    const preview = prepareLargeJobOffThread(project);
+    worker().send('estimate-ready');
+    expect(worker().upgrades).toHaveLength(1);
+    expect(worker().terminated).toBe(false);
+    worker().send();
+    await expect(preview).resolves.toEqual(result);
+    await expect(estimate).resolves.toEqual(result);
+    expect(FakeWorker.instances).toHaveLength(1);
+  });
+
+  it('keeps queued Preview when a later ETA depends on its full-result promise', async () => {
+    const release = interactive();
+    const project = createProject();
+    const earlyEstimate = prepareJobEstimateOffThread(project);
+    const previewOwner = new AbortController();
+    const preview = prepareLargeJobOffThread(project, {}, undefined, previewOwner.signal);
+    const lateEstimate = prepareJobEstimateOffThread(project);
+    previewOwner.abort();
+    await expect(preview).rejects.toMatchObject({ reason: 'consumer-cancelled' });
+    release();
+    expect(worker().requests[0]?.projection ?? 'preview').toBe('preview');
+    worker().send();
+    await expect(earlyEstimate).resolves.toEqual(result);
+    await expect(lateEstimate).resolves.toEqual(result);
+    expect(worker().terminated).toBe(true);
+  });
+
   it('preserves a later ETA sharing the upgraded Preview promise when Preview closes', async () => {
     const project = createProject();
     const earlyEstimate = prepareJobEstimateOffThread(project);

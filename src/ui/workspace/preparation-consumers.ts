@@ -18,6 +18,11 @@ export class PreparationConsumers {
     );
   }
 
+  hasOnlyEstimateConsumers(project: Project, key: string): boolean {
+    const owners = this.byProject.get(project)?.get(key);
+    return owners !== undefined && owners.size > 0 && !this.hasPreview(project, key);
+  }
+
   attach<T>(
     project: Project,
     key: string,
