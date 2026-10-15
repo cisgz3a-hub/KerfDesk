@@ -7,9 +7,11 @@ import {
   polylineToCurveSubpath,
   type ColoredPath,
   type ImportedSvg,
+  type TracedImage,
 } from '../../core/scene';
 import { deserializeProject, serializeProject } from '../../io/project';
 import { boundsForPaths, deletePathsNodes, editPathsNodesByDelta } from './path-node-edit-geometry';
+import { splitTracedImage } from './trace-break-apart';
 
 const SOURCE_PATH: ColoredPath = {
   color: '#123456',
@@ -81,6 +83,52 @@ describe('compatibility-polyline node editing', () => {
     expect(boundsForPaths([path])).toEqual({ minX: 0, minY: 0, maxX: 50, maxY: 0 });
     expect(boundsForPaths([edited!])).toEqual({ minX: 0, minY: 0, maxX: 50, maxY: 3 });
   });
+
+  it.each(['move', 'delete'] as const)(
+    'preserves holes after a canonical %s with unpaired compatibility contours',
+    (edit) => {
+      const square = (x: number, size: number) => ({
+        closed: true,
+        points: [
+          { x, y: x },
+          { x: x + size, y: x },
+          { x: x + size, y: x + size },
+          { x, y: x + size },
+        ],
+      });
+      const outer = square(0, 100);
+      const hole = square(20, 10);
+      const path: ColoredPath = {
+        color: '#000000',
+        fillRule: 'evenodd',
+        curves: [polylineToCurveSubpath(outer), polylineToCurveSubpath(hole)],
+        polylines: [hole, outer, hole],
+      };
+      const refs = (edit === 'move' ? [0, 1, 2, 3] : [1]).map((pointIndex) => ({
+        ...nodeRef(pointIndex),
+        polylineIndex: 1,
+        geometry: 'curve' as const,
+      }));
+      const edited =
+        edit === 'move'
+          ? editPathsNodesByDelta([path], refs, 20, 20)
+          : deletePathsNodes([path], refs);
+      if (edited === null) throw new Error('Expected a canonical edit.');
+      const object: TracedImage = {
+        id: 'art',
+        kind: 'traced-image',
+        source: 'trace.png',
+        transform: IDENTITY_TRANSFORM,
+        bounds: boundsForPaths(edited.paths),
+        traceMode: 'filled-contours',
+        paths: edited.paths,
+      };
+      expect(object.paths[0]?.polylines[0]?.points[0]).toEqual({ x: 0, y: 0 });
+      // Break Apart must not turn an interior hole into an independent solid shape.
+      expect(splitTracedImage(object, (index) => `part-${index}`)).toEqual([]);
+      expect(path.polylines).toEqual([hole, outer, hole]);
+    },
+  );
 
   it.each([
     ['move', () => editPathsNodesByDelta([SOURCE_PATH], [nodeRef(1)], 2, 3)],
