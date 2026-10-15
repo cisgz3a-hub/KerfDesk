@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state/store';
 import { RegistrationJigOutlineControls } from './RegistrationJigOutlineControls';
+import { createRectangle } from '../../core/shapes/primitives';
+import { isRegistrationBox } from '../../core/scene';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -12,6 +14,60 @@ const initial = useStore.getState();
 afterEach(() => useStore.setState(initial, true));
 
 describe('jig construction draft validation', () => {
+  it('previews removed artwork and defaults to keeping it, with explicit removal available', async () => {
+    useStore.setState({ project: createProject(), undoStack: [] });
+    useStore.getState().replaceRegistrationJigSet({
+      outline: { kind: 'rectangle', widthMm: 40, heightMm: 30 },
+      rows: 1,
+      columns: 3,
+      spacingX: 5,
+      spacingY: 0,
+    });
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'art',
+        color: '#0000ff',
+        spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
+      }),
+    );
+    useStore.getState().centerSelectionInRegistrationBox();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<RegistrationJigOutlineControls />));
+      const columns = host.querySelector<HTMLInputElement>('[aria-label="Jig columns"]')!;
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+          columns,
+          '2',
+        );
+        columns.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      const policy = host.querySelector<HTMLSelectElement>(
+        '[aria-label="Artwork in removed jig slots"]',
+      )!;
+      expect(policy.value).toBe('keep');
+      expect(host.textContent).toContain('1 artwork object in removed slots');
+      expect(host.textContent).toContain('can still output');
+      await act(async () => {
+        policy.value = 'remove';
+        policy.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      expect(host.textContent).toContain('Undo restores both');
+      const replace = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Replace with 2 jigs',
+      )!;
+      await act(async () => replace.click());
+      expect(
+        useStore.getState().project.scene.objects.filter((object) => !isRegistrationBox(object)),
+      ).toHaveLength(2);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it.each(['', '0', '1.5', '10000'])(
     'keeps invalid or oversized grid %s out of the scene',
     async (rows) => {

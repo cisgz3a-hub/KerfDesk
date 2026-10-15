@@ -58,7 +58,7 @@ function testPlatform() {
   const tcpRequest = vi.fn<PlatformAdapter['serial']['requestPort']>(async () => {
     throw new Error('Mock TCP target unreachable');
   });
-  const serial = { isSupported: () => true, requestPort: tcpRequest };
+  const serial = { transport: 'tcp' as const, isSupported: () => true, requestPort: tcpRequest };
   const target = vi.fn(() => serial);
   const platform: PlatformAdapter = {
     id: 'mock',
@@ -70,7 +70,10 @@ function testPlatform() {
   return { platform, usbRequest, tcpRequest, serial, target };
 }
 
-async function renderFirstNetworkConnect(platform: PlatformAdapter): Promise<void> {
+async function renderFirstNetworkConnect(
+  platform: PlatformAdapter,
+  label = 'FluidNC',
+): Promise<void> {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
@@ -87,18 +90,18 @@ async function renderFirstNetworkConnect(platform: PlatformAdapter): Promise<voi
   );
   if (!trigger) throw new Error('Missing machine details');
   await act(async () => trigger.click());
-  for (const [label, value] of [
-    ['FluidNC machine IP or hostname', '192.0.2.5'],
-    ['FluidNC Telnet port', '23'],
+  for (const [fieldLabel, value] of [
+    [`${label} machine IP or hostname`, '192.0.2.5'],
+    [`${label} Telnet port`, '23'],
   ]) {
-    const field = document.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
-    if (!field) throw new Error(`Missing ${label}`);
+    const field = document.querySelector<HTMLInputElement>(`input[aria-label="${fieldLabel}"]`);
+    if (!field) throw new Error(`Missing ${fieldLabel}`);
     await act(async () => {
       field.value = value ?? '';
       Simulate.change(field);
     });
   }
-  await act(async () => button('Connect FluidNC network').click());
+  await act(async () => button(`Connect ${label} network`).click());
 }
 
 function respondingChannel() {
@@ -126,10 +129,52 @@ function respondingChannel() {
 }
 
 describe('first FluidNC network Connect setup recovery', () => {
+  it('connects grblHAL with raw TCP and keeps explicit setup retries on that channel', async () => {
+    useStore.setState({
+      project: createProject({
+        ...fluidNcProfile,
+        controllerKind: 'grblhal',
+        workerHostedStreaming: true,
+      }),
+    });
+    const link = testPlatform();
+    const open = vi.fn(async (_request: SerialOpenRequest) => {
+      throw new Error('Mock raw channel unreachable');
+    });
+    link.tcpRequest.mockResolvedValue({ info: { transport: 'tcp' }, open });
+    await renderFirstNetworkConnect(link.platform, 'grblHAL');
+    expect(link.target).toHaveBeenCalledExactlyOnceWith('192.0.2.5', 23, 'grblhal-raw');
+    expect(useLaserStore.getState().activeControllerKind).toBe('grblhal');
+    expect(controlsText()).toContain('Network target: 192.0.2.5:23');
+    expect(controlsText()).not.toMatch(/Try other speeds|baud|Background streaming/);
+    await act(async () => button('Try again').click());
+    expect(open).toHaveBeenCalledTimes(2);
+    for (const [request] of open.mock.calls) expect(request).not.toHaveProperty('hostedStreaming');
+    expect(link.usbRequest).not.toHaveBeenCalled();
+  });
+
+  it.each(['fluidnc', 'ruida'] as const)(
+    'does not use a captured grblHAL target after switching to %s',
+    async (controllerKind) => {
+      const link = testPlatform();
+      const connection = connectionForMachineSetup(
+        link.platform,
+        { ...fluidNcProfile, controllerKind },
+        115200,
+        { kind: 'grblhal-network', serial: link.serial, host: '192.0.2.5', port: 23 },
+      );
+      await expect(connection.connect(useLaserStore.getState().connect)).rejects.toThrow(
+        'Select the grblHAL protocol',
+      );
+      expect(link.tcpRequest).not.toHaveBeenCalled();
+      expect(link.usbRequest).not.toHaveBeenCalled();
+    },
+  );
+
   it('retries the captured TCP target after failure without USB or baud scanning', async () => {
     const link = testPlatform();
     await renderFirstNetworkConnect(link.platform);
-    expect(link.target).toHaveBeenCalledExactlyOnceWith('192.0.2.5', 23);
+    expect(link.target).toHaveBeenCalledExactlyOnceWith('192.0.2.5', 23, 'fluidnc-telnet');
     expect(link.tcpRequest).toHaveBeenCalledOnce();
     expect(document.querySelector('[role="dialog"][aria-label="Machine details"]')).toBeNull();
     expect(useMachineSetupDialogStore.getState().state.kind).toBe('open');
@@ -167,6 +212,8 @@ describe('first FluidNC network Connect setup recovery', () => {
     await act(async () => openMachineSetup());
     expect(controlsText()).not.toContain('Network target:');
     await act(async () => button('Try again').click());
+    expect(link.usbRequest).not.toHaveBeenCalled();
+    await act(async () => button('Use a different port…').click());
     expect(link.usbRequest).toHaveBeenCalledOnce();
     expect(link.tcpRequest).toHaveBeenCalledTimes(3);
   });
@@ -197,8 +244,12 @@ describe('first FluidNC network Connect setup recovery', () => {
       channel.emit('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     });
     await act(async () => {
-      await vi.waitFor(() => expect(button('Read again').disabled).toBe(false));
+      await vi.waitFor(() => {
+        expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
+        expect(useLaserStore.getState().controllerOperation).toBeNull();
+      });
     });
+    expect(button('Read again').disabled).toBe(false);
     channel.write.mockClear();
     await act(async () => button('Read again').click());
     expect(channel.write).toHaveBeenCalledWith('$I\n');

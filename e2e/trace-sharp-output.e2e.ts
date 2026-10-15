@@ -65,7 +65,7 @@ test('dense Sharp artwork traces, previews and completes one simulated Frame aft
   });
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await page.evaluate(
     ({ base64, name }) => {
@@ -78,7 +78,7 @@ test('dense Sharp artwork traces, previews and completes one simulated Frame aft
     { base64: bytes.toString('base64'), name: basename(imagePath) },
   );
   await (await toolbarCommand(page, 'Import...')).click();
-  const traceButton = page.getByRole('button', { name: 'Trace Image...', exact: true });
+  const traceButton = await toolbarCommand(page, 'Trace Image...');
   await expect(traceButton).toBeEnabled({ timeout: 30_000 });
   record('imported');
   await traceButton.click();

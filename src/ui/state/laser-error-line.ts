@@ -31,6 +31,8 @@ export type ControllerRejection = {
   readonly raw: string | undefined;
   /** The firmware halted itself and needs a reset or power cycle (MA-10). */
   readonly halted?: boolean;
+  /** False for an error report whose command still owes a following ok. */
+  readonly acknowledgesLine?: boolean;
   /** Marlin skipped the line as an unknown command (MA-12). */
   readonly skipped?: SkippedCommand;
 };
@@ -70,8 +72,19 @@ export function handleErrorLine(
     noteRefusedLine(refs);
     return;
   }
+  // Stop refilling immediately, even when the firmware still owes this line
+  // its terminal ok. Keeping the head prevents that ok from answering cleanup.
+  if (rejection.acknowledgesLine === false) {
+    set((current) =>
+      current.streamer === null || isStoppedStreamErrorEcho(current.streamer)
+        ? {}
+        : {
+            streamer: { ...current.streamer, status: 'errored' },
+            ...liveCanvasLifecyclePatch(current, 'errored'),
+          },
+    );
+  } else advanceStream(set, get, refs, safeWrite, 'error');
   // A halted controller runs nothing more, so no stop line is written to it.
-  advanceStream(set, get, refs, safeWrite, 'error');
   if (rejection.halted !== true) {
     requestRealtimeStopAfterStreamError(set, get, refs, state, safeWrite);
   }

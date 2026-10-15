@@ -7,6 +7,7 @@ import {
   connectMachineAndDismissFirstSetup,
   machineJogAction,
   selectWorkspacePanel,
+  toolbarCommand,
 } from './workspace-ui';
 import { expect, type KerfDeskFixture, type Locator, type Page } from './kerfdesk-test';
 import {
@@ -255,7 +256,7 @@ export async function confirmJobReview(
 }
 
 export async function reopenProject(page: Page, name = 'project-basic.lf2'): Promise<void> {
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   await dismissNotifications(page);
 }

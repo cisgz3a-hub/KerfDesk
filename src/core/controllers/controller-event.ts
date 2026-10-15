@@ -12,6 +12,9 @@ export type ControllerEvent =
       readonly kind: 'error';
       readonly code: number | null;
       readonly raw?: string;
+      // A rejection report followed by the command's own terminal ok (Marlin).
+      // Freeze/refuse immediately, but keep its FIFO acknowledgement debt.
+      readonly acknowledgesLine?: false;
       // The firmware stopped itself and answers nothing until it is reset or
       // power-cycled (Marlin `Error:Printer halted. kill() called!`).
       readonly halted?: true;

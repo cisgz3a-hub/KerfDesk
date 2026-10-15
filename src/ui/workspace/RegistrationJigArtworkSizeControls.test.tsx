@@ -44,6 +44,40 @@ afterEach(() => {
 });
 
 describe('RegistrationJigArtworkSizeControls', () => {
+  it('offers exact artwork sizing for a single jig and undoes the resize', () => {
+    act(() => {
+      useStore.getState().newProject();
+      useStore.getState().replaceRegistrationJigSet({
+        outline: { kind: 'rectangle', widthMm: 50, heightMm: 40 },
+        rows: 1,
+        columns: 1,
+        spacingX: 0,
+        spacingY: 0,
+      });
+      useStore.getState().drawShape(
+        createRectangle({
+          id: 'single-art',
+          color: '#0000ff',
+          spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
+          transform: IDENTITY_TRANSFORM,
+        }),
+      );
+      useStore.getState().centerSelectionInRegistrationBox();
+    });
+    const before = useStore.getState().project;
+    setInputValue(inputByLabel('Jig artwork width'), '30');
+    clickButton('Apply artwork size');
+    const resized = useStore
+      .getState()
+      .project.scene.objects.find((object) => object.id === 'single-art');
+    if (resized === undefined) throw new Error('artwork missing');
+    const bounds = transformedBBox(resized);
+    expect(bounds.maxX - bounds.minX).toBeCloseTo(30);
+    expect(bounds.maxY - bounds.minY).toBeCloseTo(15);
+    act(() => useStore.getState().undo());
+    expect(useStore.getState().project).toEqual(before);
+  });
+
   it('keeps the other dimension unchanged while aspect ratio is unlocked', () => {
     expect(buttonByLabel('AR locked').getAttribute('aria-pressed')).toBe('true');
     clickButton('AR locked');

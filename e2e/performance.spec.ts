@@ -31,7 +31,7 @@ test('opens and previews a 2,000-object project inside browser budgets', async (
   ]);
 
   const openStarted = Date.now();
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page.getByText('Objects: 2000', { exact: true })).toBeVisible({ timeout: 15_000 });
   expect(Date.now() - openStarted).toBeLessThan(15_000);
 

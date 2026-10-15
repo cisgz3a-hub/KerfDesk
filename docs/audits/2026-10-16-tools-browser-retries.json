@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-16",
+  "runtime": "Local desktop renderer bundle on port 5199; not installed desktop",
+  "originalRun": "artifacts/tools-audit/tools-e2e-results.json",
+  "originalResult": { "passed": 21, "unsuccessful": 3 },
+  "retries": [
+    {
+      "file": "e2e/image-studio-transform-alpha.e2e.ts",
+      "session": 55377,
+      "exitCode": 0,
+      "passed": 1,
+      "durationSeconds": 23.4,
+      "outputDirectory": "artifacts/tools-audit/runs/alpha-bundle"
+    },
+    {
+      "files": ["e2e/convert-bitmap.spec.ts", "e2e/trace-presets-stress-worker.e2e.ts"],
+      "grep": "busy conversion|default Line Art traces",
+      "session": 89689,
+      "exitCode": 0,
+      "passed": 2,
+      "tests": [
+        {
+          "name": "busy conversion prevents duplicate work, cancels with Escape, and can be retried",
+          "seconds": 4.0
+        },
+        {
+          "name": "default Line Art traces the actual dragon in a real worker and commits its preview",
+          "seconds": 56.4
+        }
+      ],
+      "outputDirectory": "artifacts/tools-audit/runs/remaining-bundle"
+    }
+  ],
+  "limitations": [
+    "Passing selected retries do not turn the original run into a single clean full-suite result.",
+    "Automated fixtures supply file selection and inspect results; this is separate from direct computer-use evidence.",
+    "No hardware or installed-release qualification."
+  ]
+}

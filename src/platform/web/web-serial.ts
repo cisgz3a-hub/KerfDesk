@@ -33,6 +33,13 @@ import type {
   SerialPortRef,
 } from '../types';
 import { closeWriterBounded } from './bounded-writer-close';
+import {
+  boundedSerialClose,
+  closeSerialPort,
+  requireSerialPortReleased,
+  startSerialPortClose,
+  startSerialPortForget,
+} from './serial-port-close';
 import { runSerialReadLoop, type SerialReadTarget } from './serial-read-loop';
 import { encodeWireBytes, extractSerialLines } from './serial-wire';
 import { tryOpenNativeSerialConnection } from './native-serial-connection';
@@ -94,7 +101,8 @@ async function closeStalePairedPorts(): Promise<void> {
     for (const p of ports) {
       if (p.readable === null && p.writable === null) continue;
       try {
-        await p.close();
+        requireSerialPortReleased(p);
+        await closeSerialPort(p);
       } catch {
         // best-effort
       }
@@ -109,6 +117,7 @@ function makePortRef(port: SerialPort): SerialPortRef {
   return {
     ...(info === null ? {} : { info }),
     open: async (req: SerialOpenRequest): Promise<SerialConnection> => {
+      requireSerialPortReleased(port);
       if (req.hostedStreaming === true) {
         const hosted = await tryOpenNativeSerialConnection({
           port,
@@ -175,10 +184,11 @@ async function openWithRetry(port: SerialPort, baudRate: number): Promise<void> 
     if (!/already open/i.test(message)) throw err;
     console.warn('Port already open; closing and retrying once.');
     try {
-      await port.close();
+      await closeSerialPort(port);
     } catch {
-      // ignore; the open below will throw if we still can't.
+      // The open below still requires any pending close to release ownership.
     }
+    requireSerialPortReleased(port);
     await port.open(options);
   }
 }
@@ -214,16 +224,26 @@ function makeConnection(port: SerialPort): SerialConnection {
   const lineErrorSubs: Subscribers<string> = new Set();
   const ctx = openConnectionContext(port);
 
-  const closeStreamsOnce = async (): Promise<void> => {
-    if (ctx.streamsClosed) return;
+  let streamsClosing: Promise<void> | null = null;
+  const closeStreamsOnce = (): Promise<void> => {
     ctx.streamsClosed = true;
-    await closeStreams(ctx.reader, ctx.writer);
+    streamsClosing ??= closeStreams(ctx.reader, ctx.writer);
+    return streamsClosing;
   };
 
+  let closing: Promise<void> | null = null;
+  let closeNotified = false;
   const fireClose = (): void => {
-    if (ctx.closed) return;
     ctx.closed = true;
-    for (const h of closeSubs) h();
+    if (closeNotified) return;
+    closeNotified = true;
+    for (const h of closeSubs) {
+      try {
+        h();
+      } catch (error) {
+        console.error('Serial close handler threw; continuing transport cleanup:', error);
+      }
+    }
   };
 
   // The read side ended on its own: the OS dropped the port, a read error that
@@ -238,57 +258,33 @@ function makeConnection(port: SerialPort): SerialConnection {
   const handleDroppedConnection = (): void => {
     port.removeEventListener('disconnect', handleDroppedConnection);
     const closesPort = !ctx.closed;
-    const streamsClosed = closeStreamsOnce();
-    fireClose();
-    if (closesPort) void streamsClosed.then(() => port.close()).catch(() => undefined);
+    if (closesPort) {
+      closing ??= startSerialPortClose(port, closeStreamsOnce);
+      void boundedSerialClose(closing).catch(() => undefined);
+      fireClose();
+    }
   };
   port.addEventListener('disconnect', handleDroppedConnection);
 
   void runSerialReadLoop(ctx, lineSubs, handleDroppedConnection, lineErrorSubs);
 
-  const closeConnection = async (): Promise<void> => {
-    if (ctx.closed) return;
+  const startCloseConnection = (): Promise<void> => {
     ctx.closed = true;
     port.removeEventListener('disconnect', handleDroppedConnection);
-    await closeStreamsOnce();
-    try {
-      await port.close();
-    } catch (err) {
-      console.warn('port.close() rejected:', err);
-    }
-    for (const h of closeSubs) h();
+    closing ??= startSerialPortClose(port, closeStreamsOnce);
+    return closing;
   };
 
   let forgetPromise: Promise<void> | null = null;
   const forgetConnection = (): Promise<void> => {
-    forgetPromise ??= (async () => {
-      const needsClose = !ctx.closed;
-      if (needsClose) {
-        ctx.closed = true;
-        port.removeEventListener('disconnect', handleDroppedConnection);
-        await closeStreamsOnce();
-        try {
-          await port.close();
-        } catch (err) {
-          console.warn('port.close() rejected:', err);
-        }
-      }
-      // Permission revocation remains valid after a prior normal close. A
-      // late concurrent Forget must not become a no-op merely because the
-      // transport owner already marked the duplex stream closed.
-      try {
-        await port.forget?.();
-      } catch (err) {
-        console.warn('port.forget() rejected:', err);
-      }
-      if (needsClose) for (const h of closeSubs) h();
-    })();
-    return forgetPromise;
+    forgetPromise ??= startSerialPortForget(port, startCloseConnection());
+    return boundedSerialClose(forgetPromise).finally(fireClose);
   };
 
   return {
     write: async (data: string) => {
-      if (ctx.writer === undefined) throw new Error('Serial port not writable.');
+      if (ctx.closed || ctx.streamsClosed || ctx.writer === undefined)
+        throw new Error('Serial port not writable.');
       await ctx.writer.write(encodeWireBytes(data));
     },
     onLine: (handler) => {
@@ -300,7 +296,7 @@ function makeConnection(port: SerialPort): SerialConnection {
       return () => closeSubs.delete(handler);
     },
     onLineError: (handler) => subscribe(lineErrorSubs, handler),
-    close: closeConnection,
+    close: () => boundedSerialClose(startCloseConnection()).finally(fireClose),
     forget: async () => {
       // A2 audit finding: revoke the in-page permission for this port on
       // explicit Forget Device so a long-running tab doesn't accumulate
@@ -335,12 +331,15 @@ async function closeStreams(
     }
   }
   if (writer !== undefined) {
-    // Bounded, not bare: close() alone never settles on a sink that cannot
-    // drain, and nothing above this awaits with a deadline — Disconnect would
-    // spin forever and never release the connection ref, so Connect could not
-    // replace the port either. See bounded-writer-close.ts for why abort is
-    // the fallback rather than the first move.
-    await closeWriterBounded(writer);
+    // Give the cleanup bytes a chance to drain before requesting abort.
+    // Neither operation is guaranteed to settle: the caller's deadline
+    // reports that uncertainty while this cleanup retains the actual lock.
+    // See bounded-writer-close.ts for why abort is the fallback rather than
+    // the first move.
+    const outcome = await closeWriterBounded(writer);
+    // Keep the lock while native shutdown is unconfirmed. The caller-facing
+    // deadline does not let a new connection take ownership of this sink.
+    if (outcome === 'timed-out') await writer.closed.catch(() => undefined);
     try {
       writer.releaseLock();
     } catch {

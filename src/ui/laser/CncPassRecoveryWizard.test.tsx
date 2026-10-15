@@ -106,7 +106,7 @@ function exactCapsule(options?: {
     prepared,
     outputScope: DEFAULT_OUTPUT_SCOPE,
     canvasPlan: { retentionKey: 'archived-cnc-signature' } as CanvasMotionPlan,
-    controllerSettings: null,
+    controllerSettings: { reportInches: false },
     ...(options?.archiveWco === false
       ? {}
       : { controllerObservation: { wco: { x: 0, y: 0, z: 0 } } }),
@@ -129,7 +129,11 @@ function exactCapsule(options?: {
 
 function renderWizard(capsule: RecoveryCapsule): { readonly onClose: ReturnType<typeof vi.fn> } {
   useStore.setState({ project: createProject() });
-  useLaserStore.setState({ ...initialLaserState(), wcoCache: { x: 0, y: 0, z: 0 } });
+  useLaserStore.setState({
+    ...initialLaserState(),
+    wcoCache: { x: 0, y: 0, z: 0 },
+    controllerSettings: { reportInches: false },
+  });
   host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
@@ -175,6 +179,18 @@ function rezeroedRadio(): HTMLInputElement {
 }
 
 describe('CncPassRecoveryWizard', () => {
+  it('updates retained-position availability when live report units become unconfirmed', () => {
+    renderWizard(exactCapsule());
+    const retained = host?.querySelector<HTMLInputElement>('input[type="radio"]');
+    expect(retained?.disabled).toBe(false);
+
+    act(() => useLaserStore.setState({ reportUnitsUnconfirmed: true }));
+
+    expect(retained?.disabled).toBe(true);
+    expect(host?.textContent).toContain('units are unconfirmed');
+    expect(rezeroedRadio().disabled).toBe(false);
+  });
+
   it('audit retained position radio is carried into the explicitly started pass review', async () => {
     renderWizard(exactCapsule());
     completeChecklist();

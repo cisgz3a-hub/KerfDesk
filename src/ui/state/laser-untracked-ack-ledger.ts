@@ -27,6 +27,11 @@ export function reserveUntrackedAcks(
   return reservation;
 }
 
+/** The command a nonterminal rejection describes, without settling its debt. */
+export function peekUntrackedAck(refs: UntrackedAckLedgerRefs): LaserMotionOperationId | null {
+  return currentQueue(refs)[0]?.motionOperationId ?? null;
+}
+
 /** Consume one terminal response from the oldest current-session write. */
 export function consumeUntrackedAck(refs: UntrackedAckLedgerRefs): LaserMotionOperationId | null {
   const queue = currentQueue(refs);

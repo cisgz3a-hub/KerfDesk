@@ -29,9 +29,12 @@ export function CncPassRecoveryWizard(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   const liveWco = useLaserStore((state) => state.wcoCache);
+  const liveReportInches = useLaserStore((state) =>
+    state.reportUnitsUnconfirmed === true ? undefined : state.controllerSettings?.reportInches,
+  );
   const model = useMemo(
-    () => buildCncPassRecoveryModel(props.capsule, liveWco),
-    [props.capsule, liveWco],
+    () => buildCncPassRecoveryModel(props.capsule, liveWco, liveReportInches),
+    [props.capsule, liveWco, liveReportInches],
   );
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [selection, setSelection] = useState<{ groupIndex: number; passIndex: number } | null>(

@@ -5,10 +5,12 @@ import type { ControllerDriver } from '../../core/controllers';
 import { consoleSettingWriteIssue } from '../../core/controllers/console-setting-writes';
 import { machineKindOf } from '../../core/scene';
 import * as detectedSettings from './detected-settings-action';
+import { unqualifiedControllerSettingsPatch } from './controller-report-units';
 import {
-  beginReportUnitsWrite,
-  unqualifiedControllerSettingsPatch,
-} from './controller-report-units';
+  beginConsoleSettingWriteEvidence,
+  rereadSettingsAfterConsoleWrite,
+} from './laser-console-settings-write';
+import { failedControllerQualificationPatch } from './laser-controller-qualification';
 import {
   hasAccessoryCommand,
   type ConsoleStateEffect,
@@ -39,8 +41,6 @@ import {
   controllerUnlockedPatch,
   finishConsoleSettingsRead,
   releaseConsoleSettingsRead,
-  reportUnitsStayUnconfirmed,
-  settingWriteStaysUnverified,
 } from './laser-console-completion';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import { pushLog } from './laser-store-helpers';
@@ -213,9 +213,8 @@ async function dispatchPreparedConsoleCommand(
   command: PreparedConsoleCommand,
   source: TranscriptSource,
 ): Promise<void> {
-  const reportUnitsWrite = /^\$0*13\s*=/.test(command.normalized);
+  const settingWrite = beginConsoleSettingWriteEvidence(set, get, refs.driver, command);
   const settingsQuery = command.kind === 'settings-query';
-  if (reportUnitsWrite) set(beginReportUnitsWrite());
   if (settingsQuery) beginConsoleSettingsRead(set, get, refs);
   // The alarm a `$X` clears, read before its reply (controllerUnlockedPatch).
   const unlockedAlarm = get().alarmCode;
@@ -223,44 +222,37 @@ async function dispatchPreparedConsoleCommand(
     await writeConsoleCommand(refs, write, command, source);
   } catch (error) {
     if (settingsQuery) releaseConsoleSettingsRead(set, get, refs);
+    if (settingWrite.requalifiesSettings) {
+      const message = error instanceof Error ? error.message : String(error);
+      set((state) =>
+        failedControllerQualificationPatch(state, settingWrite.qualificationEpoch, message),
+      );
+    }
     throw error;
   }
   if (settingsQuery) finishConsoleSettingsRead(set, get, refs);
   // An acknowledged `$X` leaves exactly what the Alarm banner's Unlock does
   // (audit cnc-controller-1).
   if (command.kind === 'unlock') set((state) => controllerUnlockedPatch(state, unlockedAlarm));
-  else applyConsoleStateEffect(set, command);
+  // Numeric settings already expired their physical/settings evidence before
+  // dispatch. Only the fresh-status requirement and diagnostic remain here.
+  else if (settingWrite.numeric && command.stateEffect !== 'read-only') {
+    const effect = command.stateEffect;
+    set((state) => consoleObservationPatch(state, effect, command.normalized));
+  } else applyConsoleStateEffect(set, command);
   await trackConsoleWcs(set, get, refs, command, (line, action, next) =>
     write(line, action, next ?? 'system'),
   );
-  if (command.kind === 'setting-write' || reportUnitsWrite) {
-    await rereadSettingsAfterWrite(set, get, refs, write, command.normalized, reportUnitsWrite);
-  }
-}
-
-// The Console reads `$$` back after a setting write, as the settings dialog
-// verifies its writes: the write dropped the settings the app knew, and the
-// controller's own dump is the proof of what it stored (ADR-375, C-4). A `$13=`
-// write also leaves machine position hidden until the dump confirms the report
-// units (audit regressions-1). A profile without a settings query (the Falcon
-// contract) is not read.
-async function rereadSettingsAfterWrite(
-  set: SetFn,
-  get: GetFn,
-  refs: ConsoleActionRefs,
-  write: ConsoleWriteFn,
-  written: string,
-  reportUnitsWrite: boolean,
-): Promise<void> {
-  const query = refs.driver.commands.settingsQuery ?? (reportUnitsWrite ? '$$' : null);
-  if (query === null) return;
-  const settingsRead = refs.driver.prepareConsoleCommand(query);
-  try {
-    if (!settingsRead.ok) throw new Error(settingsRead.reason);
-    await dispatchPreparedConsoleCommand(set, get, refs, write, settingsRead.command, 'system');
-  } catch (error) {
-    if (reportUnitsWrite) reportUnitsStayUnconfirmed(set, error);
-    else settingWriteStaysUnverified(set, written, error);
+  if (command.kind === 'setting-write' || settingWrite.reportUnitsWrite) {
+    await rereadSettingsAfterConsoleWrite(
+      set,
+      get,
+      refs.driver,
+      command.normalized,
+      settingWrite.reportUnitsWrite,
+      (settingsRead) =>
+        dispatchPreparedConsoleCommand(set, get, refs, write, settingsRead, 'system'),
+    );
   }
 }
 

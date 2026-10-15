@@ -7,7 +7,7 @@
 
 import type { Bounds } from './scene-object';
 
-export type TileLayout =
+export type TileLayout = (
   | {
       readonly kind: 'grid';
       readonly rows: number;
@@ -15,7 +15,11 @@ export type TileLayout =
       readonly gapXMm: number;
       readonly gapYMm: number;
     }
-  | { readonly kind: 'fill'; readonly gapXMm: number; readonly gapYMm: number };
+  | { readonly kind: 'fill'; readonly gapXMm: number; readonly gapYMm: number }
+) & {
+  readonly marginMm?: number;
+  readonly circlePacking?: 'rows' | 'square';
+};
 
 export type TileOffset = { readonly dx: number; readonly dy: number };
 
@@ -37,12 +41,19 @@ export function tileIntoRegion(
   const cellH = cell.maxY - cell.minY;
   const regionW = region.maxX - region.minX;
   const regionH = region.maxY - region.minY;
+  if (
+    ![cellW, cellH, regionW, regionH, cell.minX, cell.minY, region.minX, region.minY].every(
+      Number.isFinite,
+    )
+  )
+    return [];
   if (cellW <= 0 || cellH <= 0 || regionW <= 0 || regionH <= 0) return [];
 
   const gapX = finiteNonNeg(layout.gapXMm);
   const gapY = finiteNonNeg(layout.gapYMm);
   const maxColsThatFit = fitCount(regionW, cellW, gapX);
   const maxRowsThatFit = fitCount(regionH, cellH, gapY);
+  if (Math.min(maxColsThatFit, maxRowsThatFit) === 0) return [];
   let cols = clampCount(
     layout.kind === 'fill' ? maxColsThatFit : Math.min(layout.cols, maxColsThatFit),
   );
@@ -72,10 +83,9 @@ export function tileIntoRegion(
   return offsets;
 }
 
-// How many cells (plus the gap between them) fit across `regionSpan`. Always at
-// least one — a design larger than the board still tiles as a single copy.
+// An oversized design has no fitting slots; never silently overhang the board.
 function fitCount(regionSpan: number, cellSpan: number, gap: number): number {
-  return Math.max(1, Math.floor((regionSpan + gap) / (cellSpan + gap)));
+  return Math.max(0, Math.floor((regionSpan + gap) / (cellSpan + gap)));
 }
 
 function clampCount(value: number): number {

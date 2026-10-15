@@ -1,0 +1,60 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 2,
+  "numPassedTests": 2,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1792079692184,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Image Studio bounded working-image stress"],
+          "fullName": "Image Studio bounded working-image stress restores all channels through adjustment undo and redo on a megapixel image",
+          "status": "passed",
+          "title": "restores all channels through adjustment undo and redo on a megapixel image",
+          "duration": 165.57600000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio bounded working-image stress"],
+          "fullName": "Image Studio bounded working-image stress keeps flat-image colour and alpha invariant at a large Gaussian radius",
+          "status": "passed",
+          "title": "keeps flat-image colour and alpha invariant at a large Gaussian radius",
+          "duration": 153.6338999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792079695952,
+      "endTime": 1792079696271.6338,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/image-editor/editor-tools-stress.test.ts"
+    }
+  ]
+}

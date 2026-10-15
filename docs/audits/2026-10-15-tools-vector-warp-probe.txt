@@ -1,0 +1,34 @@
+
+ RUN  v4.1.11 C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0
+
+stdout | src/core/geometry/warp-deform-extreme.audit.test.ts > audit warp 1000x expansion meets advertised 0.05mm error
+{"grid":"warp","stretch":1000,"outputPoints":10,"maxErrorMm":0.9259259259259238,"targetMm":0.05}
+
+stdout | src/core/geometry/warp-deform-extreme.audit.test.ts > audit deform 1000x expansion meets advertised 0.05mm error
+{"grid":"deform","stretch":1000,"outputPoints":10,"maxErrorMm":0.9259259259259238,"targetMm":0.05}
+
+ ❯ src/core/geometry/warp-deform-extreme.audit.test.ts (2 tests | 2 failed) 535ms
+   × audit warp 1000x expansion meets advertised 0.05mm error 409ms
+   × audit deform 1000x expansion meets advertised 0.05mm error 58ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/geometry/warp-deform-extreme.audit.test.ts > audit warp 1000x expansion meets advertised 0.05mm error
+ FAIL  src/core/geometry/warp-deform-extreme.audit.test.ts > audit deform 1000x expansion meets advertised 0.05mm error
+AssertionError: expected 0.9259259259259238 to be less than or equal to 0.05
+ ❯ src/core/geometry/warp-deform-extreme.audit.test.ts:31:20
+     29|   }
+     30|   console.log(JSON.stringify({ grid, stretch, outputPoints: points.len…
+     31|   expect(maxError).toBeLessThanOrEqual(0.05);
+       |                    ^
+     32| });
+     33|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  00:15:05
+   Duration  28.02s (transform 22.36s, setup 1.55s, import 22.59s, tests 535ms, environment 1.86s)
+

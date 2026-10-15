@@ -5,11 +5,12 @@
 
 import type { CncPassResumeJob } from '../../core/recovery/cnc-pass-resume-job';
 import type { CncResumePoint } from '../../core/recovery/cnc-resume-point';
+import { reportedWorkOffsetMm } from '../state/infer-machine-position';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import type { RecoveryCapsule } from '../state/recovery';
 
-// GRBL reports WCO at 3 decimals; equality within half a thousandth of a mm
-// is the same offset re-read, not a moved zero.
+// Compare physical millimetres, including when the archived and live $13
+// report units differ. A raw inch difference would widen this tolerance 25.4x.
 export const RETAINED_WCO_TOLERANCE_MM = 0.005;
 
 export type CncPassRecoveryPositionEvidence =
@@ -56,6 +57,7 @@ export function cncPassRecoveryReviewIssue(review: CncPassRecoveryReview): strin
 export function retainedPositionIssue(
   capsule: RecoveryCapsule,
   liveWco: WorkCoordinateOffset | null,
+  liveReportInches?: boolean,
 ): string | null {
   if (capsule.interruption.kind === 'controller-reboot') {
     return 'The controller rebooted during the incident, so its position cannot be retained. Re-establish the XY/Z zero, then choose the re-zeroed option.';
@@ -76,7 +78,25 @@ export function retainedPositionIssue(
   if (liveWco === null) {
     return 'The live controller has not reported its work offset yet. Wait for a status report, or re-establish the XY/Z zero.';
   }
-  if (!wcoMatches(archivedWco, liveWco)) {
+  const archivedReportInches =
+    capsule.artifact.kind === 'exact-execution'
+      ? capsule.artifact.archivedControllerObservation.settings?.reportInches
+      : undefined;
+  return retainedWorkOffsetIssue(archivedWco, archivedReportInches, liveWco, liveReportInches);
+}
+
+function retainedWorkOffsetIssue(
+  archivedWco: WorkCoordinateOffset,
+  archivedReportInches: boolean | undefined,
+  liveWco: WorkCoordinateOffset,
+  liveReportInches: boolean | undefined,
+): string | null {
+  if (archivedReportInches === undefined || liveReportInches === undefined) {
+    return 'The archived or live position-report units are unconfirmed, so retained position cannot be compared. Re-establish the XY/Z zero, then choose the re-zeroed option.';
+  }
+  const archivedWcoMm = reportedWorkOffsetMm(archivedWco, archivedReportInches);
+  const liveWcoMm = reportedWorkOffsetMm(liveWco, liveReportInches);
+  if (archivedWcoMm === null || liveWcoMm === null || !wcoMatches(archivedWcoMm, liveWcoMm)) {
     return 'The live work offset differs from the offset archived with the interrupted run, so retained position cannot be confirmed. Re-establish the XY/Z zero, then choose the re-zeroed option.';
   }
   return null;
@@ -106,8 +126,9 @@ export function isLaterThanDefault(
 export function latePickWarning(resumePoint: Extract<CncResumePoint, { kind: 'resume-at-pass' }>) {
   return (
     'START LATER THAN THE COMPUTED SAFE PASS?\n\n' +
-    `Controller acknowledgements only prove execution up to operation ${resumePoint.groupIndex + 1}, ` +
-    `pass ${resumePoint.passIndex + 1}. Starting at a later pass skips everything before it — any ` +
+    `The computed recovery boundary is operation ${resumePoint.groupIndex + 1}, ` +
+    `pass ${resumePoint.passIndex + 1}. It is a conservative estimate from controller acknowledgements ` +
+    'and buffer capacity, not proof of the physical cut. Starting at a later pass skips everything before it — any ' +
     'uncut material in that range stays uncut.\n\n' +
     'Continue only if you physically verified all earlier passes are complete.'
   );

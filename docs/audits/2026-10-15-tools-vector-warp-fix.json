@@ -1,0 +1,626 @@
+{
+  "numTotalTestSuites": 17,
+  "numPassedTestSuites": 17,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 55,
+  "numPassedTests": 55,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1792081298376,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Warp/Deform enlargement accuracy and bounded failure"],
+          "fullName": "Warp/Deform enlargement accuracy and bounded failure warp: enlarges a tiny canonical cubic to 100 mm at 1000x without coarse chords",
+          "status": "passed",
+          "title": "warp: enlarges a tiny canonical cubic to 100 mm at 1000x without coarse chords",
+          "duration": 24.5009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp/Deform enlargement accuracy and bounded failure"],
+          "fullName": "Warp/Deform enlargement accuracy and bounded failure warp: enlarges a tiny canonical cubic to 100 mm at 10000x without coarse chords",
+          "status": "passed",
+          "title": "warp: enlarges a tiny canonical cubic to 100 mm at 10000x without coarse chords",
+          "duration": 8.475399999999809,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp/Deform enlargement accuracy and bounded failure"],
+          "fullName": "Warp/Deform enlargement accuracy and bounded failure deform: enlarges a tiny canonical cubic to 100 mm at 1000x without coarse chords",
+          "status": "passed",
+          "title": "deform: enlarges a tiny canonical cubic to 100 mm at 1000x without coarse chords",
+          "duration": 15.727800000000116,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp/Deform enlargement accuracy and bounded failure"],
+          "fullName": "Warp/Deform enlargement accuracy and bounded failure deform: enlarges a tiny canonical cubic to 100 mm at 10000x without coarse chords",
+          "status": "passed",
+          "title": "deform: enlarges a tiny canonical cubic to 100 mm at 10000x without coarse chords",
+          "duration": 14.372199999999793,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp/Deform enlargement accuracy and bounded failure"],
+          "fullName": "Warp/Deform enlargement accuracy and bounded failure refuses over-budget canonical curves instead of accepting the cached endpoint chord",
+          "status": "passed",
+          "title": "refuses over-budget canonical curves instead of accepting the cached endpoint chord",
+          "duration": 87.42750000000024,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp/Deform enlargement accuracy and bounded failure"],
+          "fullName": "Warp/Deform enlargement accuracy and bounded failure stops mapped subdivision at its output budget rather than producing an excessive array",
+          "status": "passed",
+          "title": "stops mapped subdivision at its output budget rather than producing an excessive array",
+          "duration": 0.6200999999996384,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp/Deform enlargement accuracy and bounded failure"],
+          "fullName": "Warp/Deform enlargement accuracy and bounded failure refuses nonfinite stretch instead of falling back to a default coarse tolerance",
+          "status": "passed",
+          "title": "refuses nonfinite stretch instead of falling back to a default coarse tolerance",
+          "duration": 0.3843000000001666,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792081351637,
+      "endTime": 1792081351788.62,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/core/geometry/warp-deform-accuracy-budget.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["initial handles"],
+          "fullName": "initial handles put the four Warp handles on the box corners, in order round the box",
+          "status": "passed",
+          "title": "put the four Warp handles on the box corners, in order round the box",
+          "duration": 3.4873999999999796,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["initial handles"],
+          "fullName": "initial handles spread the 16 Deform handles evenly, row by row",
+          "status": "passed",
+          "title": "spread the 16 Deform handles evenly, row by row",
+          "duration": 2,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["initial handles"],
+          "fullName": "initial handles are recognised as unmoved until one moves",
+          "status": "passed",
+          "title": "are recognised as unmoved until one moves",
+          "duration": 0.7525000000000546,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["identity handles leave points unchanged"],
+          "fullName": "identity handles leave points unchanged warp",
+          "status": "passed",
+          "title": "warp",
+          "duration": 4.315399999999954,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["identity handles leave points unchanged"],
+          "fullName": "identity handles leave points unchanged deform",
+          "status": "passed",
+          "title": "deform",
+          "duration": 2.9747999999999593,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp"],
+          "fullName": "Warp maps the box corners exactly onto the handles",
+          "status": "passed",
+          "title": "maps the box corners exactly onto the handles",
+          "duration": 0.7706999999995787,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp"],
+          "fullName": "Warp keeps straight lines straight (a projective map)",
+          "status": "passed",
+          "title": "keeps straight lines straight (a projective map)",
+          "duration": 0.6709000000000742,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp"],
+          "fullName": "Warp is affine when Shift keeps the handles on a parallelogram",
+          "status": "passed",
+          "title": "is affine when Shift keeps the handles on a parallelogram",
+          "duration": 0.591200000000299,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp"],
+          "fullName": "Warp still maps crossed handles, folding over through the bilinear map",
+          "status": "passed",
+          "title": "still maps crossed handles, folding over through the bilinear map",
+          "duration": 1.8485999999998057,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp"],
+          "fullName": "Warp falls back to the bilinear map when one handle is pulled inside the others",
+          "status": "passed",
+          "title": "falls back to the bilinear map when one handle is pulled inside the others",
+          "duration": 0.5113999999998668,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Deform"],
+          "fullName": "Deform maps the box corners exactly onto the corner handles",
+          "status": "passed",
+          "title": "maps the box corners exactly onto the corner handles",
+          "duration": 0.5796000000000276,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Deform"],
+          "fullName": "Deform bends the artwork smoothly when an inner control point moves",
+          "status": "passed",
+          "title": "bends the artwork smoothly when an inner control point moves",
+          "duration": 0.4810000000002219,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Deform"],
+          "fullName": "Deform bends a straight line into a curve",
+          "status": "passed",
+          "title": "bends a straight line into a curve",
+          "duration": 0.28769999999985885,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpDeformBox"],
+          "fullName": "warpDeformBox opens a flat selection up so the handles have somewhere to sit",
+          "status": "passed",
+          "title": "opens a flat selection up so the handles have somewhere to sit",
+          "duration": 0.6078999999999724,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpDeformStretch"],
+          "fullName": "warpDeformStretch is 1 for handles that leave the artwork alone and grows with the stretch",
+          "status": "passed",
+          "title": "is 1 for handles that leave the artwork alone and grows with the stretch",
+          "duration": 1.1460000000001855,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792081308004,
+      "endTime": 1792081308026.146,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/core/geometry/warp-deform-map.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["warpWorldPoints"],
+          "fullName": "warpWorldPoints adds no points under identity handles",
+          "status": "passed",
+          "title": "adds no points under identity handles",
+          "duration": 5.624199999999291,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpWorldPoints"],
+          "fullName": "warpWorldPoints never splits a straight piece under a projective Warp",
+          "status": "passed",
+          "title": "never splits a straight piece under a projective Warp",
+          "duration": 1.3976999999995314,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpWorldPoints"],
+          "fullName": "warpWorldPoints bends a long straight line under Deform to within tolerance of the true bent line",
+          "status": "passed",
+          "title": "bends a long straight line under Deform to within tolerance of the true bent line",
+          "duration": 6.9606000000003405,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpWorldPoints"],
+          "fullName": "warpWorldPoints closes a closed contour through its bent closing piece, ending on its first point",
+          "status": "passed",
+          "title": "closes a closed contour through its bent closing piece, ending on its first point",
+          "duration": 14.879300000000512,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpWorldPoints"],
+          "fullName": "warpWorldPoints keeps an already repeated closing point single",
+          "status": "passed",
+          "title": "keeps an already repeated closing point single",
+          "duration": 1.0226000000002387,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpObjectPaths"],
+          "fullName": "warpObjectPaths keeps a Deform of a circle within 0.05 mm of the truly warped circle",
+          "status": "passed",
+          "title": "keeps a Deform of a circle within 0.05 mm of the truly warped circle",
+          "duration": 11.561800000000403,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpObjectPaths"],
+          "fullName": "warpObjectPaths keeps a Warp of a circle within 0.05 mm of the truly warped circle",
+          "status": "passed",
+          "title": "keeps a Warp of a circle within 0.05 mm of the truly warped circle",
+          "duration": 6.356999999999971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpObjectPaths"],
+          "fullName": "warpObjectPaths drops the exact curves, keeps the path fields and reports the flattening",
+          "status": "passed",
+          "title": "drops the exact curves, keeps the path fields and reports the flattening",
+          "duration": 2.5205000000005384,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpObjectPaths"],
+          "fullName": "warpObjectPaths does not report flattening for paths that were already straight lines",
+          "status": "passed",
+          "title": "does not report flattening for paths that were already straight lines",
+          "duration": 0.5564000000003944,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpObjectPaths"],
+          "fullName": "warpObjectPaths warps in world space and keeps the result in the object space under its transform",
+          "status": "passed",
+          "title": "warps in world space and keeps the result in the object space under its transform",
+          "duration": 1.467200000000048,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpObjectPaths"],
+          "fullName": "warpObjectPaths returns world points under the identity transform when asked",
+          "status": "passed",
+          "title": "returns world points under the identity transform when asked",
+          "duration": 0.6084000000000742,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792081304913,
+      "endTime": 1792081304966.6084,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/core/geometry/warp-deform-paths.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["applyWarpDeform"],
+          "fullName": "applyWarpDeform leaves the whole scene and Undo unchanged when one selected object exceeds the geometry budget",
+          "status": "passed",
+          "title": "leaves the whole scene and Undo unchanged when one selected object exceeds the geometry budget",
+          "duration": 157.62970000000496,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyWarpDeform"],
+          "fullName": "applyWarpDeform warps a rectangle onto the handles as one undo step, keeping id, bindings and selection",
+          "status": "passed",
+          "title": "warps a rectangle onto the handles as one undo step, keeping id, bindings and selection",
+          "duration": 6.246300000006158,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyWarpDeform"],
+          "fullName": "applyWarpDeform deforms a curve into fine lines, keeps it closed and says so",
+          "status": "passed",
+          "title": "deforms a curve into fine lines, keeps it closed and says so",
+          "duration": 9.253099999994447,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyWarpDeform"],
+          "fullName": "applyWarpDeform converts text and drawn shapes to paths in the same step and leaves images alone",
+          "status": "passed",
+          "title": "converts text and drawn shapes to paths in the same step and leaves images alone",
+          "duration": 12.848700000002282,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyWarpDeform"],
+          "fullName": "applyWarpDeform keeps a drawn line a drawn line, with its points following the bend",
+          "status": "passed",
+          "title": "keeps a drawn line a drawn line, with its points following the bend",
+          "duration": 3.981100000004517,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyWarpDeform"],
+          "fullName": "applyWarpDeform keeps the object transform and bends its world outline",
+          "status": "passed",
+          "title": "keeps the object transform and bends its world outline",
+          "duration": 1.827899999996589,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyWarpDeform"],
+          "fullName": "applyWarpDeform applies a fold-over when the handles cross",
+          "status": "passed",
+          "title": "applies a fold-over when the handles cross",
+          "duration": 1.5544999999983702,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyWarpDeform"],
+          "fullName": "applyWarpDeform changes nothing and says so when the handles have not moved",
+          "status": "passed",
+          "title": "changes nothing and says so when the handles have not moved",
+          "duration": 1.0409999999974389,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyWarpDeform"],
+          "fullName": "applyWarpDeform leaves locked artwork alone and says so",
+          "status": "passed",
+          "title": "leaves locked artwork alone and says so",
+          "duration": 1.5745000000024447,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyWarpDeform"],
+          "fullName": "applyWarpDeform starts its handles on the box round the unlocked vector artwork only",
+          "status": "passed",
+          "title": "starts its handles on the box round the unlocked vector artwork only",
+          "duration": 1.183499999999185,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpDeformNotice"],
+          "fullName": "warpDeformNotice counts in plurals and names everything left alone",
+          "status": "passed",
+          "title": "counts in plurals and names everything left alone",
+          "duration": 0.5984000000025844,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["warpDeformNotice"],
+          "fullName": "warpDeformNotice explains when nothing could bend",
+          "status": "passed",
+          "title": "explains when nothing could bend",
+          "duration": 0.524199999999837,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792081347939,
+      "endTime": 1792081348138.5242,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/state/warp-deform-actions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Warp and Deform tools"],
+          "fullName": "Warp and Deform tools start with their handles on the box round the selection",
+          "status": "passed",
+          "title": "start with their handles on the box round the selection",
+          "duration": 9.41320000000269,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp and Deform tools"],
+          "fullName": "Warp and Deform tools do not start without vector artwork, and say why",
+          "status": "passed",
+          "title": "do not start without vector artwork, and say why",
+          "duration": 2.7734999999956926,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp and Deform tools"],
+          "fullName": "Warp and Deform tools hit the nearest handle within reach of the pointer",
+          "status": "passed",
+          "title": "hit the nearest handle within reach of the pointer",
+          "duration": 1.451600000000326,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp and Deform tools"],
+          "fullName": "Warp and Deform tools move a handle by the pointer offset, not onto the pointer",
+          "status": "passed",
+          "title": "move a handle by the pointer offset, not onto the pointer",
+          "duration": 1.896999999997206,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp and Deform tools"],
+          "fullName": "Warp and Deform tools keep the Warp handles a parallelogram while Shift is held",
+          "status": "passed",
+          "title": "keep the Warp handles a parallelogram while Shift is held",
+          "duration": 1.8707999999969616,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp and Deform tools"],
+          "fullName": "Warp and Deform tools preview the bent artwork without touching the project",
+          "status": "passed",
+          "title": "preview the bent artwork without touching the project",
+          "duration": 15.130199999999604,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp and Deform tools"],
+          "fullName": "Warp and Deform tools apply as one undo step and return to the Select tool",
+          "status": "passed",
+          "title": "apply as one undo step and return to the Select tool",
+          "duration": 5.010699999998906,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp and Deform tools"],
+          "fullName": "Warp and Deform tools cancel with the artwork as it was, still selected",
+          "status": "passed",
+          "title": "cancel with the artwork as it was, still selected",
+          "duration": 1.9859999999971478,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp and Deform tools"],
+          "fullName": "Warp and Deform tools put every handle back with Reset handles",
+          "status": "passed",
+          "title": "put every handle back with Reset handles",
+          "duration": 1.4055999999982305,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Warp and Deform tools"],
+          "fullName": "Warp and Deform tools ignore a handle drag once the tool has been left",
+          "status": "passed",
+          "title": "ignore a handle drag once the tool has been left",
+          "duration": 1.334499999997206,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792081360261,
+      "endTime": 1792081360303.3345,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/workspace/warp-deform-tool.test.ts"
+    }
+  ]
+}

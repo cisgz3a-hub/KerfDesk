@@ -198,7 +198,10 @@ function isRimFitCircle(state: BoardCaptureState): boolean {
 }
 
 function captureCanCommit(state: BoardCaptureState): boolean {
-  if (state.shapeKind === 'rect') return state.corners.length === 1 || state.corners.length === 4;
+  // Typed dimensions can replace an unfinished measurement at any point after
+  // the origin was captured. The measured path still requires all four corners
+  // before it can construct geometry; both paths retain the epoch checks above.
+  if (state.shapeKind === 'rect') return state.corners.length >= 1 && state.corners.length <= 4;
   return state.circleMethod === 'rim-fit'
     ? state.corners.length === CIRCLE_RIM_POINT_COUNT
     : state.corners.length >= 1;

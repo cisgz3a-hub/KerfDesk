@@ -1,0 +1,209 @@
+{
+  "numTotalTestSuites": 4,
+  "numPassedTestSuites": 4,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 16,
+  "numPassedTests": 16,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1792080094737,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["saveOriginalImage"],
+          "fullName": "saveOriginalImage releases the decoded bitmap when re-encoding fails (missing-context)",
+          "status": "passed",
+          "title": "releases the decoded bitmap when re-encoding fails (missing-context)",
+          "duration": 12.206900000000132,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["saveOriginalImage"],
+          "fullName": "saveOriginalImage releases the decoded bitmap when re-encoding fails (draw-failure)",
+          "status": "passed",
+          "title": "releases the decoded bitmap when re-encoding fails (draw-failure)",
+          "duration": 2.42029999999977,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["saveOriginalImage"],
+          "fullName": "saveOriginalImage writes the source bytes unchanged when they already have the chosen format",
+          "status": "passed",
+          "title": "writes the source bytes unchanged when they already have the chosen format",
+          "duration": 2.569499999999607,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["saveOriginalImage"],
+          "fullName": "saveOriginalImage re-encodes into another format and reports failures",
+          "status": "passed",
+          "title": "re-encodes into another format and reports failures",
+          "duration": 1.6211000000002969,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792080101063,
+      "endTime": 1792080101082.621,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/app/save-original-image.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["handleSaveProcessedBitmap"],
+          "fullName": "handleSaveProcessedBitmap reports missing processing pixels instead of saving blank or partial output",
+          "status": "passed",
+          "title": "reports missing processing pixels instead of saving blank or partial output",
+          "duration": 8.873199999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["handleSaveProcessedBitmap"],
+          "fullName": "handleSaveProcessedBitmap reports invalid base64 processing pixels instead of saving blank or partial output",
+          "status": "passed",
+          "title": "reports invalid base64 processing pixels instead of saving blank or partial output",
+          "duration": 1.5460000000002765,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["handleSaveProcessedBitmap"],
+          "fullName": "handleSaveProcessedBitmap reports AA== processing pixels instead of saving blank or partial output",
+          "status": "passed",
+          "title": "reports AA== processing pixels instead of saving blank or partial output",
+          "duration": 1.0214999999998327,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["handleSaveProcessedBitmap"],
+          "fullName": "handleSaveProcessedBitmap reports AB== processing pixels instead of saving blank or partial output",
+          "status": "passed",
+          "title": "reports AB== processing pixels instead of saving blank or partial output",
+          "duration": 0.8843999999999141,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["handleSaveProcessedBitmap"],
+          "fullName": "handleSaveProcessedBitmap reports unrecoverable source pixels without writing a successful blank export",
+          "status": "passed",
+          "title": "reports unrecoverable source pixels without writing a successful blank export",
+          "duration": 1.097700000000259,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["handleSaveProcessedBitmap"],
+          "fullName": "handleSaveProcessedBitmap exports pass-through greys using the power range while ignoring image preparation",
+          "status": "passed",
+          "title": "exports pass-through greys using the power range while ignoring image preparation",
+          "duration": 5.59270000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["handleSaveProcessedBitmap"],
+          "fullName": "handleSaveProcessedBitmap exports the image's own settings as the job burns them, not its layer's",
+          "status": "passed",
+          "title": "exports the image's own settings as the job burns them, not its layer's",
+          "duration": 8.424800000000687,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["handleSaveProcessedBitmap"],
+          "fullName": "handleSaveProcessedBitmap exports nothing burned for an image whose power scale is zero",
+          "status": "passed",
+          "title": "exports nothing burned for an image whose power scale is zero",
+          "duration": 1.0102999999999156,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["handleSaveProcessedBitmap"],
+          "fullName": "handleSaveProcessedBitmap saves the selected image as a PNG blob",
+          "status": "passed",
+          "title": "saves the selected image as a PNG blob",
+          "duration": 1.7996000000002823,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["handleSaveProcessedBitmap"],
+          "fullName": "handleSaveProcessedBitmap keeps cancelled saves silent",
+          "status": "passed",
+          "title": "keeps cancelled saves silent",
+          "duration": 0.6439000000000306,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["handleSaveProcessedBitmap"],
+          "fullName": "handleSaveProcessedBitmap reports a missing image layer instead of writing an unrelated layer",
+          "status": "passed",
+          "title": "reports a missing image layer instead of writing an unrelated layer",
+          "duration": 0.5132999999996173,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["handleSaveProcessedBitmap"],
+          "fullName": "handleSaveProcessedBitmap rejects over-budget processed bitmaps before opening the save picker",
+          "status": "passed",
+          "title": "rejects over-budget processed bitmaps before opening the save picker",
+          "duration": 0.5772999999999229,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792080099935,
+      "endTime": 1792080099967.5774,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/app/save-processed-bitmap.test.ts"
+    }
+  ]
+}

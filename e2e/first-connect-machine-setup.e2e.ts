@@ -8,9 +8,24 @@ import {
 import { applicationHeader } from './fixtures/workspace-ui';
 import type { AppState } from '../src/ui/state';
 import type { DeviceProfile } from '../src/core/devices';
-import type { PlatformAdapter } from '../src/platform/types';
+import type { MachineNetworkProtocol, PlatformAdapter } from '../src/platform/types';
 
 const CONFIGURED_KEY = 'laserforge.device-setup.configured.v1';
+const networkControllers = [
+  { kind: 'fluidnc', label: 'FluidNC', protocol: 'fluidnc-telnet' },
+  { kind: 'grblhal', label: 'grblHAL', protocol: 'grblhal-raw' },
+] as const;
+
+type NetworkController = (typeof networkControllers)[number];
+interface NetworkTarget {
+  host: string;
+  port: number;
+  protocol: MachineNetworkProtocol;
+}
+interface NetworkCalls {
+  targets: NetworkTarget[];
+  requests: NetworkTarget[];
+}
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -195,69 +210,105 @@ test('a saved laser setup does not suppress first Connect setup for the CNC head
   expect(await configuredSignatures(page)).toEqual(saved);
 });
 
-test('first FluidNC network Connect opens setup and returns focus to Machine details after cancellation', async ({
-  page,
-  kerfdesk,
-}) => {
-  await page.evaluate(async () => {
+for (const controller of networkControllers) {
+  test(`first ${controller.label} network Connect keeps setup retries on its target and restores Machine details focus`, async ({
+    page,
+    kerfdesk,
+  }) => {
+    await enableMockNetwork(page, controller);
+    const trigger = machineToolbar(page).getByRole('button', { name: /^Machine details:/ });
+    await trigger.click();
+    const details = page.getByRole('dialog', { name: 'Machine details', exact: true });
+    await details
+      .locator('summary')
+      .filter({ hasText: new RegExp(`^${controller.label} network connection$`) })
+      .click();
+    await details
+      .getByRole('textbox', { name: `${controller.label} machine IP or hostname` })
+      .fill('192.0.2.1');
+    await details
+      .getByRole('spinbutton', { name: `${controller.label} Telnet port` })
+      .fill('23456');
+    const connect = details.getByRole('button', {
+      name: `Connect ${controller.label} network`,
+      exact: true,
+    });
+    await connect.focus();
+    await connect.press('Enter');
+    const setup = machineSetup(page);
+    await expect(setup).toBeVisible();
+    await expect(setup).toContainText('Step 1 of 3');
+    await expect(setup).toContainText('Network target: 192.0.2.1:23456');
+    await expect(details).toHaveCount(0);
+    const target = { host: '192.0.2.1', port: 23456, protocol: controller.protocol };
+    await expect.poll(() => networkCalls(page)).toEqual({ targets: [target], requests: [target] });
+    const retry = setup.getByRole('button', { name: 'Try again', exact: true });
+    await expect(retry).toBeEnabled();
+    await retry.click();
+    await expect
+      .poll(() => networkCalls(page))
+      .toEqual({ targets: [target], requests: [target, target] });
+    await expect(setup.getByLabel('Serial baud rate', { exact: true })).toHaveCount(0);
+    await expect(setup.getByRole('button', { name: 'Try other speeds', exact: true })).toHaveCount(
+      0,
+    );
+    expect(await configuredSignatures(page)).toEqual([]);
+    await page.keyboard.press('Escape');
+    await expect(setup).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    expect(
+      (await kerfdesk.events()).filter((event) =>
+        ['serial-request-port', 'serial-open', 'serial-write'].includes(event.kind),
+      ),
+    ).toEqual([]);
+  });
+}
+
+async function enableMockNetwork(page: Page, controller: NetworkController): Promise<void> {
+  await page.evaluate(async ({ kind, label }) => {
     const adapterUrl = '/src/platform/web/index.ts';
     const stateUrl = '/src/ui/state/index.ts';
     const { webAdapter } = (await import(adapterUrl)) as { webAdapter: PlatformAdapter };
     const { useStore } = (await import(stateUrl)) as { useStore: { getState: () => AppState } };
-    const targets: { host: string; port: number }[] = [];
-    Object.defineProperty(window, '__FIRST_CONNECT_NETWORK_TARGETS__', {
+    const calls: NetworkCalls = { targets: [], requests: [] };
+    Object.defineProperty(window, '__FIRST_CONNECT_NETWORK_CALLS__', {
       configurable: true,
-      value: targets,
+      value: calls,
     });
     Object.defineProperty(webAdapter, 'machineNetwork', {
       configurable: true,
       value: {
-        serialForTarget: (host: string, port: number) => {
-          targets.push({ host, port });
-          return { isSupported: () => true, requestPort: async () => null };
+        serialForTarget: (host: string, port: number, protocol: MachineNetworkProtocol) => {
+          const target = { host, port, protocol };
+          calls.targets.push(target);
+          return {
+            transport: 'tcp' as const,
+            isSupported: () => true,
+            requestPort: async () => {
+              calls.requests.push(target);
+              throw new Error('Mock network channel unreachable');
+            },
+          };
         },
       },
     });
     const device = {
       ...useStore.getState().project.device,
-      name: 'First-connect FluidNC fixture',
-      controllerKind: 'fluidnc' as const,
+      name: `First-connect ${label} fixture`,
+      controllerKind: kind,
     };
     delete device.controllerCommandSet;
     useStore.getState().replaceDeviceProfile(device);
-  });
-  const trigger = machineToolbar(page).getByRole('button', { name: /^Machine details:/ });
-  await trigger.click();
-  const details = page.getByRole('dialog', { name: 'Machine details', exact: true });
-  await details
-    .locator('summary')
-    .filter({ hasText: /^FluidNC network connection$/ })
-    .click();
-  await details.getByRole('textbox', { name: 'FluidNC machine IP or hostname' }).fill('192.0.2.1');
-  await details.getByRole('spinbutton', { name: 'FluidNC Telnet port' }).fill('23456');
-  const connect = details.getByRole('button', { name: 'Connect FluidNC network', exact: true });
-  await connect.focus();
-  await connect.click();
-  const setup = machineSetup(page);
-  await expect(setup).toBeVisible();
-  await expect(setup).toContainText('Step 1 of 3');
-  await expect(details).toHaveCount(0);
-  expect(
-    await page.evaluate(
-      () =>
-        (
-          window as typeof window & {
-            __FIRST_CONNECT_NETWORK_TARGETS__: { host: string; port: number }[];
-          }
-        ).__FIRST_CONNECT_NETWORK_TARGETS__,
-    ),
-  ).toEqual([{ host: '192.0.2.1', port: 23456 }]);
-  expect(await configuredSignatures(page)).toEqual([]);
-  await page.keyboard.press('Escape');
-  await expect(setup).toHaveCount(0);
-  await expect(trigger).toBeFocused();
-  expect((await kerfdesk.events()).filter((event) => event.kind === 'serial-open')).toEqual([]);
-});
+  }, controller);
+}
+
+async function networkCalls(page: Page): Promise<NetworkCalls> {
+  return page.evaluate(
+    () =>
+      (window as typeof window & { __FIRST_CONNECT_NETWORK_CALLS__: NetworkCalls })
+        .__FIRST_CONNECT_NETWORK_CALLS__,
+  );
+}
 
 test('menu Connect offers setup with the compact Machine rail collapsed', async ({
   page,

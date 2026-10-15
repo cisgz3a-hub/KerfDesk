@@ -264,6 +264,39 @@ describe('BoardCapturePanel', () => {
     await unmount();
   });
 
+  it.each([2, 3])(
+    'switches to typed size after capturing %i corners without resetting origin',
+    async (count) => {
+      const setOriginHere = vi.fn(async () => undefined);
+      useLaserStore.setState({ setOriginHere, connection: { kind: 'connected' }, wcoCache: null });
+      const { host, unmount } = await render();
+      const corners = [
+        [50, 30],
+        [150, 30],
+        [150, 90],
+      ] as const;
+      for (const [x, y] of corners.slice(0, count)) {
+        await setMachinePosition(x, y);
+        await clickButton(host, 'Capture corner');
+      }
+      expect(host.textContent).toContain('The first captured corner stays the bottom-left origin');
+      expect(buttonByText(host, 'Create board outline')).toBeNull();
+      await act(async () => {
+        setNumberInput(host, 'Board width in mm', '120');
+        setNumberInput(host, 'Board height in mm', '80');
+      });
+      await clickButton(host, 'Draw board at this size');
+
+      const box = findRegistrationBoxes(useStore.getState().project.scene)[0];
+      expect(box?.spec).toMatchObject({ kind: 'rect', widthMm: 120, heightMm: 80 });
+      expect(box?.locked).toBe(true);
+      expect(setOriginHere).toHaveBeenCalledTimes(1);
+      expect(host.textContent).toContain('Measured: 120.0 × 80.0 mm');
+      expect(host.textContent).not.toContain('Board coordinates changed');
+      await unmount();
+    },
+  );
+
   it('captures a circle from the centre + typed diameter, centre-anchored', async () => {
     const setOriginHere = vi.fn(async () => undefined);
     useLaserStore.setState({ setOriginHere, connection: { kind: 'connected' }, wcoCache: null });

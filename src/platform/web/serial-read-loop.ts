@@ -8,7 +8,11 @@ import {
   recoverableReadErrorName,
   type ReadRecoveryBudget,
 } from './serial-read-recovery';
-import { EMPTY_SERIAL_LINE_STATE, extractSerialLines } from './serial-wire';
+import {
+  EMPTY_SERIAL_LINE_STATE,
+  UNSYNCHRONISED_SERIAL_LINE_STATE,
+  extractSerialLines,
+} from './serial-wire';
 
 type LineSubscribers = ReadonlySet<(line: string) => void>;
 
@@ -37,9 +41,17 @@ export async function runSerialReadLoop(
   if (reader === undefined) return;
   const slice = createReadSlice();
   const budget = createReadRecoveryBudget();
+  let recoveredReader = false;
   try {
     while (reader !== undefined) {
-      const failure = await readUntilEnd(reader, lineSubs, slice, target.isOpen, budget);
+      const failure = await readUntilEnd(
+        reader,
+        lineSubs,
+        slice,
+        target.isOpen,
+        budget,
+        recoveredReader,
+      );
       if (failure === null) return;
       const recovered = replaceFailedReader(target, reader, failure.error, budget);
       if (recovered === null) {
@@ -48,6 +60,7 @@ export async function runSerialReadLoop(
       }
       reportLineError(lineErrorSubs, recovered);
       reader = target.reader;
+      recoveredReader = true;
     }
   } finally {
     slice.close();
@@ -76,13 +89,15 @@ async function readUntilEnd(
   slice: ReadSlice,
   isOpen: () => boolean,
   budget: ReadRecoveryBudget,
+  recovered: boolean,
 ): Promise<ReadFailure | null> {
   // Framing lives and dies with one reader. A line error means bytes are
   // missing at the point of failure, so the partial record before it is
   // dropped rather than glued onto the next stream's bytes, where a lost digit
-  // could turn into a plausible but wrong position.
+  // could turn into a plausible but wrong position. Its remaining tail is also
+  // discarded through LF; a startup response ending in :ok is not an ack.
   const decoder = new TextDecoder('utf-8');
-  let framing = EMPTY_SERIAL_LINE_STATE;
+  let framing = recovered ? UNSYNCHRONISED_SERIAL_LINE_STATE : EMPTY_SERIAL_LINE_STATE;
   try {
     while (true) {
       const { value, done } = await reader.read();
@@ -140,8 +155,9 @@ function dispatchLines(
   slice: ReadSlice,
   isOpen: () => boolean,
   from: number,
-): true | Promise<boolean> {
+): boolean | Promise<boolean> {
   for (let index = from; index < lines.length; index += 1) {
+    if (!isOpen()) return false;
     if (slice.spent()) return dispatchAfterYield(lineSubs, lines, slice, isOpen, index);
     dispatchLine(lineSubs, lines[index] ?? '');
   }

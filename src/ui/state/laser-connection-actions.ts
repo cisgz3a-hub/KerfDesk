@@ -87,9 +87,9 @@ export function connectionActions(
 ): Pick<LaserState, 'connect' | 'disconnect' | 'forgetDevice'> {
   return {
     connect: (adapter, options = {}) => {
-      clearCncLiveCaps();
       return runConnectAction(
         set,
+        get,
         refs,
         adapter,
         options,
@@ -106,6 +106,7 @@ export function connectionActions(
       return runDisconnect(set, get, refs, safeWrite, false);
     },
     forgetDevice: () => {
+      set({ lastConnectionTransport: null });
       clearCncLiveCaps();
       // Forget means pick again next time, so the next Connect asks (ADR-420).
       forgetRememberedSerialPort(browserLocalStorage());
@@ -247,6 +248,7 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     log: [],
     transcript: [],
     homingState: 'unknown',
+    positionEvidenceSuppressed: false,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     workZZeroEvidence: null,
@@ -308,6 +310,10 @@ async function runDisconnect(
         refs,
         retainedUnavailableTransportSafetyNotice(get()),
       );
+    } else if (get().connection.kind === 'connecting') {
+      // A picker/open may still resolve later, but its cancelled attempt no
+      // longer owns the UI. Leave Connect available while it retires itself.
+      set(disconnectedStatePatch);
     }
     return;
   }

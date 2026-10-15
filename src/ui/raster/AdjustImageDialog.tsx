@@ -1,5 +1,6 @@
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react';
 import { MAX_RASTER_LINES_PER_MM, MIN_RASTER_LINES_PER_MM } from '../../core/raster';
+import { effectiveOperationForObject } from '../../core/effective-output';
 import type { Layer, RasterImage } from '../../core/scene';
 import { jobAwareAlert, jobAwarePrompt } from '../state/job-aware-dialogs';
 import { Button, Dialog, DialogActions as KitDialogActions } from '../kit';
@@ -52,18 +53,17 @@ export function AdjustImageDialog(props: {
 }): JSX.Element {
   const sourceRef = useRef<HTMLCanvasElement>(null);
   const processedRef = useRef<HTMLCanvasElement>(null);
-  const storedLinesPerMm = props.layer.linesPerMm;
+  const operation = effectiveOperationForObject(props.layer, props.image);
+  const storedLinesPerMm = operation.linesPerMm;
   const normalize = (next: AdjustImageDraft): AdjustImageDraft =>
     normalizeDraft(next, storedLinesPerMm);
-  const [draft, setDraft] = useState<AdjustImageDraft>(() =>
-    initialDraft(props.image, props.layer),
-  );
+  const [draft, setDraft] = useState<AdjustImageDraft>(() => initialDraft(props.image, operation));
   const presetControls = useImagePresetControls(draft, setDraft, normalize);
   const presetFiles = useImagePresetFiles(
     presetControls.userPresets,
     presetControls.setUserPresets,
   );
-  usePreviewEffects(sourceRef, processedRef, props.image, draft, props.layer.power);
+  usePreviewEffects(sourceRef, processedRef, props.image, draft, operation.power);
   const update = (patch: Partial<AdjustImageDraft>): void =>
     setDraft((prev) => normalize({ ...prev, ...patch }));
   const submit = (event: React.FormEvent): void => {
@@ -78,7 +78,7 @@ export function AdjustImageDialog(props: {
       <AdjustFields
         draft={draft}
         storedLinesPerMm={storedLinesPerMm}
-        maxPower={props.layer.power}
+        maxPower={operation.power}
         update={update}
         applyPreset={presetControls.applyPreset}
         userPresets={presetControls.userPresets}

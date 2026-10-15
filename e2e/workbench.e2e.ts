@@ -521,7 +521,7 @@ kerfDeskTest(
   'controller positions, not acknowledgements, drive the live canvas trail',
   async ({ page, kerfdesk }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Open...' }).click();
+    await (await toolbarCommand(page, 'Open...')).click();
     const probe = page.getByTestId('canvas-motion-probe');
     await expect(probe).toHaveAttribute('aria-label', /Frame start planned; Job start planned/);
     await connectAndHome(page, kerfdesk);

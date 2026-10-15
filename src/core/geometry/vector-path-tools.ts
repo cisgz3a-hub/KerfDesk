@@ -60,18 +60,31 @@ export function isVectorPathObject(object: SceneObject): object is VectorSceneOb
   return 'paths' in object;
 }
 
-export function materializeVectorObject(object: VectorSceneObject, id = object.id): ImportedSvg {
-  const paths = object.paths.map((path) => ({
-    color: path.color,
-    ...(path.operationIds === undefined ? {} : { operationIds: path.operationIds }),
-    ...materializedStrokeFields(path, object.transform),
-    ...(path.fillRule === undefined && object.kind !== 'text'
-      ? {}
-      : { fillRule: path.fillRule ?? ('nonzero' as const) }),
-    polylines: materializationPolylines(path, object.transform).map((polyline) =>
+/** Optional world polylines reuse geometry already prepared by a bounded operation. */
+export function materializeVectorObject(
+  object: VectorSceneObject,
+  id = object.id,
+  worldPolylines?: ReadonlyArray<ReadonlyArray<Polyline>>,
+): ImportedSvg {
+  if (worldPolylines !== undefined && worldPolylines.length !== object.paths.length)
+    throw new RangeError('Prepared geometry must match every source path.');
+  const paths = object.paths.map((path, index) => {
+    let polylines = worldPolylines?.[index];
+    if (worldPolylines !== undefined && polylines === undefined)
+      throw new RangeError('Prepared geometry is missing a source path.');
+    polylines ??= materializationPolylines(path, object.transform).map((polyline) =>
       materializePolyline(polyline, object.transform),
-    ),
-  }));
+    );
+    return {
+      color: path.color,
+      ...(path.operationIds === undefined ? {} : { operationIds: path.operationIds }),
+      ...materializedStrokeFields(path, object.transform),
+      ...(path.fillRule === undefined && object.kind !== 'text'
+        ? {}
+        : { fillRule: path.fillRule ?? ('nonzero' as const) }),
+      polylines,
+    };
+  });
   return {
     ...objectPowerScale(object),
     ...(object.operationIds === undefined ? {} : { operationIds: object.operationIds }),

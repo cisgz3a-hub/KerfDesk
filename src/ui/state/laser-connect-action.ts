@@ -6,6 +6,7 @@ import {
   connectAttemptWasForgotten,
   type ConnectAttempt,
 } from './laser-connect-attempt';
+import { runConnectAfterPermissionCleanup } from './laser-connect-permission-cleanup';
 import { disconnectedControllerQualification } from './laser-controller-qualification';
 import { closeConnectionOnce } from './laser-connection-teardown';
 import type { ConnectControllerOptions } from './laser-store-action-types';
@@ -21,6 +22,7 @@ import { publishControllerIncident } from './laser-incident-publish';
 import { connectionScopedEvidenceReset } from './laser-module-probe';
 import { useToastStore } from './toast-store';
 import { browserLocalStorage } from './browser-local-storage';
+import { clearCncLiveCaps } from './detected-settings-action';
 import {
   chooseGrantedPort,
   loadRememberedSerialPort,
@@ -44,8 +46,12 @@ type ConnectingPatchFn = (state: LaserState, refs: LiveRefs) => Partial<LaserSta
 export const FILE_ONLY_CONNECT_REFUSAL =
   'This machine profile exports .rd files only; it has no live connection.';
 
+export const NETWORK_RECONNECT_GUIDANCE =
+  'Reconnect from the network connection form in Machine details. To switch to USB, choose Use a different port… explicitly.';
+
 export async function runConnectAction(
   set: SetFn,
+  get: () => LaserState,
   refs: LiveRefs,
   adapter: PlatformAdapter,
   options: ConnectControllerOptions,
@@ -63,15 +69,31 @@ export async function runConnectAction(
     useToastStore.getState().pushToast(FILE_ONLY_CONNECT_REFUSAL, 'error');
     return;
   }
-  await connectSerialController(
-    set,
-    refs,
-    adapter,
-    options,
-    driver,
-    closePrevious,
-    connectingPatch,
-    attachConnection,
+  if (
+    get().lastConnectionTransport === 'tcp' &&
+    adapter.serial.transport !== 'tcp' &&
+    options.portSelection !== 'choose'
+  ) {
+    if (options.portSelection !== 'automatic') {
+      set((state) => ({ log: pushLog(state, NETWORK_RECONNECT_GUIDANCE) }));
+      useToastStore.getState().pushToast(NETWORK_RECONNECT_GUIDANCE, 'warning');
+    }
+    return;
+  }
+  clearCncLiveCaps();
+  const attempt = beginTransportConnectAttempt(set, refs, adapter);
+  await runConnectAfterPermissionCleanup(refs, attempt, () =>
+    connectSerialController(
+      set,
+      refs,
+      adapter,
+      options,
+      driver,
+      closePrevious,
+      connectingPatch,
+      attachConnection,
+      attempt,
+    ),
   );
 }
 
@@ -84,9 +106,8 @@ async function connectSerialController(
   closePrevious: ClosePreviousFn,
   connectingPatch: ConnectingPatchFn,
   attachConnection: AttachConnectionFn,
+  attempt: ConnectAttempt,
 ): Promise<void> {
-  const attempt = beginConnectAttempt(refs);
-  set({ connectionAttempt: attempt.revision });
   let requestedPort: SerialPortRef | null = null;
   const attemptedBaudRate = options.baudRate ?? driver.defaultBaudRate;
   let cancelledPermissionReleased = false;
@@ -113,7 +134,9 @@ async function connectSerialController(
   refs.driver = driver;
   set((state) => ({ ...connectingPatch(state, refs), ...connectionScopedEvidenceReset() }));
   try {
-    const portRef = await resolveSerialPort(adapter, options.portSelection);
+    const portRef = await resolveSerialPort(adapter, options.portSelection, () =>
+      connectAttemptIsCurrent(refs, attempt),
+    );
     requestedPort = portRef;
     if (!connectAttemptIsCurrent(refs, attempt)) {
       await releaseCancelledPermission();
@@ -126,6 +149,7 @@ async function connectSerialController(
       }));
       return;
     }
+    set({ lastConnectionTransport: selectedTransport(portRef, adapter) });
     const baudRate = attemptedBaudRate;
     const connection = await portRef.open(serialOpenRequest(baudRate, options, refs.driver));
     if (!connectAttemptIsCurrent(refs, attempt)) {
@@ -139,21 +163,47 @@ async function connectSerialController(
       await releaseCancelledPermission().catch(() => undefined);
       return;
     }
-    const message = error instanceof Error ? error.message : String(error);
-    set((state) => ({
-      ...publishControllerIncident(
-        refs,
-        {
-          ...state,
-          connectedBaudRate: attemptedBaudRate,
-          serialPortInfo: requestedPort?.info ?? null,
-        },
-        `[lf2] Controller connection failed: ${message}`,
-      ),
-      connection: { kind: 'failed', error: message },
-      controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch),
-    }));
+    reportConnectionFailure(set, refs, attemptedBaudRate, requestedPort?.info ?? null, error);
   }
+}
+
+function reportConnectionFailure(
+  set: SetFn,
+  refs: LiveRefs,
+  baudRate: number,
+  portInfo: SerialPortIdentity | null,
+  error: unknown,
+): void {
+  const message = error instanceof Error ? error.message : String(error);
+  set((state) => ({
+    ...publishControllerIncident(
+      refs,
+      { ...state, connectedBaudRate: baudRate, serialPortInfo: portInfo },
+      `[lf2] Controller connection failed: ${message}`,
+    ),
+    connection: { kind: 'failed', error: message },
+    controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch),
+  }));
+}
+
+function beginTransportConnectAttempt(
+  set: SetFn,
+  refs: LiveRefs,
+  adapter: PlatformAdapter,
+): ConnectAttempt {
+  const attempt = beginConnectAttempt(refs);
+  set({
+    connectionAttempt: attempt.revision,
+    // A queued explicit choice already owns selection; grant events must not
+    // replace it with auto-connect while forgotten permissions finish cleanup.
+    ...(refs.connection === null ? { connection: { kind: 'connecting' as const } } : {}),
+    ...(adapter.serial.transport === 'tcp' ? { lastConnectionTransport: 'tcp' } : {}),
+  });
+  return attempt;
+}
+
+function selectedTransport(port: SerialPortRef, adapter: PlatformAdapter): 'serial' | 'tcp' {
+  return port.info?.transport ?? adapter.serial.transport ?? 'serial';
 }
 
 // The machine's port opens without the picker when chooseGrantedPort finds it
@@ -163,11 +213,17 @@ async function connectSerialController(
 async function resolveSerialPort(
   adapter: PlatformAdapter,
   selection: ConnectControllerOptions['portSelection'] = 'remembered',
+  isCurrent: () => boolean,
 ): Promise<SerialPortRef | null> {
   if (selection !== 'choose' && adapter.serial.grantedPorts !== undefined) {
+    // Forget clears stored identity while enumeration may still be pending.
+    // Retain this attempt's intended choice for its cancelled-permission cleanup.
+    const remembered = loadRememberedSerialPort(browserLocalStorage());
     const granted = await adapter.serial.grantedPorts();
-    const choice = chooseGrantedPort(granted, loadRememberedSerialPort(browserLocalStorage()));
+    const choice = chooseGrantedPort(granted, remembered);
     if (choice.kind === 'use') return choice.port;
+    // A cancelled attempt may retire its selected grant, never launch a picker.
+    if (!isCurrent()) return null;
   }
   if (selection === 'automatic') return null;
   return adapter.serial.requestPort();

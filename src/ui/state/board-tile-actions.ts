@@ -6,15 +6,14 @@
 // the project cannot hold (ADR-307 amendment 1) is refused with a notice.
 
 import {
-  boardFitRegion,
   findRegistrationBoxes,
   sceneObjectHasVisibleLayer,
   type SceneObject,
   type TileLayout,
   type TileOffset,
-  tileIntoRegion,
   transformedBBox,
 } from '../../core/scene';
+import { planBoardArray } from '../../core/scene/board-array-plan';
 import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
@@ -40,14 +39,10 @@ function applyTileSelectionIntoBoard(
   const scene = state.project.scene;
   const box = findRegistrationBoxes(scene)[0];
   if (box === undefined) return state;
-  const target = singleSelectedDesign(state, box.id);
+  const target = selectedBoardArrayDesign(state);
   if (target === undefined) return state;
 
-  const [firstSlot, ...copySlots] = tileIntoRegion(
-    transformedBBox(target),
-    boardFitRegion(box),
-    layout,
-  );
+  const [firstSlot, ...copySlots] = planBoardArray(transformedBBox(target), box, layout).offsets;
   if (firstSlot === undefined) return state;
 
   // Move the original into the first slot; build a fresh copy per remaining slot
@@ -80,9 +75,14 @@ function applyTileSelectionIntoBoard(
   };
 }
 
-function singleSelectedDesign(state: AppState, boxId: string): SceneObject | undefined {
+export function selectedBoardArrayDesign(
+  state: Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'> & {
+    readonly project: Pick<AppState['project'], 'scene'>;
+  },
+): SceneObject | undefined {
+  const boxIds = new Set(findRegistrationBoxes(state.project.scene).map((box) => box.id));
   const ids = [state.selectedObjectId, ...state.additionalSelectedIds].filter(
-    (id): id is string => id !== null && id !== boxId,
+    (id): id is string => id !== null && !boxIds.has(id),
   );
   const id = ids.length === 1 ? ids[0] : undefined;
   if (id === undefined) return undefined;

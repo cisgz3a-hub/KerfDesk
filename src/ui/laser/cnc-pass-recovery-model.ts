@@ -86,6 +86,7 @@ export const FINGERPRINT_ONLY_PASS_RECOVERY_REASON =
 export function buildCncPassRecoveryModel(
   capsule: RecoveryCapsule,
   liveWco: WorkCoordinateOffset | null,
+  liveReportInches?: boolean,
 ): CncPassRecoveryModel {
   const artifact = capsule.artifact;
   if (artifact.machineKind !== 'cnc') {
@@ -109,7 +110,7 @@ export function buildCncPassRecoveryModel(
       resumePoint?.kind === 'resume-at-pass'
         ? { groupIndex: resumePoint.groupIndex, passIndex: resumePoint.passIndex }
         : null,
-    retainedPositionIssue: retainedPositionIssue(capsule, liveWco),
+    retainedPositionIssue: retainedPositionIssue(capsule, liveWco, liveReportInches),
   };
 }
 

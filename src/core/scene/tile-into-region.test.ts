@@ -71,11 +71,10 @@ describe('tileIntoRegion', () => {
     expect(offsets[0]).toEqual({ dx: 25, dy: 25 });
   });
 
-  it('tiles a design larger than the board as one centered copy', () => {
+  it('returns no slots when a design is larger than the board', () => {
     const big: Bounds = { minX: 0, minY: 0, maxX: 200, maxY: 200 };
     const offsets = tileIntoRegion(big, REGION, { kind: 'fill', gapXMm: 0, gapYMm: 0 });
-    expect(offsets).toHaveLength(1);
-    expect(offsets[0]).toEqual({ dx: -50, dy: -50 }); // (100 - 200) / 2
+    expect(offsets).toHaveLength(0);
   });
 
   it('caps a runaway count at MAX_TILE_PER_AXIS', () => {

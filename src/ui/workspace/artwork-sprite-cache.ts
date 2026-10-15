@@ -293,8 +293,15 @@ function chooseRegion(
   const cap = pixelCap(request.ctx.canvas);
   if (fitsBudget(bounds, request.view.scale, cap)) return { region: bounds, clipped: false };
   const region = intersect(viewportRegion(request, CLIP_MARGIN_FRACTION), bounds);
-  if (region === null || !fitsBudget(region, request.view.scale, cap)) return null;
-  return { region, clipped: true };
+  if (region !== null && fitsBudget(region, request.view.scale, cap)) {
+    return { region, clipped: true };
+  }
+  // The 25% margin uses the entire 2.25x viewport pixel cap before padding.
+  // Keep the full visible viewport, but shrink its optional margin to leave
+  // room for padding/rounding and the side limit on large or wide canvases.
+  const limited = intersect(viewportRegion(request, CLIP_MARGIN_FRACTION, true), bounds);
+  if (limited === null || !fitsBudget(limited, request.view.scale, cap)) return null;
+  return { region: limited, clipped: true };
 }
 
 function pixelCap(canvas: HTMLCanvasElement): number {
@@ -302,22 +309,30 @@ function pixelCap(canvas: HTMLCanvasElement): number {
 }
 
 function fitsBudget(region: Region, scale: number, cap: number): boolean {
-  const width = (region.maxX - region.minX) * scale + 2 * SPRITE_PAD_PX;
-  const height = (region.maxY - region.minY) * scale + 2 * SPRITE_PAD_PX;
+  const width = Math.ceil((region.maxX - region.minX) * scale) + 2 * SPRITE_PAD_PX;
+  const height = Math.ceil((region.maxY - region.minY) * scale) + 2 * SPRITE_PAD_PX;
   return width <= SPRITE_MAX_SIDE_PX && height <= SPRITE_MAX_SIDE_PX && width * height <= cap;
 }
 
 // The visible canvas (plus a margin) expressed in the object's untranslated space.
-function viewportRegion(request: SpriteRequest, marginFraction: number): Region {
+function viewportRegion(request: SpriteRequest, marginFraction: number, fitBitmap = false): Region {
   const { view, transform, ctx } = request;
-  const marginX = ctx.canvas.width * marginFraction;
-  const marginY = ctx.canvas.height * marginFraction;
+  const marginX = viewportMargin(ctx.canvas.width, marginFraction, fitBitmap);
+  const marginY = viewportMargin(ctx.canvas.height, marginFraction, fitBitmap);
   return {
     minX: (-marginX - view.offsetX) / view.scale - transform.x,
     minY: (-marginY - view.offsetY) / view.scale - transform.y,
     maxX: (ctx.canvas.width + marginX - view.offsetX) / view.scale - transform.x,
     maxY: (ctx.canvas.height + marginY - view.offsetY) / view.scale - transform.y,
   };
+}
+
+function viewportMargin(side: number, fraction: number, fitBitmap: boolean): number {
+  const desired = side * fraction;
+  if (!fitBitmap) return desired;
+  // One extra pixel covers the outward rounding of fractional view transforms.
+  const allowance = SPRITE_PAD_PX + 1;
+  return Math.max(0, Math.min(desired, (SPRITE_MAX_SIDE_PX - side) / 2) - allowance);
 }
 
 function intersect(a: Region, b: Region): Region | null {

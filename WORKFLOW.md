@@ -125,7 +125,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Menu bar**: the application menus, then an **Undo** / **Redo** pair immediately right of Help (ADR-348). Each is disabled when its own history is empty and runs the same command as the Edit menu and the keyboard shortcut.
 - **Top command toolbar**: Open, Import, Import Image, Save and Preview lead with readable labels when space permits. Selecting an image brings Trace image into the row; Image Studio remains in **More**. Other commands remain in **More** and the application menus, with their existing shortcuts, disabled reasons, tooltips and actions. The row measures available width and moves commands into More instead of scrolling horizontally. Utility controls share the row down to 520 px. The project name includes an unsaved-change indicator.
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
-- **Machine connection toolbar**: the machine name and connection status sit beside the numeric transforms, with Connect/Disconnect, the Machine Setup icon and the connection-options menu. The machine-name dropdown shows the full profile, bed size, controller, connected port, fitted Laser module selector and supported FluidNC network connection form. Tab moves between its fields; Escape closes it and returns focus to the machine name. Field input stays inside the dropdown while the existing Abort shortcut remains available. Connection failures and qualification/recovery notices remain visible outside the dropdown. On narrow windows the machine controls wrap onto a second top row, and remain available when either sidebar is collapsed. Detected-settings notifications also remain active with the sidebar closed.
+- **Machine connection toolbar**: the machine name and connection status sit beside the numeric transforms, with Connect/Disconnect, the Machine Setup icon and the connection-options menu. The machine-name dropdown shows the full profile, bed size, controller, connected port, fitted Laser module selector and supported FluidNC or grblHAL network connection form. Tab moves between its fields; Escape closes it and returns focus to the machine name. Field input stays inside the dropdown while the existing Abort shortcut remains available. Connection failures and qualification/recovery notices remain visible outside the dropdown. On narrow windows the machine controls wrap onto a second top row, and remain available when either sidebar is collapsed. Detected-settings notifications also remain active with the sidebar closed.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
 - **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power and Speed each pair a full-width slider with exact numeric entry; Passes remains a numeric field; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
 - **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). An adaptive pocket's Entry & travel names its own helix ("Climb · Adaptive helix"), and names the Ramp entry angle only as the entry of reliefs on the same operation ("Relief ramp 5°", ADR-481 Amendment 1). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only. Closed-only operations also show the exact count of omitted open contours, including mixed closed/open artwork; all-open vector operations without assigned relief retain the no-toolpath explanation (ADR-481 Amendment 2).
@@ -138,7 +138,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Workspace layout**: the toolbar offers **Auto layout**, **Compact**, and **Spacious**, saved locally across reloads. Auto uses Compact when the viewport is at most 1439 px wide **or** 719 px high; otherwise it uses Spacious. Compact has one scrolling sidebar with keyboard-accessible **Artwork** and **Machine** tabs. Spacious shows the two independent panels. These are viewport CSS pixels, so browser zoom and display scaling affect the available space.
 - **Narrow windows**: below 960 px wide, the workspace always uses the single Compact sidebar, including when Spacious is selected. The saved Spacious preference takes effect again when the window is wide enough. Layout changes preserve the panels' existing controls and job workflow.
 - **CNC Canvas Focus**: has no effect. It collapsed the CNC 3D result pane by default when the viewport was 1439 px wide or less (ADR-223), and that pane has not been shown since 2026-08-03 (F-CNC28).
-- **Left tool strip (ADR-051)**: the default strip is 50 px wide and scrolls on short windows. Edit and Draw groups retain Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and named icon buttons for the design library and Design Studio (ADR-272, flows F-DS1..F-DS4). Curve-node actions remain beside the editing tools with readable labels. Preview is in the primary toolbar, with a More fallback at narrow widths, and the Window menu.
+- **Left tool strip (ADR-051)**: the default strip is 50 px wide and scrolls on short windows. Edit and Draw groups retain Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and a named icon button for the design library. Design Studio (Pro) has a labelled button in the main toolbar (ADR-272, flows F-DS1..F-DS4). Curve-node actions remain beside the editing tools with readable labels. Preview is in the primary toolbar, with a More fallback at narrow widths, and the Window menu.
 - **Machine-panel hierarchy (ADR-340, ADR-420 Amendment 2, ADR-593)**: a coloured Home button occupies the centre of the jog arrows; if homing is not configured it opens the same setup entry. Beside the arrows, three compact rows hold Manual Air, laser Auto-focus or its setup entry, and Set origin here. CNC keeps Home and Set origin when Manual Air is hidden, and still offers OFF for air left on in Laser mode. The Origin dropdown contains Reset/persistent-origin, Release motors, typed/saved positioning, the timed start mark, hand-positioning guidance and CNC probing. Placement contains placement/output and CNC maintenance. Console contains communication controls, Super console, machine hours and history/recovery. Active interruption notices, repeat offers, probe-removal/work-Z notices and the canonical Live Motion controls remain outside those dropdowns. Manual Air's setup guidance and switching behaviour are unchanged. Tutorial buttons no longer sit beside positioning, origin or Frame/Start: lessons live in Learn and on the tool panels that teach a procedure (ADR-348).
 - **After a job completes (ADR-340)**: the job dock shows **Job complete** and **Done** after controller settlement. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains offered while its receipt still matches the job, and like Start it needs a fresh Frame (ADR-372 Amendment 1). Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
 - **Workspace colours**: panels, drawing bed, grid, rulers and controls use the application appearance preference, defaulting to Light. Window > Appearance offers Light, Dark and Match System (ADR-339). Dark mode uses the approved charcoal drawing surface and light, readable vector ink. Contrast adjustments happen only while drawing the workspace; saved artwork, raster pixels, exported files and machine output retain their original colours and settings. The layout menu uses the same themed surface as the rest of the workspace.
@@ -1709,6 +1709,23 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    shows the picker.
 4. Turning it off in the **⋯** menu is remembered in this browser.
 
+#### Desktop Wi-Fi / Ethernet (ADR-601)
+1. In Machine Setup, select the controller's actual native **FluidNC** or **grblHAL** protocol.
+   A vendor command override does not establish network compatibility.
+2. Open the machine-name dropdown, expand the matching **network connection** form and enter
+   the machine IP/hostname and its configured, enabled Telnet port. The board/firmware must
+   support that service. Wi-Fi and wired Ethernet use the same form.
+3. Click **Connect FluidNC network** or **Connect grblHAL network**. Unfinished setup opens with
+   this exact target; **Try again** uses it again only on an explicit click. Changing firmware
+   family in that draft cannot reinterpret the target. Closing setup drops the target.
+4. A TCP loss never replays commands or silently switches to remembered USB. Reconnect through
+   the network form and review recovery. To switch to USB, explicitly choose **Use a different
+   port…**. Cancelling the picker retains the network choice. Forget Controller or app restart
+   clears the session-only routing hint; no address is saved.
+5. These unencrypted services belong on a trusted local network. Keep the app open and responsive;
+   TCP streaming is not hosted in a background worker. A successful socket is not controller or
+   physical-machine qualification. Frame and Start retain their canonical workflow.
+
 #### Background streaming (ADR-354)
 1. Compatible GRBL-family connections use background streaming by default. The selected USB
    port is opened inside a dedicated worker so its read and refill loop can continue while the
@@ -2234,7 +2251,10 @@ minimum target size.
    `M5`, `M9`). Without confirmed Idle or successful writes, it reports that accessories may
    still be on; it does not reset the jog or claim they are off. Reconnecting retires an old
    Abort and its cleanup so they cannot write to or clear state for the replacement connection.
-3. The UI marks the streamer cancelled. This software action does not prove that the command arrived or that physical energy stopped.
+3. The UI marks the streamer cancelled. For a queued, no-reset stop, host refill is cancelled
+   before awaiting transport handback or stop writes; in-flight commands retain their reply
+   ownership. The Abort operation stays owned through its queued cleanup writes (ADR-600).
+   This software action does not prove that the command arrived or that physical energy stopped.
 4. A reset sent into motion leaves a GRBL controller in `Alarm` (ALARM:3); the user clears it with
    `$X` (F-B9). A reset after a completed hold or a cancelled jog raises no alarm.
 
@@ -2664,6 +2684,12 @@ authorization, Frame proof, controller command, or safety boundary.
 7. An explicitly selected layout can include both an original and an edited generated
    copy. Both selected objects become artwork in the first outline; each gets a distinct
    copy in the remaining outlines. Repeating the action replaces those copies once.
+8. Changing the jig grid carries linked artwork with each surviving outline, retaining
+   its size, rotation and local offset. New positions start empty. When reducing the
+   count, choose **Keep as ordinary artwork** or **Remove with their slots**. Kept
+   artwork stays in place and can still output; removed artwork and group/order edits
+   are restored together by Undo. A retained relief's linked source cannot be silently
+   removed. Exact artwork-size controls also appear for a single fitted jig (ADR-599).
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 
@@ -2791,6 +2817,9 @@ authorization, Frame proof, controller command, or safety boundary.
   Console says that bytes from the controller were lost, at most once every 5 s with a count of
   the rest. If it happened during the job, the "controller holding program" state, its log line
   and the notice add that an acknowledgement lost with it never arrives (ADR-375).
+  The reader discards the damaged tail through the next line delimiter before accepting fresh
+  records, so a response suffix cannot become a false acknowledgement. The writer remains
+  available for Stop; no missing reply is synthesized or replayed (ADR-600).
 - After any page stall, the controller output that queued up meanwhile is handed to the app
   in slices of about 8 ms, with input, drawing and the status poll running in between,
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
@@ -4249,6 +4278,9 @@ form: enter width × height and **Draw board at this size** instead of jogging
 to the other three corners. The outline draws from the captured corner at that
 size — the same result as a four-corner capture, faster for material you've
 already measured. Blocked below 3 mm like the measured path.
+The form remains usable after two or three captures: entered dimensions replace
+those partial measurements and retain the first corner as the origin. Changing
+machine coordinate identity still requires recapture (ADR-599).
 
 **Why button-jog only.** GRBL is open-loop — pushing the head by hand does
 not update the reported position, so a hand-jog capture would record the
@@ -4326,18 +4358,24 @@ selected.
 
 **The happy path.**
 1. Place a board (F-BC1); add and select one design.
-2. **Fit to board** → the design scales to fill the outline with a ~10% margin,
-   centered (rotation-safe: a rotated design still centers).
+2. Under **Artwork fit**, choose **Fit inside board** and enter the edge margin
+   in millimetres. The size preview shows the resulting dimensions and scale;
+   **Fit to board** applies the proportional centred fit. **Keep actual size**
+   centres without resizing and reports when the margin is exceeded (ADR-599).
 3. Or set the array: leave **Fit as many as fit** checked to auto-count how many
-   fit, or uncheck it and type **rows × cols**; set the **mm spacing**.
+   fit, or uncheck it and type **rows × cols**. Set the edge margin and shared
+   spacing, or turn off **Same X / Y spacing** for independent gaps. The live
+   footprint diagram and count show the exact draft before it is applied.
 4. **Array on board** → copies tile the board, the block centered, as one undo
    step. Copies inherit the design's layer/settings.
 5. Undo restores the single design. After arraying, the whole grid is selected, so Array/Fit disable until you undo (or reselect one design) - this stops a re-click from silently stacking a doubled burn.
 
 **Edge / empty / error.** No board, or zero/several designs selected → both
 controls are disabled ("Select exactly one design…"). A design larger than the
-board tiles as a single centered copy. A runaway count (huge rows, or a tiny
-design under "fit as many as fit") is capped per axis. An array that would take
+usable board produces zero copies and leaves the scene unchanged. A fixed count
+that does not fit shows the fitting count alongside the request. A runaway count
+(huge rows, or a tiny design under "fit as many as fit") is capped at 100 per
+axis and 500 copies, with a notice in the preview. An array that would take
 the project past its limit of 10,000 objects is refused with a notice, and
 nothing changes (F-A11).
 
@@ -4378,7 +4416,11 @@ mode. Switching shape or circle method clears the in-progress capture. Verify
 and confirm controls stay unavailable while motion is active or the live machine
 position is unavailable. Reconnect, Home/manual-position, work-origin, or
 outline/Undo changes invalidate stale physical targets and require recapture.
-Fit/Array fill the circle's inscribed square, so a design stays inside the arc.
+Fit uses the circle's actual radius and explicit edge clearance, with conservative
+artwork bounds; a verified parametric ellipse can use its major radius. Array
+offers **Use the round boundary**, which centres rows and checks every footprint
+corner against the usable circle, or the conservative inscribed square. The
+preview and applied copies use the same plan; this is not optimal nesting (ADR-599).
 
 ---
 
@@ -7249,6 +7291,10 @@ as the pane's design record.
    discloses that the newest state is not autosaved. Manual Save validates and
    writes the self-contained in-memory project; no relief authority exists only as
    a local ID.
+   Autosave preparation also fails if its queued or active worker has not completed
+   within 60 seconds. It releases its own worker reservation and retains committed
+   recovery for a later retry. An explicit discard still clears recovery in order
+   and still checks that the document has not changed (ADR-598 Amendment 1).
 2. Project load rejects corrupt schema/encoding/endian/length/digest declarations
    before allocation or CAM. The original file remains untouched and the error
    identifies the invalid field.
@@ -7336,8 +7382,12 @@ as the pane's design record.
    The emitted preamble does not assume `G54` or `G94` support.
 
 #### Error — firmware answers `Error:` or `Resend:`
-1. Terminal for the stream (no replay); beam-off lines are written; with no
-   alarm state the errored stream auto-releases at the next Idle report.
+1. Terminal for the stream (no replay); beam-off lines are written. A non-halting `Error:`
+   report does not itself acknowledge a Marlin command: the command retains its reply ownership
+   until the following `ok`, including for Console. That `ok` cannot acknowledge cleanup.
+   Kill, reset, resend and skipped-command handling retain their separate semantics (ADR-600).
+   An errored stream is released only after its remaining reply ownership and Idle settlement
+   allow it; error reporting is not successful completion.
 
 ### F-H3. Smoothieware halt and recovery
 
@@ -8830,7 +8880,7 @@ history eviction is an advisory.
 
 ### F-DS1. Open the Design Studio
 
-1. Click **Design** at the bottom of the left tool rail (below **Lib**).
+1. Click **Design Studio · Pro** in the main toolbar. The existing Pro entry check offers a trial or licence when required; the launcher remains visible when file commands move into More.
 2. The overlay chunk loads lazily on first open; a "Opening Design Studio…"
    card shows while it does.
 3. The Studio opens full-window over the app: title row, Create rail above
@@ -8867,7 +8917,7 @@ status bar reads `X —  Y —` until the pointer enters the canvas.
    tabular figures so the digits do not jitter.
 2. Wheel: zooms about the pointer, so the millimetre under the cursor stays
    under the cursor.
-3. **Fit** in the title row (or Shift+F) re-frames the bed.
+3. **Fit** in the title row (or Shift+F) re-frames the bed in 2D. In 3D it resets the camera to the stock's top view; the saved 2D view and drawing stay unchanged.
 
 #### Success
 

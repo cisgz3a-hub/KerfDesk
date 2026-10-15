@@ -2,10 +2,11 @@ import type { DeviceProfile } from '../../../core/devices';
 import type { PlatformAdapter, SerialAdapter } from '../../../platform/types';
 import { connectOptionsForDevice } from '../../commands/connect-options';
 import type { ConnectControllerOptions, useLaserStore } from '../../state/laser-store';
+import { machineNetworkProfile, type MachineNetworkKind } from '../machine-network-profile';
 
 /** A first network Connect owns this target only for the setup request it opens. */
 export type MachineSetupConnection = {
-  readonly kind: 'fluidnc-network';
+  readonly kind: MachineNetworkKind;
   readonly serial: SerialAdapter;
   readonly host: string;
   readonly port: number;
@@ -20,10 +21,11 @@ export function connectionForMachineSetup(
   connection?: MachineSetupConnection,
 ) {
   const controllerKind = draft.controllerKind ?? 'grbl-v1.1';
+  const networkProfile = connection === undefined ? null : machineNetworkProfile(connection.kind);
   const blockedReason =
-    connection !== undefined &&
-    (controllerKind !== 'fluidnc' || draft.controllerCommandSet !== undefined)
-      ? 'Select the FluidNC protocol before retrying this network connection.'
+    networkProfile !== null &&
+    (controllerKind !== networkProfile.controllerKind || draft.controllerCommandSet !== undefined)
+      ? `Select the ${networkProfile.label} protocol before retrying this network connection.`
       : null;
   const adapter = connection === undefined ? platform : { ...platform, serial: connection.serial };
   return {

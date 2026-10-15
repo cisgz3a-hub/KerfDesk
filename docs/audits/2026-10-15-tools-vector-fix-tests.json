@@ -1,0 +1,337 @@
+{
+  "numTotalTestSuites": 8,
+  "numPassedTestSuites": 8,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 27,
+  "numPassedTests": 27,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1792080322079,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["join open artwork paths"],
+          "fullName": "join open artwork paths keeps untouched manual tabs physically fixed when baking a nonuniform transform",
+          "status": "passed",
+          "title": "keeps untouched manual tabs physically fixed when baking a nonuniform transform",
+          "duration": 17.591499999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["join open artwork paths"],
+          "fullName": "join open artwork paths uses physical gap after scale/mirror/rotation and preserves every source segment plus the short bridge",
+          "status": "passed",
+          "title": "uses physical gap after scale/mirror/rotation and preserves every source segment plus the short bridge",
+          "duration": 4.9702000000002045,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["join open artwork paths"],
+          "fullName": "join open artwork paths keeps distinct operation roots separate even when settings are identical",
+          "status": "passed",
+          "title": "keeps distinct operation roots separate even when settings are identical",
+          "duration": 0.8908000000001266,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["join open artwork paths"],
+          "fullName": "join open artwork paths honours path-level bindings, multiple operations and conservative artwork-setting compatibility",
+          "status": "passed",
+          "title": "honours path-level bindings, multiple operations and conservative artwork-setting compatibility",
+          "duration": 1.4709000000002561,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["join open artwork paths"],
+          "fullName": "join open artwork paths promotes legacy colour ownership and joins across different coloured-path slots in the same artwork",
+          "status": "passed",
+          "title": "promotes legacy colour ownership and joins across different coloured-path slots in the same artwork",
+          "duration": 1.375300000000152,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["join open artwork paths"],
+          "fullName": "join open artwork paths joins reversed chains at the earliest source slot, without duplicate zero-length segments",
+          "status": "passed",
+          "title": "joins reversed chains at the earliest source slot, without duplicate zero-length segments",
+          "duration": 1.2615999999998166,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["join open artwork paths"],
+          "fullName": "join open artwork paths closes a four-piece ring and keeps a two-point line open",
+          "status": "passed",
+          "title": "closes a four-piece ring and keeps a two-point line open",
+          "duration": 1.038000000000011,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["join open artwork paths"],
+          "fullName": "join open artwork paths leaves a three-way junction unchanged instead of choosing a branch from click order",
+          "status": "passed",
+          "title": "leaves a three-way junction unchanged instead of choosing a branch from click order",
+          "duration": 1.0551000000000386,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["join open artwork paths"],
+          "fullName": "join open artwork paths preserves closed contours and remaps unaffected manual tabs when an earlier path is consumed",
+          "status": "passed",
+          "title": "preserves closed contours and remaps unaffected manual tabs when an earlier path is consumed",
+          "duration": 1.1653000000001157,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["join open artwork paths"],
+          "fullName": "join open artwork paths keeps identical-source canonical cubics instead of their deliberately stale compatibility lines",
+          "status": "passed",
+          "title": "keeps identical-source canonical cubics instead of their deliberately stale compatibility lines",
+          "duration": 2.5278000000002976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["join open artwork paths"],
+          "fullName": "join open artwork paths rejects invalid tolerances and singular transforms without output",
+          "status": "passed",
+          "title": "rejects invalid tolerances and singular transforms without output",
+          "duration": 0.574500000000171,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["join open artwork paths"],
+          "fullName": "join open artwork paths joins a long chain without recursion or repeated growing concatenations",
+          "status": "passed",
+          "title": "joins a long chain without recursion or repeated growing concatenations",
+          "duration": 169.5583999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792080325538,
+      "endTime": 1792080325742.5583,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/core/geometry/vector-path-join.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["vector path actions"],
+          "fullName": "vector path actions converts selected editable vector objects into baked path objects",
+          "status": "passed",
+          "title": "converts selected editable vector objects into baked path objects",
+          "duration": 6.018400000000838,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["vector path actions"],
+          "fullName": "vector path actions welds selected closed vector objects into one selected path object",
+          "status": "passed",
+          "title": "welds selected closed vector objects into one selected path object",
+          "duration": 7.885000000002037,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["vector path actions"],
+          "fullName": "vector path actions welds mixed output metadata into distinct effective operations",
+          "status": "passed",
+          "title": "welds mixed output metadata into distinct effective operations",
+          "duration": 3.2436000000016065,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["vector path actions"],
+          "fullName": "vector path actions does not weld when the selection contains open contours",
+          "status": "passed",
+          "title": "does not weld when the selection contains open contours",
+          "duration": 2.291300000000774,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["boolean + offset actions (ADR-103 G1)"],
+          "fullName": "boolean + offset actions (ADR-103 G1) subtract cuts the clip out of the bottom-most subject and replaces the selection",
+          "status": "passed",
+          "title": "subtract cuts the clip out of the bottom-most subject and replaces the selection",
+          "duration": 4.72729999999865,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["boolean + offset actions (ADR-103 G1)"],
+          "fullName": "boolean + offset actions (ADR-103 G1) refuses booleans on a single object",
+          "status": "passed",
+          "title": "refuses booleans on a single object",
+          "duration": 0.9152999999969325,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["boolean + offset actions (ADR-103 G1)"],
+          "fullName": "boolean + offset actions (ADR-103 G1) warns and leaves state untouched when intersecting disjoint shapes (CNV-04)",
+          "status": "passed",
+          "title": "warns and leaves state untouched when intersecting disjoint shapes (CNV-04)",
+          "duration": 1.868800000000192,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["boolean + offset actions (ADR-103 G1)"],
+          "fullName": "boolean + offset actions (ADR-103 G1) offset adds a NEW grown object and keeps the source",
+          "status": "passed",
+          "title": "offset adds a NEW grown object and keeps the source",
+          "duration": 7.429699999996956,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["boolean + offset actions (ADR-103 G1)"],
+          "fullName": "boolean + offset actions (ADR-103 G1) warns and leaves state untouched when an inward offset collapses the shape (CNV-04)",
+          "status": "passed",
+          "title": "warns and leaves state untouched when an inward offset collapses the shape (CNV-04)",
+          "duration": 1.7213000000010652,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792080345258,
+      "endTime": 1792080345294.7212,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/state/vector-path-actions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "Convert to Path retains placed tabs with open=false and one undo",
+          "status": "passed",
+          "title": "Convert to Path retains placed tabs with open=false and one undo",
+          "duration": 5.28859999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "Convert to Path retains placed tabs with open=true and one undo",
+          "status": "passed",
+          "title": "Convert to Path retains placed tabs with open=true and one undo",
+          "duration": 1.2385000000003856,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792080350571,
+      "endTime": 1792080350578.2385,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/state/vector-path-conversion-tabs.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["explicit geometry repair transactions"],
+          "fullName": "explicit geometry repair transactions unions across two roots using the chosen base settings, preserves an unselected shared user, and supports undo/redo/reopen",
+          "status": "passed",
+          "title": "unions across two roots using the chosen base settings, preserves an unselected shared user, and supports undo/redo/reopen",
+          "duration": 25.974200000000565,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["explicit geometry repair transactions"],
+          "fullName": "explicit geometry repair transactions refuses a missing/unrelated operation and open/locked selection without touching history or dirty state",
+          "status": "passed",
+          "title": "refuses a missing/unrelated operation and open/locked selection without touching history or dirty state",
+          "duration": 3.083599999998114,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["explicit geometry repair transactions"],
+          "fullName": "explicit geometry repair transactions joins compatible cross-artwork paths in one undo step, keeps exact output settings, and round-trips canonical curves",
+          "status": "passed",
+          "title": "joins compatible cross-artwork paths in one undo step, keeps exact output settings, and round-trips canonical curves",
+          "duration": 19.914499999998952,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["explicit geometry repair transactions"],
+          "fullName": "explicit geometry repair transactions does not merge coincident paths owned by different operations or different scoped settings",
+          "status": "passed",
+          "title": "does not merge coincident paths owned by different operations or different scoped settings",
+          "duration": 0.9737999999997555,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792080345253,
+      "endTime": 1792080345302.9739,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Asus/.codex/worktrees/dbe6/LaserForge-2.0/src/ui/state/vector-repair-actions.test.ts"
+    }
+  ]
+}

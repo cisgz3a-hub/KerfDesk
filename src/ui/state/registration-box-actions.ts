@@ -17,6 +17,7 @@ import {
   type ShapeObject,
 } from '../../core/scene';
 import { type MutationResult, pushUndo, type StateSlice } from './scene-mutations';
+import { relayoutRegistrationJigArtwork } from './registration-jig-layout';
 import { applyRegistrationOutputToScene } from './registration-output-actions';
 
 type RemoveRegistrationBoxResult = {
@@ -95,6 +96,7 @@ export function applyRemoveRegistrationBox(
   let scene = s.project.scene;
   for (const id of boxIds) scene = removeObject(scene, id);
   scene = { ...scene, layers: scene.layers.filter((l) => l.id !== REGISTRATION_LAYER_ID) };
+  scene = relayoutRegistrationJigArtwork(s.project.scene, scene, 'keep');
   return {
     project: { ...s.project, scene },
     selectedObjectId:

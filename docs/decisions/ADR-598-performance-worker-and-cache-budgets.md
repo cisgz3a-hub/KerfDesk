@@ -21,3 +21,21 @@ The [speed audit](../audits/2026-10-14-speed-audit.md) reproduced expensive whol
 The follow-up audit records reproducible before/after fixtures and receipts. Regression checks cover actual client transfer/detachment, exact output equality, worker ownership and priority, ETA/Preview reuse, sprite memory bounds and retention, and nesting decisions compared with an independent brute-force oracle. Browser measurements distinguish dispatch time, receiver reconstruction, end-to-end interaction, and cold startup.
 
 First-time packing, receiver reconstruction, unavoidable compilation, direct painting of overflow artwork and non-preemptible active work still cost time. Synthetic fixtures on one computer do not establish performance on every machine, packaged Electron behaviour, or hardware qualification.
+
+### Amendment 1 — Bound autosave preparation liveness (2026-10-16)
+
+Autosave remains non-preemptible while healthy, preserving decision 2. Its worker
+preparation now has a 60-second deadline including time queued for the memory lane.
+A silent module worker otherwise holds both that lane and the durable write queue
+indefinitely, preventing an explicit discard from reaching its ordered recovery clear.
+Expiry terminates an active autosave worker before releasing its reservation, or
+removes only its queued reservation. It reports preparation failure through the
+existing autosave failure path; it does not substitute an empty snapshot, clear
+recovery, retry synchronously, or bypass the document revision check. Previously
+committed recovery remains intact unless the user has separately requested a clear.
+A later interval may retry. Late worker replies cannot commit the expired result.
+
+Focused tests reproduce silent-worker and queued-wait expiry, retain healthy
+non-preemption, and check that preparation failure preserves committed recovery,
+permits an explicitly queued clear, and allows later valid writes. This bounds
+worker preparation, not an unresponsive IndexedDB transaction or session lock.

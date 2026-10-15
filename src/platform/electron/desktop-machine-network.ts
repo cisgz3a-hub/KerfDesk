@@ -7,13 +7,14 @@ export function createDesktopMachineNetwork(
   request: MachineNetworkRequest = machineNetworkRequest(),
 ): MachineNetworkAdapter {
   return {
-    serialForTarget: (host, port) => ({
+    serialForTarget: (host, port, protocol = 'fluidnc-telnet') => ({
+      transport: 'tcp',
       isSupported: () => true,
       picksEndOnRestart: true,
       requestPort: async () => ({
         info: { transport: 'tcp' },
         open: async () => {
-          const result = await request('open', { host, port, protocol: 'fluidnc-telnet' });
+          const result = await request('open', { host, port, protocol });
           const id = result['sessionId'];
           if (typeof id !== 'string' || !/^[a-f0-9-]{36}$/.test(id))
             throw new Error('Invalid desktop network session.');
@@ -76,7 +77,13 @@ class DesktopMachineConnection implements SerialConnection {
     if (this.closed) return;
     this.closed = true;
     this.partialLine = '';
-    for (const handler of this.closes) handler();
+    for (const handler of this.closes) {
+      try {
+        handler();
+      } catch (error) {
+        console.error('Network close handler threw; continuing transport cleanup:', error);
+      }
+    }
     this.lines.clear();
     this.closes.clear();
     // Closing may fail after renderer/network loss; the native lease also expires.

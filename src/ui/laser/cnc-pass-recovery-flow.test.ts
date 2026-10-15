@@ -1,17 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import type { JobInterruptionKind } from '../../core/recovery';
-import {
-  createLayer,
-  createProject,
-  DEFAULT_CNC_LAYER_SETTINGS,
-  DEFAULT_CNC_MACHINE_CONFIG,
-  EMPTY_SCENE,
-  IDENTITY_TRANSFORM,
-  type SceneObject,
-} from '../../core/scene';
+import { createProject } from '../../core/scene';
 import type * as GcodeModule from '../../io/gcode';
-import { useCameraStore } from '../state/camera-store';
 import {
   cncControllerEpochOf,
   cncSetupAttestationMatches,
@@ -20,12 +9,6 @@ import {
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import { RecoveryRepository, type RecoveryCapsule } from '../state/recovery';
-import {
-  createCurrentTestExecutionArtifact,
-  MemoryRecoveryGenerationStore,
-  MemoryRecoveryStorageBackend,
-} from '../state/recovery/testing';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
@@ -41,7 +24,12 @@ import { cncPassRecoveryDefaultPoint } from './cnc-pass-recovery-model';
 import { expectCncPassRecoveryProvenance } from './cnc-pass-recovery-provenance-testing';
 import type { CncPassRecoveryReview } from './cnc-pass-recovery-review';
 import { frameVerificationForProject } from './frame-verification-testing';
-import { prepareCurrentStartJob } from './start-job-source';
+import {
+  ARCHIVED_WCO,
+  recoveryProject,
+  repository,
+  saveInterruptedRun,
+} from './cnc-pass-recovery-flow-test-fixtures';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -56,32 +44,6 @@ vi.mock('../../io/gcode', async (importOriginal) => {
 });
 
 const originalStartJob = useLaserStore.getState().startJob;
-const NOW = '2026-07-16T10:00:00.000Z';
-const LATER = '2026-07-16T10:01:00.000Z';
-const ARCHIVED_WCO = { x: 0, y: 0, z: 0 };
-const lineObject: SceneObject = {
-  kind: 'imported-svg',
-  id: 'line-object',
-  source: 'line.svg',
-  bounds: { minX: 10, minY: 10, maxX: 70, maxY: 10 },
-  transform: IDENTITY_TRANSFORM,
-  paths: [
-    {
-      color: '#ff0000',
-      polylines: [
-        {
-          points: [
-            { x: 10, y: 10 },
-            { x: 30, y: 10 },
-            { x: 50, y: 10 },
-            { x: 70, y: 10 },
-          ],
-          closed: false,
-        },
-      ],
-    },
-  ],
-};
 const baseReview: CncPassRecoveryReview = {
   cutterClear: true,
   spindleStopped: true,
@@ -91,93 +53,6 @@ const baseReview: CncPassRecoveryReview = {
   groupIndex: 0,
   passIndex: 0,
 };
-
-// Three 1 mm stepdowns so boundary slicing and late-pick have real passes.
-function recoveryProject() {
-  return {
-    ...createProject({
-      ...DEFAULT_DEVICE_PROFILE,
-      streamingMode: 'ping-pong' as const,
-      rxBufferBytes: 96,
-    }),
-    machine: DEFAULT_CNC_MACHINE_CONFIG,
-    scene: {
-      ...EMPTY_SCENE,
-      objects: [lineObject],
-      layers: [
-        {
-          ...createLayer({ id: 'red', color: '#ff0000' }),
-          cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm: 3, depthPerPassMm: 1 },
-        },
-      ],
-    },
-  };
-}
-
-function repository(): RecoveryRepository {
-  return new RecoveryRepository({
-    backend: new MemoryRecoveryStorageBackend(),
-    generationStore: new MemoryRecoveryGenerationStore(),
-    legacyStorage: { read: () => null, clear: () => undefined },
-    nowIso: () => LATER,
-  });
-}
-
-async function saveInterruptedRun(
-  repo: RecoveryRepository,
-  options?: {
-    readonly interruptionKind?: JobInterruptionKind;
-    readonly archiveWco?: boolean;
-  },
-): Promise<RecoveryCapsule> {
-  const laser = useLaserStore.getState();
-  const prepared = await prepareCurrentStartJob(
-    useStore.getState(),
-    laser,
-    useCameraStore.getState(),
-  );
-  if (!prepared.ok) {
-    throw new Error(`Expected ready CNC job: ${prepared.messages.join('; ')}`);
-  }
-  const artifact = await createCurrentTestExecutionArtifact({
-    runId: 'run-archived-cnc',
-    gcode: prepared.gcode,
-    prepared: prepared.prepared,
-    ...(prepared.jobOrigin === undefined ? {} : { jobOrigin: prepared.jobOrigin }),
-    canvasPlan: prepared.canvasPlan,
-    ...(prepared.cncToolPlan === undefined ? {} : { cncToolPlan: prepared.cncToolPlan }),
-    controllerSettings: laser.controllerSettings,
-    controllerObservation: {
-      statusReport: laser.statusReport,
-      ...(options?.archiveWco === false ? {} : { wco: { ...ARCHIVED_WCO } }),
-      overrides: laser.ovCache,
-      accessories: laser.accessoryCache ?? null,
-      workZZeroEvidence: laser.workZZeroEvidence,
-      activeControllerKind: laser.activeControllerKind,
-      controllerSessionEpoch: laser.controllerSessionEpoch,
-    },
-    createdAtIso: NOW,
-  });
-  expect((await repo.initialize()).ok).toBe(true);
-  expect((await repo.stageArtifact(artifact)).ok).toBe(true);
-  expect((await repo.activateFreshRun(artifact.runId, NOW)).ok).toBe(true);
-  expect(
-    (
-      await repo.interruptRun(
-        artifact.runId,
-        Math.min(3, artifact.sendableLines),
-        {
-          kind: options?.interruptionKind ?? 'disconnect',
-          message: 'USB connection was lost.',
-        },
-        LATER,
-      )
-    ).ok,
-  ).toBe(true);
-  const capsule = repo.getSnapshot().recoveryCapsule;
-  if (capsule === null) throw new Error('Expected interrupted CNC recovery capsule.');
-  return capsule;
-}
 
 beforeEach(() => {
   localStorage.clear();
@@ -318,6 +193,81 @@ describe('runCncPassRecoveryFlow', () => {
 
     expect(started).toBe(true);
     expect(startJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts the same physical offset after reconnect changes report units', async () => {
+    const repo = repository();
+    const capsule = await saveInterruptedRun(repo, {
+      workOffset: { x: 25.4, y: 50.8, z: 12.7 },
+    });
+    const startJob = vi.fn(
+      async (_gcode: string, options?: { assertFinalStartAuthorized?: () => void }) => {
+        options?.assertFinalStartAuthorized?.();
+      },
+    );
+    useLaserStore.setState({
+      startJob,
+      controllerSettings: { ...useLaserStore.getState().controllerSettings, reportInches: true },
+      wcoCache: { x: 1, y: 2, z: 0.5 },
+    });
+
+    const started = await runCncPassRecoveryFlow(
+      capsule,
+      { ...baseReview, position: { kind: 'retained-confirmed' } },
+      repo,
+    );
+
+    expect(started).toBe(true);
+    expect(startJob).toHaveBeenCalledOnce();
+  });
+
+  it('refuses equal raw offsets that represent different physical origins after reconnect', async () => {
+    const repo = repository();
+    const workOffset = { x: 1, y: 2, z: 0.5 };
+    const capsule = await saveInterruptedRun(repo, { workOffset });
+    const startJob = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      startJob,
+      controllerSettings: { ...useLaserStore.getState().controllerSettings, reportInches: true },
+      wcoCache: workOffset,
+    });
+
+    const started = await runCncPassRecoveryFlow(
+      capsule,
+      { ...baseReview, position: { kind: 'retained-confirmed' } },
+      repo,
+    );
+
+    expect(started).toBe(false);
+    expect(startJob).not.toHaveBeenCalled();
+    expect(jobAwareAlert).toHaveBeenCalledWith(expect.stringContaining('work offset differs'));
+  });
+
+  it('rechecks report-unit certainty at the final recovery handoff', async () => {
+    const repo = repository();
+    const capsule = await saveInterruptedRun(repo);
+    const startJob = vi.fn(
+      async (_gcode: string, options?: { assertFinalStartAuthorized?: () => void }) => {
+        options?.assertFinalStartAuthorized?.();
+      },
+    );
+    useLaserStore.setState({ startJob, wcoCache: ARCHIVED_WCO });
+    const claim = repo.claimRecovery.bind(repo);
+    vi.spyOn(repo, 'claimRecovery').mockImplementation(async (args) => {
+      useLaserStore.setState({ reportUnitsUnconfirmed: true });
+      return claim(args);
+    });
+
+    const started = await runCncPassRecoveryFlow(
+      capsule,
+      { ...baseReview, position: { kind: 'retained-confirmed' } },
+      repo,
+    );
+
+    expect(started).toBe(false);
+    expect(jobAwareAlert).toHaveBeenCalledWith(expect.stringContaining('units are unconfirmed'));
+    expect(repo.getSnapshot().recoveryCapsule?.runId).toBe(capsule.runId);
+    expect(repo.getSnapshot().activeRun).toBeNull();
   });
 
   it('refuses when the live work offset drifts from the archive during the claim', async () => {

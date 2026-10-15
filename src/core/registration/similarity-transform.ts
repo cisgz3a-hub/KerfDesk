@@ -20,22 +20,44 @@ const MIN_TARGET_DISTANCE_MM = 0.001;
 export function solveTwoPointRegistration(
   registration: TwoPointRegistration,
 ): SimilarityTransformResult {
+  if (
+    [...registration.design, ...registration.machine].some(
+      (point) => !Number.isFinite(point.x) || !Number.isFinite(point.y),
+    )
+  ) {
+    return { ok: false, reason: 'Registration target coordinates must be finite.' };
+  }
   const designVector = subtract(registration.design[1], registration.design[0]);
   const machineVector = subtract(registration.machine[1], registration.machine[0]);
   const designLength = length(designVector);
   const machineLength = length(machineVector);
+  if (!Number.isFinite(designLength) || !Number.isFinite(machineLength)) {
+    return {
+      ok: false,
+      reason: 'Registration target spacing exceeds the supported numeric range.',
+    };
+  }
   if (designLength < MIN_TARGET_DISTANCE_MM || machineLength < MIN_TARGET_DISTANCE_MM) {
     return { ok: false, reason: 'Registration targets must be distinct.' };
   }
   const scale = machineLength / designLength;
   const rotationRad = angle(machineVector) - angle(designVector);
   const mappedFirst = rotateScale(registration.design[0], scale, rotationRad);
+  const translation = subtract(registration.machine[0], mappedFirst);
+  if (
+    !(scale > 0) ||
+    !Number.isFinite(scale) ||
+    !Number.isFinite(translation.x) ||
+    !Number.isFinite(translation.y)
+  ) {
+    return { ok: false, reason: 'Registration transform exceeds the supported numeric range.' };
+  }
   return {
     ok: true,
     transform: {
       scale,
       rotationRad,
-      translation: subtract(registration.machine[0], mappedFirst),
+      translation,
     },
   };
 }

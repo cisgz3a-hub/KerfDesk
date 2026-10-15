@@ -205,7 +205,7 @@ async function openProject(
   text: string,
 ): Promise<void> {
   await kerfdesk.setOpenFiles([{ name, text }]);
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(new RegExp(name.replaceAll('.', '\\.')));
   await dismissNotifications(page);
 }

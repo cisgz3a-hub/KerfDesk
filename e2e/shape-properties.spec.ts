@@ -1,9 +1,10 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { saveProjectAs } from './fixtures/project-save';
 import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
 });
 

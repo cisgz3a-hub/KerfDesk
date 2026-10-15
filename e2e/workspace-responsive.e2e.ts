@@ -1,5 +1,6 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { test, expect, type Locator, type Page } from './fixtures/kerfdesk-test';
-import type { PlatformAdapter } from '../src/platform/types';
+import type { MachineNetworkProtocol, PlatformAdapter } from '../src/platform/types';
 import type { AppState } from '../src/ui/state';
 
 const viewports = [
@@ -10,11 +11,22 @@ const viewports = [
   { width: 1024, height: 600, layout: 'compact' },
   { width: 1536, height: 650, layout: 'compact' },
 ] as const;
+const networkControllers = [
+  { kind: 'fluidnc', label: 'FluidNC' },
+  { kind: 'grblhal', label: 'grblHAL' },
+] as const;
+
+type NetworkController = (typeof networkControllers)[number];
+interface NetworkTarget {
+  host: string;
+  port: number;
+  protocol: MachineNetworkProtocol;
+}
 
 for (const viewport of viewports) {
   test(`workspace fits ${viewport.width}x${viewport.height} without browser zoom`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.setViewportSize(viewport);
@@ -32,6 +44,9 @@ for (const viewport of viewports) {
     await expectNoPageOverflow(page);
     for (const button of await page.locator('.lf-toolbar-shell button:visible').all()) {
       await expectWithinViewport(page, button);
+    }
+    if (viewport.width === 1536 && viewport.height === 864) {
+      await page.screenshot({ path: testInfo.outputPath('design-studio-toolbar.png') });
     }
     if (viewport.layout === 'compact') {
       await page.getByRole('tab', { name: 'Machine', exact: true }).click();
@@ -58,6 +73,128 @@ for (const viewport of viewports) {
   });
 }
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`toolbar keeps optional controls reachable across compact widths in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await useThemePreference(page, theme);
+    await page.setViewportSize({ width: 640, height: 450 });
+    await page.goto('/');
+    await expect(page.locator('#app-splash')).toHaveCount(0);
+    const toolbar = page.getByRole('banner', { name: 'Toolbar' });
+    await expect(toolbar.getByRole('button', { name: 'Open Design Studio' })).toBeVisible();
+    await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
+    await expectCompactToolbarCanvas(page, toolbar);
+    await expect(toolbar.locator('.lf-workspace-layout-select > span')).toBeVisible();
+    await page.context().setOffline(true);
+    await expect(toolbar.getByRole('status')).toHaveText('Offline');
+    await page.evaluate(() => window.dispatchEvent(new Event('beforeinstallprompt')));
+    await expect(toolbar.getByRole('button', { name: 'Install app', exact: true })).toBeVisible();
+    for (const wideFont of [false, true]) {
+      await toolbar.evaluate((element, wide) => {
+        element.style.fontFamily = wide ? 'monospace' : '';
+      }, wideFont);
+      for (const width of [650, 640, 620, 601, 540]) {
+        await page.setViewportSize({ width, height: 720 });
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+            ),
+        );
+        for (const button of await toolbar.locator('button:visible').all()) {
+          await expectWithinViewport(page, button);
+          const size = await button.evaluate((element) => ({
+            width: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+          }));
+          expect(size.scrollWidth).toBeLessThanOrEqual(size.width + 1);
+        }
+        await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
+        await expectWithinViewport(page, toolbar.getByRole('status'));
+        await expectNoPageOverflow(page);
+        if (wideFont && width === 640) {
+          await page.screenshot({ path: testInfo.outputPath(`toolbar-optional-${theme}.png`) });
+        }
+      }
+    }
+    const layout = toolbar.getByRole('button', { name: 'Workspace layout', exact: true });
+    await layout.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menu', { name: 'Workspace layout options' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(layout).toBeFocused();
+  });
+}
+
+test('compact toolbar accommodates the native Phone & MCP control', async ({ page }, testInfo) => {
+  // Exercise the real native-only toolbar component in the HTTP renderer harness.
+  // This replaces only its protocol gate; it does not claim packaged-native coverage.
+  await page.route('**/src/ui/remote-access/desktop-only.ts', (route) =>
+    route.fulfill({
+      contentType: 'text/javascript',
+      body: 'export function isRemoteAccessRenderer() { return true; }',
+    }),
+  );
+  await page.setViewportSize({ width: 640, height: 450 });
+  await page.goto('/');
+  await expect(page.locator('#app-splash')).toHaveCount(0);
+  const toolbar = page.getByRole('banner', { name: 'Toolbar' });
+  await expect(toolbar.getByRole('button', { name: 'Phone & MCP', exact: true })).toBeVisible();
+  await expectCompactToolbarCanvas(page, toolbar);
+  // Reserve for wider platform font metrics as well as the local default font.
+  await toolbar.evaluate((element) => {
+    element.style.letterSpacing = '1px';
+  });
+  await expectCompactToolbarCanvas(page, toolbar);
+  const layout = toolbar.getByRole('button', { name: 'Workspace layout', exact: true });
+  await expect(layout.locator('span')).toBeHidden();
+  await layout.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menu', { name: 'Workspace layout options' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(layout).toBeFocused();
+  await page.screenshot({ path: testInfo.outputPath('native-toolbar-compact.png') });
+  await page.setViewportSize({ width: 1000, height: 720 });
+  await expect(layout.locator('span')).toBeVisible();
+});
+
+async function expectCompactToolbarCanvas(page: Page, toolbar: Locator): Promise<void> {
+  const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
+  for (const fontFamily of ['', 'monospace']) {
+    await toolbar.evaluate((element, font) => {
+      element.style.fontFamily = font;
+    }, fontFamily);
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    expect((await canvas.boundingBox())?.height ?? 0).toBeGreaterThan(200);
+    const centres = await toolbar
+      .locator('.lf-toolbar-utilities button:visible')
+      .evaluateAll((buttons) =>
+        buttons.map((button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.y + rect.height / 2;
+        }),
+      );
+    expect(Math.max(...centres) - Math.min(...centres)).toBeLessThanOrEqual(1);
+    for (const button of await toolbar.locator('button:visible').all()) {
+      await expectWithinViewport(page, button);
+    }
+    await expect(
+      toolbar.getByRole('button', { name: 'Workspace layout' }),
+    ).toHaveAccessibleDescription('Auto layout');
+    await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
+    await expectNoPageOverflow(page);
+  }
+  await toolbar.evaluate((element) => {
+    element.style.fontFamily = '';
+  });
+}
+
 test('machine connection remains reachable when its sidebar is collapsed', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 668 });
   await page.goto('/');
@@ -77,68 +214,97 @@ test('machine connection remains reachable when its sidebar is collapsed', async
   await expect(page.getByRole('dialog', { name: 'Machine Setup', exact: true })).toBeVisible();
 });
 
-test('expanded FluidNC form stays in machine details without consuming workspace height', async ({
-  page,
-  kerfdesk,
-}) => {
-  await page.setViewportSize({ width: 1280, height: 620 });
-  await page.goto('/');
-  await enableMockFluidNcNetwork(page);
-  const toolbar = page.getByRole('region', { name: 'Machine toolbar' });
-  const dock = page.getByRole('region', { name: 'Job actions' });
-  const toolbarBefore = await toolbar.boundingBox();
-  const dockBefore = await dock.boundingBox();
-  expect(await toolbar.locator('summary').count()).toBe(0);
-  const trigger = toolbar.getByRole('button', { name: /^Machine details:/ });
-  await trigger.click();
-  const popup = page.getByRole('dialog', { name: 'Machine details', exact: true });
-  await popup
-    .locator('summary')
-    .filter({ hasText: /^FluidNC network connection$/ })
-    .click();
-  const address = popup.getByRole('textbox', { name: 'FluidNC machine IP or hostname' });
-  const port = popup.getByRole('spinbutton', { name: 'FluidNC Telnet port' });
-  await address.fill('192.0.2.1');
-  await address.press('Tab');
-  await expect(port).toBeFocused();
-  await port.fill('23456');
-  await port.press('Tab');
-  const connect = popup.getByRole('button', { name: 'Connect FluidNC network', exact: true });
-  await expect(connect).toBeFocused();
-  await expect(connect).toBeEnabled();
-  await expectWithinViewport(page, popup);
-  await expectWithinViewport(page, connect);
-  expect(await toolbar.boundingBox()).toEqual(toolbarBefore);
-  expect(await dock.boundingBox()).toEqual(dockBefore);
-  await expectWithinViewport(page, dock);
-  await page.keyboard.press('Escape');
-  await expect(trigger).toBeFocused();
-  expect((await kerfdesk.events()).filter((event) => event.kind === 'serial-write')).toEqual([]);
-});
+for (const controller of networkControllers) {
+  test(`expanded ${controller.label} form stays in machine details without consuming workspace height`, async ({
+    page,
+    kerfdesk,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 620 });
+    await page.goto('/');
+    await enableMockNetwork(page, controller);
+    const toolbar = page.getByRole('region', { name: 'Machine toolbar' });
+    const dock = page.getByRole('region', { name: 'Job actions' });
+    const toolbarBefore = await toolbar.boundingBox();
+    const dockBefore = await dock.boundingBox();
+    expect(await toolbar.locator('summary').count()).toBe(0);
+    const trigger = toolbar.getByRole('button', { name: /^Machine details:/ });
+    await trigger.focus();
+    await trigger.press('Enter');
+    const popup = page.getByRole('dialog', { name: 'Machine details', exact: true });
+    const summary = popup
+      .locator('summary')
+      .filter({ hasText: new RegExp(`^${controller.label} network connection$`) });
+    await summary.focus();
+    await summary.press('Enter');
+    const address = popup.getByRole('textbox', {
+      name: `${controller.label} machine IP or hostname`,
+    });
+    const port = popup.getByRole('spinbutton', { name: `${controller.label} Telnet port` });
+    await address.fill('192.0.2.1');
+    await address.press('Tab');
+    await expect(port).toBeFocused();
+    await port.fill('23456');
+    await port.press('Tab');
+    const connect = popup.getByRole('button', {
+      name: `Connect ${controller.label} network`,
+      exact: true,
+    });
+    await expect(connect).toBeFocused();
+    await expect(connect).toBeEnabled();
+    await expectWithinViewport(page, popup);
+    await expectWithinViewport(page, connect);
+    expect(await toolbar.boundingBox()).toEqual(toolbarBefore);
+    expect(await dock.boundingBox()).toEqual(dockBefore);
+    await expectWithinViewport(page, dock);
+    await page.screenshot({ path: test.info().outputPath('network-connection.png') });
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+    expect(
+      await page.evaluate(
+        () =>
+          (window as typeof window & { __WORKSPACE_NETWORK_TARGETS__: NetworkTarget[] })
+            .__WORKSPACE_NETWORK_TARGETS__,
+      ),
+    ).toEqual([]);
+    expect((await kerfdesk.events()).filter((event) => event.kind === 'serial-write')).toEqual([]);
+  });
+}
 
-async function enableMockFluidNcNetwork(page: Page): Promise<void> {
+async function enableMockNetwork(page: Page, controller: NetworkController): Promise<void> {
   await page.getByRole('region', { name: 'Machine toolbar' }).waitFor();
-  await page.evaluate(async () => {
+  await page.evaluate(async ({ kind, label }) => {
     const adapterUrl = '/src/platform/web/index.ts';
     const stateUrl = '/src/ui/state/index.ts';
     const { webAdapter } = (await import(adapterUrl)) as { webAdapter: PlatformAdapter };
     const { useStore } = (await import(stateUrl)) as { useStore: { getState: () => AppState } };
+    const targets: NetworkTarget[] = [];
+    Object.defineProperty(window, '__WORKSPACE_NETWORK_TARGETS__', {
+      configurable: true,
+      value: targets,
+    });
     Object.defineProperty(webAdapter, 'machineNetwork', {
       configurable: true,
       value: {
-        serialForTarget: () => {
-          throw new Error('Layout regression must not open a network channel');
+        serialForTarget: (host: string, port: number, protocol: MachineNetworkProtocol) => {
+          targets.push({ host, port, protocol });
+          return {
+            transport: 'tcp' as const,
+            isSupported: () => true,
+            requestPort: async () => {
+              throw new Error('Layout regression must not open a network channel');
+            },
+          };
         },
       },
     });
     const device = {
       ...useStore.getState().project.device,
-      name: 'FluidNC layout fixture',
-      controllerKind: 'fluidnc' as const,
+      name: `${label} layout fixture`,
+      controllerKind: kind,
     };
     delete device.controllerCommandSet;
     useStore.getState().replaceDeviceProfile(device);
-  });
+  }, controller);
 }
 
 test('layout preference survives reload, constrains narrow windows and resets from Window menu', async ({
@@ -183,7 +349,7 @@ test('overflow commands and all nine anchors remain reachable on a short laptop'
   await expect(menu.getByRole('menuitem', { name: 'Save G-code...' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(more).toBeFocused();
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();
   await page.keyboard.press('Control+a');
   const anchor = page.getByRole('button', { name: 'Choose transform anchor' });
@@ -198,13 +364,17 @@ test('overflow commands and all nine anchors remain reachable on a short laptop'
   await expect(anchor).toHaveAttribute('title', /bottom right/);
 });
 
-test('short dark workspace keeps the tool rail scrollable and machine modes accessible', async ({
+test('short dark workspace keeps Design Studio in the toolbar and machine modes accessible', async ({
   page,
 }) => {
   await useThemePreference(page, 'dark');
   await page.setViewportSize({ width: 1024, height: 500 });
   await page.goto('/');
-  const designStudio = page.getByRole('button', { name: 'Open Design Studio', exact: true });
+  const designStudio = page.getByRole('banner', { name: 'Toolbar' }).getByRole('button', {
+    name: 'Open Design Studio',
+    exact: true,
+  });
+  await expect(designStudio).toContainText('Pro');
   await designStudio.focus();
   await expectWithinViewport(page, designStudio);
   await designStudio.click();

@@ -2,10 +2,12 @@ import { selectControllerDriver } from '../../../core/controllers';
 import { firmwareReportQuery } from '../../../core/controllers/controller-firmware-report';
 import type { DeviceProfile } from '../../../core/devices';
 import type { LaserState } from '../../state/laser-store';
+import { machineNetworkProfileForDevice } from '../machine-network-profile';
 
 export function machineProtocolInventory(device: DeviceProfile, laser: LaserState) {
   const driver = selectControllerDriver(device.controllerKind, device.controllerCommandSet);
   const caps = driver.capabilities;
+  const network = machineNetworkProfileForDevice(device);
   return [
     { name: 'Declared protocol', value: driver.label },
     {
@@ -13,8 +15,8 @@ export function machineProtocolInventory(device: DeviceProfile, laser: LaserStat
       value:
         caps.transport === 'file-only'
           ? 'File export only; no live transport'
-          : driver.kind === 'fluidnc'
-            ? 'Serial or explicit desktop FluidNC TCP channel'
+          : network !== null
+            ? `Serial or explicit desktop ${network.label} Wi-Fi / Ethernet channel`
             : 'Serial',
     },
     {

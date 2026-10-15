@@ -1,6 +1,31 @@
 # Can't connect to your machine?
 
-KerfDesk talks to your laser or CNC controller over a USB serial connection.
+KerfDesk supports USB serial and, in the desktop app, explicit FluidNC and grblHAL network connections.
+For Wi-Fi or Ethernet, use the network section below. Other USB device types and vendor Wi-Fi
+protocols need their own adapter; a matching cable alone does not establish compatibility.
+
+## Desktop Wi-Fi or Ethernet
+
+First connect the computer to the machine's network using your operating system's Wi-Fi settings
+or an Ethernet cable, following the controller manufacturer's network setup. KerfDesk then opens
+the controller's command service at the address you enter.
+
+1. Select the machine's actual **FluidNC** or **grblHAL** controller protocol in Machine Setup.
+2. Open the machine-name dropdown and expand its **network connection** form.
+3. Enter the controller's IP address or hostname and the port configured for its enabled Telnet
+   service. For grblHAL, the board and firmware must include networking and the raw Telnet service.
+   Use the configured port, not the WebUI HTTP port. KerfDesk does not configure the machine's Wi-Fi.
+4. Click **Connect FluidNC network** or **Connect grblHAL network**. If setup opens, **Try again**
+   keeps the entered target until setup closes. Check the address, service and network reachability
+   if it fails. Do not use these forms for a different controller family.
+
+Use a trusted local network; these services are unencrypted. Keep KerfDesk open and responsive
+while sending a job. After connection loss, reconnect through this form and review recovery.
+Commands are never replayed automatically. To return to USB, use **Use a different port…** in the
+connection menu. Cancelling the picker keeps the network choice. The address is not saved.
+
+## USB serial
+
 If the **Connect** button doesn't find your machine, or it connects but the
 machine doesn't respond, work through the steps below in order — the first two
 solve the large majority of cases.

@@ -1,0 +1,179 @@
+{
+  "sourceRevision": "7286cdbb96090993539a72db1489821abb1ac5fc",
+  "sourceChangesAfterRevision": false,
+  "command": "vitest run <23 changed test files> --maxWorkers=2",
+  "result": "passed",
+  "tests": 178,
+  "files": 23,
+  "failures": 0,
+  "rawReport": "evidence/tools-quality-2026-10-16/pr-final-vitest.json.gz",
+  "rawSha256": "48b0165b463e228b4a95046ee64a8d805ecaa60a634cc9dbbc4860e0b22dba23",
+  "testFiles": [
+    {
+      "file": "src/core/geometry/tangent-circles.test.ts",
+      "tests": 9,
+      "status": "passed"
+    },
+    {
+      "file": "src/core/geometry/tools-vector-audit-stress.test.ts",
+      "tests": 4,
+      "status": "passed"
+    },
+    {
+      "file": "src/core/geometry/vector-path-join.test.ts",
+      "tests": 12,
+      "status": "passed"
+    },
+    {
+      "file": "src/core/geometry/warp-deform-accuracy-budget.test.ts",
+      "tests": 10,
+      "status": "passed"
+    },
+    {
+      "file": "src/core/job/calibration-grid-feed.test.ts",
+      "tests": 10,
+      "status": "passed"
+    },
+    {
+      "file": "src/core/job/calibration-grid-stress.test.ts",
+      "tests": 2,
+      "status": "passed"
+    },
+    {
+      "file": "src/core/job/interval-test-grid.test.ts",
+      "tests": 7,
+      "status": "passed"
+    },
+    {
+      "file": "src/core/registration/similarity-transform.test.ts",
+      "tests": 9,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/commands/multi-file-trace-action-stream.test.ts",
+      "tests": 4,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/app/bake-variable-text.test.ts",
+      "tests": 3,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/app/save-original-image.test.ts",
+      "tests": 4,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/app/save-processed-bitmap.test.ts",
+      "tests": 12,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/image-editor/editor-tools-stress.test.ts",
+      "tests": 2,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/raster/AdjustImageDialog.test.tsx",
+      "tests": 9,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/raster/crop-image.test.ts",
+      "tests": 9,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/workspace/measure-tool.test.ts",
+      "tests": 4,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/state/autosave-durable-preparation-order.test.ts",
+      "tests": 7,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/state/autosave-preparation-client.test.ts",
+      "tests": 12,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/state/raster-adjustment-actions.test.ts",
+      "tests": 2,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/state/store.test.ts",
+      "tests": 31,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/state/vector-path-conversion-tabs.test.ts",
+      "tests": 2,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/state/warp-deform-actions.test.ts",
+      "tests": 12,
+      "status": "passed"
+    },
+    {
+      "file": "src/ui/state/warp-deform-conversion-budget.test.ts",
+      "tests": 2,
+      "status": "passed"
+    }
+  ],
+  "priorAttempt": "Sandbox cache rename EPERM before any tests ran; not a product-test failure. Retry outside sandbox passed.",
+  "integrationBase": "007ed2a96 (origin/main at integration)",
+  "staticChecks": {
+    "sourceTypeScript": "passed on merged production source",
+    "e2eTypeScript": "passed after final trace harness restoration",
+    "sourceLint": "initial audit partitions and all follow-up changed source files passed",
+    "format": "changed production source, final harnesses and fixture passed",
+    "fileSize": "passed after source freeze",
+    "adrNumbers": "passed; next free ADR-599",
+    "indexExports": "passed legacy no-growth ratchet",
+    "playwrightDiscovery": "130 browser suites plus production-bundle suite discovered",
+    "e2eLint": "final harnesses and fixture passed"
+  },
+  "followUpSuites": [
+    {
+      "scope": "Photo to Adjust and image exports",
+      "files": 5,
+      "tests": 58,
+      "status": "passed"
+    },
+    {
+      "scope": "Final Warp conversion and geometry integration",
+      "files": 7,
+      "tests": 48,
+      "status": "passed"
+    },
+    {
+      "scope": "Tangent analytic and permutation assertions",
+      "tests": 9,
+      "status": "passed"
+    },
+    {
+      "scope": "Fractional feed and calibration grids",
+      "files": 4,
+      "tests": 32,
+      "status": "passed"
+    },
+    {
+      "scope": "Final interval labels, grid stress and dialog",
+      "files": 3,
+      "tests": 12,
+      "status": "passed"
+    }
+  ],
+  "countNote": "Suites overlap; do not add these as a unique total.",
+  "browserReceipt": "2026-10-16-tools-pr-browser.json",
+  "fixtureRegression": {
+    "tests": 3,
+    "status": "passed",
+    "command": "node --test scripts/browser-apis-fixture.test.mjs"
+  }
+}

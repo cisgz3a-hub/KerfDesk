@@ -157,6 +157,40 @@ describe('durable autosave with pending worker preparation', () => {
       await service.stop();
     },
   );
+
+  it('retains committed recovery after preparation timeout and lets an explicit queued clear finish', async () => {
+    const { service, repository } = fixture();
+    await expect(
+      service.write({ ...createProject(), notes: 'committed backup' }, 100),
+    ).resolves.toMatchObject({ kind: 'ok' });
+    const previous = await repository.readSlot(STORAGE_KEY);
+    const failure: AutosavePreparation = {
+      kind: 'failed',
+      reason: 'storage-error',
+      error: new Error('Autosave preparation timed out after 60 seconds.'),
+    };
+    const held = holdPreparation();
+    const writing = service.write({ ...createProject(), notes: 'uncommitted changes' }, 200);
+    await held.started;
+    held.finish(failure);
+    await expect(writing).resolves.toEqual(failure);
+    expect(await repository.readSlot(STORAGE_KEY)).toEqual(previous);
+    expect((await service.readLatest()).snapshot?.project.notes).toBe('committed backup');
+
+    const next = holdPreparation();
+    const nextWrite = service.write(createProject(), 300);
+    await next.started;
+    const clearing = service.clearCurrent();
+    next.finish(failure);
+    await expect(nextWrite).resolves.toEqual(failure);
+    await expect(clearing).resolves.toEqual({ kind: 'ok' });
+    expect((await service.readLatest()).snapshot).toBeNull();
+    await expect(
+      service.write({ ...createProject(), notes: 'later retry' }, 400),
+    ).resolves.toMatchObject({ kind: 'ok' });
+    expect((await service.readLatest()).snapshot?.project.notes).toBe('later retry');
+    await service.stop();
+  });
 });
 
 function fixture() {

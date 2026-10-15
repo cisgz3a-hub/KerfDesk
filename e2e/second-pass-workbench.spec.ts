@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { test, expect } from './fixtures/kerfdesk-test';
 import {
   connectAndHome,
@@ -12,7 +13,7 @@ test('keeps second-pass actions reachable with selected-stroke feedback and capp
 }, testInfo) => {
   test.setTimeout(180_000);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await dismissNotifications(page);
   await connectAndHome(page, kerfdesk);

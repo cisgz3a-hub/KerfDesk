@@ -1,19 +1,16 @@
-// The bounded waits the worker-hosted transport's teardown is built from
-// (worker-serial-connection.ts). Each one resolves on its condition or at its
-// deadline and never rejects: a teardown with no deadline wedges Disconnect,
-// and one that throws strands the port.
-
-import { WRITER_CLOSE_TIMEOUT_MS } from './bounded-writer-close';
+// Worker handshakes have a deadline; actual transferred-stream cleanup must
+// retain ownership until both locks are released. The connection separately
+// bounds each caller's wait without claiming that cleanup finished (ADR-600).
 
 type PortStreams = {
   readonly readable: ReadableStream<Uint8Array> | null;
   readonly writable: WritableStream<Uint8Array> | null;
 };
 
-// How often teardown looks again for the port's streams to come free. There is
-// no event for a stream being unlocked, and the drain it waits on is the
-// serial sink sending a few short lines.
-const PORT_RELEASE_POLL_MS = 10;
+// Check normal short drains promptly, then reduce wakeups for a wedged sink.
+// Stream unlock has no event; retain a bounded polling delay until real release.
+const PORT_RELEASE_INITIAL_POLL_MS = 10;
+const PORT_RELEASE_MAX_POLL_MS = 1_000;
 
 /** Run `begin`, then resolve on its callback or on the deadline — whichever
  * comes first. Never rejects: a silent worker is handled by the caller's own
@@ -41,21 +38,15 @@ export async function settleWithin(
 // until then. Closing the port while it is locked fails and leaves the port
 // open; aborting the sink instead discards those bytes, since Chromium
 // implements abort as a transmit-buffer flush (serial_port_underlying_sink.cc).
-// So wait for both of the port's streams to come free, with the deadline the
-// main-thread transport gives its own drain (bounded-writer-close.ts), and let
-// the caller close the port regardless once it passes (audit transport-4).
-export async function portStreamsReleased(
-  port: PortStreams,
-  timeoutMs: number = WRITER_CLOSE_TIMEOUT_MS,
-): Promise<void> {
-  for (
-    let waited = 0;
-    waited < timeoutMs && portStreamLocked(port);
-    waited += PORT_RELEASE_POLL_MS
-  ) {
+// Wait for the actual release. A caller timeout is handled by
+// boundedSerialClose; it must not turn a still-locked port into a new owner.
+export async function portStreamsReleased(port: PortStreams): Promise<void> {
+  let pollMs = PORT_RELEASE_INITIAL_POLL_MS;
+  while (portStreamLocked(port)) {
     await new Promise<void>((resolve) => {
-      setTimeout(resolve, PORT_RELEASE_POLL_MS);
+      setTimeout(resolve, pollMs);
     });
+    pollMs = Math.min(pollMs * 2, PORT_RELEASE_MAX_POLL_MS);
   }
 }
 

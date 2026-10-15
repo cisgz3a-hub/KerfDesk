@@ -1,12 +1,14 @@
 import type { Socket } from 'node:net';
 import { MachineTelnetCodec, encodeMachineTelnet } from './machine-network-telnet.js';
+import type { MachineNetworkProtocol } from './machine-network-protocol.js';
 
 const RX_LIMIT = 512 * 1024;
+const WRITE_QUEUE_LIMIT = 512 * 1024;
 const WRITE_LIMIT = 64 * 1024;
 type ReadResult = { readonly data: string; readonly closed: boolean; readonly error?: string };
 
 export class MachineNetworkSession {
-  private readonly codec = new MachineTelnetCodec();
+  private readonly codec: MachineTelnetCodec | null;
   private readonly chunks: Buffer[] = [];
   private queuedBytes = 0;
   private nextWrite = 1;
@@ -16,7 +18,11 @@ export class MachineNetworkSession {
     readonly resolve: (result: ReadResult) => void;
     readonly timer: ReturnType<typeof setTimeout>;
   } | null = null;
-  constructor(private readonly socket: Socket) {
+  constructor(
+    private readonly socket: Socket,
+    protocol: MachineNetworkProtocol = 'fluidnc-telnet',
+  ) {
+    this.codec = protocol === 'fluidnc-telnet' ? new MachineTelnetCodec() : null;
     socket.setNoDelay(true);
     socket.on('data', (chunk: Buffer) => this.receive(chunk));
     socket.on('error', () =>
@@ -27,8 +33,11 @@ export class MachineNetworkSession {
   private receive(chunk: Buffer): void {
     if (this.closed) return;
     try {
-      const decoded = this.codec.decode(chunk);
-      if (decoded.reply.length > 0) this.socket.write(decoded.reply);
+      const decoded = this.codec?.decode(chunk) ?? { data: chunk, reply: Buffer.alloc(0) };
+      if (decoded.reply.length > 0) {
+        if (!this.canQueue(decoded.reply)) return;
+        this.socket.write(decoded.reply);
+      }
       if (decoded.data.length > 0) {
         this.queuedBytes += decoded.data.length;
         this.chunks.push(decoded.data);
@@ -63,13 +72,13 @@ export class MachineNetworkSession {
       throw new Error('Network write sequence was not accepted.');
     }
     const data = validPayload(encoded);
+    const wireData = this.codec === null ? data : encodeMachineTelnet(data);
     this.nextWrite += 1;
-    if (this.socket.writableLength + data.length > RX_LIMIT) {
-      this.close('Network write queue exceeded its local limit.');
+    if (!this.canQueue(wireData)) {
       throw new Error('Network write queue exceeded its local limit.');
     }
     await new Promise<void>((resolve, reject) => {
-      this.socket.write(encodeMachineTelnet(data), (error?: Error | null) => {
+      this.socket.write(wireData, (error?: Error | null) => {
         if (error != null) {
           this.close('Network write failed; delivery may be uncertain.');
           reject(new Error('Network write failed; delivery may be uncertain.'));
@@ -78,6 +87,11 @@ export class MachineNetworkSession {
         else resolve();
       });
     });
+  }
+  private canQueue(data: Buffer): boolean {
+    if (this.socket.writableLength + data.length <= WRITE_QUEUE_LIMIT) return true;
+    this.close('Network write queue exceeded its local limit.');
+    return false;
   }
   close(error?: string): void {
     if (this.closed) return;

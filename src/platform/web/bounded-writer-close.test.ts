@@ -132,9 +132,37 @@ describe('closeWriterBounded', () => {
       const settled = closeWriterBounded(writer, 1_000);
       await vi.advanceTimersByTimeAsync(1_000);
 
-      await expect(settled).resolves.toBe('aborted');
+      await expect(settled).resolves.toBe('failed');
     } finally {
       vi.useRealTimers();
     }
   });
+});
+
+// Real stream semantics: abort cannot interrupt a sink.close already in flight.
+it('bounds an in-flight close and never reports its pending abort as completed', async () => {
+  vi.useFakeTimers();
+  let drain: () => void = () => undefined;
+  const abort = vi.fn();
+  const stream = new WritableStream<Uint8Array>({
+    close: () =>
+      new Promise<void>((resolve) => {
+        drain = resolve;
+      }),
+    abort,
+  });
+  const writer = stream.getWriter();
+  try {
+    const closing = closeWriterBounded(writer, 100);
+    await vi.advanceTimersByTimeAsync(200);
+    await expect(closing).resolves.toBe('timed-out');
+    expect(abort).not.toHaveBeenCalled();
+    expect(stream.locked).toBe(true);
+    drain();
+    await writer.closed;
+  } finally {
+    drain();
+    writer.releaseLock();
+    vi.useRealTimers();
+  }
 });

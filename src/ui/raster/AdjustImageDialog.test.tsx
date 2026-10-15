@@ -44,6 +44,29 @@ afterEach(() => {
 });
 
 describe('AdjustImageDialog', () => {
+  it('opens with the selected image operation overrides after photo preparation', async () => {
+    const { host, root } = await renderDialog({
+      image: {
+        ...image,
+        operationOverride: {
+          byOperation: {
+            [layer.id]: { ditherAlgorithm: 'jarvis', linesPerMm: 5, minPower: 3, power: 20 },
+          },
+        },
+      },
+    });
+    try {
+      expect(host.querySelector<HTMLSelectElement>('select[name="ditherAlgorithm"]')?.value).toBe(
+        'jarvis',
+      );
+      expect(host.querySelector<HTMLInputElement>('input[name="imageDpi"]')?.value).toBe('127');
+      expect(host.querySelector<HTMLInputElement>('input[name="minPower"]')?.value).toBe('3');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('stages image and layer changes until OK', async () => {
     const onApply = vi.fn();
     const { host, root } = await renderDialog({ onApply });
@@ -310,6 +333,7 @@ describe('AdjustImageDialog', () => {
 });
 
 async function renderDialog(opts: {
+  readonly image?: RasterImage;
   readonly onApply?: Parameters<typeof AdjustImageDialog>[0]['onApply'];
   readonly onCancel?: () => void;
   readonly layer?: typeof layer;
@@ -321,7 +345,7 @@ async function renderDialog(opts: {
     root = createRoot(host);
     root.render(
       <AdjustImageDialog
-        image={image}
+        image={opts.image ?? image}
         layer={opts.layer ?? layer}
         onApply={opts.onApply ?? vi.fn()}
         onCancel={opts.onCancel ?? vi.fn()}
