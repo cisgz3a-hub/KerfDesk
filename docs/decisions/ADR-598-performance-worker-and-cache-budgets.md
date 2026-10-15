@@ -1,4 +1,4 @@
-## ADR-597 — Preserve worker memory bounds while prioritising interaction and reusing work
+## ADR-598 — Preserve worker memory bounds while prioritising interaction and reusing work
 
 **Status:** Implemented; local source, browser and test evidence is recorded in the linked audit. No release or hardware qualification is implied. **Date:** 2026-10-14.
 

@@ -1,6 +1,6 @@
 # Speed fixes and measurements — 14 October 2026
 
-This follows the [original audit](2026-10-14-speed-audit.md), using the same checkout base (`03f1da57737ebc58d7cf4e240be6c2225270c690`) and fixtures. Implementation is local on `codex/performance-audit-20261014`. No deployment, package or hardware qualification is included. [ADR-597](../decisions/ADR-597-performance-worker-and-cache-budgets.md) records the memory and ownership decisions.
+This follows the [original audit](2026-10-14-speed-audit.md), using the same checkout base (`03f1da57737ebc58d7cf4e240be6c2225270c690`) and fixtures. Implementation is local on `codex/performance-audit-20261014`. No deployment, package or hardware qualification is included. [ADR-598](../decisions/ADR-598-performance-worker-and-cache-budgets.md) records the memory and ownership decisions. Historical receipt hashes and captured Git status retain its original ADR-597 name; the decision was renumbered to avoid a concurrent PR collision.
 
 ## Changes
 
