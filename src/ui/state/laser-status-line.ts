@@ -371,7 +371,9 @@ function invalidatedOwnershipPatch(
 ): Partial<LaserState> {
   return {
     controllerOperation:
-      ownedReset || (alarm && state.controllerOperation?.kind === 'recovery')
+      ownedReset ||
+      state.controllerOperation?.kind === 'disconnect' ||
+      (alarm && state.controllerOperation?.kind === 'recovery')
         ? state.controllerOperation
         : null,
     pendingUntrackedAcks: ownedReset ? state.pendingUntrackedAcks : 0,

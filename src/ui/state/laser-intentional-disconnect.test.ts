@@ -1,78 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RT_SOFT_RESET } from '../../core/controllers/grbl';
-import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { DISCONNECT_WRITE_TIMEOUT_MS } from './laser-disconnect-transaction';
 import { RESET_CLEANUP_BANNER_TIMEOUT_MS } from './laser-reset-cleanup';
-import { disconnectSafetyEvents as safetyEvents } from './laser-intentional-disconnect.test-support';
+import {
+  disconnectSafetyEvents as safetyEvents,
+  makeDisconnectTestConnection as makeConnection,
+  disconnectTestAdapter as adapterFor,
+  type DisconnectTestConnection as FakeConnection,
+} from './laser-intentional-disconnect.test-support';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
-import {
-  captureTestLaserStartFenceAck,
-  respondToTestGrblHandshake,
-  startTestLaserJob,
-} from './laser-test-start-helpers';
+import { startTestLaserJob } from './laser-test-start-helpers';
 import { recoveryRepository } from './recovery';
 import { useToastStore } from './toast-store';
 
 const noop = (): void => undefined;
-
-type FakeConnection = SerialConnection & {
-  readonly emitLine: (line: string) => void;
-};
-
-function makeConnection(
-  label: string,
-  events: string[],
-  onWrite?: (data: string, emitLine: (line: string) => void) => void | Promise<void>,
-  onCloseRequest?: () => void | Promise<void>,
-): FakeConnection {
-  const lineHandlers = new Set<(line: string) => void>();
-  const emitLine = (line: string): void => {
-    for (const handler of lineHandlers) handler(line);
-  };
-  return {
-    write: async (data) => {
-      events.push(`${label}:write:${JSON.stringify(data)}`);
-      const acknowledgeFence = captureTestLaserStartFenceAck(data, emitLine);
-      await onWrite?.(data, emitLine);
-      acknowledgeFence();
-      respondToTestGrblHandshake(data, emitLine, 'G0 G54');
-    },
-    onLine: (handler) => {
-      lineHandlers.add(handler);
-      return () => lineHandlers.delete(handler);
-    },
-    onClose: () => () => undefined,
-    close: async () => {
-      events.push(`${label}:close`);
-      await onCloseRequest?.();
-    },
-    forget: async () => {
-      events.push(`${label}:forget`);
-    },
-    emitLine,
-  };
-}
-
-function adapterFor(connection: SerialConnection, events?: string[]): PlatformAdapter {
-  return {
-    id: 'mock',
-    pickFilesForOpen: async () => [],
-    pickFileForSave: async () => null,
-    serial: {
-      isSupported: () => true,
-      requestPort: async () => {
-        events?.push('picker');
-        return {
-          open: async () => {
-            events?.push('open');
-            return connection;
-          },
-        };
-      },
-    },
-  };
-}
 
 async function connectReady(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(adapterFor(connection));
@@ -138,6 +80,34 @@ describe('intentional GRBL connection teardown', () => {
       `old:write:${JSON.stringify('M9\n')}`,
       'old:close',
     ]);
+  });
+
+  it('does not carry suppressed position from an intentionally closed session to a new controller', async () => {
+    const events: string[] = [];
+    const answerReset = (data: string, emitLine: (line: string) => void): void => {
+      if (data === RT_SOFT_RESET) queueMicrotask(() => emitLine('Grbl 1.1f'));
+    };
+    const previous = makeConnection('old', events, answerReset);
+    await connectReady(previous);
+    useLaserStore.setState({ positionEvidenceSuppressed: true });
+    previous.emitLine('<Idle|MPos:10.000,20.000,0.000|WCO:0,0,0|FS:0,0>');
+    expect(useLaserStore.getState().statusReport?.mPos).toBeNull();
+    const previousEpoch = useLaserStore.getState().controllerSessionEpoch;
+
+    await useLaserStore.getState().disconnect();
+    const replacement = makeConnection('new', events, answerReset);
+    await connectReady(replacement);
+    replacement.emitLine('<Idle|MPos:30.000,40.000,0.000|WCO:0,0,0|FS:0,0>');
+
+    const current = useLaserStore.getState();
+    expect(current.controllerSessionEpoch).toBeGreaterThan(previousEpoch);
+    expect(current.positionEvidenceSuppressed).toBe(false);
+    expect(current.statusReport?.mPos).toEqual({ x: 30, y: 40, z: 0 });
+    expect(current.homingState).toBe('unknown');
+    expect(current.homingProof).toBeNull();
+    expect(current.workZZeroEvidence).toBeNull();
+    expect(current.frameVerification).toBeNull();
+    expect(current.framedRun).toBeNull();
   });
 
   it('upgrades a closing Disconnect plus Forget into one full finalization', async () => {

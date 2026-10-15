@@ -3,6 +3,10 @@ import type { JobStartMarkPhase } from './job-start-mark';
 
 export type LaserControllerOperation =
   | {
+      readonly kind: 'disconnect';
+      readonly phase: 'stopping';
+    }
+  | {
       readonly kind: 'job-start-mark';
       readonly phase: JobStartMarkPhase;
     }
@@ -174,6 +178,7 @@ function describeEstablishedControllerOperation(
   > | null,
 ): string {
   if (operation === null) return 'Controller ready';
+  if (operation.kind === 'disconnect') return 'Disconnecting controller';
   if (operation.kind === 'home') {
     return describeHomeOperation(operation.phase);
   }

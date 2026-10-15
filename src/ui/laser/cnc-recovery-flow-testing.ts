@@ -78,7 +78,12 @@ export function configureReadyCncRecovery(project: Project): void {
     ...initialLaserState(),
     connection: { kind: 'connected' },
     statusReport: IDLE_STATUS,
-    controllerSettings: { maxPowerS: 12_000, minPowerS: 0, laserModeEnabled: false },
+    controllerSettings: {
+      maxPowerS: 12_000,
+      minPowerS: 0,
+      laserModeEnabled: false,
+      reportInches: false,
+    },
     controllerQualification: { kind: 'qualified', epoch: 0, settings: 'verified' },
     ovCache: { feed: 100, rapid: 100, spindle: 100 },
     accessoryCache: { spindleCw: false, spindleCcw: false, flood: false, mist: false },

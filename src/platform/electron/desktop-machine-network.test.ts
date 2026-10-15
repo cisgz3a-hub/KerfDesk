@@ -120,3 +120,24 @@ it('closes on oversized terminated lines instead of delivering their tail or a f
   expect(lines).toEqual([]);
   expect(closed).toHaveBeenCalledTimes(1);
 });
+
+it('still closes the native session when a close subscriber throws', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  const request = vi.fn<MachineNetworkRequest>(async (action) =>
+    action === 'open' ? { sessionId: ID } : {},
+  );
+  const serial = await connection(request);
+  const closed = vi.fn();
+  serial.onClose(() => {
+    throw new Error('Broken close observer.');
+  });
+  serial.onClose(closed);
+  try {
+    await expect(serial.close()).resolves.toBeUndefined();
+    expect(request.mock.calls.filter(([action]) => action === 'close')).toHaveLength(1);
+    expect(closed).toHaveBeenCalledTimes(1);
+    await expect(serial.write('G1 X900\n')).rejects.toThrow('closed');
+  } finally {
+    log.mockRestore();
+  }
+});

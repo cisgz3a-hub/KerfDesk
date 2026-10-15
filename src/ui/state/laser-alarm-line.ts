@@ -83,7 +83,10 @@ function alarmOwnershipPatch(
     ...(keepToolChangeHold ? { toolChangeIdleSeen: false } : {}),
     ...(ownedReset ? { statusSequence: state.statusSequence + 1 } : {}),
     controllerOperation:
-      state.controllerOperation?.kind === 'recovery' ? state.controllerOperation : null,
+      state.controllerOperation?.kind === 'recovery' ||
+      state.controllerOperation?.kind === 'disconnect'
+        ? state.controllerOperation
+        : null,
     pendingUntrackedAcks: ownedReset ? state.pendingUntrackedAcks : 0,
     pendingTransportWrites: ownedReset ? (state.pendingTransportWrites ?? 0) : 0,
   };

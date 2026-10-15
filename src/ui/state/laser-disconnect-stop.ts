@@ -14,15 +14,22 @@
 // escaped the flush.
 // https://github.com/Smoothieware/Smoothieware/blob/38e2cc083db0e4f768535a9bf2d32cdf104ea980/src/libs/USBDevice/USBSerial/USBSerial.cpp#L322-L366
 //
-// A live job stream owns every acknowledgement and refills on it, so waiting
-// then would keep feeding the job after Disconnect; that case keeps its
-// immediate close and the unconfirmed-stop notice.
+// A live job still owes its earlier acknowledgements. Freeze refill before
+// sending cleanup, preserve that reply debt, and retain the existing bounded
+// write-attempt/close behavior and unconfirmed-stop notice for an active job.
 
 import { disconnectStopPlan } from './laser-disconnect-safety';
 import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState, LiveRefs } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
+import { pause as pauseStreamer } from '../../core/controllers/grbl';
+import { cancelControllerLifecycleRefs } from './laser-interactive-command';
+import { cancelRawControllerLineWait } from './laser-connection-teardown';
+import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
+import { frameProofReset } from './laser-session-reset';
+import { provisionalResetCanvasPatch } from './laser-reset-terminal-state';
+import { DISCONNECT_WRITE_TIMEOUT_MS } from './laser-reset-ownership';
 import { publishControllerIncident } from './laser-incident-publish';
 import type { TranscriptSource } from './laser-transcript';
 
@@ -54,15 +61,62 @@ export async function stopBeforeDisconnect(
   // ordinary stop commands (laser-disconnect-safety.ts).
   const stopCommands = disconnectStopPlan(get(), refs.driver).commands;
   const softReset = refs.driver.realtime.softReset;
+  freezeDisconnect(set, refs);
+  let firstError: unknown = null;
   for (const stopCommand of stopCommands) {
-    await safeWrite(stopCommand, 'disconnect');
+    if (refs.connection !== connection) break;
+    try {
+      await writeDisconnectCommand(safeWrite, stopCommand);
+    } catch (error) {
+      // A blocked/rejected first write must not prevent attempting the other
+      // tool-off lines or closing the unusable connection.
+      firstError ??= error;
+    }
   }
+  if (firstError !== null) throw firstError;
   // No realtime reset went out, so only the controller parsing these lines
   // stops the output: wait (bounded) for their acknowledgements before the
   // close drops DTR (audit TC-3).
   if (disconnectWaitsForCleanupAcks(get(), stopCommands, softReset)) {
     await waitForDisconnectCleanupAcks(set, get, refs, () => refs.connection === connection);
   }
+}
+
+/** Stop host refill and pending motion before the first transport await. Keep
+ * ACK debt and the nonterminal job until actual closure supplies its cause. */
+function freezeDisconnect(set: SetFn, refs: LiveRefs): void {
+  cancelControllerLifecycleRefs(refs, 'Controller is disconnecting.');
+  refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
+  cancelRawControllerLineWait(refs);
+  set((state) => ({
+    ...invalidateControllerSessionEvidence(state),
+    ...frameProofReset(),
+    ...provisionalResetCanvasPatch(state),
+    streamer: state.streamer === null ? null : pauseStreamer(state.streamer),
+    motionOperation: null,
+    probeBusy: false,
+    pauseResumeTransition: null,
+    controllerOperation: { kind: 'disconnect', phase: 'stopping' },
+  }));
+}
+
+function writeDisconnectCommand(safeWrite: SafeWriteFn, command: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('Serial write timed out during controller disconnect.')),
+      DISCONNECT_WRITE_TIMEOUT_MS,
+    );
+    void safeWrite(command, 'disconnect').then(
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
 }
 
 /** Whether Disconnect should wait for the cleanup lines it just wrote. */

@@ -101,7 +101,7 @@ function confirmReview(capsule: RecoveryCapsule, review: CncPassRecoveryReview):
     return false;
   }
   if (review.position.kind === 'retained-confirmed') {
-    const positionIssue = retainedPositionIssue(capsule, useLaserStore.getState().wcoCache);
+    const positionIssue = liveRetainedPositionIssue(capsule);
     if (positionIssue !== null) {
       jobAwareAlert(`Cannot use retained position:\n\n${positionIssue}`);
       return false;
@@ -194,10 +194,19 @@ function passRecoveryStreamPlan(
 // gate compares. Re-validate against the ARCHIVED offset at the wire boundary
 // so a retained-position recovery never streams against a moved work offset.
 function assertRetainedPositionStillConfirmed(capsule: RecoveryCapsule): void {
-  const issue = retainedPositionIssue(capsule, useLaserStore.getState().wcoCache);
+  const issue = liveRetainedPositionIssue(capsule);
   if (issue !== null) {
     throw new Error(`Retained position is no longer confirmed:\n\n${issue}`);
   }
+}
+
+function liveRetainedPositionIssue(capsule: RecoveryCapsule): string | null {
+  const laser = useLaserStore.getState();
+  return retainedPositionIssue(
+    capsule,
+    laser.wcoCache,
+    laser.reportUnitsUnconfirmed === true ? undefined : laser.controllerSettings?.reportInches,
+  );
 }
 
 function confirmPlan(

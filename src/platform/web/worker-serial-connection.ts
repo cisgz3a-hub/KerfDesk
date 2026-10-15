@@ -289,7 +289,7 @@ function routeResponse(link: Link, message: SerialWorkerResponse): void {
   }
   if (session.closed) return;
   if (message.kind === 'line') {
-    deliverLine(session, message.line);
+    if (!session.closing) deliverLine(session, message.line);
     return;
   }
   if (session.handover?.receive(message)) return;
