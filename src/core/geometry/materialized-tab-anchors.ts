@@ -1,5 +1,8 @@
-import { cncTabAnchorPosition, projectPointToPolyline } from '../cnc/cnc-tab-anchors';
-import type { CncTabAnchor, ColoredPath, SceneObject } from '../scene';
+import {
+  createCncTabAnchorPositionResolver,
+  createTabPolylineProjector,
+} from '../cnc/cnc-tab-anchors';
+import type { CncTabAnchor, ColoredPath, Polyline, SceneObject } from '../scene';
 import type { VectorSceneObject } from './vector-path-tools';
 
 type Position = Pick<CncTabAnchor, 'pathIndex' | 'polylineIndex'>;
@@ -23,15 +26,22 @@ export function materializedTabAnchors(
         : { curves: path.curves.map((curve) => ({ ...curve, closed: true })) }),
     })),
   };
+  const positionForAnchor = createCncTabAnchorPositionResolver(closedSource);
+  const projectors = new Map<Polyline, ReturnType<typeof createTabPolylineProjector>>();
   const remap = <A extends CncTabAnchor>(anchors: ReadonlyArray<A>): ReadonlyArray<A> =>
     anchors.flatMap((anchor) => {
       const position = locate(anchor);
       if (position === undefined) return [];
       const retained = { ...anchor, ...position };
-      const point = cncTabAnchorPosition(closedSource, anchor);
+      const point = positionForAnchor(anchor);
       const line = paths[position.pathIndex]?.polylines[position.polylineIndex];
       if (point === null || line === undefined) return [retained];
-      const projected = projectPointToPolyline({ ...line, closed: true }, point);
+      let project = projectors.get(line);
+      if (project === undefined) {
+        project = createTabPolylineProjector({ ...line, closed: true });
+        projectors.set(line, project);
+      }
+      const projected = project(point);
       return [projected === null ? retained : { ...retained, pathT: projected.pathT }];
     });
   return {

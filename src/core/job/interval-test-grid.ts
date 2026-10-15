@@ -152,15 +152,16 @@ function intervalTestLabelObjects(args: {
 }): ReadonlyArray<ImportedSvg> {
   const intervalLabels = args.cells.map((cell) => {
     const text = formatCalibrationInterval(cell.intervalMm);
+    // Keep every interval digit while fitting the label within its own swatch.
+    const width = calibrationLabelWidthMm(text, args.labelSize);
+    const sizeMm = args.labelSize * Math.min(1, (args.swatchSize * 0.9) / width);
     return createCalibrationLabelObject({
       id: `interval-test-label-${cell.step}`,
       operationId: args.labelLayerId,
       text,
-      x:
-        cell.bounds.minX +
-        centerOffset(args.swatchSize, calibrationLabelWidthMm(text, args.labelSize)),
+      x: cell.bounds.minX + centerOffset(args.swatchSize, calibrationLabelWidthMm(text, sizeMm)),
       y: cell.bounds.maxY + args.labelGap,
-      sizeMm: args.labelSize,
+      sizeMm,
     });
   });
   const text = formatGcodeFeedMmPerMin(args.effectiveSpeed);

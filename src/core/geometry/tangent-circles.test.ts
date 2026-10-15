@@ -153,3 +153,53 @@ describe('tangentCircles', () => {
     }
   });
 });
+
+it.each([1e-6, 1, 1e6])(
+  'keeps nearby physical tangent solutions for every input order at scale %s',
+  (scale) => {
+    const inputs = [
+      { center: { x: -3910 * scale, y: -2143 * scale }, radius: 0.0038 * scale },
+      { center: { x: 1797 * scale, y: 1906 * scale }, radius: 0.1706 * scale },
+      { center: { x: 253 * scale, y: -4083 * scale }, radius: 1.1178 * scale },
+    ] as const;
+    const reference = tangentCircles(...inputs);
+    expect(reference).toHaveLength(8);
+    for (const order of [
+      [0, 1, 2],
+      [0, 2, 1],
+      [1, 0, 2],
+      [1, 2, 0],
+      [2, 0, 1],
+      [2, 1, 0],
+    ] as const) {
+      const circles = [inputs[order[0]], inputs[order[1]], inputs[order[2]]] as const;
+      const solutions = tangentCircles(...circles);
+      expect(solutions).toHaveLength(8);
+      for (const original of reference) {
+        const match = solutions.find(
+          (candidate) =>
+            Math.hypot(
+              candidate.center.x - original.center.x,
+              candidate.center.y - original.center.y,
+            ) <
+              1e-7 * scale && Math.abs(candidate.radius - original.radius) < 1e-7 * scale,
+        );
+        expect(match).toBeDefined();
+        expect(match?.contact).toEqual(order.map((index) => original.contact[index]));
+      }
+      for (const solution of solutions)
+        circles.forEach((circle, index) => {
+          const expected = Math.abs(
+            solution.radius +
+              (solution.contact[index] === 'outside' ? circle.radius : -circle.radius),
+          );
+          expect(
+            Math.abs(
+              Math.hypot(solution.center.x - circle.center.x, solution.center.y - circle.center.y) -
+                expected,
+            ),
+          ).toBeLessThan(1e-7 * scale);
+        });
+    }
+  },
+);

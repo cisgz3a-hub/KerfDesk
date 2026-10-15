@@ -149,7 +149,8 @@ function quadraticRoots(a: number, b: number, c: number): ReadonlyArray<number> 
 }
 
 function sameCircle(p: Circle, q: Circle): boolean {
-  const tol = 1e-6 * Math.max(1, p.radius, q.radius);
+  // Merge numerical copies, not distinct solutions whose contact differs on tiny inputs.
+  const tol = 256 * Number.EPSILON * Math.max(1, p.radius, q.radius);
   return (
     Math.abs(p.radius - q.radius) < tol &&
     Math.abs(p.center.x - q.center.x) < tol &&

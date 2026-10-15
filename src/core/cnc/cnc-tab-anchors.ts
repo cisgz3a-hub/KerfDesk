@@ -74,6 +74,33 @@ export function cncTabAnchorPosition(object: SceneObject, anchor: CncTabAnchor):
   return local === null ? null : applyTransform(local, object.transform);
 }
 
+/** Snapshot-local resolver for batches: flatten each referenced path and measure each contour once. */
+export function createCncTabAnchorPositionResolver(
+  object: SceneObject,
+): (anchor: CncTabAnchor) => Vec2 | null {
+  const paths = new Map<number, ReadonlyArray<PolylineMeasure | null>>();
+  return (anchor) => {
+    if (!('paths' in object)) return null;
+    const path = object.paths[anchor.pathIndex];
+    if (path === undefined || path.color !== anchor.layerColor) return null;
+    let measures = paths.get(anchor.pathIndex);
+    if (measures === undefined) {
+      measures = resolvedPolylines(path).map((line) =>
+        line.closed ? measurePolyline(line) : null,
+      );
+      paths.set(anchor.pathIndex, measures);
+    }
+    const local = pointAtMeasuredFraction(measures[anchor.polylineIndex] ?? null, anchor.pathT);
+    return local === null ? null : applyTransform(local, object.transform);
+  };
+}
+
+/** Reuse one contour measure while projecting a batch of physical tab positions. */
+export function createTabPolylineProjector(polyline: Polyline): (point: Vec2) => Projection | null {
+  const measure = measurePolyline(polyline);
+  return (point) => projectPointToMeasuredPolyline(measure, point);
+}
+
 /** Replace saved positions only on the caller's eligible paths. Unanchored
  * contours remain automatic; opening the editor still uses keep-existing seeding. */
 export function redistributeCncTabAnchors(
@@ -276,7 +303,10 @@ function projectPointToMeasuredPolyline(
 }
 
 function pointAtFraction(polyline: Polyline, fraction: number): Vec2 | null {
-  const measure = measurePolyline(polyline);
+  return pointAtMeasuredFraction(measurePolyline(polyline), fraction);
+}
+
+function pointAtMeasuredFraction(measure: PolylineMeasure | null, fraction: number): Vec2 | null {
   if (measure === null) return null;
   const target = Math.max(0, Math.min(1, fraction)) * measure.total;
   for (const edge of measure.edges) {
