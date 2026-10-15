@@ -8,6 +8,10 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import asar from '@electron/asar';
+import {
+  verifyObservationOwner,
+  assertSameObservationOwner,
+} from './packaged-observation-owner.mjs';
 import { chromium } from '@playwright/test';
 import {
   NATIVE_CANVAS_OBSERVER_SOURCE,
@@ -139,6 +143,7 @@ export async function runProbe(options) {
   const expectedPid = Number(options['expected-pid']);
   if (!Number.isSafeInteger(expectedPid) || expectedPid <= 0)
     throw new Error('--expected-pid is required and must be a positive integer');
+  const owner = await verifyObservationOwner(options);
   const endpoint = validateEndpoint(options.endpoint);
   if (!isAbsolute(options.executable) || !isAbsolute(options.output))
     throw new Error('Executable and output paths must be absolute');
@@ -168,6 +173,8 @@ export async function runProbe(options) {
     const page = matches[0];
     page.setDefaultTimeout(15_000);
     receipt.runtime = await runtimeEvidence(page);
+    assertSameObservationOwner(owner, await verifyObservationOwner(options));
+    receipt.observationOwner = owner;
     if (options.mode === 'install') {
       receipt.installation = await page.evaluate(NATIVE_CANVAS_OBSERVER_SOURCE);
       receipt.renderer = await snapshot(page);
@@ -178,6 +185,7 @@ export async function runProbe(options) {
     } else {
       receipt.renderer = await snapshot(page);
     }
+    assertSameObservationOwner(owner, await verifyObservationOwner(options));
     const name = new Date().toISOString().replaceAll(':', '-') + '-' + options.mode;
     await mkdir(options.output, { recursive: true });
     if (options.mode === 'pan' || options.mode === 'snapshot') {
@@ -203,12 +211,14 @@ async function main() {
       executable: { type: 'string' },
       output: { type: 'string' },
       'expected-pid': { type: 'string' },
+      'expected-profile': { type: 'string' },
+      'isolation-root': { type: 'string' },
       help: { type: 'boolean' },
     },
   });
   if (values.help) {
     console.log(
-      'Usage: node scripts/performance-audit/packaged-trace-navigation.mjs --mode=install|snapshot|reset|pan --endpoint=http://127.0.0.1:PORT --executable=ABSOLUTE_EXE --output=ABSOLUTE_DIRECTORY --expected-pid=PID',
+      'Usage: node scripts/performance-audit/packaged-trace-navigation.mjs --mode=install|snapshot|reset|pan --endpoint=http://127.0.0.1:PORT --executable=ABSOLUTE_EXE --output=ABSOLUTE_DIRECTORY --expected-pid=PID --expected-profile=ABSOLUTE_PROFILE --isolation-root=ABSOLUTE_EVIDENCE_ROOT',
     );
     return;
   }
@@ -217,10 +227,12 @@ async function main() {
     !values.endpoint ||
     !values.executable ||
     !values.output ||
-    !values['expected-pid']
+    !values['expected-pid'] ||
+    !values['expected-profile'] ||
+    !values['isolation-root']
   )
     throw new Error(
-      'Specify --mode, --endpoint, --executable, --output and --expected-pid; use --help',
+      'Specify --mode, --endpoint, --executable, --output, --expected-pid, --expected-profile and --isolation-root; use --help',
     );
   const result = await runProbe(values);
   console.log(

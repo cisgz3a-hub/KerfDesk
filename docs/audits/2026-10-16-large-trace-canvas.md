@@ -244,7 +244,7 @@ PID and loopback CDP port. Commercial packages refuse this path. The helper
 verifies PID, packaged origin and Free channel, and creates no new browser tabs.
 
 ```powershell
-node scripts/performance-audit/packaged-trace-navigation.mjs --mode=install --endpoint=http://127.0.0.1:PORT --expected-pid=PID --executable=ABSOLUTE_EXE --output=ABSOLUTE_DIRECTORY
+node scripts/performance-audit/packaged-trace-navigation.mjs --mode=install --endpoint=http://127.0.0.1:PORT --expected-pid=PID --executable=ABSOLUTE_EXE --output=ABSOLUTE_DIRECTORY --expected-profile=ABSOLUTE_PROFILE --isolation-root=ABSOLUTE_EVIDENCE_ROOT
 ```
 
 Use `reset` immediately before a Windows gesture and `snapshot` afterward.
@@ -254,3 +254,21 @@ The helper disconnects without closing the app. The final observer filters
 queued long tasks predating reset; the recorded native run used the earlier
 observer before that hardening, with long idle gaps before resets. Preserve that
 measurement-version distinction when comparing future runs.
+
+### Diagnostic ownership hardening after the recorded run
+
+The follow-up helper now requires `--expected-profile=ABSOLUTE_PROFILE` and
+`--isolation-root=ABSOLUTE_EVIDENCE_ROOT`. It accepts only a separately launched
+Windows Free interactive observation package using the existing
+`--kerfdesk-native-smoke-interactive`, `--kerfdesk-native-smoke-user-data=...`
+and `--kerfdesk-native-smoke-result=...` options. Quote the entire argument when
+its value contains spaces. The profile and native result must already exist
+inside the explicit isolated evidence directory, outside ordinary roaming app
+data. The helper checks canonical paths (including junction targets), the OS
+process executable/start time/command line, the current launch's native
+userData/sessionData receipt and the CDP browser PID before instrumentation.
+It rechecks ownership before acting and before accepting a result.
+
+The native measurements above used the earlier helper, not this strengthened
+ownership guard. These new guard tests are source-level qualification; they do
+not retrospectively qualify the earlier run or the user's installed desktop.
