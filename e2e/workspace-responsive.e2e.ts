@@ -62,22 +62,59 @@ for (const viewport of viewports) {
   });
 }
 
-test('toolbar keeps Studio and utilities reachable with offline and install indicators', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 540, height: 720 });
-  await page.goto('/');
-  const toolbar = page.getByRole('banner', { name: 'Toolbar' });
-  await expect(toolbar.getByRole('button', { name: 'Open Design Studio' })).toBeVisible();
-  await page.context().setOffline(true);
-  await expect(toolbar.getByRole('status')).toHaveText('Offline');
-  await page.evaluate(() => window.dispatchEvent(new Event('beforeinstallprompt')));
-  await expect(toolbar.getByRole('button', { name: 'Install app', exact: true })).toBeVisible();
-  for (const button of await toolbar.locator('button:visible').all()) {
-    await expectWithinViewport(page, button);
-  }
-  await expectNoPageOverflow(page);
-});
+for (const theme of ['light', 'dark'] as const) {
+  test(`toolbar keeps optional controls reachable across compact widths in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await useThemePreference(page, theme);
+    await page.setViewportSize({ width: 640, height: 450 });
+    await page.goto('/');
+    await expect(page.locator('#app-splash')).toHaveCount(0);
+    const toolbar = page.getByRole('banner', { name: 'Toolbar' });
+    await expect(toolbar.getByRole('button', { name: 'Open Design Studio' })).toBeVisible();
+    await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
+    const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
+    expect((await canvas.boundingBox())?.height ?? 0).toBeGreaterThan(200);
+    await page.context().setOffline(true);
+    await expect(toolbar.getByRole('status')).toHaveText('Offline');
+    await page.evaluate(() => window.dispatchEvent(new Event('beforeinstallprompt')));
+    await expect(toolbar.getByRole('button', { name: 'Install app', exact: true })).toBeVisible();
+    for (const wideFont of [false, true]) {
+      await toolbar.evaluate((element, wide) => {
+        element.style.fontFamily = wide ? 'monospace' : '';
+      }, wideFont);
+      for (const width of [650, 640, 620, 601, 540]) {
+        await page.setViewportSize({ width, height: 720 });
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+            ),
+        );
+        for (const button of await toolbar.locator('button:visible').all()) {
+          await expectWithinViewport(page, button);
+          const size = await button.evaluate((element) => ({
+            width: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+          }));
+          expect(size.scrollWidth).toBeLessThanOrEqual(size.width + 1);
+        }
+        await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
+        await expectWithinViewport(page, toolbar.getByRole('status'));
+        await expectNoPageOverflow(page);
+        if (wideFont && width === 640) {
+          await page.screenshot({ path: testInfo.outputPath(`toolbar-optional-${theme}.png`) });
+        }
+      }
+    }
+    const layout = toolbar.getByRole('button', { name: 'Workspace layout', exact: true });
+    await layout.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menu', { name: 'Workspace layout options' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(layout).toBeFocused();
+  });
+}
 
 test('machine connection remains reachable when its sidebar is collapsed', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 668 });
