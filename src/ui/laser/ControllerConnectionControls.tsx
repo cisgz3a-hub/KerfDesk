@@ -17,7 +17,7 @@ import { LaserModuleRow } from './LaserModuleRow';
 import { DeviceSetupControls } from './device-setup';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
-import { FluidNcNetworkConnect } from './FluidNcNetworkConnect';
+import { MachineNetworkConnect } from './MachineNetworkConnect';
 
 type Props = {
   readonly machineKind: MachineKind;
@@ -110,7 +110,7 @@ function MachineDetailsContent(): JSX.Element {
   return (
     <>
       <LaserModuleRow />
-      <FluidNcNetworkConnect />
+      <MachineNetworkConnect />
     </>
   );
 }

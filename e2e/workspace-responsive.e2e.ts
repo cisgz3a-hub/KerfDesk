@@ -1,6 +1,6 @@
 import { toolbarCommand } from './fixtures/workspace-ui';
 import { test, expect, type Locator, type Page } from './fixtures/kerfdesk-test';
-import type { PlatformAdapter } from '../src/platform/types';
+import type { MachineNetworkProtocol, PlatformAdapter } from '../src/platform/types';
 import type { AppState } from '../src/ui/state';
 
 const viewports = [
@@ -11,6 +11,17 @@ const viewports = [
   { width: 1024, height: 600, layout: 'compact' },
   { width: 1536, height: 650, layout: 'compact' },
 ] as const;
+const networkControllers = [
+  { kind: 'fluidnc', label: 'FluidNC' },
+  { kind: 'grblhal', label: 'grblHAL' },
+] as const;
+
+type NetworkController = (typeof networkControllers)[number];
+interface NetworkTarget {
+  host: string;
+  port: number;
+  protocol: MachineNetworkProtocol;
+}
 
 for (const viewport of viewports) {
   test(`workspace fits ${viewport.width}x${viewport.height} without browser zoom`, async ({
@@ -203,68 +214,97 @@ test('machine connection remains reachable when its sidebar is collapsed', async
   await expect(page.getByRole('dialog', { name: 'Machine Setup', exact: true })).toBeVisible();
 });
 
-test('expanded FluidNC form stays in machine details without consuming workspace height', async ({
-  page,
-  kerfdesk,
-}) => {
-  await page.setViewportSize({ width: 1280, height: 620 });
-  await page.goto('/');
-  await enableMockFluidNcNetwork(page);
-  const toolbar = page.getByRole('region', { name: 'Machine toolbar' });
-  const dock = page.getByRole('region', { name: 'Job actions' });
-  const toolbarBefore = await toolbar.boundingBox();
-  const dockBefore = await dock.boundingBox();
-  expect(await toolbar.locator('summary').count()).toBe(0);
-  const trigger = toolbar.getByRole('button', { name: /^Machine details:/ });
-  await trigger.click();
-  const popup = page.getByRole('dialog', { name: 'Machine details', exact: true });
-  await popup
-    .locator('summary')
-    .filter({ hasText: /^FluidNC network connection$/ })
-    .click();
-  const address = popup.getByRole('textbox', { name: 'FluidNC machine IP or hostname' });
-  const port = popup.getByRole('spinbutton', { name: 'FluidNC Telnet port' });
-  await address.fill('192.0.2.1');
-  await address.press('Tab');
-  await expect(port).toBeFocused();
-  await port.fill('23456');
-  await port.press('Tab');
-  const connect = popup.getByRole('button', { name: 'Connect FluidNC network', exact: true });
-  await expect(connect).toBeFocused();
-  await expect(connect).toBeEnabled();
-  await expectWithinViewport(page, popup);
-  await expectWithinViewport(page, connect);
-  expect(await toolbar.boundingBox()).toEqual(toolbarBefore);
-  expect(await dock.boundingBox()).toEqual(dockBefore);
-  await expectWithinViewport(page, dock);
-  await page.keyboard.press('Escape');
-  await expect(trigger).toBeFocused();
-  expect((await kerfdesk.events()).filter((event) => event.kind === 'serial-write')).toEqual([]);
-});
+for (const controller of networkControllers) {
+  test(`expanded ${controller.label} form stays in machine details without consuming workspace height`, async ({
+    page,
+    kerfdesk,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 620 });
+    await page.goto('/');
+    await enableMockNetwork(page, controller);
+    const toolbar = page.getByRole('region', { name: 'Machine toolbar' });
+    const dock = page.getByRole('region', { name: 'Job actions' });
+    const toolbarBefore = await toolbar.boundingBox();
+    const dockBefore = await dock.boundingBox();
+    expect(await toolbar.locator('summary').count()).toBe(0);
+    const trigger = toolbar.getByRole('button', { name: /^Machine details:/ });
+    await trigger.focus();
+    await trigger.press('Enter');
+    const popup = page.getByRole('dialog', { name: 'Machine details', exact: true });
+    const summary = popup
+      .locator('summary')
+      .filter({ hasText: new RegExp(`^${controller.label} network connection$`) });
+    await summary.focus();
+    await summary.press('Enter');
+    const address = popup.getByRole('textbox', {
+      name: `${controller.label} machine IP or hostname`,
+    });
+    const port = popup.getByRole('spinbutton', { name: `${controller.label} Telnet port` });
+    await address.fill('192.0.2.1');
+    await address.press('Tab');
+    await expect(port).toBeFocused();
+    await port.fill('23456');
+    await port.press('Tab');
+    const connect = popup.getByRole('button', {
+      name: `Connect ${controller.label} network`,
+      exact: true,
+    });
+    await expect(connect).toBeFocused();
+    await expect(connect).toBeEnabled();
+    await expectWithinViewport(page, popup);
+    await expectWithinViewport(page, connect);
+    expect(await toolbar.boundingBox()).toEqual(toolbarBefore);
+    expect(await dock.boundingBox()).toEqual(dockBefore);
+    await expectWithinViewport(page, dock);
+    await page.screenshot({ path: test.info().outputPath('network-connection.png') });
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+    expect(
+      await page.evaluate(
+        () =>
+          (window as typeof window & { __WORKSPACE_NETWORK_TARGETS__: NetworkTarget[] })
+            .__WORKSPACE_NETWORK_TARGETS__,
+      ),
+    ).toEqual([]);
+    expect((await kerfdesk.events()).filter((event) => event.kind === 'serial-write')).toEqual([]);
+  });
+}
 
-async function enableMockFluidNcNetwork(page: Page): Promise<void> {
+async function enableMockNetwork(page: Page, controller: NetworkController): Promise<void> {
   await page.getByRole('region', { name: 'Machine toolbar' }).waitFor();
-  await page.evaluate(async () => {
+  await page.evaluate(async ({ kind, label }) => {
     const adapterUrl = '/src/platform/web/index.ts';
     const stateUrl = '/src/ui/state/index.ts';
     const { webAdapter } = (await import(adapterUrl)) as { webAdapter: PlatformAdapter };
     const { useStore } = (await import(stateUrl)) as { useStore: { getState: () => AppState } };
+    const targets: NetworkTarget[] = [];
+    Object.defineProperty(window, '__WORKSPACE_NETWORK_TARGETS__', {
+      configurable: true,
+      value: targets,
+    });
     Object.defineProperty(webAdapter, 'machineNetwork', {
       configurable: true,
       value: {
-        serialForTarget: () => {
-          throw new Error('Layout regression must not open a network channel');
+        serialForTarget: (host: string, port: number, protocol: MachineNetworkProtocol) => {
+          targets.push({ host, port, protocol });
+          return {
+            transport: 'tcp' as const,
+            isSupported: () => true,
+            requestPort: async () => {
+              throw new Error('Layout regression must not open a network channel');
+            },
+          };
         },
       },
     });
     const device = {
       ...useStore.getState().project.device,
-      name: 'FluidNC layout fixture',
-      controllerKind: 'fluidnc' as const,
+      name: `${label} layout fixture`,
+      controllerKind: kind,
     };
     delete device.controllerCommandSet;
     useStore.getState().replaceDeviceProfile(device);
-  });
+  }, controller);
 }
 
 test('layout preference survives reload, constrains narrow windows and resets from Window menu', async ({

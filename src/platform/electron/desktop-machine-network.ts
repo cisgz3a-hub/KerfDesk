@@ -7,13 +7,14 @@ export function createDesktopMachineNetwork(
   request: MachineNetworkRequest = machineNetworkRequest(),
 ): MachineNetworkAdapter {
   return {
-    serialForTarget: (host, port) => ({
+    serialForTarget: (host, port, protocol = 'fluidnc-telnet') => ({
+      transport: 'tcp',
       isSupported: () => true,
       picksEndOnRestart: true,
       requestPort: async () => ({
         info: { transport: 'tcp' },
         open: async () => {
-          const result = await request('open', { host, port, protocol: 'fluidnc-telnet' });
+          const result = await request('open', { host, port, protocol });
           const id = result['sessionId'];
           if (typeof id !== 'string' || !/^[a-f0-9-]{36}$/.test(id))
             throw new Error('Invalid desktop network session.');

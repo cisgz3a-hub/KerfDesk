@@ -87,9 +87,9 @@ export function connectionActions(
 ): Pick<LaserState, 'connect' | 'disconnect' | 'forgetDevice'> {
   return {
     connect: (adapter, options = {}) => {
-      clearCncLiveCaps();
       return runConnectAction(
         set,
+        get,
         refs,
         adapter,
         options,
@@ -106,6 +106,7 @@ export function connectionActions(
       return runDisconnect(set, get, refs, safeWrite, false);
     },
     forgetDevice: () => {
+      set({ lastConnectionTransport: null });
       clearCncLiveCaps();
       // Forget means pick again next time, so the next Connect asks (ADR-420).
       forgetRememberedSerialPort(browserLocalStorage());

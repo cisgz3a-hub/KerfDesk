@@ -323,9 +323,16 @@ export type SerialPortIdentity = {
   readonly transport?: 'serial' | 'tcp';
 };
 
+export type MachineNetworkProtocol = 'fluidnc-telnet' | 'grblhal-raw';
+
 export type MachineNetworkAdapter = {
-  /** Explicit operator-entered FluidNC Telnet target; no discovery or automatic reconnect. */
-  readonly serialForTarget: (host: string, port: number) => SerialAdapter;
+  /** Explicit controller channel; Wi-Fi and Ethernet use the same protocol.
+   * Omitted protocol retains the original FluidNC contract. No discovery or auto-reconnect. */
+  readonly serialForTarget: (
+    host: string,
+    port: number,
+    protocol?: MachineNetworkProtocol,
+  ) => SerialAdapter;
 };
 
 export type SerialPortRef = {
@@ -339,6 +346,8 @@ export type SerialPortRef = {
 };
 
 export type SerialAdapter = {
+  /** Network adapters identify their route before opening; omitted means serial. */
+  readonly transport?: 'serial' | 'tcp';
   // True when the underlying platform exposes a Serial API (Chromium-based
   // browsers / Electron with the right flags). UI gates Phase B features
   // behind this.

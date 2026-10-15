@@ -98,7 +98,7 @@ function ControllerContract(props: {
           ))}
         </select>
         <span style={mutedInlineStyle}>
-          {props.networkTarget === undefined ? guide.transportLabel : 'FluidNC TCP'}
+          {props.networkTarget === undefined ? guide.transportLabel : 'Wi-Fi / Ethernet (TCP)'}
         </span>
       </Row>
       {props.networkTarget === undefined && driver.capabilities.transport === 'serial' ? (
