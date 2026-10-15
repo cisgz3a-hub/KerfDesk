@@ -2,13 +2,13 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { dropCollinearPoints } from '../geometry/drop-collinear-points';
 import { buildOffsetLadder } from '../geometry/offset-ladder';
-import { pointInPolygon } from '../geometry/point-in-polygon';
 import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import type { CncPass, CncPath3dPass } from '../job';
 import type { CncTool, Polyline, Vec2 } from '../scene';
 import type { Heightmap } from './heightmap';
 import { reliefRoughingLadder } from './relief-roughing';
 import { chainLoops } from './relief-roughing-chain.test-support';
+import { inRegion } from './relief-roughing-region.test-support';
 import { reliefRoughingMotion, type ReliefRoughingLevelPaths } from './relief-roughing-motion';
 
 // ADR-424: relief roughing cuts each piece inside out, links its loops at
@@ -55,39 +55,7 @@ function areaOf(loop: ReadonlyArray<Vec2>): number {
   return signedAreaMm2(loop.slice(0, -1));
 }
 
-function inRegion(point: Vec2, region: ReadonlyArray<Polyline>): boolean {
-  // The proven tool-centre region is closed. Interpolation can round an
-  // interior link sample onto a vertex, which the strict ray cast excludes.
-  // Admit only exact boundary points; do not add an outside-distance allowance.
-  if (region.some((contour) => onBoundary(point, contour.points))) return true;
-  return region.filter((contour) => pointInPolygon(point, contour.points)).length % 2 === 1;
-}
-
-function onBoundary(point: Vec2, points: ReadonlyArray<Vec2>): boolean {
-  return points.some((a, index) => {
-    const b = points[(index + 1) % points.length];
-    if (b === undefined) return false;
-    const cross = (point.x - a.x) * (b.y - a.y) - (point.y - a.y) * (b.x - a.x);
-    return (
-      cross === 0 &&
-      point.x >= Math.min(a.x, b.x) &&
-      point.x <= Math.max(a.x, b.x) &&
-      point.y >= Math.min(a.y, b.y) &&
-      point.y <= Math.max(a.y, b.y)
-    );
-  });
-}
-
 describe('reliefRoughingMotion', () => {
-  it('admits exact link-region boundaries without admitting adjacent excluded points', () => {
-    const region = [rect(0, 0, 30, 30), rect(10, 10, 20, 20)];
-    expect(inRegion({ x: 10, y: 10 }, region)).toBe(true);
-    expect(inRegion({ x: 10, y: 15 }, region)).toBe(true);
-    expect(inRegion({ x: 10 + 1e-8, y: 15 }, region)).toBe(false);
-    expect(inRegion({ x: -1e-8, y: 15 }, region)).toBe(false);
-    expect(inRegion({ x: 15, y: 15 }, region)).toBe(false);
-  });
-
   it('cuts a square level inside out in one chain, every loop closed', () => {
     const square = level([rect(0, 0, 20, 20)]);
     const passes = reliefRoughingMotion([square], { stockOnRight: true, cutWidthMm: CUT_WIDTH_MM });
@@ -219,81 +187,89 @@ describe('reliefRoughingMotion', () => {
     ).toHaveLength(2);
   });
 
-  it('never leaves the link region between loops, on random reliefs', () => {
-    const tool: CncTool = { id: 'em', name: 'end mill', kind: 'end-mill', diameterMm: 3.175 };
-    fc.assert(
-      fc.property(
-        fc.array(
-          fc.record({
-            x: fc.double({ min: 2, max: 28, noNaN: true }),
-            y: fc.double({ min: 2, max: 28, noNaN: true }),
-            r: fc.double({ min: 2, max: 8, noNaN: true }),
-            h: fc.double({ min: 1, max: 5, noNaN: true }),
-          }),
-          { minLength: 1, maxLength: 4 },
-        ),
-        fc.integer({ min: 20, max: 90 }),
-        (bumps, stepoverPercent) => {
-          const ladder = reliefRoughingLadder(bumpMap(bumps), {
-            tool,
-            reliefDepthMm: 5,
-            depthPerPassMm: 2.5,
-            stepoverPercent,
-            fineStepMm: 0.8,
-          });
-          const passes = reliefRoughingMotion(ladder.levels, {
-            stockOnRight: true,
-            cutWidthMm: ladder.cutWidthMm,
-          });
-          for (const pass of passes) {
-            if (pass.kind !== 'contour') continue;
-            const region = ladder.levels.find((l) => l.zMm === pass.zMm)?.linkRegion ?? [];
-            for (const move of linkMoves(pass.polyline)) {
-              for (const t of [0.25, 0.5, 0.75]) {
-                const point = {
-                  x: move.from.x + t * (move.to.x - move.from.x),
-                  y: move.from.y + t * (move.to.y - move.from.y),
-                };
-                expect(inRegion(point, region)).toBe(true);
+  it.each([
+    { label: 'random reliefs', seed: undefined },
+    { label: 'regression seed -1505390208', seed: -1505390208 },
+  ])(
+    'never leaves the link region between loops, on $label',
+    ({ seed }) => {
+      const tool: CncTool = { id: 'em', name: 'end mill', kind: 'end-mill', diameterMm: 3.175 };
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.record({
+              x: fc.double({ min: 2, max: 28, noNaN: true }),
+              y: fc.double({ min: 2, max: 28, noNaN: true }),
+              r: fc.double({ min: 2, max: 8, noNaN: true }),
+              h: fc.double({ min: 1, max: 5, noNaN: true }),
+            }),
+            { minLength: 1, maxLength: 4 },
+          ),
+          fc.integer({ min: 20, max: 90 }),
+          (bumps, stepoverPercent) => {
+            const ladder = reliefRoughingLadder(bumpMap(bumps), {
+              tool,
+              reliefDepthMm: 5,
+              depthPerPassMm: 2.5,
+              stepoverPercent,
+              fineStepMm: 0.8,
+            });
+            const passes = reliefRoughingMotion(ladder.levels, {
+              stockOnRight: true,
+              cutWidthMm: ladder.cutWidthMm,
+            });
+            for (const pass of passes) {
+              if (pass.kind !== 'contour') continue;
+              const region = ladder.levels.find((l) => l.zMm === pass.zMm)?.linkRegion ?? [];
+              for (const move of linkMoves(pass.polyline)) {
+                for (const t of [0.25, 0.5, 0.75]) {
+                  const point = {
+                    x: move.from.x + t * (move.to.x - move.from.x),
+                    y: move.from.y + t * (move.to.y - move.from.y),
+                  };
+                  expect(inRegion(point, region)).toBe(true);
+                }
               }
             }
-          }
-        },
-      ),
-      {
-        // fast-check counts the pinned example, leaving all 25 generated cases.
-        numRuns: 26,
-        // Report the first counterexample promptly. Synchronous shrinking
-        // cannot be preempted by Vitest's timeout and can hide the failure.
-        endOnFailure: true,
-        examples: [
-          [
+          },
+        ),
+        {
+          // fast-check counts the pinned example, leaving all 25 generated cases.
+          numRuns: 26,
+          ...(seed === undefined ? {} : { seed }),
+          // Report the first counterexample promptly. Synchronous shrinking
+          // cannot be preempted by Vitest's timeout and can hide the failure.
+          endOnFailure: true,
+          examples: [
             [
-              {
-                x: 11.931749529863234,
-                y: 15.638928308827584,
-                r: 3.638261627567463,
-                h: 3.6128908499437324,
-              },
-              {
-                x: 2.0000000000000226,
-                y: 10.37012106297951,
-                r: 2.6837658447448702,
-                h: 1.2073630633385264,
-              },
-              {
-                x: 14.987734028055497,
-                y: 2.0567843913481525,
-                r: 4.4975612810870995,
-                h: 2.105861984062804,
-              },
+              [
+                {
+                  x: 11.931749529863234,
+                  y: 15.638928308827584,
+                  r: 3.638261627567463,
+                  h: 3.6128908499437324,
+                },
+                {
+                  x: 2.0000000000000226,
+                  y: 10.37012106297951,
+                  r: 2.6837658447448702,
+                  h: 1.2073630633385264,
+                },
+                {
+                  x: 14.987734028055497,
+                  y: 2.0567843913481525,
+                  r: 4.4975612810870995,
+                  h: 2.105861984062804,
+                },
+              ],
+              78,
             ],
-            78,
           ],
-        ],
-      },
-    );
-  }, 30_000);
+        },
+      );
+    },
+    30_000,
+  );
 
   it('ramps down along the first loop from the level above', () => {
     const square = level([rect(0, 0, 20, 20)], -1.5, -0.5);
