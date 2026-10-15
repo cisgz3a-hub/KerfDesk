@@ -3,7 +3,7 @@ import { canvasTheme } from '../theme/canvas-theme';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
 import { drawPathNodeHandles } from './draw-path-node-handles';
 import { type Handle, HANDLE_SCREEN_PX, handlesFor, selectionFrameFor } from './handles';
-import { ROTATE_HANDLE_OFFSET_MM, rotateHandlePosition } from './rotate-handle';
+import { ROTATE_HANDLE_OFFSET_PX, rotateHandlePosition } from './rotate-handle';
 import { aabbHandlePoints } from './selection-handles';
 import { drawSelectionMoveHandle } from './draw-selection-move-handle';
 import { selectionMoveHandlePosition } from './selection-move-handle';
@@ -51,7 +51,7 @@ export function drawSelectionSetOverlay(
   ctx.setLineDash([4, 3]);
   strokeSelectionFrame(ctx, selectionFrameForAabb(bbox), view);
   ctx.setLineDash([]);
-  drawRotateHandleAt(ctx, rotateHandlePositionForAabb(bbox), bbox.minY, view);
+  drawRotateHandleAt(ctx, rotateHandlePositionForAabb(bbox, view), bbox.minY, view);
   // Scale handles on the combined box so the whole selection can be resized by
   // handle, not only via the numeric W/H fields (audit C5).
   ctx.fillStyle = canvasTheme.selectionHandleFill;
@@ -140,8 +140,8 @@ function drawRotateHandle(
   obj: SceneObject,
   view: ViewTransform,
 ): void {
-  const pos = rotateHandlePosition(obj);
-  drawRotateHandleAt(ctx, pos, pos.y + ROTATE_HANDLE_OFFSET_MM, view);
+  const pos = rotateHandlePosition(obj, 1 / view.scale);
+  drawRotateHandleAt(ctx, pos, pos.y + ROTATE_HANDLE_OFFSET_PX / view.scale, view);
 }
 
 function drawRotateHandleAt(
@@ -183,9 +183,12 @@ function selectionFrameForAabb(
   ];
 }
 
-function rotateHandlePositionForAabb(bbox: AABB): { readonly x: number; readonly y: number } {
+function rotateHandlePositionForAabb(
+  bbox: AABB,
+  view: ViewTransform,
+): { readonly x: number; readonly y: number } {
   return {
     x: (bbox.minX + bbox.maxX) / 2,
-    y: bbox.minY - ROTATE_HANDLE_OFFSET_MM,
+    y: bbox.minY - ROTATE_HANDLE_OFFSET_PX / view.scale,
   };
 }

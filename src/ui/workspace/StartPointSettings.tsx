@@ -19,15 +19,7 @@ export function StartPointSettings(props: {
   const defaultsReason = defaultSaveReason(props.context);
   return (
     <div className="lf-start-settings lf-chip">
-      <button
-        type="button"
-        className="lf-btn lf-btn--ghost"
-        aria-expanded={open}
-        title="Choose automatic starts or save defaults for new jobs."
-        onClick={() => setOpen(!open)}
-      >
-        Start points
-      </button>
+      <StartPointSettingsHeading open={open} setOpen={setOpen} />
       {open && (
         <div className="lf-start-settings-panel" role="group" aria-label="Start point settings">
           <p>Drag the handles to choose starts. Selections are saved with this project.</p>
@@ -77,6 +69,44 @@ export function StartPointSettings(props: {
           <small>Defaults remember a relative position for differently sized artwork.</small>
           <span role="status">{message}</span>
         </div>
+      )}
+    </div>
+  );
+}
+
+function StartPointSettingsHeading({
+  open,
+  setOpen,
+}: {
+  readonly open: boolean;
+  readonly setOpen: (open: boolean) => void;
+}): JSX.Element {
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  return (
+    <div className="lf-start-settings-heading">
+      <button
+        ref={toggleRef}
+        type="button"
+        className="lf-btn lf-btn--ghost"
+        aria-expanded={open}
+        title="Choose automatic starts or save defaults for new jobs."
+        onClick={() => setOpen(!open)}
+      >
+        Start points
+      </button>
+      {open && (
+        <button
+          type="button"
+          className="lf-btn lf-btn--ghost lf-start-settings-close"
+          aria-label="Close start point settings"
+          title="Close start point settings"
+          onClick={() => {
+            setOpen(false);
+            toggleRef.current?.focus();
+          }}
+        >
+          <span aria-hidden="true">×</span>
+        </button>
       )}
     </div>
   );

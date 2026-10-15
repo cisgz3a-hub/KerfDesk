@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { applyTransform, IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
 import {
   hitRotateHandle,
+  hitSelectionRotateHandle,
+  selectionRotateHandlePosition,
   objectRotateAnchor,
   pointerAngleDeg,
-  ROTATE_HANDLE_OFFSET_MM,
+  ROTATE_HANDLE_OFFSET_PX,
   rotateObjectRelative,
   rotateSelectionByDrag,
   rotateObjectByDrag,
@@ -23,14 +25,27 @@ function obj(id = 'O1', x = 0, y = 0): SceneObject {
 }
 
 describe('rotate-handle', () => {
-  it('sits ROTATE_HANDLE_OFFSET_MM above the bbox top-mid', () => {
+  it.each([0.25, 1, 3, 12])(
+    'keeps the drawn and picked handle 24 pixels above the box at scale %s',
+    (scale) => {
+      const objects = [
+        obj(),
+        { ...obj(), id: 'second', transform: { ...IDENTITY_TRANSFORM, x: 20 } },
+      ];
+      const point = { x: 15, y: -24 / scale };
+      expect(selectionRotateHandlePosition(objects, 1 / scale)).toEqual(point);
+      expect(hitSelectionRotateHandle(objects, point, 1 / scale)).toBe(true);
+      expect(rotateHandlePosition(obj(), 1 / scale).y * scale).toBe(-24);
+    },
+  );
+  it('sits ROTATE_HANDLE_OFFSET_PX above the bbox top-mid', () => {
     const pos = rotateHandlePosition(obj());
     expect(pos.x).toBe(5);
-    expect(pos.y).toBe(-ROTATE_HANDLE_OFFSET_MM);
+    expect(pos.y).toBe(-ROTATE_HANDLE_OFFSET_PX);
   });
 
   it('hitRotateHandle is true when within px-tolerance, false outside', () => {
-    expect(hitRotateHandle(obj(), { x: 5, y: -ROTATE_HANDLE_OFFSET_MM }, 1)).toBe(true);
+    expect(hitRotateHandle(obj(), { x: 5, y: -ROTATE_HANDLE_OFFSET_PX }, 1)).toBe(true);
     expect(hitRotateHandle(obj(), { x: 100, y: 100 }, 1)).toBe(false);
   });
 

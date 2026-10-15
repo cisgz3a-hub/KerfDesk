@@ -148,7 +148,6 @@ function selectedPartHandle(
   pxToMm: number,
 ): DragState | null {
   if (
-    args.e.shiftKey ||
     !selectedObjects.every(
       (object) =>
         object.locked !== true &&
@@ -157,13 +156,16 @@ function selectedPartHandle(
     )
   )
     return null;
-  return pickHandleOrRotateDrag({
+  const handle = pickHandleOrRotateDrag({
     ...args,
     point,
     pxToMm,
     selectedObjects,
     selectedObj: selectedObjects.find((object) => object.id === args.selectedObjectId),
   });
+  // Shift on rotation/scale handles constrains the transform; on a part body
+  // or its move handle it still toggles selection.
+  return args.e.shiftKey && handle?.kind === 'move' ? null : handle;
 }
 
 // Validate before extraction: a two-part source becomes a single-part remainder

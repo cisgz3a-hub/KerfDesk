@@ -520,9 +520,9 @@ the linked artwork.
 - Live mm dimensions shown next to handle while dragging.
 
 #### Rotate — handle above selection
-- Handle appears above the selection box at a fixed offset.
-- Drag rotates around selection center.
-- Shift+drag: snap to 15° increments.
+- Handle appears 24 screen pixels above the selection box, keeping the same reach at every zoom.
+- Drag rotates all selected objects around their combined selection center without changing selection.
+- Shift+drag: snap to 15° increments, including when selecting individual trace parts.
 - Live angle shown next to handle.
 
 #### Mirror — menu / shortcut

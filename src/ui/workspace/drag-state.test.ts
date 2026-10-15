@@ -7,7 +7,7 @@ import {
   type SceneObject,
   type Transform,
 } from '../../core/scene';
-import { ROTATE_HANDLE_OFFSET_MM, rotateHandlePosition } from './rotate-handle';
+import { ROTATE_HANDLE_OFFSET_PX, rotateHandlePosition } from './rotate-handle';
 import { CANVAS_PADDING_PX } from './canvas-layout';
 import {
   computeMouseDownDrag,
@@ -226,7 +226,7 @@ describe('computeMouseDownDrag multi-selection', () => {
     const plainClick = vi.fn();
     const shiftClick = vi.fn();
     const drag = computeMouseDownDrag({
-      e: mouseEventAtScenePoint({ x: 20, y: -ROTATE_HANDLE_OFFSET_MM }),
+      e: mouseEventAtScenePoint({ x: 20, y: -ROTATE_HANDLE_OFFSET_PX }),
       ref: canvasRef(),
       project: projectWithObjects([objectAt('A', 0, 0), objectAt('B', 30, 0)]),
       selectedObjectId: 'A',
