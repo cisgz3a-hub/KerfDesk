@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures/kerfdesk-test';
-import type { Browser } from '@playwright/test';
+import { expectNestingStopped, observeNestingLifetime } from './fixtures/nesting-worker-lifecycle';
 import type { ProductionNestingInput } from '../src/core/nesting/production-nest';
 import type { startProductionNestingSearch } from '../src/ui/commands/production-nesting-worker-client';
 import type { validateProductionNest } from '../src/core/nesting/production-nest-validation';
@@ -64,9 +64,9 @@ function input(stockCount: number): ProductionNestingInput {
 
 test('advanced local nesting improves forty concave parts and preserves declared stock identities', async ({
   page,
-  browser,
 }) => {
   // Static same-origin harness also keeps development HMR from interrupting the workers.
+  await observeNestingLifetime(page);
   await page.goto('/packing-solver-worker.js');
   const result = await page.evaluate(
     async ({ four, two }) => {
@@ -105,13 +105,13 @@ test('advanced local nesting improves forty concave parts and preserves declared
   expect(result.limited?.produced).toBe(40);
   expect(result.limited?.valid).toBe(true);
   expect(result.limited?.ids.sort()).toEqual(['sheet-0', 'sheet-1']);
-  await expectNoNestingWorkers(browser);
+  await expectNestingStopped(page, true);
 });
 
 test('cancelling advanced nesting retains its standard draft and terminates owned workers', async ({
   page,
-  browser,
 }) => {
+  await observeNestingLifetime(page);
   await page.goto('/packing-solver-worker.js');
   const result = await page.evaluate(async (data) => {
     const clientUrl = '/src/ui/commands/production-nesting-worker-client.ts';
@@ -123,25 +123,28 @@ test('cancelling advanced nesting retains its standard draft and terminates owne
     return { cancelled: result.cancelled, produced: result.best?.produced };
   }, input(4));
   expect(result).toEqual({ cancelled: true, produced: 40 });
-  await expectNoNestingWorkers(browser);
+  await expectNestingStopped(page, false);
 });
 
-async function expectNoNestingWorkers(browser: Browser): Promise<void> {
-  const session = await browser.newBrowserCDPSession();
-  try {
-    // This static harness has no unrelated workers. Check every live dedicated
-    // worker, including pthread descendants with blob or empty URLs.
-    // Playwright's nested-worker records depend on events through their parent
-    // sessions, which are detached when the owning engine is terminated.
-    await expect
-      .poll(async () => {
-        const { targetInfos } = await session.send('Target.getTargets');
-        return targetInfos
-          .filter(({ type }) => type === 'worker')
-          .map(({ targetId, url }) => ({ targetId, url }));
-      })
-      .toEqual([]);
-  } finally {
-    await session.detach();
-  }
-}
+test('nesting lifetime proof rejects a still-running worker after reported termination', async ({
+  page,
+}) => {
+  await observeNestingLifetime(page);
+  await page.goto('/packing-solver-worker.js');
+  await page.evaluate(() => {
+    const source = `onmessage = event => {
+      const counts = new Int32Array(event.data);
+      setInterval(() => Atomics.add(counts, 1, 1), 20);
+    };`;
+    const worker = new Worker(URL.createObjectURL(new Blob([source], { type: 'text/javascript' })));
+    worker.postMessage(window.__nestingLifetime.counts.buffer);
+    // Simulate a mistaken ownership record: the liveness proof must still fail.
+    const record = window.__nestingLifetime.roots[0];
+    if (record === undefined) throw new Error('Missing worker ownership record');
+    record.terminated = true;
+  });
+  await expect
+    .poll(() => page.evaluate(() => Atomics.load(window.__nestingLifetime.counts, 1)))
+    .toBeGreaterThan(1);
+  await expect(expectNestingStopped(page, false)).rejects.toThrow();
+});
