@@ -300,7 +300,7 @@ describe('serial worker core: how the read side ends (audits connect-1, transpor
 
     const second = failingReadable();
     w.core.handle({ kind: 'reattach-readable', readable: second.readable });
-    second.push('ok\n');
+    second.push('\nok\n');
     await flush();
 
     expect(lines(w.posted)).toEqual(['ok']);
@@ -324,7 +324,41 @@ describe('serial worker core: how the read side ends (audits connect-1, transpor
     // Bytes went missing at the error, so the halves joined would read as a
     // plausible but wrong position report ('<Idle|MPos:1.9,0,0>'). The tail
     // alone is not a status report at all.
-    expect(lines(w.posted)).toEqual(['9,0,0>', 'ok']);
+    expect(lines(w.posted)).toEqual(['ok']);
+  });
+
+  it('does not refill from a damaged startup response tail after a receive error', async () => {
+    const first = failingReadable();
+    const written: string[] = [];
+    const w = attachedTo(
+      first.readable,
+      new WritableStream<Uint8Array>({
+        write: (chunk) => {
+          written.push(new TextDecoder().decode(chunk));
+        },
+      }),
+    );
+    armCore(w.core);
+    first.push('>G54G20:');
+    await flush();
+    first.fail('FramingError');
+    await w.core.readLoop();
+    const second = failingReadable();
+    w.core.handle({ kind: 'reattach-readable', readable: second.readable });
+    second.push('o');
+    await flush();
+    second.push('k\r');
+    await flush();
+    second.push('\n');
+    await flush();
+    expect(lines(w.posted)).toEqual([]);
+    expect(written).toEqual([]);
+    expect(w.core.armedStreamer()?.completed).toBe(0);
+    second.push('ok\n');
+    await flush();
+    expect(written).toEqual(['G1 X2.000\n']);
+    expect(w.core.armedStreamer()?.completed).toBe(1);
+    await w.core.close();
   });
 
   it('lets go of both streams before reporting that its read side ended', async () => {

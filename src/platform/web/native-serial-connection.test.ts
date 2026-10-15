@@ -286,7 +286,7 @@ describe('native serial connection ownership', () => {
     });
     connection.onClose(next);
     h.worker.reply({ kind: 'closed' });
-    await Promise.resolve();
+    await connection.close();
     expect(next).toHaveBeenCalledTimes(1);
     expect(h.worker.terminate).toHaveBeenCalledTimes(1);
     log.mockRestore();

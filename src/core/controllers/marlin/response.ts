@@ -49,9 +49,11 @@ function classifyMarlinReport(trimmed: string): ControllerEvent {
 }
 
 function classifyMarlinError(trimmed: string): ControllerEvent {
-  return KILLED_RE.test(trimmed)
-    ? { kind: 'error', code: null, raw: trimmed, halted: true }
-    : { kind: 'error', code: null, raw: trimmed };
+  if (KILLED_RE.test(trimmed)) return { kind: 'error', code: null, raw: trimmed, halted: true };
+  // Handler errors return to gcode.cpp, which still sends ok_to_send().
+  // Serial/checksum errors likewise end with Resend plus ok (queue.cpp).
+  // Neither error report retires a line; kill() above never returns.
+  return { kind: 'error', code: null, raw: trimmed, acknowledgesLine: false };
 }
 
 function unknownCommandEvent(command: string, raw: string): ControllerEvent {

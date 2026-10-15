@@ -99,7 +99,7 @@ describe('worker-hosted transport: UART line errors (audit connect-1)', () => {
       session.connection.onLineError?.((error) => lineErrors.push(error));
 
       port.readError(name);
-      port.emit('<Idle|MPos:0.000,0.000,0.000|FS:0,0>\r\nok\r\n');
+      port.emit('\n<Idle|MPos:0.000,0.000,0.000|FS:0,0>\r\nok\r\n');
       await waitFor(() => session.lines.length === 3, 'the lines after the error');
       await session.connection.write('?');
       await waitFor(() => port.transmitted.includes('?'), 'the write');

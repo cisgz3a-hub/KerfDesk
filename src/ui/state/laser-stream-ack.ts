@@ -19,7 +19,7 @@ import {
   containActiveStreamWriteFailure,
   streamWriteOwner,
 } from './laser-stream-heartbeat-containment';
-import { consumeUntrackedAck } from './laser-untracked-ack-ledger';
+import { consumeUntrackedAck, peekUntrackedAck } from './laser-untracked-ack-ledger';
 import { hostedRefillArmed, releaseHostedRefill } from './laser-hosted-refill';
 
 // Every queued non-job write owes exactly one terminal ok/error, in strict
@@ -62,6 +62,7 @@ export function settleUntrackedAck(
   state: LaserState,
   clsKind: string,
   refs: HandlerRefs,
+  acknowledgesLine = true,
 ): AckSettlement {
   const isTerminalAck = clsKind === 'ok' || clsKind === 'error';
   if (!isTerminalAck) return { owner: 'stream' };
@@ -69,18 +70,14 @@ export function settleUntrackedAck(
   // a replacement serial session must never advance its unconfirmed lines.
   // When a reconnect command owns an ack, settle that ledger; otherwise treat
   // a late terminal response as non-stream traffic and drop it here.
-  if (state.streamer?.status === 'disconnected') {
-    if (state.pendingUntrackedAcks > 0) {
-      const motionOperationId = consumeUntrackedAck(refs);
-      set((s) => ({ pendingUntrackedAcks: Math.max(0, s.pendingUntrackedAcks - 1) }));
-      return { owner: 'untracked', motionOperationId };
-    }
-    return { owner: 'untracked', motionOperationId: null };
+  if (streamOwnsTerminalAck(state)) return { owner: 'stream' };
+  if (state.pendingUntrackedAcks === 0) return { owner: 'untracked', motionOperationId: null };
+  // Marlin Error: is a rejection report, followed by the rejected line's ok.
+  // Attribute it now, but only that subsequent ok can retire this reservation.
+  const motionOperationId = acknowledgesLine ? consumeUntrackedAck(refs) : peekUntrackedAck(refs);
+  if (acknowledgesLine) {
+    set((s) => ({ pendingUntrackedAcks: Math.max(0, s.pendingUntrackedAcks - 1) }));
   }
-  if (state.pendingUntrackedAcks === 0) return { owner: 'stream' };
-  if (streamAwaitsTerminalAck(state.streamer)) return { owner: 'stream' };
-  const motionOperationId = consumeUntrackedAck(refs);
-  set((s) => ({ pendingUntrackedAcks: Math.max(0, s.pendingUntrackedAcks - 1) }));
   return { owner: 'untracked', motionOperationId };
 }
 

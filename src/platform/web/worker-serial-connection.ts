@@ -21,6 +21,7 @@
 import type { HostedStreamRefill, SerialConnection } from '../types';
 import { createWorkerRefillHandover } from './worker-refill-handover';
 import { portStreamsReleased, settleWithin } from './worker-teardown-waits';
+import { boundedSerialClose, startSerialPortClose } from './serial-port-close';
 import {
   isSerialWorkerResponse,
   type SerialWorkerRequest,
@@ -109,8 +110,8 @@ export function createWorkerSerialConnection(args: {
   // retires a native worker's port and refill queue.
   const fail = (): void => {
     terminate(link);
+    endSessionInBackground(link);
     fireClose(session);
-    void endSession(link);
   };
   session.handover = createWorkerRefillHandover({
     // A program's buffers are transferred, never copied (ADR-354 Amendment 3).
@@ -120,7 +121,7 @@ export function createWorkerSerialConnection(args: {
     fail,
   });
   link.unsubscribeClosing =
-    link.bridge.onClosing?.(() => void endSession(link)) ?? link.unsubscribeClosing;
+    link.bridge.onClosing?.(() => endSessionInBackground(link)) ?? link.unsubscribeClosing;
   link.unsubscribeError = link.bridge.onError?.(fail) ?? link.unsubscribeError;
   if (args.start !== undefined) startNative(session, args.start, fail);
   return connectionApi(link, session.handover.refill, fail);
@@ -213,20 +214,23 @@ function attachStreams(
 }
 
 function endSession(link: Link): Promise<void> {
-  if (link.ending !== null) return link.ending;
-  link.session.closing = true;
-  link.session.handover?.close();
-  // Install the promise before the run starts, which asks the worker to let go
-  // synchronously: an in-process bridge can answer or re-enter close at once,
-  // and must join this same teardown.
-  let resolveEnd: () => void = () => undefined;
-  let rejectEnd: (error: unknown) => void = () => undefined;
-  link.ending = new Promise<void>((resolve, reject) => {
-    resolveEnd = resolve;
-    rejectEnd = reject;
+  if (link.ending === null) {
+    link.session.closing = true;
+    link.session.handover?.close();
+    // Register ownership before the handshake or any close subscriber can
+    // try Connect again. The operation starts in a microtask, so synchronous
+    // worker replies and reentrant close calls join this same cleanup.
+    link.ending = startSerialPortClose(link.port, () => runEndSession(link));
+  }
+  // A caller deadline does not replace the actual cleanup promise. A later
+  // Forget can wait for its completion without opening or closing twice.
+  return boundedSerialClose(link.ending);
+}
+
+function endSessionInBackground(link: Link): void {
+  void endSession(link).catch((error: unknown) => {
+    console.warn('Serial worker shutdown did not complete:', error);
   });
-  void runEndSession(link).then(resolveEnd, rejectEnd);
-  return link.ending;
 }
 
 async function runEndSession(link: Link): Promise<void> {
@@ -255,9 +259,6 @@ async function runEndSession(link: Link): Promise<void> {
   // locked by the transfer pipes until the drain the worker's close started
   // is done, and closing the port before then fails (audit transport-4).
   await portStreamsReleased(link.port);
-  await link.port.close().catch((err: unknown) => {
-    console.warn('port.close() rejected:', err);
-  });
 }
 
 function terminate(link: Link): void {
@@ -304,8 +305,8 @@ function workerClosed(link: Link): void {
     requested();
     return;
   }
+  endSessionInBackground(link);
   fireClose(session);
-  void endSession(link);
 }
 
 // A UART line error ended the worker's read stream but left the port open,
@@ -329,8 +330,8 @@ function reattachReadable(link: Link, errorName: string): void {
       console.warn("The serial worker could not take the port's fresh readable:", error);
     }
   }
+  endSessionInBackground(link);
   fireClose(link.session);
-  void endSession(link);
 }
 
 function routeWriteResult(session: Session, message: SerialWorkerResponse): boolean {

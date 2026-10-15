@@ -112,7 +112,8 @@ function handleNonBannerLine(
   line: string,
   state: LaserState,
 ): void {
-  const ackSettlement = settleUntrackedAck(set, state, cls.kind, refs);
+  const acknowledgesLine = cls.kind !== 'error' || cls.acknowledgesLine !== false;
+  const ackSettlement = settleUntrackedAck(set, state, cls.kind, refs, acknowledgesLine);
   const ownedCommandLine = activeControllerCommandLine(refs);
   const commandConsumed = consumeControllerCommandResponse(refs, cls, line);
   // An arbiter-owned ALARM still has global machine meaning: invalidate
@@ -132,7 +133,7 @@ function handleNonBannerLine(
     return;
   }
   if (cls.kind === 'error') {
-    const rejection = { code: cls.code, raw: cls.raw, halted: cls.halted === true };
+    const rejection = { ...cls, raw: cls.raw };
     const ownedLine = commandConsumed ? ownedCommandLine : undefined;
     handleErrorLine(set, get, refs, safeWrite, rejection, ackSettlement, ownedLine);
     return;
