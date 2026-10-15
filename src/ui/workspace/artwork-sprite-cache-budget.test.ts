@@ -47,6 +47,21 @@ function scene(count: number, large = false) {
   return { requests, draw, drawImage };
 }
 
+function expectViewportCovered(request: SpriteRequest, sprite: HTMLCanvasElement) {
+  const painted = vi.mocked(request.paint).mock.lastCall?.[1];
+  expect(painted).toBeDefined();
+  if (painted === undefined) throw new Error('sprite was not painted');
+  for (const [offset, paintedOffset, visibleSide, spriteSide] of [
+    [request.view.offsetX, painted.offsetX, request.ctx.canvas.width, sprite.width],
+    [request.view.offsetY, painted.offsetY, request.ctx.canvas.height, sprite.height],
+  ]) {
+    const firstPixel = paintedOffset! - offset!;
+    // The sprite preserves a +/- 0.5px subpixel remainder in its padded edges.
+    expect(firstPixel).toBeGreaterThanOrEqual(2.49);
+    expect(firstPixel + visibleSide!).toBeLessThanOrEqual(spriteSide! - 2.49);
+  }
+}
+
 beforeEach(resetArtworkSpritesForTests);
 afterEach(() => {
   resetArtworkSpritesForTests();
@@ -55,6 +70,78 @@ afterEach(() => {
 });
 
 describe('artwork sprite cache admission', () => {
+  it.each([
+    [1920, 1080],
+    [2560, 1440],
+    [3840, 2160],
+    [1921, 1081],
+    [6000, 1000],
+    [1000, 6000],
+  ])(
+    'retains a clipped dense object on a %ix%i canvas across fractional pans and zooms',
+    (width, height) => {
+      vi.useFakeTimers({ toFake: ['performance', 'setTimeout', 'clearTimeout'] });
+      const state = scene(1);
+      const source = state.requests[0]!;
+      source.ctx.canvas.width = width;
+      source.ctx.canvas.height = height;
+      const request = {
+        ...source,
+        view: { scale: 1.37, offsetX: -10_000.25, offsetY: -10_000.75 },
+        measure: () => ({ minX: 0, minY: 0, maxX: 100_000, maxY: 100_000 }),
+      };
+      expect(drawArtworkSprite(request)).toBe(true);
+      expect(source.paint).toHaveBeenCalledTimes(1);
+      const sprite = state.drawImage.mock.calls[0]?.[0] as HTMLCanvasElement;
+      expect(sprite.width).toBeLessThanOrEqual(8192);
+      expect(sprite.height).toBeLessThanOrEqual(8192);
+      expect(sprite.width * sprite.height).toBeLessThanOrEqual(width * height * 2.25);
+      expectViewportCovered(request, sprite);
+
+      const panned = {
+        ...request,
+        view: {
+          ...request.view,
+          offsetX: request.view.offsetX - 25.5,
+          offsetY: request.view.offsetY - 15.25,
+        },
+      };
+      expect(drawArtworkSprite(panned)).toBe(true);
+      expect(source.paint).toHaveBeenCalledTimes(1);
+
+      const zoomed = { ...panned, view: { ...panned.view, scale: 1.4 } };
+      expect(drawArtworkSprite(zoomed)).toBe(true);
+      expect(source.paint).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(SPRITE_SETTLE_MS);
+      expect(drawArtworkSprite(zoomed)).toBe(true);
+      expect(source.paint).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(source.paint).mock.lastCall?.[1].scale).toBe(1.4);
+      expect(state.drawImage.mock.lastCall).toHaveLength(3);
+      expectViewportCovered(zoomed, sprite);
+      expect(sprite.width * sprite.height).toBeLessThanOrEqual(width * height * 2.25);
+    },
+  );
+
+  it('keeps the full visible viewport at the padded side limit and declines a wider one', () => {
+    const state = scene(1);
+    const source = state.requests[0]!;
+    source.ctx.canvas.width = 8192 - 6;
+    source.ctx.canvas.height = 1000;
+    const request = {
+      ...source,
+      view: { scale: 1, offsetX: -10_000, offsetY: -10_000 },
+      measure: () => ({ minX: 0, minY: 0, maxX: 100_000, maxY: 100_000 }),
+    };
+    expect(drawArtworkSprite(request)).toBe(true);
+    const sprite = state.drawImage.mock.calls[0]?.[0] as HTMLCanvasElement;
+    expect(sprite.width).toBe(8192);
+    const paintedView = vi.mocked(source.paint).mock.lastCall?.[1];
+    expect(paintedView?.offsetX).toBe(request.view.offsetX + 3);
+
+    source.ctx.canvas.width += 1;
+    expect(drawArtworkSprite(request)).toBe(false);
+    expect([sprite.width, sprite.height]).toEqual([0, 0]);
+  });
   it.each([8, 9, 16])('retains all %i small dense objects across stable draws', (count) => {
     const state = scene(count);
     for (let pass = 0; pass < 3; pass += 1) expect(state.draw()).toBe(0);
