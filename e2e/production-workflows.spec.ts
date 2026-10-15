@@ -5,6 +5,7 @@ import {
   openMachineToolDropdown,
   selectWorkspacePanel,
   toolbarCommand,
+  expectToolbarCommandEnabled,
 } from './fixtures/workspace-ui';
 import {
   expect,
@@ -23,7 +24,7 @@ import { composedSvgSnapshot } from './fixtures/composed-svg-browser';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await dismissNotifications(page);
 });
@@ -120,7 +121,7 @@ test('outline-nests complementary vector parts that rectangular bounds cannot fi
   kerfdesk,
 }) => {
   await kerfdesk.setOpenFiles([{ name: 'outline-nest.lf2', text: outlineNestProjectFixture() }]);
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/outline-nest\.lf2/);
   await selectAll(page);
   await runMenuCommand(page, 'Arrange', 'Quick Nest...');
@@ -495,8 +496,8 @@ test('imports a generated bitmap and traces it through the production worker wor
   ]);
   await (await toolbarCommand(page, 'Import...')).click();
   await expect(page.getByText('Objects: 2', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Trace Image...' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Trace Image...' }).click();
+  await expectToolbarCommandEnabled(page, 'Trace Image...');
+  await (await toolbarCommand(page, 'Trace Image...')).click();
   const dialog = page.getByRole('dialog', { name: 'Trace image' });
   await expect(dialog).toBeVisible();
   // This workflow explicitly retains the bitmap; deletion is the dialog default.
@@ -839,7 +840,7 @@ test('offers a selected-area second pass after completion with the Machine panel
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).click();
-  const focusReturn = page.getByRole('button', { name: 'Open...', exact: true });
+  const focusReturn = page.getByRole('button', { name: 'More commands', exact: true });
   await focusReturn.focus();
   await drainHeldSerialWrites(page, kerfdesk, baselineLines);
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
@@ -864,7 +865,7 @@ test('offers a selected-area second pass after completion with the Machine panel
   await expect(complete).toHaveCount(0);
   await expect(focusReturn).toBeFocused();
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Open...' })).toBeVisible();
+  await expect(await toolbarCommand(page, 'Open...')).toBeVisible();
   await expect(complete).toHaveCount(0);
 });
 

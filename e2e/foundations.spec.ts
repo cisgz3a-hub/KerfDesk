@@ -16,7 +16,7 @@ test('opens and saves a deterministic project through the real file workflow', a
   page,
   kerfdesk,
 }) => {
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
 
   await (await toolbarCommand(page, 'Save As...')).click();

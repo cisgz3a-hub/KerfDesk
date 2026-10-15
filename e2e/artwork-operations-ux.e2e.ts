@@ -252,7 +252,7 @@ for (const viewport of [
 
 async function openBasicProject(page: Page): Promise<Locator> {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   // Project Open parses in a worker; a cold Vite worker can exceed the default
   // assertion deadline before the settings UI is ready for interaction.
   await expect(page).toHaveTitle(/project-basic\.lf2/, { timeout: 30_000 });

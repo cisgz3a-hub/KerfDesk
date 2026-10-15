@@ -5,7 +5,11 @@
 // Web Serial fixture; acknowledgements are held so the disconnect lands at a
 // chosen line.
 
-import { selectWorkspacePanel, toolbarCommand } from './fixtures/workspace-ui';
+import {
+  selectWorkspacePanel,
+  toolbarCommand,
+  expectToolbarCommandVisible,
+} from './fixtures/workspace-ui';
 import { expect, test } from './fixtures/kerfdesk-test';
 import { recoveryExecutionLinesSince } from './fixtures/recovery-execution-lines';
 import {
@@ -28,7 +32,7 @@ import {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open...' }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await dismissNotifications(page);
 });
@@ -69,7 +73,7 @@ for (const acked of [0, 1, 3, 5]) {
 
     // The capsule is durable: a reload shows the same record, still no completion.
     await page.reload();
-    await expect(page.getByRole('button', { name: 'Open...' })).toBeVisible();
+    await expectToolbarCommandVisible(page, 'Open...');
     await selectWorkspacePanel(page, 'Machine');
     await expect(recovery.getByText('Interrupted job saved', { exact: true })).toBeVisible();
     await expect(recovery.locator('summary')).toContainText(
@@ -160,7 +164,7 @@ test('records a disconnect during post-job settle as an interruption of every li
   expect(saved?.ackedLines).toBe(total);
 
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Open...' })).toBeVisible();
+  await expectToolbarCommandVisible(page, 'Open...');
   await selectWorkspacePanel(page, 'Machine');
   await expect(recovery.locator('summary')).toContainText(
     `${total} of ${total} lines acknowledged`,
@@ -296,7 +300,7 @@ test('offers darkening once per completion, closes on Escape, re-offers after Ru
   await expect(complete).toHaveCount(0);
 
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Open...' })).toBeVisible();
+  await expectToolbarCommandVisible(page, 'Open...');
   await page.waitForTimeout(1_000);
   await expect(complete).toHaveCount(0);
   await selectWorkspacePanel(page, 'Machine');

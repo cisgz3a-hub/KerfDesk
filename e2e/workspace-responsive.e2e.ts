@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { test, expect, type Locator, type Page } from './fixtures/kerfdesk-test';
 import type { PlatformAdapter } from '../src/platform/types';
 import type { AppState } from '../src/ui/state';
@@ -203,7 +204,7 @@ test('overflow commands and all nine anchors remain reachable on a short laptop'
   await expect(menu.getByRole('menuitem', { name: 'Save G-code...' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(more).toBeFocused();
-  await page.getByRole('button', { name: 'Open...', exact: true }).click();
+  await (await toolbarCommand(page, 'Open...')).click();
   await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();
   await page.keyboard.press('Control+a');
   const anchor = page.getByRole('button', { name: 'Choose transform anchor' });

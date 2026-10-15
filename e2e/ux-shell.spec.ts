@@ -11,12 +11,12 @@ test.describe('workspace shell acceptance', () => {
   test('supports keyboard focus and disclosure controls at laptop size', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 700 });
 
-    const openButton = page.getByRole('button', { name: 'Open...', exact: true });
-    const importButton = page.getByRole('button', { name: 'Import...', exact: true });
-    await openButton.focus();
+    const more = page.getByRole('button', { name: 'More commands', exact: true });
+    const studio = page.getByRole('button', { name: 'Open Design Studio', exact: true });
+    await more.focus();
     await page.keyboard.press('Tab');
-    await expect(importButton).toBeFocused();
-    await expectFocusRing(importButton);
+    await expect(studio).toBeFocused();
+    await expectFocusRing(studio);
 
     const collapseLayers = page.getByRole('button', {
       name: 'Collapse Artwork / Operations panel',

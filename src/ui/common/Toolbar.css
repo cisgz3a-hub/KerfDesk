@@ -206,7 +206,7 @@
     gap: 4px;
   }
 }
-@media (max-width: 700px) {
+@media (max-width: 600px) {
   .lf-toolbar-shell {
     flex-wrap: wrap;
   }
