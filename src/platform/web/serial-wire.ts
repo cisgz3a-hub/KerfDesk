@@ -38,6 +38,10 @@ export type SerialLineState = {
 
 export const EMPTY_SERIAL_LINE_STATE: SerialLineState = { buffer: '', discarding: false };
 
+// A receive error can lose a prefix or delimiter. Its remaining tail is not a
+// fresh record: discard through the next LF before trusting acknowledgements.
+export const UNSYNCHRONISED_SERIAL_LINE_STATE: SerialLineState = { buffer: '', discarding: true };
+
 // Each connection carries the complete framing state between reads. Forgetting
 // discard mode would turn the tail of a dropped record into a new `ok` or status.
 // One extra trailing CR is retained because the record limit excludes its CRLF

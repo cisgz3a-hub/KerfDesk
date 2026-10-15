@@ -2251,7 +2251,10 @@ minimum target size.
    `M5`, `M9`). Without confirmed Idle or successful writes, it reports that accessories may
    still be on; it does not reset the jog or claim they are off. Reconnecting retires an old
    Abort and its cleanup so they cannot write to or clear state for the replacement connection.
-3. The UI marks the streamer cancelled. This software action does not prove that the command arrived or that physical energy stopped.
+3. The UI marks the streamer cancelled. For a queued, no-reset stop, host refill is cancelled
+   before awaiting transport handback or stop writes; in-flight commands retain their reply
+   ownership. The Abort operation stays owned through its queued cleanup writes (ADR-600).
+   This software action does not prove that the command arrived or that physical energy stopped.
 4. A reset sent into motion leaves a GRBL controller in `Alarm` (ALARM:3); the user clears it with
    `$X` (F-B9). A reset after a completed hold or a cancelled jog raises no alarm.
 
@@ -2814,6 +2817,9 @@ authorization, Frame proof, controller command, or safety boundary.
   Console says that bytes from the controller were lost, at most once every 5 s with a count of
   the rest. If it happened during the job, the "controller holding program" state, its log line
   and the notice add that an acknowledgement lost with it never arrives (ADR-375).
+  The reader discards the damaged tail through the next line delimiter before accepting fresh
+  records, so a response suffix cannot become a false acknowledgement. The writer remains
+  available for Stop; no missing reply is synthesized or replayed (ADR-600).
 - After any page stall, the controller output that queued up meanwhile is handed to the app
   in slices of about 8 ms, with input, drawing and the status poll running in between,
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
@@ -7372,8 +7378,12 @@ as the pane's design record.
    The emitted preamble does not assume `G54` or `G94` support.
 
 #### Error — firmware answers `Error:` or `Resend:`
-1. Terminal for the stream (no replay); beam-off lines are written; with no
-   alarm state the errored stream auto-releases at the next Idle report.
+1. Terminal for the stream (no replay); beam-off lines are written. A non-halting `Error:`
+   report does not itself acknowledge a Marlin command: the command retains its reply ownership
+   until the following `ok`, including for Console. That `ok` cannot acknowledge cleanup.
+   Kill, reset, resend and skipped-command handling retain their separate semantics (ADR-600).
+   An errored stream is released only after its remaining reply ownership and Idle settlement
+   allow it; error reporting is not successful completion.
 
 ### F-H3. Smoothieware halt and recovery
 

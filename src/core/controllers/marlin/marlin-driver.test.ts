@@ -17,6 +17,7 @@ describe('classifyMarlinResponse', () => {
       kind: 'error',
       code: null,
       raw: 'Error:G2/G3 bad parameters',
+      acknowledgesLine: false,
     });
     expect(classifyMarlinResponse('start')).toMatchObject({ kind: 'welcome' });
     expect(classifyMarlinResponse('FIRMWARE_NAME:Marlin 2.1.2')).toMatchObject({

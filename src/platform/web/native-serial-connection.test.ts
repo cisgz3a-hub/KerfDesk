@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { tryOpenNativeSerialConnection } from './native-serial-connection';
+import { webSerial } from './web-serial';
+import { SERIAL_PORT_CLOSE_TIMEOUT_MS } from './serial-port-close';
 import type {
   NativeSerialWorkerRequest,
   NativeSerialWorkerResponse,
@@ -58,9 +60,60 @@ function harness() {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('native serial connection ownership', () => {
+  it.each([false, true])(
+    'retains the selected window port through native Forget timeout (hosted reopen: %s)',
+    async (hostedStreaming) => {
+      vi.useFakeTimers();
+      const h = harness();
+      let releaseForget: () => void = () => undefined;
+      h.selected.forget.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            releaseForget = resolve;
+          }),
+      );
+      const connection = await h.open();
+      if (connection === null) throw new Error('Expected native connection');
+      vi.stubGlobal('navigator', { serial: h.serial });
+      const ref = (await webSerial.grantedPorts?.())?.[0];
+      if (ref === undefined) throw new Error('Expected exact selected port');
+      // Hold native close acknowledgement separately from permission revocation.
+      h.worker.respond = () => undefined;
+      const result = expect(connection.forget!()).rejects.toThrow('shutdown timed out');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.selected.forget).not.toHaveBeenCalled();
+      await expect(ref.open({ baudRate: 115200, hostedStreaming })).rejects.toThrow(
+        'still closing',
+      );
+      expect(h.selected.open).not.toHaveBeenCalled();
+      h.worker.reply({ kind: 'closed' });
+      await vi.advanceTimersByTimeAsync(SERIAL_PORT_CLOSE_TIMEOUT_MS);
+      await result;
+      expect(h.worker.terminate).toHaveBeenCalledTimes(1);
+      expect(h.selected.forget).toHaveBeenCalledTimes(1);
+      try {
+        await expect(ref.open({ baudRate: 115200, hostedStreaming })).rejects.toThrow(
+          'still closing',
+        );
+        expect(h.selected.open).not.toHaveBeenCalled();
+      } finally {
+        // The original Forget must finish even after its only caller timed out.
+        releaseForget();
+        await vi.advanceTimersByTimeAsync(0);
+      }
+      expect(h.selected.forget).toHaveBeenCalledTimes(1);
+      const reopened = await ref.open({ baudRate: 115200 });
+      expect(h.selected.open).toHaveBeenCalledTimes(1);
+      await reopened.close();
+      await connection.forget!();
+      expect(h.selected.forget).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('opens only in the worker and starts its reader after the client subscribes', async () => {
     const h = harness();
     const connection = await h.open();
@@ -286,7 +339,7 @@ describe('native serial connection ownership', () => {
     });
     connection.onClose(next);
     h.worker.reply({ kind: 'closed' });
-    await Promise.resolve();
+    await connection.close();
     expect(next).toHaveBeenCalledTimes(1);
     expect(h.worker.terminate).toHaveBeenCalledTimes(1);
     log.mockRestore();

@@ -33,7 +33,12 @@ import {
   recoverableReadErrorName,
   type ReadRecoveryBudget,
 } from './serial-read-recovery';
-import { EMPTY_SERIAL_LINE_STATE, encodeWireBytes, extractSerialLines } from './serial-wire';
+import {
+  EMPTY_SERIAL_LINE_STATE,
+  UNSYNCHRONISED_SERIAL_LINE_STATE,
+  encodeWireBytes,
+  extractSerialLines,
+} from './serial-wire';
 import type { SerialWorkerRequest, SerialWorkerResponse } from './serial-worker-protocol';
 
 export type SerialWorkerCoreDeps = {
@@ -116,10 +121,10 @@ function handleRequest(
   switch (request.kind) {
     case 'attach':
       state.writer = request.writable.getWriter();
-      startReading(state, deps, request.readable);
+      startReading(state, deps, request.readable, false);
       return;
     case 'reattach-readable':
-      startReading(state, deps, request.readable);
+      startReading(state, deps, request.readable, true);
       return;
     case 'write':
       write(state, deps, request);
@@ -271,18 +276,20 @@ function startReading(
   state: WorkerState,
   deps: SerialWorkerCoreDeps,
   readable: ReadableStream<Uint8Array>,
+  recovered: boolean,
 ): void {
   const reader = readable.getReader();
   state.reader = reader;
-  state.loop = runReadLoop(state, deps, reader);
+  state.loop = runReadLoop(state, deps, reader, recovered);
 }
 
 async function runReadLoop(
   state: WorkerState,
   deps: SerialWorkerCoreDeps,
   reader: ReadableStreamDefaultReader<Uint8Array>,
+  recovered: boolean,
 ): Promise<void> {
-  const failure = await forwardLines(state, deps, reader);
+  const failure = await forwardLines(state, deps, reader, recovered);
   // A requested close reports itself once both streams are released.
   if (state.closed) return;
   const lineError = failure === null ? null : recoverableReadErrorName(failure.error);
@@ -310,12 +317,13 @@ async function forwardLines(
   state: WorkerState,
   deps: SerialWorkerCoreDeps,
   reader: ReadableStreamDefaultReader<Uint8Array>,
+  recovered: boolean,
 ): Promise<ReadFailure | null> {
   // Framing lives and dies with one reader: after a line error the partial
   // record is missing bytes, so the next stream starts a fresh one rather than
   // gluing the two halves into a plausible but wrong line.
   const decoder = new TextDecoder('utf-8');
-  let framing = EMPTY_SERIAL_LINE_STATE;
+  let framing = recovered ? UNSYNCHRONISED_SERIAL_LINE_STATE : EMPTY_SERIAL_LINE_STATE;
   try {
     for (;;) {
       const { value, done } = await reader.read();
@@ -385,9 +393,12 @@ async function releaseStreams(state: WorkerState): Promise<void> {
     // has just queued the driver's M5/M9 cleanup lines. On a transferred
     // writable close() settles as soon as the close is posted, so the
     // renderer waits for the port's own writable to finish draining before
-    // it closes the port. The bounded close still aborts a local sink that
-    // cannot drain, so a wedged one cannot hang this.
-    await closeWriterBounded(writer);
+    // it closes the port. A stalled local sink gets a bounded abort request;
+    // the owning transport's deadline can terminate the worker.
+    const outcome = await closeWriterBounded(writer);
+    // Keep the lock until actual shutdown: the owner can terminate a stalled
+    // worker, but a timeout must never pretend the native sink has drained.
+    if (outcome === 'timed-out') await writer.closed.catch(() => undefined);
     releaseLock(() => writer.releaseLock());
   }
 }

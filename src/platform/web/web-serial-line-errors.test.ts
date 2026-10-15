@@ -60,7 +60,7 @@ describe('main-thread serial transport: UART line errors (audit connect-1)', () 
       const session = await connect(port);
 
       port.readError(name);
-      port.emit('<Run|MPos:1.000,2.000,0.000|FS:1200,800>\r\nok\r\n');
+      port.emit('\n<Run|MPos:1.000,2.000,0.000|FS:1200,800>\r\nok\r\n');
       await waitFor(() => session.lines.length === 3, 'the lines after the error');
       await session.connection.write('!');
       await waitFor(() => port.transmitted.includes('!'), 'the feed hold');
@@ -85,7 +85,7 @@ describe('main-thread serial transport: UART line errors (audit connect-1)', () 
     });
 
     port.readError('ParityError');
-    port.emit('ok\r\n');
+    port.emit('\nok\r\n');
     await waitFor(() => session.lines.length === 2, 'the line after the error');
 
     expect(session.closes()).toBe(0);
@@ -104,11 +104,30 @@ describe('main-thread serial transport: UART line errors (audit connect-1)', () 
     await settle();
     port.readError('FramingError');
     port.emit('9,0,0>\r\nok\r\n');
-    await waitFor(() => session.lines.length === 3, 'the lines after the error');
+    await waitFor(() => session.lines.length === 2, 'the lines after the error');
 
     // Bytes went missing at the error; joined, the halves would read as a
     // plausible but wrong position ('<Idle|MPos:1.9,0,0>').
-    expect(session.lines).toEqual(['ok', '9,0,0>', 'ok']);
+    expect(session.lines).toEqual(['ok', 'ok']);
+  });
+
+  it('never delivers a damaged startup response tail as an acknowledgement', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const port = new SerialPortDouble();
+    const session = await connect(port);
+    port.emit('>G54G20:');
+    await settle();
+    port.readError('FramingError');
+    port.emit('o');
+    await settle();
+    port.emit('k\r');
+    await settle();
+    port.emit('\nok\r\n');
+    await waitFor(() => session.lines.length === 2, 'the genuine acknowledgement');
+    expect(session.lines).toEqual(['ok', 'ok']);
+    await session.connection.write('!');
+    await waitFor(() => port.transmitted.includes('!'), 'the feed hold');
+    await session.connection.close();
   });
 
   it('Disconnect after a recovered line error cancels the live reader and closes the port', async () => {
@@ -116,7 +135,7 @@ describe('main-thread serial transport: UART line errors (audit connect-1)', () 
     const port = new SerialPortDouble();
     const session = await connect(port);
     port.readError('BreakError');
-    port.emit('ok\r\n');
+    port.emit('\nok\r\n');
     await waitFor(() => session.lines.length === 2, 'the line after the error');
 
     await session.connection.close();

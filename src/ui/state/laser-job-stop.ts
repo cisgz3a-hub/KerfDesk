@@ -13,7 +13,7 @@
 // sent a reset byte forgets the work origin (MA-3): Marlin keeps its G92
 // position_shift through M410 (G92.cpp L95-L98).
 
-import { markErrored } from '../../core/controllers/grbl';
+import { cancel as cancelStreamer, markErrored } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import type { SerialConnection } from '../../platform/types';
 import { clearCncLiveCaps } from './detected-settings-action';
@@ -26,7 +26,11 @@ import {
   type ControllerQualificationScheduleRefs,
 } from './laser-controller-qualification';
 import { releaseHostedRefill } from './laser-hosted-refill';
-import type { ControllerLifecycleRefs } from './laser-interactive-command';
+import {
+  cancelControllerLifecycleRefs,
+  type ControllerLifecycleRefs,
+} from './laser-interactive-command';
+import { interactiveControllerOperation } from './laser-controller-operation';
 import {
   cancelPauseResumeTransition,
   hasPauseResumeTransition,
@@ -42,6 +46,7 @@ import {
 } from './laser-safety-notice';
 import { isActiveJob } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+import { frameProofReset } from './laser-session-reset';
 import { cancelPendingManualMotions } from './manual-motion-intent';
 import { stopUnownedControllerMotion } from './unowned-motion-stop';
 import { unownedControllerMotion } from './unowned-controller-motion';
@@ -102,18 +107,16 @@ export async function runStopJob(context: JobStopContext, reason?: JobStopReason
       }
     }
     const softReset = driver().realtime.softReset;
-    // Queued stop lines need a single writer, so a controller without a realtime
-    // reset takes the hosted refill back first (ADR-334).
-    if (softReset === null) await releaseHostedRefill(refs);
+    if (softReset === null) {
+      await runNoResetStop(context, reason, ownsSession);
+      return;
+    }
     if (!ownsSession()) return;
     // Read before the cancel below clears it: a hold or restart still settling
     // means the last status report may not show the machine moving.
     const pauseResumeSettling = hasPauseResumeTransition(refs);
     cancelPauseResumeTransition(refs, TRANSITION_CANCELLATION_MESSAGE);
-    const pendingOutcome =
-      softReset === null
-        ? stopWithoutReset(context)
-        : stopWithReset(context, softReset, reason, pauseResumeSettling);
+    const pendingOutcome = stopWithReset(context, softReset, reason, pauseResumeSettling);
     const stoppedWork = captureStopOutcomeOwner(context);
     const outcome = await pendingOutcome;
     if (ownsConnection()) applyStopOutcome(context, outcome, softReset, stoppedWork);
@@ -123,6 +126,60 @@ export async function runStopJob(context: JobStopContext, reason?: JobStopReason
     if (ownsAttempt()) {
       reportClosedStopWriteFailure(context);
       throw error;
+    }
+  }
+}
+
+// A no-reset Abort must retire host refill before even the handback await.
+// Retain its sent-line ledger: their real replies still precede the stop-line
+// replies. The temporary owner keeps a fresh Idle from reopening Start while
+// cleanup is being written; cancellation is not proof of a physical stop.
+async function runNoResetStop(
+  context: JobStopContext,
+  reason: JobStopReason | undefined,
+  ownsSession: () => boolean,
+): Promise<void> {
+  const { set, get, refs, driver } = context;
+  const initial = get();
+  // Cancellation clears the unsent program, including any M7/M8 that requires
+  // M9 cleanup. Capture that requirement before retiring the queue.
+  const lines = noResetStopLines(driver(), initial);
+  const operation = isActiveJob(initial.streamer)
+    ? interactiveControllerOperation('Aborting job', 'terminal-exchange')
+    : null;
+  if (operation !== null && initial.streamer !== null) {
+    cancelControllerLifecycleRefs(refs, TRANSITION_CANCELLATION_MESSAGE);
+    set({
+      streamer: cancelStreamer(initial.streamer),
+      controllerOperation: operation,
+      ...frameProofReset(),
+      ...(reason === undefined
+        ? {}
+        : { jobStopRequest: { reason, streamerEpoch: initial.streamerEpoch } }),
+      ...(isControllerHaltedNotice(initial.safetyNotice)
+        ? {}
+        : {
+            safetyNotice: driverQuickStops(driver())
+              ? quickStopUnconfirmedNotice()
+              : disconnectStopUnconfirmedNotice(),
+          }),
+    });
+  }
+  const ownsStop = (): boolean =>
+    ownsSession() &&
+    (operation === null ||
+      (get().controllerOperation === operation && get().streamerEpoch === initial.streamerEpoch));
+  try {
+    // Queued stop lines keep one writer through a hosted-refill handback.
+    await releaseHostedRefill(refs);
+    if (!ownsStop()) return;
+    cancelPauseResumeTransition(refs, TRANSITION_CANCELLATION_MESSAGE);
+    const stoppedWork = captureStopOutcomeOwner(context);
+    const outcome = await stopWithoutReset(context, lines, ownsStop);
+    if (ownsStop()) applyStopOutcome(context, outcome, null, stoppedWork);
+  } finally {
+    if (operation !== null && get().controllerOperation === operation) {
+      set({ controllerOperation: null });
     }
   }
 }
@@ -284,11 +341,14 @@ async function settleResetWrite(
 // No realtime reset (Marlin): cancelling the host streamer is not proof that
 // the machine stopped, so the notice is raised before the first await; a
 // transport failure may replace it with the stronger write-failed notice.
-async function stopWithoutReset(context: JobStopContext): Promise<StopOutcome> {
+async function stopWithoutReset(
+  context: JobStopContext,
+  lines: ReadonlyArray<string>,
+  ownsStop: () => boolean,
+): Promise<StopOutcome> {
   const { set, get, safeWrite, driver } = context;
   const activeDriver = driver();
   const quickStopped = driverQuickStops(activeDriver);
-  const lines = noResetStopLines(activeDriver, get());
   // A halted controller runs none of the stop lines; its reset advice stays.
   if (isActiveJob(get().streamer) && !isControllerHaltedNotice(get().safetyNotice)) {
     set({
@@ -299,10 +359,11 @@ async function stopWithoutReset(context: JobStopContext): Promise<StopOutcome> {
   let allSent = false;
   try {
     for (const line of lines) {
+      if (!ownsStop()) break;
       await safeWrite(line, 'stop');
       if (isAirOffLine(line)) airOffSent = true;
     }
-    allSent = true;
+    allSent = ownsStop();
   } catch {
     // Best effort if the transport is already gone.
   }

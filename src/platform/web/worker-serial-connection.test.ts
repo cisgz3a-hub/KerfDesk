@@ -5,7 +5,6 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
-import { WRITER_CLOSE_TIMEOUT_MS } from './bounded-writer-close';
 import type { SerialWorkerRequest, SerialWorkerResponse } from './serial-worker-protocol';
 import {
   createWorkerSerialConnection,
@@ -373,6 +372,7 @@ describe('worker serial connection: line errors (audit connect-1)', () => {
     // The closed port explains itself; reading did not go on.
     expect(lineErrors).toEqual([]);
     // The worker still holds the writer, so it is asked to let go first.
+    await settle();
     expect(h.sent.at(-1)?.message).toEqual({ kind: 'close' });
     h.emit({ kind: 'closed' });
     await settle();
@@ -413,23 +413,6 @@ describe('worker serial connection: port drain before close (audit transport-4)'
 
     pipeHold.releaseLock();
     await closing;
-    expect(h.closedPort()).toBe(1);
-  });
-
-  it('closes the port anyway once the drain deadline passes', async () => {
-    vi.useFakeTimers();
-    const h = harness();
-    const writable = new WritableStream<Uint8Array>();
-    writable.getWriter();
-    h.port.writable = writable;
-
-    const closing = h.connection.close();
-    h.emit({ kind: 'closed' });
-    await vi.advanceTimersByTimeAsync(WRITER_CLOSE_TIMEOUT_MS - 20);
-    expect(h.closedPort()).toBe(0);
-    await vi.advanceTimersByTimeAsync(40);
-    await closing;
-
     expect(h.closedPort()).toBe(1);
   });
 });

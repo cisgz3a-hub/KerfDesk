@@ -267,14 +267,12 @@ function rejectCommandFromTerminalResponse(
   response: ControllerEvent,
 ): boolean {
   if (response.kind === 'error') {
-    finishControllerCommand(
-      refs,
-      request,
-      'reject',
-      new ControllerCommandRefusedError(
-        response.raw ?? (response.code === null ? 'error' : `error:${response.code}`),
-      ),
-    );
+    if (response.acknowledgesLine === false) {
+      request.refusal = response.raw ?? 'Controller rejected the command.';
+      return true;
+    }
+    const reason = response.raw ?? (response.code === null ? 'error' : `error:${response.code}`);
+    finishControllerCommand(refs, request, 'reject', new ControllerCommandRefusedError(reason));
     return true;
   }
   if (response.kind === 'resend') {
