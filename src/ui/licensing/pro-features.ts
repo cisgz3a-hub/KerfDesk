@@ -10,6 +10,8 @@ export type ProFeature =
   | 'adaptive-clearing'
   | 'advanced-trace'
   | 'camera-alignment'
+  | 'registration-jig'
+  | 'place-board'
   | 'box-generator'
   | 'design-studio'
   | 'gcode-inspector';
@@ -37,6 +39,14 @@ export const PRO_FEATURES: Readonly<
   'camera-alignment': {
     name: 'Camera alignment',
     summary: 'Calibrate the camera lens and align its picture to your machine bed.',
+  },
+  'registration-jig': {
+    name: 'Registration Jig',
+    summary: 'Place repeat artwork using a burn-aligned registration jig.',
+  },
+  'place-board': {
+    name: 'Place Board',
+    summary: 'Capture the corners of a placed board and align artwork to its outline.',
   },
   'box-generator': {
     name: 'Box generator',
