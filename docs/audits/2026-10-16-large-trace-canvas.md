@@ -93,11 +93,23 @@ show the same artwork; 81 pixels at 1080p and 2,172 pixels at 4K differ in edge
 antialiasing (0.00391% and 0.0262% respectively), with no alpha changes. Exact
 pixel identity is not claimed.
 
-Reproduce with:
+Reproduce with an explicit pre-fix baseline (required; there is no default):
 
 ```powershell
 node scripts/performance-audit/large-trace-canvas-probe.mjs --baseline=f7e2a36895b67cfa33be03c16e6c19e7c6722d14
 ```
+
+The candidate comes from the current working tree. Choose a baseline whose cache
+source differs from the candidate; an explicit but identical baseline is rejected.
+Use `--help` for options. To verify source selection and bundling without running
+the renderer measurements:
+
+```powershell
+node scripts/performance-audit/large-trace-canvas-probe.mjs --baseline=f7e2a36895b67cfa33be03c16e6c19e7c6722d14 --compile-only
+```
+
+Compile-only output reports the resolved baseline commit and both source hashes.
+It does not establish browser timing or visual correctness.
 
 Local measurement receipt and paired screenshots:
 `artifacts/large-trace-canvas/2026-10-15T16-47-48.692Z/receipt.json`.

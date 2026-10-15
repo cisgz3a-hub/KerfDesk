@@ -1,19 +1,42 @@
 /* global window */
-// Opt-in paired renderer probe. Run: node scripts/performance-audit/large-trace-canvas-probe.mjs
-// Optional: --baseline=<git-ref>. Uses a disposable browser and no web server.
+// Opt-in paired renderer probe. Requires --baseline=<git-ref>; use --help for usage.
+// Uses a disposable browser and no web server.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join, posix, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
 import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const option = (name, fallback) =>
-  process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-const baselineRef = option('baseline', 'HEAD');
+const usage = [
+  'Usage: node scripts/performance-audit/large-trace-canvas-probe.mjs --baseline=<git-ref> [--compile-only]',
+  '  --baseline      Required commit/ref containing the pre-fix cache implementation.',
+  '                  The candidate is the current working-tree source; identical sources are rejected.',
+  '  --compile-only  Build both variants and report source hashes without launching Chrome.',
+  '  --help, -h      Show this help.',
+].join('\n');
+const { values } = parseArgs({
+  options: {
+    baseline: { type: 'string' },
+    'compile-only': { type: 'boolean' },
+    help: { type: 'boolean', short: 'h' },
+  },
+});
+if (values.help) {
+  console.log(usage);
+  process.exit(0);
+}
+const baselineRef = values.baseline?.trim();
+if (!baselineRef) {
+  console.error(
+    'Missing required --baseline=<git-ref>. Choose the pre-fix revision explicitly.\n' + usage,
+  );
+  process.exit(2);
+}
 const origin = 'https://kerfdesk-canvas-probe.invalid';
 const run = new Date().toISOString().replaceAll(':', '-');
 const output = join(root, 'artifacts', 'large-trace-canvas', run);
@@ -124,8 +147,15 @@ const compiled = await build({
 const bundle = compiled.outputFiles[0].text;
 receipt.bundleSha256 = sha(bundle);
 await writeFile(join(output, 'probe.mjs'), bundle);
-if (process.argv.includes('--compile-only')) {
-  console.log(JSON.stringify({ compiled: true, bundle: join(output, 'probe.mjs') }));
+if (values['compile-only']) {
+  console.log(
+    JSON.stringify({
+      compiled: true,
+      baselineCommit: receipt.baselineCommit,
+      cacheSources: receipt.cacheSources,
+      bundle: join(output, 'probe.mjs'),
+    }),
+  );
   process.exit(0);
 }
 let browser;
