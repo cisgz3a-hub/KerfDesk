@@ -138,6 +138,22 @@ class RuntimeObserver {
       );
   }
 
+  async releaseAttachments(): Promise<void> {
+    // Debugger attachments can retain a terminated worker target and its last
+    // context metadata. Release our sessions, but keep browser discovery active:
+    // detachment itself is never accepted as proof that a runtime was destroyed.
+    const sessions = [...this.sessions.keys()];
+    await Promise.all(
+      sessions.map(async (sessionId) => {
+        try {
+          await this.cdp.send('Target.detachFromTarget', { sessionId });
+        } catch {
+          // A worker can finish and detach before this request reaches Chromium.
+        }
+        this.sessions.delete(sessionId);
+      }),
+    );
+  }
   async dispose(): Promise<void> {
     await this.cdp.detach();
   }
@@ -232,6 +248,7 @@ export async function expectNestingStopped(page: Page, completed: boolean): Prom
   expect(observer.workers.size).toBeGreaterThanOrEqual(observedWorkers);
   // Positive runtime destruction or target destruction is required. No heartbeat,
   // protocol timeout, or detached parent session can stand in for that evidence.
+  await observer.releaseAttachments();
   await expect.poll(() => observer.pending(), { timeout: 2_000 }).toEqual([]);
   // Worker.terminate() requests asynchronous teardown. Heartbeats may advance
   // before the browser confirms destruction, but must stop after that barrier.
