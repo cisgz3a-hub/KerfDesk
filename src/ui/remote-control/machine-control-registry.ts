@@ -33,6 +33,7 @@ type Receipt = {
   readonly fingerprint: string;
   readonly operation: OwnedMachineOperation;
   readonly id: string;
+  readonly capacity: 'ordinary' | 'reserved';
 };
 type ProjectionSource = {
   readonly caller: RemoteCaller;
@@ -83,9 +84,10 @@ export class MachineControlRegistry {
     if (cached !== null) return cached;
     const authority = this.assertAdmission(input, caller, execution);
     this.retireRevokedReceipts();
-    this.assertCapacity(input, caller);
+    const capacity = this.assertCapacity(input, caller);
     if (input.command === 'start_job') return this.approve(input, caller, authority, fingerprint);
-    if (input.command === 'jog_hold_stop') return this.stopHold(input, caller, fingerprint);
+    if (input.command === 'jog_hold_stop')
+      return this.stopHold(input, caller, fingerprint, capacity);
     this.assertVacant(input);
     const operation = ownMachineOperation(input, authority, this.store, this.revision);
     if (input.command === 'abort_job') {
@@ -93,7 +95,7 @@ export class MachineControlRegistry {
       for (const existing of new Set(this.operations.values()))
         cancelMachineOperation(existing, false);
     }
-    this.reserve(input.args.requestId, caller, fingerprint, operation);
+    this.reserve(input.args.requestId, caller, fingerprint, operation, capacity);
     if (input.command === 'jog_hold_start')
       this.holds.arm(input.args.requestId, caller.clientId, operation);
     this.schedule(input, operation);
@@ -109,6 +111,7 @@ export class MachineControlRegistry {
     input: Extract<MachineCommand, { readonly command: 'jog_hold_stop' }>,
     caller: RemoteCaller,
     fingerprint: string,
+    capacity: Receipt['capacity'],
   ): RemoteCommandResult {
     const operation =
       this.holds.find(caller.clientId, input.args.operationId) ??
@@ -116,7 +119,7 @@ export class MachineControlRegistry {
     if (operation === undefined || operation.kind !== 'hold') throw new RemoteFault('not_found');
     this.holds.release(input.args.operationId);
     releaseHeldMotion(operation);
-    this.reserve(input.args.requestId, caller, fingerprint, operation);
+    this.reserve(input.args.requestId, caller, fingerprint, operation, capacity);
     return this.result(caller, input.args.requestId, operation, false);
   }
   private caller(execution: Execution): RemoteCaller {
@@ -158,17 +161,21 @@ export class MachineControlRegistry {
       throw new RemoteFault('stale_revision');
     return authority;
   }
-  private assertCapacity(input: MachineAction, caller: RemoteCaller): void {
+  private assertCapacity(input: MachineAction, caller: RemoteCaller): Receipt['capacity'] {
     const prefix = `${caller.sessionId}/${caller.clientId}/`;
     const own = [...this.receipts]
       .filter(([receiptKey]) => receiptKey.startsWith(prefix))
       .map(([, receipt]) => receipt);
-    const aborting = input.command === 'abort_job';
-    if (
-      own.filter((receipt) => (receipt.operation.kind === 'abort') === aborting).length >=
-      (aborting ? MAX_ABORTS : MAX_ACTIONS)
-    )
+    const ordinary = own.filter((receipt) => receipt.capacity === 'ordinary').length;
+    // Routine releases preserve the Abort reserve; saturation must not strand an owned hold.
+    const capacity =
+      input.command === 'abort_job' ||
+      (input.command === 'jog_hold_stop' && ordinary >= MAX_ACTIONS)
+        ? 'reserved'
+        : 'ordinary';
+    if (capacity === 'reserved' ? own.length - ordinary >= MAX_ABORTS : ordinary >= MAX_ACTIONS)
       throw new RemoteFault('request_limit');
+    return capacity;
   }
   private assertVacant(input: BackgroundMachineAction): void {
     if (['abort_job', 'pause_job', 'resume_job'].includes(input.command)) return;
@@ -202,8 +209,9 @@ export class MachineControlRegistry {
     caller: RemoteCaller,
     fingerprint: string,
     operation: OwnedMachineOperation,
+    capacity: Receipt['capacity'] = 'ordinary',
   ): void {
-    this.receipts.set(key(caller, id), { id, fingerprint, operation });
+    this.receipts.set(key(caller, id), { id, fingerprint, operation, capacity });
     this.operations.set(key(caller, id), operation);
   }
   private approve(

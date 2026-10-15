@@ -1,4 +1,9 @@
-import { operationIdsForObject, sceneLayerVisibility, type Layer } from '../../core/scene';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  operationIdsForObject,
+  sceneLayerVisibility,
+  type Layer,
+} from '../../core/scene';
 import { transformedBBox } from '../../core/scene/hit-test';
 import type { AppState } from '../state/store';
 import type { RemoteBounds } from './types';
@@ -69,7 +74,7 @@ export function workspaceProjection(state: AppState, shareArtwork = false) {
     .slice(0, LIMIT)
     .map((layer) => ({
       id: layer.id,
-      type: mode === 'laser' ? layer.mode : (layer.cnc?.cutType ?? 'cnc'),
+      type: mode === 'laser' ? layer.mode : (layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS).cutType,
       // Operation names have no source provenance: converted text can retain its
       // old wording here. Labels therefore share the explicit artwork opt-in.
       name: shareArtwork ? safeLabel(layer.name, 'Operation') : 'Operation',
@@ -77,7 +82,7 @@ export function workspaceProjection(state: AppState, shareArtwork = false) {
       ...(/^#[0-9a-f]{6}$/.test(layer.color) ? { color: layer.color } : {}),
       artworkCount: artworkCounts.get(layer.id) ?? 0,
       ...(mode === 'laser' ? { ...operationValues(layer), ...laserDetails(layer) } : {}),
-      ...(mode === 'cnc' && layer.cnc !== undefined ? { cnc: cncDetails(layer.cnc) } : {}),
+      ...(mode === 'cnc' ? { cnc: cncDetails(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS) } : {}),
     }));
   const allSelected = selectedIds(state).filter(publicIdentifier);
   return {

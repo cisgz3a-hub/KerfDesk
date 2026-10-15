@@ -2,7 +2,7 @@ import { uuid } from './protocol.js';
 import { plainObject } from './device-envelope.js';
 
 export type Observation = { revision: string; machineSeq: number };
-type WaitArgs = { sinceRevision?: string; sinceMachineSeq?: number; timeoutMs?: number };
+export type WaitArgs = { sinceRevision?: string; sinceMachineSeq?: number; timeoutMs?: number };
 type WaitResult = {
   revision: string;
   machineSeq: number;
