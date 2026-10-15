@@ -1,5 +1,25 @@
+import { writeFile } from 'node:fs/promises';
 import { expect, test } from './fixtures/kerfdesk-test';
-import { expectNestingStopped, observeNestingLifetime } from './fixtures/nesting-worker-lifecycle';
+import {
+  disposeNestingLifetime,
+  expectNestingStopped,
+  observeNestingLifetime,
+  nestingRuntimeSnapshot,
+  nestingPendingTargets,
+} from './fixtures/nesting-worker-lifecycle';
+
+test.afterEach(async ({ page, browser }, testInfo) => {
+  const evidence = testInfo.outputPath('worker-runtime-evidence.json');
+  await writeFile(
+    evidence,
+    JSON.stringify({ chrome: browser.version(), workers: nestingRuntimeSnapshot(page) }, null, 2),
+  );
+  await testInfo.attach('worker-runtime-evidence', {
+    path: evidence,
+    contentType: 'application/json',
+  });
+  await disposeNestingLifetime(page);
+});
 import type { ProductionNestingInput } from '../src/core/nesting/production-nest';
 import type { startProductionNestingSearch } from '../src/ui/commands/production-nesting-worker-client';
 import type { validateProductionNest } from '../src/core/nesting/production-nest-validation';
@@ -118,7 +138,17 @@ test('cancelling advanced nesting retains its standard draft and terminates owne
     const { startProductionNestingSearch: search } = (await import(clientUrl)) as {
       startProductionNestingSearch: typeof startProductionNestingSearch;
     };
-    const active = search(data, () => setTimeout(() => active.cancel(), 0), true);
+    const active = search(data, () => undefined, true);
+    // Cancel an actually started solver pool, not merely the standard draft.
+    try {
+      const deadline = performance.now() + 10_000;
+      while (Atomics.load(window.__nestingLifetime.counts, 0) < 2) {
+        if (performance.now() > deadline) throw new Error('Solver pthread pool did not start');
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    } finally {
+      active.cancel();
+    }
     const result = await active.result;
     return { cancelled: result.cancelled, produced: result.best?.produced };
   }, input(4));
@@ -147,4 +177,56 @@ test('nesting lifetime proof rejects a still-running worker after reported termi
     .poll(() => page.evaluate(() => Atomics.load(window.__nestingLifetime.counts, 1)))
     .toBeGreaterThan(1);
   await expect(expectNestingStopped(page, false)).rejects.toThrow();
+});
+
+test('nesting lifetime proof rejects a live blocked child despite silent heartbeats', async ({
+  page,
+}) => {
+  await observeNestingLifetime(page);
+  await page.goto('/packing-solver-worker.js');
+  await page.evaluate(() => {
+    const child = `onmessage = event => {
+      const counts = new Int32Array(event.data);
+      Atomics.store(counts, 1, 2);
+      Atomics.store(counts, 2, 1);
+      Atomics.wait(counts, 3, 0);
+    };`;
+    const root = `onmessage = event => {
+      const child = new Worker(URL.createObjectURL(new Blob([${JSON.stringify(child)}], { type: 'text/javascript' })));
+      child.postMessage(event.data);
+    };`;
+    const worker = new Worker(URL.createObjectURL(new Blob([root], { type: 'text/javascript' })));
+    window.__nestingBlockedWorker = worker;
+    worker.postMessage(window.__nestingLifetime.counts.buffer);
+    const record = window.__nestingLifetime.roots[0];
+    if (!record) throw new Error('Missing root owner');
+    record.terminated = true;
+  });
+  await page.waitForFunction(() => Atomics.load(window.__nestingLifetime.counts, 2) === 1);
+  const rootUrl = await page.evaluate(() => window.__nestingLifetime.roots[0]?.url);
+  await expect
+    .poll(() => {
+      const workers = nestingRuntimeSnapshot(page);
+      const root = workers.find((worker) => worker.url === rootUrl);
+      return workers.filter((worker) => worker.parent === root?.target && worker.sawContext).length;
+    })
+    .toBe(1);
+  const runtimes = nestingRuntimeSnapshot(page);
+  const root = runtimes.find((worker) => worker.url === rootUrl);
+  const child = runtimes.find((worker) => worker.parent === root?.target);
+  expect(child?.destroyed).toBe(false);
+  expect(
+    nestingPendingTargets(page).some((target) =>
+      target.startsWith(child?.target ?? 'missing-child'),
+    ),
+  ).toBe(true);
+  try {
+    await expect(expectNestingStopped(page, false)).rejects.toThrow();
+  } finally {
+    await page.evaluate(() => {
+      window.__nestingBlockedWorker?.terminate();
+      Atomics.notify(window.__nestingLifetime.counts, 3);
+    });
+  }
+  await expectNestingStopped(page, false);
 });
