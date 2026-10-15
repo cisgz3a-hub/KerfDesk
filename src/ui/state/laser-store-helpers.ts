@@ -277,6 +277,7 @@ type InitialLaserState = Pick<
   | 'connection'
   | 'serialPortInfo'
   | 'connectedBaudRate'
+  | 'lastConnectionTransport'
   | 'statusReport'
   | 'controllerSessionEpoch'
   | 'statusSequence'
@@ -345,6 +346,7 @@ type InitialLaserState = Pick<
 export function initialLaserState(): InitialLaserState {
   return {
     ...initialControllerConnectionState(),
+    lastConnectionTransport: null,
     controllerSessionEpoch: 0,
     controllerFirmwareReport: null,
     statusSequence: 0,

@@ -21,6 +21,7 @@ import { publishControllerIncident } from './laser-incident-publish';
 import { connectionScopedEvidenceReset } from './laser-module-probe';
 import { useToastStore } from './toast-store';
 import { browserLocalStorage } from './browser-local-storage';
+import { clearCncLiveCaps } from './detected-settings-action';
 import {
   chooseGrantedPort,
   loadRememberedSerialPort,
@@ -44,8 +45,12 @@ type ConnectingPatchFn = (state: LaserState, refs: LiveRefs) => Partial<LaserSta
 export const FILE_ONLY_CONNECT_REFUSAL =
   'This machine profile exports .rd files only; it has no live connection.';
 
+export const NETWORK_RECONNECT_GUIDANCE =
+  'Reconnect from the network connection form in Machine details. To switch to USB, choose Use a different port… explicitly.';
+
 export async function runConnectAction(
   set: SetFn,
+  get: () => LaserState,
   refs: LiveRefs,
   adapter: PlatformAdapter,
   options: ConnectControllerOptions,
@@ -63,6 +68,18 @@ export async function runConnectAction(
     useToastStore.getState().pushToast(FILE_ONLY_CONNECT_REFUSAL, 'error');
     return;
   }
+  if (
+    get().lastConnectionTransport === 'tcp' &&
+    adapter.serial.transport !== 'tcp' &&
+    options.portSelection !== 'choose'
+  ) {
+    if (options.portSelection !== 'automatic') {
+      set((state) => ({ log: pushLog(state, NETWORK_RECONNECT_GUIDANCE) }));
+      useToastStore.getState().pushToast(NETWORK_RECONNECT_GUIDANCE, 'warning');
+    }
+    return;
+  }
+  clearCncLiveCaps();
   await connectSerialController(
     set,
     refs,
@@ -85,8 +102,7 @@ async function connectSerialController(
   connectingPatch: ConnectingPatchFn,
   attachConnection: AttachConnectionFn,
 ): Promise<void> {
-  const attempt = beginConnectAttempt(refs);
-  set({ connectionAttempt: attempt.revision });
+  const attempt = beginTransportConnectAttempt(set, refs, adapter);
   let requestedPort: SerialPortRef | null = null;
   const attemptedBaudRate = options.baudRate ?? driver.defaultBaudRate;
   let cancelledPermissionReleased = false;
@@ -126,6 +142,7 @@ async function connectSerialController(
       }));
       return;
     }
+    set({ lastConnectionTransport: selectedTransport(portRef, adapter) });
     const baudRate = attemptedBaudRate;
     const connection = await portRef.open(serialOpenRequest(baudRate, options, refs.driver));
     if (!connectAttemptIsCurrent(refs, attempt)) {
@@ -154,6 +171,23 @@ async function connectSerialController(
       controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch),
     }));
   }
+}
+
+function beginTransportConnectAttempt(
+  set: SetFn,
+  refs: LiveRefs,
+  adapter: PlatformAdapter,
+): ConnectAttempt {
+  const attempt = beginConnectAttempt(refs);
+  set({
+    connectionAttempt: attempt.revision,
+    ...(adapter.serial.transport === 'tcp' ? { lastConnectionTransport: 'tcp' } : {}),
+  });
+  return attempt;
+}
+
+function selectedTransport(port: SerialPortRef, adapter: PlatformAdapter): 'serial' | 'tcp' {
+  return port.info?.transport ?? adapter.serial.transport ?? 'serial';
 }
 
 // The machine's port opens without the picker when chooseGrantedPort finds it

@@ -1,16 +1,37 @@
 import { expect, it, vi } from 'vitest';
 import { createDesktopMachineNetwork } from './desktop-machine-network';
 import type { MachineNetworkRequest } from './desktop-machine-network-api';
-import type { SerialConnection } from '../types';
+import type { MachineNetworkProtocol, SerialConnection } from '../types';
 
 const ID = '12345678-1234-1234-1234-123456789abc';
-async function connection(request: MachineNetworkRequest): Promise<SerialConnection> {
-  const adapter = createDesktopMachineNetwork(request).serialForTarget('127.0.0.1', 23);
+async function connection(
+  request: MachineNetworkRequest,
+  protocol?: MachineNetworkProtocol,
+): Promise<SerialConnection> {
+  const adapter = createDesktopMachineNetwork(request).serialForTarget('127.0.0.1', 23, protocol);
   const port = await adapter.requestPort();
   if (port === null) throw new Error('Missing network port');
   expect(port.info).toEqual({ transport: 'tcp' });
   return port.open({ baudRate: 115200 });
 }
+
+it.each(['fluidnc-telnet', 'grblhal-raw'] as const)(
+  'opens only the selected %s channel and preserves wire bytes',
+  async (protocol) => {
+    const request = vi.fn<MachineNetworkRequest>(async (action) =>
+      action === 'open' ? { sessionId: ID } : {},
+    );
+    const serial = await connection(request, protocol);
+    expect(request).toHaveBeenCalledWith('open', { host: '127.0.0.1', port: 23, protocol });
+    await serial.write('\x18\x85?\xff');
+    expect(request).toHaveBeenCalledWith('write', {
+      sessionId: ID,
+      sequence: 1,
+      data: btoa('\x18\x85?\xff'),
+    });
+    await serial.close();
+  },
+);
 
 it('orders writes and preserves raw realtime bytes without sending host details after open', async () => {
   const packets: Array<Record<string, unknown>> = [];

@@ -1,18 +1,27 @@
 import { randomUUID } from 'node:crypto';
 import { Socket, isIP } from 'node:net';
 import { MachineNetworkSession } from './machine-network-session.js';
+import {
+  validateMachineNetworkProtocol,
+  type MachineNetworkProtocol,
+} from './machine-network-protocol.js';
 
 export class MachineNetworkBridge {
   private readonly sessions = new Map<string, MachineNetworkSession>();
   private pending: Socket | null = null;
   private readonly leases = new Map<string, ReturnType<typeof setTimeout>>();
-  async open(host: string, port: number): Promise<{ readonly sessionId: string }> {
+  async open(
+    host: string,
+    port: number,
+    protocol: MachineNetworkProtocol = 'fluidnc-telnet',
+  ): Promise<{ readonly sessionId: string }> {
+    validateMachineNetworkProtocol(protocol);
     validateNetworkTarget(host, port);
     if (this.pending !== null || this.sessions.size > 0)
       throw new Error('Disconnect the current network session before opening another.');
     const socket = new Socket();
     this.pending = socket;
-    const session = new MachineNetworkSession(socket);
+    const session = new MachineNetworkSession(socket, protocol);
     try {
       await connectSocket(socket, host, port);
       if (this.pending !== socket || socket.destroyed)
@@ -76,7 +85,7 @@ export function validateNetworkTarget(host: string, port: number): void {
   )
     throw new Error('Enter a machine IP address or hostname, without a URL, path or credentials.');
   if (!Number.isInteger(port) || port < 1 || port > 65535)
-    throw new Error('Enter the enabled FluidNC Telnet/Port value (1–65535).');
+    throw new Error('Enter the enabled machine network port (1–65535).');
 }
 
 function connectSocket(socket: Socket, host: string, port: number): Promise<void> {

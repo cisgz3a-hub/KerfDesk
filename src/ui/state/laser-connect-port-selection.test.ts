@@ -70,6 +70,68 @@ afterEach(async () => {
 });
 
 describe('connect port selection', () => {
+  it.each(['remembered', 'automatic'] as const)(
+    'does not replace a TCP session with a %s USB port',
+    async (portSelection) => {
+      const opened: SerialPortIdentity[] = [];
+      const usb = adapter({ granted: [portStub(CH340, opened)] });
+      const close = vi.fn(async () => undefined);
+      const tcp: PlatformAdapter = {
+        ...usb.platform,
+        serial: {
+          transport: 'tcp',
+          isSupported: () => true,
+          requestPort: async () => ({
+            info: { transport: 'tcp' },
+            open: async () => ({ ...connectionStub(), close }),
+          }),
+        },
+      };
+      await useLaserStore
+        .getState()
+        .connect(tcp, { controllerKind: 'grblhal', portSelection: 'choose' });
+      const attempt = useLaserStore.getState().connectionAttempt;
+      await useLaserStore.getState().connect(usb.platform, { portSelection });
+      expect(opened).toEqual([]);
+      expect(usb.requestPort).not.toHaveBeenCalled();
+      expect(close).not.toHaveBeenCalled();
+      expect(useLaserStore.getState().connectionAttempt).toBe(attempt);
+      await useLaserStore.getState().disconnect();
+      expect(useLaserStore.getState().lastConnectionTransport).toBe('tcp');
+      await useLaserStore.getState().connect(usb.platform, { portSelection });
+      expect(opened).toEqual([]);
+      expect(usb.requestPort).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps a failed network choice until an explicit USB selection succeeds', async () => {
+    const opened: SerialPortIdentity[] = [];
+    const usb = adapter({ granted: [portStub(CH340, opened)], picked: portStub(CH340, opened) });
+    const tcp: PlatformAdapter = {
+      ...usb.platform,
+      serial: {
+        transport: 'tcp',
+        isSupported: () => true,
+        requestPort: async () => {
+          throw new Error('Network unreachable');
+        },
+      },
+    };
+    await useLaserStore
+      .getState()
+      .connect(tcp, { controllerKind: 'grblhal', portSelection: 'choose' });
+    expect(useLaserStore.getState().connection.kind).toBe('failed');
+    await useLaserStore.getState().connect(usb.platform);
+    expect(opened).toEqual([]);
+    const cancelled = adapter({ granted: [], picked: null });
+    await useLaserStore.getState().connect(cancelled.platform, { portSelection: 'choose' });
+    expect(useLaserStore.getState().lastConnectionTransport).toBe('tcp');
+    await useLaserStore.getState().connect(usb.platform, { portSelection: 'choose' });
+    expect(opened).toEqual([CH340]);
+    expect(usb.requestPort).toHaveBeenCalledOnce();
+    expect(useLaserStore.getState().lastConnectionTransport).toBe('serial');
+  });
+
   it('opens the remembered adapter without the picker', async () => {
     rememberSerialPort(localStorage, CH340);
     const opened: SerialPortIdentity[] = [];

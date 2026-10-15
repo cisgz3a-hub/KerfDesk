@@ -162,7 +162,7 @@ function connectedPhase(facts: FindMachineFacts): FindMachinePhase {
       'Your machine didn’t answer',
       facts.networkTarget === undefined
         ? `Nothing came back at ${facts.connectedBaudRate ?? facts.baudRate} baud. The controller may use another speed, or this port belongs to another device.`
-        : `No controller answer came back from ${facts.networkTarget}. Check the target and its enabled FluidNC channel, then retry explicitly.`,
+        : `No controller answer came back from ${facts.networkTarget}. Check the target and its enabled network service, then retry explicitly.`,
     );
   }
   if (facts.qualification.kind === 'qualifying') {

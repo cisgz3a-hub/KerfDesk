@@ -44,3 +44,24 @@ it('refuses unsupported channel families and bounded malformed bodies without co
   expect(opening).not.toHaveBeenCalled();
   bridge.dispose();
 });
+
+it.each(['fluidnc-telnet', 'grblhal-raw'] as const)(
+  'passes the explicit %s channel to the native bridge',
+  async (protocol) => {
+    const bridge = new MachineNetworkBridge();
+    const opening = vi.spyOn(bridge, 'open').mockResolvedValue({
+      sessionId: '12345678-1234-1234-1234-123456789abc',
+    });
+    const route = withMachineNetworkRoutes(async () => new Response('fallback'), bridge);
+    const result = await route(
+      new Request('app://app/api/machine-network/open', {
+        method: 'POST',
+        headers: { 'X-KerfDesk-Machine-Network': '1' },
+        body: JSON.stringify({ host: '192.0.2.5', port: 23, protocol }),
+      }),
+    );
+    expect(result.status).toBe(200);
+    expect(opening).toHaveBeenCalledWith('192.0.2.5', 23, protocol);
+    bridge.dispose();
+  },
+);
