@@ -62,6 +62,34 @@ describe('Focus validation follows actual operation compilation', () => {
       ).toBe(true);
     },
   );
+  it.each(['operation', 'artwork'] as const)(
+    'keeps ordinary output with zero effective Focus power from %s on an unsupported controller',
+    async (source) => {
+      const base = fixture('line', true, true);
+      const project = {
+        ...base,
+        scene: {
+          ...base.scene,
+          layers: base.scene.layers.map((layer, index) =>
+            index === 0 && source === 'operation' ? { ...layer, power: 0 } : layer,
+          ),
+          objects: base.scene.objects.map((object, index) =>
+            index === 0 && source === 'artwork' ? { ...object, powerScale: 0 } : object,
+          ),
+        },
+      };
+      const sync = prepareOutput(project);
+      expect(sync.ok).toBe(true);
+      expect(
+        await prepareOutputAsync(project, {}, { jobId: 'zero-focus-power', runCncTasks: vi.fn() }),
+      ).toEqual(sync);
+      if (!sync.ok) throw new Error('Expected ordinary output');
+      expect(sync.job.groups.length).toBeGreaterThan(0);
+      expect(
+        sync.job.groups.every((group) => group.kind !== 'cut' || group.focusTest === undefined),
+      ).toBe(true);
+    },
+  );
   it('retains refusal for executable Focus on an unsupported controller', async () => {
     const project = fixture('line', true, true);
     const sync = prepareOutput(project);

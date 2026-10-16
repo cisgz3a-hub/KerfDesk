@@ -78,7 +78,7 @@ function appendOperationCompilation(
         `vector:${output.vectorRun++}:${operationLayer.id}`,
       );
       for (const group of vector.groups) {
-        if (!hasFocusGeometry(group, operationLayer)) continue;
+        if (!hasFocusOutputIntent(group, operationLayer)) continue;
         assertFocusOperation(operationLayer, device);
         output.groups.push(withFocusMotion(group, operationLayer));
       }
@@ -116,9 +116,11 @@ function withFocusMotion(group: Group, layer: Layer): Group {
   return { ...group, focusTest: layer.focusTest };
 }
 
-/** Exact geometry only: output rounding must wait until final placement. */
-function hasFocusGeometry(group: Group, layer: Layer): boolean {
+/** Raw zero effective power is invariant across live S ranges; geometry rounding
+ * must wait until final placement. Ordinary zero-power groups stay intact. */
+function hasFocusOutputIntent(group: Group, layer: Layer): boolean {
   if (layer.focusTest === undefined || group.kind !== 'cut') return true;
+  if (group.power <= 0) return false;
   return group.segments.some((segment) => {
     const first = segment.polyline[0];
     return (

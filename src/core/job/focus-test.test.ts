@@ -109,7 +109,31 @@ describe('Focus Test', () => {
     ).toThrow('GRBL');
     expect(() =>
       compileJob(
-        { ...scene, layers: scene.layers.map((layer) => ({ ...layer, mode: 'image' })) },
+        {
+          ...scene,
+          layers: scene.layers.map((layer) => ({ ...layer, mode: 'fill' })),
+          objects: scene.objects.map((object) =>
+            object.kind !== 'imported-svg'
+              ? object
+              : {
+                  ...object,
+                  paths: object.paths.map((path) => ({
+                    ...path,
+                    polylines: [
+                      {
+                        closed: true,
+                        points: [
+                          { x: 0, y: 0 },
+                          { x: 20, y: 0 },
+                          { x: 20, y: 10 },
+                          { x: 0, y: 10 },
+                        ],
+                      },
+                    ],
+                  })),
+                },
+          ),
+        },
         DEFAULT_DEVICE_PROFILE,
       ),
     ).toThrow('Line mode');

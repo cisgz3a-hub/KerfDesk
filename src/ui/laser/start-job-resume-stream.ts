@@ -17,6 +17,7 @@ import { recoveryRepository } from '../state/recovery';
 import type { LaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
 import { resumeConfirmation } from './resume-confirmation';
+import { buildLaserResumeProgram } from './laser-resume-program';
 import { markOwnedResumeCheckpoint, sameCheckpoint } from './start-job-checkpoint-policy';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
 import {
@@ -146,7 +147,10 @@ function reviewResume(
   readonly resumeGcode: string;
   readonly laserModeStartEvidence: Exclude<ReturnType<typeof confirmLaserModeStartEvidence>, null>;
 } | null {
-  const resume = buildResumeProgram(gcode, fromLine, resumeBuildOptions(project));
+  const resume =
+    machineKindOf(project.machine) === 'laser'
+      ? buildLaserResumeProgram(gcode, fromLine, project.device)
+      : buildResumeProgram(gcode, fromLine, resumeBuildOptions(project));
   if (resume.kind === 'error') {
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
     return null;

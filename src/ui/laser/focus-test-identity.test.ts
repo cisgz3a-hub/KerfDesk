@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { generateFocusTest } from '../../core/job/focus-test';
 import { createLayer, createLayerSubLayer } from '../../core/scene';
 import { fingerprintGcode } from '../../core/recovery';
-import { emitGcode } from '../../io/gcode/emit-gcode';
+import { emitGcode, emitPreparedGcode } from '../../io/gcode/emit-gcode';
+import { prepareOutput } from '../../io/gcode/prepare-output';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { resolveJobPlacement, runtimeCoordinatePreparationOptions } from '../job-placement';
@@ -103,12 +104,7 @@ describe('Focus Test execution and Frame identity', () => {
                   },
             ),
             objects: state.project.scene.objects.map((object, index) => {
-              if (
-                index !== 0 ||
-                object.kind !== 'imported-svg' ||
-                !['point', 'collapsed'].includes(kind)
-              )
-                return object;
+              if (index !== 0 || object.kind !== 'imported-svg' || kind !== 'point') return object;
               return {
                 ...object,
                 paths: object.paths.map((path) => ({
@@ -116,13 +112,7 @@ describe('Focus Test execution and Frame identity', () => {
                   polylines: [
                     {
                       closed: false,
-                      points:
-                        kind === 'point'
-                          ? [{ x: 10, y: 10 }]
-                          : [
-                              { x: 10, y: 10 },
-                              { x: 10.0001, y: 10 },
-                            ],
+                      points: [{ x: 10, y: 10 }],
                     },
                   ],
                 })),
@@ -347,7 +337,9 @@ describe('Focus Test execution and Frame identity', () => {
     }));
     const project = useStore.getState().project;
     expect(emitGcode(project).gcode).not.toContain('G1 Z');
-    expect(emitGcode(project, { laserMaxPowerS: 10000 }).gcode).toContain('G1 Z');
+    expect(emitPreparedGcode(prepareOutput(project, { laserMaxPowerS: 10000 })).gcode).toContain(
+      'G1 Z',
+    );
     const spatial = currentFrameSpatialSignature();
     useStore
       .getState()

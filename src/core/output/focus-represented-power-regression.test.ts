@@ -90,7 +90,9 @@ describe('Focus requires represented positive laser power', () => {
     };
     const prepared = prepareOutput(project);
     if (!prepared.ok) throw new Error('Fixture must compile');
-    expect(prepared.job.groups.every((group) => group.power === 0)).toBe(true);
+    expect(prepared.job.groups.every((group) => group.kind === 'cut' && group.power === 0)).toBe(
+      true,
+    );
     expect(emitPreparedGcode(prepared).gcode).not.toContain('G1 Z');
     expect(compiledFocusTestWarnings(prepared)).toEqual([]);
   });

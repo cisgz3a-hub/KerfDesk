@@ -10,6 +10,7 @@ import {
   layerFromSubLayer,
   type Layer,
   type Project,
+  type SceneObject,
 } from '../../core/scene';
 import { deserializeProject } from '../project';
 import { normalizeLayer } from '../project/normalize-layer';
@@ -37,6 +38,52 @@ function focusProject(): Project {
   };
 }
 
+function invalidModeProject(project: Project, mode: 'fill' | 'image'): Project {
+  return {
+    ...project,
+    scene: {
+      ...project.scene,
+      layers: project.scene.layers.map((layer) => ({ ...layer, mode })),
+      objects: project.scene.objects.map((object): SceneObject => {
+        if (object.kind !== 'imported-svg') return object;
+        if (mode === 'fill')
+          return {
+            ...object,
+            paths: object.paths.map((path) => ({
+              ...path,
+              polylines: [
+                {
+                  closed: true,
+                  points: [
+                    { x: 0, y: 0 },
+                    { x: 20, y: 0 },
+                    { x: 20, y: 10 },
+                    { x: 0, y: 10 },
+                  ],
+                },
+              ],
+            })),
+          };
+        return {
+          kind: 'raster-image',
+          id: object.id,
+          source: 'focus-raster.png',
+          ...(object.operationIds === undefined ? {} : { operationIds: object.operationIds }),
+          dataUrl: 'data:image/png;base64,',
+          pixelWidth: 1,
+          pixelHeight: 1,
+          bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+          transform: object.transform,
+          color: object.paths[0]?.color ?? '#000000',
+          dither: 'threshold',
+          linesPerMm: 10,
+          lumaBase64: 'AA==',
+        };
+      }),
+    },
+  };
+}
+
 describe('Focus compilation failures', () => {
   it.each(['fill', 'image', 'unsupported-controller'] as const)(
     'returns the same structured failure for sync, async, export and Preview: %s',
@@ -45,13 +92,7 @@ describe('Focus compilation failures', () => {
       const project: Project =
         invalid === 'unsupported-controller'
           ? { ...source, device: { ...source.device, controllerKind: 'ruida' } }
-          : {
-              ...source,
-              scene: {
-                ...source.scene,
-                layers: source.scene.layers.map((layer) => ({ ...layer, mode: invalid })),
-              },
-            };
+          : invalidModeProject(source, invalid);
       expect(() => compileJob(project.scene, project.device)).toThrow(FocusTestCompilationError);
       const prepared = prepareOutput(project);
       expect(prepared).toMatchObject({
