@@ -27,6 +27,10 @@ The final direct cancellation check paused a real batch's filename lookup, click
 
 The E2E TypeScript configuration now includes TSX fixtures, with the required DOM iterable library types. A pre-existing nullable CNC fixture setting was corrected after that additional coverage exposed it. Migration assertions now include the schema 17→18 step without weakening document-preservation checks.
 
+The first hosted CI run caught a stale installed-project qualification contract at schema 17. The contract now requires schema 18 for current saves while retaining schema 17 as an explicit historical upgrade input; malformed and future schemas remain rejected. All 31 installed-file and upgrade-qualification tests passed after the correction. This changes qualification scripts, not the application bundle used for the computer-use observations above.
+
+The full local release-integrity run after that correction passed 786 of 787 tests. The remaining Windows NSIS test requires full 7-Zip, which is not installed on this host; it failed before installer verification. The first sandboxed attempt was interrupted after temporary evidence renames were denied (`EPERM`); the reported 786 passes come from the subsequent run with filesystem access. Hosted Linux CI separately skips Windows-only cases and must pass before merge.
+
 ## Verification and limits
 
 The broad project/output run completed 1,071 tests: 1,069 passed and two stale migration-step assertions failed. Those two assertions were corrected; the affected subset and Focus pipeline then passed (14 tests). Additional focused receipts cover registration (77 tests), Focus integration/recovery (17 tests plus 13 existing pre-emit cases), final Focus generation/compilation (22 tests), UI, commands, image codecs, batch cancellation and browser workflows. These overlapping runs are not summed into a misleading unique-test total.
