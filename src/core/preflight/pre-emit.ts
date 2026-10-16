@@ -10,6 +10,7 @@
 // Pure-core: no clock, no random, no I/O.
 
 import { sceneObjectUsesOperation, type Project } from '../scene';
+import { collectLayerContours } from '../cnc/collect-cnc-contours';
 import type { PreflightIssue, PreflightResult } from './preflight';
 import { findInvalidCncToolGeometry } from './cnc-tool-geometry';
 import { controlledLaserOffTravelFeedIssue } from './laser-off-motion-policy';
@@ -24,7 +25,12 @@ export function runPreEmitPreflight(project: Project): PreflightResult {
         (layer) =>
           layer.output &&
           layer.focusTest !== undefined &&
-          project.scene.objects.some((object) => sceneObjectUsesOperation(object, layer)),
+          // Use the CNC compiler's canonical-curve materializer: a binding
+          // with only empty/one-point paths cannot be reinterpreted as a cut.
+          (collectLayerContours(project.scene.objects, layer, project.device).length > 0 ||
+            project.scene.objects.some(
+              (object) => object.kind === 'relief' && sceneObjectUsesOperation(object, layer),
+            )),
       )
     )
       issues.push({

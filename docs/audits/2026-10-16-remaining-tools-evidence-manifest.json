@@ -30,9 +30,19 @@
     "sha256": "138c7ee896fe9f387f930f314e91043f297e9b09bde5e57e92a4e6ead6866dd0"
   },
   {
+    "file": "evidence/remaining-tools-2026-10-16/automated-focus-manual-resume.png",
+    "bytes": 166985,
+    "sha256": "9a3dfb8fd29a00c8cd1077aee2e681ffbff01045effd53b263bcd27dfcc963fe"
+  },
+  {
     "file": "evidence/remaining-tools-2026-10-16/automated-focus-review-inspector.png",
     "bytes": 204897,
     "sha256": "54e40e5cdfc8763d699020e354c1bc759270e9cfd16e9ab78d22b3599b12606d"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/automated-focus-rounded-empty.png",
+    "bytes": 146990,
+    "sha256": "e16f2c47478168fc98f6db8773f4f01847cd12da610ac1f1a460dcdcc277c26a"
   },
   {
     "file": "evidence/remaining-tools-2026-10-16/automated-print-cut.png",
@@ -70,6 +80,11 @@
     "sha256": "7f8a1f00f7a6ccf02c76b3655a757a1eae1fd319e72045f954cb2853a8172d90"
   },
   {
+    "file": "evidence/remaining-tools-2026-10-16/external-followup-regressions.json.gz",
+    "bytes": 1715,
+    "sha256": "df5a852e863a74ab1737e77bb3ba8bfc557a30d1bd48e130d2c98b9a947bfc36"
+  },
+  {
     "file": "evidence/remaining-tools-2026-10-16/final-browser.json.gz",
     "bytes": 182378,
     "sha256": "a4ee10fce0c8ff0dac865cf4b8ad09e4a62fa568ec19ba45cab5724190cb0507"
@@ -85,6 +100,11 @@
     "sha256": "476ef981f4cda852baf7bef77018805b1e55f67e64f56e182b1a9280c7688795"
   },
   {
+    "file": "evidence/remaining-tools-2026-10-16/final-review-source.json.gz",
+    "bytes": 4068,
+    "sha256": "dc8ad4868e93a620fdb2afacb9fbc6d385e9941f622c67104861c76a01552f37"
+  },
+  {
     "file": "evidence/remaining-tools-2026-10-16/focus-browser-rendered.json.gz",
     "bytes": 365361,
     "sha256": "ec76b79ca64de98babb60ccb6b919b874ed7772339c8156041c89cd14c625268"
@@ -95,9 +115,34 @@
     "sha256": "ff02e400bec284c42ef348cd86445b01e521f14bc3ef3312b2dc62175c466774"
   },
   {
+    "file": "evidence/remaining-tools-2026-10-16/focus-cnc-contribution-review-tests.json.gz",
+    "bytes": 1604,
+    "sha256": "bab5b0be300a235e6f488b8e0ce4dbc5898252da86f9436e494b39c3f990e1a1"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/focus-final-browser.json.gz",
+    "bytes": 764585,
+    "sha256": "c5908e0bad9a551d2a11eb0e7d97907de58595ebe865c9d1f82d5cd1560c0954"
+  },
+  {
     "file": "evidence/remaining-tools-2026-10-16/focus-integration-vitest.json.gz",
     "bytes": 1264,
     "sha256": "fd2458502140ef58df4d88e834eadaefd174ce4d5148c6e07e9bed8d0f300088"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/focus-manual-resume-browser.json.gz",
+    "bytes": 1532,
+    "sha256": "cde55974803928c88e3d1c47c56df688270d5306662c3033ab6071ce68f35ff4"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/focus-resume-final-unit.json.gz",
+    "bytes": 976,
+    "sha256": "c3160d1fef6b8acddc6a9af06a96d357c6b087e252040f9e0b9f7746f76ae258"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/focus-resume-regressions.json.gz",
+    "bytes": 2321,
+    "sha256": "e8ca06ea380bb361d4bdcc233342f8069ddcac7d76ed3a3d1b5a4b526cf7c35b"
   },
   {
     "file": "evidence/remaining-tools-2026-10-16/focus-review-browser.json.gz",
@@ -113,6 +158,16 @@
     "file": "evidence/remaining-tools-2026-10-16/focus-review-scope-vitest.json.gz",
     "bytes": 2092,
     "sha256": "8ec78774a7a5cb6cb0764d5db76690b43b30292f3bbd8bb272213c20057a7413"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/focus-rounded-browser.json.gz",
+    "bytes": 156711,
+    "sha256": "95dfd7f19380ebfa81d67ea2f87bd19ce1b2fa32d8f32b4ec907cf700639b84f"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/focus-second-pass-eligibility-vitest.json.gz",
+    "bytes": 2163,
+    "sha256": "6b2090aae2373998b88b4b68562e8b7149fe38da3ce9d4d5a3d63eef340a7f6a"
   },
   {
     "file": "evidence/remaining-tools-2026-10-16/image-ai-browser.json.gz",

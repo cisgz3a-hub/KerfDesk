@@ -139,3 +139,37 @@ test('Focus Test invalid Fill preview reports its reason and recovers after rest
   ).toBeEnabled();
   expect(errors).toEqual([]);
 });
+
+test('Focus samples below output precision have no motion and Undo restores the sweep', async ({
+  page,
+  kerfdesk,
+}) => {
+  await runMenuCommand(page, 'Tools', 'Focus Test...');
+  const dialog = page.getByRole('dialog', { name: 'Focus Test', exact: true });
+  await dialog.getByLabel('Samples', { exact: true }).fill('2');
+  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await runMenuCommand(page, 'Edit', 'Select All');
+  const width = page.getByRole('textbox', { name: 'Selection width', exact: true });
+  await width.fill('0.0001');
+  await width.press('Enter');
+  const savedBefore = (await kerfdesk.events()).filter((event) => event.kind === 'file-saved');
+  await runMenuCommand(page, 'File', 'Save G-code...');
+  const save = page.getByRole('dialog', { name: 'Save G-code', exact: true });
+  await expect(save).toContainText('No final file was selected or modified');
+  await expect(save.getByRole('button', { name: 'Save as…', exact: true })).toBeDisabled();
+  expect((await kerfdesk.events()).filter((event) => event.kind === 'file-saved')).toEqual(
+    savedBefore,
+  );
+  await save.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await runMenuCommand(page, 'File', 'Inspect G-code (3D)...');
+  const inspector = page.getByRole('dialog', { name: /G-code Inspector: .*current canvas/ });
+  await expect(inspector.getByText('No motion found', { exact: true })).toBeVisible();
+  await expect(inspector.getByLabel('Program source')).not.toContainText('Focus Test Z offset');
+  await page.screenshot({ path: test.info().outputPath('focus-rounded-empty-output.png') });
+  await inspector.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(width).toHaveValue('20');
+  const restored = await saveTopologyGcode(page, kerfdesk);
+  expect(restored).toContain('G91\nG1 Z-2.000 F300 S0\nG90');
+  expect(restored).toContain('G91\nG1 Z2.000 F300 S0\nG90');
+});
