@@ -46,8 +46,11 @@ describe('Focus Test ordinary output preparation', () => {
       color: scene.layers[0]?.color ?? '#000000',
       operationOverride: { mode: 'image' },
     };
-    expect(() => emitGcode({ ...createProject(), scene: { ...scene, objects: [image] } })).toThrow(
-      'raster',
-    );
+    const result = emitGcode({ ...createProject(), scene: { ...scene, objects: [image] } });
+    expect(result.gcode).toBe('');
+    expect(result.preflight).toMatchObject({
+      ok: false,
+      issues: [{ code: 'focus-test-uncompilable', message: expect.stringContaining('raster') }],
+    });
   });
 });

@@ -7,6 +7,7 @@ import {
   type OutputScope,
   DEFAULT_CNC_LAYER_SETTINGS,
   machineKindOf,
+  sceneObjectUsesOperation,
   type CncLayerSettings,
   type Layer,
   type LayerOperationSettings,
@@ -77,6 +78,13 @@ function spatialProject(
     retainAllCoordinates,
     !placementAnchorBound,
   );
+  // Placement dependencies may retain unselected artwork, but its Focus Z
+  // metadata cannot change the selected program's motion.
+  const selectedIds = scope.cutSelectedGraphics ? new Set(scope.selectedObjectIds) : undefined;
+  const focusArtwork =
+    selectedIds === undefined
+      ? scene.objects
+      : scene.objects.filter((object) => selectedIds.has(object.id));
   const projected = {
     ...base,
     ...(isCnc && setup?.twoSided !== undefined
@@ -91,7 +99,15 @@ function spatialProject(
     device: spatialDevice(project.device),
     scene: {
       ...scene,
-      layers: scene.layers.map((layer) => spatialLayer(layer, isCnc)),
+      layers: scene.layers.map((layer) =>
+        spatialLayer(
+          layer,
+          isCnc,
+          layer.focusTest !== undefined &&
+            layer.output &&
+            focusArtwork.some((object) => sceneObjectUsesOperation(object, layer)),
+        ),
+      ),
       objects: scene.objects.map(spatialObject),
     },
   };
@@ -154,14 +170,14 @@ function spatialDevice(device: DeviceProfile): DeviceProfile {
   ) as DeviceProfile;
 }
 
-function spatialLayer(layer: Layer, isCnc: boolean): Layer {
-  const { materialBinding: _binding, ...base } = spatialSettings(layer) as Layer;
+function spatialLayer(layer: Layer, isCnc: boolean, hasOutputArtwork: boolean): Layer {
+  const { materialBinding: _binding, focusTest, ...base } = spatialSettings(layer) as Layer;
   const cnc = layer.cnc ?? (isCnc ? DEFAULT_CNC_LAYER_SETTINGS : undefined);
   return {
     ...base,
-    ...(layer.focusTest === undefined
+    ...(focusTest === undefined || !hasOutputArtwork
       ? {}
-      : { focusTest: { ...layer.focusTest, travelFeedMmPerMin: 1 } }),
+      : { focusTest: { ...focusTest, travelFeedMmPerMin: 1 } }),
     name: '',
     subLayers: layer.subLayers.map((subLayer) => ({
       ...subLayer,

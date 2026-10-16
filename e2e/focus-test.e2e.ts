@@ -111,3 +111,31 @@ test('Focus Test cancellation, invalid input and maximum sample boundary', async
   await history(page, false);
   await expect.poll(async () => (await snapshot(page)).project.scene.objects.length).toBe(0);
 });
+
+test('Focus Test invalid Fill preview reports its reason and recovers after restoring Line', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await runMenuCommand(page, 'Tools', 'Focus Test...');
+  const dialog = page.getByRole('dialog', { name: 'Focus Test', exact: true });
+  await dialog.getByLabel('Samples', { exact: true }).fill('2');
+  await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await page.getByRole('radio', { name: 'Fill', exact: true }).check();
+  await (await toolbarCommand(page, 'Preview')).click();
+  const preview = page.getByRole('region', { name: 'Preview playback', exact: true });
+  await expect(preview.getByRole('alert')).toContainText(
+    'Focus Test samples require Line mode to retain their Z-motion meaning.',
+    { timeout: 30_000 },
+  );
+  await expect(preview.getByText('Preparing preview…', { exact: true })).toBeHidden();
+  await page.screenshot({ path: test.info().outputPath('focus-invalid-fill-preview.png') });
+  await page.getByRole('radio', { name: 'Line', exact: true }).check();
+  await expect(preview.getByRole('alert')).toBeHidden({ timeout: 30_000 });
+  await expect(preview.getByText('Preparing preview…', { exact: true })).toBeHidden();
+  await expect(
+    preview.getByRole('button', { name: 'Play route preview', exact: true }),
+  ).toBeEnabled();
+  expect(errors).toEqual([]);
+});

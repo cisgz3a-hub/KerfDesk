@@ -121,7 +121,10 @@ export function focusTestProfileIssue(device: DeviceProfile): string | null {
     : 'Focus Test Z output currently supports GRBL, grblHAL and FluidNC only.';
 }
 
-export function focusTestWarnings(layers: ReadonlyArray<Layer>, device: DeviceProfile): string[] {
+export function focusTestWarnings(
+  layers: ReadonlyArray<Pick<Layer, 'output' | 'focusTest'>>,
+  device: DeviceProfile,
+): string[] {
   const samples = layers.filter((layer) => layer.output && layer.focusTest !== undefined);
   if (samples.length === 0) return [];
   const offsets = samples.map((layer) => layer.focusTest?.offsetMm ?? 0);

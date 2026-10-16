@@ -51,6 +51,7 @@ import {
 } from './program-materialization';
 import { prepareReliefAuthoringLinks } from './prepare-relief-authoring-links';
 import { reliefMaterializationFailure } from './relief-materialization-failure';
+import { focusTestCompilationFailure } from './focus-test-compilation-failure';
 import { contourEntryBoundsForDevice, withContourEntryBounds } from '../../core/job/contour-entry';
 import { placeCncParks } from '../../core/job/job-origin';
 import { placeLaserFinish } from '../../core/job/laser-finish';
@@ -123,6 +124,8 @@ export function prepareOutput(
     }
     return completePreparedOutput(input, compiled.job);
   } catch (error) {
+    const focusFailure = focusTestCompilationFailure(error);
+    if (focusFailure !== null) return { ok: false, preflight: focusFailure };
     if (isProgramMaterializationRangeError(error)) {
       return { ok: false, preflight: programMaterializationFailure() };
     }

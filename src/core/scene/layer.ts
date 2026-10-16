@@ -314,7 +314,7 @@ export function layerFromSubLayer(layer: Layer, subLayer: LayerSubLayer): Layer 
     bindingOperationId: layer.id,
     visible: layer.visible,
     output: layer.output && subLayer.enabled,
-    ...subLayer.settings,
+    ...captureLayerOperationSettings(subLayer.settings),
     subLayers: [],
   };
 }

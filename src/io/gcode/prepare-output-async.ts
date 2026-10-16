@@ -16,6 +16,7 @@ import {
   programMaterializationFailure,
 } from './program-materialization';
 import { reliefMaterializationFailure } from './relief-materialization-failure';
+import { focusTestCompilationFailure } from './focus-test-compilation-failure';
 import {
   completePreparedOutput,
   prepareOutputInput,
@@ -62,6 +63,8 @@ export async function prepareOutputAsync(
     emitProgress(context, 'finalizing', 'direct', 0, 0, 0, 0);
     return completePreparedOutput(input, compiled.job);
   } catch (error) {
+    const focusFailure = focusTestCompilationFailure(error);
+    if (focusFailure !== null) return { ok: false, preflight: focusFailure };
     if (isProgramMaterializationRangeError(error)) {
       return { ok: false, preflight: programMaterializationFailure() };
     }

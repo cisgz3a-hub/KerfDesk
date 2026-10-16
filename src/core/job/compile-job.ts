@@ -9,6 +9,7 @@ import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version
 import type { Group, Job, JobDiagnostic } from './job';
 import { compileVectorGroupsForLayer } from './compile-vector-operation';
 import { focusTestProfileIssue } from './focus-test';
+import { FocusTestCompilationError } from './focus-test-compilation-error';
 
 export function compileJob(
   scene: Scene,
@@ -85,7 +86,7 @@ function appendOperationCompilation(
       laserPowerScaleVersion,
     });
     if (operationLayer.focusTest !== undefined && raster.groups.length > 0)
-      throw new Error(
+      throw new FocusTestCompilationError(
         'Focus Test operations require vector Line artwork; raster output cannot retain their Z-motion meaning.',
       );
     for (const group of raster.groups) output.groups.push(group);
@@ -96,14 +97,18 @@ function appendOperationCompilation(
 function assertFocusOperation(layer: Layer, device: DeviceProfile): void {
   if (layer.focusTest === undefined) return;
   const issue = focusTestProfileIssue(device);
-  if (issue !== null) throw new Error(issue);
+  if (issue !== null) throw new FocusTestCompilationError(issue);
   if (layer.mode !== 'line')
-    throw new Error('Focus Test samples require Line mode to retain their Z-motion meaning.');
+    throw new FocusTestCompilationError(
+      'Focus Test samples require Line mode to retain their Z-motion meaning.',
+    );
 }
 
 function withFocusMotion(group: Group, layer: Layer): Group {
   if (layer.focusTest === undefined) return group;
   if (group.kind !== 'cut')
-    throw new Error('Focus Test artwork overrides must retain vector Line mode.');
+    throw new FocusTestCompilationError(
+      'Focus Test artwork overrides must retain vector Line mode.',
+    );
   return { ...group, focusTest: layer.focusTest };
 }

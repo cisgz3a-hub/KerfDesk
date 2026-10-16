@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { generateFocusTest } from '../../core/job/focus-test';
+import { createLayer } from '../../core/scene';
 import { fingerprintGcode } from '../../core/recovery';
 import { emitGcode } from '../../io/gcode/emit-gcode';
 import { useStore } from '../state';
@@ -28,6 +29,60 @@ beforeEach(() => {
 });
 
 describe('Focus Test execution and Frame identity', () => {
+  it('retains Frame when an unselected Focus operation changes', () => {
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          layers: [
+            ...state.project.scene.layers,
+            createLayer({ id: 'ordinary', color: '#123456' }),
+          ],
+          objects: [
+            ...state.project.scene.objects,
+            { ...state.project.scene.objects[0]!, id: 'ordinary-line', operationIds: ['ordinary'] },
+          ],
+        },
+      },
+      selectedObjectId: 'ordinary-line',
+      outputScopeSettings: { cutSelectedGraphics: true, useSelectionOrigin: false },
+    }));
+    const spatial = currentFrameSpatialSignature();
+    useStore.getState().setLayerParam('focus-test-1', {
+      focusTest: { offsetMm: -2, travelFeedMmPerMin: 450 },
+    });
+    expect(currentFrameSpatialSignature()).toBe(spatial);
+  });
+  it('binds only the selected Focus sample offset while ignoring its travel feed', () => {
+    useStore.setState({
+      selectedObjectId: 'focus-test-1-line',
+      outputScopeSettings: { cutSelectedGraphics: true, useSelectionOrigin: false },
+    });
+    const spatial = currentFrameSpatialSignature();
+    useStore.getState().setLayerParam('focus-test-2', {
+      focusTest: { offsetMm: 2, travelFeedMmPerMin: 300 },
+    });
+    expect(currentFrameSpatialSignature()).toBe(spatial);
+    useStore.getState().setLayerParam('focus-test-1', {
+      focusTest: { offsetMm: -1, travelFeedMmPerMin: 450 },
+    });
+    expect(currentFrameSpatialSignature()).toBe(spatial);
+    useStore.getState().setLayerParam('focus-test-1', {
+      focusTest: { offsetMm: -2, travelFeedMmPerMin: 450 },
+    });
+    expect(currentFrameSpatialSignature()).not.toBe(spatial);
+  });
+  it('ignores offsets on enabled Focus layers after their artwork is deleted', () => {
+    useStore.setState((state) => ({
+      project: { ...state.project, scene: { ...state.project.scene, objects: [] } },
+    }));
+    const spatial = currentFrameSpatialSignature();
+    useStore.getState().setLayerParam('focus-test-1', {
+      focusTest: { offsetMm: -2, travelFeedMmPerMin: 300 },
+    });
+    expect(currentFrameSpatialSignature()).toBe(spatial);
+  });
   it('does not invent a starting Z datum for recovery, including replay from line one', () => {
     const project = useStore.getState().project;
     const gcode = emitGcode(project).gcode;

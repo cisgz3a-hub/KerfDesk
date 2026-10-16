@@ -364,7 +364,7 @@ function normalizeLayerOperationSettings(value: unknown): LayerOperationSettings
   normalizeCommonLayerFields(settings);
   normalizeFillLayerFields(settings);
   normalizeImageLayerFields(settings);
-  return settings as unknown as LayerOperationSettings;
+  return captureLayerOperationSettings(settings as unknown as LayerOperationSettings);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

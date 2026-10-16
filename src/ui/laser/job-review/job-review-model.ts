@@ -1,5 +1,5 @@
 import { cncProgramReachWarnings } from '../../../io/cnc/cnc-program-reach';
-import { focusTestWarnings } from '../../../core/job/focus-test';
+import { compiledFocusTestWarnings } from './focus-test-warnings';
 // buildJobReviewModel maps one successful Start preparation and its store
 // snapshots into the Job Review display model (ADR-224). Live editable sections
 // still read stores directly; compiled facts come from the prepared job.
@@ -119,7 +119,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
     // was previously only a transient toast, so it joins the review here.
     // The M7 check runs against the exact prepared program, not the settings.
     warnings: uniqueReviewWarnings([
-      ...focusTestWarnings(args.project.scene.layers, args.project.device),
+      ...compiledFocusTestWarnings(args.prepared.prepared),
       ...args.prepared.warnings,
       ...detectM7AirAssistWarnings(
         args.prepared.gcode,

@@ -5,6 +5,11 @@
     "sha256": "55673367b8a7cd091f9e7083ac464ea2e17235510cc2d926f576399d62f03b84"
   },
   {
+    "file": "evidence/remaining-tools-2026-10-16/air-relative-review-tests.json.gz",
+    "bytes": 2670,
+    "sha256": "479071a961053e16c7039b938b4a35d1d8425649df74b2802853f9790bea511b"
+  },
+  {
     "file": "evidence/remaining-tools-2026-10-16/automated-board.png",
     "bytes": 108785,
     "sha256": "ac39e336144f8be77b11a116d34db90ed55f6b53851db47b3480f2d4e43e446c"
@@ -18,6 +23,16 @@
     "file": "evidence/remaining-tools-2026-10-16/automated-focus-inspector.png",
     "bytes": 204914,
     "sha256": "bdda396166e261c9ec3f224a5ec5f6e7ff35fb1af3caa13f0fc08dbd437fac51"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/automated-focus-invalid-preview.png",
+    "bytes": 157285,
+    "sha256": "138c7ee896fe9f387f930f314e91043f297e9b09bde5e57e92a4e6ead6866dd0"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/automated-focus-review-inspector.png",
+    "bytes": 204897,
+    "sha256": "54e40e5cdfc8763d699020e354c1bc759270e9cfd16e9ab78d22b3599b12606d"
   },
   {
     "file": "evidence/remaining-tools-2026-10-16/automated-print-cut.png",
@@ -85,6 +100,21 @@
     "sha256": "fd2458502140ef58df4d88e834eadaefd174ce4d5148c6e07e9bed8d0f300088"
   },
   {
+    "file": "evidence/remaining-tools-2026-10-16/focus-review-browser.json.gz",
+    "bytes": 624010,
+    "sha256": "a735ca771284407386cd02372e69666fef64cf362fd0f2968758bd6778c7ab94"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/focus-review-regressions.json.gz",
+    "bytes": 2841,
+    "sha256": "406b490ebb4f9751070ac4bd70d59c92d39f40575094a7745ab8b4c05e9b6b4a"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/focus-review-scope-vitest.json.gz",
+    "bytes": 2092,
+    "sha256": "8ec78774a7a5cb6cb0764d5db76690b43b30292f3bbd8bb272213c20057a7413"
+  },
+  {
     "file": "evidence/remaining-tools-2026-10-16/image-ai-browser.json.gz",
     "bytes": 1310,
     "sha256": "39113a4da33611c24e7f4057fa6620459c665f39b6622e692b2f86807ec7c2fb"
@@ -108,5 +138,15 @@
     "file": "evidence/remaining-tools-2026-10-16/release-integrity-schema18-unsandboxed.log.gz",
     "bytes": 27725,
     "sha256": "4264c8022548a19d0927196b3897024d8246cd7a08e151446230fbc9a0ae47e9"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/review-bundle-source.json.gz",
+    "bytes": 2810,
+    "sha256": "c84bfc9ad294916b0866bb2601af9dfc6d9546df3885185f3aabee8e30948c1a"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/review-emitter-unsandboxed.json.gz",
+    "bytes": 1213,
+    "sha256": "fe95b30234cf9effcd90ebb1a0cb1405419526279e25b5bd0c35418953090fe2"
   }
 ]
