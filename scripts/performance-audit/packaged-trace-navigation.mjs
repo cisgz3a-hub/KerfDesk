@@ -163,6 +163,16 @@ function assertPanResponse(before, after) {
   if (!painted) throw new Error('Pan did not produce a workspace paint response');
 }
 
+/** Archive identity must follow the verified OS executable, never its supplied alias. */
+export async function packageEvidenceForOwner(owner) {
+  const executable = owner.executable;
+  if (!isAbsolute(executable) || !(await stat(executable)).isFile())
+    throw new Error('Expected a canonical packaged executable file');
+  const archive = join(dirname(executable), 'resources', 'app.asar');
+  const metadata = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
+  return { executable, archive, packaged: freePackageEvidence(metadata) };
+}
+
 export async function runProbe(options) {
   const expectedPid = Number(options['expected-pid']);
   if (!Number.isSafeInteger(expectedPid) || expectedPid <= 0)
@@ -171,11 +181,7 @@ export async function runProbe(options) {
   const endpoint = validateEndpoint(options.endpoint);
   if (!isAbsolute(options.executable) || !isAbsolute(options.output))
     throw new Error('Executable and output paths must be absolute');
-  const executable = resolve(options.executable);
-  if (!(await stat(executable)).isFile()) throw new Error('Expected a packaged executable file');
-  const archive = join(dirname(executable), 'resources', 'app.asar');
-  const metadata = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
-  const packaged = freePackageEvidence(metadata);
+  const { executable, archive, packaged } = await packageEvidenceForOwner(owner);
   const receipt = {
     mode: options.mode,
     startedAt: new Date().toISOString(),

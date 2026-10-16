@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import vm from 'node:vm';
+import { mkdtemp, mkdir, writeFile, symlink, realpath, rm } from 'node:fs/promises';
+import { join, resolve, sep } from 'node:path';
+import asar from '@electron/asar';
+import { verifyObservationOwner } from './packaged-observation-owner.mjs';
 import {
   freePackageEvidence,
+  packageEvidenceForOwner,
   panPlan,
   runPan,
   runProbe,
@@ -316,4 +321,88 @@ test('pan needs trusted workspace input and a workspace paint response', async (
   const result = await runPan(fixture.page);
   assert.equal(result.after.inputs.pointerup, 1);
   assert.equal(result.after.commands.workspace.drawImage, 2);
+});
+
+test('archive metadata follows the canonical process executable rather than a file alias', async (t) => {
+  const root = await mkdtemp(resolve('output-package-alias-test-'));
+  const oldAppData = process.env.APPDATA;
+  try {
+    const build = join(root, 'running-build');
+    const aliasDirectory = join(root, 'supplied-alias');
+    const isolation = join(root, 'isolated');
+    const profile = join(isolation, 'profile');
+    const ordinary = join(root, 'roaming');
+    await Promise.all(
+      [build, aliasDirectory, profile, ordinary].map((directory) =>
+        mkdir(directory, { recursive: true }),
+      ),
+    );
+    const executable = join(build, 'KerfDesk.exe');
+    const alias = join(aliasDirectory, 'KerfDesk.exe');
+    await writeFile(executable, 'fixture');
+    try {
+      await symlink(executable, alias, 'file');
+    } catch (error) {
+      if (error.code === 'EPERM' || error.code === 'EACCES') {
+        t.skip('File symlinks unavailable on this host');
+        return;
+      }
+      throw error;
+    }
+    for (const [directory, version] of [
+      [build, '1.0.20'],
+      [aliasDirectory, '9.9.9'],
+    ]) {
+      const source = join(directory, 'source');
+      await mkdir(source);
+      await mkdir(join(directory, 'resources'));
+      await writeFile(join(source, 'package.json'), JSON.stringify({ version }));
+      await asar.createPackage(source, join(directory, 'resources', 'app.asar'));
+    }
+    process.env.APPDATA = ordinary;
+    const result = join(isolation, 'ready.json');
+    await writeFile(
+      result,
+      JSON.stringify({
+        mode: 'interactive-observation',
+        isPackaged: true,
+        isolated: true,
+        readyToShow: true,
+        userData: profile,
+        sessionData: profile,
+      }),
+    );
+    const identity = {
+      pid: 123,
+      executable,
+      startedAt: new Date(Date.now() - 60_000).toISOString(),
+      commandLine:
+        '"' +
+        executable +
+        '" --kerfdesk-native-smoke-interactive "--kerfdesk-native-smoke-user-data=' +
+        profile +
+        '" "--kerfdesk-native-smoke-result=' +
+        result +
+        '"',
+    };
+    const owner = await verifyObservationOwner(
+      {
+        'expected-pid': 123,
+        executable: alias,
+        'expected-profile': profile,
+        'isolation-root': isolation,
+      },
+      async () => identity,
+    );
+    const evidence = await packageEvidenceForOwner(owner);
+    assert.equal(evidence.executable, await realpath(executable));
+    assert.equal(evidence.archive, join(build, 'resources', 'app.asar'));
+    assert.equal(evidence.packaged.version, '1.0.20');
+    assert.notEqual(evidence.packaged.version, '9.9.9');
+  } finally {
+    if (oldAppData === undefined) delete process.env.APPDATA;
+    else process.env.APPDATA = oldAppData;
+    assert.ok(root.startsWith(process.cwd() + sep));
+    await rm(root, { recursive: true, force: true });
+  }
 });
