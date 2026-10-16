@@ -6,7 +6,7 @@ import { expect, test, type Page } from './fixtures/kerfdesk-test';
 test.use({ trace: 'off', viewport: { width: 3840, height: 2160 } });
 test.skip(process.env['KERFDESK_DENSE_CANVAS_AUDIT'] !== '1', 'Opt-in full-renderer canvas audit');
 
-test('a completed dense trace uses bitmap draws while panning and zooming a large canvas', async ({
+test('a completed dense trace uses bitmap draws while panning, zooming and moving on a large canvas', async ({
   page,
 }, info) => {
   test.setTimeout(240_000);
@@ -39,6 +39,7 @@ test('a completed dense trace uses bitmap draws while panning and zooming a larg
   expect(pan.imageDraws).toBeGreaterThanOrEqual(10);
   // Bed/rulers/selection still draw; the thousands of artwork contours must not.
   expect(pan.lineCommands).toBeLessThan(12_000);
+  expectTranslationReuse(pan);
 
   await startPaintProbe(page);
   for (let step = 0; step < 5; step += 1) {
@@ -50,13 +51,101 @@ test('a completed dense trace uses bitmap draws while panning and zooming a larg
   const zoom = await readPaintProbe(page);
   expect(zoom.imageDraws).toBeGreaterThanOrEqual(4);
   expect(zoom.lineCommands).toBeLessThan(12_000);
+  // Zoom may replace the exact-resolution sprite after each settled scale.
+  expect(zoom.spriteRebuilds).toBeLessThanOrEqual(6);
+  expect(await geometryHash(page)).toBe(initial.geometryHash);
+  await positionDenseTrace(page);
+  await page.waitForTimeout(400);
+  const target = await traceDragTarget(page);
+  await page.mouse.move(target.x, target.y);
+  await page.mouse.down();
+  await startPaintProbe(page);
+  for (let step = 1; step <= 12; step += 1) {
+    const before = (await readPaintProbe(page)).imageDraws;
+    await page.mouse.move(target.x + step * 5, target.y + step * 2);
+    await expect.poll(async () => (await readPaintProbe(page)).imageDraws).toBeGreaterThan(before);
+  }
+  await page.mouse.up();
+  const move = await readPaintProbe(page);
+  expect(move.imageDraws).toBeGreaterThanOrEqual(10);
+  expect(move.lineCommands).toBeLessThan(12_000);
+  expectTranslationReuse(move);
+  const moved = await traceDragTarget(page);
+  expect(
+    Math.hypot(moved.transform.x - target.transform.x, moved.transform.y - target.transform.y),
+  ).toBeGreaterThan(0.1);
+  expect(await geometryHash(page)).toBe(initial.geometryHash);
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await traceDragTarget(page)).transform).toEqual(target.transform);
+  // Negative control: invalidate the real sprite cache before each translation.
+  // The identical reuse metric must reject the resulting offscreen raster work.
+  await page.waitForTimeout(400);
+  await startPaintProbe(page);
+  await page.mouse.move(x, y);
+  await page.mouse.down({ button: 'middle' });
+  for (let step = 1; step <= 6; step += 1) {
+    await page.evaluate(async () => {
+      const cachePath = '/src/ui/workspace/artwork-sprite-cache.ts';
+      const cache = (await import(
+        /* @vite-ignore */ cachePath
+      )) as typeof import('../src/ui/workspace/artwork-sprite-cache');
+      cache.resetArtworkSpritesForTests();
+    });
+    const before = (await readPaintProbe(page)).imageDraws;
+    await page.mouse.move(x + step * 5, y + step * 2);
+    await expect.poll(async () => (await readPaintProbe(page)).imageDraws).toBeGreaterThan(before);
+  }
+  await page.mouse.up({ button: 'middle' });
+  const invalidated = await readPaintProbe(page);
+  expect(invalidated.spriteRebuilds).toBeGreaterThanOrEqual(6);
+  expect(() => expectTranslationReuse(invalidated)).toThrow();
   expect(await geometryHash(page)).toBe(initial.geometryHash);
   await info.attach('dense-trace-navigation.json', {
-    body: JSON.stringify({ initial, pan, zoom }, null, 2),
+    body: JSON.stringify(
+      { initial, pan, zoom, move, invalidated, before: target.transform, after: moved.transform },
+      null,
+      2,
+    ),
     contentType: 'application/json',
   });
   await canvas.screenshot({ path: info.outputPath('dense-trace-after-navigation.png') });
 });
+
+async function traceDragTarget(page: Page) {
+  return page.evaluate(async () => {
+    const storePath = '/src/ui/state/store.ts';
+    const uiPath = '/src/ui/state/ui-store.ts';
+    const viewPath = '/src/ui/workspace/view-transform.ts';
+    const { useStore } = (await import(/* @vite-ignore */ storePath)) as {
+      useStore: { getState: () => { project: Project } };
+    };
+    const { useUiStore } = (await import(/* @vite-ignore */ uiPath)) as {
+      useUiStore: { getState: () => { zoomFactor: number; panX: number; panY: number } };
+    };
+    const { computeView } = (await import(
+      /* @vite-ignore */ viewPath
+    )) as typeof import('../src/ui/workspace/view-transform');
+    const project = useStore.getState().project;
+    const trace = project.scene.objects.find((object) => object.kind === 'traced-image');
+    const canvas = document.querySelector<HTMLCanvasElement>('canvas[aria-label$=" workspace"]');
+    if (trace === undefined || canvas === null) throw new Error('Missing trace or canvas');
+    const view = computeView(
+      canvas.width,
+      canvas.height,
+      project.device.bedWidth,
+      project.device.bedHeight,
+      useUiStore.getState(),
+    );
+    const rect = canvas.getBoundingClientRect();
+    // Inside rounded contour 775, away from handles. The fixture uses identity
+    // scale/rotation; movement changes only its translation.
+    return {
+      x: rect.x + (153 + trace.transform.x) * view.scale + view.offsetX,
+      y: rect.y + (155 + trace.transform.y) * view.scale + view.offsetY,
+      transform: trace.transform,
+    };
+  });
+}
 
 async function installDenseTrace(page: Page): Promise<void> {
   await page.evaluate(async () => {
@@ -176,6 +265,8 @@ async function geometryHash(page: Page): Promise<string> {
 interface PaintProbe {
   lineCommands: number;
   imageDraws: number;
+  spriteRebuilds: number;
+  offscreenLineCommands: number;
 }
 type ProbeWindow = Window & { __denseCanvasPaint?: PaintProbe };
 
@@ -186,18 +277,57 @@ async function startPaintProbe(page: Page): Promise<void> {
       const canvas = document.querySelector<HTMLCanvasElement>('canvas[aria-label$=" workspace"]');
       const context = canvas?.getContext('2d');
       if (context === null || context === undefined) throw new Error('Workspace context missing');
-      const lineTo = context.lineTo.bind(context);
-      const drawImage = context.drawImage.bind(context);
-      context.lineTo = (...args: Parameters<typeof lineTo>) => {
-        if (state.__denseCanvasPaint !== undefined) state.__denseCanvasPaint.lineCommands += 1;
-        lineTo(...args);
-      };
-      context.drawImage = ((...args: Parameters<typeof drawImage>) => {
-        if (state.__denseCanvasPaint !== undefined) state.__denseCanvasPaint.imageDraws += 1;
-        drawImage(...args);
-      }) as typeof drawImage;
+      // Wrap prototypes so cached and newly allocated sprite contexts are seen.
+      // Keep workspace overlays separate from offscreen rasterisation.
+      const prototypes = [CanvasRenderingContext2D.prototype];
+      if (typeof OffscreenCanvasRenderingContext2D !== 'undefined')
+        prototypes.push(
+          OffscreenCanvasRenderingContext2D.prototype as unknown as typeof CanvasRenderingContext2D.prototype,
+        );
+      const rasterWork = new WeakMap<object, number>();
+      for (const prototype of prototypes) {
+        const lineTo = prototype.lineTo;
+        const drawImage = prototype.drawImage;
+        for (const method of ['fill', 'stroke'] as const) {
+          const original = prototype[method];
+          prototype[method] = function (this: CanvasRenderingContext2D, ...args: unknown[]) {
+            if (this.canvas !== canvas)
+              rasterWork.set(this.canvas, (rasterWork.get(this.canvas) ?? 0) + 1);
+            return Reflect.apply(original, this, args);
+          } as typeof original;
+        }
+        prototype.lineTo = function (...args: Parameters<typeof lineTo>) {
+          const probe = state.__denseCanvasPaint;
+          if (probe) {
+            if (this.canvas === canvas) probe.lineCommands++;
+            else probe.offscreenLineCommands++;
+          }
+          return Reflect.apply(lineTo, this, args);
+        };
+        prototype.drawImage = function (
+          this: CanvasRenderingContext2D,
+          ...args: Parameters<typeof drawImage>
+        ) {
+          const probe = state.__denseCanvasPaint;
+          if (this.canvas === canvas && probe) {
+            probe.imageDraws++;
+            const source = args[0];
+            // Count raster work only on actual bitmap sources consumed by the workspace.
+            if ((rasterWork.get(source) ?? 0) > 0) {
+              probe.spriteRebuilds++;
+              rasterWork.delete(source);
+            }
+          }
+          return Reflect.apply(drawImage, this, args);
+        } as typeof drawImage;
+      }
     }
-    state.__denseCanvasPaint = { lineCommands: 0, imageDraws: 0 };
+    state.__denseCanvasPaint = {
+      lineCommands: 0,
+      imageDraws: 0,
+      spriteRebuilds: 0,
+      offscreenLineCommands: 0,
+    };
   });
 }
 
@@ -207,4 +337,9 @@ async function readPaintProbe(page: Page): Promise<PaintProbe> {
     if (result === undefined) throw new Error('Paint probe not started');
     return { ...result };
   });
+}
+
+function expectTranslationReuse(probe: PaintProbe): void {
+  // One initial/style transition is permitted; rebuilding each drag frame is not.
+  expect(probe.spriteRebuilds).toBeLessThanOrEqual(2);
 }
