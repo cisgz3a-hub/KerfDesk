@@ -98,5 +98,15 @@
     "file": "evidence/remaining-tools-2026-10-16/integration-vitest.json.gz",
     "bytes": 47590,
     "sha256": "aef4869d65aa375e0f5c2ecf4a5a2f57f74551cf38125f2f1b8ce9f0d427ab0c"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/native-nsis-archive-tool.log.gz",
+    "bytes": 187,
+    "sha256": "c9e4f25127258449ca5cb83e73585f976de3295a01255baf346c65426de29614"
+  },
+  {
+    "file": "evidence/remaining-tools-2026-10-16/release-integrity-schema18-unsandboxed.log.gz",
+    "bytes": 27725,
+    "sha256": "4264c8022548a19d0927196b3897024d8246cd7a08e151446230fbc9a0ae47e9"
   }
 ]
