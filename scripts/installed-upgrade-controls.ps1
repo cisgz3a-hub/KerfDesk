@@ -176,11 +176,15 @@ function Set-UpgradeMachine($Machine) {
 }
 
 function Invoke-UpgradeFileCommand([string]$Name) {
-  # The primary toolbar owns Open and Import; Save As lives in More commands.
-  if ($Name -eq 'Save As...') {
-    Invoke-UpgradeControl 'More commands'
-    Invoke-UpgradeControl $Name 'MenuItem' -Prefix
-  } else { Invoke-UpgradeControl $Name }
+  # Responsive layouts can move any file command into More. Historical builds
+  # may still expose it as a primary button, so follow the actual visible UI.
+  $button = Get-UpgradeControl $Name 'Button' -TimeoutSeconds 1 -Optional
+  if ($null -ne $button) {
+    Invoke-UpgradeControl $Name
+    return
+  }
+  Invoke-UpgradeControl 'More commands'
+  Invoke-UpgradeControl $Name 'MenuItem' -Prefix -RevealOffscreen
 }
 
 function Assert-UpgradePreferences($Value) {
