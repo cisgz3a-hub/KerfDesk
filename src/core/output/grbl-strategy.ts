@@ -155,10 +155,15 @@ function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string[]
   return lines;
 }
 
+type SegmentBurnContext = Pick<
+  SegmentEmissionContext,
+  'laserPowerScaleVersion' | 's' | 'feed' | 'dialect' | 'arcMovesEnabled' | 'entryRunwayMm'
+>;
+
 function segmentBurnLines(
   seg: CutSegment,
   first: { readonly x: number; readonly y: number },
-  context: SegmentEmissionContext,
+  context: SegmentBurnContext,
 ): SegmentBurns | null {
   // Fitted arc moves (ADR-432) replace the polyline when this output writes them.
   const arcs = arcSegmentBurns(seg, first, context);
@@ -170,7 +175,7 @@ function segmentBurnLines(
 function polylineSegmentBurns(
   seg: CutSegment,
   first: { readonly x: number; readonly y: number },
-  context: SegmentEmissionContext,
+  context: SegmentBurnContext,
 ): SegmentBurns | null {
   const { s, feed, dialect } = context;
   const lines: string[] = [];
@@ -236,6 +241,35 @@ function segmentApproachLines(
     ),
     ...laserOffMoveLines(cursor, firstHead, laserOffRunwayLine(first.x, first.y, context.feed)),
   ];
+}
+
+/** Use the burn emitter itself so rounding, arcs and final-pass edits cannot disagree. */
+export function hasRepresentedCutBurn(
+  group: CutGroup,
+  context: Pick<
+    GroupEmissionContext,
+    'device' | 'dialect' | 'arcMovesEnabled' | 'laserPowerScaleVersion'
+  >,
+): boolean {
+  const segmentContext = {
+    ...context,
+    s: scaleS(group.power, context.device.maxPowerS, context.laserPowerScaleVersion),
+    feed: roundedPositiveFeed(group.speed, 'Layer ' + group.layerId),
+    entryRunwayMm: group.entryRunwayMm,
+  };
+  const finalPass = finalPassCutSegments(group);
+  for (let pass = 0; pass < group.passes; pass += 1) {
+    for (const segment of cutSegmentsForPass(group, finalPass, pass, group.passes)) {
+      const first = segment.polyline[0];
+      if (
+        first !== undefined &&
+        segment.polyline.length >= 2 &&
+        segmentBurnLines(segment, first, segmentContext) !== null
+      )
+        return true;
+    }
+  }
+  return false;
 }
 
 function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
@@ -339,6 +373,7 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
 function emitAnyGroup(group: Group, context: GroupEmissionContext): string {
   switch (group.kind) {
     case 'cut':
+      if (group.focusTest !== undefined && !hasRepresentedCutBurn(group, context)) return '';
       return emitFocusTestGroup(group, context, () => emitGroup(group, context));
     case 'fill':
       return (group.fillStyle ?? 'scanline') === 'offset'
