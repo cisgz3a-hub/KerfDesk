@@ -1,8 +1,16 @@
+import { createHash } from 'node:crypto';
+
 // Fixed attach-only diagnostic source. It is never bundled into the shipped application.
 // It observes the main renderer only. Worker canvases and actual presentation are not measured.
-export const NATIVE_CANVAS_OBSERVER_SOURCE = String.raw`(() => {
+const OBSERVER_BODY = String.raw`(() => {
   const key = '__kerfdeskNativeCanvasObservation';
-  if (window[key]) return { installed: true };
+  const version = 2;
+  const sourceId = '__OBSERVER_SOURCE_ID__';
+  if (window[key]) {
+    if (window[key].version !== version || window[key].sourceId !== sourceId)
+      throw new Error('Stale observer identity; dispose it explicitly before reinstalling');
+    return { installed: true, version, sourceId };
+  }
   let canvas = document.querySelector('canvas[aria-label$=" workspace"]');
   let startedAt = performance.now();
   const methods = ['drawImage', 'lineTo', 'bezierCurveTo', 'quadraticCurveTo', 'fill', 'stroke'];
@@ -31,12 +39,16 @@ export const NATIVE_CANVAS_OBSERVER_SOURCE = String.raw`(() => {
   const inputs = { pointerdown: 0, pointermove: 0, pointerup: 0, pointercancel: 0, wheel: 0, syntheticIgnored: 0 };
   const inputEvents = [];
   let lastNavigationInput = -Infinity;
+  let navigationFramePending = false;
   const inputTypes = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'wheel'];
   const onInput = (event) => {
     if (event.target !== canvas) return;
     if (!event.isTrusted) { inputs.syntheticIgnored += 1; return; }
     inputs[event.type] += 1;
-    if (event.type === 'wheel' || event.buttons !== 0) lastNavigationInput = performance.now();
+    if (event.type === 'wheel' || event.buttons !== 0) {
+      lastNavigationInput = performance.now();
+      navigationFramePending = true;
+    }
     inputEvents.push({
       atMs: performance.now() - startedAt, type: event.type, button: event.button,
       buttons: event.buttons, x: event.clientX, y: event.clientY,
@@ -65,8 +77,10 @@ export const NATIVE_CANVAS_OBSERVER_SOURCE = String.raw`(() => {
     if (previousFrame !== null) {
       const duration = now - previousFrame;
       record(frameIntervals, duration);
-      if (now - lastNavigationInput <= 500) record(navigationFrameIntervals, duration);
+      if (navigationFramePending || now - lastNavigationInput <= 500) record(navigationFrameIntervals, duration);
     }
+    if (previousFrame === null && navigationFramePending && now > lastNavigationInput) record(navigationFrameIntervals, now - lastNavigationInput);
+    navigationFramePending = false;
     previousFrame = now;
     raf = requestAnimationFrame(onFrame);
   };
@@ -81,6 +95,20 @@ export const NATIVE_CANVAS_OBSERVER_SOURCE = String.raw`(() => {
     });
     observer.observe({ type: 'longtask' });
   }
+  const numberFormat = new Intl.NumberFormat(typeof navigator === 'undefined' ? 'en-US' : navigator.language);
+  const groupSeparator = numberFormat.formatToParts(12345).find((part) => part.type === 'group')?.value;
+  const localizedDigits = Array.from({ length: 10 }, (_, digit) =>
+    numberFormat.formatToParts(digit).find((part) => part.type === 'integer').value);
+  const displayedCount = (text, label) => {
+    const match = text.match(new RegExp('([\\p{Decimal_Number}][\\p{Decimal_Number}.,\\s\\u066b\\u066c]*) ' + label + 's?', 'u'));
+    if (!match) return null;
+    let digits = match[1].trim();
+    if (groupSeparator) digits = digits.split(groupSeparator).join('');
+    for (const [digit, localized] of localizedDigits.entries()) digits = digits.split(localized).join(String(digit));
+    if (!/^\d+$/.test(digits)) return null;
+    const value = Number(digits);
+    return Number.isSafeInteger(value) ? value : null;
+  };
   let lastTrace = null;
   const traceHistory = [];
   const traceObservation = () => {
@@ -90,8 +118,8 @@ export const NATIVE_CANVAS_OBSERVER_SOURCE = String.raw`(() => {
     const preset = document.querySelector('select[aria-label="Trace preset"]')?.value ?? null;
     const observation = {
       atMs: performance.now() - startedAt, state: status.getAttribute('data-state'), text, preset,
-      displayedPathCount: Number(text.match(/([\d,]+) paths?/i)?.[1]?.replaceAll(',', '')) || null,
-      displayedNodeCount: Number(text.match(/([\d,]+) nodes?/i)?.[1]?.replaceAll(',', '')) || null,
+      displayedPathCount: displayedCount(text, 'path'),
+      displayedNodeCount: displayedCount(text, 'node'),
       svgPathElements: document.querySelectorAll('.lf-trace-preview__vectors svg path').length,
     };
     if (!lastTrace || lastTrace.text !== text || lastTrace.preset !== preset) {
@@ -106,7 +134,7 @@ export const NATIVE_CANVAS_OBSERVER_SOURCE = String.raw`(() => {
     const rect = canvas?.getBoundingClientRect();
     const activeTrace = traceObservation();
     return JSON.parse(JSON.stringify({
-      elapsedMs: performance.now() - startedAt, visibility: document.visibilityState,
+      version, sourceId, elapsedMs: performance.now() - startedAt, visibility: document.visibilityState,
       canvas: canvas ? { width: canvas.width, height: canvas.height, devicePixelRatio,
         rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } } : null,
       commands, inputs, recentInputEvents: inputEvents, frameIntervals, navigationFrameIntervals,
@@ -114,6 +142,7 @@ export const NATIVE_CANVAS_OBSERVER_SOURCE = String.raw`(() => {
       nodePrimitives: { require: typeof require, process: typeof process, module: typeof module, Buffer: typeof Buffer },
       limitations: [
         'rAF intervals describe scheduling, not presented FPS.',
+        'Navigation timing includes input-to-first-frame latency when no prior frame exists in this epoch.',
         'isTrusted excludes DOM-dispatched input, but does not distinguish OS from Electron input.',
         'Other canvas counts include all main-renderer non-workspace contexts; workers are excluded.',
         'Trace counts are visible preview status, not a saved-project geometry verification.',
@@ -128,7 +157,8 @@ export const NATIVE_CANVAS_OBSERVER_SOURCE = String.raw`(() => {
     for (const stats of [frameIntervals, navigationFrameIntervals, longTasks]) {
       stats.count = 0; stats.totalMs = 0; stats.maxMs = 0; stats.buckets.fill(0);
     }
-    inputEvents.length = 0; previousFrame = null; lastNavigationInput = -Infinity;
+    inputEvents.length = 0; previousFrame = null; lastNavigationInput = -Infinity; navigationFramePending = false;
+    lastTrace = null; traceHistory.length = 0;
     return snapshot();
   };
   const dispose = () => {
@@ -139,8 +169,19 @@ export const NATIVE_CANVAS_OBSERVER_SOURCE = String.raw`(() => {
     for (const restore of restorers) restore();
     delete window[key];
   };
-  Object.defineProperty(window, key, { configurable: true, value: Object.freeze({ snapshot, reset, dispose }) });
-  return { installed: true };
+  Object.defineProperty(window, key, { configurable: true, value: Object.freeze({ version, sourceId, snapshot, reset, dispose }) });
+  return { installed: true, version, sourceId };
 })()`;
 
-export const NATIVE_CANVAS_SNAPSHOT_SOURCE = 'window.__kerfdeskNativeCanvasObservation.snapshot()';
+export const NATIVE_CANVAS_OBSERVER_SOURCE_ID = createHash('sha256')
+  .update(OBSERVER_BODY)
+  .digest('hex');
+export const NATIVE_CANVAS_OBSERVER_SOURCE = OBSERVER_BODY.replaceAll(
+  '__OBSERVER_SOURCE_ID__',
+  NATIVE_CANVAS_OBSERVER_SOURCE_ID,
+);
+function checkedObserverCall(method) {
+  return `(() => { const observer = window.__kerfdeskNativeCanvasObservation; if (observer?.version !== 2 || observer?.sourceId !== '${NATIVE_CANVAS_OBSERVER_SOURCE_ID}') throw new Error('Stale observer identity'); return observer.${method}(); })()`;
+}
+export const NATIVE_CANVAS_SNAPSHOT_SOURCE = checkedObserverCall('snapshot');
+export const NATIVE_CANVAS_RESET_SOURCE = checkedObserverCall('reset');

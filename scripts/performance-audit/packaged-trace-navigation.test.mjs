@@ -252,3 +252,68 @@ test('endpoint PID guard verifies the browser process and detaches on mismatch',
     await assert.rejects(runProbe({ 'expected-pid': expectedPid }), /expected-pid/);
   }
 });
+
+function panFixture({ overlay = false, pointer = true, paint = true, missing = null } = {}) {
+  const rect = { x: 0, y: 0, width: 1200, height: 600 };
+  const canvas = { getBoundingClientRect: () => rect };
+  let samples = 0;
+  const events = [];
+  const context = vm.createContext({
+    document: {
+      visibilityState: 'visible',
+      querySelectorAll: () => [],
+      querySelector: () => canvas,
+      elementFromPoint: () => (overlay ? { overlay: true } : canvas),
+    },
+  });
+  return {
+    events,
+    page: {
+      evaluate: async (source, arg) => {
+        if (typeof source === 'function') {
+          context.arg = arg;
+          return vm.runInContext('(' + source.toString() + ')(arg)', context);
+        }
+        const after = samples++ > 0;
+        return {
+          inputs: {
+            pointerdown: after && pointer ? 1 : 0,
+            pointermove: after && pointer ? 13 : 0,
+            pointerup: after && pointer ? 1 : 0,
+            ...(missing ? { [missing]: 0 } : {}),
+          },
+          commands: {
+            workspace: { drawImage: after && paint ? 2 : 0 },
+            otherCanvas2d: { stroke: 99 },
+          },
+        };
+      },
+      mouse: Object.fromEntries(
+        ['move', 'down', 'up'].map((name) => [
+          name,
+          async (...args) => events.push([name, ...args]),
+        ]),
+      ),
+    },
+  };
+}
+test('pan refuses an overlay-covered workspace before sending input', async () => {
+  const fixture = panFixture({ overlay: true });
+  await assert.rejects(runPan(fixture.page), /workspace|covered|intercept/i);
+  assert.equal(fixture.events.length, 0);
+});
+test('pan needs trusted workspace input and a workspace paint response', async () => {
+  for (const options of [
+    { pointer: false },
+    { paint: false },
+    ...['pointerdown', 'pointermove', 'pointerup'].map((missing) => ({ missing })),
+  ]) {
+    const fixture = panFixture(options);
+    await assert.rejects(runPan(fixture.page), /workspace|input|paint/i);
+    assert.equal(fixture.events.at(-1)[0], 'up');
+  }
+  const fixture = panFixture();
+  const result = await runPan(fixture.page);
+  assert.equal(result.after.inputs.pointerup, 1);
+  assert.equal(result.after.commands.workspace.drawImage, 2);
+});

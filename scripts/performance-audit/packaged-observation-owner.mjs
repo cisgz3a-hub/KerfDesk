@@ -89,7 +89,9 @@ export async function verifyObservationOwner(options, readProcess = readWindowsP
     same(ordinary, root) ||
     inside(ordinary, root) ||
     same(ordinary, profile) ||
-    inside(ordinary, profile)
+    inside(ordinary, profile) ||
+    same(ordinary, result) ||
+    inside(ordinary, result)
   )
     throw new Error('Ordinary app/user profile is forbidden');
   const receiptStat = await stat(result);

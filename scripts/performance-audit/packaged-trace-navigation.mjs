@@ -16,6 +16,7 @@ import { chromium } from '@playwright/test';
 import {
   NATIVE_CANVAS_OBSERVER_SOURCE,
   NATIVE_CANVAS_SNAPSHOT_SOURCE,
+  NATIVE_CANVAS_RESET_SOURCE,
 } from './packaged-canvas-observer.mjs';
 
 export function freePackageEvidence(metadata) {
@@ -114,6 +115,15 @@ export async function runPan(page) {
     return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
   });
   const plan = panPlan(rect);
+  await page.evaluate((plan) => {
+    const canvas = document.querySelector('canvas[aria-label$=" workspace"]');
+    for (let step = 0; step <= plan.steps; step += 1) {
+      const x = plan.start.x + (plan.dx * step) / plan.steps;
+      const y = plan.start.y + (plan.dy * step) / plan.steps;
+      if (!canvas || document.elementFromPoint(x, y) !== canvas)
+        throw new Error('Pan workspace trajectory is covered or intercepted');
+    }
+  }, plan);
   const before = await snapshot(page);
   await page.mouse.move(plan.start.x, plan.start.y);
   let pressed = false;
@@ -131,12 +141,26 @@ export async function runPan(page) {
     if (pressed) await page.mouse.up({ button: 'middle' });
   }
   await delay(150);
+  const after = await snapshot(page);
+  assertPanResponse(before, after);
   return {
     inputSource: 'CDP-injected middle-button drag',
     plan,
     before,
-    after: await snapshot(page),
+    after,
   };
+}
+
+function assertPanResponse(before, after) {
+  const increased = (a, b) => Number.isSafeInteger(a) && a >= 0 && Number.isSafeInteger(b) && b > a;
+  for (const type of ['pointerdown', 'pointermove', 'pointerup']) {
+    if (!increased(before?.inputs?.[type], after?.inputs?.[type]))
+      throw new Error('Pan did not produce trusted workspace pointer input');
+  }
+  const painted = Object.entries(after?.commands?.workspace ?? {}).some(([method, count]) =>
+    increased(before?.commands?.workspace?.[method], count),
+  );
+  if (!painted) throw new Error('Pan did not produce a workspace paint response');
 }
 
 export async function runProbe(options) {
@@ -179,7 +203,7 @@ export async function runProbe(options) {
       receipt.installation = await page.evaluate(NATIVE_CANVAS_OBSERVER_SOURCE);
       receipt.renderer = await snapshot(page);
     } else if (options.mode === 'reset') {
-      receipt.renderer = await page.evaluate('window.__kerfdeskNativeCanvasObservation.reset()');
+      receipt.renderer = await page.evaluate(NATIVE_CANVAS_RESET_SOURCE);
     } else if (options.mode === 'pan') {
       receipt.pan = await runPan(page);
     } else {

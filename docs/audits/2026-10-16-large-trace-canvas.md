@@ -272,3 +272,21 @@ It rechecks ownership before acting and before accepting a result.
 The native measurements above used the earlier helper, not this strengthened
 ownership guard. These new guard tests are source-level qualification; they do
 not retrospectively qualify the earlier run or the user's installed desktop.
+
+### Review hardening after the recorded measurements
+
+Observer version 2 includes a source identity and rejects older installed observers
+before installation reuse, snapshot or reset. Reset now clears trace observations,
+counts accept locale-formatted digits and grouping, and the first frame following
+a navigation stall remains in the navigation distribution even after 500 ms.
+Native receipt paths are checked against ordinary roaming AppData, and bounded
+pan receipts require a clear input trajectory, trusted workspace pointer events
+and a workspace paint response.
+
+The full-renderer regression also observes raster work on bitmap sources actually
+consumed by the workspace. Translation allows at most two sprite rebuilds; zoom
+has its own allowance. A negative control invalidates the real sprite cache six
+times and must fail the translation-reuse metric. This headless test passed.
+The observer and ownership regressions run in Node harnesses, without operating
+a user's native app. None of these later fixes retroactively qualifies the
+earlier native measurements, sustained Windows drag timing or presented FPS.

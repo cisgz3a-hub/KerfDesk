@@ -107,6 +107,17 @@ test('validates actual OS ownership and native profile evidence before allowing 
       verifyObservationOwner({ ...options, 'expected-profile': alias }, async () => redirected),
       /inside isolation|Ordinary/,
     );
+    const ordinaryResult = join(ordinary, 'ready.json');
+    await writeFile(ordinaryResult, JSON.stringify(receipt));
+    for (const redirectedResult of [ordinaryResult, join(alias, 'ready.json')]) {
+      await assert.rejects(
+        verifyObservationOwner({ ...options, 'isolation-root': root }, async () => ({
+          ...identity,
+          commandLine: identity.commandLine.replace(result, redirectedResult),
+        })),
+        /Ordinary/,
+      );
+    }
     process.env.APPDATA = isolation;
     await assert.rejects(verifyObservationOwner(options, read), /Ordinary/);
   } finally {
