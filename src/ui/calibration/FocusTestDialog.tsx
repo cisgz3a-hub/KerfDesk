@@ -55,7 +55,7 @@ export function FocusTestDialog(props: { readonly onClose: () => void }): JSX.El
       onSubmit={(event) => {
         event.preventDefault();
         if (issue !== null) return;
-        replaceScene(generateFocusTest(options));
+        replaceScene(generateFocusTest(options), true);
         useToastStore
           .getState()
           .pushToast(
@@ -115,6 +115,7 @@ function FocusFields(props: {
           {label}
           <input
             type="number"
+            title={label}
             step={key === 'steps' ? '1' : 'any'}
             value={props.draft[key]}
             onChange={(event) => props.onChange(key, event.target.value)}

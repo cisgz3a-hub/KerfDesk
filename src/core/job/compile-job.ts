@@ -69,7 +69,6 @@ function appendOperationCompilation(
   laserPowerScaleVersion: LaserPowerScaleVersion,
 ): void {
   for (const operationLayer of outputOperationLayers(layer)) {
-    assertFocusOperation(operationLayer, device);
     if (operationLayer.mode !== 'image') {
       const vector = compileVectorGroupsForLayer(
         vectorObjects,
@@ -78,7 +77,11 @@ function appendOperationCompilation(
         priorityObjectId,
         `vector:${output.vectorRun++}:${operationLayer.id}`,
       );
-      for (const group of vector.groups) output.groups.push(withFocusMotion(group, operationLayer));
+      for (const group of vector.groups) {
+        if (!hasFocusGeometry(group, operationLayer)) continue;
+        assertFocusOperation(operationLayer, device);
+        output.groups.push(withFocusMotion(group, operationLayer));
+      }
       for (const diagnostic of vector.diagnostics) output.diagnostics.push(diagnostic);
     }
     const raster = compileRasterGroupsForLayer(rasterObjects, operationLayer, device, {
@@ -111,4 +114,16 @@ function withFocusMotion(group: Group, layer: Layer): Group {
       'Focus Test artwork overrides must retain vector Line mode.',
     );
   return { ...group, focusTest: layer.focusTest };
+}
+
+/** Exact geometry only: output rounding must wait until final placement. */
+function hasFocusGeometry(group: Group, layer: Layer): boolean {
+  if (layer.focusTest === undefined || group.kind !== 'cut') return true;
+  return group.segments.some((segment) => {
+    const first = segment.polyline[0];
+    return (
+      first !== undefined &&
+      segment.polyline.some((point) => point.x !== first.x || point.y !== first.y)
+    );
+  });
 }

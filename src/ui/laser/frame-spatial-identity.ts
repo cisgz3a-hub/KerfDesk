@@ -1,3 +1,4 @@
+import { frameFocusContributingLayers } from './frame-focus-contribution';
 import { frameSpatialPlacementBinding } from './frame-spatial-placement-anchor';
 import { createLastScopeProjectionCache } from './frame-spatial-projection-cache';
 import { frameSpatialOutputScene } from './frame-spatial-output-scene';
@@ -63,10 +64,11 @@ function spatialProject(
         ids: scope.selectedObjectIds,
         selectionOrigin: scope.useSelectionOrigin,
         relative,
+        placement,
         retainAllCoordinates,
         placementAnchorBound,
       })
-    : '';
+    : JSON.stringify(placement);
   const cached = spatialProjects.get(project, scopeKey);
   if (cached !== undefined) return cached;
   const isCnc = machineKindOf(project.machine) === 'cnc';
@@ -80,6 +82,7 @@ function spatialProject(
   );
   // Placement dependencies may retain unselected artwork, but its Focus Z
   // metadata cannot change the selected program's motion.
+  const focusLayers = frameFocusContributingLayers(project, scope, placement);
   const selectedIds = scope.cutSelectedGraphics ? new Set(scope.selectedObjectIds) : undefined;
   const focusArtwork =
     selectedIds === undefined
@@ -105,7 +108,9 @@ function spatialProject(
           isCnc,
           layer.focusTest !== undefined &&
             layer.output &&
-            focusArtwork.some((object) => sceneObjectUsesOperation(object, layer)),
+            (focusLayers === null
+              ? focusArtwork.some((object) => sceneObjectUsesOperation(object, layer))
+              : focusLayers.has(layer.id)),
         ),
       ),
       objects: scene.objects.map(spatialObject),

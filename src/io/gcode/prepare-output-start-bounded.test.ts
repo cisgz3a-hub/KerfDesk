@@ -50,7 +50,7 @@ function prepare(job: Job, relative = true) {
     optimization: { ...base.optimization, travelPolicy: 'source-order' },
     ...(relative ? { startPoints: { job: { x: 1, y: 0, relative: true as const } } } : {}),
   };
-  return completePreparedOutput(
+  const prepared = completePreparedOutput(
     {
       ok: true,
       sourceProject: project,
@@ -61,6 +61,8 @@ function prepare(job: Job, relative = true) {
     },
     job,
   );
+  if (!prepared.ok) throw new Error('Expected successful preparation');
+  return prepared;
 }
 
 describe('bounded preparation of relative cutting starts', () => {

@@ -14,7 +14,14 @@ import { secondPassProjectEligible } from './second-pass-eligibility';
 /** Only a flat laser run whose program the transformer can read is offered;
  * a CNC, Marlin or Smoothieware completion would lead straight to a refusal. */
 export function secondPassOfferable(artifact: ExecutionArtifactV1): boolean {
-  return artifact.machineKind === 'laser' && secondPassProjectEligible(artifact.prepared.project);
+  return (
+    artifact.machineKind === 'laser' &&
+    secondPassProjectEligible(
+      artifact.prepared.project,
+      artifact.prepared.job,
+      artifact.prepared.laserPowerScaleVersion ?? 1,
+    )
+  );
 }
 
 /** The job that just finished, when a second pass can be offered for it: the

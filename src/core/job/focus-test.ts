@@ -128,6 +128,10 @@ export function focusTestWarnings(
   const samples = layers.filter((layer) => layer.output && layer.focusTest !== undefined);
   if (samples.length === 0) return [];
   const offsets = samples.map((layer) => layer.focusTest?.offsetMm ?? 0);
+  if (offsets.every((offset) => offset === 0))
+    return [
+      'The 2D estimate excludes Focus Test laser-off returns. Inspect G-code (3D) shows the exact emitted motion and its playback estimate. Sample labels are operation names, not engraved marks.',
+    ];
   const warnings = [
     `Focus Test moves Z from ${Math.min(...offsets).toFixed(3)} to ${Math.max(...offsets).toFixed(3)} mm relative to starting focus. Positive Z follows the controller axis direction. Each completed sample returns to starting Z; an interrupted job may not. Frame traces XY only: verify material clearance and both Z directions. Physical focus and travel remain unqualified.`,
     'The 2D estimate excludes Focus Test Z travel and laser-off returns. Inspect G-code (3D) shows the exact emitted motion and its playback estimate. Sample labels are operation names, not engraved marks.',

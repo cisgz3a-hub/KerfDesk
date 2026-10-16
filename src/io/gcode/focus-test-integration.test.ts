@@ -30,7 +30,7 @@ function focusProject(): Project {
 }
 
 describe('Focus Test output integration', () => {
-  it('refuses CNC reinterpretation before synchronous or worker compilation', async () => {
+  it('refuses CNC reinterpretation when preparing synchronous or worker output', async () => {
     const project = { ...focusProject(), machine: DEFAULT_CNC_MACHINE_CONFIG };
     const prepared = prepareOutput(project);
     expect(prepared).toMatchObject({

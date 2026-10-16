@@ -53,9 +53,9 @@ export async function prepareOutputAsync(
   options: PrepareOutputOptions,
   context: PrepareOutputAsyncContext,
 ): Promise<PreparedOutput> {
-  const input = prepareOutputInput(project, options);
-  if (!input.ok) return input.prepared;
   try {
+    const input = prepareOutputInput(project, options);
+    if (!input.ok) return input.prepared;
     const compiled = await compileOutputProject(input.project, context);
     if (compiled.kind === 'relief-materialization-failed') {
       return { ok: false, preflight: reliefMaterializationFailure(compiled) };

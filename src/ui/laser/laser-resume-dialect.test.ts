@@ -19,6 +19,7 @@ import {
 import { grblDriver, selectControllerDriver } from '../../core/controllers';
 import { buildResumeProgram, type StatusReport } from '../../core/controllers/grbl';
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
+import { generateFocusTest } from '../../core/job/focus-test';
 import { fingerprintGcode } from '../../core/recovery';
 import {
   createLayer,
@@ -152,12 +153,16 @@ function strokeProject(dialect: Dialect): Project {
 }
 
 function prepared(dialect: Dialect) {
+  return preparedProject(strokeProject(dialect));
+}
+
+function preparedProject(project: Project, scope = DEFAULT_OUTPUT_SCOPE) {
   const result = prepareStartJob(
-    strokeProject(dialect),
+    project,
     useLaserStore.getState().controllerSettings,
     { statusReport: STATUS, alarmCode: null, hasActiveStreamer: false },
     { startFrom: 'absolute', anchor: 'front-left' },
-    DEFAULT_OUTPUT_SCOPE,
+    scope,
     undefined,
     false,
   );
@@ -313,4 +318,76 @@ describe.each(DIALECTS)('laser resume on $name', (dialect) => {
       }),
     ).toBe(false);
   });
+});
+
+describe('Focus artifact resume entry points', () => {
+  function focusJob(zeroOnly: boolean) {
+    const scene = generateFocusTest({
+      steps: 3,
+      minOffsetMm: -1,
+      maxOffsetMm: 1,
+      lineLengthMm: 20,
+      spacingMm: 3,
+      speed: 1200,
+      power: 10,
+      travelFeedMmPerMin: 300,
+    });
+    return preparedProject(
+      { ...createProject(), scene },
+      zeroOnly
+        ? {
+            ...DEFAULT_OUTPUT_SCOPE,
+            cutSelectedGraphics: true,
+            selectedObjectIds: ['focus-test-2-line'],
+          }
+        : DEFAULT_OUTPUT_SCOPE,
+    );
+  }
+
+  it.each([1, 2])(
+    'refuses manual nonzero Focus restart from line %s before streaming',
+    async (line) => {
+      const startJob = vi.fn(async () => undefined);
+      useLaserStore.setState({ startJob });
+      const job = focusJob(false);
+      expect(job.gcode).toMatch(/G1 Z-?1\.000 /);
+      expect(
+        await streamResumeFromRawLine(
+          job.prepared.project,
+          job.gcode,
+          line,
+          job.canvasPlan,
+          captureLaserModeStartSnapshot(useLaserStore.getState()),
+        ),
+      ).toBe(false);
+      expect(startJob).not.toHaveBeenCalled();
+      expect(jobAwareAlert).toHaveBeenCalledWith(
+        expect.stringContaining('original starting Z focus'),
+      );
+    },
+  );
+
+  it.each([1, 2])(
+    'allows zero-only Focus artifacts through both resume entry points at line %s',
+    async (line) => {
+      const startJob = vi.fn(async () => undefined);
+      useLaserStore.setState({ startJob });
+      const job = focusJob(true);
+      expect(job.gcode).toContain('; Focus Test Z offset 0.000 mm');
+      expect(job.gcode).not.toMatch(/G1 Z/);
+      const resume = buildLaserResumeProgram(job.gcode, line, job.prepared.project.device);
+      expect(resume.kind).toBe('ok');
+      expect(
+        await streamResumeFromRawLine(
+          job.prepared.project,
+          job.gcode,
+          line,
+          job.canvasPlan,
+          captureLaserModeStartSnapshot(useLaserStore.getState()),
+        ),
+      ).toBe(true);
+      expect(jobAwareAlert).not.toHaveBeenCalled();
+      expect(startJob).toHaveBeenCalledOnce();
+    },
+  );
 });

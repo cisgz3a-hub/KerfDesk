@@ -52,6 +52,7 @@ import {
 import { prepareReliefAuthoringLinks } from './prepare-relief-authoring-links';
 import { reliefMaterializationFailure } from './relief-materialization-failure';
 import { focusTestCompilationFailure } from './focus-test-compilation-failure';
+import { hasContributingFocusMotion } from '../../core/preflight/focus-contribution';
 import { contourEntryBoundsForDevice, withContourEntryBounds } from '../../core/job/contour-entry';
 import { placeCncParks } from '../../core/job/job-origin';
 import { placeLaserFinish } from '../../core/job/laser-finish';
@@ -115,9 +116,9 @@ export function prepareOutput(
   project: Project,
   options: PrepareOutputOptions = {},
 ): PreparedOutput {
-  const input = prepareOutputInput(project, options);
-  if (!input.ok) return input.prepared;
   try {
+    const input = prepareOutputInput(project, options);
+    if (!input.ok) return input.prepared;
     const compiled = compileForMachine(input.project);
     if (compiled.kind === 'relief-materialization-failed') {
       return { ok: false, preflight: reliefMaterializationFailure(compiled) };
@@ -224,18 +225,22 @@ function withExecutionLaserPowerScale(project: Project, maxPowerS: number | unde
 export function completePreparedOutput(
   input: Extract<PreparedOutputInput, { readonly ok: true }>,
   compiled: Job,
-): Extract<PreparedOutput, { readonly ok: true }> {
-  const offset =
-    (input.options.jobOrigin?.startFrom ?? 'absolute') === 'absolute'
-      ? (input.options.absoluteProgramOffset ?? ZERO_OFFSET)
-      : input.options.jobOrigin
-        ? resolveJobOriginOffset(
-            input.placementProject ?? input.sourceProject,
-            compiled,
-            input.options.jobOrigin,
-            input.outputScope,
-          )
-        : ZERO_OFFSET;
+): PreparedOutput {
+  const offset = resolvedOutputOffset(input, compiled);
+  if (input.project.machine?.kind === 'cnc' && hasContributingFocusMotion(input.project, offset))
+    return {
+      ok: false,
+      preflight: {
+        ok: false,
+        issues: [
+          {
+            code: 'focus-test-needs-laser',
+            message:
+              'Focus Test samples contain relative laser Z motion that cannot be compiled as CNC cutting depths. Switch back to Laser mode, or exclude the focus samples from this output.',
+          },
+        ],
+      },
+    };
   const entryBounds =
     input.options.contourEntryBounds !== undefined
       ? input.options.contourEntryBounds
@@ -278,6 +283,22 @@ export function completePreparedOutput(
     jobOriginOffset: offset,
     advisories: input.advisories,
   };
+}
+
+function resolvedOutputOffset(
+  input: Extract<PreparedOutputInput, { readonly ok: true }>,
+  compiled: Job,
+): Vec2 {
+  return (input.options.jobOrigin?.startFrom ?? 'absolute') === 'absolute'
+    ? (input.options.absoluteProgramOffset ?? ZERO_OFFSET)
+    : input.options.jobOrigin
+      ? resolveJobOriginOffset(
+          input.placementProject ?? input.sourceProject,
+          compiled,
+          input.options.jobOrigin,
+          input.outputScope,
+        )
+      : ZERO_OFFSET;
 }
 
 function jobStartTarget(

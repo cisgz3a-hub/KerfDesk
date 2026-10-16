@@ -251,9 +251,12 @@ export function hasRepresentedCutBurn(
     'device' | 'dialect' | 'arcMovesEnabled' | 'laserPowerScaleVersion'
   >,
 ): boolean {
+  const s = scaleS(group.power, context.device.maxPowerS, context.laserPowerScaleVersion);
+  // Focus must produce a mark: nonzero authored power may still emit S0.
+  if (!(Number(formatGcodePowerS(s, context.laserPowerScaleVersion)) > 0)) return false;
   const segmentContext = {
     ...context,
-    s: scaleS(group.power, context.device.maxPowerS, context.laserPowerScaleVersion),
+    s,
     feed: roundedPositiveFeed(group.speed, 'Layer ' + group.layerId),
     entryRunwayMm: group.entryRunwayMm,
   };

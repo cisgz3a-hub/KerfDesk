@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
-import { useStore } from '../state';
+import { useStore, currentOutputScope } from '../state';
+import { prepareOutput } from '../../io/gcode/prepare-output';
 import { FocusTestDialog } from './FocusTestDialog';
 
 (
@@ -13,6 +14,7 @@ import { FocusTestDialog } from './FocusTestDialog';
 describe('Focus Test dialog', () => {
   it('rejects empty/duplicate samples and creates one undoable normal scene without motion', async () => {
     useStore.setState({ project: createProject(), undoStack: [], redoStack: [], dirty: false });
+    useStore.getState().setOutputScopeSettings({ cutSelectedGraphics: true });
     const before = useStore.getState().project;
     const onClose = vi.fn();
     const host = document.createElement('div');
@@ -50,6 +52,10 @@ describe('Focus Test dialog', () => {
       expect(useStore.getState().project.scene.layers).toHaveLength(101);
       expect(useStore.getState().undoStack).toHaveLength(1);
       expect(onClose).toHaveBeenCalledOnce();
+      const state = useStore.getState();
+      const prepared = prepareOutput(state.project, { outputScope: currentOutputScope(state) });
+      if (!prepared.ok) throw new Error('Generated samples must compile');
+      expect(prepared.job.groups).toHaveLength(101);
       await act(async () => {
         useStore.getState().undo();
       });
