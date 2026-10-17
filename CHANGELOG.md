@@ -11,6 +11,10 @@ release before it is tagged.
 
 ### Highlights
 
+- **Mac and Linux.** Linux desktop packages (AppImage and `.deb`) that open `.lf2` projects from
+  the file manager; Mac menus show shortcuts as ⌘ and ⇧; network cameras find a Homebrew FFmpeg
+  on a Mac; and on both systems KerfDesk remembers the USB port you picked across restarts
+  ([#1243](https://github.com/cisgz3a-hub/KerfDesk/pull/1243)).
 - **New licence.** KerfDesk is now all rights reserved. It stays free to use under its License &
   Safety Notice, except features marked Pro, which need a trial or a paid licence. Versions up to
   and including the `mit-final` tag remain under the MIT License

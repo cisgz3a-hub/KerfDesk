@@ -3,6 +3,7 @@ import { EditorAdjustMenus } from './EditorAdjustMenus';
 import { TutorialButton } from '../tutorials/TutorialButton';
 import { useImageEditorStore } from './image-editor-store';
 import { Icon } from '../kit/icons';
+import { shortcutLabel } from '../common/shortcut-label';
 
 export type ImageEditorTopBarActions = {
   readonly undo: () => void;
@@ -64,7 +65,7 @@ function PhotoViewButtons(): JSX.Element {
       <button
         type="button"
         className="lf-btn"
-        title="Fit the whole photo in the canvas (Ctrl+0)"
+        title={shortcutLabel('Fit the whole photo in the canvas (Ctrl+0)')}
         onClick={() => setView(null)}
       >
         Fit photo
@@ -72,7 +73,7 @@ function PhotoViewButtons(): JSX.Element {
       <button
         type="button"
         className="lf-btn"
-        title="Show one image pixel per screen pixel (Ctrl+1)"
+        title={shortcutLabel('Show one image pixel per screen pixel (Ctrl+1)')}
         onClick={zoomTo100}
       >
         100%
@@ -97,7 +98,7 @@ function ActionButtons(props: {
         className="lf-btn"
         onClick={props.actions.undo}
         disabled={!props.canUndo}
-        title="Undo the last editor step (Ctrl+Z)"
+        title={shortcutLabel('Undo the last editor step (Ctrl+Z)')}
       >
         Undo
       </button>
@@ -106,7 +107,7 @@ function ActionButtons(props: {
         className="lf-btn"
         onClick={props.actions.redo}
         disabled={!props.canRedo}
-        title="Redo the last undone editor step (Ctrl+Shift+Z)"
+        title={shortcutLabel('Redo the last undone editor step (Ctrl+Shift+Z)')}
       >
         Redo
       </button>

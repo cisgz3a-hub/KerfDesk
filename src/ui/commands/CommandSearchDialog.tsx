@@ -14,6 +14,7 @@ import { runCommand, type AppCommand } from './command-registry';
 import { searchCommands } from './command-search';
 import { useCommandSearchStore } from './command-search-store';
 import './command-search.css';
+import { shortcutLabel } from '../common/shortcut-label';
 
 export function CommandSearchHost(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -173,7 +174,7 @@ function CommandSearchRow(props: {
         <span className="lf-command-search__label">{command.label}</span>
         <span className="lf-command-search__family">{props.family}</span>
         {command.shortcut === undefined ? null : (
-          <kbd className="lf-command-search__shortcut">{command.shortcut}</kbd>
+          <kbd className="lf-command-search__shortcut">{shortcutLabel(command.shortcut)}</kbd>
         )}
       </span>
       <span className="lf-command-search__detail">{detail}</span>
