@@ -9,6 +9,7 @@ import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { Icon } from '../kit';
 import { DeleteLayerButton } from './DeleteLayerButton';
+import { LayerFocusTestNotice } from './LayerFocusTestNotice';
 import { LayerOrderControls } from './LayerOrderControls';
 import { LayerSettingsClipboardButtons } from './LayerSettingsClipboardButtons';
 import { SelectLayerObjectsButton } from './SelectLayerObjectsButton';
@@ -41,6 +42,7 @@ export function LayerRow(props: {
         isActive={active}
         onActivate={activate}
       />
+      <LayerFocusTestNotice layer={props.layer} />
       <button
         type="button"
         className="lf-btn lf-btn--ghost lf-operation-card__visibility"

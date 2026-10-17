@@ -16,6 +16,7 @@ export {
   createLayerSubLayer,
   layerFromSubLayer,
   layerOperationSettingsEqual,
+  layerWithoutFocusTest,
   normalizeLayerColor,
   nextLayerSubLayerId,
   outputOperationLayers,

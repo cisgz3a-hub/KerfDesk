@@ -90,7 +90,7 @@ function appendOperationCompilation(
     });
     if (operationLayer.focusTest !== undefined && raster.groups.length > 0)
       throw new FocusTestCompilationError(
-        'Focus Test operations require vector Line artwork; raster output cannot retain their Z-motion meaning.',
+        `Focus Test operations require vector Line artwork; raster output cannot retain their Z-motion meaning. ${focusRemovalHint(operationLayer)}`,
       );
     for (const group of raster.groups) output.groups.push(group);
     for (const diagnostic of raster.diagnostics) output.diagnostics.push(diagnostic);
@@ -103,15 +103,19 @@ function assertFocusOperation(layer: Layer, device: DeviceProfile): void {
   if (issue !== null) throw new FocusTestCompilationError(issue);
   if (layer.mode !== 'line')
     throw new FocusTestCompilationError(
-      'Focus Test samples require Line mode to retain their Z-motion meaning.',
+      `Focus Test samples require Line mode to retain their Z-motion meaning. ${focusRemovalHint(layer)}`,
     );
+}
+
+function focusRemovalHint(layer: Layer): string {
+  return `Switch "${layer.name}" back to Line, or use Remove Focus Test Z on that operation to make it an ordinary operation.`;
 }
 
 function withFocusMotion(group: Group, layer: Layer): Group {
   if (layer.focusTest === undefined) return group;
   if (group.kind !== 'cut')
     throw new FocusTestCompilationError(
-      'Focus Test artwork overrides must retain vector Line mode.',
+      `Focus Test artwork overrides must retain vector Line mode. ${focusRemovalHint(layer)}`,
     );
   return { ...group, focusTest: layer.focusTest };
 }

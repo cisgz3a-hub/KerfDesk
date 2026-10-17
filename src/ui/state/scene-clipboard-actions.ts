@@ -3,6 +3,7 @@ import {
   addLayer,
   addObject,
   createArtworkOperation,
+  layerWithoutFocusTest,
   operationIdsForObject,
   remapSceneObjectOperationBindings,
   sceneObjectUsesOperation,
@@ -209,8 +210,12 @@ export function prepareClipboardPaste(
       name: source.name,
       subLayers: source.subLayers,
     }).operation;
+    // Focus Test Z intent is relative to the source document's sample run; a
+    // paste into another project (or Saved Artwork insert) gets an ordinary
+    // operation rather than silent relative Z moves.
+    const copied = cloneLayer(source);
     const operation: Layer = {
-      ...cloneLayer(source),
+      ...(reuseExistingOperations ? copied : layerWithoutFocusTest(copied)),
       id: seed.id,
       name: seed.name,
       color: seed.color,
