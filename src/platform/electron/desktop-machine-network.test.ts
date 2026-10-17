@@ -141,3 +141,26 @@ it('still closes the native session when a close subscriber throws', async () =>
     log.mockRestore();
   }
 });
+
+it('delivers the controller lines carried by a closing read before closing', async () => {
+  const request: MachineNetworkRequest = async (action) =>
+    action === 'open'
+      ? { sessionId: ID }
+      : action === 'read'
+        ? { data: btoa('error:9\r\nALARM:1\r\n'), closed: true, error: 'Network connection closed.' }
+        : {};
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  try {
+    const serial = await connection(request);
+    const lines: string[] = [];
+    const closed = vi.fn(() => lines.push('<closed>'));
+    serial.onClose(closed);
+    serial.onLine((line) => lines.push(line));
+    for (let i = 0; i < 20; i += 1) await Promise.resolve();
+    expect(lines).toEqual(['error:9', 'ALARM:1', '<closed>']);
+    expect(closed).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Network connection closed.'));
+  } finally {
+    warn.mockRestore();
+  }
+});
