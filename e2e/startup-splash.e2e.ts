@@ -11,12 +11,13 @@ test('paints the splash before the bundle and honours reduced motion', async ({ 
     await expect(splash).toBeVisible();
     await expect(page.locator('#app-root')).toBeEmpty();
     await expect(splash.getByText('Created by Ons Houtkombuis', { exact: true })).toBeVisible();
-    const beam = splash.locator('.app-splash__beam');
-    await expect
-      .poll(() => beam.evaluate((element) => element.getAnimations().length))
-      .toBeGreaterThan(0);
+    // The pulse is several layered animations (beam, glow, flare, sparks);
+    // reduced motion must stop every one of them.
+    const splashAnimations = () =>
+      splash.evaluate((element) => element.getAnimations({ subtree: true }).length);
+    await expect.poll(splashAnimations).toBeGreaterThan(0);
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await expect.poll(() => beam.evaluate((element) => element.getAnimations().length)).toBe(0);
+    await expect.poll(splashAnimations).toBe(0);
 
     await main.release();
     // The desktop module is attached dynamically after DOMContentLoaded. Its
