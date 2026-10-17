@@ -22,13 +22,18 @@ import {
 } from './device-setup-option-status';
 import { DeviceSetupRotaryFields } from './DeviceSetupRotaryFields';
 import { DeviceSetupRasterDiagnostics } from './DeviceSetupRasterDiagnostics';
+import { PositioningLightEditor } from './PositioningLightEditor';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 
 export function DeviceSetupOptionsStep({
   state,
   dispatch,
   openAutofocus,
-}: DeviceSetupStepProps & { readonly openAutofocus?: boolean }): JSX.Element {
+  openPositioningLight,
+}: DeviceSetupStepProps & {
+  readonly openAutofocus?: boolean;
+  readonly openPositioningLight?: boolean;
+}): JSX.Element {
   const draft = state.draft;
   const update = (patch: Partial<DeviceProfile>): void => dispatch({ kind: 'edit', patch });
   return (
@@ -64,6 +69,7 @@ export function DeviceSetupOptionsStep({
           draft={draft}
           update={update}
           openAutofocus={openAutofocus === true}
+          openPositioningLight={openPositioningLight === true}
         />
       ) : null}
     </section>
@@ -74,10 +80,21 @@ function LaserCalibrationSections(props: {
   readonly draft: DeviceProfile;
   readonly update: (patch: Partial<DeviceProfile>) => void;
   readonly openAutofocus: boolean;
+  readonly openPositioningLight: boolean;
 }): JSX.Element {
   const { draft, update } = props;
   return (
     <>
+      <OptionSection
+        title="Positioning LED / crosshair"
+        status={draft.positioningLight === undefined ? 'Not configured' : 'Configured'}
+        open={props.openPositioningLight}
+      >
+        <PositioningLightEditor
+          device={draft}
+          onChange={(positioningLight) => update({ positioningLight })}
+        />
+      </OptionSection>
       <OptionSection title="Raster scan-offset calibration" status={scanOffsetStatus(draft)}>
         <ScanOffsetEditor
           value={draft.scanningOffsets}

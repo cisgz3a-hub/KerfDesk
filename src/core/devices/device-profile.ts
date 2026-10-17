@@ -5,6 +5,7 @@
 import type { CameraModelRecord } from '../camera/model/camera-model-record';
 import type { RotarySetup } from './rotary';
 import type { LaserFireControl } from './fire-control';
+import type { PositioningLight } from './positioning-light';
 import type { ScanOffsetCalibrationStatus, ScanOffsetPoint } from './scan-offset-profile';
 import type { GcodeDialectSelection } from './gcode-dialects';
 import { DEFAULT_GRBL_RX_BUFFER_BYTES, type GrblStreamingMode } from '../grbl-streaming';
@@ -295,6 +296,7 @@ export type DeviceProfile = {
   // applies only while `rotary.enabled` — disabled output is byte-identical.
   readonly rotary?: RotarySetup;
   readonly fireControl?: LaserFireControl;
+  readonly positioningLight?: PositioningLight | undefined;
   // Feed used by the Frame button (jog around the job bounding box).
   // Separate from `maxFeed` so a user who lowers maxFeed to constrain
   // cut speeds doesn't also slow framing. The firmware still enforces its

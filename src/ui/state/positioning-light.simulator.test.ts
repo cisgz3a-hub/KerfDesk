@@ -1,0 +1,60 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  createGrblSimulator,
+  createMarlinSimulator,
+  createSmoothieSimulator,
+} from '../../__fixtures__/controllers';
+import type { ControllerKind } from '../../core/devices/device-profile';
+import { useLaserStore } from './laser-store';
+import { useStore } from './store';
+import { resetStore } from './test-helpers';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  resetStore();
+});
+afterEach(async () => {
+  await disconnectOnTestClock();
+  resetStore();
+  vi.useRealTimers();
+});
+
+async function finish(operation: Promise<void>): Promise<void> {
+  let done = false;
+  const result = operation.finally(() => {
+    done = true;
+  });
+  void result.catch(() => undefined);
+  for (let tick = 0; tick < 200 && !done; tick++) await vi.advanceTimersByTimeAsync(50);
+  await result;
+}
+
+const families: ControllerKind[] = ['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware'];
+describe('positioning light through real store serial and ACK ownership', () => {
+  it.each(families)('finishes a mapped auxiliary light exchange on %s', async (kind) => {
+    const sim =
+      kind === 'marlin'
+        ? createMarlinSimulator()
+        : kind === 'smoothieware'
+          ? createSmoothieSimulator()
+          : createGrblSimulator();
+    // The scripted fixtures expose coolant as their auxiliary output. This is
+    // an explicit test mapping, never a machine default or crosshair detection.
+    useStore.getState().updateDeviceProfile({
+      controllerKind: kind,
+      positioningLight: { onCommand: 'M7', offCommand: 'M9', offsetXmm: 0, offsetYmm: 0 },
+    });
+    await useLaserStore.getState().connect(sim.adapter, { controllerKind: kind });
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
+    await finish(useLaserStore.getState().centrePositioningLight(10, 15, 1000));
+    expect(useLaserStore.getState().positioningLightEnabled).toBe(true);
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(sim.outbound().join('')).toContain('M7\n');
+    await finish(useLaserStore.getState().setPositioningLightEnabled(false));
+    expect(useLaserStore.getState().positioningLightEnabled).toBe(false);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+  });
+});

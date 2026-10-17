@@ -94,7 +94,11 @@ function EssentialsStage(props: DeviceSetupStagesProps): JSX.Element {
           <small>Optional · keep your existing settings</small>
         </summary>
         <div className="lf-setup-disclosure-body">
-          <DeviceSetupOptionsStep {...props} openAutofocus={props.highlight === 'autofocus'} />
+          <DeviceSetupOptionsStep
+            {...props}
+            openAutofocus={props.highlight === 'autofocus'}
+            openPositioningLight={props.highlight === 'positioning-light'}
+          />
         </div>
       </details>
     </div>

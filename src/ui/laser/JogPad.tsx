@@ -65,6 +65,7 @@ export function JogPad({ disabled, machineHome, machineActions }: Props): JSX.El
   // is a coolant relay. CNC keeps the button only to switch off air that was
   // left on from Laser mode.
   const airAssistOn = useLaserStore((s) => s.airAssistOn);
+  const positioningLightEnabled = useLaserStore((s) => s.positioningLightEnabled);
   const showManualAir = machineKind === 'laser' || airAssistOn;
 
   const sendVector = useCallback(
@@ -108,7 +109,9 @@ export function JogPad({ disabled, machineHome, machineActions }: Props): JSX.El
           onCancel={cancelContinuousJog}
         />
       </JogControlsLayout>
-      {machineKind === 'laser' ? <CentreSelectionButton disabled={disabled} /> : null}
+      {machineKind === 'laser' || positioningLightEnabled ? (
+        <CentreSelectionButton disabled={disabled} />
+      ) : null}
       <JogSettingsRow
         disabled={disabled}
         step={step}

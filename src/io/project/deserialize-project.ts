@@ -1,4 +1,5 @@
 import { normalizeSceneObject } from './normalize-scene-object';
+import { normalizePositioningLight } from '../../core/devices/positioning-light';
 import type { ReliefAuthoringResolutions } from './project-relief-authoring-validator';
 // deserializeProject - parses a .lf2 string and returns a typed Project, or a
 // structured error describing why it cannot be loaded.
@@ -344,6 +345,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     cameraModel: normalizeCameraModelRecord(dev['cameraModel']),
     otherCameraModels: normalizeOtherCameraModels(dev['otherCameraModels']),
     fireControl: normalizeLaserFireControl(dev['fireControl']),
+    positioningLight: normalizePositioningLight(dev['positioningLight']),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
     ...(dev['cameraProfile'] !== undefined
       ? { cameraProfile: normalizeCameraProfile(dev['cameraProfile'] as CameraProfile) }

@@ -33,6 +33,7 @@ type SessionScopedState = FinishedJobState &
     | 'ovCache'
     | 'rxCapacityEvidence'
     | 'plannerCapacityEvidence'
+    | 'positioningLightEnabled'
   >;
 
 /**
@@ -92,5 +93,6 @@ export function sessionScopedJobStateReset(): SessionScopedState {
     ovCache: null,
     rxCapacityEvidence: null,
     plannerCapacityEvidence: null,
+    positioningLightEnabled: false,
   };
 }
