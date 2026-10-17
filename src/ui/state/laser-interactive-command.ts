@@ -358,8 +358,15 @@ export function observeControllerIdleWait(
   // status report proves the controller is alive, so the timeout measures
   // status silence, not elapsed time.
   armIdleWaitTimer(refs, request);
-  request.idleReports = report.state === 'Idle' ? request.idleReports + 1 : 0;
-  set((state) => updateOperationIdleReports(state, request.kind, request.idleReports));
+  set((state) => {
+    // A paused, fully acknowledged tail is still a paused job. Marlin and
+    // stream-side pauses may report Idle, but only Resume can release it.
+    const completionAllowed =
+      request.kind !== 'post-job-settle' || state.streamer?.status === 'done';
+    request.idleReports =
+      report.state === 'Idle' && completionAllowed ? request.idleReports + 1 : 0;
+    return updateOperationIdleReports(state, request.kind, request.idleReports);
+  });
   if (request.idleReports >= request.requiredReports) {
     finishIdleWait(refs, request, 'resolve');
   }

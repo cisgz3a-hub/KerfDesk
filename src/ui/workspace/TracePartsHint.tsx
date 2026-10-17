@@ -1,6 +1,5 @@
 import { useStore } from '../state/store';
 import { useUiStore, type ToolMode } from '../state/ui-store';
-import { activateTracePartTool } from './trace-part-tool';
 import { retryTracePartPreparation } from './trace-part-preparation';
 import { useTracePartPreparationStatus } from './trace-part-preparation-store';
 import { useTracePartSelection } from './use-trace-part-selection';
@@ -21,28 +20,25 @@ export function TracePartsHint(): JSX.Element | null {
   const editingNodes = mode === 'node';
   const editing = active || editingNodes;
   useTracePartSelection(active && !preview);
-  if (preview || (!editing && (mode !== 'select' || !hasTrace))) return null;
+  if (preview || !editing) return null;
   return (
     <div
       role="status"
       className="lf-trace-parts-hint"
       aria-busy={active && preparation.status === 'preparing'}
     >
-      {editing ? <strong>{editingNodes ? 'Editing nodes' : 'Editing trace parts'}</strong> : null}
-      {editing ? (
-        <button
-          type="button"
-          className="lf-btn"
-          aria-label={editingNodes ? 'Done editing nodes' : 'Done editing trace parts'}
-          title="Keep completed edits and return to Select (Esc)."
-          onClick={() => useUiStore.getState().resetToolMode()}
-        >
-          Done
-        </button>
-      ) : null}
+      <strong>{editingNodes ? 'Editing nodes' : 'Editing trace parts'}</strong>
+      <button
+        type="button"
+        className="lf-btn"
+        aria-label={editingNodes ? 'Done editing nodes' : 'Done editing trace parts'}
+        title="Keep completed edits and return to Select (Esc)."
+        onClick={() => useUiStore.getState().resetToolMode()}
+      >
+        Done
+      </button>
       <EditingHint mode={mode} preparation={preparation} />
       <TraceActions
-        editing={editing}
         hasTrace={hasTrace}
         mode={mode}
         preparationFailed={preparation.status === 'error'}
@@ -59,32 +55,26 @@ function EditingHint({
   readonly preparation: ReturnType<typeof useTracePartPreparationStatus.getState>;
 }): JSX.Element {
   if (mode === 'node') return <NodeEditHint />;
-  return <span>{traceEditingHint(mode, preparation)}</span>;
+  return <span>{traceEditingHint(preparation)}</span>;
 }
 
 function traceEditingHint(
-  mode: ToolMode['kind'],
   preparation: ReturnType<typeof useTracePartPreparationStatus.getState>,
 ): string {
-  if (mode === 'trace-parts') {
-    if (preparation.status === 'preparing') {
-      return 'Preparing trace parts… You can pan or choose Done while this runs.';
-    }
-    if (preparation.status === 'error') {
-      return preparation.message ?? 'Could not prepare trace parts. Choose Retry to try again.';
-    }
-    return 'Drag a traced line or shape. Shift-click adds parts. Arrow keys nudge; Delete removes. Holes stay with their outline. Esc cancels a drag; press Esc again or choose Done to finish.';
+  if (preparation.status === 'preparing') {
+    return 'Preparing trace parts… You can pan or choose Done while this runs.';
   }
-  return 'Move a single part of this trace, or reshape its nodes.';
+  if (preparation.status === 'error') {
+    return preparation.message ?? 'Could not prepare trace parts. Choose Retry to try again.';
+  }
+  return 'Drag a traced line or shape. Shift-click adds parts. Arrow keys nudge; Delete removes. Holes stay with their outline. Esc cancels a drag; press Esc again or choose Done to finish.';
 }
 
 function TraceActions({
-  editing,
   hasTrace,
   mode,
   preparationFailed,
 }: {
-  readonly editing: boolean;
   readonly hasTrace: boolean;
   readonly mode: ToolMode['kind'];
   readonly preparationFailed: boolean;
@@ -101,16 +91,6 @@ function TraceActions({
           Retry
         </button>
       ) : null}
-      {!editing ? (
-        <button
-          type="button"
-          className="lf-btn"
-          title="Pick and move individual traced lines or shapes while keeping their holes."
-          onClick={activateTracePartTool}
-        >
-          Edit trace parts
-        </button>
-      ) : null}
       {hasTrace && mode !== 'node' ? (
         <button
           type="button"
@@ -118,7 +98,7 @@ function TraceActions({
           title="Reshape the selected trace by moving its nodes and curve handles."
           onClick={() => useUiStore.getState().setToolMode({ kind: 'node' })}
         >
-          {mode === 'trace-parts' ? 'Edit part nodes' : 'Edit nodes'}
+          Edit part nodes
         </button>
       ) : null}
     </>

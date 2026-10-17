@@ -74,14 +74,22 @@ export function beginPostJobSettle(
     current.controllerSessionEpoch === state.controllerSessionEpoch &&
     current.streamerEpoch === state.streamerEpoch &&
     current.activeRunId === state.activeRunId &&
-    current.streamer?.status === 'done' &&
-    current.streamer.queued === streamLines &&
+    retainsAcknowledgedTail(current.streamer, streamLines) &&
     ownsTransport();
   set({
     controllerOperation: operation,
     log: pushLog(state, '[lf2] Job lines acknowledged. Settling controller before ready.'),
   });
   void runPostJobSettle(set, refs, safeWrite, ownsCurrent, `${driver.commands.settleDwell}\n`);
+}
+
+function retainsAcknowledgedTail(
+  streamer: LaserState['streamer'],
+  lines: ReadonlyArray<string>,
+): boolean {
+  return (
+    (streamer?.status === 'done' || streamer?.status === 'paused') && streamer.queued === lines
+  );
 }
 
 async function runPostJobSettle(
@@ -115,7 +123,7 @@ async function runPostJobSettle(
               phase: 'awaiting-idle',
               idleReports: 0,
             }),
-            ...liveCanvasFinishingPatch(state),
+            ...(state.streamer?.status === 'paused' ? {} : liveCanvasFinishingPatch(state)),
           }
         : {},
     );
@@ -123,23 +131,32 @@ async function runPostJobSettle(
     // resumes, or during the phase update. It must not recreate an old waiter
     // on the replacement controller's shared lifecycle refs.
     if (!ownsCurrent()) return;
-    await waitForFreshIdle(refs, {
-      kind: 'post-job-settle',
-      requiredReports: STABLE_IDLE_REPORTS,
-    });
-    set((state) =>
-      ownsCurrent(state)
-        ? {
-            controllerOperation: null,
-            streamer: null,
-            ...finishedJobStateReset(),
-            ...settledProgramAirAssistPatch(state.streamer),
-            liveCanvasRun: completeLiveCanvasRun(state.liveCanvasRun ?? null),
-            ...settledCompletedFramePatch(state),
-            log: pushLog(state, '[lf2] Controller settled after job.'),
-          }
-        : {},
-    );
+    // Pause can arrive after the job's last ACK, including while the marker
+    // itself is awaiting its reply. Keep this exact owner across that pause;
+    // dropping its continuation leaves a permanent post-job operation behind.
+    while (ownsCurrent()) {
+      await waitForFreshIdle(refs, {
+        kind: 'post-job-settle',
+        requiredReports: STABLE_IDLE_REPORTS,
+      });
+      let completed = false;
+      set((state) => {
+        if (!ownsCurrent(state) || state.streamer?.status !== 'done') return {};
+        completed = true;
+        return {
+          controllerOperation: null,
+          streamer: null,
+          ...finishedJobStateReset(),
+          ...settledProgramAirAssistPatch(state.streamer),
+          liveCanvasRun: completeLiveCanvasRun(state.liveCanvasRun ?? null),
+          ...settledCompletedFramePatch(state),
+          log: pushLog(state, '[lf2] Controller settled after job.'),
+        };
+      });
+      if (completed) return;
+      // A pause between the final Idle and this continuation requires fresh
+      // completion evidence after Resume, rather than consuming that old Idle.
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // The failure is terminal for the operation — clear it rather than park it

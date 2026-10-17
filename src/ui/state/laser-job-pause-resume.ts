@@ -54,6 +54,7 @@ import {
   streamSidePauseMessage,
 } from './laser-stream-pause-beam';
 import type { TranscriptSource } from './laser-transcript';
+import { continueControllerOperation } from './laser-controller-operation';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -268,10 +269,25 @@ function freezeStreamer(context: PauseResumeContext): void {
     if (state.streamer === null) return {};
     const pausedStreamer = pauseStreamer(state.streamer);
     if (pausedStreamer === state.streamer && state.streamer.status !== 'paused') return {};
+    // Stream-side Pause/Resume can finish between status polls. Discard the
+    // pre-pause Idle count now, rather than relying on a paused status report.
+    const idleWait = context.refs.controllerIdleWait;
+    if (idleWait?.kind === 'post-job-settle') idleWait.idleReports = 0;
+    const operation = state.controllerOperation;
     // Freezing the sender does not prove the controller has stopped. The live
     // clock and route keep following physical status through buffered motion
     // and deceleration; a fresh settled hold freezes them separately.
-    return { streamer: pausedStreamer };
+    return {
+      streamer: pausedStreamer,
+      ...(operation?.kind === 'post-job-settle'
+        ? {
+            controllerOperation: continueControllerOperation(operation, {
+              ...operation,
+              idleReports: 0,
+            }),
+          }
+        : {}),
+    };
   });
 }
 

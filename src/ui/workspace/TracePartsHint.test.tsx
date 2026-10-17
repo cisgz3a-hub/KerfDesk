@@ -57,7 +57,7 @@ describe('path editing completion', () => {
     expect(useStore.getState().project).toBe(edited);
     expect(useStore.getState().undoStack).toBe(history);
     expect(useStore.getState().selectedObjectId).toBe('trace');
-    expect(host.querySelector('button[aria-label^="Done editing"]')).toBeNull();
+    expect(host.textContent).toBe('');
     await act(async () => useStore.getState().undo());
     expect(useStore.getState().project).toBe(original);
   });

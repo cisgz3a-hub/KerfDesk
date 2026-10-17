@@ -71,7 +71,7 @@ describe('LiveMotionBar controller holding the program', () => {
     });
     const { host, root } = await render(<LiveMotionBar />);
     try {
-      expect(host.textContent).toContain('CONTROLLER HOLDING PROGRAM');
+      expect(host.textContent).toContain('WAITING FOR CONTROLLER REPLIES');
       expect(host.textContent).toContain('reports Idle');
       expect(host.textContent).toContain('last 3 sent lines for 12 s');
       expect(host.textContent).toContain('nothing was reset');
@@ -115,7 +115,7 @@ describe('LiveMotionBar controller holding the program', () => {
     });
     const { host, root } = await render(<LiveMotionBar />);
     try {
-      expect(host.textContent).toContain('$152=100');
+      expect(host.textContent).toContain('$152 standby setting');
     } finally {
       await act(async () => root.unmount());
     }

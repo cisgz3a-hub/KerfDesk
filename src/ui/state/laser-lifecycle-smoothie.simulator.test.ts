@@ -232,6 +232,30 @@ describe('Smoothieware lifecycle against the simulator', () => {
     expect(sim.state().pos.x).toBe(39);
   });
 
+  it('requires two new Idle reports after Pause and Resume between status polls', async () => {
+    const sim = await connectSmoothieIdle();
+    await startTestLaserJob('M5\n');
+    await pump(20);
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'post-job-settle',
+      phase: 'awaiting-idle',
+    });
+    const idle = '<Idle|MPos:0.000,0.000,0.000|FS:0,0>';
+    sim.port.emitLine(idle);
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({ idleReports: 1 });
+    // Smoothie pauses the host sender without a status confirmation exchange.
+    // Keep the test clock still, so no periodic status can reset the waiter.
+    await useLaserStore.getState().pauseJob();
+    await useLaserStore.getState().resumeJob();
+    sim.port.emitLine(idle);
+    for (let tick = 0; tick < 30; tick += 1) await Promise.resolve();
+    expect(useLaserStore.getState().streamer?.status).toBe('done');
+    sim.port.emitLine(idle);
+    for (let tick = 0; tick < 30; tick += 1) await Promise.resolve();
+    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+  });
+
   it('keeps buffered timing active and settles when the paused final line already acknowledged', async () => {
     const sim = await connectSmoothieIdle({ motionMs: 2_000 });
     await startTestLaserJob(DRAINED_PAUSE_JOB, {

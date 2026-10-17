@@ -108,7 +108,7 @@ describe('a Marlin M5 I drain', () => {
     await vi.advanceTimersByTimeAsync(STREAM_HOLD_VISIBLE_MS + 2_000);
     const laser = useLaserStore.getState();
     expect(laser.streamHold).toMatchObject({ controllerState: null, statusNotPolled: true });
-    const began = laser.log.find((line) => line.includes('Controller holding program'));
+    const began = laser.log.find((line) => line.includes('Waiting for controller replies'));
     expect(began).toContain('no status is polled while it streams');
     expect(began).not.toContain('reports Idle');
   });

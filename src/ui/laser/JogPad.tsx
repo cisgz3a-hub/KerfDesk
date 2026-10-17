@@ -24,6 +24,7 @@ import { withheldControllerMPos } from '../state/laser-status-position';
 import { firmwareJogCheckPosition, resolveManualMotionLimits } from '../state/manual-motion-limits';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from '../state/native-bed-frame';
 import { FocusJogControls, focusJogReady } from './FocusJogControls';
+import { CentreSelectionButton } from './CentreSelectionButton';
 import { JogArrowGrid } from './JogArrowGrid';
 import { JogPadAirAssist } from './JogPadAirAssist';
 import { JogSettingsRow } from './JogSettingsRow';
@@ -107,6 +108,7 @@ export function JogPad({ disabled, machineHome, machineActions }: Props): JSX.El
           onCancel={cancelContinuousJog}
         />
       </JogControlsLayout>
+      {machineKind === 'laser' ? <CentreSelectionButton disabled={disabled} /> : null}
       <JogSettingsRow
         disabled={disabled}
         step={step}
