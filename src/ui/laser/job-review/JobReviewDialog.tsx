@@ -1,3 +1,4 @@
+import { JobReviewRegistrationJig, registrationJigConfirmLabel } from './JobReviewRegistrationJig';
 // JobReviewDialog — the pre-start Job Review window (ADR-224). Opens for
 // every Start that goes through the shared start flow, shows everything the
 // burn depends on (stats from the exact prepared G-code, grouped warnings,
@@ -58,6 +59,7 @@ function OpenJobReview(props: {
     <Dialog title={copy.dialogTitle} size="xl" onClose={handleCancel}>
       <span ref={topAnchorRef} aria-hidden="true" />
       <JobReviewHeader machineKind={model.machineKind} />
+      <JobReviewRegistrationJig output={model.registrationJigOutput} isPreparing={isPreparing} />
       <JobReviewStats stats={model.stats} isPreparing={isPreparing} />
       {blocker !== null ? (
         <BlockerBanner blocker={blocker} purpose={purpose} onRetry={requestReviewRebuild} />
@@ -93,7 +95,7 @@ function OpenJobReview(props: {
         >
           <span style={startButtonContentStyle}>
             <Icon name="play" size={11} />
-            {copy.confirmLabel}
+            {registrationJigConfirmLabel(model.registrationJigOutput, purpose, copy.confirmLabel)}
           </span>
         </Button>
       </div>

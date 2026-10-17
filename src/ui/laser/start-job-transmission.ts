@@ -6,6 +6,7 @@ import type { createRunId, LastCompletedReceipt, RecoveryRepository } from '../s
 import type { CncSetupAttestation } from '../state/cnc-setup-attestation';
 import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence';
 import { armVariableStreamAdvancement } from './variable-stream-advancement';
+import { armRegistrationJigCompletion } from './registration-jig-stream-completion';
 import type { prepareCurrentStartJob } from './start-job-source';
 import type { JobReviewModel } from './job-review';
 import {
@@ -71,6 +72,15 @@ export async function transmitPreparedStart(input: {
     input.runId,
     input.args.outputScope,
   );
+  const jigCompletion =
+    input.args.prepared.laserSecondPassChain === undefined
+      ? armRegistrationJigCompletion({
+          project: input.args.project,
+          outputScope: input.args.outputScope,
+          job: input.args.prepared.prepared.job,
+          runId: input.runId,
+        })
+      : null;
   const retention = observeFreshExecutionRetention(input.runId, input.args.repository);
   let startAccepted = false;
   try {
@@ -82,6 +92,7 @@ export async function transmitPreparedStart(input: {
     );
     startAccepted = true;
     advancement.accept();
+    jigCompletion?.accept();
     handoffArmed = false;
     // ADR-337: the archive is built and stored only now, off the path between
     // Start and motion. The handoff armed before the wire already carries the
@@ -89,7 +100,10 @@ export async function transmitPreparedStart(input: {
     await archiveAcceptedFreshRun(input.args, input.runId, retention);
     return true;
   } catch (error) {
-    if (!startAccepted) advancement.cancel();
+    if (!startAccepted) {
+      advancement.cancel();
+      jigCompletion?.cancel();
+    }
     if (isJobStartTransmissionError(error) && error.runId === input.runId) {
       // A rejected write can still have delivered a prefix. The pending intent
       // belongs to this attempted program until its exact archive takes over.
