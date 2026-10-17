@@ -9,6 +9,7 @@ import {
   type SetStateAction,
 } from 'react';
 import {
+  findRegistrationBoxes,
   hitTest,
   sceneObjectHasVisibleLayer,
   transformedBBox,
@@ -29,12 +30,18 @@ import {
 } from '../view-transform';
 import { jigSelectionForHit, moveJigSelection } from './jig-canvas-selection';
 import { fitJigCanvasView, JIG_BED_VIEW } from './jig-canvas-view';
+import { jigOutlineAt } from './fit-jig-artwork';
+import { isJigArtworkFile } from './JigArtworkImport';
 
 export type RegistrationJigCanvasProps = {
   readonly project: Project;
   readonly selectedIds: ReadonlySet<string>;
+  /** Changes when the outline layout is rebuilt; the view then refits to it. */
+  readonly fitRequest?: number;
   readonly onSelectionChange: (ids: ReadonlySet<string>) => void;
   readonly onCommit: (project: Project) => void;
+  /** Artwork files dropped on the canvas, with the outline under the drop point. */
+  readonly onDropFiles?: (files: ReadonlyArray<File>, outlineId: string | null) => void;
 };
 
 type Gesture = {
@@ -51,10 +58,15 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
   const ref = useRef<HTMLCanvasElement>(null);
   const size = useCanvasBitmapSize(ref);
   // Use the measured viewport as it becomes available, without chasing objects
-  // as the user edits them. Panning/zooming takes ownership until Fit jig is used.
-  const initialProject = useRef(project);
+  // as the user edits them. Panning/zooming takes ownership until Fit jig is used
+  // or the layout is rebuilt, which can grow the grid well past the old view.
+  const [fit, setFit] = useState({ request: props.fitRequest, project });
   const [manualView, setView] = useState<ViewState | null>(null);
-  const view = manualView ?? fitJigCanvasView(initialProject.current, size);
+  if (fit.request !== props.fitRequest) {
+    setFit({ request: props.fitRequest, project });
+    setView(null);
+  }
+  const view = manualView ?? fitJigCanvasView(fit.project, size);
   const [preview, setPreview] = useState<Project | null>(null);
   const spaceHeld = useRef(false);
   const { gesture, begin, update, end } = useJigCanvasGesture({
@@ -101,16 +113,43 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
             event.preventDefault();
           }
         }}
+        {...jigCanvasDropHandlers(props.onDropFiles, project, view)}
       />
       <div style={footerStyle}>
         <span id="registration-jig-canvas-help">
-          Drag to move · Shift-click to select more · Wheel to zoom · Space-drag to pan
+          Drag to move · Shift-click to select more · Wheel to zoom · Space-drag to pan · Drop
+          artwork files on an outline
         </span>
         <Button onClick={() => setView(fitJigCanvasView(project, size))}>Fit jig</Button>
         <Button onClick={() => setView(JIG_BED_VIEW)}>Fit bed</Button>
       </div>
     </div>
   );
+}
+
+// Artwork files dropped on the canvas go to the outline under the drop point.
+function jigCanvasDropHandlers(
+  onDropFiles: RegistrationJigCanvasProps['onDropFiles'],
+  project: Project,
+  view: ViewState,
+): Pick<React.DOMAttributes<HTMLCanvasElement>, 'onDragOver' | 'onDrop'> {
+  return {
+    onDragOver: (event) => {
+      if (onDropFiles === undefined) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    },
+    onDrop: (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const files = Array.from(event.dataTransfer.files).filter(isJigArtworkFile);
+      if (onDropFiles === undefined || files.length === 0) return;
+      const point = canvasMouseToScene(event, event.currentTarget, project, view);
+      const outlines = findRegistrationBoxes(project.scene);
+      const index = point === null ? -1 : jigOutlineAt(outlines, point);
+      onDropFiles(files, outlines[index]?.id ?? null);
+    },
+  };
 }
 
 function useJigCanvasWheel(args: {

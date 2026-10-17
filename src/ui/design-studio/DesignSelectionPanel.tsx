@@ -5,6 +5,7 @@ import { useDesignStudioStore } from './design-studio-store';
 import { selectionBounds } from './design-handles';
 import { ShapeInspector } from './ShapeInspector';
 import './design-selection-panel.css';
+import { shortcutLabel } from '../common/shortcut-label';
 
 const NAMES = {
   rect: 'Rectangle',
@@ -138,7 +139,7 @@ function SelectionLayout({
           <div className="design-selection__actions">
             <button
               type="button"
-              title="Duplicate selected shapes together (Ctrl+D)"
+              title={shortcutLabel('Duplicate selected shapes together (Ctrl+D)')}
               onClick={duplicate}
             >
               Duplicate
@@ -215,7 +216,7 @@ function ShapeList({ session }: { readonly session: DesignSession }): JSX.Elemen
         <button
           type="button"
           disabled={sketch.entities.length === 0}
-          title="Select every shape (Ctrl+A)"
+          title={shortcutLabel('Select every shape (Ctrl+A)')}
           onClick={selectAll}
         >
           Select all

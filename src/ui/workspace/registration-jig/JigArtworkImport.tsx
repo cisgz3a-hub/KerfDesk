@@ -1,13 +1,35 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SceneObject } from '../../../core/scene';
 import { importSvgFiles } from '../../app/svg-import-action';
 import { importImageFile } from '../../commands/import-image-action';
+import { Button } from '../../kit';
 import { useToastStore } from '../../state/toast-store';
+import type { JigImportPlacement } from './jig-editor-artwork';
 
-export function JigArtworkImport(props: {
-  readonly onImport: (object: SceneObject) => void;
-  readonly onBusyChange: (busy: boolean) => void;
-}): JSX.Element {
+export const JIG_ARTWORK_ACCEPT = '.svg,.png,.jpg,.jpeg,.webp,.bmp';
+const JIG_ARTWORK_EXTENSIONS = JIG_ARTWORK_ACCEPT.split(',');
+
+export type JigArtworkImporter = {
+  readonly busy: boolean;
+  /** Import files one by one; file N fits into the Nth outline from the anchor. */
+  readonly importFiles: (
+    files: ReadonlyArray<File>,
+    anchorIds: ReadonlySet<string>,
+  ) => Promise<void>;
+};
+
+/** True for a file the jig editor can import (by extension, as the picker filters). */
+export function isJigArtworkFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return JIG_ARTWORK_EXTENSIONS.some((extension) => name.endsWith(extension));
+}
+
+// One importer per editor, shared by the Import button and canvas drops, so a
+// second batch cannot start while the first is still being added.
+export function useJigArtworkImport(
+  onImport: (object: SceneObject, placement: JigImportPlacement) => void,
+  onBusyChange: (busy: boolean) => void,
+): JigArtworkImporter {
   const alive = useRef(true);
   const pending = useRef(false);
   const abort = useRef<AbortController | null>(null);
@@ -19,64 +41,89 @@ export function JigArtworkImport(props: {
       abort.current?.abort();
     };
   }, []);
-  const importFiles = async (files: ReadonlyArray<File>): Promise<void> => {
-    if (pending.current || files.length === 0) return;
-    pending.current = true;
-    const controller = new AbortController();
-    abort.current = controller;
-    setBusy(true);
-    props.onBusyChange(true);
-    const toast = useToastStore.getState().pushToast;
-    try {
-      for (const file of files) {
-        if (!alive.current) break;
-        if (file.name.toLowerCase().endsWith('.svg')) {
-          await importSvgFiles(
-            [file],
-            (object) => {
-              if (!alive.current) throw new DOMException('Import cancelled', 'AbortError');
-              props.onImport(object);
-              return { kind: 'added' };
-            },
-            toast,
-          );
-        } else {
-          await importImageFile(
-            file,
-            (object) => {
-              controller.signal.throwIfAborted();
-              props.onImport(object);
-              return { kind: 'added' };
-            },
-            toast,
-            { signal: controller.signal },
-          );
+  const importFiles = useCallback(
+    async (files: ReadonlyArray<File>, anchorIds: ReadonlySet<string>): Promise<void> => {
+      if (pending.current || files.length === 0) return;
+      pending.current = true;
+      const controller = new AbortController();
+      abort.current = controller;
+      setBusy(true);
+      onBusyChange(true);
+      const toast = useToastStore.getState().pushToast;
+      let batchIndex = 0;
+      const add = (object: SceneObject): { readonly kind: 'added' } => {
+        onImport(object, { anchorIds, batchIndex });
+        batchIndex += 1;
+        return { kind: 'added' };
+      };
+      try {
+        for (const file of files) {
+          if (!alive.current) break;
+          if (file.name.toLowerCase().endsWith('.svg')) {
+            await importSvgFiles(
+              [file],
+              (object) => {
+                if (!alive.current) throw new DOMException('Import cancelled', 'AbortError');
+                return add(object);
+              },
+              toast,
+            );
+          } else {
+            await importImageFile(
+              file,
+              (object) => {
+                controller.signal.throwIfAborted();
+                return add(object);
+              },
+              toast,
+              { signal: controller.signal },
+            );
+          }
+        }
+      } finally {
+        pending.current = false;
+        if (alive.current) {
+          setBusy(false);
+          onBusyChange(false);
         }
       }
-    } finally {
-      pending.current = false;
-      if (alive.current) {
-        setBusy(false);
-        props.onBusyChange(false);
-      }
-    }
-  };
+    },
+    [onImport, onBusyChange],
+  );
+  return { busy, importFiles };
+}
+
+export function JigArtworkImport(props: {
+  readonly busy: boolean;
+  readonly onFiles: (files: ReadonlyArray<File>) => void;
+}): JSX.Element {
+  const input = useRef<HTMLInputElement>(null);
   return (
-    <label className="lf-jig-import">
-      Import artwork
+    <div className="lf-jig-import">
+      <Button
+        variant="primary"
+        disabled={props.busy}
+        title="Choose SVG or image files. Each file is fitted into its own outline, starting at the selected one."
+        onClick={() => input.current?.click()}
+      >
+        {props.busy ? 'Importing artwork…' : 'Import artwork…'}
+      </Button>
       <input
+        ref={input}
+        hidden
         title="Import SVG or image artwork into the jig, fitted inside the selected outline"
         type="file"
-        accept=".svg,.png,.jpg,.jpeg,.webp,.bmp"
+        accept={JIG_ARTWORK_ACCEPT}
         multiple
-        disabled={busy}
+        disabled={props.busy}
         aria-label="Import jig artwork"
         onChange={(event) => {
           const files = Array.from(event.currentTarget.files ?? []);
           event.currentTarget.value = '';
-          void importFiles(files);
+          props.onFiles(files);
         }}
       />
-    </label>
+      <p className="lf-jig-muted">Or drop SVG or image files onto an outline on the jig canvas.</p>
+    </div>
   );
 }

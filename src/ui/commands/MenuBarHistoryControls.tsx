@@ -15,6 +15,7 @@ import { Icon, type IconName } from '../kit';
 import { commandHelpId, controlHelp } from '../help/help-topics';
 import { runCommand, type AppCommand } from './command-registry';
 import { UndoListButton } from './UndoListButton';
+import { shortcutLabel } from '../common/shortcut-label';
 
 export function MenuBarHistoryControls(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -55,5 +56,7 @@ function HistoryButton(props: {
 function historyTitle(command: AppCommand): string {
   if (command.disabledReason !== undefined)
     return controlHelp(commandHelpId(command.id), command.disabledReason);
-  return command.shortcut === undefined ? command.title : `${command.title} (${command.shortcut})`;
+  return command.shortcut === undefined
+    ? command.title
+    : `${command.title} (${shortcutLabel(command.shortcut)})`;
 }
