@@ -1,4 +1,4 @@
-// A dialog's background vector preview (ADR-606). Each change of sources or
+// A dialog's background vector preview (ADR-609). Each change of sources or
 // task supersedes the previous run; the dialog keeps showing the last settled
 // result, marked as updating, until the current request settles.
 

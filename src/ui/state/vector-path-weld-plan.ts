@@ -58,7 +58,7 @@ export function finishWeldSelection(
   return ok({ object: welded.value, layers: prepared.layers, operands: prepared.operands });
 }
 
-/** Everything but the union: cheap enough for the UI thread (ADR-606). */
+/** Everything but the union: cheap enough for the UI thread (ADR-609). */
 export function prepareWeldSelection(
   scene: Scene,
   objects: ReadonlyArray<VectorSceneObject>,

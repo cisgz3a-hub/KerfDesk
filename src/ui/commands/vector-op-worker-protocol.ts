@@ -6,7 +6,7 @@ import type { ResultObjectMessage } from './vector-op-result-transfer';
 
 /**
  * One costly vector operation, with the exact result ids the committing action
- * will use, so a settled result can be committed as it is (ADR-606).
+ * will use, so a settled result can be committed as it is (ADR-609).
  */
 export type VectorOpTask =
   | {

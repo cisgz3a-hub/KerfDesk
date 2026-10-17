@@ -1,5 +1,5 @@
 // One-click vector commands (Offset outlines, Cut Shapes) compute in the
-// vector worker (ADR-606) instead of freezing the canvas. Each click owns a
+// vector worker (ADR-609) instead of freezing the canvas. Each click owns a
 // fresh worker; a newer click of the same command terminates the older one.
 // The result is committed through the ordinary action, as one undo step, only
 // when the project and selection are still the ones the click saw. A real

@@ -23,7 +23,7 @@ export type CutShapesActions = {
   /**
    * Cut the selection with its top-most closed shape; true when anything was
    * cut. A background plan for this exact scene and selection is committed as
-   * it is (ADR-606); otherwise the cut is planned here.
+   * it is (ADR-609); otherwise the cut is planned here.
    */
   readonly cutSelectedShapes: (prepared?: PreparedCutShapes) => boolean;
 };

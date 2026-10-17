@@ -77,7 +77,7 @@ test('cuts one rectangle with another, then trims an outline back to its crossin
   await page.keyboard.press('Escape');
   await page.keyboard.press('Control+a');
   await runMenu(page, 'Tools', 'Cut Shapes');
-  // The cut is worked out in the vector worker and commits when it settles (ADR-606).
+  // The cut is worked out in the vector worker and commits when it settles (ADR-609).
   await expect.poll(async () => (await sceneSummary(page)).undo).toBe(drawn.undo + 1);
   const cut = await sceneSummary(page);
   expect(cut.objects.map((object) => object.id).sort()).toEqual(

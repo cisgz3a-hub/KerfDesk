@@ -30,7 +30,7 @@ async function committed(run: () => unknown): Promise<string> {
   return JSON.stringify(useStore.getState().project);
 }
 
-describe('one-click vector commands in the background (ADR-606)', () => {
+describe('one-click vector commands in the background (ADR-609)', () => {
   beforeEach(load);
 
   it.each([1, -0.6])('Offset outlines %s mm commits the in-thread document', async (deltaMm) => {

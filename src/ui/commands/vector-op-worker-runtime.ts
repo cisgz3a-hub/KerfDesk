@@ -1,4 +1,4 @@
-// The vector-geometry worker's pure body (ADR-606). The worker, the no-Worker
+// The vector-geometry worker's pure body (ADR-609). The worker, the no-Worker
 // test fallback and the parity tests all run the same core calls the in-thread
 // actions make, so a worker result equals the in-thread result.
 

@@ -1,4 +1,4 @@
-// Shared fixtures for the vector worker parity tests (ADR-606). The largest
+// Shared fixtures for the vector worker parity tests (ADR-609). The largest
 // object passes the packing threshold, so these cases exercise the packed
 // transfer rather than the plain clone.
 

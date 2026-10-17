@@ -55,7 +55,7 @@ export type VectorCombineOptions = {
   readonly expectedProject?: Project;
   readonly expectedIds?: ReadonlyArray<string>;
   readonly isCurrent?: () => boolean;
-  /** A dialog's settled background result, committed when its inputs still match (ADR-606). */
+  /** A dialog's settled background result, committed when its inputs still match (ADR-609). */
   readonly prepared?: PreparedVectorCombine;
 };
 

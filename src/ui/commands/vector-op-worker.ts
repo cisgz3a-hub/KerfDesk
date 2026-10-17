@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 // Runs Offset Shapes, Combine Shapes and Weld previews off the UI thread
-// (ADR-606). The worker keeps the last source objects it was sent, so a dialog
+// (ADR-609). The worker keeps the last source objects it was sent, so a dialog
 // posts its selection once and each later edit posts only the new options.
 
 import type { VectorSceneObject } from '../../core/geometry';

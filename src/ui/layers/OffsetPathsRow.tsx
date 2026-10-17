@@ -3,7 +3,7 @@
 // clearing outlines and inlay gaps on a router), so it mounts OUTSIDE the
 // laser-only Shape Properties gate. The result is a NEW object; the
 // sources stay (VCarve/Offsetter convention). The offset runs in the vector
-// worker and commits when it settles (ADR-606).
+// worker and commits when it settles (ADR-609).
 
 import { useState } from 'react';
 import { NumberField as ClearableNumberField } from '../common/NumberField';

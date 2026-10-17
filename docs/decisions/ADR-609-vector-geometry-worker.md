@@ -1,4 +1,4 @@
-## ADR-606 - Offset, Combine, Weld and Cut Shapes compute in a vector geometry worker
+## ADR-609 - Offset, Combine, Weld and Cut Shapes compute in a vector geometry worker
 
 **Status:** Accepted; measured in Node on the maintainer's PC, browser and packaged-desktop qualification pending. | **Date:** 2026-10-18
 

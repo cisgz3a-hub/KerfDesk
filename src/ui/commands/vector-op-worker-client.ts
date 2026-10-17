@@ -1,4 +1,4 @@
-// Main-thread client for src/ui/commands/vector-op-worker.ts (ADR-606).
+// Main-thread client for src/ui/commands/vector-op-worker.ts (ADR-609).
 //
 // One session belongs to one open dialog. Its worker holds the dialog's source
 // objects, so the selection crosses the boundary once (packed, ADR-346) and an

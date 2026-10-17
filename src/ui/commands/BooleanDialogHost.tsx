@@ -203,7 +203,7 @@ type BooleanPreviewState = {
   readonly prepared: PreparedVectorCombine | undefined;
 };
 
-// The union runs in the vector worker (ADR-606) with the ids Apply will use, so
+// The union runs in the vector worker (ADR-609) with the ids Apply will use, so
 // Apply commits the settled result instead of computing it again on this thread.
 function useBooleanPreview(session: BooleanSession, operation: BooleanPreviewOperation) {
   const scene = session.project.scene;

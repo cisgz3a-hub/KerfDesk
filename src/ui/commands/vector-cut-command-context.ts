@@ -20,7 +20,7 @@ export function vectorCutCommandContext(): VectorCutCommandContext {
       if (ui.toolMode.kind === 'extend-shapes') ui.resetToolMode();
       else ui.setToolMode({ kind: 'extend-shapes' });
     },
-    // The cut runs in the vector worker and commits when it settles (ADR-606).
+    // The cut runs in the vector worker and commits when it settles (ADR-609).
     cutShapes: () => void cutShapesInBackground(),
   };
 }

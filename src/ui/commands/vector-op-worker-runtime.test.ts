@@ -27,7 +27,7 @@ function expectIdentical(worker: unknown, inThread: unknown): void {
   expect(worker).toStrictEqual(inThread);
 }
 
-describe('vector worker parity with the in-thread core calls (ADR-606)', () => {
+describe('vector worker parity with the in-thread core calls (ADR-609)', () => {
   it('packs the dense fixture instead of cloning every point', () => {
     const packed = packSceneObjectsMessage(parityObjects());
     expect(packed.message.kind).toBe('packed-scene-objects');

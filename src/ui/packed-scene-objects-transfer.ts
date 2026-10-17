@@ -1,5 +1,5 @@
 // A selection of scene objects crosses a worker boundary as packed geometry,
-// exactly as a whole project does (ADR-346, ADR-606).
+// exactly as a whole project does (ADR-346, ADR-609).
 //
 // Workers that operate on the selection rather than the project (the vector
 // geometry worker behind Offset Shapes and Combine Shapes) would otherwise

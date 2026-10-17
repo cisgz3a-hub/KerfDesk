@@ -23,7 +23,7 @@ export type OffsetShapesActions = {
   /**
    * Returns true when the offset was added; false leaves the project as it was.
    * A dialog's settled background result is committed when its inputs still
-   * match (ADR-606); otherwise the offset is computed here.
+   * match (ADR-609); otherwise the offset is computed here.
    */
   readonly offsetShapesSelection: (
     request: OffsetShapesRequest,

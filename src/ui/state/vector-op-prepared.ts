@@ -1,5 +1,5 @@
 // A vector result the background worker already computed for a dialog's
-// preview or a one-click command (ADR-606). An action commits it only when it was computed from
+// preview or a one-click command (ADR-609). An action commits it only when it was computed from
 // exactly the inputs the action would use now: the same source objects (by
 // identity, in order), the same options and the same result ids. The core
 // calls are pure, so that result is the one the action would compute. Any

@@ -63,7 +63,7 @@ const offset = (distanceMm: number): VectorOpTask => ({
   ids: IDS,
 });
 
-describe('vector worker session (ADR-606)', () => {
+describe('vector worker session (ADR-609)', () => {
   it('posts the selection once and then only the options', async () => {
     const { session, workers } = harness();
     const sources = parityObjects();

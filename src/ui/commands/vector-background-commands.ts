@@ -1,4 +1,4 @@
-// Offset outlines and Cut Shapes, computed in the vector worker (ADR-606).
+// Offset outlines and Cut Shapes, computed in the vector worker (ADR-609).
 // A selection the action refuses outright (nothing eligible, locked, a live
 // compound, too few shapes) goes straight to the action, which explains why
 // at once; only real geometry work goes to the worker.

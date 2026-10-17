@@ -76,7 +76,7 @@ function marked(object: ImportedSvg | null): ImportedSvg | null {
   return object === null ? null : { ...object, source: 'worker result' };
 }
 
-describe('committing a background vector result (ADR-606)', () => {
+describe('committing a background vector result (ADR-609)', () => {
   beforeEach(load);
 
   it('Offset Shapes commits the same document as the in-thread offset', () => {

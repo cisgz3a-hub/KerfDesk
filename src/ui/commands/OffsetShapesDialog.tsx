@@ -1,7 +1,7 @@
 // Offset Shapes dialog (LightBurn gap batch 3, ADR-410). Distance, direction,
 // corner style, Outer Shapes Only and Delete Originals, with a live preview and
 // size readout computed by the same core call the action uses. That call runs
-// in the vector worker (ADR-606), and Apply commits its settled result.
+// in the vector worker (ADR-609), and Apply commits its settled result.
 
 import { useMemo, useState } from 'react';
 import type { VectorSceneObject } from '../../core/geometry';

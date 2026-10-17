@@ -1,4 +1,4 @@
-// Vector-geometry worker results return as packed vertices (ADR-606).
+// Vector-geometry worker results return as packed vertices (ADR-609).
 //
 // A structured clone would rebuild every {x, y} point of a large offset or
 // weld on the UI thread while it deserializes the reply. The worker instead
