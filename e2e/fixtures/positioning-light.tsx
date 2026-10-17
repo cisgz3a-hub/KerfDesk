@@ -42,7 +42,7 @@ useLaserStore.setState({
     fixtureElement('result').textContent = `Simulated centre ${x}, ${y}`;
     useLaserStore.setState({ positioningLightEnabled: true });
   },
-  setPositioningLightEnabled: async () => {
+  switchPositioningLightOff: async () => {
     fixtureElement('result').textContent = 'Simulated LED off';
     useLaserStore.setState({ positioningLightEnabled: false });
   },

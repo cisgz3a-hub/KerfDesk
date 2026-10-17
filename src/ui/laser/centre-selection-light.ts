@@ -16,7 +16,11 @@ export async function centreSelectionLight(): Promise<void> {
   const app = useStore.getState();
   const { project } = app;
   const light = project.device.positioningLight;
-  const issue = positioningLightIssue(light, project.device.controllerKind);
+  const issue = positioningLightIssue(
+    light,
+    project.device.controllerKind,
+    project.device.gcodeDialect?.dialectId,
+  );
   if (light === undefined || issue !== null)
     throw new Error(issue ?? 'Set up the separate positioning light in Machine Setup first.');
   if (machineKindOf(project.machine) !== 'laser')

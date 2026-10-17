@@ -19,7 +19,11 @@ export function CentreSelectionButton({
     const light = state.project.device.positioningLight;
     return (
       light === undefined ||
-      positioningLightIssue(light, state.project.device.controllerKind) !== null
+      positioningLightIssue(
+        light,
+        state.project.device.controllerKind,
+        state.project.device.gcodeDialect?.dialectId,
+      ) !== null
     );
   });
   const fileOnly = useStore((state) => state.project.device.controllerKind === 'ruida');
@@ -69,7 +73,7 @@ function PositioningLightOffButton({
   readonly configured: boolean;
 }): JSX.Element | null {
   const lightEnabled = useLaserStore((state) => state.positioningLightEnabled);
-  const off = useLaserStore((state) => state.setPositioningLightEnabled);
+  const off = useLaserStore((state) => state.switchPositioningLightOff);
   const blocked = useLaserStore((state) => headMoveBlockMessage(state));
   if (!lightEnabled && !configured) return null;
   return (
@@ -83,7 +87,7 @@ function PositioningLightOffButton({
       }
       disabled={blocked !== null}
       onClick={() => {
-        void off(false).catch(controllerActionFailureHandler('LED off'));
+        void off().catch(controllerActionFailureHandler('LED off'));
       }}
     >
       LED off

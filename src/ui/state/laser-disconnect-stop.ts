@@ -32,6 +32,7 @@ import { provisionalResetCanvasPatch } from './laser-reset-terminal-state';
 import { DISCONNECT_WRITE_TIMEOUT_MS } from './laser-reset-ownership';
 import { publishControllerIncident } from './laser-incident-publish';
 import type { TranscriptSource } from './laser-transcript';
+import { positioningLightDisconnectOff } from './positioning-light-actions';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -53,8 +54,14 @@ export async function stopBeforeDisconnect(
   safeWrite: SafeWriteFn,
   connection: NonNullable<LiveRefs['connection']>,
 ): Promise<void> {
+  // A light KerfDesk switched on over this connection is switched off with the
+  // other cleanup lines, best effort: it never blocks or fails Disconnect.
+  const lightOff = positioningLightDisconnectOff(get(), refs);
   if (isGrblFamilyDriver(refs.driver)) {
-    await runGrblDisconnectTransaction(set, refs, safeWrite, { keepErroredStreamer: true });
+    await runGrblDisconnectTransaction(set, refs, safeWrite, {
+      keepErroredStreamer: true,
+      ...(lightOff === null ? {} : { cleanupLines: ['M5', 'M9', lightOff] }),
+    });
     return;
   }
   // Marlin's quickstop lines when anything may still run (MA-7), else the
@@ -74,10 +81,15 @@ export async function stopBeforeDisconnect(
     }
   }
   if (firstError !== null) throw firstError;
+  const lightLines = lightOff === null ? [] : [`${lightOff}\n`];
+  for (const line of lightLines) {
+    if (refs.connection !== connection) break;
+    await writeDisconnectCommand(safeWrite, line).catch(() => undefined);
+  }
   // No realtime reset went out, so only the controller parsing these lines
   // stops the output: wait (bounded) for their acknowledgements before the
   // close drops DTR (audit TC-3).
-  if (disconnectWaitsForCleanupAcks(get(), stopCommands, softReset)) {
+  if (disconnectWaitsForCleanupAcks(get(), [...stopCommands, ...lightLines], softReset)) {
     await waitForDisconnectCleanupAcks(set, get, refs, () => refs.connection === connection);
   }
 }

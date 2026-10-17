@@ -352,7 +352,13 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     cameraModel: normalizeCameraModelRecord(dev['cameraModel']),
     otherCameraModels: normalizeOtherCameraModels(dev['otherCameraModels']),
     fireControl: normalizeLaserFireControl(dev['fireControl']),
-    positioningLight: normalizePositioningLight(dev['positioningLight']),
+    // An invalid or since-tightened light mapping is dropped, not a reason to
+    // refuse the whole project; it is configured again in Machine Setup.
+    positioningLight: normalizePositioningLight(
+      dev['positioningLight'],
+      controllerKind,
+      normalizeGcodeDialectSelection(dev['gcodeDialect']).dialectId,
+    ),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
     ...(dev['cameraProfile'] !== undefined
       ? { cameraProfile: normalizeCameraProfile(dev['cameraProfile'] as CameraProfile) }
