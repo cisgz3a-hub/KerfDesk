@@ -11,6 +11,7 @@ import { Icon } from '../kit';
 import { measureReadout } from './measure-tool';
 import { SnapSettingsButton } from './SnapSettingsPopover';
 import { computeView } from './view-transform';
+import { shortcutLabel } from '../common/shortcut-label';
 
 export function DragOverlay(): JSX.Element {
   return (
@@ -84,7 +85,7 @@ export function ZoomControls(): JSX.Element {
       <button
         type="button"
         onClick={() => fitToSelection()}
-        title="Fit to selection (Shift+F)"
+        title={shortcutLabel('Fit to selection (Shift+F)')}
         aria-label="Fit to selection"
         style={zoomBtnStyle}
       >

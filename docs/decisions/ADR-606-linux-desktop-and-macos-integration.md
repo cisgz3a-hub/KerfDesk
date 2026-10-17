@@ -40,14 +40,19 @@ web app. An audit of the desktop shell on 2026-10-18 found these gaps on macOS a
    install scripts, which set up `chrome-sandbox` and, on Ubuntu 24.04 and newer, an AppArmor
    profile that lets the sandbox use user namespaces. electron-builder writes `--no-sandbox` into
    every AppImage desktop entry; `appImage.executableArgs: []` removes it, so the AppImage's own
-   launcher drops the sandbox only where the system blocks user namespaces. On such a system the
-   AppImage runs without Chromium's sandbox; the `.deb` keeps it.
+   launcher drops the sandbox only where the system blocks user namespaces. The AppImage launcher
+   of electron-builder 26.16.1 does this on both of its build paths (`generateAppRunScript`: it
+   adds `--no-sandbox` when `unshare -Ur true` fails), and the package contract checks that it
+   still does. On such a system the AppImage runs without Chromium's sandbox; the `.deb` keeps it.
 3. **Linux file opens.** On a POSIX path API, a `file://` launch argument becomes its path when it
    is local (no host, or `localhost`) and has no query, fragment, or encoded slash or NUL. Every
    other check of ADR-378 applies to the result unchanged.
-4. **Mac shortcut labels.** Wherever KerfDesk shows a shortcut, a Mac shows it with the Mac's own
-   symbols in Apple's order (Option, Shift, Command), for example `⇧⌘V` for Ctrl+Shift+V. Keys,
-   handlers and the Windows and Linux labels are unchanged.
+4. **Mac shortcut labels.** Wherever KerfDesk shows a shortcut (menus, toolbar, command search
+   and its button, Keyboard Shortcuts, jog hints, Design and Image Studio), a Mac shows it with the
+   Mac's own symbols in Apple's order (Option, Shift, Command), for example `⇧⌘V` for
+   Ctrl+Shift+V. Only chords whose handlers take Command for Ctrl are relabelled. Keys, handlers
+   and the Windows and Linux labels are unchanged. On macOS and Linux the Connect tooltips also say
+   that an adapter without a serial number is chosen again after each start.
 5. **FFmpeg on a Mac.** After the folders on PATH, KerfDesk looks in `/opt/homebrew/bin`,
    `/usr/local/bin` and `/opt/local/bin` (Homebrew on Apple silicon and Intel, then MacPorts),
    always by full path. Windows and Linux still search PATH alone. The "FFmpeg not installed"
@@ -66,9 +71,10 @@ web app. An audit of the desktop shell on 2026-10-18 found these gaps on macOS a
 8. **CI.** The Desktop package check gains a Linux job on every pull request: it builds the
    AppImage and `.deb` from the Preview config, checks their contract
    (`scripts/verify-linux-package.sh`: identity, legal files, desktop entry, MIME type, no updater
-   metadata), checks fuses and `app.asar`, installs the `.deb` with Ubuntu's user-namespace
-   restriction still on, launches, imports and saves in the installed app, removes it, and proves
-   a modified `app.asar` stops the app. The existing unpacked Linux job now launches `kerfdesk`.
+   metadata, the AppImage launcher's sandbox fallback), checks fuses and `app.asar`, installs the
+   `.deb` with Ubuntu's user-namespace restriction still on, launches, imports and saves in the
+   installed app and in the AppImage's launcher, removes the `.deb`, and proves a modified
+   `app.asar` stops the app. The existing unpacked Linux job now launches `kerfdesk`.
 
 ### Not decided here
 

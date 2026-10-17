@@ -9,6 +9,7 @@ import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { invertMask, type SelectionCombineMode } from '../../core/image-select';
 import type { SelectionModifyKind } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
+import { shortcutLabel } from '../common/shortcut-label';
 
 const MODES: readonly {
   readonly mode: SelectionCombineMode;
@@ -142,13 +143,13 @@ export function SelectionActions(): JSX.Element {
       />
       <ActionButton
         label="Invert"
-        title="Invert the selection (Ctrl+Shift+I)"
+        title={shortcutLabel('Invert the selection (Ctrl+Shift+I)')}
         onClick={invert}
         enabled={hasSelection}
       />
       <ActionButton
         label="Deselect"
-        title="Clear the selection (Ctrl+D)"
+        title={shortcutLabel('Clear the selection (Ctrl+D)')}
         onClick={() => select(null)}
         enabled={hasSelection}
       />

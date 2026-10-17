@@ -185,6 +185,17 @@ jobs:
       - name: Launch, import and save in the installed app
         run: xvfb-run -a pnpm smoke:desktop:native -- /opt/KerfDesk/kerfdesk
 
+      - name: Launch, import and save in the AppImage
+        # Still with Ubuntu's restriction on: the AppImage's launcher must drop
+        # Chromium's sandbox by itself here, where user namespaces are blocked.
+        # Extracted, so the runner needs no FUSE; the launcher is the same.
+        run: |
+          appimage_dir="${RUNNER_TEMP}/kerfdesk-appimage"
+          mkdir -p "${appimage_dir}"
+          appimage="$(pwd)/release/${VERSION}/KerfDesk-${VERSION}-linux-x86_64.AppImage"
+          (cd "${appimage_dir}" && "${appimage}" --appimage-extract >/dev/null)
+          xvfb-run -a pnpm smoke:desktop:native -- "${appimage_dir}/squashfs-root/AppRun"
+
       - name: Remove the .deb
         run: |
           sudo apt-get remove -y kerfdesk

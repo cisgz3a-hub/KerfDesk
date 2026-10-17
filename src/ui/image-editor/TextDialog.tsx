@@ -11,6 +11,7 @@ import {
   useTextDialogStore,
   type TextDialogState,
 } from './text-dialog-store';
+import { shortcutLabel } from '../common/shortcut-label';
 
 const OUTLINE_FONTS = FONT_REGISTRY.filter((entry) => entry.geometry === 'outline');
 
@@ -72,7 +73,7 @@ function TextDialogBody(props: { readonly state: TextDialogState }): JSX.Element
             className="lf-btn lf-btn--primary"
             onClick={() => void state.commit()}
             disabled={state.text.trim().length === 0}
-            title="Rasterize onto a new layer (Ctrl+Enter)"
+            title={shortcutLabel('Rasterize onto a new layer (Ctrl+Enter)')}
           >
             OK
           </button>

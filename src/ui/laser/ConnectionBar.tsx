@@ -45,8 +45,11 @@ export type ConnectionBarProps = {
   readonly onChoosePort?: () => void;
   readonly autoConnect?: boolean;
   readonly onAutoConnectChange?: (enabled: boolean) => void;
-  /** The desktop app on macOS and Linux forgets its chosen ports when it closes (ADR-366). */
+  /** Chosen ports last only until KerfDesk closes (ADR-366). */
   readonly portChoiceEndsOnRestart?: boolean;
+  /** Only an adapter with a USB serial number is remembered across restarts: macOS and Linux,
+   * in Chrome and the desktop app (ADR-606). */
+  readonly portMemoryNeedsSerialNumber?: boolean;
   /** The toolbar label; the full machine profile stays in the details popover. */
   readonly machineName?: string;
   /** Additional machine details, such as the fitted laser module. */
@@ -152,17 +155,24 @@ function connectButton(props: Props, label: string, disabled: boolean): JSX.Elem
 }
 
 function connectTitle(props: Props): string {
-  return props.portChoiceEndsOnRestart === true
-    ? `Connect to your ${props.machineNoun} controller. Choose its USB port the first time after KerfDesk starts; until KerfDesk closes, Connect uses that port.`
-    : `Connect to your ${props.machineNoun} controller on the USB port it used last time. The first time, choose its port.`;
+  if (props.portChoiceEndsOnRestart === true)
+    return `Connect to your ${props.machineNoun} controller. Choose its USB port the first time after KerfDesk starts; until KerfDesk closes, Connect uses that port.`;
+  const remembered = `Connect to your ${props.machineNoun} controller on the USB port it used last time. The first time, choose its port.`;
+  return props.portMemoryNeedsSerialNumber === true
+    ? `${remembered} An adapter that reports no USB serial number (most CH340 boards) is chosen again after each start.`
+    : remembered;
 }
 
 // Where picks last until KerfDesk closes (ADR-366), the app reconnects by
 // itself only when the machine is plugged back in.
 function autoConnectTitle(props: Props): string {
-  return props.portChoiceEndsOnRestart === true
-    ? `Connect by itself when the ${props.machineNoun} is plugged back in, to the port chosen since KerfDesk started. After each start, choose the port once with Connect. Connecting only reads settings; nothing moves.`
-    : `Connect by itself when KerfDesk starts or the ${props.machineNoun} is plugged in, to the port it used last time. Connecting only reads settings; nothing moves.`;
+  if (props.portChoiceEndsOnRestart === true)
+    return `Connect by itself when the ${props.machineNoun} is plugged back in, to the port chosen since KerfDesk started. After each start, choose the port once with Connect. Connecting only reads settings; nothing moves.`;
+  const caveat =
+    props.portMemoryNeedsSerialNumber === true
+      ? ' An adapter with no USB serial number (most CH340 boards) connects by itself only after it is chosen once since KerfDesk started.'
+      : '';
+  return `Connect by itself when KerfDesk starts or the ${props.machineNoun} is plugged in, to the port it used last time.${caveat} Connecting only reads settings; nothing moves.`;
 }
 
 function ConnectionMenu(props: Props & { readonly notice: ControllerNotice }): JSX.Element {

@@ -14,6 +14,7 @@ import { canRedo, canUndo } from './design-history';
 import { useDesignApply } from './use-design-apply';
 import { useDesignStudioStore } from './design-studio-store';
 import { TutorialButton } from '../tutorials/TutorialButton';
+import { shortcutLabel } from '../common/shortcut-label';
 
 export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element | null {
   const session = useDesignStudioStore((state) => state.session);
@@ -33,13 +34,13 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
 
       <BarButton
         label="Undo"
-        title="Undo (Ctrl+Z)"
+        title={shortcutLabel('Undo (Ctrl+Z)')}
         onClick={undo}
         disabled={!canUndo(session.history)}
       />
       <BarButton
         label="Redo"
-        title="Redo (Ctrl+Y)"
+        title={shortcutLabel('Redo (Ctrl+Y)')}
         onClick={redo}
         disabled={!canRedo(session.history)}
       />
@@ -48,24 +49,24 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
 
       <BarButton
         label="Fit"
-        title="Frame the bed; in 3D, reset to the stock's top view (Shift+F)"
+        title={shortcutLabel("Frame the bed; in 3D, reset to the stock's top view (Shift+F)")}
         onClick={props.onFit}
       />
       <BarToggle
         label="Snap"
-        title="Snap to grid and geometry (Shift+S)"
+        title={shortcutLabel('Snap to grid and geometry (Shift+S)')}
         on={session.snapEnabled}
         onClick={toggleSnap}
       />
       <BarToggle
         label="Ortho"
-        title="Constrain to horizontal and vertical (Shift+O)"
+        title={shortcutLabel('Constrain to horizontal and vertical (Shift+O)')}
         on={session.orthoEnabled}
         onClick={toggleOrtho}
       />
       <BarToggle
         label="Grid"
-        title="Show the grid (Shift+G)"
+        title={shortcutLabel('Show the grid (Shift+G)')}
         on={session.showGrid}
         onClick={toggleGrid}
       />

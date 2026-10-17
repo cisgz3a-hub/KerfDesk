@@ -81,6 +81,10 @@ appimage_path="$(realpath "${appimage}")"
 (cd "${work}" && "${appimage_path}" --appimage-extract >/dev/null)
 root="${work}/squashfs-root"
 test -x "${root}/AppRun" || fail 'AppImage has no AppRun'
+# The desktop entry adds no --no-sandbox (ADR-606), so the launcher itself must
+# drop Chromium's sandbox where the system blocks user namespaces.
+grep -q 'unshare -Ur true' "${root}/AppRun" || fail 'AppRun has no user namespace check'
+grep -q 'NO_SANDBOX=(--no-sandbox)' "${root}/AppRun" || fail 'AppRun has no sandbox fallback'
 test -x "${root}/kerfdesk" || fail 'AppImage has no kerfdesk executable'
 check_legal_files "${root}/resources"
 check_desktop_entry "${root}/kerfdesk.desktop" 'AppRun %U'
