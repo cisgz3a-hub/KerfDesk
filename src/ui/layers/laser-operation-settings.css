@@ -225,11 +225,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--lf-text-sm);
 }
 
+/* Same width as the Power and Speed entries above it (operation-slider-field.css). */
 .lf-laser-essentials__passes .lf-laser-field__value {
-  flex: 0 0 100px;
+  flex: 0 0 84px;
 }
 
 /* The one or two settings that matter for Fill or Image, laid out like the

@@ -59,7 +59,13 @@
   container-name: machine-rail-body;
 }
 
+/* When a short window makes the rail scroll, Frame and Start stay pinned to
+   its bottom edge instead of scrolling out of view, or stopping a fraction of
+   a pixel past it when a scroll lands on a whole pixel. */
 .lf-workspace-panels--compact > .lf-workspace-job-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   flex-shrink: 0;
 }
 

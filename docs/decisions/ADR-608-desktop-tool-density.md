@@ -18,6 +18,7 @@ KerfDesk's type scale started at 15 px body text, with 36–40 px controls and 5
 4. **Transforms and machine controls share one row from 1141 px** (previously 1240 px), so a 1280 px laptop no longer spends a second 47 px row on Laser / CNC, the machine and Connect.
 5. **Widths**: the tools column is 40 px (was 50 px; 52 px while curve actions show). The Compact side panel is `clamp(290px, 27vw, 360px)` (was `clamp(320px, 34vw, 400px)`). Spacious keeps its 300 px panels.
 6. **Panel contents**: the Artwork panel heading, view tabs, operation card, Line / Fill / Image switch, slider fields and panel-wide inputs shrink to the same 24–28 px scale.
+7. **Frame and Start stay pinned.** When a short window makes the Compact side panel scroll, the job dock sticks to the panel's bottom edge. Frame and Start stay fully visible instead of scrolling away, or ending up a fraction of a pixel past the edge when a scroll stops on a whole pixel.
 
 At 1280 × 680 the canvas grows from 829 × 391 px to 893 × 501 px (+38 % area). At 1366 × 768 it grows from 915 × 521 px to 965 × 589 px (+19 %).
 
