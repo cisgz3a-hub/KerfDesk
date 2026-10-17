@@ -119,6 +119,9 @@ linux:
       arch:
         - x64
   artifactName: KerfDesk-${version}-linux-${arch}.${ext}
+  # No Linux update feed exists yet: write no updater metadata (latest-linux.yml,
+  # app-update.yml), and never inherit the Windows feed below.
+  publish: null
 
 deb:
   packageName: kerfdesk
