@@ -1,9 +1,9 @@
 import { cloneSelectionGroups } from './clone-selection-groups';
+import { layerWithoutFocusTest } from '../../core/scene/layer';
 import {
   addLayer,
   addObject,
   createArtworkOperation,
-  layerWithoutFocusTest,
   operationIdsForObject,
   remapSceneObjectOperationBindings,
   sceneObjectUsesOperation,

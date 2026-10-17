@@ -1,4 +1,5 @@
-import { layerWithoutFocusTest, type Project } from '../../core/scene';
+import type { Project } from '../../core/scene';
+import { layerWithoutFocusTest } from '../../core/scene/layer';
 import { pushUndo } from './scene-mutations';
 
 export type LayerFocusTestActions = {
