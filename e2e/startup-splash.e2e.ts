@@ -11,8 +11,8 @@ test('paints the splash before the bundle and honours reduced motion', async ({ 
     await expect(splash).toBeVisible();
     await expect(page.locator('#app-root')).toBeEmpty();
     await expect(splash.getByText('Created by Ons Houtkombuis', { exact: true })).toBeVisible();
-    // The pulse is several layered animations (beam, glow, flare, sparks);
-    // reduced motion must stop every one of them.
+    // Several lights flow along the artwork's grooves, each its own
+    // animation; reduced motion must stop every one of them.
     const splashAnimations = () =>
       splash.evaluate((element) => element.getAnimations({ subtree: true }).length);
     await expect.poll(splashAnimations).toBeGreaterThan(0);
