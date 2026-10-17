@@ -17,9 +17,15 @@ async function openProject(
   fixture: KerfDeskFixture,
   text: string,
   name: string,
+  discardChanges = false,
 ): Promise<void> {
   await fixture.setOpenFiles([{ name, text }]);
   await (await toolbarCommand(page, 'Open...')).click();
+  if (discardChanges)
+    await page
+      .getByRole('dialog', { name: 'Save changes?', exact: true })
+      .getByRole('button', { name: "Don't Save", exact: true })
+      .click();
   await expect(page).toHaveTitle(new RegExp(name.replaceAll('.', '\\.')), { timeout: 90_000 });
 }
 
@@ -114,6 +120,7 @@ test('Focus Test cancellation, invalid input and maximum sample boundary', async
 
 test('Focus Test invalid Fill preview reports its reason and recovers after restoring Line', async ({
   page,
+  kerfdesk,
 }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -122,6 +129,44 @@ test('Focus Test invalid Fill preview reports its reason and recovers after rest
   await dialog.getByLabel('Samples', { exact: true }).fill('2');
   await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
   await expect(dialog).toBeHidden();
+  const generated = (await snapshot(page)).project;
+  const sample = generated.scene.objects[0];
+  const operation = generated.scene.layers[0];
+  if (sample?.kind !== 'imported-svg' || operation === undefined)
+    throw new Error('Generated Focus sample missing');
+  // Open lines have no Fill contribution. Use a real closed contour so the
+  // unsupported Focus/Fill control tests executable output, then recover Line.
+  const closedSample = {
+    ...sample,
+    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 5 },
+    paths: [
+      {
+        color: operation.color,
+        polylines: [
+          {
+            closed: true,
+            points: [
+              { x: 0, y: 0 },
+              { x: 20, y: 0 },
+              { x: 20, y: 5 },
+              { x: 0, y: 5 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  await openProject(
+    page,
+    kerfdesk,
+    JSON.stringify({
+      ...generated,
+      scene: { layers: [operation], objects: [closedSample], groups: [] },
+    }),
+    'focus-closed-sample.lf2',
+    true,
+  );
+  await runMenuCommand(page, 'Edit', 'Select All');
   await page.getByRole('radio', { name: 'Fill', exact: true }).check();
   await (await toolbarCommand(page, 'Preview')).click();
   const preview = page.getByRole('region', { name: 'Preview playback', exact: true });
