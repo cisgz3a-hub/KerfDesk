@@ -39,8 +39,10 @@ test('routes mobile browsers to purchase and phone setup without downloading wor
         'href',
         '/download.html',
       );
-      await expect(mobileNav.getByRole('link', { name: 'Phone & MCP', exact: true })).toBeVisible();
-      await expect(page.getByRole('link', { name: 'Set up Phone & MCP' })).toBeVisible();
+      await expect(
+        mobileNav.getByRole('link', { name: 'Phone access', exact: true }),
+      ).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Set up phone access' })).toBeVisible();
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true);
@@ -51,7 +53,7 @@ test('routes mobile browsers to purchase and phone setup without downloading wor
         });
       }
 
-      await mobileNav.getByRole('link', { name: 'Phone & MCP', exact: true }).click();
+      await mobileNav.getByRole('link', { name: 'Phone access', exact: true }).click();
       await expect(page).toHaveURL(/\/phone(?:\.html)?$/);
       await expect(page.getByRole('heading', { name: 'Three steps to connect.' })).toBeVisible();
       await expect(page.locator('.phone-steps')).toContainText('Edit → Settings… → Phone & MCP');
@@ -70,7 +72,7 @@ test('routes mobile browsers to purchase and phone setup without downloading wor
       await expect(
         page.getByRole('status').filter({ hasText: 'Pro purchases are not open yet' }),
       ).toBeVisible();
-      await page.getByRole('link', { name: 'Set up Phone & MCP' }).click();
+      await page.getByRole('link', { name: 'Set up phone access' }).click();
       await page.getByText('How do I connect ChatGPT or another MCP app?', { exact: true }).click();
       await expect(page.locator('.phone-mcp-url')).toHaveText(
         'https://kerfdesk-phone-control.cisgz3a.workers.dev/mcp',
