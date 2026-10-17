@@ -36,7 +36,7 @@ export function centreLightAfterFrameWanted(): boolean {
   }
 }
 
-/** Point the light at the centre of the job the completed Frame traced (ADR-604). */
+/** Point the light at the centre of the job the completed Frame traced (ADR-605). */
 export async function centreLightOnFramedArtwork(): Promise<void> {
   assertCentreLightAvailable();
   const laser = useLaserStore.getState();
