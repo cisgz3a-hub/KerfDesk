@@ -65,7 +65,8 @@ export type IconName =
   | 'undo'
   | 'redo'
   | 'laser'
-  | 'cnc';
+  | 'cnc'
+  | 'search';
 
 const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
   terminal: (
@@ -92,6 +93,12 @@ const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
       <circle cx="12" cy="12" r="6" />
       <path d="M12 2v5M12 17v5M2 12h5M17 12h5" />
       <circle className="lf-icon-accent" cx="12" cy="12" r="1" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path className="lf-icon-accent" d="m15.5 15.5 5.5 5.5" />
     </>
   ),
   'arrow-up': <path d="M12 21V4M6 10l6-6 6 6" />,

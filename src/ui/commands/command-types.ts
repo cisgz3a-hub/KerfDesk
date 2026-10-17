@@ -141,6 +141,7 @@ export type CommandId =
   | 'window.project-notes'
   | 'window.undo-history'
   | 'help.about'
+  | 'help.find-command'
   | 'help.tutorials'
   | 'help.connection'
   | 'help.safety'

@@ -145,7 +145,9 @@ function JogControlsLayout(props: {
           ? {
               ...jogRowStyle,
               gridTemplateAreas: machineActionAreas(props.showManualAir, props.machineKind),
-              rowGap: 4,
+              // LaserWindow.css spaces these rows with margins, so the Fire and
+              // warning rows take no height while they are empty.
+              rowGap: 0,
             }
           : jogRowStyle
       }
@@ -234,14 +236,15 @@ function useJogPadShortcuts(pad: {
   });
 }
 
-const containerStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
+const containerStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 };
 const jogRowStyle: React.CSSProperties = {
   display: 'grid',
   // The Fire/air-assist column shrinks (minmax floor 0) rather than overflowing
   // the fixed-width rail when the panel is dragged toward its minimum width; the
-  // arrow pad keeps its 116px min so the jog buttons never clip.
-  gridTemplateColumns: 'minmax(116px, 1fr) minmax(0, 104px)',
+  // arrow pad keeps its own width as the floor so the jog buttons never clip.
+  // At full rail width the column is wide enough for one-line action labels.
+  gridTemplateColumns: 'minmax(min-content, 1fr) minmax(0, 128px)',
   gridTemplateAreas: '"arrows air" "arrows fire" "warning warning"',
   alignItems: 'stretch',
-  gap: 8,
+  gap: 6,
 };
