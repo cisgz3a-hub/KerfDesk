@@ -185,16 +185,23 @@ jobs:
       - name: Launch, import and save in the installed app
         run: xvfb-run -a pnpm smoke:desktop:native -- /opt/KerfDesk/kerfdesk
 
-      - name: Launch, import and save in the AppImage
+      - name: Launch, import and save in the AppImage, as double-clicked
         # Still with Ubuntu's restriction on: the AppImage's launcher must drop
         # Chromium's sandbox by itself here, where user namespaces are blocked.
-        # Extracted, so the runner needs no FUSE; the launcher is the same.
+        # And without libfuse2, which Ubuntu 22.04 and newer no longer install:
+        # the static runtime must mount the AppImage with its own FUSE support.
         run: |
-          appimage_dir="${RUNNER_TEMP}/kerfdesk-appimage"
-          mkdir -p "${appimage_dir}"
+          if ldconfig -p | grep -q 'libfuse\.so\.2'; then
+            sudo apt-get remove -y 'libfuse2*'
+          fi
+          if ldconfig -p | grep -q 'libfuse\.so\.2'; then
+            echo 'libfuse2 is still installed, so this would not prove the AppImage needs none.' >&2
+            exit 1
+          fi
+          ls -l /dev/fuse
+          command -v fusermount3 || sudo apt-get install -y fuse3
           appimage="$(pwd)/release/${VERSION}/KerfDesk-${VERSION}-linux-x86_64.AppImage"
-          (cd "${appimage_dir}" && "${appimage}" --appimage-extract >/dev/null)
-          xvfb-run -a pnpm smoke:desktop:native -- "${appimage_dir}/squashfs-root/AppRun"
+          xvfb-run -a pnpm smoke:desktop:native -- "${appimage}"
 
       - name: Remove the .deb
         run: |

@@ -133,6 +133,13 @@ deb:
 appImage:
   executableArgs: []
 
+# The static AppImage runtime (electron-builder 26.16.1 lists it as a beta toolset)
+# carries its own FUSE support, so the AppImage starts on Ubuntu 22.04 and newer
+# without libfuse2, which those systems no longer install. The default legacy
+# runtime needs libfuse2 and fails before KerfDesk starts (ADR-606).
+toolsets:
+  appimage: 1.0.3
+
 mac:
   appId: com.kerfdesk.app
   icon: public/app-icon.icns

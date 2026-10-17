@@ -44,6 +44,9 @@ web app. An audit of the desktop shell on 2026-10-18 found these gaps on macOS a
    of electron-builder 26.16.1 does this on both of its build paths (`generateAppRunScript`: it
    adds `--no-sandbox` when `unshare -Ur true` fails), and the package contract checks that it
    still does. On such a system the AppImage runs without Chromium's sandbox; the `.deb` keeps it.
+   The AppImage uses electron-builder's static runtime (`toolsets.appimage: 1.0.3`, listed as a
+   beta toolset in 26.16.1), which carries its own FUSE support: the default legacy runtime needs
+   `libfuse2`, which Ubuntu 22.04 and newer no longer install, and fails before KerfDesk starts.
 3. **Linux file opens.** On a POSIX path API, a `file://` launch argument becomes its path when it
    is local (no host, or `localhost`) and has no query, fragment, or encoded slash or NUL. Every
    other check of ADR-378 applies to the result unchanged.
@@ -72,9 +75,10 @@ web app. An audit of the desktop shell on 2026-10-18 found these gaps on macOS a
 8. **CI.** The Desktop package check gains a Linux job on every pull request: it builds the
    AppImage and `.deb` from the Preview config, checks their contract
    (`scripts/verify-linux-package.sh`: identity, legal files, desktop entry, MIME type, no updater
-   metadata, the AppImage launcher's sandbox fallback), checks fuses and `app.asar`, installs the
-   `.deb` with Ubuntu's user-namespace restriction still on, launches, imports and saves in the
-   installed app and in the AppImage's launcher, and removes the `.deb`. The existing unpacked
+   metadata in the release folder or in either package's resources, the AppImage launcher's sandbox
+   fallback), checks fuses and `app.asar`, installs the `.deb` with Ubuntu's user-namespace
+   restriction still on, launches, imports and saves in the installed app and in the `.AppImage`
+   file itself with `libfuse2` absent, and removes the `.deb`. The existing unpacked
    Linux job now launches `kerfdesk`.
 9. **No ASAR integrity on Linux.** Electron 44.5.1 enforces the embedded ASAR integrity fuse on
    macOS and Windows only (`docs/tutorial/asar-integrity.md`, "Version support"). This PR's first

@@ -55,6 +55,8 @@ check_legal_files() {
   done
   grep -q 'All rights reserved' "${resources}/legal/LICENSE" ||
     fail "${resources}/legal/LICENSE is not the KerfDesk licence"
+  # An installed copy reads its update feed from here; no Linux feed exists yet.
+  test ! -e "${resources}/app-update.yml" || fail "${resources}/app-update.yml names an update feed"
 }
 
 work="$(mktemp -d)"
