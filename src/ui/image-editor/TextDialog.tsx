@@ -48,7 +48,7 @@ function TextDialogBody(props: { readonly state: TextDialogState }): JSX.Element
           value={state.text}
           onChange={(e) => state.setText(e.target.value)}
           rows={3}
-          placeholder="Type text — Ctrl+Enter to add"
+          placeholder={shortcutLabel('Type text — Ctrl+Enter to add')}
           style={textareaStyle}
           aria-label="Text content"
           title="The text to rasterize onto a new layer"

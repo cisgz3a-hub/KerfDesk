@@ -178,9 +178,13 @@ jobs:
           grep -q '^application/x-kerfdesk-project=.*kerfdesk\.desktop' \
             /usr/share/applications/mimeinfo.cache
           grep -q 'application/x-kerfdesk-project' /usr/share/mime/globs2
-          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
-            echo "apparmor_restrict_unprivileged_userns=$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)"
-          fi
+
+      - name: Keep Ubuntu's user-namespace restriction on for both launches
+        # Both launches below must prove the sandbox setup under Ubuntu's
+        # default, so the restriction is set and checked rather than assumed.
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=1
+          test "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = 1
 
       - name: Launch, import and save in the installed app
         run: xvfb-run -a pnpm smoke:desktop:native -- /opt/KerfDesk/kerfdesk

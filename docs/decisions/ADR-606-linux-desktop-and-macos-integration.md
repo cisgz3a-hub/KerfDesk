@@ -53,7 +53,8 @@ web app. An audit of the desktop shell on 2026-10-18 found these gaps on macOS a
 4. **Mac shortcut labels.** Wherever KerfDesk shows a shortcut (menus, toolbar, command search
    and its button, Keyboard Shortcuts, jog hints, Design and Image Studio), a Mac shows it with the
    Mac's own symbols in Apple's order (Option, Shift, Command), for example `⇧⌘V` for
-   Ctrl+Shift+V. Only chords whose handlers take Command for Ctrl are relabelled. Keys, handlers
+   Ctrl+Shift+V. Only chords whose handlers take Command for Ctrl are relabelled. Tutorial and help prose keeps the
+   Windows wording; it stays true on a Mac, where those handlers also take Ctrl. Keys, handlers
    and the Windows and Linux labels are unchanged. On macOS and Linux the Connect tooltips also say
    that an adapter without a serial number is chosen again after each start.
 5. **FFmpeg on a Mac.** After the folders on PATH, KerfDesk looks in `/opt/homebrew/bin`,
