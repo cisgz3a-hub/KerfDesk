@@ -117,6 +117,26 @@ describe('ArrayDialog', () => {
     expect(inputValue('Center Y (mm)')).toBe('50.00');
   });
 
+  it('keeps a half-typed total width and sets the spacing once the total fits', async () => {
+    await renderDialog({ onApply: vi.fn() });
+    const total = labelled('Total width (mm)').querySelector('input');
+    if (!(total instanceof HTMLInputElement)) throw new Error('Total width input missing');
+    expect(total.value).toBe('42.00');
+    await act(async () => Simulate.focus(total));
+    await setInput('Total width (mm)', '5');
+    expect(total.value).toBe('5');
+    expect(inputValue('Horizontal spacing (mm)')).toBe('2');
+    expect(requiredHost().querySelector('[role="alert"]')?.textContent).toBe(
+      'Enter a total of at least 40.00 mm.',
+    );
+    await setInput('Total width (mm)', '50');
+    expect(total.value).toBe('50');
+    expect(inputValue('Horizontal spacing (mm)')).toBe('10.000');
+    expect(requiredHost().querySelector('[role="alert"]')).toBeNull();
+    await act(async () => Simulate.blur(total));
+    expect(total.value).toBe('50.00');
+  });
+
   it('cancels without applying an array', async () => {
     const onApply = vi.fn();
     const onCancel = vi.fn();

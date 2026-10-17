@@ -12,8 +12,7 @@
 // isEditableTarget, kind-of-event).
 
 import { useEffect, useRef } from 'react';
-import { isModalOpen, useUiStore } from '../state/ui-store';
-import { useCanvasTextStore } from '../text/canvas-text-store';
+import { keyboardOwnedElsewhere } from '../common/keyboard-owner';
 import { usePlatform } from './platform-context';
 import { editingToolShortcutContext, handleEditingToolShortcut } from './editing-tool-shortcuts';
 import { arrangeShortcutContext, handleArrangeShortcut } from './arrange-shortcuts';
@@ -64,10 +63,4 @@ export function useShortcuts(): void {
       window.removeEventListener('keydown', onTransformViewKey);
     };
   }, []);
-}
-
-// A modal or an on-canvas text session owns the keyboard; the workspace
-// shortcuts stand down until it closes.
-function keyboardOwnedElsewhere(): boolean {
-  return isModalOpen(useUiStore.getState()) || useCanvasTextStore.getState().session !== null;
 }

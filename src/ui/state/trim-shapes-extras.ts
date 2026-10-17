@@ -2,7 +2,9 @@
 //
 // Auto-join (on unless Ctrl is held): the trimmed object's pieces are joined
 // at the points where they were cut to any open contour meeting them there,
-// its own or another unlocked object's on the same operation and colour. A
+// its own or another unlocked object's path that cuts identically: the same
+// effective operations (path binding, else artwork binding, else colour),
+// colour, power scale and overrides. A
 // partner contour is carried into the trimmed object's coordinates exactly
 // and removed from where it was; an object left with nothing is deleted.
 //
@@ -18,6 +20,7 @@ import {
 } from '../../core/geometry/shear-bake';
 import type { TrimEdit } from '../../core/geometry/trim-shape-edit';
 import type { AffineMatrix } from '../../core/vector-export/affine-curves';
+import { pathJoinSignature } from '../../core/geometry/vector-path-join';
 import { boundsForPaths } from '../../core/geometry/vector-path-tools';
 import {
   applyTransform,
@@ -27,6 +30,7 @@ import {
   type ColoredPath,
   type CurveSubpath,
   type ImportedSvg,
+  type Layer,
   type Project,
   type SceneObject,
 } from '../../core/scene';
@@ -44,10 +48,6 @@ function contoursOf(path: ColoredPath): ReadonlyArray<CurveSubpath> {
   return path.curves ?? path.polylines.map(polylineToCurveSubpath);
 }
 
-function sameOperation(a: SceneObject, b: SceneObject): boolean {
-  return JSON.stringify(a.operationIds ?? null) === JSON.stringify(b.operationIds ?? null);
-}
-
 type Partner = {
   readonly objectId: string;
   readonly pathIndex: number;
@@ -59,6 +59,7 @@ export function autoJoinTrimmed(
   objects: ReadonlyArray<SceneObject>,
   trimmed: SceneObject,
   edit: TrimEdit,
+  operations: ReadonlyArray<Layer>,
 ): { readonly objects: ReadonlyArray<SceneObject>; readonly joins: number } | null {
   if (!isPathArtwork(trimmed) || edit.pathRemoved || edit.cutPoints.length === 0) return null;
   const path = trimmed.paths[edit.pathIndex];
@@ -73,7 +74,10 @@ export function autoJoinTrimmed(
       );
     });
   const own: JoinCandidate[] = contoursOf(path).map((curve) => ({ curve, anchored: true }));
-  const { partners, foreign } = partnerContours(objects, trimmed, path, inverse, touches);
+  const signature = pathJoinSignature(trimmed, path, operations);
+  const sameCut = (object: PathArtwork, candidate: ColoredPath) =>
+    pathJoinSignature(object, candidate, operations) === signature;
+  const { partners, foreign } = partnerContours(objects, trimmed, inverse, sameCut, touches);
   const scale = Math.max(Math.abs(trimmed.transform.scaleX), Math.abs(trimmed.transform.scaleY));
   const result = joinTouchingContours(
     [...own, ...foreign],
@@ -109,23 +113,22 @@ export function autoJoinTrimmed(
   return { objects: nextObjects, joins: result.joins };
 }
 
-// Open contours of other objects on the same operation and colour whose ends meet a cut point,
-// carried into the trimmed object's local coordinates.
+// Open contours of other objects' paths that cut like the trimmed path and whose ends meet a
+// cut point, carried into the trimmed object's local coordinates.
 function partnerContours(
   objects: ReadonlyArray<SceneObject>,
   trimmed: PathArtwork,
-  path: ColoredPath,
   inverse: AffineMatrix,
+  sameCut: (object: PathArtwork, path: ColoredPath) => boolean,
   touches: (curve: CurveSubpath, object: SceneObject) => boolean,
 ): { readonly partners: ReadonlyArray<Partner>; readonly foreign: ReadonlyArray<JoinCandidate> } {
   const partners: Partner[] = [];
   const foreign: JoinCandidate[] = [];
   for (const object of objects) {
     if (object.id === trimmed.id || object.locked === true || !isPathArtwork(object)) continue;
-    if (!sameOperation(object, trimmed)) continue;
     const toLocal = multiplyAffine(inverse, transformAffine(object.transform));
     object.paths.forEach((candidatePath, pathIndex) => {
-      if (candidatePath.color !== path.color) return;
+      if (!sameCut(object, candidatePath)) return;
       contoursOf(candidatePath).forEach((curve, curveIndex) => {
         if (curve.closed || !touches(curve, object)) return;
         const [local] = bakeCurves([curve], toLocal);

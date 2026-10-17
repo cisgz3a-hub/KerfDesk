@@ -5,6 +5,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { contourSegments, segmentPoint, segmentStart } from '../../core/geometry/trim-curve-split';
 import { applyTransform, polylineToCurveSubpath, type Project, type Vec2 } from '../../core/scene';
+import { keyboardOwnedElsewhere } from '../common/keyboard-owner';
 import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
@@ -66,7 +67,7 @@ function useNodeEditKeys(active: boolean, scale: number): void {
     if (!active) return undefined;
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
-      if (isEditableShortcutTarget(event.target)) return;
+      if (isEditableShortcutTarget(event.target) || keyboardOwnedElsewhere()) return;
       const key = event.key.toLowerCase();
       if (!NODE_EDIT_KEYS.has(key)) return;
       const app = useStore.getState();

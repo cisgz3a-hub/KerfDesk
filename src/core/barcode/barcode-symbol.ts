@@ -65,7 +65,7 @@ const LINEAR_ENCODERS: Readonly<
   code93: [encodeCode93, 'Code 93'],
   upce: [encodeUpcE, 'UPC-E'],
   codabar: [encodeCodabar, 'Codabar'],
-  itf: [(data) => encodeItf(data), 'Interleaved 2 of 5'],
+  itf: [encodeItf, 'Interleaved 2 of 5'],
   isbn: [encodeIsbn, 'ISBN'],
 };
 
