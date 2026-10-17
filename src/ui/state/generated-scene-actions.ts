@@ -20,16 +20,18 @@ type GeneratedScenePatch = {
 type GeneratedSceneSet = (fn: (state: GeneratedSceneState) => GeneratedScenePatch) => void;
 
 export type GeneratedSceneActions = {
-  readonly replaceSceneWithGeneratedScene: (scene: Scene) => void;
+  readonly replaceSceneWithGeneratedScene: (scene: Scene, selectGenerated?: boolean) => void;
 };
 
 export function generatedSceneActions(set: GeneratedSceneSet): GeneratedSceneActions {
   return {
-    replaceSceneWithGeneratedScene: (scene) =>
+    replaceSceneWithGeneratedScene: (scene, selectGenerated = false) =>
       set((state) => ({
         project: { ...state.project, scene },
-        selectedObjectId: null,
-        additionalSelectedIds: new Set(),
+        selectedObjectId: selectGenerated ? (scene.objects[0]?.id ?? null) : null,
+        additionalSelectedIds: new Set(
+          selectGenerated ? scene.objects.slice(1).map((object) => object.id) : [],
+        ),
         undoStack: pushUndo(state.project, state.undoStack),
         redoStack: [],
         dirty: true,

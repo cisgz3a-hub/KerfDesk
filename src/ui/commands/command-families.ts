@@ -320,11 +320,11 @@ function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
 
 function focusTestCommand(ctx: AppCommandContext): AppCommand {
   const invoke = guardedCalibrationAction(ctx, 'create a focus test', ctx.focusTest);
-  return disabled(
+  return enabled(
     'tools.focus-test',
     'tools',
     'Focus Test...',
-    'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.',
+    'Generate laser samples at relative Z offsets',
     invoke,
   );
 }

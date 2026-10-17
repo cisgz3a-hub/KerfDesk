@@ -87,7 +87,7 @@ export type MultiFileTraceDeps = {
   readonly signal?: AbortSignal;
   // Called as each file's turn starts, with its 1-based position.
   readonly onProgress?: (current: number, total: number) => void;
-  readonly write?: (file: BatchTraceFile) => Promise<boolean> | boolean;
+  readonly write?: (file: BatchTraceFile, signal?: AbortSignal) => Promise<boolean> | boolean;
   /** Trace settings for every image (default: the Line Art preset). */
   readonly options?: TraceOptions;
   // Line + fill's Max stroke width in millimetres, converted to each file's
@@ -346,7 +346,7 @@ async function writeTraceExport(
 ): Promise<void> {
   // After Cancel nothing more is written, even a file already traced.
   signal?.throwIfAborted();
-  if (!(await write(file))) return;
+  if (!(await (signal === undefined ? write(file) : write(file, signal)))) return;
   tally.written += 1;
   tally.format = file.format;
   if (file.densitySource === 'default') tally.defaultDensity += 1;
@@ -359,11 +359,14 @@ async function writeTraceExport(
 export async function writeTraceFileWithPlatform(
   platform: PlatformAdapter,
   file: BatchTraceFile,
+  signal?: AbortSignal,
 ): Promise<boolean> {
+  signal?.throwIfAborted();
   const target = await platform.pickFileForSave({
     suggestedName: file.filename,
     extensions: ['.' + file.format],
   });
+  signal?.throwIfAborted();
   if (target === null) return false;
   await target.write(file.text);
   return true;
@@ -375,8 +378,10 @@ export async function writeTraceFileWithPlatform(
 export function traceFileWriterForDirectory(
   directory: SaveDirectoryTarget,
 ): NonNullable<MultiFileTraceDeps['write']> {
-  return async (file) => {
-    await directory.file(await freeDirectoryName(directory, file.filename)).write(file.text);
+  return async (file, signal) => {
+    const name = await freeDirectoryName(directory, file.filename, signal);
+    signal?.throwIfAborted();
+    await directory.file(name).write(file.text);
     return true;
   };
 }
@@ -384,13 +389,16 @@ export function traceFileWriterForDirectory(
 async function freeDirectoryName(
   directory: SaveDirectoryTarget,
   filename: string,
+  signal?: AbortSignal,
 ): Promise<string> {
+  signal?.throwIfAborted();
   const exists = directory.exists;
   if (exists === undefined || !(await exists(filename))) return filename;
   const dot = filename.lastIndexOf('.');
   const stem = dot > 0 ? filename.slice(0, dot) : filename;
   const extension = dot > 0 ? filename.slice(dot) : '';
   for (let n = 2; ; n += 1) {
+    signal?.throwIfAborted();
     const candidate = `${stem}-${n}${extension}`;
     if (!(await exists(candidate))) return candidate;
   }

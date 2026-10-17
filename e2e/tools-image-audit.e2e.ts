@@ -210,7 +210,7 @@ test('Apply, Remove, Crop and Flatten masks preserve pixels, reference rules and
   });
 });
 
-test('Original and Processed save actual PNG data and leave the scene unchanged', async ({
+test('Original PNG/JPEG/BMP and Processed PNG export decodable pixels without changing the scene', async ({
   page,
   kerfdesk,
 }) => {
@@ -246,6 +246,15 @@ test('Original and Processed save actual PNG data and leave the scene unchanged'
   const dialog = page.getByRole('dialog', { name: 'Save Original Image', exact: true });
   await dialog.getByRole('button', { name: 'Save...', exact: true }).click();
   await expect.poll(async () => Object.keys(await kerfdesk.savedFiles())).toContain('audit.png');
+  for (const [format, filename] of [
+    ['jpeg', 'audit.jpg'],
+    ['bmp', 'audit.bmp'],
+  ] as const) {
+    await command(page, 'save-original-image');
+    await dialog.getByRole('combobox', { name: 'Image format' }).selectOption(format);
+    await dialog.getByRole('button', { name: 'Save...', exact: true }).click();
+    await expect.poll(async () => Object.keys(await kerfdesk.savedFiles())).toContain(filename);
+  }
   await command(page, 'save-processed-bitmap');
   await expect
     .poll(async () => Object.keys(await kerfdesk.savedFiles()))
@@ -280,6 +289,13 @@ test('Original and Processed save actual PNG data and leave the scene unchanged'
     137, 80, 78, 71, 13, 10, 26, 10,
   ]);
   expect(bytes['audit-processed.png']?.dark).toBeGreaterThan(0);
+  expect(bytes['audit.jpg']?.bytes.slice(0, 2)).toEqual([255, 216]);
+  expect(bytes['audit.bmp']?.bytes.slice(0, 2)).toEqual([66, 77]);
+  for (const name of ['audit.png', 'audit.jpg', 'audit.bmp', 'audit-processed.png']) {
+    expect(bytes[name]?.width).toBe(image.pixelWidth);
+    expect(bytes[name]?.height).toBe(image.pixelHeight);
+    expect(bytes[name]?.dark).toBeGreaterThan(0);
+  }
   expect((await project(page)).scene.objects[0]).toEqual(image);
 });
 

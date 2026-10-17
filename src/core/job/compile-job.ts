@@ -8,6 +8,8 @@ import { registrationJigCompilationRuns } from './registration-jig-compilation-r
 import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
 import type { Group, Job, JobDiagnostic } from './job';
 import { compileVectorGroupsForLayer } from './compile-vector-operation';
+import { focusTestProfileIssue } from './focus-test';
+import { FocusTestCompilationError } from './focus-test-compilation-error';
 
 export function compileJob(
   scene: Scene,
@@ -75,14 +77,55 @@ function appendOperationCompilation(
         priorityObjectId,
         `vector:${output.vectorRun++}:${operationLayer.id}`,
       );
-      for (const group of vector.groups) output.groups.push(group);
+      for (const group of vector.groups) {
+        if (!hasFocusOutputIntent(group, operationLayer)) continue;
+        assertFocusOperation(operationLayer, device);
+        output.groups.push(withFocusMotion(group, operationLayer));
+      }
       for (const diagnostic of vector.diagnostics) output.diagnostics.push(diagnostic);
     }
     const raster = compileRasterGroupsForLayer(rasterObjects, operationLayer, device, {
       sceneObjects: completeSceneObjects,
       laserPowerScaleVersion,
     });
+    if (operationLayer.focusTest !== undefined && raster.groups.length > 0)
+      throw new FocusTestCompilationError(
+        'Focus Test operations require vector Line artwork; raster output cannot retain their Z-motion meaning.',
+      );
     for (const group of raster.groups) output.groups.push(group);
     for (const diagnostic of raster.diagnostics) output.diagnostics.push(diagnostic);
   }
+}
+
+function assertFocusOperation(layer: Layer, device: DeviceProfile): void {
+  if (layer.focusTest === undefined) return;
+  const issue = focusTestProfileIssue(device);
+  if (issue !== null) throw new FocusTestCompilationError(issue);
+  if (layer.mode !== 'line')
+    throw new FocusTestCompilationError(
+      'Focus Test samples require Line mode to retain their Z-motion meaning.',
+    );
+}
+
+function withFocusMotion(group: Group, layer: Layer): Group {
+  if (layer.focusTest === undefined) return group;
+  if (group.kind !== 'cut')
+    throw new FocusTestCompilationError(
+      'Focus Test artwork overrides must retain vector Line mode.',
+    );
+  return { ...group, focusTest: layer.focusTest };
+}
+
+/** Raw zero effective power is invariant across live S ranges; geometry rounding
+ * must wait until final placement. Ordinary zero-power groups stay intact. */
+function hasFocusOutputIntent(group: Group, layer: Layer): boolean {
+  if (layer.focusTest === undefined || group.kind !== 'cut') return true;
+  if (group.power <= 0) return false;
+  return group.segments.some((segment) => {
+    const first = segment.polyline[0];
+    return (
+      first !== undefined &&
+      segment.polyline.some((point) => point.x !== first.x || point.y !== first.y)
+    );
+  });
 }

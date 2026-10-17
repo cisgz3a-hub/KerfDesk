@@ -96,6 +96,8 @@ export type LayerSubLayer = {
 };
 
 export type Layer = LayerOperationSettings & {
+  /** Schema 18: a laser focus sample, relative to the starting physical Z. */
+  readonly focusTest?: { readonly offsetMm: number; readonly travelFeedMmPerMin: number };
   readonly id: string;
   readonly name: string;
   readonly color: string; // lowercase 6-digit presentation color
@@ -305,13 +307,14 @@ export function createLayerSubLayer(
 
 export function layerFromSubLayer(layer: Layer, subLayer: LayerSubLayer): Layer {
   return {
+    ...(layer.focusTest === undefined ? {} : { focusTest: layer.focusTest }),
     id: layerSubLayerOperationId(layer.id, subLayer.id),
     name: subLayer.label,
     color: layer.color,
     bindingOperationId: layer.id,
     visible: layer.visible,
     output: layer.output && subLayer.enabled,
-    ...subLayer.settings,
+    ...captureLayerOperationSettings(subLayer.settings),
     subLayers: [],
   };
 }

@@ -169,22 +169,31 @@ function runScheduledPreviewBuild(args: {
       ? { snapshot: { ...(registration === undefined ? {} : { registration }) } }
       : {}),
   };
-  const next = Promise.resolve(
+  const next = Promise.resolve().then(() =>
     needsSnapshot
       ? { ...buildToolpath(EMPTY_JOB), previewIssue: { kind: 'too-complex' as const } }
       : buildPreviewToolpath(args.project, options),
   );
-  void next.then((built) => {
-    if (args.isCancelled()) return;
-    settleBuiltToolpath({
-      built,
-      project: args.project,
-      options: backgroundOptions,
-      isCancelled: args.isCancelled,
-      signal: args.signal,
-      setToolpath: args.setToolpath,
+  void next
+    .then((built) => {
+      if (args.isCancelled()) return;
+      settleBuiltToolpath({
+        built,
+        project: args.project,
+        options: backgroundOptions,
+        isCancelled: args.isCancelled,
+        signal: args.signal,
+        setToolpath: args.setToolpath,
+      });
+    })
+    .catch((error: unknown) => {
+      if (args.isCancelled()) return;
+      const message = error instanceof Error ? error.message : String(error);
+      args.setToolpath({
+        ...buildToolpath(EMPTY_JOB),
+        previewIssue: { kind: 'preparation-failed', messages: [message] },
+      });
     });
-  });
 }
 
 function previewPreparationOptions(

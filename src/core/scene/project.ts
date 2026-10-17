@@ -32,7 +32,7 @@ import type { ProductionNestDefinition } from '../nesting/production-nest';
 // v16 embeds editable native studio documents; older readers must not drop them.
 // v17 preserves selected frame and cutting starts; older readers must not
 // silently replace their output semantics with automatic entry points.
-export const PROJECT_SCHEMA_VERSION = 17 as const;
+export const PROJECT_SCHEMA_VERSION = 18 as const;
 
 export type EmbeddedFont = {
   readonly key: string;

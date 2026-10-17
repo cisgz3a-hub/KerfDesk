@@ -194,7 +194,15 @@ export async function activateAcceptedFreshRun(
     await repository.discardStagedRun(runId);
     return;
   }
-  retention.retain(secondPassProjectEligible(prepared.prepared.project) ? archive.keep : null);
+  retention.retain(
+    secondPassProjectEligible(
+      prepared.prepared.project,
+      prepared.prepared.job,
+      prepared.prepared.laserPowerScaleVersion ?? 1,
+    )
+      ? archive.keep
+      : null,
+  );
   const untracked = untrackedRecord();
   const fallback = await repository.noteUntrackedRunAccepted(runId, untracked, retention);
   await retention.settle();

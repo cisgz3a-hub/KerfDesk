@@ -78,6 +78,8 @@ export type PreflightCode =
   | 'plunged-travel'
   | 'spindle-start-before-clearance'
   | 'relief-needs-cnc'
+  | 'focus-test-needs-laser'
+  | 'focus-test-uncompilable'
   | 'non-finite-coordinate'
   | 'coordinate-unencodable'
   | 'fluidnc-line-unexecutable'

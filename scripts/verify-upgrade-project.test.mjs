@@ -69,7 +69,24 @@ test('installed project qualification matches the canonical writer schema before
 });
 
 test('current project qualification refuses historical, future and malformed schema versions', () => {
-  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 14, 15, 16, 18, '16', '17', null, undefined]) {
+  for (const schemaVersion of [
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    19,
+    '16',
+    '17',
+    '18',
+    null,
+    undefined,
+  ]) {
     assert.throws(
       () => validateUpgradeProject(encoded({ ...fixture, schemaVersion })),
       /Expected current project schema/,
@@ -78,7 +95,7 @@ test('current project qualification refuses historical, future and malformed sch
 });
 
 test('upgrade qualification retains selected starts through Save As and schema 16 migration', () => {
-  for (const schemaVersion of [16, CURRENT_QUALIFICATION_PROJECT_SCHEMA]) {
+  for (const schemaVersion of [16, 17, CURRENT_QUALIFICATION_PROJECT_SCHEMA]) {
     const previous = { ...selectedStartsFixture, schemaVersion };
     assert.deepEqual(
       validateUpgradeProject(encoded(selectedStartsFixture), previous, knownUpgrade),
@@ -173,7 +190,7 @@ test('the known upgrade contract accepts historical retention and current migrat
 });
 
 test('known upgrade qualification keeps schema, scene and machine evidence strict', () => {
-  for (const schemaVersion of [11, 18, '12', '13', '14', '15', '16', '17', null, undefined]) {
+  for (const schemaVersion of [11, 19, '12', '13', '14', '15', '16', '17', '18', null, undefined]) {
     assert.throws(
       () =>
         validateUpgradeProject(
@@ -199,8 +216,8 @@ test('known upgrade qualification keeps schema, scene and machine evidence stric
   );
 });
 
-test('known upgrade preserves schema 13/14/15/16 saves and verifies their migration to the current writer', () => {
-  for (const schemaVersion of [13, 14, 15, 16]) {
+test('known upgrade preserves schema 13/14/15/16/17 saves and verifies their migration to the current writer', () => {
+  for (const schemaVersion of [13, 14, 15, 16, 17]) {
     const previous = { ...historicalFixture, schemaVersion };
     assert.deepEqual(validateUpgradeProject(encoded(previous), previous, knownUpgrade), previous);
     assert.deepEqual(validateUpgradeProject(encoded(fixture), previous, knownUpgrade), fixture);
@@ -227,7 +244,7 @@ test('known upgrade preserves schema 13/14/15/16 saves and verifies their migrat
 });
 
 test('the authenticated installed writer fences each phase while keeping historical sources admissible', () => {
-  for (const schemaVersion of [12, 14, 15]) {
+  for (const schemaVersion of [12, 14, 15, 17]) {
     const old = { ...historicalFixture, schemaVersion };
     assert.deepEqual(
       validateUpgradeProject(encoded(old), old, {
@@ -415,7 +432,7 @@ test('CNC setup comparison preserves missing older fields and their applicable d
 
 test('schema discovery reads the exact installed source without evaluating it', async () => {
   const sourceSha = 'a'.repeat(40);
-  for (const schemaVersion of [12, 14, CURRENT_QUALIFICATION_PROJECT_SCHEMA]) {
+  for (const schemaVersion of [12, 14, 17, CURRENT_QUALIFICATION_PROJECT_SCHEMA]) {
     const schema = await readUpgradeProjectSchema(
       sourceSha,
       '/review-root',
@@ -483,7 +500,7 @@ test('the actual CLI fences the saved schema against each installed source in lo
     };
     git('init', '--quiet');
     const sourceCommits = {};
-    for (const schemaVersion of [14, CURRENT_QUALIFICATION_PROJECT_SCHEMA]) {
+    for (const schemaVersion of [14, 17, CURRENT_QUALIFICATION_PROJECT_SCHEMA]) {
       await writeFile(
         join(temp, 'src/core/scene/project.ts'),
         `export const PROJECT_SCHEMA_VERSION = ${schemaVersion} as const;\n`,
@@ -500,7 +517,7 @@ test('the actual CLI fences the saved schema against each installed source in lo
       assert.ifError(result.error);
       return result;
     };
-    for (const schemaVersion of [12, 14]) {
+    for (const schemaVersion of [12, 14, 17]) {
       await writeFile(oldPath, encoded({ ...historicalFixture, schemaVersion }));
       const historical = cli(oldPath, oldPath);
       assert.equal(historical.status, 0, historical.stderr);
@@ -520,9 +537,9 @@ test('the actual CLI fences the saved schema against each installed source in lo
       assert.equal(stale.status, 1);
       assert.match(stale.stderr, /differs from the authenticated installed writer/);
     }
-    const baseline = cli('--expected-source', sourceCommits[14], oldPath, oldPath);
+    const baseline = cli('--expected-source', sourceCommits[17], oldPath, oldPath);
     assert.equal(baseline.status, 0, baseline.stderr);
-    const wrongBaselineWriter = cli('--expected-source', sourceCommits[14], currentPath, oldPath);
+    const wrongBaselineWriter = cli('--expected-source', sourceCommits[17], currentPath, oldPath);
     assert.equal(wrongBaselineWriter.status, 1);
     assert.match(wrongBaselineWriter.stderr, /differs from the authenticated installed writer/);
 

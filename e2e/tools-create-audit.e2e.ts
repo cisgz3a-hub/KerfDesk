@@ -346,13 +346,14 @@ for (const [id, label, title, generate] of [
   });
 }
 
-test('tools.focus-test remains unavailable and explains missing verified Z generator', async ({
+test('tools.focus-test opens its relative Z generator and cancels without changing artwork', async ({
   page,
 }) => {
-  await page.getByRole('menuitem', { name: 'Tools', exact: true }).click();
-  const command = page.getByRole('menuitem', { name: 'Focus Test...', exact: true });
-  await expect(command).toBeDisabled();
-  await expect(command).toHaveAttribute('title', /hardware-verified Z-motion generator/);
+  await tool(page, 'Focus Test...');
+  const dialog = page.getByRole('dialog', { name: 'Focus Test', exact: true });
+  await expect(dialog).toContainText('starting focus');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(await count(page)).toBe(0);
 });
 
 test('tools.optimization-settings applies source order and preserves it on reopening', async ({

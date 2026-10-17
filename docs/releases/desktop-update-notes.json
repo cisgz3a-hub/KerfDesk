@@ -6,7 +6,7 @@
     "Preview board fits and margins before placing artwork. Jig grid edits keep linked artwork aligned and offer keep/remove choices. Registration Jig and Place Board now follow the Pro tool prompt.",
     "Connect grblHAL over TCP from Windows desktop Machine details. Retries retain the chosen connection. Abort, Disconnect and Forget handle queued commands and permissions more reliably; reconnecting never resumes a job automatically.",
     "Dense artwork uses less repeated drawing work while navigating large canvases. Save and trace preparation receive priority, and node edits preserve inner contours.",
-    "More accurate Tangent Circle, Warp and Deform results, preserved tabs when joining or converting paths, clearer calibration labels and improved image export and Undo make design tools more dependable.",
+    "Create relative-Z Focus Tests through the normal Frame and Start flow. Tool fixes improve Tangent Circle, Warp, tab preservation, calibration labels, image exports and batch-trace cancellation.",
     "MCP canvas editing adds group selection, selection boxes, Select all and Deselect, with improved cancellation and desktop synchronisation. Fixes also improve multi-selection rotation, numbering and keyboard editing."
   ]
 }

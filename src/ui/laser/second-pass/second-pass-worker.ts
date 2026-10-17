@@ -127,9 +127,16 @@ function compileSelectedPass(source: ExecutionArtifactV1, selection: LaserSecond
 }
 
 async function validateSource(candidate: ExecutionArtifactV1): Promise<void> {
-  if (candidate.machineKind !== 'laser' || !secondPassProjectEligible(candidate.prepared.project)) {
+  if (
+    candidate.machineKind !== 'laser' ||
+    !secondPassProjectEligible(
+      candidate.prepared.project,
+      candidate.prepared.job,
+      candidate.prepared.laserPowerScaleVersion ?? 1,
+    )
+  ) {
     throw new Error(
-      'Painted second passes require a flat laser job generated for GRBL, grblHAL or FluidNC.',
+      'Painted second passes require an XY-only laser job generated for GRBL, grblHAL or FluidNC, without rotary or Focus Test Z motion.',
     );
   }
   if (
