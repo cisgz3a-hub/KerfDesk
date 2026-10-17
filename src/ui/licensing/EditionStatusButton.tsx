@@ -8,6 +8,9 @@ import { useEdition } from './edition';
 const DAY = 86_400;
 
 export function editionLabel(status: LicenceStatus, nowSeconds: number): string {
+  // Saved rights that only wait on the licence service are still Pro rights.
+  if (status.state === 'checkin-required' && status.tier !== null && status.tier !== 'developer')
+    return status.tier === 'trial' ? 'Pro trial · check-in needed' : 'Pro · check-in needed';
   if (status.edition === 'pro') {
     if (status.tier === 'trial' && status.accessExpiresAt !== null) {
       const days = Math.max(0, Math.ceil((status.accessExpiresAt - nowSeconds) / DAY));

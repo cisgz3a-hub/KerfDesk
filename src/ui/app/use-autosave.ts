@@ -27,6 +27,7 @@ import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
 import { preserveUnadmittedProProject } from '../state/pending-pro-project';
+import { initialLicenceStatus } from '../licensing/edition';
 import { isAutosaveDiscardPending } from './autosave-file-cleanup';
 
 export const AUTOSAVE_FAILURE_MESSAGE =
@@ -131,6 +132,10 @@ export async function runAutosaveRecovery(
   // If something already loaded (URL drop, deep-link, etc.), the user
   // is mid-workflow and recovery would clobber it. Leave the slot alone
   // (M15: clearing here silently destroyed the only backup).
+  if (!isUntouched()) return;
+  // Desktop starts with Pro locked until the licence status arrives; a paying
+  // user's autosave must not be judged against that startup lock (ADR-592).
+  await initialLicenceStatus();
   if (!isUntouched()) return;
   // A browser cannot admit Pro operations, and desktop Free admits only an
   // autosave sealed on this computer (ADR-592). Offer a portable copy before any

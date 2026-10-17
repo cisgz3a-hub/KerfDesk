@@ -40,6 +40,34 @@ export function sealProjectText(text: string): string {
   return key === null || hasProjectSeal(text) ? text : withProjectSeal(text, sealFor(key, text));
 }
 
+/**
+ * The same seal as `sealProjectText`, computed by the browser's native WebCrypto
+ * HMAC where available, so a large manual save does not hash on the canvas thread.
+ */
+export async function sealProjectTextAsync(text: string): Promise<string> {
+  const secret = key;
+  if (secret === null || hasProjectSeal(text)) return text;
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle === undefined) return sealProjectText(text);
+  try {
+    const hmacKey = await subtle.importKey(
+      'raw',
+      secret,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    );
+    const body = encoder.encode(text);
+    const message = new Uint8Array(DOMAIN.length + body.length);
+    message.set(DOMAIN);
+    message.set(body, DOMAIN.length);
+    const signature = new Uint8Array(await subtle.sign('HMAC', hmacKey, message));
+    return withProjectSeal(text, base64url(signature));
+  } catch {
+    return withProjectSeal(text, sealFor(secret, text));
+  }
+}
+
 /** The loaded key, passed to an autosave worker so large text is hashed off the canvas thread. */
 export function currentProjectSealKey(): string | null {
   return key === null ? null : base64url(key);

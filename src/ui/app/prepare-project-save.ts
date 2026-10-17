@@ -9,7 +9,7 @@ import {
   type SaveProjectOutcome,
 } from './project-save-completion';
 import { projectSaveNeedsWorker } from './project-save-size';
-import { projectSealReady, sealProjectText } from '../licensing/project-seal';
+import { projectSealReady, sealProjectTextAsync } from '../licensing/project-seal';
 
 type ProjectSavePreparationResult =
   | {
@@ -30,7 +30,7 @@ export async function prepareProjectSave(
   if (result.kind !== 'ready') return result;
   // Sealed after the picker has used the click (ADR-592).
   await projectSealReady();
-  return { ...result, json: sealProjectText(result.json) };
+  return { ...result, json: await sealProjectTextAsync(result.json) };
 }
 
 async function prepareUnsealedProjectSave(
