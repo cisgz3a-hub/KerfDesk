@@ -126,7 +126,7 @@ describe('Release train workflow gate (ADR-541)', () => {
     expect(packageCheckText).toMatch(
       /workflow_call:\n {4}inputs:[\s\S]*\n {6}ref:\n {8}type: string/u,
     );
-    expect(packageCheckText.match(/^ {10}ref: \$\{\{ inputs\.ref \}\}$/gmu)).toHaveLength(3);
+    expect(packageCheckText.match(/^ {10}ref: \$\{\{ inputs\.ref \}\}$/gmu)).toHaveLength(4);
     expect(packageCheckText).toContain(
       'group: desktop-package-check-${{ inputs.ref || github.ref }}',
     );

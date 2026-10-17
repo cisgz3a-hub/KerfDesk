@@ -102,6 +102,24 @@ describe('ConnectionBar device permission actions', () => {
     expect(auto).not.toContain('when KerfDesk starts');
   });
 
+  // ADR-606: macOS and Linux remember only adapters that report a USB serial number.
+  it('says on macOS and Linux that an adapter without a serial number is chosen again', async () => {
+    const host = await renderBar({
+      connection: { kind: 'disconnected' },
+      autoConnect: true,
+      onAutoConnectChange: vi.fn(),
+      portMemoryNeedsSerialNumber: true,
+    });
+    const connect = connectButton(host)?.title ?? '';
+    expect(connect).toContain('on the USB port it used last time');
+    expect(connect).toContain('no USB serial number (most CH340 boards) is chosen again');
+    await openMenu(host);
+    const auto = menuItem('Connect automatically')?.title ?? '';
+    expect(auto).toContain('when KerfDesk starts');
+    expect(auto).toContain('only after it is chosen once since KerfDesk started');
+    expect(auto).toMatch(/Connecting only reads settings; nothing moves\.$/);
+  });
+
   it('says a port another program holds is busy', async () => {
     const host = await renderBar({
       connection: {

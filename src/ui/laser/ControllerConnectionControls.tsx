@@ -18,6 +18,7 @@ import { DeviceSetupControls } from './device-setup';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { MachineNetworkConnect } from './MachineNetworkConnect';
+import { isApplePlatform, isLinuxDesktop } from '../common/operating-system';
 
 type Props = {
   readonly machineKind: MachineKind;
@@ -84,6 +85,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         autoConnect={autoConnect.enabled}
         onAutoConnectChange={autoConnect.change}
         portChoiceEndsOnRestart={platform.serial.picksEndOnRestart === true}
+        portMemoryNeedsSerialNumber={isApplePlatform() || isLinuxDesktop()}
         connection={connection}
         machineNoun={machineNoun(props.machineKind)}
         onConnect={connect}

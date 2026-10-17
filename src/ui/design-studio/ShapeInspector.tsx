@@ -15,6 +15,7 @@ import { findEntity, type SketchEntity } from '../../core/design';
 import { entityFields, type FieldGroup } from './design-entity-fields';
 import { useDesignStudioStore } from './design-studio-store';
 import { ShapeInspectorField } from './ShapeInspectorField';
+import { shortcutLabel } from '../common/shortcut-label';
 
 const GROUPS: ReadonlyArray<{ readonly group: FieldGroup; readonly heading: string }> = [
   { group: 'position', heading: 'Position' },
@@ -134,7 +135,7 @@ function InspectorActions(props: { readonly entity: SketchEntity }): JSX.Element
       <button
         type="button"
         style={{ ...actionStyle, marginLeft: 'auto' }}
-        title="Delete this shape (Ctrl+Z restores it)"
+        title={shortcutLabel('Delete this shape (Ctrl+Z restores it)')}
         onClick={deleteSelected}
       >
         Delete

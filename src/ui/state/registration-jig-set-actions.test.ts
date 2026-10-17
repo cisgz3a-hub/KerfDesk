@@ -6,6 +6,7 @@ import { createRectangle } from '../../core/shapes/primitives';
 import { serializeProject } from '../../io/project/serialize-project';
 import { deserializeProject } from '../../io/project/deserialize-project';
 import {
+  applyReplaceRegistrationJigSet,
   createRegistrationJigOutlines,
   MAX_REGISTRATION_JIG_OUTLINES,
   registrationJigSetIssue,
@@ -106,7 +107,7 @@ describe('registration jig set actions', () => {
 
   it('replaces a set at the same fixture origin and carries its all-locked state', () => {
     useStore.getState().replaceRegistrationJigSet({ ...FIVE_JIGS, columns: 2 });
-    useStore.getState().nudgeSelection(12, 8);
+    useStore.getState().nudgeSelection(-12, 8);
     useStore.getState().setRegistrationBoxLocked(true);
     const before = findRegistrationBoxBounds(useStore.getState().project.scene);
 
@@ -119,6 +120,38 @@ describe('registration jig set actions', () => {
     expect(after?.minY).toBe(before?.minY);
     expect(boxes).toHaveLength(5);
     expect(boxes.every((box) => box.locked === true)).toBe(true);
+  });
+
+  it('shifts a grown set back onto the bed instead of past its edge', () => {
+    const { bedWidth, bedHeight } = useStore.getState().project.device;
+    useStore.getState().replaceRegistrationJigSet({ ...FIVE_JIGS, columns: 1 });
+    useStore.getState().nudgeSelection(100, 100);
+    const before = findRegistrationBoxBounds(useStore.getState().project.scene)!;
+
+    useStore.getState().replaceRegistrationJigSet({ ...FIVE_JIGS, rows: 3 });
+
+    const after = findRegistrationBoxBounds(useStore.getState().project.scene)!;
+    expect(after.maxX).toBeCloseTo(bedWidth);
+    expect(after.maxY).toBeLessThanOrEqual(bedHeight);
+    expect(after.minY).toBeCloseTo(Math.min(before.minY, bedHeight - (after.maxY - after.minY)));
+    expect(after.minX).toBeGreaterThanOrEqual(0);
+  });
+
+  it('keeps an unsaved set centred where it was when the grid grows', () => {
+    useStore.getState().replaceRegistrationJigSet({ ...FIVE_JIGS, columns: 1 });
+    const before = findRegistrationBoxBounds(useStore.getState().project.scene)!;
+    const state = useStore.getState();
+
+    const result = applyReplaceRegistrationJigSet(
+      state,
+      { ...FIVE_JIGS, rows: 2 },
+      () => crypto.randomUUID(),
+      'centre',
+    );
+
+    const after = findRegistrationBoxBounds(result.project!.scene)!;
+    expect((after.minX + after.maxX) / 2).toBeCloseTo((before.minX + before.maxX) / 2);
+    expect((after.minY + after.maxY) / 2).toBeCloseTo((before.minY + before.maxY) / 2);
   });
 
   it('does not replace a captured-board outline through the jig-set action', () => {

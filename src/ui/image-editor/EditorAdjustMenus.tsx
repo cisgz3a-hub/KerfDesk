@@ -11,6 +11,7 @@ import { ADJUSTMENTS, type AdjustmentSpec } from './editor-adjustments';
 import { useResizeDialogStore } from './resize-dialog-store';
 import { useTextDialogStore } from './text-dialog-store';
 import { useImageEditorStore } from './image-editor-store';
+import { shortcutLabel } from '../common/shortcut-label';
 
 type MenuItem = {
   readonly key: string;
@@ -76,7 +77,7 @@ function catalogItems(
   return ADJUSTMENTS.filter((a) => a.menu === menu).map((entry) => ({
     key: entry.id,
     label: entry.label,
-    hint: entry.shortcutHint,
+    hint: shortcutLabel(entry.shortcutHint),
     title:
       entry.params.length === 0 && entry.id !== 'curves'
         ? `Apply ${entry.label} immediately`
