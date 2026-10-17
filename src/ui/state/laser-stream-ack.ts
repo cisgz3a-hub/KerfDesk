@@ -21,6 +21,7 @@ import {
 } from './laser-stream-heartbeat-containment';
 import { consumeUntrackedAck, peekUntrackedAck } from './laser-untracked-ack-ledger';
 import { hostedRefillArmed, releaseHostedRefill } from './laser-hosted-refill';
+import { streamHoldPatch } from './laser-stream-hold';
 
 // Every queued non-job write owes exactly one terminal ok/error, in strict
 // receive order. While the streamer still has unsettled acks, the earliest
@@ -118,6 +119,11 @@ export function advanceStreamBy(
   // the batch started from detects exactly the step that entered the hold.
   set((state) => ({
     ...steppedStreamerPatch(state, s, stepped.state),
+    // A reply ends this wait immediately, even when the next poll is delayed.
+    // Do not leave stale missing-reply telemetry over the finishing phase.
+    ...(stepped.state.completed > s.completed && state.streamHold !== null
+      ? streamHoldPatch(state, refs, null)
+      : {}),
     ...(stepped.state.status === 'errored' && !isProvisionalResetFreeze(state)
       ? liveCanvasLifecyclePatch(state, 'errored')
       : {}),

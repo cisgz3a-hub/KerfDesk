@@ -1,4 +1,6 @@
 import { validateCameraProfileShape } from '../../core/camera';
+import { positioningLightIssue } from '../../core/devices/positioning-light';
+import { isKnownControllerKind } from '../../core/devices/device-profile';
 import {
   HARD_MAX_FIRE_POWER_PERCENT,
   isEstimateTimeScale,
@@ -26,6 +28,14 @@ import {
   validateArray,
   valueAtPath,
 } from './project-shape-primitives';
+
+export function optionalPositioningLight(device: Record<string, unknown>): string | null {
+  const kind = device['controllerKind'];
+  return positioningLightIssue(
+    device['positioningLight'],
+    isKnownControllerKind(kind) ? kind : undefined,
+  );
+}
 
 export function optionalNoGoZones(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);

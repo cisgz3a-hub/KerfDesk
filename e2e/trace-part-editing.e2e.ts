@@ -64,9 +64,8 @@ test('edits only picked trace parts, preserves holes, and saves the edited artwo
   const tool = page
     .getByRole('complementary', { name: 'Drawing tools' })
     .getByRole('button', { name: 'Edit trace parts', exact: true });
-  const hint = page.getByRole('status').filter({ hasText: 'Move a single part of this trace' });
-  await expect(hint).toBeVisible();
-  await hint.getByRole('button', { name: 'Edit trace parts', exact: true }).click();
+  await expect(page.locator('.lf-trace-parts-hint')).toBeHidden();
+  await tool.click();
   await expect(tool).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText('Drag a traced line or shape.', { exact: false })).toBeVisible();
   const from = await screenPoint(page, trace, ringPoint);
@@ -95,6 +94,7 @@ test('edits only picked trace parts, preserves holes, and saves the edited artwo
   });
   await page.getByRole('button', { name: 'Done editing trace parts', exact: true }).click();
   await expect(tool).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.lf-trace-parts-hint')).toBeHidden();
   expect((await snapshot(page)).traces).toEqual(moved.traces);
   await tool.click();
 
@@ -251,6 +251,7 @@ test('picks one part of a 4096-shape bitmap trace without expanding every shape'
     undefined,
   );
   if (point === undefined) throw new Error('Dense trace has no contour');
+  await expect(page.locator('.lf-trace-parts-hint')).toBeHidden();
   const preparationWorkers: string[] = [];
   page.on('worker', (worker) => {
     if (worker.url().includes('trace-part-worker')) preparationWorkers.push(worker.url());

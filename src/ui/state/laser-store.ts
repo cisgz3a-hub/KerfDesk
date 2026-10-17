@@ -39,6 +39,7 @@ import type { ConnectionTeardownOwnershipRefs } from './laser-connection-teardow
 import { jobActions } from './laser-job-actions';
 import { appendSystemNotice } from './laser-system-notice';
 import { jogActions } from './laser-jog-actions';
+import { positioningLightActions } from './positioning-light-actions';
 import { type LaserMotionOperation } from './laser-motion-operation';
 import { type WorkCoordinateOffset } from './origin-actions';
 import { originActions } from './laser-origin-actions';
@@ -146,6 +147,8 @@ export type LaserState = LaserStoreActions &
     // uncertain or rejected M3 retains this latch so Fire-off remains reachable;
     // accepted M5 and controller/session invalidation cleanup clear it.
     readonly fireActive: boolean;
+    /** Separate light was requested in this session; not a physical observation. */
+    readonly positioningLightEnabled: boolean;
     // P0-B: operator-facing safety alert raised when the store cannot guarantee
     // the machine is safe — a failed Stop/Pause/Resume/Disconnect write, or a USB
     // drop mid-job. null = nothing to warn about. Reconnect preserves the notice;
@@ -519,6 +522,7 @@ export const useLaserStore = create<LaserState>((set, get) => {
       safeWrite(set, get, line, action, source),
     ),
     ...jogActions(set, get, refs, write),
+    ...positioningLightActions(set, get, refs, write),
     ...airAssistActions(set, get),
     ...controllerFireActions(set, get, refs, (line, action, source) =>
       safeWrite(set, get, line, action, source),

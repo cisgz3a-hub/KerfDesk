@@ -20,6 +20,7 @@ import {
   isControllerCommandSet,
 } from '../../core/devices/device-profile';
 import { cncSubProfileIssues } from '../../core/devices/cnc-sub-profile-validation';
+import { positioningLightIssue } from '../../core/devices/positioning-light';
 import {
   invalidSavedHeadPositionIndex,
   isLaserFinishPosition,
@@ -72,7 +73,11 @@ export function validateMachineProfileShape(value: Record<string, unknown>): str
 }
 
 function validateLaserOutputFields(value: Record<string, unknown>): string | null {
-  return validateLaserFireControl(value['fireControl']) ?? validateHeadPositions(value);
+  return (
+    validateLaserFireControl(value['fireControl']) ??
+    positioningLightIssue(value['positioningLight']) ??
+    validateHeadPositions(value)
+  );
 }
 
 // ADR-493: the same guards project load uses.

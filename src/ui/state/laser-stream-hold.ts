@@ -144,7 +144,7 @@ export function isStreamDwell(hold: StreamHold): boolean {
 
 /** The live bar's heading for the wait. */
 export function streamHoldHeading(hold: StreamHold): string {
-  return isStreamDwell(hold) ? 'DWELLING (SPINDLE SPIN-UP)' : 'CONTROLLER HOLDING PROGRAM';
+  return isStreamDwell(hold) ? 'DWELLING (SPINDLE SPIN-UP)' : 'WAITING FOR CONTROLLER REPLIES';
 }
 
 /**
@@ -204,7 +204,7 @@ function holdBeganLine(
       ? 'no Bf field'
       : `Bf ${buffer.plannerBlocksFree} blocks / ${buffer.rxBytesFree} B free`;
   return (
-    `[lf2] Controller holding program: ${holdStatusPhrase(hold)} ` +
+    `[lf2] Waiting for controller replies: ${holdStatusPhrase(hold)} ` +
     `${hold.unacknowledgedLines} sent lines (${hold.unacknowledgedBytes} B) unacknowledged ` +
     `for ${streamHoldSeconds(hold)} s; window ${streamer?.rxBufferBytes ?? 0} B; ` +
     `${streamer?.completed ?? 0} acknowledged, ${queued} queued; ${bufferText}; ` +
@@ -238,7 +238,7 @@ function lineErrorSentence(hold: StreamHold): string {
 }
 
 function holdEndedLine(previous: StreamHold): string {
-  return `[lf2] Controller resumed acknowledging after holding the program for ${streamHoldSeconds(previous)} s.`;
+  return `[lf2] Controller resumed acknowledging after waiting ${streamHoldSeconds(previous)} s for replies.`;
 }
 
 // Names only a status report received during the wait (MA-9): a controller
@@ -259,9 +259,8 @@ export function controllerUnresponsiveNotice(hold: StreamHold): LaserSafetyNotic
       `The controller has not acknowledged the last ${hold.unacknowledgedLines} lines KerfDesk sent ` +
       `for ${streamHoldSeconds(hold)} s${holdEvidenceClause(hold)}. KerfDesk is ` +
       'connected and waiting; it has not reset the controller and no job bytes were dropped. ' +
-      'A machine holding its own program can continue on its own (on a Creality Falcon A1 the ' +
-      "firmware's standby timer, $152, is a known cause); if it does not, abort the job, check " +
-      'the machine and the USB link, then re-run.' +
+      'Completion is still unconfirmed, even if the head has returned to its finish position. ' +
+      'If replies do not resume, abort the job and check the machine and the USB link.' +
       lineErrorSentence(hold),
   };
 }
@@ -281,7 +280,7 @@ export function describeStreamHold(hold: StreamHold, falconAirTimerHint: boolean
   ];
   if (falconAirTimerHint) {
     parts.push(
-      "On a Creality A1 this is usually the firmware's own standby timer — send $152=100 from the Console after the job",
+      'If a Creality A1 enters standby unexpectedly, check its firmware and $152 standby setting after the job',
     );
   }
   const lineError = lineErrorClause(hold);

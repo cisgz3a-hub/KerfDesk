@@ -63,6 +63,9 @@ export function controllerCompatibleProfile(
     streamingMode,
     rxBufferBytes,
     gcodeDialect: { dialectId },
+    ...((profile.controllerKind ?? 'grbl-v1.1') !== resolvedControllerKind
+      ? { positioningLight: undefined }
+      : {}),
     ...(identityChanged && profile.scanningOffsets.length > 0
       ? { scanningOffsets: [], scanOffsetCalibrationStatus: undefined }
       : {}),

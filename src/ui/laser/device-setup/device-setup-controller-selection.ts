@@ -50,6 +50,11 @@ export function controllerSelectionChanges(
   return [
     ...controllerCompatibleProfile(profile, controllerKind).corrections.flatMap(correctionChange),
     ...changed('Vendor commands', vendorCommandsText(profile), vendorCommandsText(next)),
+    ...changed(
+      'Positioning light',
+      profile.positioningLight === undefined ? 'Not configured' : 'Configured',
+      next.positioningLight === undefined ? 'Not configured' : 'Configured',
+    ),
     ...changed('Baud rate', String(baudRateOf(profile)), String(baudRateOf(next))),
     ...changed('Power range', powerRangeText(profile), powerRangeText(next)),
     ...scanCalibrationChange(profile, next),

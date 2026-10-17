@@ -103,7 +103,7 @@ describe('streamHoldPatch', () => {
     const began = streamHoldPatch(state, refs, first);
     expect(began.streamHold).toBe(first);
     expect(began.log?.at(-1)).toContain(
-      'Controller holding program: reports Idle with 4 sent lines',
+      'Waiting for controller replies: reports Idle with 4 sent lines',
     );
     expect(began.log?.at(-1)).toContain('Bf 512 blocks / 65535 B free');
     expect(began.log?.at(-1)).toContain('has not reset the controller');
@@ -123,7 +123,7 @@ describe('streamHoldPatch', () => {
     const ended = streamHoldPatch(holding, refs, null);
     expect(ended.streamHold).toBeNull();
     expect(ended.log?.at(-1)).toBe(
-      '[lf2] Controller resumed acknowledging after holding the program for 60 s.',
+      '[lf2] Controller resumed acknowledging after waiting 60 s for replies.',
     );
   });
 
@@ -172,8 +172,9 @@ describe('sameStreamHoldEpisode / copy', () => {
       'The controller reports Idle and has not acknowledged the last 41 sent lines for 12 s. ' +
         'KerfDesk is connected and waiting; nothing was reset',
     );
-    expect(describeStreamHold(hold, true)).toContain('$152=100');
-    expect(controllerUnresponsiveNotice(hold).message).toContain('$152');
+    expect(describeStreamHold(hold, true)).toContain('$152 standby setting');
+    expect(controllerUnresponsiveNotice(hold).message).toContain('Completion is still unconfirmed');
+    expect(controllerUnresponsiveNotice(hold).message).not.toContain('Falcon');
   });
 
   // A reply lost to a UART line error never arrives, so the controller may not
@@ -216,7 +217,7 @@ describe('sameStreamHoldEpisode / copy', () => {
         'error (FramingError) during this job, and an acknowledgement lost with it never arrives',
     );
     expect(describeStreamHold(named, true)).toMatch(
-      /\$152=100 from the Console after the job\. The serial link/,
+      /\$152 standby setting after the job\. The serial link/,
     );
     expect(controllerUnresponsiveNotice(named).message).toMatch(/line error \(FramingError\).*\.$/);
     expect(patches.at(-1)?.log?.at(-1)).toContain('line error (FramingError)');
@@ -261,7 +262,7 @@ describe('stream hold evidence', () => {
     );
     const patch = streamHoldPatch(state, refs, hold);
     expect(patch.log?.at(-1)).toContain(
-      'Controller holding program: no status is polled while it streams, with 4 sent lines',
+      'Waiting for controller replies: no status is polled while it streams, with 4 sent lines',
     );
     expect(patch.safetyNotice?.message).toContain(
       "sent no busy report meanwhile; KerfDesk does not poll this controller's status",
@@ -329,11 +330,11 @@ describe('a programmed G4 dwell', () => {
     const end = 10_000 + 5_000 + STREAM_DWELL_MARGIN_MS;
     const hold = streamHoldFromProbe(state, probeUntil(state, end), end) as StreamHold;
     expect(hold.dwellSeconds).toBeUndefined();
-    expect(streamHoldHeading(hold)).toBe('CONTROLLER HOLDING PROGRAM');
+    expect(streamHoldHeading(hold)).toBe('WAITING FOR CONTROLLER REPLIES');
     const dwelling = { ...hold, dwellSeconds: 5 };
     expect(sameStreamHoldEpisode(dwelling, hold)).toBe(false);
     const patch = streamHoldPatch({ ...state, streamHold: dwelling }, refs, hold);
-    expect(patch.log?.at(-1)).toContain('Controller holding program: reports Idle');
+    expect(patch.log?.at(-1)).toContain('Waiting for controller replies: reports Idle');
   });
 
   it('reads G4 P as seconds only in the GRBL family', () => {

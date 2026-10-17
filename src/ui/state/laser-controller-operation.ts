@@ -47,6 +47,8 @@ export type LaserControllerOperation =
       readonly phase: 'command';
       readonly label: string;
       readonly pollingOwnership?: 'terminal-exchange';
+      /** This owned exchange may have dispatched a move; Disconnect must stop it. */
+      readonly mayMove?: true;
     }
   | {
       readonly kind: 'recovery';

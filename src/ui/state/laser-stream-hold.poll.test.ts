@@ -122,7 +122,7 @@ describe('poll tick controller-hold telemetry', () => {
     expect(held.streamer?.status).toBe('streaming');
     expect(held.streamHold?.unacknowledgedLines).toBe(3);
     expect(held.streamHold?.controllerState).toBe('Idle');
-    const beganLines = held.log.filter((line) => line.includes('Controller holding program'));
+    const beganLines = held.log.filter((line) => line.includes('Waiting for controller replies'));
     expect(beganLines).toHaveLength(1);
     expect(beganLines[0]).toContain('3 sent lines');
     expect(beganLines[0]).toContain('Bf 15 blocks / 128 B free');
@@ -133,16 +133,50 @@ describe('poll tick controller-hold telemetry', () => {
     await vi.advanceTimersByTimeAsync(2_000);
     const later = useLaserStore.getState();
     expect(later.streamHold?.since).toBe(held.streamHold?.since);
-    expect(later.log.filter((line) => line.includes('Controller holding program'))).toHaveLength(1);
+    expect(
+      later.log.filter((line) => line.includes('Waiting for controller replies')),
+    ).toHaveLength(1);
 
     connection.emitLine('ok');
     connection.emitLine('ok');
     connection.emitLine('ok');
+    // Clearing belongs to the acknowledgement, not to a later UI/poll timer.
+    expect(useLaserStore.getState().streamHold).toBeNull();
     await vi.advanceTimersByTimeAsync(500);
     const resumed = useLaserStore.getState();
     expect(resumed.streamHold ?? null).toBeNull();
     expect(resumed.log.some((line) => line.includes('Controller resumed acknowledging'))).toBe(
       true,
     );
+  });
+
+  it('finishes after a delayed final park reply and drain confirmation without a stale wait', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+    liveConnection = connection;
+    await connectReady(connection);
+    await startTestLaserJob('G1 X10 F600 S100\nM5\nG0 X0 Y0 S0\n');
+    connection.emitLine('ok');
+    connection.emitLine('ok');
+    await flush();
+
+    // The machine has parked and reports Idle, but its last reply is delayed.
+    await vi.advanceTimersByTimeAsync(STREAM_HOLD_VISIBLE_MS + 750);
+    expect(useLaserStore.getState().streamer?.inFlight[0]?.line).toBe('G0 X0 Y0 S0\n');
+    expect(useLaserStore.getState().streamHold?.controllerState).toBe('Idle');
+    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+
+    connection.emitLine('ok');
+    expect(useLaserStore.getState().streamHold).toBeNull();
+    await flush();
+    expect(writes.at(-1)).toBe('G4 P0.01\n');
+    expect(useLaserStore.getState().controllerOperation?.kind).toBe('post-job-settle');
+    connection.emitLine('ok');
+    await flush();
+    await vi.advanceTimersByTimeAsync(750);
+    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+    expect(useLaserStore.getState().streamHold).toBeNull();
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
   });
 });

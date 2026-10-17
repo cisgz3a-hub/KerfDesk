@@ -13,6 +13,7 @@ import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falc
 import { validateScanOffsetProfile } from './scan-offset-profile';
 import { cncSubProfileIssues } from './cnc-sub-profile-validation';
 import { machineProfileControllerIssues } from './machine-profile-controller-validation';
+import { positioningLightIssue } from './positioning-light';
 import {
   XTOOL_D1_PRO_PROFILES,
   SCULPFUN_S30_PROFILE,
@@ -244,6 +245,8 @@ export function duplicateProfileAsCustom(
 
 export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<string> {
   const errors: string[] = [];
+  const lightIssue = positioningLightIssue(profile.positioningLight, profile.controllerKind);
+  if (lightIssue !== null) errors.push(lightIssue);
   requireNonEmpty(profile.name, 'name', errors);
   if (profile.profileId !== undefined) requireNonEmpty(profile.profileId, 'profileId', errors);
   errors.push(...machineProfileControllerIssues(profile));

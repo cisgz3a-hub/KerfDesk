@@ -1,4 +1,4 @@
-/* global window */
+/* global window, document */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -113,6 +113,24 @@ export async function loadCanvas(browser, state = canvasFixture(), width = 900) 
   if (state.workspace.permissions.artworkSharingEnabled === false)
     await page.waitForFunction(() => window.subject.store.get().workspace !== null);
   else await page.locator('.art-path').last().waitFor();
+  // Artwork can mount before ResizeObserver measures the canvas and automatic fit
+  // commits. Raw pointer coordinates bypass Playwright's actionability checks, so
+  // wait until the measured camera is also the camera rendered by the SVG.
+  await page.waitForFunction(() => {
+    const view = window.subject.store.get().view;
+    const svg = document.querySelector('.canvas-wrap svg');
+    if (view === null || svg === null) return false;
+    const box = svg.getBoundingClientRect();
+    const rendered = svg.viewBox.baseVal;
+    return (
+      box.width > 0 &&
+      box.height > 0 &&
+      Math.abs(rendered.x - view.x) < 0.001 &&
+      Math.abs(rendered.y - view.y) < 0.001 &&
+      Math.abs(rendered.width * view.scale - box.width) < 0.5 &&
+      Math.abs(rendered.height * view.scale - box.height) < 0.5
+    );
+  });
   return { page, context, state, errors };
 }
 

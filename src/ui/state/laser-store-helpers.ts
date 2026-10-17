@@ -226,11 +226,7 @@ export function disconnectStopCommands(
 ): ReadonlyArray<string> {
   const fireOff = state.fireActive ? ['M5\n'] : [];
   const softReset = driver.realtime.softReset;
-  if (
-    isActiveJob(state.streamer) ||
-    state.controllerOperation?.kind === 'probe' ||
-    state.controllerOperation?.kind === 'job-start-mark'
-  ) {
+  if (disconnectRequiresReset(state)) {
     return softReset === null
       ? [...fireOff, ...noResetStopLines(driver, state)]
       : [softReset, ...fireOff, ...terminated(driver.commands.stopLaserLines)];
@@ -241,6 +237,16 @@ export function disconnectStopCommands(
   if (state.motionOperation === null) return [];
   const jogCancel = driver.realtime.jogCancel;
   return jogCancel === null ? [] : [jogCancel];
+}
+
+function disconnectRequiresReset(state: LaserState): boolean {
+  const operation = state.controllerOperation;
+  return (
+    isActiveJob(state.streamer) ||
+    operation?.kind === 'probe' ||
+    operation?.kind === 'job-start-mark' ||
+    (operation?.kind === 'interactive-command' && operation.mayMove === true)
+  );
 }
 
 function terminated(lines: ReadonlyArray<string>): ReadonlyArray<string> {
@@ -289,6 +295,7 @@ type InitialLaserState = Pick<
   | 'safetyNotice'
   | 'airAssistOn'
   | 'fireActive'
+  | 'positioningLightEnabled'
   | 'autofocusBusy'
   | 'probeBusy'
   | 'motionOperation'

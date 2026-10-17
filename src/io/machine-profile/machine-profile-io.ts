@@ -345,6 +345,9 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     ...canonicalCameraModel(profile),
     ...(profile.rotary !== undefined ? { rotary: { ...profile.rotary } } : {}),
     ...canonicalFireControl(profile),
+    ...(profile.positioningLight === undefined
+      ? {}
+      : { positioningLight: { ...profile.positioningLight } }),
     origin: profile.origin,
     homing: { ...profile.homing },
     autofocusCommand: profile.autofocusCommand,
