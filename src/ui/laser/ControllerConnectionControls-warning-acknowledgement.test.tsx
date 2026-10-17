@@ -161,11 +161,11 @@ it.each([false, true])(
         </PlatformProvider>,
       );
     });
+    // Controller info opens from the connection menu (ADR-606).
     await act(async () =>
-      host
-        ?.querySelector<HTMLButtonElement>('[aria-label="Controller notification"] button')
-        ?.click(),
+      host?.querySelector<HTMLButtonElement>('[aria-label="More connection options"]')?.click(),
     );
+    await act(async () => button('Controller info').click());
     await act(async () => {
       button('Reconnect controller').click();
       await vi.advanceTimersByTimeAsync(1_000);

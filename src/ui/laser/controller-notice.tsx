@@ -80,33 +80,24 @@ export function BriefQualificationNotice(
   props: Props & { readonly notice: ControllerNotice },
 ): JSX.Element | null {
   const qualification = props.qualification;
+  // Reading settings after a reset, and a read that failed while the
+  // controller still answers, stay in Controller info: the machine works
+  // without them. Only a controller that stopped answering announces itself
+  // (ADR-606).
   if (
     props.notice.key === null ||
     props.notice.briefHidden ||
     props.notice.show === undefined ||
-    qualification === undefined
+    qualification?.kind !== 'failed' ||
+    props.controllerStoppedResponding !== true
   )
     return null;
-  const message =
-    qualification.kind === 'failed'
-      ? props.reconnectRecommended
-        ? 'Controller connection needs recovery'
-        : 'Controller information unavailable'
-      : qualification.kind === 'qualifying'
-        ? qualification.phase !== 'settings-read' && props.qualificationReadBlockReason != null
-          ? 'Waiting to read controller settings…'
-          : qualificationMessage(qualification.phase)
-        : '';
-  const detail =
-    qualification.kind === 'failed'
-      ? qualification.message
-      : (props.qualificationReadBlockReason ?? '');
   return (
     <ControllerToolbarNotice
-      key={`${props.notice.key}:${props.reconnectRecommended === true}`}
+      key={props.notice.key}
       focusFallbackRef={props.notice.triggerRef}
-      message={message}
-      detail={detail}
+      message="Controller is not responding"
+      detail={qualification.message}
       onShow={props.notice.show}
     />
   );

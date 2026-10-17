@@ -147,7 +147,8 @@ describe('ConnectionBar device permission actions', () => {
       host.remove();
     };
 
-    expect(host.textContent).toContain('Controller information unavailable');
+    // A failed read on a controller that still answers stays in Controller info.
+    expect(host.querySelector('[aria-label="Controller notification"]')).toBeNull();
     expect(host.querySelector('[role="alert"]')).toBeNull();
     await openMenu(host);
     await act(async () => menuItem('Controller info')?.click());

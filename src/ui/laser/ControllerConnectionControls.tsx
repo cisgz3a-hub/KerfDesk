@@ -7,6 +7,7 @@ import { machineNoun } from '../machine/machine-labels';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { browserLocalStorage } from '../state/browser-local-storage';
+import { controllerStoppedResponding } from '../state/controller-recovery-status';
 import { useLaserStore } from '../state/laser-store';
 import type { ConnectControllerOptions } from '../state/laser-store';
 import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
@@ -35,6 +36,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
     state.getMachineSettingsReadBlockReason(),
   );
   const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
+  const stoppedResponding = useLaserStore((state) => controllerStoppedResponding(state));
   const connectController = useLaserStore((state) => state.connect);
   const disconnectController = useLaserStore((state) => state.disconnect);
   const retryQualification = useLaserStore((state) => state.retryControllerQualification);
@@ -94,6 +96,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         qualification={qualification}
         qualificationReadBlockReason={qualificationReadBlockReason}
         reconnectRecommended={reconnectRecommended}
+        controllerStoppedResponding={stoppedResponding}
         onRetryQualification={retryControllerInformation}
         onReconnectQualification={reconnect}
         disabled={
