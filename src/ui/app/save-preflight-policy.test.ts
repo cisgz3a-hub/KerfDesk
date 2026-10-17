@@ -8,6 +8,11 @@ describe('partitionSavePreflight', () => {
     const issues: ReadonlyArray<PreflightIssue> = [
       { code: 'non-finite-coordinate', message: 'Line 3: X is NaN.' },
       { code: 'empty-output', message: 'No cuts.' },
+      {
+        code: 'focus-test-needs-laser',
+        message: 'Relative laser Z cannot become CNC cutting depths.',
+      },
+      { code: 'focus-test-uncompilable', message: 'This dialect cannot retain Focus motion.' },
     ];
 
     const split = partitionSavePreflight(issues);
@@ -66,6 +71,8 @@ describe('partitionSavePreflight', () => {
       'coordinate-unencodable',
       'empty-output',
       'fluidnc-line-unexecutable',
+      'focus-test-needs-laser',
+      'focus-test-uncompilable',
       'no-output-layer',
       'non-finite-coordinate',
       'program-materialization-failed',

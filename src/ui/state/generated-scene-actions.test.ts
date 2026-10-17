@@ -28,3 +28,29 @@ describe('generated scene actions', () => {
     expect(useStore.getState().undoStack).toHaveLength(1);
   });
 });
+
+it('selects generated samples atomically when requested without changing output preferences', () => {
+  useStore
+    .getState()
+    .setOutputScopeSettings({ cutSelectedGraphics: true, useSelectionOrigin: true });
+  const scene: Scene = {
+    layers: [createLayer({ id: 'generated', color: '#100000', mode: 'line' })],
+    objects: [svgObj('sample-a', ['#100000']), svgObj('sample-b', ['#100000'])],
+  };
+  const snapshots: Array<{ first: string | null; rest: string[] }> = [];
+  const unsubscribe = useStore.subscribe((state) => {
+    if (state.project.scene === scene)
+      snapshots.push({ first: state.selectedObjectId, rest: [...state.additionalSelectedIds] });
+  });
+  try {
+    useStore.getState().replaceSceneWithGeneratedScene(scene, true);
+  } finally {
+    unsubscribe();
+  }
+  expect(snapshots).toEqual([{ first: 'sample-a', rest: ['sample-b'] }]);
+  expect(useStore.getState().outputScopeSettings).toEqual({
+    cutSelectedGraphics: true,
+    useSelectionOrigin: true,
+  });
+  expect(useStore.getState().undoStack).toHaveLength(1);
+});

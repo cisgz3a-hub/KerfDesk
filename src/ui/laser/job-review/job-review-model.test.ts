@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { StatusReport } from '../../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
+import { generateFocusTest } from '../../../core/job/focus-test';
 import {
   createLayer,
   createProject,
@@ -94,7 +95,9 @@ async function buildModelFromCurrentStores(): Promise<JobReviewModel> {
   // Frame-first (ADR-228): a recorded Frame for the exact current job is the
   // one Start gate; record it here so prepare succeeds for every arrangement.
   useLaserStore.setState({
-    frameVerification: frameVerificationForProject(useStore.getState().project),
+    frameVerification: frameVerificationForProject(useStore.getState().project, {
+      outputScope: currentOutputScope(useStore.getState()),
+    }),
   });
   const app = useStore.getState();
   const laser = useLaserStore.getState();
@@ -111,6 +114,65 @@ async function buildModelFromCurrentStores(): Promise<JobReviewModel> {
 }
 
 describe('buildJobReviewModel', () => {
+  it.each(['unselected', 'deleted', 'disabled'] as const)(
+    'omits Focus sweep warnings when its artwork is %s',
+    async (caseKind) => {
+      const focus = generateFocusTest({
+        steps: 3,
+        minOffsetMm: -1,
+        maxOffsetMm: 1,
+        lineLengthMm: 20,
+        spacingMm: 3,
+        speed: 1200,
+        power: 10,
+        travelFeedMmPerMin: 300,
+      });
+      useStore.setState((state) => ({
+        project: {
+          ...state.project,
+          scene: {
+            ...state.project.scene,
+            layers: [
+              ...state.project.scene.layers,
+              ...focus.layers.map((layer) => ({ ...layer, output: caseKind !== 'disabled' })),
+            ],
+            objects: [
+              ...state.project.scene.objects,
+              ...(caseKind === 'deleted' ? [] : focus.objects),
+            ],
+          },
+        },
+        selectedObjectId: lineObject.id,
+        outputScopeSettings: {
+          cutSelectedGraphics: caseKind === 'unselected',
+          useSelectionOrigin: false,
+        },
+      }));
+      const model = await buildModelFromCurrentStores();
+      expect(model.warnings.some((warning) => /Focus Test|focus sweep/.test(warning))).toBe(false);
+    },
+  );
+  it('reports only the compiled selected Focus sample range', async () => {
+    const focus = generateFocusTest({
+      steps: 3,
+      minOffsetMm: -1,
+      maxOffsetMm: 1,
+      lineLengthMm: 20,
+      spacingMm: 3,
+      speed: 1200,
+      power: 10,
+      travelFeedMmPerMin: 300,
+    });
+    useStore.setState((state) => ({
+      project: { ...state.project, scene: focus },
+      selectedObjectId: 'focus-test-1-line',
+      outputScopeSettings: { cutSelectedGraphics: true, useSelectionOrigin: false },
+    }));
+    const model = await buildModelFromCurrentStores();
+    expect(model.warnings.find((warning) => warning.startsWith('Focus Test moves Z'))).toContain(
+      'from -1.000 to -1.000 mm',
+    );
+  });
   it('summarizes a laser job from the exact prepared program', async () => {
     const model = await buildModelFromCurrentStores();
 

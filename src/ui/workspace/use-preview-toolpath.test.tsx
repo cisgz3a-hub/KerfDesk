@@ -85,6 +85,27 @@ afterEach(async () => {
 });
 
 describe('usePreviewToolpath', () => {
+  it('surfaces a synchronous preparation exception instead of escaping the scheduled callback', async () => {
+    let scheduled: (() => void) | null = null;
+    const scheduleBuild: PreviewBuildScheduler = (work) => {
+      scheduled = work;
+      return () => undefined;
+    };
+    previewMocks.buildPreviewToolpath.mockImplementation(() => {
+      throw new Error('Focus Test samples require Line mode');
+    });
+    await renderHarness(true, scheduleBuild);
+    await act(async () => scheduled?.());
+    expect(probe.current).toMatchObject({
+      steps: [],
+      previewIssue: {
+        kind: 'preparation-failed',
+        messages: ['Focus Test samples require Line mode'],
+      },
+    });
+    expect(workerMocks.prepareLargeJobOffThread).not.toHaveBeenCalled();
+  });
+
   it('stays idle with a fresh scheduler each render, including imported owner changes', async () => {
     let renders = 0;
     const schedule = vi.fn((_work: () => void) => () => undefined);

@@ -45,6 +45,7 @@ type KeepAliveCursor = {
   air: AirWord | null;
   spindle: 'M3' | 'M4' | 'off';
   motion: GcodeMotionMode;
+  relative: boolean;
   feedMmPerMin: number;
   power: number;
   x: number;
@@ -70,6 +71,7 @@ export function withAirKeepAlive(
     air: null,
     spindle: 'off',
     motion: 0,
+    relative: false,
     feedMmPerMin: 0,
     power: 0,
     x: 0,
@@ -130,8 +132,8 @@ function applyBlock(
   cursor.lit = cursor.motion !== 0 && cursor.power > 0 && cursor.spindle !== 'off';
 }
 
-// This postprocessor consumes generated G21/G90 XY-plane output, not arbitrary
-// imported programs. Shared arc-center/sweep math counts the actual G2/G3 path.
+// This postprocessor consumes generated G21 XY-plane output, including Focus
+// Test's G91 Z excursions. Shared arc math counts the actual G2/G3 path.
 function motionDistanceMm(
   cursor: KeepAliveCursor,
   target: { readonly x: number; readonly y: number; readonly z: number },
@@ -199,14 +201,18 @@ function axisTarget(
   for (const { letter, value } of words) {
     if (letter !== 'X' && letter !== 'Y' && letter !== 'Z') continue;
     target ??= { x: cursor.x, y: cursor.y, z: cursor.z };
-    if (letter === 'X') target.x = value;
-    else if (letter === 'Y') target.y = value;
-    else target.z = value;
+    if (letter === 'X') target.x = axisCoordinate(cursor, 'x', value);
+    else if (letter === 'Y') target.y = axisCoordinate(cursor, 'y', value);
+    else target.z = axisCoordinate(cursor, 'z', value);
   }
   if (target !== null) return target;
   return (cursor.motion === 2 || cursor.motion === 3) && hasMotionTarget(words)
     ? { x: cursor.x, y: cursor.y, z: cursor.z }
     : null;
+}
+
+function axisCoordinate(cursor: KeepAliveCursor, axis: 'x' | 'y' | 'z', value: number): number {
+  return cursor.relative ? cursor[axis] + value : value;
 }
 
 function applyGWord(
@@ -215,6 +221,7 @@ function applyGWord(
   words: ReadonlyArray<GcodeWordMatch>,
 ): void {
   if (value === 0 || value === 1 || value === 2 || value === 3) cursor.motion = value;
+  else if (value === 90 || value === 91) cursor.relative = value === 91;
   else if (value === 4) {
     // GRBL's G4 P is in seconds; the dwell counts toward the interval.
     const pause = words.find(({ letter }) => letter === 'P')?.value ?? 0;

@@ -262,7 +262,7 @@ export type AppState = PartGeneratorActions &
     readonly sceneClipboard: SceneClipboard | null;
     readonly layerDefaults: LayerDefaultsState;
 
-    readonly replaceSceneWithGeneratedScene: (scene: Scene) => void;
+    readonly replaceSceneWithGeneratedScene: (scene: Scene, selectGenerated?: boolean) => void;
 
     // batchOffsetIdx (default 0) shifts the imported object by 10mm × N to the
     // right and down (F-A3 multi-import). The first file in a batch passes 0,

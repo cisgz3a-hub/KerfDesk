@@ -14,6 +14,7 @@ import {
 import type { LaserResumeDialect } from './laser-resume-dialect';
 import { createNativeLaserBeam, type NativeLaserBeam } from './native-laser-resume-beam';
 import { nativeLaserResume, scanNativeBeamLine } from './native-laser-resume';
+import { focusResumeIssue } from './focus-resume-issue';
 import { canTrackHeadStopBlock } from './resume-head-stop-block';
 
 export { resumeTravelMm } from './resume-travel';
@@ -77,6 +78,8 @@ export function buildResumeProgram(
   if (!Number.isInteger(fromLine) || fromLine < 1 || fromLine > lines.length) {
     return { kind: 'error', reason: `Line must be between 1 and ${lines.length}.` };
   }
+  const focusIssue = focusResumeIssue(gcode);
+  if (focusIssue !== null) return { kind: 'error', reason: focusIssue };
   const transform = options.laserTransform ?? LASER_RESUME_TRANSFORM_VERSION;
   const state = initialModalState();
   const beam = nativeBeamFor(transform, options.laserDialect);

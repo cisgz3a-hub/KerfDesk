@@ -27,6 +27,7 @@ import { validateLayerOperationSettings, validateLayerSubLayers } from './projec
 export function validateProjectLayer(layer: unknown, path: string): string | null {
   if (!isObject(layer)) return `missing or invalid \`${path}\``;
   return firstError([
+    validateFocusTest(layer['focusTest'], path),
     validateTaperedInlay(layer['cnc'], path),
     validatePocketRestStock(layer['cnc'], path),
     ...(isObject(layer['cnc'])
@@ -70,6 +71,20 @@ export function validateProjectLayer(layer: unknown, path: string): string | nul
     validateLayerSubLayers(layer['subLayers'], `${path}.subLayers`),
     validateMaterialBinding(layer['materialBinding'], `${path}.materialBinding`),
   ]);
+}
+
+function validateFocusTest(value: unknown, path: string): string | null {
+  if (value === undefined) return null;
+  if (!isObject(value)) return `Invalid ${path}.focusTest`;
+  const offset = value['offsetMm'];
+  if (
+    typeof offset !== 'number' ||
+    !Number.isFinite(offset) ||
+    Math.abs(offset) > 1000 ||
+    Number(offset.toFixed(3)) !== offset
+  )
+    return `Invalid ${path}.focusTest.offsetMm`;
+  return requirePositiveNumber(value, `${path}.focusTest.travelFeedMmPerMin`);
 }
 
 function validateMaterialBinding(value: unknown, path: string): string | null {

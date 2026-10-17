@@ -340,13 +340,13 @@ export async function runChosenMultiFileTrace(
   }
 }
 
-type TraceWriter = (file: BatchTraceFile) => Promise<boolean> | boolean;
+type TraceWriter = (file: BatchTraceFile, signal?: AbortSignal) => Promise<boolean> | boolean;
 
 async function reserveTraceOutput(
   platform: PlatformAdapter,
   pushToast: PushToast,
 ): Promise<TraceWriter | null> {
-  const perFile: TraceWriter = (file) => writeTraceFileWithPlatform(platform, file);
+  const perFile: TraceWriter = (file, signal) => writeTraceFileWithPlatform(platform, file, signal);
   if (platform.reserveSaveDirectory === undefined) return perFile;
   let directory: SaveDirectoryTarget | null;
   try {

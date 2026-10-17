@@ -1,9 +1,14 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "DOM.AsyncIterable"],
     "types": ["node", "@playwright/test"]
   },
-  "include": ["./**/*.ts", "../playwright.config.ts", "../playwright-production.config.ts"],
+  "include": [
+    "./**/*.ts",
+    "./**/*.tsx",
+    "../playwright.config.ts",
+    "../playwright-production.config.ts"
+  ],
   "exclude": []
 }

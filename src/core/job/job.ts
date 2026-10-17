@@ -80,6 +80,7 @@ export type FillSegment = CutSegment & {
 };
 
 export type CutGroup = {
+  readonly focusTest?: { readonly offsetMm: number; readonly travelFeedMmPerMin: number };
   /** New topology packet scope. Historical groups without it retain legacy optimization/replay. */
   readonly topologyScope?: string;
   readonly kind: 'cut';

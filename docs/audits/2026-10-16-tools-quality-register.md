@@ -1,6 +1,6 @@
 # Tools quality register — 16 October 2026
 
-**Status: evidence-backed audit delivered; not a blanket quality sign-off.** All **61** commands in the actual Tools menu are inventoried below, including its trailing Other group. The screenshots supplied with the request did not show the entire menu. Direct computer use completed **53 representative workflows**; **7 remain partial** because of hardware, native-picker or desktop/licence prerequisites; **Focus Test is unimplemented**.
+**Historical audit checkpoint; not a blanket quality sign-off.** All **61** commands in the actual Tools menu are inventoried below, including its trailing Other group. The screenshots supplied with the request did not show the entire menu. At this checkpoint direct computer use completed **53 representative workflows**, **7 remained partial**, and **Focus Test was unimplemented**. The [follow-up register](2026-10-16-remaining-tools-and-focus.md) records the seven additional software workflows and the Focus Test implementation, with native, provider and hardware limits kept explicit. The original observations below remain historical evidence.
 
 Initial audit baseline: `f7e2a36895b67cfa33be03c16e6c19e7c6722d14`; working branch: `codex/tools-quality-audit`. The original browser and direct-computer evidence applies to the audit repairs at that checkpoint. Follow-up repairs and their separate validation are recorded below. No machine was operated and no application was released or deployed.
 
