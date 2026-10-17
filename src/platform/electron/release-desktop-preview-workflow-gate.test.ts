@@ -180,8 +180,9 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
       'bash scripts/verify-macos-preview-package.sh "${VERSION}" "${ARCH}"',
     );
     expect(packageCheck).toContain('-Scenario Launch');
+    // Electron 44 enforces ASAR integrity on macOS and Windows only, so Linux has no such check.
     expect(packageCheck.match(/node scripts\/verify-asar-integrity-enforced\.mjs/g)).toHaveLength(
-      3,
+      2,
     );
     expect(packageCheck).toContain('bash scripts/verify-linux-package.sh "${VERSION}"');
     expect(packageCheck).toContain(

@@ -73,8 +73,15 @@ web app. An audit of the desktop shell on 2026-10-18 found these gaps on macOS a
    (`scripts/verify-linux-package.sh`: identity, legal files, desktop entry, MIME type, no updater
    metadata, the AppImage launcher's sandbox fallback), checks fuses and `app.asar`, installs the
    `.deb` with Ubuntu's user-namespace restriction still on, launches, imports and saves in the
-   installed app and in the AppImage's launcher, removes the `.deb`, and proves a modified
-   `app.asar` stops the app. The existing unpacked Linux job now launches `kerfdesk`.
+   installed app and in the AppImage's launcher, and removes the `.deb`. The existing unpacked
+   Linux job now launches `kerfdesk`.
+9. **No ASAR integrity on Linux.** Electron 44.5.1 enforces the embedded ASAR integrity fuse on
+   macOS and Windows only (`docs/tutorial/asar-integrity.md`, "Version support"). This PR's first
+   CI run confirmed it: a Linux build with a modified `app.asar` started and wrote a smoke result.
+   The Linux packages keep the same fuses, but the Linux job runs no tamper check, and nothing may
+   describe a Linux build as refusing a modified `app.asar`. The `.deb` installs under root-owned
+   `/opt/KerfDesk`, so changing it needs administrator rights; an AppImage can be repacked by its
+   owner.
 
 ### Not decided here
 
@@ -82,7 +89,9 @@ web app. An audit of the desktop shell on 2026-10-18 found these gaps on macOS a
   (`public/desktop-release-manifest.mjs`) and the manual commercial download
   (`public/desktop-manual-download.mjs`) each accept an exact artifact list that installed copies
   check, so adding Linux to them needs a design that keeps those copies working. The download page
-  and the desktop download link keep naming Windows and macOS until then.
+  and the desktop download link keep naming Windows and macOS until then. A Linux build of the
+  commercial channel must also weigh decision 9: the app code that checks a Pro licence (ADR-540,
+  ADR-592) is not tamper-checked on Linux.
 - **Signed and notarized Mac builds.** These need the maintainer's Apple Developer ID and
   notarization credentials (ADR-024/135/248). The Mac build stays the unsigned Preview.
 - **Linux arm64** (for example a Raspberry Pi beside the machine) and other package formats (RPM,

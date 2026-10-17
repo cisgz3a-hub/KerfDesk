@@ -202,14 +202,9 @@ jobs:
           test ! -e /opt/KerfDesk/kerfdesk
           test ! -e /usr/share/applications/kerfdesk.desktop
 
-      - name: Check that a modified app.asar stops the app
-        run: |
-          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
-            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          fi
-          app_dir="$(pwd)/release/${VERSION}/linux-unpacked"
-          xvfb-run -a node scripts/verify-asar-integrity-enforced.mjs \
-            "${app_dir}/kerfdesk" "${app_dir}/resources/app.asar"
+      # No modified-app.asar check here: Electron 44 enforces ASAR integrity on
+      # macOS and Windows only (docs/tutorial/asar-integrity.md), so a Linux
+      # build starts with a modified app.asar whatever the fuse says (ADR-606).
 
       - name: Upload native smoke evidence
         if: always()
