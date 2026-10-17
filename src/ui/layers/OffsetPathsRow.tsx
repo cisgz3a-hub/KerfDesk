@@ -2,12 +2,14 @@
 // distance (ADR-103 G1). Machine-agnostic (kerf compensation on a laser,
 // clearing outlines and inlay gaps on a router), so it mounts OUTSIDE the
 // laser-only Shape Properties gate. The result is a NEW object; the
-// sources stay (VCarve/Offsetter convention).
+// sources stay (VCarve/Offsetter convention). The offset runs in the vector
+// worker and commits when it settles (ADR-606).
 
 import { useState } from 'react';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
 import { selectionCanWeld } from '../commands/selection-command-state';
+import { offsetOutlinesInBackground } from '../commands/vector-background-commands';
 
 const DEFAULT_OFFSET_MM = 1;
 const MIN_OFFSET_MM = 0.01;
@@ -17,7 +19,6 @@ export function OffsetPathsRow(): JSX.Element | null {
   const project = useStore((s) => s.project);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
-  const offsetSelection = useStore((s) => s.offsetSelection);
   const [distanceMm, setDistanceMm] = useState(DEFAULT_OFFSET_MM);
   const selectedIds = [
     ...(selectedObjectId === null ? [] : [selectedObjectId]),
@@ -48,14 +49,14 @@ export function OffsetPathsRow(): JSX.Element | null {
       <div className="lf-artwork-tool__actions">
         <button
           type="button"
-          onClick={() => offsetSelection(distanceMm)}
+          onClick={() => void offsetOutlinesInBackground(distanceMm)}
           title="Add a new path outside the selected shapes at this distance."
         >
           Outward copy
         </button>
         <button
           type="button"
-          onClick={() => offsetSelection(-distanceMm)}
+          onClick={() => void offsetOutlinesInBackground(-distanceMm)}
           title="Add a new path inside the selected shapes at this distance."
         >
           Inward copy

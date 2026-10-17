@@ -134,8 +134,13 @@ function hasPaths(object: SceneObject): object is VectorObject {
 }
 
 function countVectorPoints(project: Project): number {
+  return countObjectVectorPoints(project.scene.objects);
+}
+
+/** Polyline points plus curve segments: the size the packing threshold measures. */
+export function countObjectVectorPoints(objects: ReadonlyArray<SceneObject>): number {
   let count = 0;
-  for (const object of project.scene.objects) {
+  for (const object of objects) {
     if (!hasPaths(object)) continue;
     for (const path of object.paths) {
       for (const polyline of path.polylines) count += polyline.points.length;
@@ -147,7 +152,9 @@ function countVectorPoints(project: Project): number {
   return count;
 }
 
-function packedPathsFor(paths: ReadonlyArray<ColoredPath>): ReadonlyArray<PackedColoredPath> {
+export function packedPathsFor(
+  paths: ReadonlyArray<ColoredPath>,
+): ReadonlyArray<PackedColoredPath> {
   const cached = packedPaths.get(paths);
   if (cached !== undefined) return cached;
   const packed = paths.map(packColoredPath);

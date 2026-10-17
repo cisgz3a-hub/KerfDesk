@@ -2,13 +2,11 @@
 // LBG-T08). useAppCommands re-renders on every tool change, so reading the
 // tool mode here keeps the menu check mark current.
 
-import type { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { cutShapesInBackground } from './vector-background-commands';
 import type { VectorCutCommandContext } from './vector-cut-command-types';
 
-export function vectorCutCommandContext(
-  app: ReturnType<typeof useStore.getState>,
-): VectorCutCommandContext {
+export function vectorCutCommandContext(): VectorCutCommandContext {
   return {
     trimShapesActive: useUiStore.getState().toolMode.kind === 'trim-shapes',
     trimShapes: () => {
@@ -22,8 +20,7 @@ export function vectorCutCommandContext(
       if (ui.toolMode.kind === 'extend-shapes') ui.resetToolMode();
       else ui.setToolMode({ kind: 'extend-shapes' });
     },
-    cutShapes: () => {
-      app.cutSelectedShapes();
-    },
+    // The cut runs in the vector worker and commits when it settles (ADR-606).
+    cutShapes: () => void cutShapesInBackground(),
   };
 }

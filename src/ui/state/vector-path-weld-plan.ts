@@ -31,12 +31,39 @@ export type WeldSelectionPlan = {
   readonly operands: ReadonlyArray<VectorSceneObject>;
 };
 
+/** The operation bookkeeping a weld needs, ready for the costly union. */
+export type PreparedWeldSelection = {
+  readonly resultId: string;
+  /** The operands, rebound to their weld operations, that the union welds. */
+  readonly operands: ReadonlyArray<VectorSceneObject>;
+  readonly layers: ReadonlyArray<Layer>;
+};
+
 /** Build every geometry and operation change before Zustand publishes it. */
 export function planWeldSelection(
   scene: Scene,
   objects: ReadonlyArray<VectorSceneObject>,
   resultId: string,
 ): Result<WeldSelectionPlan, VectorOpError> {
+  const prepared = prepareWeldSelection(scene, objects, resultId);
+  return finishWeldSelection(prepared, weldVectorObjects(prepared.operands, resultId));
+}
+
+/** The plan once the union of `prepared.operands` (in thread or in a worker) is known. */
+export function finishWeldSelection(
+  prepared: PreparedWeldSelection,
+  welded: Result<ImportedSvg, VectorOpError>,
+): Result<WeldSelectionPlan, VectorOpError> {
+  if (welded.kind === 'error') return welded;
+  return ok({ object: welded.value, layers: prepared.layers, operands: prepared.operands });
+}
+
+/** Everything but the union: cheap enough for the UI thread (ADR-606). */
+export function prepareWeldSelection(
+  scene: Scene,
+  objects: ReadonlyArray<VectorSceneObject>,
+  resultId: string,
+): PreparedWeldSelection {
   const buckets = operationBuckets(scene, objects);
   const occupiedOperationIds = reservedWeldOperationIds(scene);
   const legacyColors = legacyWeldOperationColors(scene);
@@ -93,13 +120,11 @@ export function planWeldSelection(
     preparedObjects.push(...prepareWeldObjectsForBucket(bucket, layer.id));
   }
 
-  const welded = weldVectorObjects(preparedObjects, resultId);
-  if (welded.kind === 'error') return welded;
-  return ok({
-    object: welded.value,
-    layers: insertClonedLayers(scene.layers, clonedLayers),
+  return {
+    resultId,
     operands: preparedObjects,
-  });
+    layers: insertClonedLayers(scene.layers, clonedLayers),
+  };
 }
 
 function operationBuckets(
