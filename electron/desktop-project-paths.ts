@@ -1,8 +1,8 @@
 // Project files the operating system hands to KerfDesk (ADR-378): a project
 // double-clicked in Explorer, Finder or a Linux file manager, dropped on the
-// app icon, or named on the command line. Main reads only paths that arrived this way, and checks
-// each one again before every read: an absolute, canonical path to a regular
-// file with a project extension.
+// app icon, or named on the command line. Main reads only paths that arrived
+// this way, and checks each one again before every read: an absolute,
+// canonical path to a regular file with a project extension.
 
 import * as path from 'node:path';
 

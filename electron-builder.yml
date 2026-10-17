@@ -104,7 +104,6 @@ fileAssociations:
 # keeps the running window grouped with that entry.
 linux:
   executableName: kerfdesk
-  packageName: kerfdesk
   icon: public/app-icon-512x512.png
   category: Graphics
   synopsis: CAM for GRBL laser cutters, engravers and CNC routers
@@ -122,6 +121,7 @@ linux:
   artifactName: KerfDesk-${version}-linux-${arch}.${ext}
 
 deb:
+  packageName: kerfdesk
   packageCategory: graphics
   priority: optional
 
