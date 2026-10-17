@@ -22,7 +22,7 @@ export function RegistrationJigEditor(props: { readonly onClose: () => void }): 
       aria-label="Registration Jig editor"
       tabIndex={-1}
       className="lf-jig-editor"
-      onKeyDown={(event) => handleJigEditorKey(event, editor.setSession)}
+      onKeyDown={(event) => handleJigEditorKey(event, editor.session, editor.setSession)}
       onDragOver={stopDrop}
       onDrop={stopDrop}
     >

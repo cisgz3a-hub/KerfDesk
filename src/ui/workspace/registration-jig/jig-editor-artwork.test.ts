@@ -10,7 +10,8 @@ import {
 import { applyRegistrationOutput } from '../../state/registration-output-actions';
 import { useStore } from '../../state/store';
 import { resetStore, svgObj } from '../../state/test-helpers';
-import { deleteJigArtwork, importJigArtwork, upsertJigText } from './jig-editor-artwork';
+import { useToastStore } from '../../state/toast-store';
+import { deleteJigArtworkWithRepairs, importJigArtwork, upsertJigText } from './jig-editor-artwork';
 import { createJigEditorSession } from './jig-editor-session';
 
 function operationFor(scene: Scene, objectId: string) {
@@ -92,7 +93,12 @@ describe('registration jig draft artwork edits', () => {
         },
       },
     };
-    const result = deleteJigArtwork({ ...session, draft });
+    const toasts = useToastStore.getState().toasts.length;
+    const deletion = deleteJigArtworkWithRepairs({ ...session, draft });
+    const result = deletion.session;
+    // Pure: the caller reports repairs outside its state updater.
+    expect(deletion.repairs).toMatchObject({ repairedImageMasks: 1 });
+    expect(useToastStore.getState().toasts).toHaveLength(toasts);
     expect(result.draft.project.scene.objects.some((object) => object.id === 'mask')).toBe(false);
     expect(
       result.draft.project.scene.groups?.some((group) => group.objectIds.includes('mask')),

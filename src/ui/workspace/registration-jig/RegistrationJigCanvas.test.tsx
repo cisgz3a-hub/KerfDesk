@@ -141,4 +141,23 @@ describe('registration jig canvas drag transactions', () => {
     pointer('pointerup', 10, 10);
     expect(commit).not.toHaveBeenCalled();
   });
+
+  it('zooms with a non-passive native wheel listener so the page does not scroll', () => {
+    const add = vi.spyOn(HTMLCanvasElement.prototype, 'addEventListener');
+    act(() => root.render(<Harness key="wheel" />));
+    expect(add).toHaveBeenCalledWith('wheel', expect.any(Function), { passive: false });
+    const canvas = host.querySelector('canvas')!;
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600 }) as DOMRect;
+    const wheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: -100,
+      clientX: 400,
+      clientY: 300,
+    });
+    act(() => {
+      canvas.dispatchEvent(wheel);
+    });
+    expect(wheel.defaultPrevented).toBe(true);
+  });
 });

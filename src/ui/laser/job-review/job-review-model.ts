@@ -107,7 +107,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
   const outputScope = args.outputScope ?? DEFAULT_OUTPUT_SCOPE;
   return {
     machineKind,
-    ...jig.facts(args.project, args.prepared.prepared.job),
+    ...jig.facts(args.project, args.prepared.prepared.job, outputScope),
     ...buildReviewedOmissions(args.prepared, outputScope),
     stats: buildStatTiles(
       args.prepared,

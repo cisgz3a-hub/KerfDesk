@@ -3,6 +3,7 @@ import {
   findRegistrationBoxes,
   machineKindOf,
   REGISTRATION_LAYER_ID,
+  type OutputScope,
   type Project,
 } from '../../../core/scene';
 
@@ -28,8 +29,17 @@ export function registrationJigReviewOutput(
 
 export type ReviewFacts = {
   readonly registrationJigOutput?: RegistrationJigReviewOutput | null;
+  /** Whole-output run: only then can a completed outline select Artwork only. */
+  readonly registrationJigWholeOutput?: boolean;
 };
 
-export function facts(project: Project, job: Pick<Job, 'groups'>): ReviewFacts {
-  return { registrationJigOutput: registrationJigReviewOutput(project, job) };
+export function facts(
+  project: Project,
+  job: Pick<Job, 'groups'>,
+  outputScope: Pick<OutputScope, 'cutSelectedGraphics' | 'useSelectionOrigin'>,
+): ReviewFacts {
+  return {
+    registrationJigOutput: registrationJigReviewOutput(project, job),
+    registrationJigWholeOutput: !outputScope.cutSelectedGraphics && !outputScope.useSelectionOrigin,
+  };
 }

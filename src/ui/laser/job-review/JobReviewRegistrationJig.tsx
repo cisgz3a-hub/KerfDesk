@@ -7,6 +7,8 @@ import { sectionHeadingStyle, sectionStyle } from './job-review.styles';
 
 export function JobReviewRegistrationJig(props: {
   readonly output: RegistrationJigReviewOutput | null | undefined;
+  /** Selected-only or selection-origin runs never switch to Artwork only. */
+  readonly wholeOutput?: boolean | undefined;
   readonly isPreparing: boolean;
 }): JSX.Element | null {
   const chooseOutput = (scope: 'box' | 'artwork'): void => {
@@ -44,7 +46,7 @@ export function JobReviewRegistrationJig(props: {
         </li>
         <li>Set the laser focus to the top surface of the piece, then burn the artwork.</li>
       </ol>
-      {props.output === 'box' && (
+      {props.output === 'box' && props.wholeOutput === true && (
         <p style={{ margin: '8px 0' }}>
           After a successful complete outline run, Artwork only is selected automatically.
         </p>

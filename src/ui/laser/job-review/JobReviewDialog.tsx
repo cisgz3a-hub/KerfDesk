@@ -59,7 +59,11 @@ function OpenJobReview(props: {
     <Dialog title={copy.dialogTitle} size="xl" onClose={handleCancel}>
       <span ref={topAnchorRef} aria-hidden="true" />
       <JobReviewHeader machineKind={model.machineKind} />
-      <JobReviewRegistrationJig output={model.registrationJigOutput} isPreparing={isPreparing} />
+      <JobReviewRegistrationJig
+        output={model.registrationJigOutput}
+        wholeOutput={model.registrationJigWholeOutput}
+        isPreparing={isPreparing}
+      />
       <JobReviewStats stats={model.stats} isPreparing={isPreparing} />
       {blocker !== null ? (
         <BlockerBanner blocker={blocker} purpose={purpose} onRetry={requestReviewRebuild} />

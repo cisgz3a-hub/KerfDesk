@@ -7,10 +7,7 @@ import {
 } from '../../../core/scene';
 import { applyFreshImport, applyUpsertText, pruneOrphanLayers } from '../../state/scene-mutations';
 import { removeObjectIdsFromGroups } from '../../state/scene-group-actions';
-import {
-  repairDanglingObjectDependencies,
-  reportDependencyRepairs,
-} from '../../state/object-delete-actions';
+import { repairDanglingObjectDependencies } from '../../state/object-delete-actions';
 import { applyRegistrationOutput } from '../../state/registration-output-actions';
 import { fitJigArtwork } from './fit-jig-artwork';
 import {
@@ -116,7 +113,17 @@ export function nudgeJigSelection(
   return changeJigDraft(session, { project: { ...project, scene: { ...project.scene, objects } } });
 }
 
-export function deleteJigArtwork(session: JigEditorSession): JigEditorSession {
+export type JigArtworkDeletion = {
+  readonly session: JigEditorSession;
+  readonly repairs: Pick<
+    ReturnType<typeof repairDanglingObjectDependencies>,
+    'repairedImageMasks' | 'repairedPathTextGuides'
+  > | null;
+};
+
+// Pure: the caller reports the dependency repairs after updating its state,
+// never from inside a React state updater.
+export function deleteJigArtworkWithRepairs(session: JigEditorSession): JigArtworkDeletion {
   const ids = selectedJigIds(session.draft);
   let scene = session.draft.project.scene;
   const removed = new Set<string>();
@@ -131,9 +138,8 @@ export function deleteJigArtwork(session: JigEditorSession): JigEditorSession {
       removed.add(object.id);
     }
   }
-  if (removed.size === 0) return session;
+  if (removed.size === 0) return { session, repairs: null };
   const repaired = repairDanglingObjectDependencies(removeObjectIdsFromGroups(scene, removed));
-  reportDependencyRepairs(repaired);
   scene = pruneOrphanLayers(repaired.scene);
   const previousSnapshot =
     session.draft.registrationArtworkOutputSnapshot ??
@@ -145,7 +151,7 @@ export function deleteJigArtwork(session: JigEditorSession): JigEditorSession {
       : Object.fromEntries(
           Object.entries(previousSnapshot).filter(([id]) => liveOperations.has(id)),
         );
-  return changeJigDraft(session, {
+  const next = changeJigDraft(session, {
     project: {
       ...session.draft.project,
       scene,
@@ -155,4 +161,5 @@ export function deleteJigArtwork(session: JigEditorSession): JigEditorSession {
     selectedObjectId: null,
     additionalSelectedIds: new Set(),
   });
+  return { session: next, repairs: repaired };
 }

@@ -14,6 +14,7 @@ import { resetStore } from '../../state/test-helpers';
 import { useToastStore } from '../../state/toast-store';
 import { JobReviewRegistrationJig } from './JobReviewRegistrationJig';
 import {
+  facts,
   registrationJigReviewOutput,
   type RegistrationJigReviewOutput,
 } from './job-review-registration-jig';
@@ -112,9 +113,19 @@ afterEach(async () => {
   resetStore();
 });
 
-async function render(output: RegistrationJigReviewOutput, isPreparing = false): Promise<void> {
+async function render(
+  output: RegistrationJigReviewOutput,
+  isPreparing = false,
+  wholeOutput = true,
+): Promise<void> {
   await act(async () =>
-    root.render(<JobReviewRegistrationJig output={output} isPreparing={isPreparing} />),
+    root.render(
+      <JobReviewRegistrationJig
+        output={output}
+        wholeOutput={wholeOutput}
+        isPreparing={isPreparing}
+      />,
+    ),
   );
 }
 
@@ -149,6 +160,28 @@ describe('JobReviewRegistrationJig', () => {
       'Switch to Outline only',
       'Switch to Artwork only',
     ]);
+  });
+
+  it('promises the Artwork only switch only for a whole outline run', async () => {
+    const promise = 'Artwork only is selected automatically';
+    await render('box');
+    expect(host.textContent).toContain(promise);
+    await render('box', false, false);
+    expect(host.textContent).not.toContain(promise);
+    expect(host.textContent).toContain('This job burns the outline only');
+  });
+
+  it('derives whole output from the reviewed output scope', () => {
+    const project = jigProject();
+    const job = { groups: [group('registration')] };
+    const scope = { cutSelectedGraphics: false, useSelectionOrigin: false };
+    expect(facts(project, job, scope).registrationJigWholeOutput).toBe(true);
+    expect(
+      facts(project, job, { ...scope, cutSelectedGraphics: true }).registrationJigWholeOutput,
+    ).toBe(false);
+    expect(
+      facts(project, job, { ...scope, useSelectionOrigin: true }).registrationJigWholeOutput,
+    ).toBe(false);
   });
 
   it('prevents mode switching while preparation is in flight', async () => {

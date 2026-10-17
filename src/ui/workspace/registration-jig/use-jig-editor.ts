@@ -6,6 +6,7 @@ import {
   type TextObject,
 } from '../../../core/scene';
 import { useStore } from '../../state';
+import { reportDependencyRepairs } from '../../state/object-delete-actions';
 import {
   changeJigDraft,
   commitJigEditorSession,
@@ -16,7 +17,7 @@ import {
   type JigEditorSession,
 } from './jig-editor-session';
 import {
-  deleteJigArtwork,
+  deleteJigArtworkWithRepairs,
   importJigArtwork,
   nudgeJigSelection,
   upsertJigText,
@@ -109,6 +110,7 @@ const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
 
 export function handleJigEditorKey(
   event: React.KeyboardEvent,
+  session: JigEditorSession,
   setSession: React.Dispatch<React.SetStateAction<JigEditorSession>>,
 ): void {
   if (isTextInput(event.target)) return;
@@ -118,7 +120,10 @@ export function handleJigEditorKey(
     setSession((current) => undoJigDraft(current, event.shiftKey || key === 'y'));
   } else if (key === 'delete' || key === 'backspace') {
     event.preventDefault();
-    setSession(deleteJigArtwork);
+    const deletion = deleteJigArtworkWithRepairs(session);
+    if (deletion.session === session) return;
+    setSession(deletion.session);
+    if (deletion.repairs !== null) reportDependencyRepairs(deletion.repairs);
   } else {
     const direction = ARROWS[key];
     if (direction === undefined) return;

@@ -66,6 +66,7 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
     spaceHeld,
   });
   useJigCanvasPaint(ref, preview ?? project, selectedIds, size, view);
+  useJigCanvasWheel({ ref, gesture, view, size, project, setView });
 
   return (
     <div style={hostStyle}>
@@ -100,22 +101,6 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
             event.preventDefault();
           }
         }}
-        onWheel={(event) => {
-          event.preventDefault();
-          if (gesture.current !== null) return;
-          const cursorPx = clientToCanvasPx(event, ref.current);
-          if (cursorPx === null) return;
-          const zoom = wheelZoomFactor(view, event.deltaY);
-          setView(
-            zoomAtCursorPx({
-              cursorPx,
-              factor: zoom / view.zoomFactor,
-              canvas: size,
-              bed: { width: project.device.bedWidth, height: project.device.bedHeight },
-              view,
-            }),
-          );
-        }}
       />
       <div style={footerStyle}>
         <span id="registration-jig-canvas-help">
@@ -126,6 +111,43 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
       </div>
     </div>
   );
+}
+
+function useJigCanvasWheel(args: {
+  readonly ref: RefObject<HTMLCanvasElement>;
+  readonly gesture: MutableRefObject<Gesture | null>;
+  readonly view: ViewState;
+  readonly size: { readonly width: number; readonly height: number };
+  readonly project: Project;
+  readonly setView: (view: ViewState) => void;
+}): void {
+  const { ref, gesture, view, size, project, setView } = args;
+  // React registers wheel handlers as passive, so preventDefault() there cannot
+  // stop the page from scrolling. Listen natively with passive: false instead.
+  const onWheel = useRef<(event: WheelEvent) => void>(() => undefined);
+  onWheel.current = (event) => {
+    event.preventDefault();
+    if (gesture.current !== null) return;
+    const cursorPx = clientToCanvasPx(event, ref.current);
+    if (cursorPx === null) return;
+    const zoom = wheelZoomFactor(view, event.deltaY);
+    setView(
+      zoomAtCursorPx({
+        cursorPx,
+        factor: zoom / view.zoomFactor,
+        canvas: size,
+        bed: { width: project.device.bedWidth, height: project.device.bedHeight },
+        view,
+      }),
+    );
+  };
+  useEffect(() => {
+    const canvas = ref.current;
+    if (canvas === null) return;
+    const listener = (event: WheelEvent): void => onWheel.current(event);
+    canvas.addEventListener('wheel', listener, { passive: false });
+    return () => canvas.removeEventListener('wheel', listener);
+  }, [ref]);
 }
 
 function wheelZoomFactor(view: ViewState, deltaY: number): number {

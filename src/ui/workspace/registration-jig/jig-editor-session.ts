@@ -2,6 +2,7 @@ import {
   findRegistrationBoxes,
   isRegistrationBox,
   REGISTRATION_LAYER_ID,
+  registrationRunState,
   type Project,
 } from '../../../core/scene';
 import type { AppState } from '../../state/store';
@@ -173,11 +174,19 @@ export function commitJigEditorSession(
   state: AppState,
   session: JigEditorSession,
 ): Partial<AppState> | null {
-  if (state.project !== session.baseProject || state.projectDocumentEpoch !== session.documentEpoch)
-    return null;
+  if (state.projectDocumentEpoch !== session.documentEpoch) return null;
+  const rebase = state.project !== session.baseProject;
+  if (rebase && !onlyOutputModeChanged(session.baseProject, state.project)) return null;
   if (findRegistrationBoxes(state.project.scene).some((box) => box.provenance === 'captured-board'))
     return null;
   let draft = session.draft;
+  if (rebase) {
+    // A completed outline run may select Artwork only while the editor is open.
+    // Keep the draft and adopt that output mode instead of discarding the edits.
+    const mode = registrationRunState(state.project.scene);
+    if (mode === 'box' || mode === 'artwork')
+      draft = { ...draft, ...applyRegistrationOutput({ ...draft, undoStack: [] }, mode) };
+  }
   if (session.firstSave && findRegistrationBoxes(draft.project.scene).length > 0) {
     draft = { ...draft, ...applyRegistrationOutput({ ...draft, undoStack: [] }, 'box') };
   }
@@ -204,4 +213,40 @@ export function commitJigEditorSession(
     redoStack: [],
     dirty: true,
   };
+}
+
+// True only when the main project differs from the editor's base by the
+// registration output mode: same objects, same operations apart from their
+// output flags, and every other project field unchanged.
+function onlyOutputModeChanged(base: Project, current: Project): boolean {
+  if (registrationRunState(base.scene) === registrationRunState(current.scene)) return false;
+  const { scene: baseScene, registrationArtworkOutputSnapshot: _b, ...baseFields } = base;
+  const { scene: currentScene, registrationArtworkOutputSnapshot: _c, ...currentFields } = current;
+  const keys = Object.keys(currentFields) as Array<keyof typeof currentFields>;
+  if (
+    keys.length !== Object.keys(baseFields).length ||
+    keys.some((key) => currentFields[key] !== baseFields[key])
+  )
+    return false;
+  const { layers: baseLayers, ...baseRest } = baseScene;
+  const { layers: currentLayers, ...currentRest } = currentScene;
+  const sceneKeys = Object.keys(currentRest) as Array<keyof typeof currentRest>;
+  return (
+    sceneKeys.length === Object.keys(baseRest).length &&
+    sceneKeys.every((key) => currentRest[key] === baseRest[key]) &&
+    currentLayers.length === baseLayers.length &&
+    currentLayers.every((layer, index) => sameExceptOutput(layer, baseLayers[index]))
+  );
+}
+
+function sameExceptOutput(layer: object, other: object | undefined): boolean {
+  if (other === undefined) return false;
+  if (layer === other) return true;
+  const { output: _a, ...rest } = layer as Record<string, unknown>;
+  const { output: _b, ...otherRest } = other as Record<string, unknown>;
+  const keys = Object.keys(rest);
+  return (
+    keys.length === Object.keys(otherRest).length &&
+    keys.every((key) => rest[key] === otherRest[key])
+  );
 }

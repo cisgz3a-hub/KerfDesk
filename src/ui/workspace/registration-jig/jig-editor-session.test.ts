@@ -185,6 +185,36 @@ describe('registration jig editor session', () => {
     ).toBeNull();
   });
 
+  it('keeps the draft when an outline run selects Artwork only while the editor is open', () => {
+    const initial = useStore.getState();
+    const saved = commit(initial, createJigEditorSession(initial));
+    const session = replaceJigLayout(createJigEditorSession(saved), GRID);
+    const switched = { ...saved, ...applyRegistrationOutput(saved, 'artwork') };
+    const resaved = commit(switched, session);
+
+    expect(findRegistrationBoxes(resaved.project.scene)).toHaveLength(6);
+    expect(outputs(resaved.project)).toMatchObject({
+      [REGISTRATION_LAYER_ID]: false,
+      [artworkOperation('enabled-art')]: true,
+      [artworkOperation('disabled-art')]: false,
+    });
+    expect(resaved.registrationArtworkOutputSnapshot).toBeNull();
+    expect(resaved.undoStack).toEqual([...switched.undoStack, switched.project]);
+  });
+
+  it('still refuses a draft when the main project changed beyond the output mode', () => {
+    const initial = useStore.getState();
+    const saved = commit(initial, createJigEditorSession(initial));
+    const session = createJigEditorSession(saved);
+    const switched = { ...saved, ...applyRegistrationOutput(saved, 'artwork') };
+    const edited = {
+      ...switched,
+      project: { ...switched.project, scene: { ...switched.project.scene, objects: [] } },
+    };
+
+    expect(commitJigEditorSession(edited, session)).toBeNull();
+  });
+
   it('refuses to replace a captured board and keeps its geometry and lock untouched', () => {
     useStore.getState().addCapturedBoardBox(120, 80);
     const state = useStore.getState();
