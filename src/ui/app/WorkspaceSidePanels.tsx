@@ -100,6 +100,7 @@ function CompactPanelTabs(props: {
   readonly collapsed: boolean;
   readonly onSelect: (panel: RailPanelId) => void;
 }): JSX.Element {
+  const visibility = useUiStore((state) => state.railPanelVisibility);
   return (
     <div
       role="tablist"
@@ -113,6 +114,7 @@ function CompactPanelTabs(props: {
         label="Artwork"
         icon="layers"
         selected={props.active === 'layers'}
+        expanded={visibility.layers}
         onSelect={() => props.onSelect('layers')}
       />
       <PanelTab
@@ -121,6 +123,7 @@ function CompactPanelTabs(props: {
         label="Machine"
         icon="sliders"
         selected={props.active === 'machine'}
+        expanded={visibility.machine}
         onSelect={() => props.onSelect('machine')}
       />
     </div>
@@ -184,6 +187,7 @@ function PanelTab(props: {
   readonly label: string;
   readonly icon: IconName;
   readonly selected: boolean;
+  readonly expanded: boolean;
   readonly onSelect: () => void;
 }): JSX.Element {
   return (
@@ -196,7 +200,13 @@ function PanelTab(props: {
       aria-selected={props.selected}
       tabIndex={props.selected ? 0 : -1}
       title={`Show ${props.label} panel`}
-      className={props.selected ? 'lf-btn lf-btn--primary' : 'lf-btn lf-btn--ghost'}
+      className={
+        !props.expanded
+          ? 'lf-btn lf-panel-expand-hint'
+          : props.selected
+            ? 'lf-btn lf-btn--primary'
+            : 'lf-btn lf-btn--ghost'
+      }
       onClick={props.onSelect}
       onKeyDown={moveTabFocus}
     >
@@ -215,7 +225,7 @@ function PanelToggle(props: {
   return (
     <button
       type="button"
-      className="lf-btn"
+      className={props.expanded ? 'lf-btn' : 'lf-btn lf-panel-expand-hint'}
       aria-pressed={props.expanded}
       title={`${props.expanded ? 'Hide' : 'Show'} ${props.label} panel`}
       onClick={props.onToggle}
