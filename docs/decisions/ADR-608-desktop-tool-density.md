@@ -30,6 +30,8 @@ The workspace reads as a desktop tool: more canvas, more commands visible before
 
 Dialogs that use the shared tokens get the denser type too. Dialog layout, spacing and widths are unchanged.
 
+The smaller line heights are fractional (13 px × 1.4 = 18.2 px, where 15 px × 1.4 was a whole 21 px). In the G-code Inspector they left the 3D view, and the readout card drawn over its WebGL canvas, at a fractional pixel offset. On Linux CI, Chrome's software compositor then blended the card's edge one level differently from frame to frame, which broke the Inspector's pixel-exact playback test. The Inspector panel now rounds its size to whole, even pixels, and its two header rows have whole-pixel minimum heights (42 px and 62 px). That puts the 3D view on a pixel boundary.
+
 No job output, Frame, Start, controller or licence behaviour changes.
 
 ## Verification

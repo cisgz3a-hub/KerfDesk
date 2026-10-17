@@ -631,6 +631,12 @@ body {
 .lf-dialog--gcode-inspector {
   width: min(1400px, 96vw);
   height: min(760px, 92vh);
+  /* Whole, even pixel sizes put the centred panel, and with the whole-pixel
+     header rows the 3D view, on a pixel boundary. Overlays drawn over the
+     WebGL canvas at a fractional offset can composite their edges one level
+     differently from frame to frame in Chrome's software renderer. */
+  width: round(down, min(1400px, 96vw), 2px);
+  height: round(down, min(760px, 92vh), 2px);
   max-width: none;
   max-height: none;
   padding: 0;

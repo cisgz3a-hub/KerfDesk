@@ -19,6 +19,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  /* A whole-pixel height keeps the 3D view below it on a pixel boundary
+     (tokens.css, .lf-dialog--gcode-inspector). */
+  box-sizing: border-box;
+  min-height: 62px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--lf-border);
   background: var(--lf-bg-1);
