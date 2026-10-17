@@ -45,14 +45,15 @@ this feature.
 | clipper2-ts | BSL-1.0 (Boost Software License 1.0) | Port of Angus Johnson's Clipper2 — https://github.com/ErikSom/Clipper2-ts |
 | lucide-static | ISC | © Lucide Contributors — https://github.com/lucide-icons/lucide |
 | @tabler/icons 3.43.0 | MIT | © 2020-2026 Paweł Kuna and Tabler Icons contributors — https://github.com/tabler/tabler-icons/tree/v3.43.0 |
-| @modelcontextprotocol/server, @modelcontextprotocol/core 2.2.0 (desktop and MCP relay) | Apache-2.0 and historical MIT, as described by the packages' licence transition notice | Anthropic, PBC and MCP contributors — https://github.com/modelcontextprotocol/typescript-sdk |
-| zod 4.4.3 | MIT | © Colin McDonnell — https://github.com/colinhacks/zod |
-| ws 8.21.0 (desktop relay connection) | MIT | © Einar Otto Stangvik and contributors — https://github.com/websockets/ws |
+| @modelcontextprotocol/server, @modelcontextprotocol/core 2.3.1 (desktop) and 2.2.0 (MCP relay) | Apache-2.0 and historical MIT, as described by the packages' licence transition notice | Anthropic, PBC and MCP contributors — https://github.com/modelcontextprotocol/typescript-sdk |
+| zod 4.6.7 (desktop) and 4.4.3 (MCP relay) | MIT | © Colin McDonnell — https://github.com/colinhacks/zod |
+| ws 8.22.0 (desktop relay connection) | MIT | © Einar Otto Stangvik and contributors — https://github.com/websockets/ws |
 | @cloudflare/workers-oauth-provider 1.2.1 (phone and MCP service) | MIT | © 2025 Cloudflare, Inc. — https://github.com/cloudflare/workers-oauth-provider |
 
-The MCP packages' `package.json` metadata says MIT, while their actual `LICENSE`
-files include the Apache-2.0 transition notice, full Apache-2.0 terms and retained
-historical MIT terms. The generated release notices reproduce those complete
+The MCP packages' `package.json` metadata says Apache-2.0 from 2.3.0 and MIT
+before it, while their actual `LICENSE` files include the Apache-2.0 transition
+notice, full Apache-2.0 terms and retained historical MIT terms. The generated
+release notices reproduce those complete
 files; the metadata label does not replace them. The MCP client and WebSocket
 TypeScript declarations are development-only dependencies.
 

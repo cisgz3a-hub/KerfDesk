@@ -18,10 +18,6 @@ allowBuilds:
   sharp: true
   workerd: true
 minimumReleaseAgeExclude:
-  # Reviewed upstream backports: the npm signatures, tarball integrity and
-  # Windows ZIP digest match Electron's official 44.5.1 release. This exact
-  # version exception retains pnpm's default 24-hour policy for other packages.
-  - electron@44.5.1
   - tmp@0.2.6
   - miniflare@4.20260526.0
   - wrangler@4.95.0
@@ -70,7 +66,7 @@ minimumReleaseAgeExclude:
 overrides:
   # PDF.js runs only in the browser renderer. Remove its unused optional Node
   # canvas edge so native binaries are absent from the resolved runtime closure.
-  'pdfjs-dist@6.3.289>@napi-rs/canvas': '-'
+  'pdfjs-dist@6.4.299>@napi-rs/canvas': '-'
   tmp@<0.2.6: ^0.2.6
   esbuild@<0.28.1: ^0.28.1
   ws@<8.21.0: 8.21.0
