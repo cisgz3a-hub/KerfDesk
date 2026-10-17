@@ -2,6 +2,7 @@ import {
   captureLayerOperationSettings,
   findRegistrationLayer,
   type LayerOperationSettings,
+  type Scene,
 } from '../../core/scene';
 import { Button } from '../kit';
 import { LayerRowCutSettings } from '../layers/LayerRowCutSettings';
@@ -12,11 +13,18 @@ import { useStore } from '../state';
 export function RegistrationJigOperationSettings(): JSX.Element | null {
   const scene = useStore((state) => state.project.scene);
   const setLayerParam = useStore((state) => state.setLayerParam);
-  const layer = findRegistrationLayer(scene);
+  return <RegistrationJigOperationSettingsEditor scene={scene} onChange={setLayerParam} />;
+}
+
+export function RegistrationJigOperationSettingsEditor(props: {
+  readonly scene: Scene;
+  readonly onChange: (operationId: string, patch: Partial<LayerOperationSettings>) => void;
+}): JSX.Element | null {
+  const layer = findRegistrationLayer(props.scene);
   const { settingsOpen, cutSettingsBlocked, openSettings, closeSettings } =
     useCutSettingsLauncher();
   if (layer === null) return null;
-  const commit = (patch: Partial<LayerOperationSettings>): void => setLayerParam(layer.id, patch);
+  const commit = (patch: Partial<LayerOperationSettings>): void => props.onChange(layer.id, patch);
   return (
     <section aria-label="Registration jig outline settings" style={sectionStyle}>
       <strong>Jig outline laser settings</strong>

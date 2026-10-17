@@ -1,448 +1,109 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  findRegistrationBoxes,
-  IDENTITY_TRANSFORM,
-  isRegistrationBox,
-  REGISTRATION_LAYER_ID,
-  transformedBBox,
-} from '../../core/scene';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { findRegistrationBoxes, registrationRunState } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { RegistrationJigPanel } from './RegistrationJigPanel';
 
+vi.mock('./registration-jig/RegistrationJigEditor', () => ({
+  RegistrationJigEditor: () => (
+    <div role="dialog" aria-label="Registration Jig editor">
+      Dedicated jig canvas
+    </div>
+  ),
+}));
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
-
 let container: HTMLDivElement;
 let root: Root;
-
 beforeEach(() => {
   useStore.getState().newProject();
-  useUiStore.getState().setRegistrationPanelPosition(null);
-  useUiStore.getState().openRegistrationPanel();
+  useUiStore.getState().closeRegistrationPanel();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
 });
-
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  useStore.getState().newProject();
-  useUiStore.getState().setRegistrationPanelPosition(null);
   useUiStore.getState().closeRegistrationPanel();
 });
-
 function render(): void {
   act(() => root.render(<RegistrationJigPanel />));
 }
-
-function click(label: string): void {
-  const button = buttonByLabel(label);
-  act(() => {
-    button.click();
-  });
-}
-
-function buttonByLabel(label: string): HTMLButtonElement {
-  const button = [...container.querySelectorAll('button')].find(
-    (b) => b.textContent?.trim() === label,
+function button(label: string): HTMLButtonElement {
+  const found = [...container.querySelectorAll('button')].find(
+    (item) => item.textContent === label,
   );
-  if (button === undefined) throw new Error(`button not found: ${label}`);
-  return button;
+  if (found === undefined) throw new Error(`Missing ${label}`);
+  return found;
 }
-
-function selectByLabel(label: string): HTMLSelectElement {
-  const select = container.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`);
-  if (select === null) throw new Error(`select not found: ${label}`);
-  return select;
-}
-
-function setInputValue(input: HTMLInputElement, value: string): void {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-  if (setter === undefined) throw new Error('native value setter not found');
-  act(() => {
-    setter.call(input, value);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+describe('Registration Jig main canvas bar', () => {
+  it('does not cover an empty workspace with a panel', () => {
+    render();
+    expect(container.textContent).toBe('');
   });
-}
-
-function addArt(): void {
-  act(() => {
+  it('shows the compact bar whenever a jig exists even with the editor closed', () => {
+    useStore.getState().addRegistrationBox(80, 40);
+    render();
+    expect([...container.querySelectorAll('button')].map((item) => item.textContent)).toEqual([
+      'Edit jig',
+      'Outline only',
+      'Artwork only',
+    ]);
+    expect(button('Artwork only').disabled).toBe(true);
+  });
+  it('switches complete-set output without changing outline geometry', () => {
+    useStore.getState().replaceRegistrationJigSet({
+      outline: { kind: 'circle', diameterMm: 40 },
+      rows: 2,
+      columns: 3,
+      spacingX: 5,
+      spacingY: 5,
+    });
     useStore.getState().drawShape(
       createRectangle({
         id: 'art',
         color: '#0000ff',
-        spec: { widthMm: 20, heightMm: 20, cornerRadiusMm: 0 },
-        transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 },
+        spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
       }),
     );
-  });
-}
-
-describe('RegistrationJigPanel', () => {
-  it('prompts to create an outline when no jig exists', () => {
-    render();
-    expect(container.textContent).toContain('Create a jig outline below to begin');
-  });
-
-  it('keeps How to use collapsed until the operator opens it', () => {
-    render();
-
-    expect(buttonByLabel('How to use').getAttribute('aria-expanded')).toBe('false');
-    expect(container.textContent).not.toContain('Put one object inside each burned outline.');
-
-    click('How to use');
-
-    expect(buttonByLabel('How to use').getAttribute('aria-expanded')).toBe('true');
-    expect(container.textContent).toContain('Put one object inside each burned outline.');
-    click('How to use');
-    expect(buttonByLabel('How to use').getAttribute('aria-expanded')).toBe('false');
-    expect(container.textContent).not.toContain('Put one object inside each burned outline.');
-  });
-
-  it('flips the Next-burn banner and layer output as the Box/Artwork toggle is clicked', () => {
-    useStore.getState().addRegistrationBox(80, 40);
-    addArt();
-    render();
-
-    click('Outline only');
-    expect(container.textContent).toContain('JIG outline');
-    const regLayer = () =>
-      useStore.getState().project.scene.layers.find((l) => l.id === REGISTRATION_LAYER_ID);
-    expect(regLayer()?.output).toBe(true);
-
-    expect(buttonByLabel('Artwork only').disabled).toBe(false);
-    click('Artwork only');
-    expect(container.textContent).toContain('your ARTWORK');
-    expect(regLayer()?.output).toBe(false);
-  });
-
-  it('keeps Artwork only disabled until actual artwork exists', () => {
-    useStore.getState().addRegistrationBox(80, 40);
-    render();
-
-    expect(buttonByLabel('Artwork only').disabled).toBe(true);
-
-    addArt();
-
-    expect(buttonByLabel('Artwork only').disabled).toBe(false);
-  });
-
-  it('auto-selects Artwork only when creating a box around existing artwork', () => {
-    addArt();
-    render();
-
-    click('Create outline');
-
-    expect(container.textContent).toContain('your ARTWORK');
-    expect(buttonByLabel('Artwork only').getAttribute('aria-pressed')).toBe('true');
-  });
-
-  it('edits the registration outline operation instead of leaving generic defaults hidden', () => {
-    useStore.getState().addRegistrationBox(80, 40);
-    render();
-
-    expect(container.textContent).toContain('Jig outline laser settings');
-    const power = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Power for registration jig outline"]',
-    );
-    if (power === null) throw new Error('jig outline power input not found');
-    setInputValue(power, '18');
-    act(() => {
-      power.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
-    });
-
-    const registration = useStore
-      .getState()
-      .project.scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID);
-    expect(registration?.power).toBe(18);
-    expect(buttonByLabel('Advanced outline settings').disabled).toBe(false);
-  });
-
-  it('offers a circle outline for round blanks', () => {
-    render();
-
-    const shape = selectByLabel('Registration jig shape');
-    expect([...shape.options].map((option) => option.textContent)).toEqual(['Rectangle', 'Circle']);
-
-    act(() => {
-      shape.value = 'circle';
-      shape.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    const diameter = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Registration circle diameter"]',
-    );
-    expect(diameter).not.toBeNull();
-    if (diameter === null) throw new Error('diameter input not found');
-    setInputValue(diameter, '64');
-    click('Create outline');
-
-    const [circle] = findRegistrationBoxes(useStore.getState().project.scene);
-    expect(circle?.spec).toEqual({ kind: 'ellipse', widthMm: 64, heightMm: 64 });
-  });
-
-  it('moves when the header is dragged', () => {
-    render();
-    const panel = container.querySelector<HTMLElement>('[aria-label="Registration jig"]');
-    const handle = container.querySelector<HTMLElement>(
-      '[aria-label="Move registration jig panel"]',
-    );
-    if (panel === null || handle === null) throw new Error('registration panel handle not found');
-
-    panel.getBoundingClientRect = () =>
-      ({
-        bottom: 320,
-        height: 120,
-        left: 300,
-        right: 550,
-        top: 200,
-        width: 250,
-        x: 300,
-        y: 200,
-        toJSON: () => ({}),
-      }) as DOMRect;
-    container.getBoundingClientRect = () =>
-      ({
-        bottom: 600,
-        height: 600,
-        left: 0,
-        right: 900,
-        top: 0,
-        width: 900,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      }) as DOMRect;
-
-    act(() => {
-      handle.dispatchEvent(
-        new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 320, clientY: 220 }),
-      );
-    });
-    act(() => {
-      window.dispatchEvent(new MouseEvent('pointermove', { clientX: 260, clientY: 180 }));
-    });
-    act(() => {
-      window.dispatchEvent(new MouseEvent('pointerup'));
-    });
-
-    expect(panel.style.left).toBe('240px');
-    expect(panel.style.top).toBe('160px');
-    expect(panel.style.right).toBe('auto');
-  });
-
-  it('moves with arrow keys when the drag handle is focused', () => {
-    render();
-    const panel = container.querySelector<HTMLElement>('[aria-label="Registration jig"]');
-    const handle = container.querySelector<HTMLElement>(
-      '[aria-label="Move registration jig panel"]',
-    );
-    if (panel === null || handle === null) throw new Error('registration panel handle not found');
-
-    panel.getBoundingClientRect = () =>
-      ({
-        bottom: 320,
-        height: 120,
-        left: 300,
-        right: 550,
-        top: 200,
-        width: 250,
-        x: 300,
-        y: 200,
-        toJSON: () => ({}),
-      }) as DOMRect;
-    container.getBoundingClientRect = () =>
-      ({
-        bottom: 600,
-        height: 600,
-        left: 0,
-        right: 900,
-        top: 0,
-        width: 900,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      }) as DOMRect;
-
-    act(() => {
-      handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
-    });
-
-    expect(panel.style.left).toBe('290px');
-    expect(panel.style.top).toBe('200px');
-    expect(panel.style.right).toBe('auto');
-  });
-
-  it('locks the box via the Lock box checkbox', () => {
-    useStore.getState().addRegistrationBox(80, 40);
-    render();
-    const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
-    if (checkbox === null) throw new Error('lock checkbox not found');
-    expect(checkbox.checked).toBe(false);
-    act(() => {
-      checkbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    expect(findRegistrationBoxes(useStore.getState().project.scene)[0]?.locked).toBe(true);
-  });
-
-  it('disables unlock and Replace and warns for a captured board (CAM-04)', () => {
-    useStore.getState().addCapturedBoardBox(120, 80);
-    render();
-
-    const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
-    if (checkbox === null) throw new Error('lock checkbox not found');
-    expect(checkbox.disabled).toBe(true);
-    expect(buttonByLabel('Replace outline').disabled).toBe(true);
-    expect(container.textContent).toContain('captured board');
-  });
-
-  it('leaves unlock and Replace enabled for a jig outline (CAM-04)', () => {
-    useStore.getState().addRegistrationBox(80, 40);
-    render();
-
-    const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
-    if (checkbox === null) throw new Error('lock checkbox not found');
-    expect(checkbox.disabled).toBe(false);
-    expect(buttonByLabel('Replace outline').disabled).toBe(false);
-    expect(container.textContent).not.toContain('captured board');
-  });
-
-  it('creates five jigs, copies selected artwork to all, and toggles both runs set-wide', () => {
-    render();
-    const columns = container.querySelector<HTMLInputElement>('input[aria-label="Jig columns"]');
-    if (columns === null) throw new Error('jig columns input not found');
-    setInputValue(columns, '5');
-
-    click('Create 5 jigs');
-    expect(findRegistrationBoxes(useStore.getState().project.scene)).toHaveLength(5);
-    expect(container.textContent).toContain('5 jigs on canvas');
-
-    addArt();
-    click('Auto-fit + copy artwork to all 5');
-    const artwork = useStore
-      .getState()
-      .project.scene.objects.filter((object) => !isRegistrationBox(object));
-    expect(artwork).toHaveLength(5);
-    for (const object of artwork) {
-      const bounds = transformedBBox(object);
-      expect(bounds.maxX - bounds.minX).toBeCloseTo(36);
-      expect(bounds.maxY - bounds.minY).toBeCloseTo(36);
-    }
-
-    expect(
-      container.querySelector<HTMLInputElement>('input[aria-label="Jig artwork width"]')?.value,
-    ).toBe('36');
-    expect(
-      container.querySelector<HTMLInputElement>('input[aria-label="Jig artwork height"]')?.value,
-    ).toBe('36');
-    expect(container.textContent).toContain('AR locked');
-    const width = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Jig artwork width"]',
-    );
-    if (width === null) throw new Error('jig artwork width input not found');
-    setInputValue(width, '30');
-    click('Apply size to all 5');
-    for (const object of useStore
-      .getState()
-      .project.scene.objects.filter((candidate) => !isRegistrationBox(candidate))) {
-      const bounds = transformedBBox(object);
-      expect(bounds.maxX - bounds.minX).toBeCloseTo(30);
-      expect(bounds.maxY - bounds.minY).toBeCloseTo(30);
-    }
-
-    click('Outline only');
-    expect(container.textContent).toContain('all 5 JIG outlines');
-    click('Artwork only');
-    expect(container.textContent).toContain('all ARTWORK copies');
-  });
-
-  it('Replace outline applies edited dimensions while preserving the existing artwork', () => {
-    useStore.getState().addRegistrationBox(80, 40);
-    addArt();
-    const artwork = useStore
-      .getState()
-      .project.scene.objects.find((object) => !isRegistrationBox(object));
-    render();
-    const width = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Registration box width"]',
-    );
-    if (width === null) throw new Error('Missing outline width');
-    setInputValue(width, '100');
-    click('Replace outline');
     const boxes = findRegistrationBoxes(useStore.getState().project.scene);
-    expect(boxes).toHaveLength(1);
-    const box = boxes[0];
-    if (box === undefined) throw new Error('Missing replaced outline');
-    const bounds = transformedBBox(box);
-    expect(bounds.maxX - bounds.minX).toBeCloseTo(100);
-    expect(bounds.maxY - bounds.minY).toBeCloseTo(40);
-    expect(
-      useStore.getState().project.scene.objects.find((object) => !isRegistrationBox(object)),
-    ).toBe(artwork);
+    render();
+    act(() => button('Outline only').click());
+    expect(registrationRunState(useStore.getState().project.scene)).toBe('box');
+    act(() => button('Outline only').click());
+    act(() => button('Artwork only').click());
+    expect(registrationRunState(useStore.getState().project.scene)).toBe('artwork');
+    expect(findRegistrationBoxes(useStore.getState().project.scene)).toEqual(boxes);
   });
-
-  it('reopens an existing rectangular set with its rows, columns, and spacing', () => {
-    useStore.getState().replaceRegistrationJigSet({
-      outline: { kind: 'rectangle', widthMm: 40, heightMm: 30 },
-      rows: 2,
-      columns: 3,
-      spacingX: 8,
-      spacingY: 6,
+  it('opens the dedicated editor through Edit jig', async () => {
+    useStore.getState().addRegistrationBox(80, 40);
+    render();
+    await act(async () => {
+      button('Edit jig').click();
+    });
+    expect(useUiStore.getState().registrationPanelOpen).toBe(true);
+    expect(document.querySelector('[aria-label="Registration Jig editor"]')).not.toBeNull();
+  });
+  it('does not expose jig output switches for a captured board', () => {
+    useStore.getState().addRegistrationBox(80, 40);
+    const project = useStore.getState().project;
+    useStore.setState({
+      project: {
+        ...project,
+        scene: {
+          ...project.scene,
+          objects: project.scene.objects.map((object) =>
+            object.kind === 'shape' ? { ...object, provenance: 'captured-board' as const } : object,
+          ),
+        },
+      },
     });
     render();
-
-    expect(container.querySelector<HTMLInputElement>('input[aria-label="Jig rows"]')?.value).toBe(
-      '2',
-    );
-    expect(
-      container.querySelector<HTMLInputElement>('input[aria-label="Jig columns"]')?.value,
-    ).toBe('3');
-    expect(
-      container.querySelector<HTMLInputElement>('input[aria-label="Horizontal jig spacing"]')
-        ?.value,
-    ).toBe('8');
-    expect(
-      container.querySelector<HTMLInputElement>('input[aria-label="Vertical jig spacing"]')?.value,
-    ).toBe('6');
-  });
-
-  it('refreshes saved grid geometry when a project opens while the panel is already mounted', () => {
-    useStore.getState().replaceRegistrationJigSet({
-      outline: { kind: 'rectangle', widthMm: 40, heightMm: 30 },
-      rows: 2,
-      columns: 3,
-      spacingX: 8,
-      spacingY: 6,
-    });
-    const savedProject = useStore.getState().project;
-    useStore.getState().newProject();
-    render();
-
-    expect(container.querySelector<HTMLInputElement>('input[aria-label="Jig rows"]')?.value).toBe(
-      '1',
-    );
-    act(() => {
-      useStore.getState().setProject(savedProject);
-    });
-
-    expect(container.querySelector<HTMLInputElement>('input[aria-label="Jig rows"]')?.value).toBe(
-      '2',
-    );
-    expect(
-      container.querySelector<HTMLInputElement>('input[aria-label="Jig columns"]')?.value,
-    ).toBe('3');
-    expect(
-      container.querySelector<HTMLInputElement>('input[aria-label="Horizontal jig spacing"]')
-        ?.value,
-    ).toBe('8');
-    expect(
-      container.querySelector<HTMLInputElement>('input[aria-label="Vertical jig spacing"]')?.value,
-    ).toBe('6');
+    expect(container.querySelector('button')).toBeNull();
   });
 });

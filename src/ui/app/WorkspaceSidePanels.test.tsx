@@ -85,6 +85,22 @@ describe('WorkspaceSidePanels', () => {
       expect(host.textContent).not.toContain('Layer rail');
       expect(layersToggle?.getAttribute('aria-pressed')).toBe('false');
       expect(layersToggle?.getAttribute('title')).toBe('Show Layers panel');
+      expect(layersToggle?.classList.contains('lf-panel-expand-hint')).toBe(true);
+      const machineToggle = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent?.trim() === 'Machine',
+      );
+      expect(machineToggle?.classList.contains('lf-panel-expand-hint')).toBe(false);
+      await act(async () => machineToggle?.click());
+      expect(host.textContent).not.toContain('Machine rail');
+      expect(machineToggle?.classList.contains('lf-panel-expand-hint')).toBe(true);
+
+      await act(async () => layersToggle?.click());
+      expect(host.textContent).toContain('Layer rail');
+      expect(layersToggle?.classList.contains('lf-panel-expand-hint')).toBe(false);
+      expect(machineToggle?.classList.contains('lf-panel-expand-hint')).toBe(true);
+      await act(async () => machineToggle?.click());
+      expect(host.textContent).toContain('Machine rail');
+      expect(machineToggle?.classList.contains('lf-panel-expand-hint')).toBe(false);
     } finally {
       await act(async () => root.unmount());
     }
@@ -144,6 +160,30 @@ describe('WorkspaceSidePanels', () => {
       await act(async () => useUiStore.getState().focusRailPanel('layers'));
       expect(host.textContent).toContain('Layer rail');
       expect(host.textContent).not.toContain('Machine rail');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('keeps each compact panel discoverable until its own tab reopens it', async () => {
+    media.compact = true;
+    useUiStore.getState().setRailPanelVisible('layers', false);
+    useUiStore.getState().setRailPanelVisible('machine', false);
+    const { host, root } = await renderPanels();
+    try {
+      const artwork = host.querySelector<HTMLButtonElement>('[role="tab"][aria-label="Artwork"]');
+      const machine = host.querySelector<HTMLButtonElement>('[role="tab"][aria-label="Machine"]');
+      expect(artwork?.classList.contains('lf-panel-expand-hint')).toBe(true);
+      expect(machine?.classList.contains('lf-panel-expand-hint')).toBe(true);
+
+      await act(async () => artwork?.click());
+      expect(useUiStore.getState().railPanelVisibility).toEqual({ layers: true, machine: false });
+      expect(artwork?.classList.contains('lf-panel-expand-hint')).toBe(false);
+      expect(machine?.classList.contains('lf-panel-expand-hint')).toBe(true);
+      await act(async () => machine?.click());
+      expect(useUiStore.getState().railPanelVisibility).toEqual({ layers: true, machine: true });
+      expect(machine?.classList.contains('lf-panel-expand-hint')).toBe(false);
+      expect(host.textContent).toContain('Machine rail');
     } finally {
       await act(async () => root.unmount());
     }

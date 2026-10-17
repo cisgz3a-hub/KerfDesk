@@ -2643,15 +2643,25 @@ authorization, Frame proof, controller command, or safety boundary.
 
 ### F-B15a. Burn a multi-outline registration jig set (ADR-057 amendment)
 
-1. Open **Registration Jig**, choose Rectangle or Circle, enter the outline size,
-   then enter rows, columns, and horizontal/vertical spacing. A 1 x 5 grid creates
-   five independently visible outlines as one fixture set.
-2. Select one artwork or artwork group and click **Auto-fit + copy artwork to all N**.
+1. Open **Registration Jig** or **Edit jig** to enter its dedicated editor. Its own
+   canvas opens fitted to the jig, with **Fit jig** and **Fit bed** available. Draft
+   edits and Undo/Redo stay in the editor until **Save to canvas**; closing without
+   saving leaves the main canvas unchanged.
+2. In **Jig layout**, choose Rectangle or Circle, enter the outline size, then enter
+   rows, columns, and horizontal/vertical spacing. Apply the layout before saving.
+   A 1 x 5 grid creates five independently visible outlines as one fixture set.
+3. In **Artwork**, use the existing writing styles for text, import artwork, or upload
+   an image and use the existing tracers directly in the editor. Imported and traced
+   artwork fits inside the selected outline, or the first outline when none is selected.
+   **Line / Fill settings** controls the selected artwork's operation, power, speed and
+   passes; Fill also exposes line interval, scan angle, fill style and cross-hatch.
+   Use Line for open traced paths. These edits remain in the draft until saved.
+4. Select one artwork or artwork group and click **Centre + copy artwork to all N**.
    The original is proportionally fitted into 90% of the first outline's usable
    region, preserving aspect ratio, and one identical operation-preserving copy is
    centered in every remaining outline. Circle outlines use their inscribed-square
    fit region so the artwork remains inside the arc.
-3. To use a different exact size, enter the desired **W** or **H** under **Artwork
+5. To use a different exact size, enter the desired **W** or **H** under **Artwork
    size - all N copies**. **AR locked** is the default and updates the paired
    dimension proportionally. Click **AR locked** to switch to **AR unlocked** when
    W and H must be entered independently, then click **Apply size to all N**. Every
@@ -2659,26 +2669,40 @@ authorization, Frame proof, controller command, or safety boundary.
    grid spacing does not scale. For rotated artwork, W and H follow the artwork's
    rotated local axes; the rotation is preserved and the shared resize remains
    available without inventing shear or asking the operator to relock AR.
-4. Pick **Outline only**. Every registration outline is enabled and every artwork
-   operation is disabled; Frame, Preview, Save G-code, and Start therefore describe
-   the complete physical fixture outline run.
-5. Put one blank inside each burned outline, then pick **Artwork only**. Every
+6. Click **Save to canvas** to apply the draft as one undoable edit. A new jig starts
+   in **Outline only**; editing an existing jig retains its output mode. Outlines
+   lock on the main canvas. The compact bar keeps **Edit jig**, **Outline only** and
+   **Artwork only** available without covering the canvas.
+7. With **Outline only**, every registration outline is enabled and every artwork
+   operation is disabled. Burn the complete outline set on the jig base before
+   placing the pieces. After an accepted, successful complete outline run has
+   physically settled, the unchanged project automatically selects **Artwork only**.
+   Frame, interrupted/failed runs and selected-only outline runs do not switch it.
+8. Put one blank inside each burned outline and focus on the blank's **top surface**,
+   which is higher than the outline surface. Keep X/Y placement and work origin
+   unchanged. Confirm **Artwork only** before burning the artwork. Every
    registration outline is disabled and every artwork copy on an enabled source
    operation is included in the second run. Output completes all enabled operations
    for one physical jig instance before starting the next instance in grid order;
    scanline fill does not sweep back and forth across separate jig outlines.
-6. Both runs use the combined bounds of the complete outline set as their one
-   placement anchor. Moving or replacing the set changes that ordinary job evidence;
-   the existing exact-job Frame rule remains the only Start guard.
+9. Start's existing Job Review identifies Outline, Artwork, or mixed output and
+   repeats the sequence and artwork-focus reminder. Switching output there closes
+   the review; press Start again to review the new executable job. The reminder is
+   advisory and does not focus the laser or move Z automatically.
+10. Both runs use the combined bounds of the complete outline set as their one
+    placement anchor. Frame remains the sole ordinary Start gate for the unchanged
+    footprint and placement (ADR-565). Frame again if those coordinates change;
+    power/speed edits retain that spatial evidence, and each Start reviews and
+    claims the current exact executable program.
 
 #### Empty and edge cases
 
 1. A 1 x 1 grid preserves the original single-jig workflow and button wording.
 2. **Remove all outlines** deletes the complete set and its reserved operation.
-3. **Lock all outlines** applies one lock state to the complete fixture set.
+3. Outlines remain editable in the dedicated editor and lock when saved to the main canvas.
 4. A captured-board outline remains owned by **Place Board** and is not replaced
    from Registration Jig; the existing provenance explanation remains in the panel.
-5. Repeating **Auto-fit + copy artwork to all N** replaces the generated copies
+5. Repeating **Centre + copy artwork to all N** replaces the generated copies
    instead of layering another set on the canvas.
 6. Reopened projects retain per-jig output order and shared-size controls because
    generated artwork retains its source ancestry and physical outline. Existing

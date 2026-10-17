@@ -162,7 +162,6 @@ function CanvasArea(): JSX.Element {
   const accessories = (
     <>
       <WorkspaceCameraOverlay />
-      <RegistrationJigPanel />
       <CameraPanel />
       <BoardCapturePanel />
       {!showGcode ? <CncStockCanvasHud /> : null}
@@ -173,6 +172,7 @@ function CanvasArea(): JSX.Element {
   return (
     <WorkspaceViewport
       controls={<CanvasViewSwitch showGcode={showGcode} onChange={changeView} />}
+      banner={<RegistrationJigPanel />}
       footer={<ProjectSheetsBar />}
       content={
         showGcode ? (

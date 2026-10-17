@@ -61,8 +61,10 @@ function updateCapturedBoardMutation(s: AppState, shape: BoardShape): Partial<Ap
   if (existing === undefined) return null;
   const replacement = resizedCapturedBoard(existing, shape);
   const scene = replaceObject(s.project.scene, existing.id, replacement);
+  const project = { ...s.project, scene };
+  delete project.registrationArtworkOutputSnapshot;
   return {
-    project: { ...s.project, scene },
+    project,
     jobPlacement: placementFor(shape),
     registrationArtworkOutputSnapshot: null,
     undoStack: pushUndo(s.project, s.undoStack),
@@ -163,10 +165,16 @@ function commitCapturedBoard(
   placement: JobPlacementSettings,
 ): AppState | Partial<AppState> {
   const added = applyAddRegistrationBox(s, box);
-  const scene = applyRegistrationOutputToScene(added.project.scene, 'artwork');
+  const scene = applyRegistrationOutputToScene(
+    added.project.scene,
+    'artwork',
+    s.registrationArtworkOutputSnapshot ?? s.project.registrationArtworkOutputSnapshot,
+  );
+  const project = { ...added.project, scene };
+  delete project.registrationArtworkOutputSnapshot;
   return {
     ...added,
-    project: { ...added.project, scene },
+    project,
     jobPlacement: placement,
     registrationArtworkOutputSnapshot: null,
   };

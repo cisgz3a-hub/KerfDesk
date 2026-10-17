@@ -22,6 +22,7 @@ import { applyRegistrationOutputToScene } from './registration-output-actions';
 
 type RemoveRegistrationBoxResult = {
   readonly project: Project;
+  readonly registrationArtworkOutputSnapshot: null;
   readonly selectedObjectId: string | null;
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly undoStack: ReadonlyArray<Project>;
@@ -93,12 +94,19 @@ export function applyRemoveRegistrationBox(
   const layer = findRegistrationLayer(s.project.scene);
   if (boxes.length === 0 && layer === null) return null;
   const boxIds = new Set(boxes.map((box) => box.id));
-  let scene = s.project.scene;
+  let scene = applyRegistrationOutputToScene(
+    s.project.scene,
+    'artwork',
+    s.project.registrationArtworkOutputSnapshot,
+  );
   for (const id of boxIds) scene = removeObject(scene, id);
   scene = { ...scene, layers: scene.layers.filter((l) => l.id !== REGISTRATION_LAYER_ID) };
   scene = relayoutRegistrationJigArtwork(s.project.scene, scene, 'keep');
+  const project = { ...s.project, scene };
+  delete project.registrationArtworkOutputSnapshot;
   return {
-    project: { ...s.project, scene },
+    project,
+    registrationArtworkOutputSnapshot: null,
     selectedObjectId:
       s.selectedObjectId !== null && boxIds.has(s.selectedObjectId) ? null : s.selectedObjectId,
     additionalSelectedIds: new Set([...s.additionalSelectedIds].filter((id) => !boxIds.has(id))),

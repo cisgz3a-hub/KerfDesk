@@ -98,6 +98,20 @@ function buttonByText(text: string): HTMLButtonElement {
 }
 
 describe('JobReviewDialog', () => {
+  it.each([
+    ['box', 'Start outline'],
+    ['artwork', 'Start artwork'],
+  ] as const)(
+    'names the exact %s burn on the existing Start confirmation',
+    async (output, label) => {
+      useJobReviewStore.getState().open({ ...model, registrationJigOutput: output });
+      await render();
+      expect(host.textContent).toContain('What are you burning?');
+      expect(buttonByText(label).disabled).toBe(false);
+      await act(async () => buttonByText(label).click());
+      expect(useJobReviewStore.getState().pendingSignal).toBe('confirm');
+    },
+  );
   it('audit Controller Machine and Warnings disclosures toggle without resolving review', async () => {
     useJobReviewStore.getState().open(model);
     await render();

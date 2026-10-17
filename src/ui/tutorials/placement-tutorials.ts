@@ -84,7 +84,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Place the real keychain on the burned outline',
         examplePhase: 1,
         instruction:
-          'Place the leather blank inside the burned rectangle, lining up its outside edges and intended hole orientation. Keep the wood, canvas outline and work origin fixed. Add and select the design, choose Auto-fit artwork in outline, then check clearance from the rounded edges and hole.',
+          'Place the leather blank inside the burned rectangle, lining up its outside edges and intended hole orientation. Keep the wood, canvas outline and work origin fixed. Add and select the design, choose Centre artwork in outline, then check clearance from the rounded edges and hole.',
         focus: 'Place the leather; keep the wood and origin fixed',
         result:
           'Known coordinates locate the artwork on the placed leather. The machine does not detect the keychain.',
@@ -99,7 +99,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
           'The artwork is engraved on the leather keychain; the locating outline remains on the wood underneath.',
       },
     ],
-    tip: 'For a batch, create a Rows × Columns grid, burn all outlines, place one blank in each, and use Auto-fit + copy artwork to all. Each of the two output jobs needs its own completed Frame.',
+    tip: 'For a batch, create a Rows × Columns grid, burn all outlines, place one blank in each, and use Centre + copy artwork to all. Each of the two output jobs needs its own completed Frame.',
     keywords: [
       'registration',
       'jig',

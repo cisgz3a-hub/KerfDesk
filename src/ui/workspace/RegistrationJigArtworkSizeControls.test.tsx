@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { IDENTITY_TRANSFORM, isRegistrationBox, transformedBBox } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from '../state';
-import { RegistrationJigArtworkSizeControls } from './RegistrationJigArtworkSizeControls';
+import {
+  RegistrationJigArtworkSizeControls,
+  RegistrationJigArtworkSizeEditor,
+} from './RegistrationJigArtworkSizeControls';
+import { applyRegistrationJigArtworkSize } from '../state/registration-jig-artwork-actions';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -76,6 +80,35 @@ describe('RegistrationJigArtworkSizeControls', () => {
     expect(bounds.maxY - bounds.minY).toBeCloseTo(15);
     act(() => useStore.getState().undo());
     expect(useStore.getState().project).toEqual(before);
+  });
+
+  it('applies shared sizing to a draft without changing the main canvas', () => {
+    const liveProject = useStore.getState().project;
+    let draftProject = liveProject;
+    act(() =>
+      root.render(
+        <RegistrationJigArtworkSizeEditor
+          scene={draftProject.scene}
+          onResize={(input) => {
+            const result = applyRegistrationJigArtworkSize(
+              { project: draftProject, undoStack: [] },
+              input,
+            );
+            if (result.state.project !== undefined) draftProject = result.state.project;
+            return result.outcome;
+          }}
+        />,
+      ),
+    );
+    setInputValue(inputByLabel('Jig artwork width'), '25');
+    clickButton('Apply size to all 2');
+    expect(useStore.getState().project).toBe(liveProject);
+    const artwork = draftProject.scene.objects.filter((object) => !isRegistrationBox(object));
+    expect(artwork).toHaveLength(2);
+    for (const object of artwork) {
+      const bounds = transformedBBox(object);
+      expect(bounds.maxX - bounds.minX).toBeCloseTo(25);
+    }
   });
 
   it('keeps the other dimension unchanged while aspect ratio is unlocked', () => {

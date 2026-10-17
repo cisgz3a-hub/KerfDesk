@@ -1,4 +1,5 @@
 import { Icon, IconButton } from '../kit';
+import './collapsible-rail.css';
 
 export const COLLAPSED_RAIL_WIDTH_PX = 48;
 
@@ -36,9 +37,10 @@ export function CollapsedRail(props: {
     <aside aria-label={props.ariaLabel} className="lf-rail" style={collapsedRailStyle}>
       <button
         type="button"
-        className="lf-btn lf-btn--ghost"
+        className="lf-btn lf-panel-expand-hint"
         style={expandButtonStyle}
         aria-label={label}
+        aria-expanded={false}
         title={label}
         onClick={props.onExpand}
       >
@@ -66,14 +68,16 @@ const headingStyle: React.CSSProperties = {
 };
 const collapsedRailStyle: React.CSSProperties = {
   width: COLLAPSED_RAIL_WIDTH_PX,
+  height: '100%',
   flexShrink: 0,
-  padding: 4,
+  padding: 0,
   boxSizing: 'border-box',
   overflow: 'hidden',
 };
 const expandButtonStyle: React.CSSProperties = {
-  width: 32,
+  width: '100%',
   height: '100%',
+  borderRadius: 0,
   padding: '8px 0',
   display: 'flex',
   flexDirection: 'column',

@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "6abbe396c9176514389ea1114acbaa7cae534d01",
+  "sinceSourceSha": "cbc7a91fa00452f0b171172307ac3fe5e5d8457b",
   "highlights": [
-    "Machine, Placement and Console use compact controls. Clearer power settings and menus leave more canvas space. Design Studio moves to the main toolbar, and Fit adjusts the active 2D or 3D view.",
-    "Preview board fits and margins before placing artwork. Jig grid edits keep linked artwork aligned and offer keep/remove choices. Registration Jig and Place Board now follow the Pro tool prompt.",
-    "Connect grblHAL over TCP from Windows desktop Machine details. Retries retain the chosen connection. Abort, Disconnect and Forget handle queued commands and permissions more reliably; reconnecting never resumes a job automatically.",
-    "Dense artwork uses less repeated drawing work while navigating large canvases. Save and trace preparation receive priority, and node edits preserve inner contours.",
-    "Create relative-Z Focus Tests through the normal Frame and Start flow. Tool fixes improve Tangent Circle, Warp, tab preservation, calibration labels, image exports and batch-trace cancellation.",
-    "MCP canvas editing adds group selection, selection boxes, Select all and Deselect, with improved cancellation and desktop synchronisation. Fixes also improve multi-selection rotation, numbering and keyboard editing."
+    "Registration Jig now opens its own editor page with a canvas fitted to the jig. Edit outlines and artwork there, then Save to canvas; the main canvas keeps a compact Edit jig, Outline only and Artwork only bar.",
+    "In the jig editor, add text with your existing fonts, import artwork, or upload an image and trace it directly. Imported and traced artwork fits inside the jig outline, with Line or Fill settings for each piece.",
+    "After a complete outline burn, the jig switches to Artwork only and reminds you to place the piece and focus on its top surface. Job Review shows the burn order and the artwork focus reminder.",
+    "Collapsed Artwork and Machine panels now pulse in the orange accent, so a closed panel is easy to find and reopen.",
+    "New Centre & LED controls under the laser jog buttons move to the centre of the design and switch a configured pointer light on, with a separate LED off action.",
+    "Jobs complete more reliably when Pause races the final controller replies, and the canvas no longer shows an unsolicited selection popup."
   ]
 }

@@ -15,24 +15,43 @@ export type RegistrationOutputActions = {
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
+export type RegistrationOutputState = Pick<
+  AppState,
+  'project' | 'registrationArtworkOutputSnapshot' | 'undoStack'
+>;
+
+export type RegistrationOutputResult = RegistrationOutputState &
+  Partial<Pick<AppState, 'redoStack' | 'dirty'>>;
+
 export function registrationOutputActions(set: Setter): RegistrationOutputActions {
   return {
     setRegistrationOutput: (scope) => set((state) => applyRegistrationOutput(state, scope)),
   };
 }
 
-function applyRegistrationOutput(
-  state: AppState,
+export function applyRegistrationOutput(
+  state: RegistrationOutputState,
   scope: RegistrationOutputScope,
-): AppState | Partial<AppState> {
+): RegistrationOutputResult {
+  if (!state.project.scene.layers.some((layer) => layer.id === REGISTRATION_LAYER_ID)) return state;
+  const existingSnapshot =
+    state.registrationArtworkOutputSnapshot ?? state.project.registrationArtworkOutputSnapshot;
   const snapshot =
     scope === 'box'
-      ? captureArtworkOutputSnapshot(state.project.scene)
-      : (state.registrationArtworkOutputSnapshot ?? enableAllArtworkSnapshot(state.project.scene));
-  const scene = applyRegistrationOutputToScene(state.project.scene, scope, snapshot ?? undefined);
-  if (scene === state.project.scene) return state;
+      ? (existingSnapshot ?? captureArtworkOutputSnapshot(state.project.scene))
+      : (existingSnapshot ?? enableAllArtworkSnapshot(state.project.scene));
+  const scene = applyRegistrationOutputToScene(state.project.scene, scope, snapshot);
+  const persistedSnapshot = scope === 'box' ? snapshot : undefined;
+  if (
+    scene === state.project.scene &&
+    state.project.registrationArtworkOutputSnapshot === persistedSnapshot
+  )
+    return state;
+  const project = { ...state.project, scene };
+  if (persistedSnapshot === undefined) delete project.registrationArtworkOutputSnapshot;
+  else project.registrationArtworkOutputSnapshot = persistedSnapshot;
   return {
-    project: { ...state.project, scene },
+    project,
     registrationArtworkOutputSnapshot: scope === 'box' ? snapshot : null,
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
