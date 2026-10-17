@@ -5,7 +5,7 @@
 // folder can be wherever a project was double-clicked, such as Downloads.
 // An app opened from the Finder or the Dock gets macOS's short default PATH,
 // which leaves out Homebrew and MacPorts, so on a Mac their fixed folders are
-// searched after PATH (ADR-606).
+// searched after PATH (ADR-607).
 
 import { statSync } from 'node:fs';
 import * as path from 'node:path';

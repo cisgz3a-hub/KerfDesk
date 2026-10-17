@@ -1709,7 +1709,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 3. Chrome keeps a port grant across restarts on Windows, and on macOS and Linux only for adapters
    that report a USB serial number; a CH340 there needs one Connect after each replug or browser
    restart. The desktop app remembers picks the same way on Windows (ADR-552) and on macOS and
-   Linux (ADR-606): an adapter with a USB serial number is remembered there, and a CH340 without
+   Linux (ADR-607): an adapter with a USB serial number is remembered there, and a CH340 without
    one is granted for the run only (ADR-366), so after a restart its first Connect shows the
    picker.
 4. Turning it off in the **⋯** menu is remembered in this browser.

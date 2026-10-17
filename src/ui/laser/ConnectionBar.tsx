@@ -48,7 +48,7 @@ export type ConnectionBarProps = {
   /** Chosen ports last only until KerfDesk closes (ADR-366). */
   readonly portChoiceEndsOnRestart?: boolean;
   /** Only an adapter with a USB serial number is remembered across restarts: macOS and Linux,
-   * in Chrome and the desktop app (ADR-606). */
+   * in Chrome and the desktop app (ADR-607). */
   readonly portMemoryNeedsSerialNumber?: boolean;
   /** The toolbar label; the full machine profile stays in the details popover. */
   readonly machineName?: string;
@@ -299,7 +299,7 @@ export function connectionStatusLabel(connection: ConnectionState): string {
 // Chromium's open() failure names no cause; the usual one is another program
 // (LightBurn, a serial monitor, another KerfDesk tab) holding the port. Linux
 // opens a serial port only for members of its serial group (dialout on Debian,
-// Ubuntu and Fedora; uucp on Arch), and that refusal looks the same (ADR-606).
+// Ubuntu and Fedora; uucp on Arch), and that refusal looks the same (ADR-607).
 export function connectionFailureText(
   error: string,
   machineNoun: string,
