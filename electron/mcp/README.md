@@ -184,7 +184,7 @@ fence later dispatch; a job already handed to the ordinary streamer retains its
 normal run lifecycle. Network Abort requires a working connection and is not a
 physical emergency stop.
 
-The dependency pins are SDK server/client 2.2.0 and Zod 4.4.3. The optional
+The dependency pins are SDK server/client 2.3.1 and Zod 4.6.7. The optional
 OpenAI extensions package is omitted because its current SDK v1 peer contract
 does not match these SDK v2 packages. No OpenAI API key or API call is required
 by this implementation. Clients and remote connectivity have their own setup
