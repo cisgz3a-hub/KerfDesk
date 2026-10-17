@@ -8,6 +8,7 @@ import {
   readSerialPortGrants,
   SerialPortGrants,
   serialPortGrantsWriter,
+  serialPortIdentity,
 } from './serial-port-grants.js';
 
 // Electron's two shapes of one port on Windows: the SerialPort object of the
@@ -116,6 +117,59 @@ describe('SerialPortGrants', () => {
     expect(grants.preferredIndex([other, laserPort])).toBe(1);
     expect(grants.preferredIndex([other])).toBe(0);
     expect(grants.preferredIndex([])).toBe(0);
+  });
+});
+
+describe('serial port identity on macOS and Linux (ADR-606)', () => {
+  const mac = serialPortIdentity('darwin');
+  const linux = serialPortIdentity('linux');
+  const ftdi = {
+    vendorId: '1027',
+    productId: '24577',
+    serialNumber: 'A10KJ3QZ',
+    usbDriverName: 'AppleUSBFTDI',
+  };
+  const ftdiStored = {
+    vendor_id: 1027,
+    product_id: 24577,
+    serial_number: 'A10KJ3QZ',
+    usb_driver: 'AppleUSBFTDI',
+  };
+
+  it('names a port the same way in both of its Electron forms', () => {
+    expect(mac?.fromPort(ftdi)).not.toBeNull();
+    expect(mac?.fromPort(ftdi)).toBe(mac?.fromStored(ftdiStored));
+    expect(linux?.fromPort(ftdi)).toBe(linux?.fromStored(ftdiStored));
+    // Linux has no driver name, so the two systems store different ids.
+    expect(linux?.fromPort(ftdi)).not.toBe(mac?.fromPort(ftdi));
+  });
+
+  it('remembers nothing for an adapter Electron cannot remember either', () => {
+    const ch340 = { vendorId: '6790', productId: '29987', portName: 'ttyUSB0' };
+    expect(linux?.fromPort(ch340)).toBeNull();
+    expect(mac?.fromPort({ ...ftdi, usbDriverName: undefined })).toBeNull();
+    for (const bad of [
+      { ...ftdi, vendorId: '0x0403' },
+      { ...ftdi, vendorId: '65536' },
+      { ...ftdi, productId: '' },
+      { ...ftdi, serialNumber: 'S'.repeat(600) },
+    ]) {
+      expect(linux?.fromPort(bad)).toBeNull();
+    }
+    expect(linux?.fromStored({ ...ftdiStored, vendor_id: '1027' })).toBeNull();
+    expect(linux?.fromStored({ ...ftdiStored, product_id: 1.5 })).toBeNull();
+  });
+
+  it('keeps serial numbers exact, as Electron compares them', () => {
+    const grants = new SerialPortGrants([], vi.fn(), linux ?? undefined);
+    grants.recordPick(ftdi, 1);
+    expect(grants.allows(ftdiStored)).toBe(true);
+    expect(grants.allows({ ...ftdiStored, serial_number: 'a10kj3qz' })).toBe(false);
+  });
+
+  it('remembers ports only where Electron does', () => {
+    expect(serialPortIdentity('win32')).not.toBeNull();
+    expect(serialPortIdentity('freebsd')).toBeNull();
   });
 });
 

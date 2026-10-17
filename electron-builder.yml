@@ -93,13 +93,47 @@ fileAssociations:
   - ext: lf2
     name: KerfDesk.Project
     description: KerfDesk project
+    # Linux only: the shared-mime-info type the desktop entry opens (ADR-606).
+    mimeType: application/x-kerfdesk-project
 
-# This stable Windows config keeps macOS / Linux targets absent. ADR-248 governs
-# the future Mac Preview config/workflow; Linux remains out of scope.
-# mac:
-#   target: dmg
-# linux:
-#   target: AppImage
+# Linux desktop (ADR-606): an AppImage that runs on most distributions without
+# installing, and a .deb for Debian and Ubuntu, both x64. electron-builder's
+# .deb scripts set up the Chromium sandbox and, on Ubuntu 24.04 and newer, the
+# AppArmor profile it needs. The desktop entry claims the .lf2 MIME type so a
+# double-clicked project opens in KerfDesk, and desktopName in package.json
+# keeps the running window grouped with that entry.
+linux:
+  executableName: kerfdesk
+  packageName: kerfdesk
+  icon: public/app-icon-512x512.png
+  category: Graphics
+  synopsis: CAM for GRBL laser cutters, engravers and CNC routers
+  description: KerfDesk prepares artwork, previews toolpaths, writes G-code and runs GRBL laser cutters, engravers and CNC routers.
+  maintainer: Johann Stolk <support@kerfdesk.com>
+  vendor: Johann Stolk
+  syncDesktopName: true
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  artifactName: KerfDesk-${version}-linux-${arch}.${ext}
+
+deb:
+  packageCategory: graphics
+  priority: optional
+
+# electron-builder's AppImage desktop entry always adds --no-sandbox. Leave it
+# out: its AppRun already drops Chromium's sandbox only where the system blocks
+# the user namespaces it needs (Ubuntu 24.04 and newer), and keeps it elsewhere.
+appImage:
+  executableArgs: []
+
+# This stable config has no macOS target: the Mac builds are the unsigned
+# Preview (electron-builder.preview.yml, ADR-248) until a Developer ID and
+# notarization exist. The Linux block above packages the same app (ADR-606).
 
 # Self-hosted generic update feed on Cloudflare R2 (ADR-024). Configuring a
 # `publish` block makes electron-builder emit `latest.yml` + `.blockmap`;

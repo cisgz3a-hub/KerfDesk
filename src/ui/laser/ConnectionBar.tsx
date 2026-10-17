@@ -17,6 +17,7 @@ import { useId, useState, type ReactNode } from 'react';
 import { assertNever } from '../../core/scene';
 import { Icon } from '../kit/icons';
 import { AnchoredPopover, movePopoverFocus } from '../common/AnchoredPopover';
+import { isLinuxDesktop } from '../common/operating-system';
 import type { ControllerQualification } from '../state/laser-controller-qualification';
 import type { ConnectionState } from '../state/laser-store';
 import { CompactConnectionControls } from './CompactConnectionControls';
@@ -156,8 +157,8 @@ function connectTitle(props: Props): string {
     : `Connect to your ${props.machineNoun} controller on the USB port it used last time. The first time, choose its port.`;
 }
 
-// Desktop picks on macOS and Linux last until KerfDesk closes (ADR-366), so the
-// app there reconnects by itself only when the machine is plugged back in.
+// Where picks last until KerfDesk closes (ADR-366), the app reconnects by
+// itself only when the machine is plugged back in.
 function autoConnectTitle(props: Props): string {
   return props.portChoiceEndsOnRestart === true
     ? `Connect by itself when the ${props.machineNoun} is plugged back in, to the port chosen since KerfDesk started. After each start, choose the port once with Connect. Connecting only reads settings; nothing moves.`
@@ -286,13 +287,23 @@ export function connectionStatusLabel(connection: ConnectionState): string {
 }
 
 // Chromium's open() failure names no cause; the usual one is another program
-// (LightBurn, a serial monitor, another KerfDesk tab) holding the port.
-export function connectionFailureText(error: string, machineNoun: string): string {
+// (LightBurn, a serial monitor, another KerfDesk tab) holding the port. Linux
+// opens a serial port only for members of its serial group (dialout on Debian,
+// Ubuntu and Fedora; uucp on Arch), and that refusal looks the same (ADR-606).
+export function connectionFailureText(
+  error: string,
+  machineNoun: string,
+  linux: boolean = isLinuxDesktop(),
+): string {
   if (/failed to open serial port/i.test(error)) {
-    return `The port is busy or unavailable. Close any other program using the ${machineNoun} (another sender, a serial monitor, another KerfDesk window), then Connect again.`;
+    const busy = `The port is busy or unavailable. Close any other program using the ${machineNoun} (another sender, a serial monitor, another KerfDesk window), then Connect again.`;
+    return linux ? `${busy} ${LINUX_SERIAL_ACCESS}` : busy;
   }
   return error;
 }
+
+const LINUX_SERIAL_ACCESS =
+  'On Linux your account also needs serial access: run sudo usermod -aG dialout $USER (on Arch, uucp instead of dialout), then log out and back in.';
 
 function StatusDot({ connection }: { readonly connection: ConnectionState }): JSX.Element {
   const color = connectionStatusColor(connection);

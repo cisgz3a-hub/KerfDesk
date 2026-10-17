@@ -73,6 +73,31 @@ describe('projectPathsFromArgv', () => {
     expect(paths.filter((file) => file === '/p/0.lf2')).toHaveLength(1);
   });
 
+  it('takes the file:// link a Linux file manager passes for a double-clicked project (ADR-606)', () => {
+    const argv = [
+      '/opt/KerfDesk/kerfdesk',
+      'file:///home/maker/Laser%20jobs/sign.lf2',
+      'file://localhost/home/maker/box.lbrn2',
+    ];
+    expect(
+      projectPathsFromArgv(argv, { defaultApp: false, workingDirectory: '/', pathApi: posix }),
+    ).toEqual(['/home/maker/Laser jobs/sign.lf2', '/home/maker/box.lbrn2']);
+  });
+
+  it('refuses file:// links that name another host or hide a slash or NUL', () => {
+    const argv = [
+      'kerfdesk',
+      'file://server/share/job.lf2',
+      'file:///home/maker/a%2F..%2Fjob.lf2',
+      'file:///tmp/a%00.lf2',
+      'file:///tmp/job.lf2?x=1',
+      'file:///tmp/notes.txt',
+    ];
+    expect(
+      projectPathsFromArgv(argv, { defaultApp: false, workingDirectory: '/', pathApi: posix }),
+    ).toEqual([]);
+  });
+
   it('refuses arguments carrying a NUL byte', () => {
     expect(
       projectPathsFromArgv(['kerfdesk', '/tmp/a\0.lf2'], {

@@ -362,8 +362,8 @@ export type SerialAdapter = {
   // grantedPorts(); it never opens a port by itself.
   readonly onGrantedPortsChange?: (handler: () => void) => () => void;
   // True where a pick lasts only until the app closes, so every start begins
-  // with no granted port: the desktop app on macOS and Linux (ADR-366). Chrome
-  // and the Windows desktop app remember picks (ADR-420, ADR-552).
+  // with no granted port (ADR-366). Chrome and the desktop app on Windows,
+  // macOS and Linux remember picks (ADR-420, ADR-552, ADR-606).
   readonly picksEndOnRestart?: boolean;
 };
 

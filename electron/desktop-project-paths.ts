@@ -1,6 +1,6 @@
 // Project files the operating system hands to KerfDesk (ADR-378): a project
-// double-clicked in Explorer or Finder, dropped on the app icon, or named on
-// the command line. Main reads only paths that arrived this way, and checks
+// double-clicked in Explorer, Finder or a Linux file manager, dropped on the
+// app icon, or named on the command line. Main reads only paths that arrived this way, and checks
 // each one again before every read: an absolute, canonical path to a regular
 // file with a project extension.
 
@@ -39,7 +39,8 @@ export function projectPathsFromArgv(
 ): string[] {
   const pathApi = options.pathApi ?? path;
   const paths: string[] = [];
-  for (const arg of argv.slice(options.defaultApp ? 2 : 1)) {
+  for (const launchArgument of argv.slice(options.defaultApp ? 2 : 1)) {
+    const arg = localFileArgument(launchArgument, pathApi);
     if (!isProjectArgument(arg, pathApi)) continue;
     const resolved = pathApi.resolve(options.workingDirectory, arg);
     if (!paths.includes(resolved)) paths.push(resolved);
@@ -76,6 +77,21 @@ export function isCanonicalPath(candidate: string, pathApi: PathApi = path): boo
   if (pathApi.resolve(candidate) !== candidate) return false;
   if (pathApi.sep !== '\\') return true;
   return !candidate.slice(pathApi.parse(candidate).root.length).includes(':');
+}
+
+// A Linux desktop entry's %U hands a double-clicked file over as a file:// URL
+// (ADR-606). Only a local one becomes a path: no host but localhost, and no
+// encoded slash or NUL that would change which file the path names.
+function localFileArgument(arg: string, pathApi: PathApi): string {
+  if (pathApi.sep !== '/' || !/^file:\/\//i.test(arg)) return arg;
+  try {
+    const url = new URL(arg);
+    if (url.protocol !== 'file:' || !['', 'localhost'].includes(url.hostname)) return '';
+    if (url.search !== '' || url.hash !== '' || /%(?:2f|00)/i.test(url.pathname)) return '';
+    return decodeURIComponent(url.pathname);
+  } catch {
+    return '';
+  }
 }
 
 function isProjectArgument(arg: string, pathApi: PathApi): boolean {

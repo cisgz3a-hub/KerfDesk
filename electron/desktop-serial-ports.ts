@@ -1,9 +1,11 @@
 // Serial access for the desktop session. Every platform gets the Select dialog
 // (desktop-serial-chooser.ts), and only the picked port is granted (ADR-366).
-// On Windows main also remembers the picks across restarts (ADR-552), as
-// Chrome does: a device permission handler grants the trusted page exactly the
-// ports picked there and not forgotten, and nothing else. Elsewhere there is
-// no handler, so Electron keeps each pick for the run.
+// On Windows, macOS and Linux main also remembers the picks across restarts
+// (ADR-552, ADR-606), as Chrome does: a device permission handler grants the
+// trusted page exactly the ports picked there and not forgotten, and nothing
+// else. Electron keeps a pick it cannot remember (on macOS and Linux, an
+// adapter with no serial number) for the run, and any other system has no
+// handler at all.
 
 import { join } from 'node:path';
 import type {
@@ -19,6 +21,8 @@ import {
   SERIAL_PORT_GRANTS_FILE,
   SerialPortGrants,
   serialPortGrantsWriter,
+  serialPortIdentity,
+  type SerialPortIdentity,
 } from './serial-port-grants.js';
 import { isTrustedRendererOrigin } from './trusted-renderer-policy.js';
 
@@ -51,16 +55,24 @@ export function installDesktopSerialPorts(
   ses: SerialSession,
   options: DesktopSerialPortOptions,
 ): void {
-  const memory =
-    (options.platform ?? process.platform) === 'win32' ? rememberPicks(ses, options) : undefined;
+  const identity = serialPortIdentity(options.platform ?? process.platform);
+  const memory = identity === null ? undefined : rememberPicks(ses, options, identity);
   ses.on('select-serial-port', (event, portList, webContents, callback) => {
     handleSelectSerialPort(event, portList, webContents, callback, memory);
   });
 }
 
-function rememberPicks(ses: SerialSession, options: DesktopSerialPortOptions): SerialPortGrants {
+function rememberPicks(
+  ses: SerialSession,
+  options: DesktopSerialPortOptions,
+  identity: SerialPortIdentity,
+): SerialPortGrants {
   const file = join(options.userDataPath, SERIAL_PORT_GRANTS_FILE);
-  const grants = new SerialPortGrants(readSerialPortGrants(file), serialPortGrantsWriter(file));
+  const grants = new SerialPortGrants(
+    readSerialPortGrants(file),
+    serialPortGrantsWriter(file),
+    identity,
+  );
   ses.setDevicePermissionHandler(
     (details) =>
       details.deviceType === 'serial' &&

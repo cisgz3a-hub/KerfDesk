@@ -6,6 +6,7 @@ import type { MachineKind } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useNudgeStore } from '../state/nudge-preferences';
 import { shortcutFamilies } from './shortcut-list';
+import { shortcutLabel } from './shortcut-label';
 
 export function ShortcutsDialog(props: {
   readonly machineKind: MachineKind;
@@ -22,7 +23,7 @@ export function ShortcutsDialog(props: {
               {entry.rows.map((row) => (
                 <div key={row.keys} style={rowStyle}>
                   <dt style={keysStyle}>
-                    <kbd style={kbdStyle}>{row.keys}</kbd>
+                    <kbd style={kbdStyle}>{shortcutLabel(row.keys)}</kbd>
                   </dt>
                   <dd style={actionStyle}>{row.action}</dd>
                 </div>
