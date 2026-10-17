@@ -83,7 +83,7 @@ export function BriefQualificationNotice(
   // Reading settings after a reset, and a read that failed while the
   // controller still answers, stay in Controller info: the machine works
   // without them. Only a controller that stopped answering announces itself
-  // (ADR-606).
+  // (ADR-607).
   if (
     props.notice.key === null ||
     props.notice.briefHidden ||

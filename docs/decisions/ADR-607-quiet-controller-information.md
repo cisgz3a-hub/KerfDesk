@@ -1,4 +1,4 @@
-## ADR-606 - Controller information stays out of the way unless the controller stops answering (2026-10-17)
+## ADR-607 - Controller information stays out of the way unless the controller stops answering (2026-10-17)
 
 **Status:** Accepted. | **Date:** 2026-10-17
 
@@ -36,7 +36,7 @@ Settings, and announces the connection only when it is lost.
 - Safety notices, Alarm banners, connection failures and Job Review warnings
   are untouched.
 
-Together with ADR-605, which stops the job-end watchdog from resetting a
+Together with ADR-606, which stops the job-end watchdog from resetting a
 controller whose last replies were lost, this removes the resets and pop-ups
 that made the controller look as if it kept needing a reconnect.
 

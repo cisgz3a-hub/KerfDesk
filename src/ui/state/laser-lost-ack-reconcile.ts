@@ -1,6 +1,6 @@
 // laser-lost-ack-reconcile — finishes a job whose last acknowledgements were
 // lost on the serial link, instead of holding it until the 90 s watchdog
-// soft-resets the controller (ADR-605).
+// soft-resets the controller (ADR-606).
 //
 // GRBL answers every line with exactly one `ok` or `error:N`, and the streamer
 // counts them in order. A reply lost to a UART line error therefore leaves the

@@ -1,5 +1,5 @@
 // A job whose last replies were lost on the serial link finishes on the
-// controller's own evidence instead of a watchdog soft reset (ADR-605).
+// controller's own evidence instead of a watchdog soft reset (ADR-606).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGrblSimulator, type GrblSimulator } from '../../__fixtures__/controllers';

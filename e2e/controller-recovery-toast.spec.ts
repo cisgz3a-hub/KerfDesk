@@ -78,7 +78,7 @@ for (const viewport of [
     await expect(toast).toHaveCount(0);
     await expect(disconnect).toBeFocused();
 
-    // Reading settings after a reset is routine: it never pops up (ADR-606).
+    // Reading settings after a reset is routine: it never pops up (ADR-607).
     for (const phase of ['controller-response', 'reset-cleanup', 'settings-read'] as const) {
       await setQualification(page, 'qualifying', phase);
       await expect(

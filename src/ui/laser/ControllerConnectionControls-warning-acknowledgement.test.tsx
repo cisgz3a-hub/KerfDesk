@@ -161,7 +161,7 @@ it.each([false, true])(
         </PlatformProvider>,
       );
     });
-    // Controller info opens from the connection menu (ADR-606).
+    // Controller info opens from the connection menu (ADR-607).
     await act(async () =>
       host?.querySelector<HTMLButtonElement>('[aria-label="More connection options"]')?.click(),
     );

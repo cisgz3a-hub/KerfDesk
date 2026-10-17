@@ -131,7 +131,7 @@ async function render(platform: PlatformAdapter): Promise<HTMLElement> {
       </PlatformProvider>,
     );
   });
-  // Recovery details are requested from the connection menu (ADR-606).
+  // Recovery details are requested from the connection menu (ADR-607).
   const options = '[aria-label="More connection options"]';
   await act(async () => host?.querySelector<HTMLButtonElement>(options)?.click());
   await act(async () => button(document.body, 'Controller info').click());

@@ -2855,7 +2855,7 @@ authorization, Frame proof, controller command, or safety boundary.
   15 s, plus the time of any G4 still in flight. A `Bf` showing unread input keeps waiting, so
   a controller holding its own program is not finished early. The ordinary post-job settle
   then confirms completion, and the log names how many replies were lost and that one may
-  have been an error (ADR-605).
+  have been an error (ADR-606).
 - After any page stall, the controller output that queued up meanwhile is handed to the app
   in slices of about 8 ms, with input, drawing and the status poll running in between,
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
@@ -3151,7 +3151,7 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    after a reset, and a read that failed while the controller still answers
    status queries, do not pop up a toolbar notice: the machine runs without
    them, as in other senders. Only a controller that has stopped answering
-   shows the brief "Controller is not responding" notice (ADR-606).
+   shows the brief "Controller is not responding" notice (ADR-607).
 4. A CNC Pause/Resume confirmation warning retains the paused job and its saved
    artifact. A later accepted Abort, actual Disconnect or controller fault
    records its own terminal cause. A reset-owned host freeze remains provisional.

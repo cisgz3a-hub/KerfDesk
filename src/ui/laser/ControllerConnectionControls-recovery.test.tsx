@@ -108,7 +108,7 @@ async function render(platform: PlatformAdapter, machineKind: 'laser' | 'cnc' = 
     );
   });
   // Controller info opens from the connection menu; a failed read on a
-  // controller that still answers does not pop up (ADR-606).
+  // controller that still answers does not pop up (ADR-607).
   await act(async () =>
     host?.querySelector<HTMLButtonElement>('[aria-label="More connection options"]')?.click(),
   );
