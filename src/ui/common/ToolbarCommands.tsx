@@ -5,6 +5,7 @@ import { commandHelpId, controlHelp } from '../help/help-topics';
 import { AnchoredPopover, movePopoverFocus } from './AnchoredPopover';
 import { ToolbarIcon } from './ToolbarIcon';
 import { toolbarGroups, useToolbarOverflow } from './use-toolbar-overflow';
+import { shortcutLabel } from './shortcut-label';
 
 export function ToolbarCommands(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -137,7 +138,7 @@ function OverflowCommand(props: {
     >
       <ToolbarIcon icon={command.id} />
       <span className="lf-toolbar-command-label">{command.label}</span>
-      {command.shortcut === undefined ? null : <kbd>{command.shortcut}</kbd>}
+      {command.shortcut === undefined ? null : <kbd>{shortcutLabel(command.shortcut)}</kbd>}
       {command.active === true ? <Icon name="check" size={15} /> : null}
     </button>
   );
@@ -197,7 +198,9 @@ function toolbarButtonClass(id: CommandId): string {
 function toolbarTitle(command: AppCommand): string {
   if (command.disabledReason !== undefined)
     return controlHelp(commandHelpId(command.id), command.disabledReason);
-  return command.shortcut === undefined ? command.title : `${command.title} (${command.shortcut})`;
+  return command.shortcut === undefined
+    ? command.title
+    : `${command.title} (${shortcutLabel(command.shortcut)})`;
 }
 
 export function ToolbarSeparator(props: { readonly className?: string } = {}): JSX.Element {

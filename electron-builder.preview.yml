@@ -91,6 +91,54 @@ fileAssociations:
   - ext: lf2
     name: KerfDesk.Project
     description: KerfDesk project
+    # Linux only: the shared-mime-info type the desktop entry opens (ADR-606).
+    mimeType: application/x-kerfdesk-project
+
+# Linux desktop (ADR-606): an AppImage that runs on most distributions without
+# installing, and a .deb for Debian and Ubuntu, both x64. electron-builder's
+# .deb scripts set up the Chromium sandbox and, on Ubuntu 24.04 and newer, the
+# AppArmor profile it needs. The desktop entry claims the .lf2 MIME type so a
+# double-clicked project opens in KerfDesk, and desktopName in package.json
+# keeps the running window grouped with that entry.
+linux:
+  executableName: kerfdesk
+  icon: public/app-icon-512x512.png
+  category: Graphics
+  synopsis: CAM for GRBL laser cutters, engravers and CNC routers
+  description: KerfDesk prepares artwork, previews toolpaths, writes G-code and runs GRBL laser cutters, engravers and CNC routers.
+  maintainer: Johann Stolk <support@kerfdesk.com>
+  vendor: Johann Stolk
+  syncDesktopName: true
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  artifactName: KerfDesk-${version}-linux-${arch}.${ext}
+  # No Linux update feed exists yet, and electron-builder would otherwise derive
+  # one from the git remote: write no updater metadata (latest-linux.yml,
+  # app-update.yml).
+  publish: null
+
+deb:
+  packageName: kerfdesk
+  packageCategory: graphics
+  priority: optional
+
+# electron-builder's AppImage desktop entry always adds --no-sandbox. Leave it
+# out: its AppRun already drops Chromium's sandbox only where the system blocks
+# the user namespaces it needs (Ubuntu 24.04 and newer), and keeps it elsewhere.
+appImage:
+  executableArgs: []
+
+# The static AppImage runtime (electron-builder 26.16.1 lists it as a beta toolset)
+# carries its own FUSE support, so the AppImage starts on Ubuntu 22.04 and newer
+# without libfuse2, which those systems no longer install. The default legacy
+# runtime needs libfuse2 and fails before KerfDesk starts (ADR-606).
+toolsets:
+  appimage: 1.0.3
 
 mac:
   appId: com.kerfdesk.app

@@ -81,7 +81,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the device',
         instruction:
-          'Choose Connect. The first time, select the controller in the serial picker; after that Connect reuses the same port, and Connect automatically in the ⋯ menu connects when KerfDesk starts and when the machine is plugged in. The desktop app on macOS or Linux asks for the port once after each start. Use a different port… in that menu always shows the picker.',
+          'Choose Connect. The first time, select the controller in the serial picker; after that Connect reuses the same port, and Connect automatically in the ⋯ menu connects when KerfDesk starts and when the machine is plugged in. On macOS and Linux, an adapter that reports no serial number (most CH340 boards) is asked for once after each start, in Chrome and in the desktop app. Use a different port… in that menu always shows the picker.',
         focus: 'Connect',
         result: 'The connection status changes and controller replies become available.',
       },
