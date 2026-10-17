@@ -229,6 +229,23 @@ describe('separate positioning light transaction', () => {
     expect(h.writes).not.toContain(`${h.mapping.onCommand}\n`);
   });
 
+  it('preserves a replacement controller operation when failure cleanup finishes', async () => {
+    const h = harness('marlin');
+    const replacement = {
+      kind: 'interactive-command' as const,
+      phase: 'command' as const,
+      label: 'New controller operation',
+    };
+    h.fail('G0 X40.000 Y45.000 F1200');
+    h.set({
+      stopJob: async () => {
+        h.set({ controllerOperation: replacement });
+      },
+    });
+    await expect(h.actions.centrePositioningLight(40, 45, 1200)).rejects.toThrow('handoff');
+    expect(h.get().controllerOperation).toBe(replacement);
+  });
+
   it('reserves motion ownership for Disconnect before any travel', async () => {
     const h = harness();
     h.hold('M5');

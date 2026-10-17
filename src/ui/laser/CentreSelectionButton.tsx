@@ -9,7 +9,11 @@ import { centreSelectionLight } from './centre-selection-light';
 import { openMachineSetup } from './device-setup/machine-setup-dialog-store';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 
-export function CentreSelectionButton({ disabled }: { readonly disabled: boolean }): JSX.Element {
+export function CentreSelectionButton({
+  disabled,
+}: {
+  readonly disabled: boolean;
+}): JSX.Element | null {
   const laserMode = useStore((state) => machineKindOf(state.project.machine) === 'laser');
   const needsSetup = useStore((state) => {
     const light = state.project.device.positioningLight;
@@ -20,9 +24,9 @@ export function CentreSelectionButton({ disabled }: { readonly disabled: boolean
   });
   const fileOnly = useStore((state) => state.project.device.controllerKind === 'ruida');
   const lightEnabled = useLaserStore((state) => state.positioningLightEnabled);
-  const off = useLaserStore((state) => state.setPositioningLightEnabled);
   const machineBlocked = useLaserStore((state) => headMoveBlockMessage(state));
   const blocked = useCentreBlockMessage(fileOnly, needsSetup, disabled, machineBlocked);
+  if (!laserMode && !lightEnabled) return null;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
       {laserMode ? (
@@ -46,6 +50,7 @@ export function CentreSelectionButton({ disabled }: { readonly disabled: boolean
         <button
           type="button"
           className="lf-btn"
+          title="Open Machine Setup to configure the separate positioning light and its offset."
           onClick={() =>
             openMachineSetup({ kind: 'step', step: 'options', highlight: 'positioning-light' })
           }
@@ -53,24 +58,36 @@ export function CentreSelectionButton({ disabled }: { readonly disabled: boolean
           Set up LED
         </button>
       ) : null}
-      {lightEnabled || (laserMode && !needsSetup && !fileOnly) ? (
-        <button
-          type="button"
-          className="lf-btn"
-          aria-label="LED off"
-          title={
-            machineBlocked ??
-            'Switch off the separate positioning light. Its physical state is not reported by the controller.'
-          }
-          disabled={machineBlocked !== null}
-          onClick={() => {
-            void off(false).catch(controllerActionFailureHandler('LED off'));
-          }}
-        >
-          LED off
-        </button>
-      ) : null}
+      <PositioningLightOffButton configured={laserMode && !needsSetup && !fileOnly} />
     </div>
+  );
+}
+
+function PositioningLightOffButton({
+  configured,
+}: {
+  readonly configured: boolean;
+}): JSX.Element | null {
+  const lightEnabled = useLaserStore((state) => state.positioningLightEnabled);
+  const off = useLaserStore((state) => state.setPositioningLightEnabled);
+  const blocked = useLaserStore((state) => headMoveBlockMessage(state));
+  if (!lightEnabled && !configured) return null;
+  return (
+    <button
+      type="button"
+      className="lf-btn"
+      aria-label="LED off"
+      title={
+        blocked ??
+        'Switch off the separate positioning light. Its physical state is not reported by the controller.'
+      }
+      disabled={blocked !== null}
+      onClick={() => {
+        void off(false).catch(controllerActionFailureHandler('LED off'));
+      }}
+    >
+      LED off
+    </button>
   );
 }
 

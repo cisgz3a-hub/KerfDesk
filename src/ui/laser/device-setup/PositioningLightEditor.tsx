@@ -28,6 +28,7 @@ export function PositioningLightEditor({
       <label>
         <input
           type="checkbox"
+          title="Enable explicit command and offset settings for a separately wired positioning light."
           checked={value !== undefined}
           onChange={(event) => onChange(event.target.checked ? EMPTY_LIGHT : undefined)}
         />{' '}
@@ -86,6 +87,7 @@ function CommandField(props: {
       {props.label}
       <input
         type="text"
+        title={`${props.label}: enter the documented command for the dedicated light output.`}
         maxLength={100}
         value={props.value}
         onChange={(event) => props.onChange(event.target.value)}
@@ -105,6 +107,7 @@ function OffsetField(props: {
       {props.axis} offset (mm)
       <input
         type="number"
+        title={`${props.axis} pointer spot minus cutting spot, in canvas bed millimetres.`}
         min={-1000}
         max={1000}
         step="any"

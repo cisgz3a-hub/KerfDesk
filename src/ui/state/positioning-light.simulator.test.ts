@@ -32,6 +32,25 @@ async function finish(operation: Promise<void>): Promise<void> {
 
 const families: ControllerKind[] = ['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware'];
 describe('positioning light through real store serial and ACK ownership', () => {
+  it('releases a failed Marlin positioning operation after its no-reset quickstop', async () => {
+    const sim = createMarlinSimulator({
+      rejectLines: [{ pattern: /^G0 /, error: 'Positioning move refused' }],
+    });
+    useStore.getState().updateDeviceProfile({
+      controllerKind: 'marlin',
+      positioningLight: { onCommand: 'M7', offCommand: 'M9', offsetXmm: 0, offsetYmm: 0 },
+    });
+    await useLaserStore.getState().connect(sim.adapter, { controllerKind: 'marlin' });
+    await vi.advanceTimersByTimeAsync(1500);
+    const operation = useLaserStore.getState().centrePositioningLight(10, 15, 1000);
+    const rejected = expect(operation).rejects.toThrow('Positioning move refused');
+    await finish(operation.catch(() => undefined));
+    await rejected;
+    expect(sim.outbound().join('')).toContain('M410\n');
+    expect(sim.outbound().join('')).not.toContain('M7\n');
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+  });
+
   it.each(families)('finishes a mapped auxiliary light exchange on %s', async (kind) => {
     const sim =
       kind === 'marlin'

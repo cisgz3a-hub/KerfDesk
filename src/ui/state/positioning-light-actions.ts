@@ -108,6 +108,12 @@ async function runPositioningLight(
       if (mayHaveMoved && !settled)
         await get()
           .stopJob()
+          .then(() => {
+            // No-reset controllers quick-stop without replacing an interactive
+            // owner. Retire ours only after Abort finishes; a newer operation
+            // or controller session must keep its own lifecycle untouched.
+            if (owns()) set({ controllerOperation: null });
+          })
           .catch(() => undefined);
       else set({ controllerOperation: null });
     }
