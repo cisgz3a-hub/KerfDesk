@@ -8,6 +8,7 @@ import {
 } from '../../core/scene';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { useToastStore } from './toast-store';
 
 const square = (x: number, y: number, size: number): Polyline => ({
   closed: true,
@@ -105,5 +106,66 @@ describe('Trim Shapes options', () => {
       { x: 20, y: 20 },
       { x: 10, y: 20 },
     ]);
+  });
+
+  it('does not auto-join a sub-path bound to another operation, even on the same artwork binding', () => {
+    // B's only path is bound to Score although B as a whole says Cut: the path binding wins.
+    const scored = art('b', square(10, 10, 20));
+    const b: ImportedSvg = {
+      ...scored,
+      paths: scored.paths.map((path) => ({ ...path, operationIds: ['score'] })),
+    };
+    const state = useStore.getState();
+    useStore.setState({
+      project: {
+        ...state.project,
+        scene: { ...state.project.scene, objects: [art('a', square(0, 0, 20)), b] },
+      },
+    });
+    const trim = useStore.getState().trimShapeAt;
+    expect(trim({ x: 20, y: 15 }, 0.5, { autoJoin: true })).toBe(true);
+    expect(trim({ x: 15, y: 10 }, 0.5, { autoJoin: true })).toBe(true);
+    const remaining = objects() as ReadonlyArray<ImportedSvg>;
+    expect(remaining.map((object) => object.id)).toEqual(['a', 'b']);
+    expect(remaining[1]?.paths[0]?.operationIds).toEqual(['score']);
+    expect(remaining.some((object) => object.paths[0]?.curves?.[0]?.closed === true)).toBe(false);
+  });
+
+  it('does not auto-join artwork whose power scale differs', () => {
+    const state = useStore.getState();
+    useStore.setState({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          objects: [
+            art('a', square(0, 0, 20)),
+            { ...art('b', square(10, 10, 20)), powerScale: 50 },
+          ],
+        },
+      },
+    });
+    const trim = useStore.getState().trimShapeAt;
+    trim({ x: 20, y: 15 }, 0.5, { autoJoin: true });
+    trim({ x: 15, y: 10 }, 0.5, { autoJoin: true });
+    expect(objects().map((object) => object.id)).toEqual(['a', 'b']);
+  });
+
+  it('warns that a kept stretch will be cut when the trimmed path is bound to the drawing layer', () => {
+    const plain = art('only', square(0, 0, 20));
+    const { operationIds: _ids, ...unbound } = plain;
+    const original: ImportedSvg = {
+      ...unbound,
+      paths: plain.paths.map((path) => ({ ...path, operationIds: ['score'] })),
+    };
+    const state = useStore.getState();
+    useStore.setState({
+      project: { ...state.project, scene: { ...state.project.scene, objects: [original] } },
+    });
+    useToastStore.setState({ toasts: [] });
+    useStore.getState().trimShapeAt({ x: 20, y: 10 }, 0.5, { keepRemoved: { color: '#ff0000' } });
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toContain(
+      'The kept segment is on the same layer as the trimmed shape, so it will be cut too.',
+    );
   });
 });

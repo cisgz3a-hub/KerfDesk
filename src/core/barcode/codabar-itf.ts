@@ -7,11 +7,10 @@
 //
 // Interleaved 2 of 5: digits in pairs, the first of each pair in the bars and
 // the second in the spaces, five elements each with two wide. An odd count
-// gets a leading zero. A GS1 mod-10 check digit is added only when asked.
+// gets a leading zero. No check digit is added: the data is encoded as typed.
 // Wide elements are three narrow modules, as for Code 39, so laser-spread
 // bars stay distinguishable.
 
-import { gs1CheckDigit } from './ean-upc';
 import { printableText, type LinearEncodeResult } from './linear-symbol';
 
 const WIDE = 3;
@@ -95,7 +94,7 @@ const ITF = [
   '01010',
 ];
 
-export function encodeItf(text: string, addCheckDigit = false): LinearEncodeResult {
+export function encodeItf(text: string): LinearEncodeResult {
   const digits = text.trim();
   if (!/^\d+$/.test(digits)) {
     return { ok: false, message: 'Interleaved 2 of 5 encodes digits only.' };
@@ -103,8 +102,7 @@ export function encodeItf(text: string, addCheckDigit = false): LinearEncodeResu
   if (digits.length > MAX_LENGTH) {
     return { ok: false, message: `Interleaved 2 of 5 is limited to ${MAX_LENGTH} digits here.` };
   }
-  const withCheck = addCheckDigit ? digits + String(gs1CheckDigit(digits)) : digits;
-  const even = withCheck.length % 2 === 0 ? withCheck : `0${withCheck}`;
+  const even = digits.length % 2 === 0 ? digits : `0${digits}`;
   let modules = '1010'; // start: narrow bar, space, bar, space
   for (let index = 0; index < even.length; index += 2) {
     const bars = ITF[Number(even[index])] ?? '';

@@ -2,7 +2,7 @@ import type { LayoutCommandId } from '../commands/layout-command-types';
 import type { CommandHelpTopic } from './command-help-topics';
 
 const DRAW_ORDER_NOTE =
-  'Only what is drawn on top changes; the order the laser cuts in stays as set in the run order.';
+  'The run order of artwork stays as set. Artwork sharing one operation is cut as one unit, and with Travel policy set to Keep source order its shapes follow the drawing order, so restacking them changes the order they are cut in.';
 
 const DOCK_TIP =
   'until its bounding box meets another object or the bed edge, keeping the docking padding. Artwork inside a frame docks past the frame. Docking Options sets the padding and grouping.';

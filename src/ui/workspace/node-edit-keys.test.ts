@@ -84,3 +84,18 @@ describe('node tool hover keys', () => {
     expect(rotation).toBeCloseTo(360 - before, 9);
   });
 });
+
+describe('node tool T key', () => {
+  it('trims with auto-join on, like a Trim tool click without Ctrl', () => {
+    const calls: unknown[] = [];
+    const app = {
+      ...useStore.getState(),
+      trimShapeAt: (...args: unknown[]) => {
+        calls.push(args[2]);
+        return true;
+      },
+    };
+    expect(handleNodeEditKey(app, 't', { x: 5, y: 0.5 }, 0.1)).toBe(true);
+    expect(calls).toEqual([{ autoJoin: true }]);
+  });
+});
