@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import { Icon } from '../kit/icons';
 import type { MachineKind } from '../../core/scene';
-import { machineDisplayName } from '../machine/machine-labels';
+import { commandFamilyLabel } from './command-family-label';
 import {
   COMMAND_FAMILY_ORDER,
   runCommand,
@@ -13,6 +13,8 @@ import { handleMenuKeyDown } from './menu-keyboard';
 import { useMenuBarState } from './use-menu-bar-state';
 import { AppMenuChrome } from './AppMenuChrome';
 import { MenuBarHistoryControls } from './MenuBarHistoryControls';
+import { CommandSearchButton } from './CommandSearchButton';
+import { CommandSearchHost } from './CommandSearchDialog';
 import { RecentProjectMenuGroup } from '../recent-projects/RecentProjectMenuGroup';
 import { MENU_GROUPS } from './app-menu-groups';
 
@@ -67,6 +69,8 @@ export function AppMenuBar(props: {
           ))}
         </nav>
         <MenuBarHistoryControls commands={props.commands} />
+        <CommandSearchButton />
+        <CommandSearchHost commands={props.commands} machineKind={props.machineKind} />
       </div>
     </AppMenuChrome>
   );
@@ -103,7 +107,7 @@ function MenuFamily(props: {
         }}
         onFocus={props.onFocus}
       >
-        {familyLabel(props.family, props.machineKind)}
+        {commandFamilyLabel(props.family, props.machineKind)}
       </summary>
       {props.open ? (
         <div role="menu" className="lf-menu" style={menuStyle} data-family-menu={props.family}>
@@ -181,27 +185,6 @@ function groupCommands(
   return [...grouped, { label: 'Other', commands: leftovers }].filter(
     (group) => group.commands.length > 0,
   );
-}
-
-function familyLabel(family: CommandFamily, machineKind: MachineKind): string {
-  switch (family) {
-    case 'file':
-      return 'File';
-    case 'edit':
-      return 'Edit';
-    case 'tools':
-      return 'Tools';
-    case 'arrange':
-      return 'Arrange';
-    case 'laser':
-      // The family KEY stays 'laser' (ADR-101 §7); only the visible label
-      // follows the machine kind.
-      return machineDisplayName(machineKind);
-    case 'window':
-      return 'Window';
-    case 'help':
-      return 'Help';
-  }
 }
 
 const menuBarStyle: React.CSSProperties = {

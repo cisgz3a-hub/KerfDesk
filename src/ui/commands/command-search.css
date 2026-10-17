@@ -1,0 +1,99 @@
+/* Command search (Ctrl+K). The shared dialog shell centres the panel; this
+   pins it near the top instead, so the list grows downwards as results
+   arrive and the box stays put while the operator types. */
+
+.lf-dialog-backdrop:has(> .lf-command-search) {
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+
+.lf-command-search {
+  width: min(560px, calc(100vw - 32px));
+  max-height: 70vh;
+  overflow: hidden;
+  gap: 8px;
+}
+
+.lf-command-search__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  font-size: var(--lf-text-lg);
+}
+
+.lf-command-search__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.lf-command-search__option {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 10px;
+  border-radius: var(--lf-radius-sm);
+  cursor: pointer;
+}
+
+.lf-command-search__option[aria-selected='true'] {
+  background: var(--lf-tint-accent);
+  color: var(--lf-accent-fg);
+}
+
+.lf-command-search__option[aria-disabled='true'] {
+  cursor: default;
+}
+
+.lf-command-search__option[aria-disabled='true'] .lf-command-search__label {
+  color: var(--lf-text-faint);
+}
+
+.lf-command-search__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lf-command-search__label {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.lf-command-search__family,
+.lf-command-search__shortcut {
+  flex-shrink: 0;
+  color: var(--lf-text-faint);
+  font-size: var(--lf-text-xs);
+}
+
+.lf-command-search__shortcut {
+  font-family: inherit;
+  padding: 0 4px;
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-sm);
+}
+
+.lf-command-search__detail {
+  overflow: hidden;
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lf-command-search__empty,
+.lf-command-search__hint {
+  margin: 0;
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.lf-command-search__hint {
+  font-size: var(--lf-text-xs);
+}
