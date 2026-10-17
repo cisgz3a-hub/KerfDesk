@@ -172,7 +172,11 @@ function requestPreparation(
     // Keep the same exact options: a queued estimate can be promoted to a
     // full Preview, satisfying both consumers with the same compile.
     rejectQueuedRequests(new PreparationSupersededError('newer-request'), key);
-    if (cancelledBurst.continuesBurst(project)) armQuietWindow();
+    if (cancelledBurst.continuesBurst(project)) {
+      // One edit, one re-arm: the next edit's own cancellation remembers again.
+      cancelledBurst.forget();
+      armQuietWindow();
+    }
   }
   if (typeof Worker === 'undefined') return null;
   const promise = new Promise<LargeJobPreparation | LargeJobEstimate>((resolve, reject) => {

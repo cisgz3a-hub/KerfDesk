@@ -278,7 +278,8 @@ describe('registration jig completion', () => {
   it('keeps Outline only and says so when no artwork is set to burn', () => {
     useStore.getState().setRegistrationOutput('artwork');
     for (const layer of useStore.getState().project.scene.layers)
-      if (layer.id !== 'registration') useStore.getState().setLayerParam(layer.id, { output: false });
+      if (layer.id !== 'registration')
+        useStore.getState().setLayerParam(layer.id, { output: false });
     useStore.getState().setRegistrationOutput('box');
     const observer = armRegistrationJigCompletion(args())!;
     observer.accept();

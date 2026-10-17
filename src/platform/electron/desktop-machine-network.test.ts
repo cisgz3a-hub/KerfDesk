@@ -147,7 +147,11 @@ it('delivers the controller lines carried by a closing read before closing', asy
     action === 'open'
       ? { sessionId: ID }
       : action === 'read'
-        ? { data: btoa('error:9\r\nALARM:1\r\n'), closed: true, error: 'Network connection closed.' }
+        ? {
+            data: btoa('error:9\r\nALARM:1\r\n'),
+            closed: true,
+            error: 'Network connection closed.',
+          }
         : {};
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   try {

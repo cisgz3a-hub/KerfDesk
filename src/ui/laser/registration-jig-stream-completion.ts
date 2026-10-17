@@ -169,7 +169,9 @@ function publishArtworkSelection(
     return;
   // No artwork operation would output (none exists, or every one is off in the
   // snapshot): switching would leave neither run selected.
-  if (registrationRunState(applyRegistrationOutput(current, 'artwork').project.scene) !== 'artwork') {
+  if (
+    registrationRunState(applyRegistrationOutput(current, 'artwork').project.scene) !== 'artwork'
+  ) {
     useToastStore
       .getState()
       .pushToast(

@@ -125,7 +125,9 @@ function isEditableTarget(e: KeyboardEvent): boolean {
 // not also commit an unfinished pen draft and swallow the activation.
 function activatesFocusedControl(target: EventTarget | null): boolean {
   if (isKeyboardActivationTarget(target)) return true;
-  return target instanceof HTMLElement && target.matches('a[href], [role^="menuitem"], [role="tab"]');
+  return (
+    target instanceof HTMLElement && target.matches('a[href], [role^="menuitem"], [role="tab"]')
+  );
 }
 
 // Ctrl+E moved to the Ellipse tool (LightBurn parity, ADR-051 B7); export

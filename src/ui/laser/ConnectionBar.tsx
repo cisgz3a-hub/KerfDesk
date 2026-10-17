@@ -65,8 +65,7 @@ export function ConnectionBar(props: Props): JSX.Element {
   const notice = useControllerNotice(props);
   // The brief notice fades after a few seconds; a failed controller check stays
   // visible on the status until it is resolved.
-  const needsRecovery =
-    connection.kind === 'connected' && props.qualification?.kind === 'failed';
+  const needsRecovery = connection.kind === 'connected' && props.qualification?.kind === 'failed';
   return (
     <section
       className="lf-connection-compact"
