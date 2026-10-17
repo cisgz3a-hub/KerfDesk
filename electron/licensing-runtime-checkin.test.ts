@@ -160,3 +160,15 @@ it('keeps a paid status when its last-seen mark cannot be saved', async () => {
   h.clock(NOW + 3_600_000);
   expect(await h.runtime.status()).toMatchObject({ state: 'ready', edition: 'pro' });
 });
+it('moves a clock mark on at each quiet check without calling the service', async () => {
+  const trial = harness({ ...saved(trialClaims()), refreshedAt: NOW / 1000 });
+  trial.clock(NOW + 30 * 60_000);
+  expect(await trial.runtime.refreshInBackground()).toMatchObject({ state: 'ready' });
+  expect(trial.fetch).not.toHaveBeenCalled();
+  expect(trial.saved()?.lastSeenAt).toBe(NOW / 1000 + 1800);
+  const paid = harness({ ...saved(), refreshedAt: NOW / 1000 });
+  paid.clock(NOW + 30 * 60_000);
+  await paid.runtime.refreshInBackground();
+  expect(paid.fetch).not.toHaveBeenCalled();
+  expect(paid.saved()?.lastSeenAt).toBe(NOW / 1000 + 1800);
+});

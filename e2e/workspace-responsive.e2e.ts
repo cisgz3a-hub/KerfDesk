@@ -83,7 +83,8 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.locator('#app-splash')).toHaveCount(0);
     const toolbar = page.getByRole('banner', { name: 'Toolbar' });
     await expect(toolbar.getByRole('button', { name: 'Open Design Studio' })).toBeVisible();
-    await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
+    // This build has Pro unlocked, so Design Studio carries no Pro badge.
+    await expect(toolbar.locator('.lf-toolbar-pro-badge')).toHaveCount(0);
     await expectCompactToolbarCanvas(page, toolbar);
     await expect(toolbar.locator('.lf-workspace-layout-select > span')).toBeVisible();
     await page.context().setOffline(true);
@@ -110,7 +111,6 @@ for (const theme of ['light', 'dark'] as const) {
           }));
           expect(size.scrollWidth).toBeLessThanOrEqual(size.width + 1);
         }
-        await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
         await expectWithinViewport(page, toolbar.getByRole('status'));
         await expectNoPageOverflow(page);
         if (wideFont && width === 640) {
@@ -187,7 +187,6 @@ async function expectCompactToolbarCanvas(page: Page, toolbar: Locator): Promise
     await expect(
       toolbar.getByRole('button', { name: 'Workspace layout' }),
     ).toHaveAccessibleDescription('Auto layout');
-    await expect(toolbar.locator('.lf-toolbar-pro-badge')).toBeVisible();
     await expectNoPageOverflow(page);
   }
   await toolbar.evaluate((element) => {
@@ -374,7 +373,7 @@ test('short dark workspace keeps Design Studio in the toolbar and machine modes 
     name: 'Open Design Studio',
     exact: true,
   });
-  await expect(designStudio).toContainText('Pro');
+  await expect(designStudio).toHaveText('Design Studio');
   await designStudio.focus();
   await expectWithinViewport(page, designStudio);
   await designStudio.click();
