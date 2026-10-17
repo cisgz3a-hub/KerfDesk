@@ -1,7 +1,10 @@
 ﻿import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ControllerKind } from '../../core/devices/device-profile';
 import { disconnectStopCommands } from './laser-store-helpers';
-import { cancelControllerLifecycleRefs } from './laser-interactive-command';
+import {
+  cancelControllerLifecycleRefs,
+  consumeControllerCommandResponse,
+} from './laser-interactive-command';
 import { positioningLightDisconnectOff } from './positioning-light-actions';
 import {
   framedRunControllerSnapshot,
