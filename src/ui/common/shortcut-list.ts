@@ -11,6 +11,7 @@
 import type { MachineKind } from '../../core/scene';
 import { machineDisplayName } from '../machine/machine-labels';
 import { DEFAULT_NUDGE_STEPS, type NudgeSteps } from '../state/nudge-preferences';
+import { shortcutLabel } from './shortcut-label';
 
 export type ShortcutRow = {
   readonly keys: string;
@@ -153,7 +154,7 @@ export function shortcutHint(
 ): string {
   return shortcutFamilies(machineKind, nudgeSteps)
     .map((entry) => {
-      const rows = entry.rows.map((row) => `${row.keys} ${row.action}`).join(' - ');
+      const rows = entry.rows.map((row) => `${shortcutLabel(row.keys)} ${row.action}`).join(' - ');
       return `${entry.family}: ${rows}`;
     })
     .join('\n');

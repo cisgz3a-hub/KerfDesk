@@ -11,6 +11,7 @@ import {
 } from './jog-control-policy';
 import { keyboardJogHint } from './jog-keyboard-map';
 import { useHoldJog } from './use-hold-jog';
+import { shortcutLabel } from '../common/shortcut-label';
 
 const DIRECTIONS: ReadonlyArray<{
   readonly direction: PhysicalJogDirection;
@@ -70,7 +71,7 @@ function JogArrowButton(
   const label = jogVectorLabel(stepVector, props.stepMm);
   // The tooltip names this arrow's keyboard keys (ADR-493); the accessible name
   // stays the wire command.
-  const hinted = `${label} (${keyboardJogHint(props.direction)})`;
+  const hinted = `${label} (${shortcutLabel(keyboardJogHint(props.direction))})`;
   const handlers = useHoldJog({
     disabled: props.disabled,
     holdEnabled: props.continuousJogSupported,

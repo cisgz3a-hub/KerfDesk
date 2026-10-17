@@ -1708,9 +1708,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    or a controller operation, and does nothing for a file-only controller.
 3. Chrome keeps a port grant across restarts on Windows, and on macOS and Linux only for adapters
    that report a USB serial number; a CH340 there needs one Connect after each replug or browser
-   restart. The Windows desktop app remembers picks the same way (ADR-552). The desktop app on
-   macOS and Linux grants a pick for the run only (ADR-366), so after a restart the first Connect
-   shows the picker.
+   restart. The desktop app remembers picks the same way on Windows (ADR-552) and on macOS and
+   Linux (ADR-606): an adapter with a USB serial number is remembered there, and a CH340 without
+   one is granted for the run only (ADR-366), so after a restart its first Connect shows the
+   picker.
 4. Turning it off in the **⋯** menu is remembered in this browser.
 
 #### Desktop Wi-Fi / Ethernet (ADR-601)
@@ -2645,15 +2646,27 @@ authorization, Frame proof, controller command, or safety boundary.
 ### F-B15a. Burn a multi-outline registration jig set (ADR-057 amendment)
 
 1. Open **Registration Jig** or **Edit jig** to enter its dedicated editor. Its own
-   canvas opens fitted to the jig, with **Fit jig** and **Fit bed** available. Draft
-   edits and Undo/Redo stay in the editor until **Save to canvas**; closing without
-   saving leaves the main canvas unchanged.
+   canvas opens fitted to the jig, with **Fit jig** and **Fit bed** available. A new
+   jig opens on **Jig layout**; an existing jig opens on **Artwork**. Draft edits and
+   Undo/Redo stay in the editor until **Save to canvas**, and the footer shows
+   **Unsaved changes** while the draft differs. Escape in a field only leaves the
+   field; otherwise Escape first clears the selection.
+   Escape with nothing selected, or **Close without saving**, closes at once when
+   nothing changed; otherwise it asks **Save jig changes?** with **Save to canvas**,
+   **Discard changes** and **Keep editing**. Discarding leaves the main canvas unchanged.
 2. In **Jig layout**, choose Rectangle or Circle, enter the outline size, then enter
-   rows, columns, and horizontal/vertical spacing. Apply the layout before saving.
-   A 1 x 5 grid creates five independently visible outlines as one fixture set.
-3. In **Artwork**, use the existing writing styles for text, import artwork, or upload
-   an image and use the existing tracers directly in the editor. Imported and traced
-   artwork fits inside the selected outline, or the first outline when none is selected.
+   rows, columns, and horizontal/vertical spacing. Apply the layout before saving;
+   until then the tab reads **Jig layout •**. A 1 x 5 grid creates five independently
+   visible outlines as one fixture set, and the canvas refits to the new grid. A jig
+   that was never saved stays centred where it was; a saved jig keeps its first
+   outline in place. Either way, a grid that would cross the bed edge is moved back
+   just far enough to stay on the bed.
+3. In **Artwork**, click **Import artwork…**, drop SVG or image files onto an outline
+   on the jig canvas, use the existing writing styles for text, or open **Trace an
+   image** and use the existing tracers directly in the editor. Imported and traced
+   artwork fits inside the outline it was dropped on, else the selected outline, else
+   the outline holding the selected artwork, else the first outline. Several files at
+   once fill consecutive outlines in grid order from there.
    **Line / Fill settings** controls the selected artwork's operation, power, speed and
    passes; Fill also exposes line interval, scan angle, fill style and cross-hatch.
    Use Line for open traced paths. These edits remain in the draft until saved.
@@ -2671,7 +2684,8 @@ authorization, Frame proof, controller command, or safety boundary.
    rotated local axes; the rotation is preserved and the shared resize remains
    available without inventing shear or asking the operator to relock AR.
 6. Click **Save to canvas** to apply the draft as one undoable edit. A new jig starts
-   in **Outline only**; editing an existing jig retains its output mode. Outlines
+   in **Outline only**; editing an existing jig retains its output mode. Saving an
+   existing jig with no edits just closes the editor, adding no undo step. Outlines
    lock on the main canvas. The compact bar keeps **Edit jig**, **Outline only** and
    **Artwork only** available without covering the canvas.
 7. With **Outline only**, every registration outline is enabled and every artwork
@@ -2701,6 +2715,9 @@ authorization, Frame proof, controller command, or safety boundary.
 1. A 1 x 1 grid preserves the original single-jig workflow and button wording.
 2. **Remove all outlines** deletes the complete set and its reserved operation.
 3. Outlines remain editable in the dedicated editor and lock when saved to the main canvas.
+   With **Artwork only** selected the outlines may already be burned, so the editor
+   opens them locked. **Unlock outlines** in **Jig layout** makes them movable again
+   as an undoable draft edit.
 4. A captured-board outline remains owned by **Place Board** and is not replaced
    from Registration Jig; the existing provenance explanation remains in the panel.
 5. Repeating **Centre + copy artwork to all N** replaces the generated copies

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  findRegistrationBoxBounds,
   findRegistrationBoxes,
   IDENTITY_TRANSFORM,
   primaryOperationForObject,
@@ -14,10 +15,13 @@ import {
   centerJigArtwork,
   commitJigEditorSession,
   createJigEditorSession,
+  jigDraftDirty,
+  jigOutlinesLocked,
   removeJigLayout,
   replaceJigLayout,
   selectJigObjects,
   undoJigDraft,
+  unlockJigOutlines,
   type JigEditorSession,
 } from './jig-editor-session';
 
@@ -119,6 +123,32 @@ describe('registration jig editor session', () => {
       true,
     );
     expect(findRegistrationBoxes(saved.project.scene).every((box) => box.locked)).toBe(true);
+  });
+
+  it('opens burned outlines locked and unlocks them only as an undoable edit', () => {
+    const initial = useStore.getState();
+    const saved = commit(initial, createJigEditorSession(initial));
+    const artworkState = { ...saved, ...applyRegistrationOutput(saved, 'artwork') };
+    const reopened = createJigEditorSession(artworkState);
+
+    expect(jigOutlinesLocked(reopened.draft.project)).toBe(true);
+    expect(jigDraftDirty(reopened)).toBe(false);
+    const unlocked = unlockJigOutlines(reopened);
+    expect(jigOutlinesLocked(unlocked.draft.project)).toBe(false);
+    expect(jigDraftDirty(unlocked)).toBe(true);
+    expect(unlockJigOutlines(unlocked)).toBe(unlocked);
+    expect(jigOutlinesLocked(undoJigDraft(unlocked).draft.project)).toBe(true);
+    expect(jigOutlinesLocked(createJigEditorSession(saved).draft.project)).toBe(false);
+  });
+
+  it('keeps a new jig centred on the bed when its grid grows', () => {
+    const state = useStore.getState();
+    const { bedWidth, bedHeight } = state.project.device;
+    const session = replaceJigLayout(createJigEditorSession(state), { ...GRID, columns: 6 });
+    const bounds = findRegistrationBoxBounds(session.draft.project.scene)!;
+
+    expect((bounds.minX + bounds.maxX) / 2).toBeCloseTo(bedWidth / 2);
+    expect((bounds.minY + bounds.maxY) / 2).toBeCloseTo(bedHeight / 2);
   });
 
   it('retains Artwork only when an existing jig is reopened and saved', () => {

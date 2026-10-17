@@ -17,12 +17,28 @@ import {
   type JigEditorSession,
 } from './jig-editor-session';
 
-export function importJigArtwork(session: JigEditorSession, object: SceneObject): JigEditorSession {
+/** Which outline an import fits into: the anchor outline (by selection), then
+ *  one outline further along for each later file in the same batch. */
+export type JigImportPlacement = {
+  readonly anchorIds: ReadonlySet<string>;
+  readonly batchIndex: number;
+};
+
+export function importJigArtwork(
+  session: JigEditorSession,
+  object: SceneObject,
+  placement: JigImportPlacement = { anchorIds: selectedJigIds(session.draft), batchIndex: 0 },
+): JigEditorSession {
   let draft: JigDraft = {
     ...session.draft,
     ...applyFreshImport({ ...session.draft, undoStack: [] }, object, 0),
   };
-  const fitted = fitJigArtwork(object, session.draft.project.scene, selectedJigIds(session.draft));
+  const fitted = fitJigArtwork(
+    object,
+    session.draft.project.scene,
+    placement.anchorIds,
+    placement.batchIndex,
+  );
   if (fitted !== object) {
     draft = {
       ...draft,

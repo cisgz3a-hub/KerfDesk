@@ -17,6 +17,7 @@ import { CommandSearchButton } from './CommandSearchButton';
 import { CommandSearchHost } from './CommandSearchDialog';
 import { RecentProjectMenuGroup } from '../recent-projects/RecentProjectMenuGroup';
 import { MENU_GROUPS } from './app-menu-groups';
+import { shortcutLabel } from '../common/shortcut-label';
 
 export function AppMenuBar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -162,7 +163,7 @@ function MenuItem(props: {
       </span>
       <span style={menuLabelStyle}>{command.label}</span>
       {command.shortcut !== undefined ? (
-        <span style={shortcutStyle}>{command.shortcut}</span>
+        <span style={shortcutStyle}>{shortcutLabel(command.shortcut)}</span>
       ) : null}
     </button>
   );

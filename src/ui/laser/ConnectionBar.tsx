@@ -17,6 +17,7 @@ import { useId, useState, type ReactNode } from 'react';
 import { assertNever } from '../../core/scene';
 import { Icon } from '../kit/icons';
 import { AnchoredPopover, movePopoverFocus } from '../common/AnchoredPopover';
+import { isLinuxDesktop } from '../common/operating-system';
 import type { ControllerQualification } from '../state/laser-controller-qualification';
 import type { ConnectionState } from '../state/laser-store';
 import { CompactConnectionControls } from './CompactConnectionControls';
@@ -44,8 +45,11 @@ export type ConnectionBarProps = {
   readonly onChoosePort?: () => void;
   readonly autoConnect?: boolean;
   readonly onAutoConnectChange?: (enabled: boolean) => void;
-  /** The desktop app on macOS and Linux forgets its chosen ports when it closes (ADR-366). */
+  /** Chosen ports last only until KerfDesk closes (ADR-366). */
   readonly portChoiceEndsOnRestart?: boolean;
+  /** Only an adapter with a USB serial number is remembered across restarts: macOS and Linux,
+   * in Chrome and the desktop app (ADR-606). */
+  readonly portMemoryNeedsSerialNumber?: boolean;
   /** The toolbar label; the full machine profile stays in the details popover. */
   readonly machineName?: string;
   /** Additional machine details, such as the fitted laser module. */
@@ -151,17 +155,24 @@ function connectButton(props: Props, label: string, disabled: boolean): JSX.Elem
 }
 
 function connectTitle(props: Props): string {
-  return props.portChoiceEndsOnRestart === true
-    ? `Connect to your ${props.machineNoun} controller. Choose its USB port the first time after KerfDesk starts; until KerfDesk closes, Connect uses that port.`
-    : `Connect to your ${props.machineNoun} controller on the USB port it used last time. The first time, choose its port.`;
+  if (props.portChoiceEndsOnRestart === true)
+    return `Connect to your ${props.machineNoun} controller. Choose its USB port the first time after KerfDesk starts; until KerfDesk closes, Connect uses that port.`;
+  const remembered = `Connect to your ${props.machineNoun} controller on the USB port it used last time. The first time, choose its port.`;
+  return props.portMemoryNeedsSerialNumber === true
+    ? `${remembered} An adapter that reports no USB serial number (most CH340 boards) is chosen again after each start.`
+    : remembered;
 }
 
-// Desktop picks on macOS and Linux last until KerfDesk closes (ADR-366), so the
-// app there reconnects by itself only when the machine is plugged back in.
+// Where picks last until KerfDesk closes (ADR-366), the app reconnects by
+// itself only when the machine is plugged back in.
 function autoConnectTitle(props: Props): string {
-  return props.portChoiceEndsOnRestart === true
-    ? `Connect by itself when the ${props.machineNoun} is plugged back in, to the port chosen since KerfDesk started. After each start, choose the port once with Connect. Connecting only reads settings; nothing moves.`
-    : `Connect by itself when KerfDesk starts or the ${props.machineNoun} is plugged in, to the port it used last time. Connecting only reads settings; nothing moves.`;
+  if (props.portChoiceEndsOnRestart === true)
+    return `Connect by itself when the ${props.machineNoun} is plugged back in, to the port chosen since KerfDesk started. After each start, choose the port once with Connect. Connecting only reads settings; nothing moves.`;
+  const caveat =
+    props.portMemoryNeedsSerialNumber === true
+      ? ' An adapter with no USB serial number (most CH340 boards) connects by itself only after it is chosen once since KerfDesk started.'
+      : '';
+  return `Connect by itself when KerfDesk starts or the ${props.machineNoun} is plugged in, to the port it used last time.${caveat} Connecting only reads settings; nothing moves.`;
 }
 
 function ConnectionMenu(props: Props & { readonly notice: ControllerNotice }): JSX.Element {
@@ -286,13 +297,23 @@ export function connectionStatusLabel(connection: ConnectionState): string {
 }
 
 // Chromium's open() failure names no cause; the usual one is another program
-// (LightBurn, a serial monitor, another KerfDesk tab) holding the port.
-export function connectionFailureText(error: string, machineNoun: string): string {
+// (LightBurn, a serial monitor, another KerfDesk tab) holding the port. Linux
+// opens a serial port only for members of its serial group (dialout on Debian,
+// Ubuntu and Fedora; uucp on Arch), and that refusal looks the same (ADR-606).
+export function connectionFailureText(
+  error: string,
+  machineNoun: string,
+  linux: boolean = isLinuxDesktop(),
+): string {
   if (/failed to open serial port/i.test(error)) {
-    return `The port is busy or unavailable. Close any other program using the ${machineNoun} (another sender, a serial monitor, another KerfDesk window), then Connect again.`;
+    const busy = `The port is busy or unavailable. Close any other program using the ${machineNoun} (another sender, a serial monitor, another KerfDesk window), then Connect again.`;
+    return linux ? `${busy} ${LINUX_SERIAL_ACCESS}` : busy;
   }
   return error;
 }
+
+const LINUX_SERIAL_ACCESS =
+  'On Linux your account also needs serial access: run sudo usermod -aG dialout $USER (on Arch, uucp instead of dialout), then log out and back in.';
 
 function StatusDot({ connection }: { readonly connection: ConnectionState }): JSX.Element {
   const color = connectionStatusColor(connection);

@@ -8,6 +8,8 @@
 import { Icon } from '../kit';
 import { commandHelpId, controlHelp } from '../help/help-topics';
 import { openCommandSearch } from './command-search-store';
+import { shortcutLabel } from '../common/shortcut-label';
+import { isApplePlatform } from '../common/operating-system';
 
 export function CommandSearchButton(): JSX.Element {
   const helpId = commandHelpId('help.find-command');
@@ -16,14 +18,14 @@ export function CommandSearchButton(): JSX.Element {
       type="button"
       className="lf-btn lf-btn--ghost lf-menu-search-button"
       aria-label="Find a command"
-      aria-keyshortcuts="Control+K"
-      title={`${controlHelp(helpId)} (Ctrl+K)`}
+      aria-keyshortcuts={isApplePlatform() ? 'Meta+K' : 'Control+K'}
+      title={`${controlHelp(helpId)} (${shortcutLabel('Ctrl+K')})`}
       data-help-id={helpId}
       onClick={openCommandSearch}
     >
       <Icon name="search" size={14} />
       <span className="lf-menu-search-button__label">Search</span>
-      <kbd className="lf-menu-search-button__keys">Ctrl+K</kbd>
+      <kbd className="lf-menu-search-button__keys">{shortcutLabel('Ctrl+K')}</kbd>
     </button>
   );
 }

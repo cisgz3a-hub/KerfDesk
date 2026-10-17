@@ -2,7 +2,7 @@
   "name": "laserforge",
   "version": "0.1.0",
   "private": true,
-  "description": "Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows desktop from one codebase.",
+  "description": "Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows, macOS and Linux desktop from one codebase.",
   "author": {
     "name": "Johann Stolk"
   },
@@ -14,6 +14,7 @@
   "packageManager": "pnpm@11.3.0",
   "type": "module",
   "main": "dist-electron/main.js",
+  "desktopName": "kerfdesk.desktop",
   "bin": {
     "kerfdesk-trace": "scripts/trace-cli.mjs"
   },

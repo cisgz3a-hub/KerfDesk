@@ -61,7 +61,9 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(builder).toMatch(/win:\s*\n\s*icon: public\/app-icon\.ico/);
     expect(builder).toMatch(/mac:\s[\s\S]*icon: public\/app-icon\.icns/);
     expect(builder).not.toMatch(/mac:\s[\s\S]*arch:\s*\n\s*- x64[\s\S]*- arm64/);
-    expect(builder).not.toMatch(/^linux:/m);
+    // Linux packages are built and checked on every pull request, not yet published (ADR-606).
+    expect(workflow).not.toContain('--linux');
+    expect(builder).toMatch(/^linux:\s[\s\S]*target: AppImage[\s\S]*target: deb/m);
   });
 
   it('uses canonical exact-version KerfDesk artifact names', () => {
@@ -152,7 +154,7 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(workflow).toContain('Release verification and legal-closure gate');
   });
 
-  it('builds and checks the Windows and macOS Preview in the release train, Linux on every pull request (ADR-522 Amendment 1)', () => {
+  it('builds and checks the Windows and macOS Preview in the release train, Linux on every pull request (ADR-522 Amendment 1, ADR-606)', () => {
     expect(packageCheck).toMatch(/^ {2}pull_request:$/m);
     expect(packageCheck).toMatch(/^ {2}workflow_call:$/m);
     expect(packageCheck).toMatch(/^ {2}workflow_dispatch:$/m);
@@ -169,7 +171,7 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     const releaseBuilds = previewBuildFlags(workflow);
     const pullRequestBuilds = previewBuildFlags(packageCheck);
     expect(releaseBuilds).toHaveLength(3);
-    expect(pullRequestBuilds).toHaveLength(2);
+    expect(pullRequestBuilds).toHaveLength(3);
     expect(new Set([...releaseBuilds, ...pullRequestBuilds]).size).toBe(1);
     expect(packageCheck).toContain(
       './scripts/verify-windows-preview-package.ps1 -Version $env:VERSION',
@@ -178,8 +180,13 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
       'bash scripts/verify-macos-preview-package.sh "${VERSION}" "${ARCH}"',
     );
     expect(packageCheck).toContain('-Scenario Launch');
+    // Electron 44 enforces ASAR integrity on macOS and Windows only, so Linux has no such check.
     expect(packageCheck.match(/node scripts\/verify-asar-integrity-enforced\.mjs/g)).toHaveLength(
       2,
+    );
+    expect(packageCheck).toContain('bash scripts/verify-linux-package.sh "${VERSION}"');
+    expect(packageCheck).toContain(
+      'xvfb-run -a pnpm smoke:desktop:native -- /opt/KerfDesk/kerfdesk',
     );
     expect(packageCheck).not.toContain('${{ secrets.');
     // A volume macOS still holds right after the checks must not fail a passed job.

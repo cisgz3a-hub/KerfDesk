@@ -10,6 +10,7 @@ import { ColorPickerDialog } from './ColorPickerDialog';
 import { EditorToolIcon } from './editor-icons';
 import type { EditorTool } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
+import { shortcutLabel } from '../common/shortcut-label';
 
 type ToolEntry = {
   readonly tool: EditorTool;
@@ -98,7 +99,7 @@ export function EditorToolStrip(): JSX.Element {
             onClick={() => setTool(entry.tool)}
             aria-pressed={isActive}
             aria-label={entry.label}
-            title={`${entry.label}${shapeSuffix} (${entry.shortcut})`}
+            title={`${entry.label}${shapeSuffix} (${shortcutLabel(entry.shortcut)})`}
             style={{ ...buttonStyle, ...(isActive ? activeStyle : null) }}
           >
             <EditorToolIcon kind={entry.tool.kind} />
