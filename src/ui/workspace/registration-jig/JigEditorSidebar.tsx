@@ -82,7 +82,7 @@ export function JigEditorSidebar({
         />
         <JigSharedArtworkSize editor={editor} />
         <details>
-          <summary>Import artwork</summary>
+          <summary title="Show or hide artwork import">Import artwork</summary>
           <JigArtworkImport onImport={editor.onImport} onBusyChange={editor.onImportBusy} />
         </details>
         <JigTraceControls

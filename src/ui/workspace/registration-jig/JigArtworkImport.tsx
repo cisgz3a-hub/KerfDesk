@@ -65,6 +65,7 @@ export function JigArtworkImport(props: {
     <label className="lf-jig-import">
       Import artwork
       <input
+        title="Import SVG or image artwork into the jig, fitted inside the selected outline"
         type="file"
         accept=".svg,.png,.jpg,.jpeg,.webp,.bmp"
         multiple

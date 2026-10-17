@@ -47,6 +47,7 @@ export function JigTraceControls(props: JigTraceControlsProps): JSX.Element {
       <label>
         Upload image to trace
         <input
+          title="Upload an image and trace it directly into the jig"
           type="file"
           accept="image/png,image/jpeg,image/webp,image/bmp,image/gif"
           disabled={commit.busy}

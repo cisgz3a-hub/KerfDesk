@@ -138,6 +138,7 @@ function JigTextForm(props: Props & { readonly existing: TextObject | undefined 
         <label>
           Writing
           <textarea
+            title="Text to add to the jig"
             className="lf-input"
             aria-label="Jig text content"
             rows={3}
@@ -157,6 +158,7 @@ function JigTextForm(props: Props & { readonly existing: TextObject | undefined 
         <label>
           Size (mm)
           <input
+            title="Text height in millimetres"
             className="lf-input"
             aria-label="Jig text size"
             type="number"
@@ -167,6 +169,7 @@ function JigTextForm(props: Props & { readonly existing: TextObject | undefined 
           />
         </label>
         <button
+          title="Add or update this text on the jig canvas"
           type="button"
           className="lf-btn"
           disabled={!valid || busy}

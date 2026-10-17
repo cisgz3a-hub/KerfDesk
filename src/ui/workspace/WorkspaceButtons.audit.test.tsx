@@ -16,7 +16,7 @@ import { useUiStore, type ToolMode } from '../state/ui-store';
 import { useTutorialStore } from '../tutorials/tutorial-store';
 import { ZoomControls } from './overlays';
 import { PreviewControlsPanel, PreviewRouteControls } from './preview-overlays';
-import { RegistrationJigPanel } from './RegistrationJigPanel';
+import { RegistrationJigEditor } from './registration-jig/RegistrationJigEditor';
 import { ToolStrip } from './ToolStrip';
 import { Toolbar } from '../common/Toolbar';
 
@@ -301,40 +301,58 @@ describe('viewport and preview individual outcomes', () => {
 });
 
 describe('registration jig remaining actions', () => {
-  it('air assist updates the outline operation and Advanced settings opens that operation', async () => {
+  // The jig controls live in the dedicated editor; edits are draft-only until
+  // Save to canvas, so each action is checked in the draft and after saving.
+  function outlineAir(): boolean | undefined {
+    return useStore
+      .getState()
+      .project.scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID)?.airAssist;
+  }
+
+  it('air assist updates the outline operation on save and Advanced settings opens that operation', async () => {
     useStore.getState().addRegistrationBox(80, 40);
-    useUiStore.getState().openRegistrationPanel();
-    await mount(<RegistrationJigPanel />);
+    const before = outlineAir();
+    await mount(<RegistrationJigEditor onClose={vi.fn()} />);
     const air = host.querySelector<HTMLInputElement>(
       '[aria-label="Air assist for registration jig outline"]',
     );
     if (air === null) throw new Error('Missing jig air');
-    const before = air.checked;
+    expect(air.checked).toBe(before === true);
     await act(async () => air.click());
-    expect(
-      useStore.getState().project.scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID)
-        ?.airAssist,
-    ).toBe(!before);
+    expect(outlineAir()).toBe(before);
     await click('Advanced outline settings');
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Cut Settings');
+    expect(
+      [...document.querySelectorAll('[role="dialog"]')].some((dialog) =>
+        dialog.textContent?.includes('Cut Settings'),
+      ),
+    ).toBe(true);
+    await click('Save to canvas');
+    expect(outlineAir()).toBe(before !== true);
   });
 
-  it('Remove outline preserves artwork, tutorial opens the jig lesson, and Close only hides the panel', async () => {
+  it('Remove outline preserves artwork, tutorial opens the jig lesson, and Close without saving keeps the project', async () => {
     useStore.getState().addRegistrationBox(80, 40);
     addRectangle();
-    useUiStore.getState().openRegistrationPanel();
-    await mount(<RegistrationJigPanel />);
+    const project = useStore.getState().project;
+    const onClose = vi.fn();
+    await mount(<RegistrationJigEditor onClose={onClose} />);
     await click('Tutorial: Registration jig');
     expect(useTutorialStore.getState().tutorialId).toBe('registration');
     await click('Remove outline');
+    expect(useStore.getState().project).toBe(project);
+    await click('Close without saving');
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(useStore.getState().project).toBe(project);
+
+    // Reopen with a fresh editor session, as Edit jig does after closing.
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await mount(<RegistrationJigEditor onClose={onClose} />);
+    await click('Remove outline');
+    await click('Save to canvas');
     expect(useStore.getState().project.scene.objects.some(isRegistrationBox)).toBe(false);
     expect(useStore.getState().project.scene.objects.some((object) => object.id === 'art')).toBe(
       true,
     );
-    const project = useStore.getState().project;
-    await click('Close registration jig panel');
-    expect(useUiStore.getState().registrationPanelOpen).toBe(false);
-    expect(host.textContent).toBe('');
-    expect(useStore.getState().project).toBe(project);
   });
 });

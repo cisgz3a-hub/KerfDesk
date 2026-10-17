@@ -32,6 +32,7 @@ export function JigArtworkSettings(props: {
         <label>
           Operation
           <select
+            title="Choose which artwork operation these settings change"
             className="lf-select"
             aria-label="Jig artwork operation"
             value={operation.id}
@@ -70,6 +71,7 @@ function BurnMode({ operation, onChange }: OperationFieldsProps): JSX.Element {
     <label>
       Burn mode
       <select
+        title="Burn the selected artwork as Line (outline) or Fill (scan)"
         className="lf-select"
         aria-label="Jig artwork burn mode"
         value={operation.mode}
@@ -146,6 +148,7 @@ function FillOptions({ operation, onChange }: OperationFieldsProps): JSX.Element
       <label>
         Fill style
         <select
+          title="How Fill scans the artwork"
           className="lf-select"
           aria-label="Jig fill style"
           value={operation.fillStyle}
@@ -162,6 +165,7 @@ function FillOptions({ operation, onChange }: OperationFieldsProps): JSX.Element
       </label>
       <label>
         <input
+          title="Add a second fill pass at 90 degrees"
           type="checkbox"
           checked={operation.fillCrossHatch}
           onChange={(event) => onChange({ fillCrossHatch: event.currentTarget.checked })}

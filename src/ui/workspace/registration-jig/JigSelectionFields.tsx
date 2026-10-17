@@ -66,6 +66,7 @@ export function JigSelectionFields(props: {
       </div>
       <label>
         <input
+          title="Keep width and height proportional when resizing"
           type="checkbox"
           checked={preserveAspect}
           onChange={(event) => setPreserveAspect(event.target.checked)}
