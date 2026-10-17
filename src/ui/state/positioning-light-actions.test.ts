@@ -288,6 +288,32 @@ describe('separate positioning light transaction', () => {
     expect(h.writes.at(-1)?.trim()).toBe(h.mapping.offCommand);
   });
 
+  it.each([
+    ['marlin', 'M355 S1', 'M0355 S1'],
+    ['fluidnc', 'M64 P0', 'M65 P1'],
+    ['marlin', 'M125', 'M355 S0'],
+  ] as const)(
+    'rejects invalid %s light mapping before any controller write',
+    async (kind, onCommand, offCommand) => {
+      const h = harness(kind);
+      useStore.setState((state) => ({
+        project: {
+          ...state.project,
+          device: {
+            ...state.project.device,
+            positioningLight: { ...h.mapping, onCommand, offCommand },
+          },
+        },
+      }));
+      await expect(h.actions.centrePositioningLight(40, 45, 1200)).rejects.toThrow(
+        /Positioning light/,
+      );
+      expect(h.writes).toEqual([]);
+      expect(h.hasMoved()).toBe(false);
+      expect(h.get().controllerOperation).toBeNull();
+    },
+  );
+
   it('rejects file-only controllers and invalid maps without any command', async () => {
     const h = harness('ruida');
     await expect(h.actions.centrePositioningLight(40, 45, 1200)).rejects.toThrow('file export');

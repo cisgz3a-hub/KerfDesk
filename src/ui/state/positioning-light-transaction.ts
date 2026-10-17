@@ -39,6 +39,10 @@ export async function positioningLightStatus(
   context: PositioningLightTransaction,
 ): Promise<StatusReport> {
   context.assertCurrent();
+  // A rejected registration owns no waiter and must not cancel another action's
+  // pending readiness proof or dispatch a query into its exchange.
+  if (context.refs.controllerStatusWait != null)
+    throw new Error('A controller status confirmation is already active.');
   const state = context.get();
   const driver = context.refs.driver;
   const query = driver.realtime.statusQuery ?? driver.commands.queuedStatusQuery;
