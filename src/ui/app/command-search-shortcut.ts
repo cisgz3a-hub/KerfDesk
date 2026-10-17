@@ -8,6 +8,7 @@
 // only Cmd+K opens the search while typing.
 
 import { isEditableShortcutTarget } from '../common/keyboard-targets';
+import { isApplePlatform } from '../common/operating-system';
 
 export function handleCommandSearchShortcut(
   e: KeyboardEvent,
@@ -20,9 +21,4 @@ export function handleCommandSearchShortcut(
   e.preventDefault();
   openSearch();
   return true;
-}
-
-function isApplePlatform(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
 }
