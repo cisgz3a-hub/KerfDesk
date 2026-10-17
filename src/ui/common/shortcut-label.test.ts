@@ -49,6 +49,21 @@ describe('shortcut labels on each keyboard (ADR-606)', () => {
     expect(shortcutLabel('Shift+arrows', true)).toBe('⇧ arrows');
   });
 
+  it('converts chords inside a sentence and keeps the punctuation around them', () => {
+    expect(shortcutLabel('Rasterize onto a new layer (Ctrl+Enter)', true)).toBe(
+      'Rasterize onto a new layer (⌘↩)',
+    );
+    expect(shortcutLabel('Undo (Ctrl+Z)', true)).toBe('Undo (⌘Z)');
+    expect(shortcutLabel('Fit the whole photo in the canvas (Ctrl+0)', true)).toBe(
+      'Fit the whole photo in the canvas (⌘0)',
+    );
+    expect(shortcutLabel('Delete this shape (Ctrl+Z restores it)', true)).toBe(
+      'Delete this shape (⌘Z restores it)',
+    );
+    expect(shortcutLabel('Ctrl+Shift+] or Numpad 8', true)).toBe('⇧⌘] or Numpad 8');
+    expect(shortcutLabel('Move left (Alt+Left).', true)).toBe('Move left (⌥←).');
+  });
+
   it('names a modifier held on its own, and leaves plain keys alone', () => {
     expect(shortcutLabel('Ctrl (hold while moving)', true)).toBe('⌘ (hold while moving)');
     expect(shortcutLabel('Alt (hold while dragging)', true)).toBe('⌥ (hold while dragging)');

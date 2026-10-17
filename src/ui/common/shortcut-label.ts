@@ -18,7 +18,8 @@ const MAC_KEYS: Readonly<Record<string, string>> = {
   Enter: '↩',
 };
 // A chord ("Alt+Shift+H", "Ctrl+,"), or a modifier held on its own ("Ctrl (hold ...)").
-const CHORD = /\b(?:(?:Ctrl|Alt|Shift)\+)+[^\s/]+|\b(?:Ctrl|Alt)\b(?!\+)/g;
+// The key is one word or one symbol, so prose around it ("(Ctrl+Enter)") stays outside.
+const CHORD = /\b(?:(?:Ctrl|Alt|Shift)\+)+(?:[A-Za-z0-9]+|[^\sA-Za-z0-9/])|\b(?:Ctrl|Alt)\b(?!\+)/g;
 
 /** `shortcut` as this computer's keyboard labels it. */
 export function shortcutLabel(shortcut: string, apple: boolean = isApplePlatform()): string {
