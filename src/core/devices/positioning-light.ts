@@ -7,6 +7,8 @@ export type PositioningLight = {
   /** Pointer spot minus laser spot, in bed coordinates (millimetres). */
   readonly offsetXmm: number;
   readonly offsetYmm: number;
+  /** After a clean ordinary Frame, centre the pointer on the framed artwork and switch it on (ADR-604). */
+  readonly afterFrame?: boolean;
 };
 
 export const MAX_POSITIONING_LIGHT_OFFSET_MM = 1000;
@@ -39,6 +41,9 @@ export function positioningLightIssue(
     String(light['offCommand']).trim().toUpperCase()
   ) {
     return 'Positioning light on and off commands must be different.';
+  }
+  if (light['afterFrame'] !== undefined && typeof light['afterFrame'] !== 'boolean') {
+    return 'Positioning light "Centre & LED after Frame" must be on or off.';
   }
   return offsetIssue(light);
 }
@@ -89,5 +94,6 @@ export function normalizePositioningLight(value: unknown): PositioningLight | un
     offCommand: light.offCommand.trim(),
     offsetXmm: light.offsetXmm,
     offsetYmm: light.offsetYmm,
+    ...(light.afterFrame === true ? { afterFrame: true } : {}),
   };
 }

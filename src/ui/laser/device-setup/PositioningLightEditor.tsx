@@ -66,6 +66,7 @@ export function PositioningLightEditor({
             value={value.offsetYmm}
             onChange={(offsetYmm) => onChange({ ...value, offsetYmm })}
           />
+          <AfterFrameField value={value} onChange={onChange} />
           {issue === null ? null : (
             <p role="alert" style={{ margin: 0, color: 'var(--lf-danger)' }}>
               {issue}
@@ -74,6 +75,26 @@ export function PositioningLightEditor({
         </>
       ) : null}
     </div>
+  );
+}
+
+function AfterFrameField(props: {
+  readonly value: PositioningLight;
+  readonly onChange: (value: PositioningLight) => void;
+}): JSX.Element {
+  return (
+    <label>
+      <input
+        type="checkbox"
+        title="After a clean Frame in Absolute Coords, move the pointer to the framed artwork centre and switch it on. The Frame stays valid for Start."
+        checked={props.value.afterFrame === true}
+        onChange={(event) => {
+          const { afterFrame: _previous, ...rest } = props.value;
+          props.onChange(event.target.checked ? { ...rest, afterFrame: true } : rest);
+        }}
+      />{' '}
+      Centre &amp; LED after Frame
+    </label>
   );
 }
 
