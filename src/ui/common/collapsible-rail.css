@@ -1,28 +1,40 @@
-/* Keep a collapsed workspace panel discoverable until it is reopened. */
+/* Keep a collapsed workspace panel discoverable until it is reopened: a faint
+   accent tint with a slow heartbeat (two soft beats, then a long rest). It
+   must read as a hint, never as a filled button competing with the canvas.
+   Every hint runs on the document timeline (sync-panel-pulses.ts), so two
+   collapsed rails beat together whenever each was collapsed. */
 .lf-btn.lf-panel-expand-hint {
-  border-color: var(--lf-accent);
-  background: var(--lf-accent);
-  color: var(--lf-on-fill);
-  animation: lf-panel-expand-pulse 2.4s ease-in-out infinite;
+  border-color: color-mix(in srgb, var(--lf-accent) 45%, var(--lf-border));
+  background: var(--lf-accent-wash);
+  color: var(--lf-accent-fg);
+  animation: lf-panel-expand-pulse 3.2s ease-in-out infinite;
 }
 
 .lf-btn.lf-panel-expand-hint:hover:not(:disabled),
 .lf-btn.lf-panel-expand-hint:focus-visible:not(:disabled) {
   animation: none;
-  background: var(--lf-accent-hover);
-  color: var(--lf-on-fill);
+  border-color: var(--lf-accent);
+  background: var(--lf-tint-accent);
+  color: var(--lf-accent-fg);
 }
 
 @keyframes lf-panel-expand-pulse {
   0%,
+  14%,
+  30%,
   100% {
+    border-color: color-mix(in srgb, var(--lf-accent) 45%, var(--lf-border));
     background: var(--lf-accent-wash);
-    color: var(--lf-accent-fg);
   }
 
-  50% {
-    background: var(--lf-accent);
-    color: var(--lf-on-fill);
+  7% {
+    border-color: var(--lf-accent);
+    background: color-mix(in srgb, var(--lf-accent) 18%, transparent);
+  }
+
+  21% {
+    border-color: color-mix(in srgb, var(--lf-accent) 80%, var(--lf-border));
+    background: color-mix(in srgb, var(--lf-accent) 13%, transparent);
   }
 }
 
