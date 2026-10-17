@@ -141,6 +141,10 @@ async function runNoResetStop(
 ): Promise<void> {
   const { set, get, refs, driver } = context;
   const initial = get();
+  // Disconnect has frozen the stream and is writing these same stop lines
+  // before it closes the port. It owns the controller until the close; taking
+  // its operation over would reopen polling and command gates meanwhile.
+  if (initial.controllerOperation?.kind === 'disconnect') return;
   // Cancellation clears the unsent program, including any M7/M8 that requires
   // M9 cleanup. Capture that requirement before retiring the queue.
   const lines = noResetStopLines(driver(), initial);
