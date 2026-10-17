@@ -108,7 +108,7 @@ export async function runStopJob(context: JobStopContext, reason?: JobStopReason
     }
     const softReset = driver().realtime.softReset;
     if (softReset === null) {
-      await runNoResetStop(context, reason, ownsSession);
+      await runNoResetStopUnlessDisconnecting(context, reason, ownsSession);
       return;
     }
     if (!ownsSession()) return;
@@ -130,6 +130,18 @@ export async function runStopJob(context: JobStopContext, reason?: JobStopReason
   }
 }
 
+// Disconnect has frozen the stream and is writing these same stop lines before
+// it closes the port. It owns the controller until the close; taking its
+// operation over would reopen polling and command gates meanwhile.
+async function runNoResetStopUnlessDisconnecting(
+  context: JobStopContext,
+  reason: JobStopReason | undefined,
+  ownsSession: () => boolean,
+): Promise<void> {
+  if (context.get().controllerOperation?.kind === 'disconnect') return;
+  await runNoResetStop(context, reason, ownsSession);
+}
+
 // A no-reset Abort must retire host refill before even the handback await.
 // Retain its sent-line ledger: their real replies still precede the stop-line
 // replies. The temporary owner keeps a fresh Idle from reopening Start while
@@ -141,10 +153,6 @@ async function runNoResetStop(
 ): Promise<void> {
   const { set, get, refs, driver } = context;
   const initial = get();
-  // Disconnect has frozen the stream and is writing these same stop lines
-  // before it closes the port. It owns the controller until the close; taking
-  // its operation over would reopen polling and command gates meanwhile.
-  if (initial.controllerOperation?.kind === 'disconnect') return;
   // Cancellation clears the unsent program, including any M7/M8 that requires
   // M9 cleanup. Capture that requirement before retiring the queue.
   const lines = noResetStopLines(driver(), initial);

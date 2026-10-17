@@ -30,7 +30,7 @@ import { handleUnifiedArtworkImport } from './import-dispatch';
 import { useStore } from '../state';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { finishPen } from '../workspace/pen-tool';
-import { isEditableShortcutTarget, isKeyboardActivationTarget } from '../common/keyboard-targets';
+import { isEditableShortcutTarget, isEnterActivationTarget } from '../common/keyboard-targets';
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import type { NudgeSteps } from '../state/nudge-preferences';
 import { tryNudge } from './nudge-step';
@@ -119,15 +119,6 @@ function hasMeta(e: KeyboardEvent): boolean {
 
 function isEditableTarget(e: KeyboardEvent): boolean {
   return isEditableShortcutTarget(e.target);
-}
-
-// Enter on a focused button, link or menu item activates that control. It must
-// not also commit an unfinished pen draft and swallow the activation.
-function activatesFocusedControl(target: EventTarget | null): boolean {
-  if (isKeyboardActivationTarget(target)) return true;
-  return (
-    target instanceof HTMLElement && target.matches('a[href], [role^="menuitem"], [role="tab"]')
-  );
 }
 
 // Ctrl+E moved to the Ellipse tool (LightBurn parity, ADR-051 B7); export
@@ -324,7 +315,7 @@ const EDIT_BINDINGS: ReadonlyArray<KeyBinding<EditCtx>> = [
       return (
         !hasMeta(e) &&
         e.key === 'Enter' &&
-        !activatesFocusedControl(e.target) &&
+        !isEnterActivationTarget(e.target) &&
         ui.toolMode.kind === 'draw' &&
         ui.toolMode.shape === 'polyline' &&
         ui.penDraft !== null &&
