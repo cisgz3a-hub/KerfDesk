@@ -49,6 +49,7 @@ import {
 } from './canvas-compilation-main-bridge';
 import { PreparationResultCache } from './preparation-result-cache';
 import { PreparationConsumers } from './preparation-consumers';
+import { PreparationCancelledBurst } from './preparation-cancelled-burst';
 import {
   PreparationSupersededError,
   mergePreparationRequest,
@@ -100,6 +101,7 @@ let activeTransfer: PreparationTransferAssembler | null = null;
 let queuedRequests: ReadonlyArray<QueuedRequest> = [];
 let quietWindowTimer: ReturnType<typeof setTimeout> | null = null;
 let memoryReservation: MemoryReservation | null = null;
+const cancelledBurst = new PreparationCancelledBurst<Project>(SUPERSEDE_QUIET_WINDOW_MS);
 const preparationCache = new PreparationResultCache(MAX_SETTLED_PREPARATIONS);
 const preparationConsumers = new PreparationConsumers(
   cancelUnownedPreparation,
@@ -170,6 +172,7 @@ function requestPreparation(
     // Keep the same exact options: a queued estimate can be promoted to a
     // full Preview, satisfying both consumers with the same compile.
     rejectQueuedRequests(new PreparationSupersededError('newer-request'), key);
+    if (cancelledBurst.continuesBurst(project)) armQuietWindow();
   }
   if (typeof Worker === 'undefined') return null;
   const promise = new Promise<LargeJobPreparation | LargeJobEstimate>((resolve, reject) => {
@@ -213,7 +216,9 @@ function cancelUnownedPreparation(project: Project, key: string): void {
   );
   queuedRequests = queuedRequests.filter((request) => !held.includes(request));
   for (const request of held) request.reject(cancelled);
-  if (activeRequest?.project === project && activeRequest.key === key) {
+  const activeCancelled = activeRequest?.project === project && activeRequest.key === key;
+  if (activeCancelled || held.length > 0) cancelledBurst.remember(project);
+  if (activeCancelled && activeRequest !== null) {
     const active = activeRequest;
     activeRequest = null;
     retireWorker();
@@ -462,6 +467,7 @@ function rejectAllPendingAndRetireWorker(message: string): void {
     clearTimeout(quietWindowTimer);
     quietWindowTimer = null;
   }
+  cancelledBurst.forget();
   const stale = activeRequest;
   activeRequest = null;
   retireWorker();
