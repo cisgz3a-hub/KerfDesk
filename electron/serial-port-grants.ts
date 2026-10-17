@@ -91,6 +91,10 @@ export class SerialPortGrants {
 
   /** The operator picked `port`, an Electron SerialPort, in the Select dialog. */
   recordPick(port: unknown, now: number = Date.now()): void {
+    // Electron remembers no port without a display name on any system
+    // (CanStorePersistentEntry): it keeps that pick for the run itself and never
+    // asks the handler, so a record of it would only promise what cannot happen.
+    if (boundedString(port, 'displayName') === null) return;
     const id = this.identity.fromPort(port);
     if (id !== null) {
       this.#remember({ id, pickedAt: now });

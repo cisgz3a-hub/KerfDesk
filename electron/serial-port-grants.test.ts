@@ -124,6 +124,7 @@ describe('serial port identity on macOS and Linux (ADR-606)', () => {
   const mac = serialPortIdentity('darwin');
   const linux = serialPortIdentity('linux');
   const ftdi = {
+    displayName: 'FT232R USB UART',
     vendorId: '1027',
     productId: '24577',
     serialNumber: 'A10KJ3QZ',
@@ -165,6 +166,21 @@ describe('serial port identity on macOS and Linux (ADR-606)', () => {
     grants.recordPick(ftdi, 1);
     expect(grants.allows(ftdiStored)).toBe(true);
     expect(grants.allows({ ...ftdiStored, serial_number: 'a10kj3qz' })).toBe(false);
+  });
+
+  it('records no pick without a display name, which Electron never remembers', () => {
+    const save = vi.fn();
+    const grants = new SerialPortGrants([], save, linux ?? undefined);
+    grants.recordPick({ ...ftdi, displayName: undefined }, 1);
+    grants.recordPick({ ...ftdi, displayName: '' }, 2);
+    expect(save).not.toHaveBeenCalled();
+    expect(grants.list()).toEqual([]);
+    expect(grants.allows(ftdiStored)).toBe(false);
+
+    const windows = new SerialPortGrants([], save);
+    windows.recordPick({ ...laserPort, displayName: undefined }, 3);
+    expect(windows.list()).toEqual([]);
+    expect(save).not.toHaveBeenCalled();
   });
 
   it('remembers ports only where Electron does', () => {

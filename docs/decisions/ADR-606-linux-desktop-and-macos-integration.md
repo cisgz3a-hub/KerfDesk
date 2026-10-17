@@ -62,7 +62,8 @@ web app. An audit of the desktop shell on 2026-10-18 found these gaps on macOS a
    there (`shell/browser/serial/serial_chooser_context.cc`, `PortInfoToValue`): USB vendor ID,
    product ID and serial number, plus the USB driver name on macOS. An adapter without a serial
    number (most CH340 boards) cannot be stored by Electron, so it stays a pick for the run, as in
-   Chrome. Every other rule of ADR-552 (trusted origin only, Forget removes the port, 16 picks,
+   Chrome. Electron also stores no port without a display name, on any system, so KerfDesk records
+   no such pick either. Every other rule of ADR-552 (trusted origin only, Forget removes the port, 16 picks,
    bounded file) applies unchanged. The renderer's `picksEndOnRestart` is false on Windows, macOS
    and Linux.
 7. **Linux serial access.** When a serial port fails to open on desktop Linux (web app or desktop
