@@ -1,4 +1,6 @@
 import { prepareFrameLaser } from './frame-cnc-preparation';
+import { centreLightAfterFrameWanted, centreLightOnFramedArtwork } from './centre-selection-light';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { frameBoundsSignature } from '../../core/job';
 import { currentFrameSpatialSignature } from './frame-spatial-identity';
@@ -70,8 +72,16 @@ import {
 
 export function useFrameAction(): () => void {
   return () => {
-    void runFrameNow();
+    void runFrameNow().then(centreLightAfterCleanFrame);
   };
+}
+
+/** The operator's Frame button may finish with Centre & LED (ADR-604). The
+ * light move is a separate, beam-off action after the permit exists; its
+ * failure is reported but never revokes Frame or retries it. */
+export async function centreLightAfterCleanFrame(framed: boolean): Promise<void> {
+  if (!framed || !centreLightAfterFrameWanted()) return;
+  await centreLightOnFramedArtwork().catch(controllerActionFailureHandler('Centre & LED'));
 }
 
 /**

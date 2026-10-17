@@ -351,6 +351,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     tooltip:
       'See your installed version, check for a newer release, and follow the available download and installation choices. Updates never close KerfDesk while you work.',
   },
+  'help.find-command': {
+    family: 'help',
+    tooltip:
+      'Search every menu command by name or by what it does, then run it with Enter. Greyed-out results say why they are unavailable.',
+  },
   'help.tutorials': {
     family: 'help',
     tooltip: 'Browse step-by-step visual tutorials for tools, artwork, and machine workflows.',

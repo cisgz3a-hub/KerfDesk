@@ -9,6 +9,11 @@ import {
 } from './laser-interactive-command';
 import { observeFreshControllerStatus } from './laser-controller-status-wait';
 import { positioningLightActions } from './positioning-light-actions';
+import {
+  framedRunControllerSnapshot,
+  framedRunStartHandoffIssue,
+  type FramedRunPermit,
+} from './framed-run';
 import { useLaserStore, type LaserState, type LiveRefs } from './laser-store';
 import { useStore } from './store';
 import type { SafeWrite } from './laser-safe-write';
@@ -304,5 +309,68 @@ describe('separate positioning light transaction', () => {
     });
     await expect(g.actions.centrePositioningLight(40, 45, 1200)).rejects.toThrow(/accessory/);
     expect(g.writes).toEqual([]);
+  });
+});
+
+describe('Frame evidence across a positioning-light move (ADR-604)', () => {
+  type Harness = ReturnType<typeof harness>;
+  function completeFrame(h: Harness, startFrom: 'absolute' | 'current-position'): FramedRunPermit {
+    const permit = {
+      kind: 'ready',
+      completedStatusSequence: h.get().statusSequence,
+      controller: framedRunControllerSnapshot(h.get()),
+      candidate: { preparedStart: { jobOrigin: { startFrom } } },
+    } as unknown as FramedRunPermit;
+    const frameVerification = { boundsSignature: 'b', wco: null, workOriginActive: false };
+    h.set({ framedRun: permit, completedFrame: permit, frameVerification });
+    return permit;
+  }
+  const isTravel = (line: string): boolean => line.startsWith('$J=') || line.startsWith('G1 ');
+
+  it('keeps an Absolute Frame and observes the verified light position', async () => {
+    const h = harness();
+    const permit = completeFrame(h, 'absolute');
+    await h.actions.centrePositioningLight(40, 45, 1200);
+    const kept = h.get().completedFrame!;
+    expect(kept).not.toBe(permit);
+    expect(kept.candidate).toBe(permit.candidate);
+    expect(kept.controller.statusReport?.mPos).toMatchObject({ x: 40, y: 45 });
+    expect(h.get().framedRun).toBe(kept);
+    expect(framedRunStartHandoffIssue(kept, h.get())).toBeNull();
+    expect(framedRunStartHandoffIssue(permit, h.get())).not.toBeNull();
+    expect(h.get().frameVerification).not.toBeNull();
+    expect(h.get().positioningLightEnabled).toBe(true);
+  });
+
+  it('voids a Current Position Frame, whose placement follows the head', async () => {
+    const h = harness();
+    completeFrame(h, 'current-position');
+    await h.actions.centrePositioningLight(40, 45, 1200);
+    expect(h.get().completedFrame).toBeNull();
+    expect(h.get().framedRun).toBeNull();
+  });
+
+  it('voids the Frame when the canvas changes during the move, even if changed back', async () => {
+    const h = harness();
+    completeFrame(h, 'absolute');
+    const project = useStore.getState().project;
+    h.after((line) => {
+      if (!isTravel(line)) return;
+      useStore.setState({ project: { ...project } });
+    });
+    await h.actions.centrePositioningLight(40, 45, 1200);
+    expect(h.get().completedFrame).toBeNull();
+    expect(h.get().framedRun).toBeNull();
+  });
+
+  it('voids the Frame when the light travel fails', async () => {
+    const h = harness();
+    completeFrame(h, 'absolute');
+    h.after((line) => {
+      if (isTravel(line)) h.fail(line);
+    });
+    await expect(h.actions.centrePositioningLight(40, 45, 1200)).rejects.toThrow();
+    expect(h.get().completedFrame).toBeNull();
+    expect(h.get().framedRun).toBeNull();
   });
 });

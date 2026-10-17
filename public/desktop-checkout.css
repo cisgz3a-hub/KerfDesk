@@ -146,6 +146,13 @@ h1 span {
 .hero-link span {
   margin-left: 14px;
 }
+.hero-recover {
+  margin: 14px 0 0;
+  font-size: 12px;
+}
+.hero-recover a {
+  color: #d9d2c2;
+}
 .hero-caption {
   position: absolute;
   right: 30px;

@@ -9,6 +9,7 @@ import {
 import { jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { frameProofReset } from './laser-session-reset';
+import { rebasedLightMoveFramePatch, type StashedFrameProof } from './completed-frame-run';
 import { warnJogMotionPolicy } from './laser-jog-warnings';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWrite } from './laser-safe-write';
@@ -223,18 +224,51 @@ async function moveToLightTarget(
   if (current === null) throw new Error('Positioning light needs a live machine position.');
   const params = { dx: target.x - current.x, dy: target.y - current.y, feed: target.feed };
   const moving = Math.abs(params.dx) >= 0.001 || Math.abs(params.dy) >= 0.001;
-  if (moving) {
-    warnJogMotionPolicy(set, context.get, params);
-    set(frameProofReset());
-    const commands = context.refs.driver.commands
-      .buildJog(params)
-      .split('\n')
-      .filter((line) => line.trim() !== '');
-    onMotion();
-    for (const line of commands) await positioningLightCommand(context, line);
-    await settlePositioningLightMove(context);
+  if (!moving) {
+    assertLightTargetReached(context, target);
+    return;
   }
+  warnJogMotionPolicy(set, context.get, params);
+  const proof = stashFrameProof(context.get());
+  set(frameProofReset());
+  const commands = context.refs.driver.commands
+    .buildJog(params)
+    .split('\n')
+    .filter((line) => line.trim() !== '');
+  onMotion();
+  for (const line of commands) await positioningLightCommand(context, line);
+  await settlePositioningLightMove(context);
   assertLightTargetReached(context, target);
+  restoreFrameProof(context, set, proof);
+}
+
+type LightMoveFrameProof = StashedFrameProof & {
+  readonly project: unknown;
+  readonly jobPlacement: unknown;
+};
+
+function stashFrameProof(state: LaserState): LightMoveFrameProof {
+  const app = useStore.getState();
+  return {
+    framedRun: state.framedRun,
+    completedFrame: state.completedFrame ?? null,
+    frameVerification: state.frameVerification,
+    project: app.project,
+    jobPlacement: app.jobPlacement,
+  };
+}
+
+// The proof was voided for the move itself, so the drift subscription could
+// not watch the canvas meanwhile; any edit, even one undone, keeps it void.
+function restoreFrameProof(
+  context: PositioningLightTransaction,
+  set: SetFn,
+  proof: LightMoveFrameProof,
+): void {
+  const app = useStore.getState();
+  if (app.project !== proof.project || app.jobPlacement !== proof.jobPlacement) return;
+  context.assertCurrent();
+  set((state) => rebasedLightMoveFramePatch(proof, state));
 }
 
 function assertLightTargetReached(context: PositioningLightTransaction, target: Target): void {
