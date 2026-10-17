@@ -80,7 +80,7 @@ describe('separate positioning light configuration', () => {
   });
 });
 
-describe('Centre & LED after Frame setting (ADR-604)', () => {
+describe('Centre & LED after Frame setting (ADR-605)', () => {
   it('accepts a boolean and keeps only an enabled setting when normalizing', () => {
     expect(positioningLightIssue({ ...light, afterFrame: true }, 'grblhal')).toBeNull();
     expect(positioningLightIssue({ ...light, afterFrame: false }, 'grblhal')).toBeNull();

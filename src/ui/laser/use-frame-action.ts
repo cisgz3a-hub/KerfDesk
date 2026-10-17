@@ -76,7 +76,7 @@ export function useFrameAction(): () => void {
   };
 }
 
-/** The operator's Frame button may finish with Centre & LED (ADR-604). The
+/** The operator's Frame button may finish with Centre & LED (ADR-605). The
  * light move is a separate, beam-off action after the permit exists; its
  * failure is reported but never revokes Frame or retries it. */
 export async function centreLightAfterCleanFrame(framed: boolean): Promise<void> {
