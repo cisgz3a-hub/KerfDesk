@@ -15,7 +15,29 @@
       href="/startup-craft.webp"
       fetchpriority="high"
     />
-    <title>KerfDesk</title>
+    <title>KerfDesk — Laser and CNC Software</title>
+    <!-- Search and link-preview metadata mirrors the public pages (public/pricing/).
+         The runtime window title still comes from use-window-title.ts. -->
+    <meta
+      name="description"
+      content="KerfDesk is laser and CNC software for GRBL machines, in a Free and a Pro edition. Design, assign operations, preview the toolpath and send the job from your browser or a desktop app."
+    />
+    <link rel="canonical" href="https://kerfdesk.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="KerfDesk" />
+    <meta property="og:title" content="KerfDesk — Laser and CNC Software" />
+    <meta
+      property="og:description"
+      content="KerfDesk is laser and CNC software for GRBL machines, in a Free and a Pro edition. Design, assign operations, preview the toolpath and send the job from your browser or a desktop app."
+    />
+    <meta property="og:url" content="https://kerfdesk.com/" />
+    <meta
+      property="og:image"
+      content="https://kerfdesk.com/privacy/assets/social-card.ed667b4921.png"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
     <!-- The wordmark, credit and activity indicator paint before JS or artwork.
          main.tsx dismisses the screen when the workspace is ready (F-A1); the
          desktop app holds it briefly first (ADR-049 Amendment 1).
@@ -124,6 +146,16 @@
         font-size: 12px;
         letter-spacing: 0.4px;
         line-height: 1.6;
+      }
+      #app-splash .app-splash__about {
+        margin-top: 28px;
+        color: #c7c1b8;
+        font-size: 14px;
+        line-height: 1.6;
+        pointer-events: auto;
+      }
+      #app-splash .app-splash__about a {
+        color: #e6d2b8;
       }
       #app-splash .app-splash__footer {
         position: absolute;
@@ -253,6 +285,22 @@
           </div>
           <p class="app-splash__status">Opening your workspace…</p>
         </div>
+        <!-- Crawlers and script-free visitors read this summary instead of only
+             the loading line; with scripts on it never renders. -->
+        <noscript>
+          <div class="app-splash__about">
+            <p>
+              KerfDesk is laser and CNC software for GRBL machines, in a Free and a Pro edition.
+              Design artwork, assign cut, fill, image and CNC operations, preview the toolpath and
+              send the job from your browser or the desktop app.
+            </p>
+            <p>
+              The workspace needs JavaScript. You can still
+              <a href="/download">download the desktop app</a>, see
+              <a href="/pricing/">pricing</a> or get <a href="/support">support</a>.
+            </p>
+          </div>
+        </noscript>
       </div>
       <div class="app-splash__footer">
         <p class="app-splash__credit">Created by <span>Ons Houtkombuis</span></p>

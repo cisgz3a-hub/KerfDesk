@@ -19,6 +19,8 @@ import { editingToolShortcutContext, handleEditingToolShortcut } from './editing
 import { arrangeShortcutContext, handleArrangeShortcut } from './arrange-shortcuts';
 import { handleSettingsShortcut } from './settings-shortcut';
 import { openSettings } from '../settings/settings-dialog-store';
+import { handleCommandSearchShortcut } from './command-search-shortcut';
+import { openCommandSearch } from '../commands/command-search-store';
 import {
   editShortcutContext,
   fileShortcutContext,
@@ -43,6 +45,7 @@ export function useShortcuts(): void {
     const onFileEditKey = (e: KeyboardEvent): void => {
       if (keyboardOwnedElsewhere()) return;
       if (handleSettingsShortcut(e, openSettings)) return;
+      if (handleCommandSearchShortcut(e, openCommandSearch)) return;
       if (handleFileShortcut(e, fileShortcutContext(platformRef.current))) return;
       if (handleToolShortcut(e, TOOL_SHORTCUT_CONTEXT)) return;
       handleEditShortcut(e, editShortcutContext());

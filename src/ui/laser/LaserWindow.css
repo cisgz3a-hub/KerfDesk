@@ -99,10 +99,20 @@
 }
 
 .lf-jog-panel {
-  padding: 8px;
+  /* Jog arrows, Home, Z and the action column. Kept compact so the sections
+     below the pad (Console and the rest) get the height. */
+  --lf-jog-button: 30px;
+  padding: 6px;
   border: 1px solid var(--lf-border);
   border-radius: 10px;
   background: var(--lf-bg-0);
+}
+
+/* Touch-only screens keep the larger targets. */
+@media (pointer: coarse) {
+  .lf-jog-panel {
+    --lf-jog-button: 36px;
+  }
 }
 
 .lf-jog-panel select {
@@ -119,10 +129,16 @@
   align-self: start;
 }
 
+/* Row spacing for the action column and the Fire/warning rows (the grid's
+   row-gap is 0). The first action shares the top row with the arrows. */
+.lf-jog-controls--machine-actions > :nth-child(n + 3) {
+  margin-top: 3px;
+}
+
 .lf-jog-controls--machine-actions > .lf-btn {
   align-self: start;
-  min-height: 36px;
-  padding: 3px 6px;
+  min-height: var(--lf-jog-button);
+  padding: 2px 6px;
   font-size: 12px;
   line-height: 1.2;
 }
@@ -131,8 +147,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: var(--lf-jog-button);
+  height: var(--lf-jog-button);
   padding: 0;
   color: var(--lf-accent-fg);
   background: var(--lf-tint-accent);

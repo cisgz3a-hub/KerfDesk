@@ -121,7 +121,7 @@ class BrowserPurchasePage {
         this.status(
           this.config.environment === 'sandbox'
             ? 'Test checkout only. No real payment will be taken.'
-            : 'Buy here, then activate your licence in the Windows app. This phone does not use a licence seat.',
+            : 'Buy here, then activate your licence in the Windows app. Buying here does not use a licence seat.',
         );
     });
   }

@@ -141,7 +141,7 @@ function ReliefViewerLaunch(props: {
       <button
         type="button"
         onClick={() => setViewerOpen(true)}
-        title="Open the real-time 3D view of this relief (ADR-102)."
+        title="Open the real-time 3D view of this relief."
         style={viewerButtonStyle}
       >
         View 3D…

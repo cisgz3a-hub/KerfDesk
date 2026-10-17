@@ -94,7 +94,7 @@ export function ToolStrip(): JSX.Element {
       <button
         type="button"
         aria-label="Open design library"
-        title="Insert ready-made line art from the bundled design library (ADR-105)."
+        title="Insert ready-made line art from the bundled design library."
         onClick={() => setLibraryDialogOpen(true)}
         className="lf-btn lf-iconbtn lf-toolstrip__launcher"
       >
