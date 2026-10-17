@@ -48,6 +48,7 @@ function assertAdmission(state: LaserState, refs: LiveRefs): void {
   if (
     state.autofocusBusy ||
     state.probeBusy ||
+    refs.controllerStatusWait != null ||
     state.pendingUntrackedAcks > 0 ||
     pendingTransportWriteCount(state) > 0
   )

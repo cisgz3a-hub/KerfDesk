@@ -79,3 +79,87 @@ describe('separate positioning light configuration', () => {
     expect(controllerCompatibleProfile(profile, 'grblhal').profile.positioningLight).toEqual(light);
   });
 });
+
+describe('positioning light command meaning', () => {
+  it.each([
+    ['M355 S1', 'M0355 S1'],
+    ['M355 S1', 'm355  s1'],
+    ['M355 S1', 'M355 S01.0'],
+    ['M355 S1 P255', 'M0355 P0255.00 S+1'],
+    ['M106.01 P02', 'M0106.1 P2.0'],
+    ['M106 P0', 'M106.0 P-0'],
+  ])('rejects equivalent on/off commands %s and %s', (onCommand, offCommand) => {
+    expect(positioningLightIssue({ ...light, onCommand, offCommand }, 'marlin')).toContain(
+      'different',
+    );
+  });
+
+  it.each(['M355 S1 S1', 'M355 S0 S1', 'M710 P0 p1'])(
+    'rejects ambiguous duplicate parameter words in %s',
+    (offCommand) => {
+      expect(
+        positioningLightIssue({ ...light, onCommand: 'M355 S1', offCommand }, 'marlin'),
+      ).not.toBeNull();
+    },
+  );
+
+  it.each(['grblhal', 'fluidnc'] as const)(
+    'rejects standard %s output pairs that cannot switch the same output off',
+    (kind) => {
+      for (const [onCommand, offCommand] of [
+        ['M64 P0', 'M65 P1'],
+        ['M64 P0', 'M64 P1'],
+        ['M65 P0', 'M65 P1'],
+      ]) {
+        expect(positioningLightIssue({ ...light, onCommand, offCommand }, kind)).toContain(
+          'same output',
+        );
+      }
+    },
+  );
+
+  it.each(['grblhal', 'fluidnc'] as const)('retains normal and active-low %s pairs', (kind) => {
+    for (const [onCommand, offCommand] of [
+      ['M64 P0', 'M65 P0'],
+      ['M065 P00', 'm064 p0'],
+    ])
+      expect(positioningLightIssue({ ...light, onCommand, offCommand }, kind)).toBeNull();
+  });
+
+  it('retains distinct integer subcodes and documented custom mappings', () => {
+    expect(
+      positioningLightIssue(
+        { ...light, onCommand: 'M106.10', offCommand: 'M106.1' },
+        'smoothieware',
+      ),
+    ).toBeNull();
+    expect(
+      positioningLightIssue({ ...light, onCommand: 'M710 P1', offCommand: 'M711 P0' }, 'grblhal'),
+    ).toBeNull();
+    expect(
+      positioningLightIssue({ ...light, onCommand: 'M64 P0', offCommand: 'M710 P0' }, 'fluidnc'),
+    ).toBeNull();
+  });
+
+  it.each([
+    'M125',
+    'M48 P10',
+    'M290 S1',
+    'M361',
+    'M362',
+    'M363',
+    'M364',
+    'M401',
+    'M402',
+    'M701',
+    'M702',
+    'M915',
+  ])('rejects standard motion/probing command %s as either light command', (command) => {
+    expect(
+      positioningLightIssue({ ...light, onCommand: command, offCommand: 'M355 S0' }, 'marlin'),
+    ).not.toBeNull();
+    expect(
+      positioningLightIssue({ ...light, onCommand: 'M355 S1', offCommand: command }, 'marlin'),
+    ).not.toBeNull();
+  });
+});

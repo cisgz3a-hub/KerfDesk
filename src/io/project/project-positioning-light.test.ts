@@ -63,4 +63,52 @@ describe('positioning light persistence', () => {
       expect(result.kind).toBe('invalid');
     },
   );
+  it.each([
+    ['fluidnc', 'M64 P8', 'M65 P8'],
+    ['grblhal', 'M62 P0', 'M63 P0'],
+    ['fluidnc', 'M64 P0', 'M65 P1'],
+    ['marlin', 'M355 S1', 'M0355 S1'],
+    ['marlin', 'M125', 'M355 S0'],
+  ] as const)(
+    'rejects invalid %s mappings in both import formats',
+    (controllerKind, onCommand, offCommand) => {
+      const device = {
+        ...DEFAULT_DEVICE_PROFILE,
+        controllerKind,
+        positioningLight: { ...positioningLight, onCommand, offCommand },
+      };
+      expect(deserializeProject(serializeProject(createProject(device))).kind).toBe('invalid');
+      expect(deserializeMachineProfileDocument(profileDocument(device))).toMatchObject({
+        kind: 'invalid',
+        reason: expect.stringContaining('Positioning light'),
+      });
+    },
+  );
+
+  it.each(['fluidnc', 'grblhal'] as const)(
+    'preserves active-low %s mappings in both import formats',
+    (controllerKind) => {
+      const device = {
+        ...DEFAULT_DEVICE_PROFILE,
+        controllerKind,
+        positioningLight: { ...positioningLight, onCommand: 'M65 P0', offCommand: 'M64 P0' },
+      };
+      const project = deserializeProject(serializeProject(createProject(device)));
+      const profile = deserializeMachineProfileDocument(profileDocument(device));
+      expect(project.kind).toBe('ok');
+      expect(profile.kind).toBe('ok');
+      if (profile.kind === 'ok')
+        expect(profile.document.profile.positioningLight).toEqual(device.positioningLight);
+    },
+  );
 });
+
+function profileDocument(profile: typeof DEFAULT_DEVICE_PROFILE): string {
+  return JSON.stringify({
+    format: MACHINE_PROFILE_FORMAT,
+    schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
+    profile,
+    source: { kind: 'custom', label: 'Pointer' },
+    reviewNotes: [],
+  });
+}
