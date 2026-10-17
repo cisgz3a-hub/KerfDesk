@@ -5,6 +5,8 @@ import { Icon } from '../kit/icons';
 type Props = {
   readonly machineName: string;
   readonly status: string;
+  /** Announced and shown on hover beside the status without changing the row's width. */
+  readonly statusNote?: string;
   readonly statusDot: ReactNode;
   readonly machine?: ReactNode;
   readonly details?: ReactNode;
@@ -20,6 +22,8 @@ export function CompactConnectionControls(props: Props): JSX.Element {
   const popoverId = useId();
   const triggerId = `${popoverId}-trigger`;
   const statusId = `${popoverId}-status`;
+  const fullStatus =
+    props.statusNote === undefined ? props.status : `${props.status} · ${props.statusNote}`;
   useRetainedDetailsFocus(open, popoverId);
   const close = useCallback(() => setOpen(false), []);
   const closeAndFocus = (): void => {
@@ -52,7 +56,7 @@ export function CompactConnectionControls(props: Props): JSX.Element {
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={open ? popoverId : undefined}
-          title={`${props.machineName} · ${props.status}. Show machine details and laser module.`}
+          title={`${props.machineName} · ${fullStatus}. Show machine details and laser module.`}
           onClick={() => setOpen((value) => !value)}
           onKeyDown={(event) => {
             if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
@@ -64,7 +68,7 @@ export function CompactConnectionControls(props: Props): JSX.Element {
           <MachineSummary {...props} statusId={statusId} />
         </button>
         <span className="lf-connection-status-live" role="status" aria-live="polite">
-          {props.status}
+          {fullStatus}
         </span>
         {props.children}
       </div>
@@ -94,15 +98,24 @@ export function CompactConnectionControls(props: Props): JSX.Element {
 }
 
 function MachineSummary(
-  props: Pick<Props, 'machineName' | 'status' | 'statusDot'> & { readonly statusId: string },
+  props: Pick<Props, 'machineName' | 'status' | 'statusNote' | 'statusDot'> & {
+    readonly statusId: string;
+  },
 ): JSX.Element {
   return (
     <>
       {props.statusDot}
       <span className="lf-connection-machine-summary">
         <strong className="lf-connection-machine-name">{props.machineName}</strong>
-        <span id={props.statusId} className="lf-connection-machine-status">
+        <span
+          id={props.statusId}
+          className="lf-connection-machine-status"
+          data-attention={props.statusNote === undefined ? undefined : 'true'}
+        >
           {props.status}
+          {props.statusNote === undefined ? null : (
+            <span className="lf-connection-status-note"> · {props.statusNote}</span>
+          )}
         </span>
       </span>
       <Icon name="chevron-down" size={13} />

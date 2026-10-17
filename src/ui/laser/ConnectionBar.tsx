@@ -84,11 +84,8 @@ export function ConnectionBar(props: Props): JSX.Element {
         <div className="lf-connection-toolbar-controls">
           <CompactConnectionControls
             machineName={props.machineName ?? 'Unnamed machine'}
-            status={
-              needsRecovery
-                ? `${connectionStatusLabel(connection)} · controller needs recovery`
-                : connectionStatusLabel(connection)
-            }
+            status={connectionStatusLabel(connection)}
+            {...(needsRecovery ? { statusNote: 'controller needs recovery' } : {})}
             statusDot={<StatusDot connection={connection} needsRecovery={needsRecovery} />}
             machine={props.machine}
             details={props.details}

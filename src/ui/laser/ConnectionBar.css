@@ -144,6 +144,26 @@
   color: var(--lf-success-fg);
 }
 
+/* A persistent recovery state recolours the status without changing the
+   row's width: the note itself is read by assistive technology and the
+   tooltip, never laid out. */
+.lf-connection-compact[data-state='connected']
+  .lf-connection-machine-status[data-attention='true'] {
+  color: var(--lf-warning-fg);
+}
+
+.lf-connection-status-note {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 .lf-connection-compact[data-state='failed'] .lf-connection-machine-status {
   color: var(--lf-danger);
 }
