@@ -2,9 +2,31 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   LICENCE_CHECK_INTERVAL_MS,
+  licenceRefreshDue,
   scheduleLicenceChecks,
   type StartTimer,
 } from './licensing-schedule';
+
+describe('when a quiet check asks the licence service (ADR-592)', () => {
+  const NOW = 1_790_000_000;
+  const paid = { state: 'ready', tier: 'paid' };
+  it('asks weekly for paid rights, daily for a trial, and at once when overdue', () => {
+    const seen = { refreshedAt: NOW, lastSeenAt: NOW };
+    expect(licenceRefreshDue(paid, seen, NOW + 6 * 86_400)).toBe(false);
+    expect(licenceRefreshDue(paid, seen, NOW + 7 * 86_400)).toBe(true);
+    expect(licenceRefreshDue({ state: 'ready', tier: 'trial' }, seen, NOW + 86_400)).toBe(true);
+    expect(licenceRefreshDue({ state: 'checkin-required', tier: 'paid' }, seen, NOW)).toBe(true);
+    expect(licenceRefreshDue({ state: 'unavailable', tier: null }, seen, NOW + 30 * 86_400)).toBe(
+      false,
+    );
+  });
+  it('asks at once when the clock is earlier than the device was last seen', () => {
+    const seen = { refreshedAt: NOW + 19 * 86_400, lastSeenAt: NOW + 20 * 86_400 };
+    expect(licenceRefreshDue(paid, seen, NOW + 20 * 86_400 - 300)).toBe(false);
+    expect(licenceRefreshDue(paid, seen, NOW + 20 * 86_400 - 301)).toBe(true);
+    expect(licenceRefreshDue(paid, { refreshedAt: NOW, lastSeenAt: NOW }, NOW - 301)).toBe(true);
+  });
+});
 
 function fakeTimer() {
   const timer = { unref: vi.fn(), clear: vi.fn() };

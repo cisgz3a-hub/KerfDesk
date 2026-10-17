@@ -6,7 +6,6 @@ import {
   type LicensingStore,
 } from './licensing-store.js';
 import type { LicenceClaims } from './licensing-verification.js';
-
 import { evaluateLicence, licenceSummary, type LicenceStatus } from './licensing-status.js';
 import { LicenceServiceError, licensingRequest } from './licensing-http.js';
 import {
@@ -28,6 +27,7 @@ import { LicensingUpdateCache } from './licensing-update-cache.js';
 import { findLicenceKey } from '../public/licence-key-text.mjs';
 import { manageLicenceDevices, type DeviceInput } from './licensing-devices.js';
 import { saveTrialClock, TrialSessionClock, withTrialBudget } from './licensing-trial-clock.js';
+import { PaidClockMark } from './licensing-paid-clock.js';
 import { licenceRefreshDue } from './licensing-schedule.js';
 import { clockErrorMessage, LicenceClockError } from './licensing-clock.js';
 import {
@@ -41,11 +41,8 @@ import {
   type GrantAction,
   type VerifiedGrant,
 } from './licensing-grant.js';
-import {
-  deactivateDevice,
-  resetSavedLicence,
-  type DeactivationAccess,
-} from './licensing-signout.js';
+import { deactivateDevice, resetSavedLicence } from './licensing-signout.js';
+import type { DeactivationAccess } from './licensing-signout.js';
 export type { LicenceStatus } from './licensing-status.js';
 
 type RuntimeOptions = {
@@ -76,6 +73,7 @@ class LicensingService {
   // saved record fails. Only a newly accepted online grant may restore it.
   private rejectedEntitlement: string | null = null;
   private trialClock: TrialSessionClock | null = null;
+  private readonly paidMark = new PaidClockMark(() => this.now());
   private queue: Promise<unknown> = Promise.resolve();
   private readonly updateCache: LicensingUpdateCache;
 
@@ -165,6 +163,7 @@ class LicensingService {
             mutation === 'activation' ? () => this.evaluate(saved, device) : undefined,
           );
         }
+        await this.paidMark.save(result, this.load, this.write, this.updateCache);
         return result;
       } catch (error) {
         this.updateCache.invalidate();
@@ -231,10 +230,10 @@ class LicensingService {
     this.updateCache.failAuthentication();
     let grant: VerifiedGrant;
     try {
-      grant = verifyGrant(this.config, value, device, this.now());
+      grant = verifyGrant(this.config, value, device, this.now(), action);
     } catch (error) {
       if (!(error instanceof LicenceClockError)) throw error;
-      // The service answered, but this computer's clock is too far off to trust it.
+      // The service answered, but this clock is too far off (a paid refresh is kept: verifyGrant).
       const kept = this.evaluate(saved, device);
       return { ...kept, state: 'clock-error', message: clockErrorMessage(error.offset) };
     }
@@ -304,7 +303,7 @@ class LicensingService {
       if (this.config.channel !== 'commercial') return this.readStatus();
       const { saved, device } = await this.load();
       const current = this.evaluate(saved, device);
-      if (licenceRefreshDue(current, saved.refreshedAt, this.now())) return this.acquire('refresh');
+      if (licenceRefreshDue(current, saved, this.now())) return this.acquire('refresh');
       return current;
     }, true);
   readonly deactivate = () =>

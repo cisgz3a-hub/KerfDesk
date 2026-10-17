@@ -732,11 +732,17 @@ describe('clock checks and the saved clock mark (ADR-523 Amendment 2)', () => {
     expect((await trial.runtime.startTrial()).message).toContain('about 3 days ahead');
     expect(trial.saved()).toBeNull();
   });
-  it('saves observed trial progress while avoiding unchanged and paid writes', async () => {
+  it('saves observed trial progress each second and paid progress every five minutes', async () => {
     const paid = harness(saved());
-    paid.clock(NOW + 3_600_000);
+    paid.clock(NOW + 299_000);
     await paid.runtime.status();
     expect(paid.store.write).not.toHaveBeenCalled();
+    paid.clock(NOW + 3_600_000);
+    await paid.runtime.status();
+    expect(paid.saved()?.lastSeenAt).toBe(NOW / 1000 + 3600);
+    expect(paid.store.write).toHaveBeenCalledOnce();
+    await paid.runtime.status();
+    expect(paid.store.write).toHaveBeenCalledOnce();
     const trial = harness(saved(trialClaims()));
     trial.clock(NOW + 30_000);
     await trial.runtime.status();
@@ -748,7 +754,7 @@ describe('clock checks and the saved clock mark (ADR-523 Amendment 2)', () => {
     await trial.runtime.status();
     expect(trial.saved()?.lastSeenAt).toBe(NOW / 1000 + 61);
   });
-  it('moves a trial clock mark on at each quiet check without calling the service', async () => {
+  it('moves a clock mark on at each quiet check without calling the service', async () => {
     const trial = harness({ ...saved(trialClaims()), refreshedAt: NOW / 1000 });
     trial.clock(NOW + 30 * 60_000);
     expect(await trial.runtime.refreshInBackground()).toMatchObject({ state: 'ready' });
@@ -757,7 +763,8 @@ describe('clock checks and the saved clock mark (ADR-523 Amendment 2)', () => {
     const paid = harness({ ...saved(), refreshedAt: NOW / 1000 });
     paid.clock(NOW + 30 * 60_000);
     await paid.runtime.refreshInBackground();
-    expect(paid.store.write).not.toHaveBeenCalled();
+    expect(paid.fetch).not.toHaveBeenCalled();
+    expect(paid.saved()?.lastSeenAt).toBe(NOW / 1000 + 1800);
   });
 });
 

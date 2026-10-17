@@ -1,4 +1,11 @@
-import { CHECK_IN_LIMIT, checkInOverdue, clockRolledBack } from './licensing-clock.js';
+import {
+  CHECK_IN_LIMIT,
+  CLOCK_TOLERANCE,
+  checkInDueAt,
+  checkInOverdue,
+  clockRolledBack,
+  clockWarningMessage,
+} from './licensing-clock.js';
 import type { LicensingConfig } from './licensing-config.js';
 import type { LicenceRecord } from './licensing-store.js';
 import {
@@ -30,6 +37,11 @@ export type LicenceStatus = {
   readonly accessExpiresAt: number | null;
   /** Current main-process trial budget; the signed original deadline is unchanged. */
   readonly trialExpiresInMs?: number;
+  /**
+   * Unix seconds on this computer's clock when new Pro choices pause unless the
+   * licence service confirms these rights first (ADR-592). Absent without a check-in.
+   */
+  readonly checkInDueAt?: number;
   readonly updatesUntil: number | null;
   readonly perpetualUpdates: boolean;
   /** The saved licence key, so a buyer can activate their other devices. */
@@ -154,21 +166,37 @@ export function evaluateLicence(
       claims,
       'Your 30-day Pro trial has ended. KerfDesk Free keeps working. Buy a licence or enter your key to use the Pro tools again.',
     );
-  return summary(...currentRights(claims, release, saved.lastSeenAt, now));
+  return withCheckInDue(summary(...currentRights(claims, release, saved, now)), claims, saved);
+}
+
+/** A paid grant's saved clock offset (ADR-592); a trial is never measured by one. */
+function paidOffset(claims: LicenceClaims, saved: LicenceRecord): number {
+  return claims.tier === 'paid' ? (saved.clockOffset ?? 0) : 0;
+}
+
+function withCheckInDue(
+  status: LicenceStatus,
+  claims: LicenceClaims,
+  saved: LicenceRecord,
+): LicenceStatus {
+  const due = checkInDueAt(claims, paidOffset(claims, saved));
+  return due === null ? status : { ...status, checkInDueAt: due };
 }
 
 /** Rights that verified and have not ended: due a check-in, beyond their updates, or ready. */
 function currentRights(
   claims: LicenceClaims,
   release: VerifiedRelease,
-  lastSeenAt: number,
+  saved: LicenceRecord,
   now: number,
 ): [LicenceStatus['state'], LicenceClaims, string | null] {
-  if (checkInOverdue(claims, lastSeenAt, now))
+  const offset = paidOffset(claims, saved);
+  if (checkInOverdue(claims, saved.lastSeenAt, now, offset))
     return ['checkin-required', claims, checkInMessage(claims)];
   if (!licenceCoversRelease(claims, release))
     return ['updates-expired', claims, updatesExpiredMessage(claims)];
-  return ['ready', claims, null];
+  // The last confirmation arrived with this clock off: keep saying so.
+  return ['ready', claims, Math.abs(offset) > CLOCK_TOLERANCE ? clockWarningMessage(offset) : null];
 }
 
 function checkInMessage(claims: LicenceClaims): string {

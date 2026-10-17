@@ -61,9 +61,31 @@ export function useEdition(): EditionValue {
 let fallback: EditionValue = DEFAULT_EDITION;
 let active: EditionValue = DEFAULT_EDITION;
 
+let statusKnown: Promise<void> = Promise.resolve();
+let markStatusKnown: () => void = () => undefined;
+
 /** EditionProvider publishes itself here for callers outside React. */
 export function setActiveEdition(value: EditionValue | null): void {
   active = value ?? fallback;
+  if (value !== null && value.status !== null) markStatusKnown();
+}
+
+/** How long startup work waits for the first licence status before treating the window as Free. */
+export const INITIAL_LICENCE_STATUS_TIMEOUT_MS = 10_000;
+
+/**
+ * Resolves once a licensed window has its first licence status, or after a
+ * timeout, so startup decisions such as autosave recovery see a paying user's
+ * Pro instead of the locked startup edition. Other windows resolve at once.
+ */
+export function initialLicenceStatus(
+  timeoutMs: number = INITIAL_LICENCE_STATUS_TIMEOUT_MS,
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, timeoutMs);
+  });
+  return Promise.race([statusKnown, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -71,6 +93,9 @@ export function setActiveEdition(value: EditionValue | null): void {
  * reports, so nothing opened during startup is admitted as Pro (ADR-592).
  */
 export function startLicensedEditionLocked(): void {
+  statusKnown = new Promise<void>((resolve) => {
+    markStatusKnown = resolve;
+  });
   fallback = {
     status: null,
     licensed: true,

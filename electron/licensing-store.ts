@@ -13,6 +13,12 @@ export type LicenceRecord = {
   readonly lastSeenAt: number;
   /** Last time the licence service confirmed this device's rights. */
   readonly refreshedAt?: number;
+  /**
+   * Seconds this computer's clock was ahead of the licence service (behind if
+   * negative) when it accepted the saved paid grant despite its clock (ADR-592).
+   * Absent when the clock agreed.
+   */
+  readonly clockOffset?: number;
   readonly credential?: LicenceCredential;
   /** Kept with the credential so a buyer can read it back for their other devices. */
   readonly licenseKey?: string;
@@ -87,6 +93,7 @@ function validSavedExtras(value: Record<string, unknown>): boolean {
   const refreshed = value.refreshedAt;
   if (refreshed !== undefined && (!Number.isSafeInteger(refreshed) || (refreshed as number) < 0))
     return false;
+  if (value.clockOffset !== undefined && !Number.isSafeInteger(value.clockOffset)) return false;
   return value.licenseKey === undefined || validLicenceKey(value.licenseKey);
 }
 
