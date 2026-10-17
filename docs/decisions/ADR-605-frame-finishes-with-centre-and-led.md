@@ -1,4 +1,4 @@
-## ADR-604 - Frame can finish with Centre & LED, keeping the Absolute Frame
+## ADR-605 - Frame can finish with Centre & LED, keeping the Absolute Frame
 
 **Status:** Accepted by the maintainer's explicit instruction on 2026-10-17 (an optional per-machine setting that keeps Frame valid). Amends ADR-565 and ADR-603. Software verification only; physical controller, accessory and air-cut qualification remain separate evidence.
 

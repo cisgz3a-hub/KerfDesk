@@ -312,7 +312,7 @@ describe('separate positioning light transaction', () => {
   });
 });
 
-describe('Frame evidence across a positioning-light move (ADR-604)', () => {
+describe('Frame evidence across a positioning-light move (ADR-605)', () => {
   type Harness = ReturnType<typeof harness>;
   function completeFrame(h: Harness, startFrom: 'absolute' | 'current-position'): FramedRunPermit {
     const permit = {
