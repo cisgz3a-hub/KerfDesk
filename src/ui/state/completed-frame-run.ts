@@ -53,7 +53,7 @@ export type StashedFrameProof = Pick<
 >;
 
 /** A verified, beam-off positioning-light move keeps an Absolute footprint
- * (ADR-604): it observes the new head exactly as owned-run settlement does.
+ * (ADR-605): it observes the new head exactly as owned-run settlement does.
  * Current Position, transient permits, a split trace awaiting its program, or
  * any newer Frame evidence stay void. */
 export function rebasedLightMoveFramePatch(

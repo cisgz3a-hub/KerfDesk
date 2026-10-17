@@ -7,7 +7,7 @@ export type PositioningLight = {
   /** Pointer spot minus laser spot, in bed coordinates (millimetres). */
   readonly offsetXmm: number;
   readonly offsetYmm: number;
-  /** After a clean ordinary Frame, centre the pointer on the framed artwork and switch it on (ADR-604). */
+  /** After a clean ordinary Frame, centre the pointer on the framed artwork and switch it on (ADR-605). */
   readonly afterFrame?: boolean;
 };
 
