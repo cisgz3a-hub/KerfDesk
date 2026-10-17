@@ -19,9 +19,9 @@ The result is a deliberately tiny runtime tree — **10 packages**, read from `p
 | `clipper2-ts` | `2.0.1-17` | The **only** geometry kernel dependency | ADR-098 §2 (`DECISIONS.md:4561`) |
 | `three` | `^0.180.0` | 3D relief / cut preview — UI only | ADR-102 (`DECISIONS.md:4872`), an explicit override of ADR-098 §2 |
 | `opentype.js` | `^2.0.0` | Text → outlines | ADR-012 (`DECISIONS.md:415`) |
-| `dompurify` | `^3.4.12` | SVG sanitization (untrusted input) | ADR-017; `PROJECT.md:475` requires ≥ 3.3.2 |
+| `dompurify` | `3.4.17` | SVG sanitization (untrusted input) | ADR-017; `PROJECT.md:475` requires ≥ 3.3.2 |
 | `imagetracerjs` | `^1.2.6` | Multi-colour trace fallback, **UI-unreachable** | ADR-123 (`DECISIONS.md:6492`) |
-| `electron-updater` | `^6.8.9` | Desktop update feed, **inert** until signing exists | ADR-024/135 |
+| `electron-updater` | `6.8.10` | Desktop update feed, **inert** until signing exists | ADR-024/135 |
 | `lucide-static` | `^1.23.0` | Icon assets | **UNDECIDED — no ADR** found for this package |
 
 Notable *absences*, each deliberate:

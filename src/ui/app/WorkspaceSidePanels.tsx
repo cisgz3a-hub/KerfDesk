@@ -9,6 +9,7 @@ import { useWorkspaceLayoutStore } from '../state/workspace-layout-store';
 import { useMachineRailVisibility } from '../state/use-machine-rail-visibility';
 import type { RailPanelId } from '../state/ui-rail-panel';
 import { useWorkspaceLayout } from './use-workspace-layout';
+import { useSyncedPanelPulses } from '../common/sync-panel-pulses';
 
 export function WorkspaceSidePanels(): JSX.Element {
   const layout = useWorkspaceLayout();
@@ -190,6 +191,7 @@ function PanelTab(props: {
   readonly expanded: boolean;
   readonly onSelect: () => void;
 }): JSX.Element {
+  useSyncedPanelPulses();
   return (
     <button
       id={props.id}
@@ -222,6 +224,7 @@ function PanelToggle(props: {
   readonly expanded: boolean;
   readonly onToggle: () => void;
 }): JSX.Element {
+  useSyncedPanelPulses();
   return (
     <button
       type="button"
