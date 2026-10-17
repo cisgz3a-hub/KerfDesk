@@ -15,7 +15,7 @@ vi.mock('./report-controller-action-failure', () => ({
 
 import { centreLightAfterCleanFrame } from './use-frame-action';
 
-describe('Frame button finishing with Centre & LED (ADR-604)', () => {
+describe('Frame button finishing with Centre & LED (ADR-605)', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('centres the light on the framed artwork after a clean Frame', async () => {
