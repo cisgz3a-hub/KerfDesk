@@ -43,7 +43,6 @@ export function JigTraceControls(props: JigTraceControlsProps): JSX.Element {
   useBusyNotification(source.loading || commit.busy, props.onBusyChange);
   return (
     <section aria-label="Trace image in jig" style={sectionStyle}>
-      <h3 style={{ margin: 0 }}>Trace an image</h3>
       <label>
         Upload image to trace
         <input

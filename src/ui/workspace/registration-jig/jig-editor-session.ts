@@ -31,8 +31,12 @@ export type JigEditorSession = {
 
 export function createJigEditorSession(state: AppState): JigEditorSession {
   const boxes = findRegistrationBoxes(state.project.scene);
+  // Artwork only follows the outline burn. Moving outlines then would leave the
+  // artwork registered to outlines that no longer match the board, so they stay
+  // locked until the operator unlocks them on purpose.
+  const burned = registrationRunState(state.project.scene) === 'artwork';
   let draft: JigDraft = {
-    project: editableProject(state.project),
+    project: burned ? lockOutlines(state.project) : editableProject(state.project),
     selectedObjectId: state.selectedObjectId,
     additionalSelectedIds: state.additionalSelectedIds,
     registrationArtworkOutputSnapshot:
@@ -85,6 +89,24 @@ function editableProject(project: Project): Project {
   };
 }
 
+/** True while the draft's outlines are locked against moving. */
+export function jigOutlinesLocked(project: Project): boolean {
+  return findRegistrationBoxes(project.scene).some(
+    (box) => box.locked === true && box.provenance !== 'captured-board',
+  );
+}
+
+/** Explicit, undoable opt-in to move outlines that may already be burned. */
+export function unlockJigOutlines(session: JigEditorSession): JigEditorSession {
+  if (!jigOutlinesLocked(session.draft.project)) return session;
+  return changeJigDraft(session, { project: editableProject(session.draft.project) });
+}
+
+/** True once the draft holds an edit the main project does not have. */
+export function jigDraftDirty(session: JigEditorSession): boolean {
+  return session.past.length > 0;
+}
+
 export function selectedJigIds(draft: JigDraft): ReadonlySet<string> {
   return new Set([
     ...(draft.selectedObjectId === null ? [] : [draft.selectedObjectId]),
@@ -125,8 +147,13 @@ export function replaceJigLayout(
   spec: RegistrationJigSetSpec,
 ): JigEditorSession {
   const previous = session.draft.project.scene.layers;
-  const result = applyReplaceRegistrationJigSet({ ...session.draft, undoStack: [] }, spec, () =>
-    crypto.randomUUID(),
+  // Outlines that never reached the main canvas cannot have been burned, so a
+  // resized grid stays centred where it was instead of growing from one corner.
+  const result = applyReplaceRegistrationJigSet(
+    { ...session.draft, undoStack: [] },
+    spec,
+    () => crypto.randomUUID(),
+    session.firstSave ? 'centre' : 'corner',
   );
   const project = result.project;
   if (project === undefined || project === session.draft.project) return session;
@@ -190,15 +217,7 @@ export function commitJigEditorSession(
   if (session.firstSave && findRegistrationBoxes(draft.project.scene).length > 0) {
     draft = { ...draft, ...applyRegistrationOutput({ ...draft, undoStack: [] }, 'box') };
   }
-  const project = {
-    ...draft.project,
-    scene: {
-      ...draft.project.scene,
-      objects: draft.project.scene.objects.map((object) =>
-        isRegistrationBox(object) ? { ...object, locked: true } : object,
-      ),
-    },
-  };
+  const project = lockOutlines(draft.project);
   // Publish one edit, never the editor's intermediate history or machine state.
   return {
     project,
@@ -212,6 +231,18 @@ export function commitJigEditorSession(
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,
+  };
+}
+
+function lockOutlines(project: Project): Project {
+  return {
+    ...project,
+    scene: {
+      ...project.scene,
+      objects: project.scene.objects.map((object) =>
+        isRegistrationBox(object) && object.locked !== true ? { ...object, locked: true } : object,
+      ),
+    },
   };
 }
 

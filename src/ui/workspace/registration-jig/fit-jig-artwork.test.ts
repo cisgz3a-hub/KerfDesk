@@ -76,6 +76,50 @@ describe('fit imported artwork to a jig', () => {
     }
   });
 
+  it('fits each file of a batch into the next outline from the anchor, wrapping round', () => {
+    const outlines = [0, 1, 2].map((index) =>
+      createRegistrationBox({
+        widthMm: 80,
+        heightMm: 40,
+        x: index * 100,
+        y: 50,
+        id: `jig-${index}`,
+      }),
+    );
+    const centreX = (index: number): number => {
+      const box = transformedBBox(
+        fitJigArtwork(artwork, scene(...outlines), new Set(['jig-1']), index),
+      );
+      return (box.minX + box.maxX) / 2;
+    };
+    expect([0, 1, 2].map(centreX)).toEqual([140, 240, 40]);
+  });
+
+  it('anchors on the outline holding selected artwork when no outline is selected', () => {
+    const outlines = [0, 1].map((index) =>
+      createRegistrationBox({
+        widthMm: 80,
+        heightMm: 40,
+        x: index * 100,
+        y: 0,
+        id: `jig-${index}`,
+      }),
+    );
+    const placed = {
+      ...svgObj('placed', ['#000000']),
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: { ...artwork.transform, x: 130, y: 10 },
+    };
+    const box = transformedBBox(
+      fitJigArtwork(
+        artwork,
+        { ...scene(...outlines), objects: [...outlines, placed] },
+        new Set(['placed']),
+      ),
+    );
+    expect((box.minX + box.maxX) / 2).toBeCloseTo(140);
+  });
+
   it('leaves the normal import fallback available when there is no outline', () => {
     expect(fitJigArtwork(artwork, scene(), new Set())).toBe(artwork);
   });
