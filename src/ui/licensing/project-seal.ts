@@ -15,7 +15,8 @@ const encoder = new TextEncoder();
 const DOMAIN = encoder.encode('kerfdesk-project-seal:v1:');
 const BLOCK = 64;
 
-let key: Uint8Array | null = null;
+// Backed by a plain ArrayBuffer, as WebCrypto's importKey requires.
+let key: Uint8Array<ArrayBuffer> | null = null;
 let ready: Promise<void> = Promise.resolve();
 const trusted = new WeakSet<object>();
 
@@ -107,7 +108,7 @@ export function resetProjectSealForTests(value: string | null = null): void {
   ready = Promise.resolve();
 }
 
-function decodeKey(value: string | null): Uint8Array | null {
+function decodeKey(value: string | null): Uint8Array<ArrayBuffer> | null {
   if (value === null || !/^[A-Za-z0-9_-]{43}$/.test(value)) return null;
   const binary = atob(value.replaceAll('-', '+').replaceAll('_', '/'));
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));

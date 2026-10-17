@@ -26,7 +26,9 @@ export class PaidClockMark {
     write: (next: LicenceRecord, device: string) => Promise<void>,
     cache: { readonly update: (saved: LicenceRecord, device: string) => void },
   ): Promise<void> {
-    if (status.tier !== 'paid') return;
+    // A licence with no tier, or any tier but paid, never gets a paid mark.
+    const tier = status.tier;
+    if (tier !== 'paid') return;
     let loaded: Loaded;
     try {
       loaded = await load();
@@ -39,7 +41,7 @@ export class PaidClockMark {
       this.clock = new TrialSessionClock(Infinity, this.wallNow, saved.lastSeenAt);
       this.payload = payload;
     }
-    const mark = nextPaidMark(status, saved.lastSeenAt, Math.floor(this.clock.now()));
+    const mark = nextPaidMark({ tier }, saved.lastSeenAt, Math.floor(this.clock.now()));
     if (mark === null) return;
     // The store writes atomically, so a failure leaves the saved record as it was.
     await write({ ...saved, lastSeenAt: mark }, device).catch(() => cache.update(saved, device));
