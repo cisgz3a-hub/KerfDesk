@@ -56,6 +56,7 @@ function lossyAdapter(sim: GrblSimulator, link: Link): PlatformAdapter {
       ...sim.adapter.serial,
       requestPort: async (...args: Parameters<PlatformAdapter['serial']['requestPort']>) => {
         const port = await sim.adapter.serial.requestPort(...args);
+        if (port === null) return null;
         return {
           ...port,
           open: async (...openArgs: Parameters<typeof port.open>) => {
@@ -170,9 +171,15 @@ describe('lost job-line replies at the end of a job', () => {
 });
 
 describe('reportProof', () => {
+  const stamp = (sessionEpoch: number) => ({
+    sessionEpoch,
+    positionEpoch: 0,
+    sequence: 1,
+    observedAt: 1,
+  });
   const base = {
     controllerSessionEpoch: 3,
-    statusObservation: { sessionEpoch: 3, observedAt: 1 },
+    statusObservation: stamp(3),
     rxCapacityEvidence: { rxBytesFree: 128, plannerBlocksFree: 15, sessionEpoch: 3, observedAt: 1 },
     plannerCapacityEvidence: { plannerBlocksFree: 15, sessionEpoch: 3, observedAt: 1 },
   };
@@ -187,7 +194,7 @@ describe('reportProof', () => {
     expect(
       reportProof({
         ...base,
-        statusObservation: { sessionEpoch: 2, observedAt: 1 },
+        statusObservation: stamp(2),
         statusReport: report('Idle', null),
       }),
     ).toBeNull();
