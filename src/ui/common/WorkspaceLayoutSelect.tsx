@@ -58,11 +58,11 @@ export function WorkspaceLayoutSelect(): JSX.Element {
           setOpen(true);
         }}
       >
-        <Icon name="panels" size={18} />
+        <Icon name="panels" size={16} />
         <span id={valueId}>
           {LAYOUT_OPTIONS.find((option) => option.value === preference)?.label}
         </span>
-        <Icon name="chevron-down" size={13} />
+        <Icon name="chevron-down" size={12} />
       </button>
       {open ? (
         <AnchoredPopover

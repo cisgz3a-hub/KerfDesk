@@ -101,14 +101,18 @@
   /* Floating-surface shadow (toasts; modal panels use --lf-backdrop) */
   --lf-shadow: 0 2px 8px rgba(28, 25, 21, 0.18);
 
-  /* Type scale */
+  /* Type scale — desktop-tool density (ADR-608). LightBurn, like other Qt
+   * apps, sets its window text in the OS UI font at 9 pt, which is 12 px at
+   * 100 % Windows scaling. Body text here is 13 px, one step above that, and
+   * labels and inputs use LightBurn's 12 px. Windows display scaling multiplies
+   * every value, so a 150 % laptop shows these at 19.5 px and 18 px physical. */
   --lf-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --lf-font-mono: ui-monospace, Menlo, monospace;
-  --lf-text-xs: 12px;
-  --lf-text-sm: 14px;
-  --lf-text-md: 15px;
-  --lf-text-lg: 16px;
-  --lf-text-xl: 18px;
+  --lf-text-xs: 11px;
+  --lf-text-sm: 12px;
+  --lf-text-md: 13px;
+  --lf-text-lg: 14px;
+  --lf-text-xl: 16px;
 
   /* Space + radius */
   --lf-space-1: 2px;
@@ -195,7 +199,7 @@ body {
   background: var(--lf-bg-1);
   border: 1px solid var(--lf-border);
   border-radius: var(--lf-radius-md);
-  padding: 3px 10px;
+  padding: 2px 8px;
   cursor: pointer;
   transition:
     background-color 80ms,
@@ -311,7 +315,7 @@ body {
 
 .lf-btn--sm {
   font-size: var(--lf-text-sm);
-  padding: 2px 8px;
+  padding: 1px 6px;
   min-height: 24px;
 }
 
@@ -509,8 +513,8 @@ body {
   display: flex;
   align-items: center;
   gap: var(--lf-space-3);
-  min-height: 28px;
-  padding: var(--lf-space-2) 0;
+  min-height: 24px;
+  padding: var(--lf-space-1) 0;
   font-size: var(--lf-text-sm);
   font-weight: 600;
   color: var(--lf-text);
@@ -807,7 +811,7 @@ body {
   color: var(--lf-text);
   font: inherit;
   font-size: var(--lf-text-md);
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: var(--lf-radius-sm);
   cursor: pointer;
   text-align: left;

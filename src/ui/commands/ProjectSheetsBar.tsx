@@ -57,7 +57,7 @@ export function ProjectSheetsBar(): JSX.Element {
             )
           }
         >
-          <Icon name="plus" size={18} />
+          <Icon name="plus" size={16} />
         </button>
         <Button
           aria-label="Manage project sheets"

@@ -190,8 +190,8 @@ function groupCommands(
 const menuBarStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'stretch',
-  gap: 2,
-  padding: '2px 0',
+  gap: 1,
+  padding: '1px 0',
   background: 'var(--lf-bg-0)',
   color: 'var(--lf-text)',
   fontFamily: 'system-ui, sans-serif',
@@ -203,7 +203,7 @@ const familyStyle: React.CSSProperties = { position: 'relative' };
 const summaryStyle: React.CSSProperties = {
   listStyle: 'none',
   cursor: 'pointer',
-  padding: '4px 8px',
+  padding: '2px 7px',
   borderRadius: 4,
   userSelect: 'none',
 };
@@ -229,9 +229,9 @@ const menuSeparatorStyle: React.CSSProperties = {
   margin: '3px 6px',
 };
 const menuGroupLabelStyle: React.CSSProperties = {
-  padding: '5px 9px 2px',
+  padding: '4px 8px 1px',
   color: 'var(--lf-text-faint)',
-  fontSize: 11,
+  fontSize: 'var(--lf-text-xs)',
   fontWeight: 700,
   letterSpacing: '0.04em',
   textTransform: 'uppercase',
@@ -249,6 +249,6 @@ const checkmarkStyle: React.CSSProperties = {
 const menuLabelStyle: React.CSSProperties = { flex: 1 };
 const shortcutStyle: React.CSSProperties = {
   color: 'var(--lf-text-faint)',
-  fontSize: 12,
+  fontSize: 'var(--lf-text-xs)',
   whiteSpace: 'nowrap',
 };

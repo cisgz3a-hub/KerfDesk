@@ -192,7 +192,7 @@ function ConnectionMenu(props: Props & { readonly notice: ControllerNotice }): J
           setOpen((value) => !value);
         }}
       >
-        <Icon name="more" size={18} />
+        <Icon name="more" size={16} />
       </button>
       {open ? (
         <AnchoredPopover
