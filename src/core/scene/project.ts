@@ -174,6 +174,8 @@ export type Project = {
   readonly workspace: Workspace;
   readonly optimization: ProjectOptimizationSettings;
   readonly startPoints?: ProjectStartPoints;
+  // Artwork output intent retained through Outline only, undo/redo and .lf2 reload.
+  readonly registrationArtworkOutputSnapshot?: Readonly<Record<string, boolean>>;
   readonly jobSetup: ProjectJobSetup;
   readonly variables?: ProjectVariableData;
   readonly printAndCutTargets?: PrintAndCutDesignTargets;

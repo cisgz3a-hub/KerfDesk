@@ -91,9 +91,7 @@ async function tool(page: Page, name: string) {
   await command.click({ timeout: 15_000 });
   if (name !== 'Measure' && name !== 'Text...') {
     await page
-      .locator(
-        '[role="dialog"], section[aria-label="Registration jig"], section[aria-label="Place board"]',
-      )
+      .locator('[role="dialog"], section[aria-label="Place board"]')
       .first()
       .waitFor({ state: 'visible', timeout: 60_000 });
   }
@@ -236,12 +234,14 @@ test('tools.add-text renders text, adds artwork and undoes', async ({ page }) =>
   await insertedAndUndo(page);
 });
 
-test('tools.registration-jig creates an outline, closes the panel and undoes', async ({ page }) => {
+test('tools.registration-jig saves an outline from the editor and undoes', async ({ page }) => {
   await tool(page, 'Registration Jig');
-  const panel = page.getByRole('region', { name: 'Registration jig', exact: true });
-  await panel.getByRole('button', { name: 'Create outline', exact: true }).click();
-  await expect(panel).toContainText('1 jig on canvas');
-  await panel.getByRole('button', { name: 'Close registration jig panel' }).click();
+  const editor = page.getByRole('dialog', { name: 'Registration Jig editor', exact: true });
+  await editor.getByRole('button', { name: 'Save to canvas', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(
+    page.getByRole('region', { name: 'Registration jig controls', exact: true }),
+  ).toBeVisible();
   await insertedAndUndo(page);
 });
 

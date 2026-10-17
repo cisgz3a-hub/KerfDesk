@@ -54,10 +54,10 @@ export function registrationJigSetActions(set: Setter): RegistrationJigSetAction
 }
 
 export function applyReplaceRegistrationJigSet(
-  state: AppState,
+  state: Pick<AppState, 'project' | 'undoStack'>,
   spec: RegistrationJigSetSpec,
   idFactory: () => string,
-): AppState | Partial<AppState> {
+): Pick<AppState, 'project' | 'undoStack'> | Partial<AppState> {
   const issue = registrationJigSetIssue(spec, state.project.scene);
   if (issue !== null) throw new Error(issue);
   const existing = findRegistrationBoxes(state.project.scene);

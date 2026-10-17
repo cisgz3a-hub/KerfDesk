@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { SceneObject } from '../../core/scene';
+import type { Scene, SceneObject } from '../../core/scene';
+import type {
+  RegistrationJigArtworkResizeResult,
+  RegistrationJigArtworkSizeInput,
+} from '../state/registration-jig-artwork-actions';
 import { selectionMetricsInFrame } from '../../core/scene/selection-transform';
 import { registrationJigArtworkInstances } from '../../core/scene/registration-jig-artwork';
 import { useStore } from '../state';
@@ -11,6 +15,14 @@ const DIMENSION_DECIMALS = 3;
 export function RegistrationJigArtworkSizeControls(): JSX.Element | null {
   const scene = useStore((state) => state.project.scene);
   const resizeArtwork = useStore((state) => state.resizeRegistrationJigArtwork);
+  return <RegistrationJigArtworkSizeEditor scene={scene} onResize={resizeArtwork} />;
+}
+
+export function RegistrationJigArtworkSizeEditor(props: {
+  readonly scene: Scene;
+  readonly onResize: (input: RegistrationJigArtworkSizeInput) => RegistrationJigArtworkResizeResult;
+}): JSX.Element | null {
+  const { scene, onResize: resizeArtwork } = props;
   const pushToast = useToastStore((state) => state.pushToast);
   const instances = useMemo(() => registrationJigArtworkInstances(scene), [scene]);
   const firstObjects = instances[0]?.objects ?? [];

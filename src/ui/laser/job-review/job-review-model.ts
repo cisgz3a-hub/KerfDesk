@@ -1,8 +1,8 @@
+import * as jig from './job-review-registration-jig';
 import { cncProgramReachWarnings } from '../../../io/cnc/cnc-program-reach';
 import { compiledFocusTestWarnings } from './focus-test-warnings';
-// buildJobReviewModel maps one successful Start preparation and its store
-// snapshots into the Job Review display model (ADR-224). Live editable sections
-// still read stores directly; compiled facts come from the prepared job.
+// Job Review uses one successful Start preparation (ADR-224). Editable sections read stores;
+// compiled facts come from the prepared job.
 
 import type { OverrideValues } from '../../../core/controllers/grbl';
 import {
@@ -75,7 +75,7 @@ export type JobReviewAcknowledgement =
   | { readonly kind: 'laser-unverified'; readonly prompt: string }
   | { readonly kind: 'cnc'; readonly prompt: string };
 
-export type JobReviewModel = JobReviewOmissions & {
+export interface JobReviewModel extends JobReviewOmissions, jig.ReviewFacts {
   readonly machineKind: MachineKind;
   readonly stats: ReadonlyArray<JobReviewStatTile>;
   readonly warnings: ReadonlyArray<string>;
@@ -86,7 +86,7 @@ export type JobReviewModel = JobReviewOmissions & {
   readonly acknowledgement: JobReviewAcknowledgement;
   readonly outputQualityFacts: ReadonlyArray<JobReviewFact>;
   readonly effectiveOperations: ReturnType<typeof buildEffectiveOperationReview>;
-};
+}
 
 export type JobReviewStreamThroughput = Pick<StreamThroughputInput, 'window' | 'controllerKind'>;
 
@@ -107,6 +107,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
   const outputScope = args.outputScope ?? DEFAULT_OUTPUT_SCOPE;
   return {
     machineKind,
+    ...jig.facts(args.project, args.prepared.prepared.job, outputScope),
     ...buildReviewedOmissions(args.prepared, outputScope),
     stats: buildStatTiles(
       args.prepared,

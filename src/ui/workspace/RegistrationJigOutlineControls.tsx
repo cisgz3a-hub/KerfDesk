@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   findRegistrationBoxes,
   transformedBBox,
@@ -14,9 +14,7 @@ import {
   removedJigArtworkIds,
   type RemovedJigArtworkPolicy,
 } from '../state/registration-jig-layout';
-import { useStore } from '../state';
 import {
-  LockRegistrationJigSetControl,
   RegistrationJigGridFields,
   RegistrationJigShapeFields,
   RemoveRegistrationJigSetButton,
@@ -47,15 +45,56 @@ type InitialGridControls = {
   readonly spacingY: string;
 };
 
-export function RegistrationJigOutlineControls(): JSX.Element {
-  const scene = useStore((state) => state.project.scene);
-  const replaceSet = useStore((state) => state.replaceRegistrationJigSet);
-  const removeSet = useStore((state) => state.removeRegistrationBox);
-  const setLocked = useStore((state) => state.setRegistrationBoxLocked);
-  const boxes = findRegistrationBoxes(scene);
+export function RegistrationJigOutlineControls(props: {
+  readonly scene: Scene;
+  readonly onReplace: (spec: RegistrationJigSetSpec) => void;
+  readonly onRemove: () => void;
+  readonly onPendingChange: (pending: boolean) => void;
+}): JSX.Element {
+  const boxes = findRegistrationBoxes(props.scene);
+  const fields = useOutlineFields(boxes, props.onPendingChange);
+  const [removedArtwork, setRemovedArtwork] = useState<RemovedJigArtworkPolicy>('keep');
+  const spec = { ...fields.spec, removedArtwork };
+  const issue = registrationJigSetIssue(spec, props.scene);
+  const captured = boxes.some((box) => box.provenance === 'captured-board');
+  return (
+    <>
+      <RegistrationJigShapeFields {...fields.shapeFields} />
+      <RegistrationJigGridFields {...fields.gridFields} />
+      <JigLayoutSummary
+        scene={props.scene}
+        issue={issue}
+        requestedCount={spec.rows * spec.columns}
+        outlineCount={boxes.length}
+        removedArtwork={removedArtwork}
+        onPolicyChange={setRemovedArtwork}
+      />
+      <div style={actionRowStyle}>
+        <ReplaceJigButton
+          capturedBoard={captured}
+          issue={issue}
+          label="Apply layout"
+          onClick={() => {
+            props.onReplace(spec);
+            setRemovedArtwork('keep');
+          }}
+        />
+        <RemoveRegistrationJigSetButton
+          show={boxes.length > 0 && !captured}
+          outlineCount={boxes.length}
+          onClick={props.onRemove}
+        />
+      </div>
+    </>
+  );
+}
+
+function useOutlineFields(
+  boxes: ReadonlyArray<ShapeObject>,
+  onPendingChange: (pending: boolean) => void,
+) {
   const initial = initialOutlineControls(boxes[0]);
   const initialGrid = initialGridControls(boxes);
-  const isCapturedBoard = boxes.some((box) => box.provenance === 'captured-board');
   const [shape, setShape] = useState<RegistrationJigShape>(initial.shape);
   const [widthMm, setWidthMm] = useState(initial.widthMm);
   const [heightMm, setHeightMm] = useState(initial.heightMm);
@@ -64,69 +103,44 @@ export function RegistrationJigOutlineControls(): JSX.Element {
   const [columns, setColumns] = useState(initialGrid.columns);
   const [spacingX, setSpacingX] = useState(initialGrid.spacingX);
   const [spacingY, setSpacingY] = useState(initialGrid.spacingY);
-  const [removedArtwork, setRemovedArtwork] = useState<RemovedJigArtworkPolicy>('keep');
-  const spec = {
-    ...jigSetSpec(shape, widthMm, heightMm, diameterMm, rows, columns, spacingX, spacingY),
-    removedArtwork,
+  const pending =
+    JSON.stringify([shape, widthMm, heightMm, diameterMm, rows, columns, spacingX, spacingY]) !==
+    JSON.stringify([
+      initial.shape,
+      initial.widthMm,
+      initial.heightMm,
+      initial.diameterMm,
+      initialGrid.rows,
+      initialGrid.columns,
+      initialGrid.spacingX,
+      initialGrid.spacingY,
+    ]);
+  useEffect(() => {
+    onPendingChange(pending);
+  }, [pending, onPendingChange]);
+  return {
+    spec: jigSetSpec(shape, widthMm, heightMm, diameterMm, rows, columns, spacingX, spacingY),
+    shapeFields: {
+      shape,
+      widthMm,
+      heightMm,
+      diameterMm,
+      onShapeChange: setShape,
+      onWidthChange: setWidthMm,
+      onHeightChange: setHeightMm,
+      onDiameterChange: setDiameterMm,
+    },
+    gridFields: {
+      rows,
+      columns,
+      spacingX,
+      spacingY,
+      onRowsChange: setRows,
+      onColumnsChange: setColumns,
+      onSpacingXChange: setSpacingX,
+      onSpacingYChange: setSpacingY,
+    },
   };
-  const issue = registrationJigSetIssue(spec, scene);
-  const requestedCount = spec.rows * spec.columns;
-
-  return (
-    <>
-      <RegistrationJigShapeFields
-        shape={shape}
-        widthMm={widthMm}
-        heightMm={heightMm}
-        diameterMm={diameterMm}
-        onShapeChange={setShape}
-        onWidthChange={setWidthMm}
-        onHeightChange={setHeightMm}
-        onDiameterChange={setDiameterMm}
-      />
-      <RegistrationJigGridFields
-        rows={rows}
-        columns={columns}
-        spacingX={spacingX}
-        spacingY={spacingY}
-        onRowsChange={setRows}
-        onColumnsChange={setColumns}
-        onSpacingXChange={setSpacingX}
-        onSpacingYChange={setSpacingY}
-      />
-      <JigLayoutSummary
-        scene={scene}
-        issue={issue}
-        requestedCount={requestedCount}
-        outlineCount={boxes.length}
-        removedArtwork={removedArtwork}
-        onPolicyChange={setRemovedArtwork}
-      />
-      <div style={actionRowStyle}>
-        <ReplaceJigButton
-          capturedBoard={isCapturedBoard}
-          issue={issue}
-          label={createButtonLabel(initial.hasOutline, requestedCount)}
-          onClick={() => {
-            replaceSet(spec);
-            setRemovedArtwork('keep');
-          }}
-        />
-        <RemoveRegistrationJigSetButton
-          show={initial.hasOutline}
-          outlineCount={boxes.length}
-          onClick={removeSet}
-        />
-      </div>
-      <LockRegistrationJigSetControl
-        show={initial.hasOutline}
-        checked={initial.locked}
-        disabled={isCapturedBoard}
-        outlineCount={boxes.length}
-        onChange={setLocked}
-      />
-    </>
-  );
 }
 
 function ReplaceJigButton(props: {
@@ -228,7 +242,7 @@ function initialOutlineControls(box: ShapeObject | undefined): InitialOutlineCon
       shape: 'circle',
       widthMm: String(DEFAULT_WIDTH_MM),
       heightMm: String(DEFAULT_HEIGHT_MM),
-      diameterMm: String(box.spec.widthMm),
+      diameterMm: String(box.spec.widthMm * Math.abs(box.transform.scaleX)),
     };
   }
   if (box.spec.kind === 'rect') {
@@ -236,8 +250,8 @@ function initialOutlineControls(box: ShapeObject | undefined): InitialOutlineCon
       hasOutline: true,
       locked: box.locked === true,
       shape: 'rectangle',
-      widthMm: String(box.spec.widthMm),
-      heightMm: String(box.spec.heightMm),
+      widthMm: String(box.spec.widthMm * Math.abs(box.transform.scaleX)),
+      heightMm: String(box.spec.heightMm * Math.abs(box.transform.scaleY)),
       diameterMm: String(DEFAULT_DIAMETER_MM),
     };
   }
@@ -322,13 +336,6 @@ function jigSetSpec(
 
 function finiteNumber(value: string): number {
   return value.trim() === '' ? Number.NaN : Number(value);
-}
-
-function createButtonLabel(hasOutline: boolean, count: number): string {
-  if (!Number.isSafeInteger(count) || count < 1)
-    return hasOutline ? 'Replace outlines' : 'Create outlines';
-  if (count === 1) return hasOutline ? 'Replace outline' : 'Create outline';
-  return hasOutline ? `Replace with ${count} jigs` : `Create ${count} jigs`;
 }
 
 function jigWord(count: number): string {

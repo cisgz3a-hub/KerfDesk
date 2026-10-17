@@ -6,10 +6,17 @@ import {
   operationIdsForObject,
   primaryOperationForObject,
   REGISTRATION_LAYER_ID,
+  updateLayer,
 } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { deserializeProject } from '../../io/project/deserialize-project';
+import { serializeProject } from '../../io/project/serialize-project';
+import {
+  applyRegistrationOutput,
+  type RegistrationOutputState,
+} from './registration-output-actions';
 
 const ART_COLOR = '#0000ff';
 const DISABLED_ART_COLOR = '#00aa00';
@@ -103,9 +110,10 @@ describe('setRegistrationOutput', () => {
     expect(output[disabledOperationId]).toBe(false);
   });
 
-  it('enables all artwork after reopening a project saved in Outline-only mode', () => {
+  it('enables all artwork after reopening a legacy Outline-only project without saved intent', () => {
     useStore.getState().setRegistrationOutput('box');
-    const savedProject = useStore.getState().project;
+    const savedProject = { ...useStore.getState().project };
+    delete savedProject.registrationArtworkOutputSnapshot;
     useStore.getState().setProject(savedProject);
     expect(useStore.getState().registrationArtworkOutputSnapshot).toBeNull();
 
@@ -125,12 +133,122 @@ describe('setRegistrationOutput', () => {
     expect(useStore.getState().registrationArtworkOutputSnapshot).toBeNull();
   });
 
+  it.each(['history', 'reload'] as const)(
+    'restores enabled and disabled artwork after an Outline-only %s round trip',
+    (roundTrip) => {
+      useStore.getState().drawShape(
+        createRectangle({
+          id: 'disabled-art',
+          color: DISABLED_ART_COLOR,
+          spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+          transform: IDENTITY_TRANSFORM,
+        }),
+      );
+      const enabled = operationIdFor('art');
+      const disabled = operationIdFor('disabled-art');
+      useStore.getState().setLayerParam(disabled, { output: false });
+      useStore.getState().setRegistrationOutput('box');
+      if (roundTrip === 'history') {
+        useStore.getState().undo();
+        useStore.getState().redo();
+      } else {
+        const loaded = deserializeProject(serializeProject(useStore.getState().project));
+        expect(loaded.kind).toBe('ok');
+        if (loaded.kind !== 'ok') return;
+        useStore.setState({ project: loaded.project, registrationArtworkOutputSnapshot: null });
+      }
+      expect(outputById()[enabled]).toBe(false);
+      useStore.getState().setRegistrationOutput('artwork');
+      expect(outputById()).toMatchObject({
+        [enabled]: true,
+        [disabled]: false,
+        [REGISTRATION_LAYER_ID]: false,
+      });
+      expect(useStore.getState().project).not.toHaveProperty('registrationArtworkOutputSnapshot');
+    },
+  );
+
+  it('preserves the original enabled and disabled artwork when Outline only is repeated', () => {
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'disabled-art',
+        color: DISABLED_ART_COLOR,
+        spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: 40, y: 10 },
+      }),
+    );
+    const artOperationId = operationIdFor('art');
+    const disabledOperationId = operationIdFor('disabled-art');
+    useStore.getState().setLayerParam(disabledOperationId, { output: false });
+    useStore.getState().setRegistrationOutput('box');
+    const firstOutline = useStore.getState();
+
+    useStore.getState().setRegistrationOutput('box');
+    useStore.getState().setRegistrationOutput('box');
+
+    expect(useStore.getState().registrationArtworkOutputSnapshot).toBe(
+      firstOutline.registrationArtworkOutputSnapshot,
+    );
+    expect(useStore.getState().project).toBe(firstOutline.project);
+    expect(useStore.getState().undoStack).toBe(firstOutline.undoStack);
+    useStore.getState().setRegistrationOutput('artwork');
+    expect(outputById()[artOperationId]).toBe(true);
+    expect(outputById()[disabledOperationId]).toBe(false);
+    expect(outputById()[REGISTRATION_LAYER_ID]).toBe(false);
+  });
+
+  it('applies an output change to an isolated draft without mutating the live project', () => {
+    const live = useStore.getState();
+    const draft: RegistrationOutputState = {
+      project: live.project,
+      registrationArtworkOutputSnapshot: null,
+      undoStack: [],
+    };
+
+    const outline = applyRegistrationOutput(draft, 'box');
+    const repeatedOutline = applyRegistrationOutput(outline, 'box');
+    const editedDraft = {
+      ...repeatedOutline,
+      project: {
+        ...repeatedOutline.project,
+        scene: updateLayer(repeatedOutline.project.scene, REGISTRATION_LAYER_ID, { output: false }),
+      },
+    };
+    const restoredOutline = applyRegistrationOutput(editedDraft, 'box');
+    const artwork = applyRegistrationOutput(restoredOutline, 'artwork');
+
+    expect(useStore.getState().project).toBe(live.project);
+    expect(repeatedOutline).toBe(outline);
+    expect(restoredOutline.registrationArtworkOutputSnapshot).toBe(
+      outline.registrationArtworkOutputSnapshot,
+    );
+    expect(outline.undoStack).toEqual([draft.project]);
+    expect(outline.dirty).toBe(true);
+    expect(artwork.registrationArtworkOutputSnapshot).toBeNull();
+    expect(
+      artwork.project.scene.layers.find((layer) => layer.id === operationIdFor('art'))?.output,
+    ).toBe(true);
+  });
+
   it('is a no-op when there is no registration jig', () => {
     resetStore();
     const before = useStore.getState().project;
     useStore.getState().setRegistrationOutput('box');
     expect(useStore.getState().project).toBe(before);
   });
+
+  it.each(['remove', 'capture'] as const)(
+    'restores artwork and clears durable intent when replacing the jig through %s',
+    (action) => {
+      const enabled = operationIdFor('art');
+      useStore.getState().setRegistrationOutput('box');
+      if (action === 'remove') useStore.getState().removeRegistrationBox();
+      else useStore.getState().addCapturedBoardBox(90, 60);
+      expect(outputById()[enabled]).toBe(true);
+      expect(useStore.getState().project).not.toHaveProperty('registrationArtworkOutputSnapshot');
+      expect(useStore.getState().registrationArtworkOutputSnapshot).toBeNull();
+    },
+  );
 });
 
 function operationIdFor(objectId: string): string {

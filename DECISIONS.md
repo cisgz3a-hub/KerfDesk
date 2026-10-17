@@ -3569,6 +3569,38 @@ for rotated artwork; no resize refusal, hidden input, or instruction to relock A
 introduced. This does not change Frame, Preview, compilation, transport, or machine
 authorization.
 
+### Amendment (2026-10-17) — dedicated jig editor and guided two-run output
+
+The floating jig panel is replaced by a dedicated editor with its own editable
+canvas, fitted to the jig on opening. Layout, selection transforms, text with the
+existing writing styles, imports, inline image tracing and Line/Fill operation
+settings are draft changes with local Undo/Redo. Shared artwork sizing, aspect-lock
+controls and the existing jig-instance copy/ordering semantics remain available.
+**Save to canvas** commits one undoable edit and locks the outlines on the main
+canvas. A new jig initially selects **Outline only**; editing an existing jig keeps
+its output mode. Closing without saving does not publish the draft. Captured boards
+remain owned by Place Board.
+
+The main canvas retains a compact **Edit jig / Outline only / Artwork only** bar.
+It explains the physical sequence: burn outlines on the base, place the pieces,
+focus on their top surface, then burn artwork without changing XY placement or
+work origin. The existing Start Job Review identifies the actual prepared output
+and offers the alternate output; choosing it cancels that review before changing
+the project. Artwork review reminds the operator that the piece is higher than
+the outline surface. The reminder is advisory, with no automatic focus/Z command
+and no additional Start gate.
+
+Only an accepted full outline run that finishes and physically settles cleanly
+can automatically select **Artwork only**. Completion ownership is fenced to the
+run, document and unchanged project/placement; Frame, partial selected-only runs,
+errors, cancellation and disconnects do not trigger the switch. Artwork output
+flags are preserved through the two-run toggle and project save/reopen.
+
+This amendment follows ADR-565: completed Frame evidence belongs to the unchanged
+footprint and placement, while each Start reviews and claims the current exact
+executable program. Output changes that alter that footprint require Frame again;
+power/speed changes alone do not discard spatial evidence.
+
 ### Consequences
 
 - The jig is a composition of existing machinery — reserved-id layer (ADR-005

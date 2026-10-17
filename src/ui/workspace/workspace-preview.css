@@ -6,6 +6,7 @@
   display: grid;
   grid-template:
     'controls' auto
+    'banner' auto
     'stage' minmax(0, 1fr)
     'preview' auto
     'sheets' auto / minmax(0, 1fr);
@@ -82,4 +83,9 @@
   .lf-workspace-view-controls {
     --lf-text-md: 12px;
   }
+}
+
+.lf-workspace-banner {
+  grid-area: banner;
+  min-width: 0;
 }

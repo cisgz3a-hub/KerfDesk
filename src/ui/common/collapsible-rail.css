@@ -1,0 +1,33 @@
+/* Keep a collapsed workspace panel discoverable until it is reopened. */
+.lf-btn.lf-panel-expand-hint {
+  border-color: var(--lf-accent);
+  background: var(--lf-accent);
+  color: var(--lf-on-fill);
+  animation: lf-panel-expand-pulse 2.4s ease-in-out infinite;
+}
+
+.lf-btn.lf-panel-expand-hint:hover:not(:disabled),
+.lf-btn.lf-panel-expand-hint:focus-visible:not(:disabled) {
+  animation: none;
+  background: var(--lf-accent-hover);
+  color: var(--lf-on-fill);
+}
+
+@keyframes lf-panel-expand-pulse {
+  0%,
+  100% {
+    background: var(--lf-accent-wash);
+    color: var(--lf-accent-fg);
+  }
+
+  50% {
+    background: var(--lf-accent);
+    color: var(--lf-on-fill);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lf-btn.lf-panel-expand-hint {
+    animation: none;
+  }
+}

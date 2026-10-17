@@ -9,6 +9,7 @@ export function WorkspaceViewport(props: {
   readonly content: ReactNode;
   readonly children: ReactNode;
   readonly footer?: ReactNode;
+  readonly banner?: ReactNode;
 }): JSX.Element {
   return (
     <div
@@ -19,6 +20,7 @@ export function WorkspaceViewport(props: {
       aria-label="Active project sheet workspace"
     >
       <div className="lf-workspace-view-controls">{props.controls}</div>
+      <div className="lf-workspace-banner">{props.banner}</div>
       {props.content}
       <div className="lf-workspace-accessories">{props.children}</div>
       {props.footer === undefined ? null : (
