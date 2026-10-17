@@ -76,12 +76,11 @@ function Harness(props: {
   const [selectedIds, onSelectionChange] = useState<ReadonlySet<string>>(new Set());
   return (
     <RegistrationJigCanvas
+      {...props}
       project={project}
       selectedIds={selectedIds}
-      fitRequest={props.fitRequest}
       onSelectionChange={onSelectionChange}
       onCommit={commit}
-      onDropFiles={props.onDropFiles}
     />
   );
 }
