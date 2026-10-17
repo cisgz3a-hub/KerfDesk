@@ -53,7 +53,12 @@ if (!expectedRemotes.includes(normalizeGitRemoteUrl(origin))) {
 }
 
 const indexHtml = readFileSync(resolve(repoRoot, 'index.html'), 'utf8');
-if (!indexHtml.includes('<title>KerfDesk</title>') || !indexHtml.includes('id="app-root"')) {
+// The shell title may carry a descriptive suffix for search results
+// ("KerfDesk — Laser and CNC Software"); the runtime window title is set by the app.
+if (
+  !/<title>KerfDesk(?:\s[^<]*)?<\/title>/.test(indexHtml) ||
+  !indexHtml.includes('id="app-root"')
+) {
   fail('index.html does not look like the KerfDesk app shell');
 }
 
