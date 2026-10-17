@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state/store';
 import { RegistrationJigOutlineControls } from './RegistrationJigOutlineControls';
@@ -13,7 +13,79 @@ import { isRegistrationBox } from '../../core/scene';
 const initial = useStore.getState();
 afterEach(() => useStore.setState(initial, true));
 
+function TestControls(): JSX.Element {
+  const scene = useStore((state) => state.project.scene);
+  return (
+    <RegistrationJigOutlineControls
+      key={JSON.stringify(scene.objects.filter(isRegistrationBox))}
+      scene={scene}
+      onReplace={useStore.getState().replaceRegistrationJigSet}
+      onRemove={useStore.getState().removeRegistrationBox}
+      onPendingChange={() => undefined}
+    />
+  );
+}
+
 describe('jig construction draft validation', () => {
+  it('reports pending layout edits and uses scaled dimensions without changing the live scene', async () => {
+    useStore.setState({ project: createProject(), undoStack: [] });
+    useStore.getState().addRegistrationBox(80, 40);
+    const live = useStore.getState().project;
+    const scene = {
+      ...live.scene,
+      objects: live.scene.objects.map((object) =>
+        isRegistrationBox(object)
+          ? { ...object, transform: { ...object.transform, scaleX: 2, scaleY: 0.5 } }
+          : object,
+      ),
+    };
+    const onReplace = vi.fn();
+    const onPendingChange = vi.fn();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () =>
+        root.render(
+          <RegistrationJigOutlineControls
+            scene={scene}
+            onReplace={onReplace}
+            onRemove={() => undefined}
+            onPendingChange={onPendingChange}
+          />,
+        ),
+      );
+      expect(onPendingChange).toHaveBeenLastCalledWith(false);
+      const width = host.querySelector<HTMLInputElement>('[aria-label="Registration box width"]')!;
+      const height = host.querySelector<HTMLInputElement>(
+        '[aria-label="Registration box height"]',
+      )!;
+      expect(width.value).toBe('160');
+      expect(height.value).toBe('20');
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+          width,
+          '170',
+        );
+        width.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      expect(onPendingChange).toHaveBeenLastCalledWith(true);
+      const apply = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Apply layout',
+      )!;
+      await act(async () => apply.click());
+      expect(onReplace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          outline: { kind: 'rectangle', widthMm: 170, heightMm: 20 },
+        }),
+      );
+      expect(useStore.getState().project).toBe(live);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('previews removed artwork and defaults to keeping it, with explicit removal available', async () => {
     useStore.setState({ project: createProject(), undoStack: [] });
     useStore.getState().replaceRegistrationJigSet({
@@ -35,7 +107,7 @@ describe('jig construction draft validation', () => {
     document.body.appendChild(host);
     const root = createRoot(host);
     try {
-      await act(async () => root.render(<RegistrationJigOutlineControls />));
+      await act(async () => root.render(<TestControls />));
       const columns = host.querySelector<HTMLInputElement>('[aria-label="Jig columns"]')!;
       await act(async () => {
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
@@ -56,7 +128,7 @@ describe('jig construction draft validation', () => {
       });
       expect(host.textContent).toContain('Undo restores both');
       const replace = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Replace with 2 jigs',
+        (button) => button.textContent === 'Apply layout',
       )!;
       await act(async () => replace.click());
       expect(
@@ -76,7 +148,7 @@ describe('jig construction draft validation', () => {
       document.body.appendChild(host);
       const root = createRoot(host);
       try {
-        await act(async () => root.render(<RegistrationJigOutlineControls />));
+        await act(async () => root.render(<TestControls />));
         const setField = async (label: string, value: string): Promise<void> => {
           const input = host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`);
           if (input === null) throw new Error(`Missing ${label}`);
@@ -90,8 +162,8 @@ describe('jig construction draft validation', () => {
         };
         await setField('Jig rows', rows);
         await setField('Jig columns', '10000');
-        const create = [...host.querySelectorAll('button')].find((button) =>
-          button.textContent?.startsWith('Create'),
+        const create = [...host.querySelectorAll('button')].find(
+          (button) => button.textContent === 'Apply layout',
         );
         expect(create?.disabled).toBe(true);
         expect(host.textContent).toContain(rows === '10000' ? 'at most 10000' : 'Rows must');

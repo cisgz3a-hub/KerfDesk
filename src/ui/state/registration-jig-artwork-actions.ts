@@ -70,9 +70,14 @@ export function registrationJigArtworkActions(set: Setter): RegistrationJigArtwo
   };
 }
 
+type JigArtworkState = Pick<
+  AppState,
+  'project' | 'undoStack' | 'selectedObjectId' | 'additionalSelectedIds'
+>;
+
 export function applyCenterArtworkInRegistrationJigSet(
-  state: AppState,
-): AppState | Partial<AppState> {
+  state: JigArtworkState,
+): JigArtworkState | Partial<AppState> {
   const boxes = findRegistrationBoxes(state.project.scene);
   const selected = selectedArtwork(state);
   const firstBox = boxes[0];
@@ -207,10 +212,10 @@ function canReplaceJigArtwork(
 }
 
 export function applyRegistrationJigArtworkSize(
-  state: AppState,
+  state: Pick<AppState, 'project' | 'undoStack'>,
   input: RegistrationJigArtworkSizeInput,
 ): {
-  readonly state: AppState | Partial<AppState>;
+  readonly state: Pick<AppState, 'project' | 'undoStack'> | Partial<AppState>;
   readonly outcome: RegistrationJigArtworkResizeResult;
 } {
   const scene = state.project.scene;
@@ -275,7 +280,7 @@ export function applyRegistrationJigArtworkSize(
   };
 }
 
-function selectedArtwork(state: AppState): ReadonlyArray<SceneObject> {
+function selectedArtwork(state: JigArtworkState): ReadonlyArray<SceneObject> {
   const ids = new Set([
     ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
     ...state.additionalSelectedIds,

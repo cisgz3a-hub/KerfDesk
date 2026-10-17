@@ -154,11 +154,11 @@ function normalizeProject(
     machine?.['kind'] === 'cnc' ? null : normalizeCncMachineConfig(raw['parkedCncMachine']);
   if (parked === null) delete normalized['parkedCncMachine'];
   else normalized['parkedCncMachine'] = parked;
-  normalizeCncProductionMetadata(raw, normalized, machine, parked);
+  normalizeProjectMetadata(raw, normalized, machine, parked);
   return normalized as unknown as Project;
 }
 
-function normalizeCncProductionMetadata(
+function normalizeProjectMetadata(
   raw: Record<string, unknown>,
   normalized: Record<string, unknown>,
   machine: Record<string, unknown> | undefined,
@@ -175,6 +175,13 @@ function normalizeCncProductionMetadata(
   }
   const nest = parseProductionNestDefinition(raw['productionNest']);
   if (nest.kind === 'ok' && nest.value !== undefined) normalized['productionNest'] = nest.value;
+  const artworkOutput = raw['registrationArtworkOutputSnapshot'];
+  if (
+    isObject(artworkOutput) &&
+    Object.values(artworkOutput).every((value) => typeof value === 'boolean')
+  ) {
+    normalized['registrationArtworkOutputSnapshot'] = { ...artworkOutput };
+  } else delete normalized['registrationArtworkOutputSnapshot'];
 }
 
 // Optional machine config (CNC support). Absent → undefined. A CNC config
