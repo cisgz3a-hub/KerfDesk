@@ -63,6 +63,10 @@ type Props = ConnectionBarProps;
 export function ConnectionBar(props: Props): JSX.Element {
   const { connection } = props;
   const notice = useControllerNotice(props);
+  // The brief notice fades after a few seconds; a failed controller check stays
+  // visible on the status until it is resolved.
+  const needsRecovery =
+    connection.kind === 'connected' && props.qualification?.kind === 'failed';
   return (
     <section
       className="lf-connection-compact"
@@ -81,8 +85,12 @@ export function ConnectionBar(props: Props): JSX.Element {
         <div className="lf-connection-toolbar-controls">
           <CompactConnectionControls
             machineName={props.machineName ?? 'Unnamed machine'}
-            status={connectionStatusLabel(connection)}
-            statusDot={<StatusDot connection={connection} />}
+            status={
+              needsRecovery
+                ? `${connectionStatusLabel(connection)} · controller needs recovery`
+                : connectionStatusLabel(connection)
+            }
+            statusDot={<StatusDot connection={connection} needsRecovery={needsRecovery} />}
             machine={props.machine}
             details={props.details}
             leading={props.mode}
@@ -294,8 +302,11 @@ export function connectionFailureText(error: string, machineNoun: string): strin
   return error;
 }
 
-function StatusDot({ connection }: { readonly connection: ConnectionState }): JSX.Element {
-  const color = connectionStatusColor(connection);
+function StatusDot(props: {
+  readonly connection: ConnectionState;
+  readonly needsRecovery: boolean;
+}): JSX.Element {
+  const color = props.needsRecovery ? 'var(--lf-warning)' : connectionStatusColor(props.connection);
   return (
     <span
       aria-hidden="true"
