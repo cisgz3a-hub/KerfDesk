@@ -150,11 +150,9 @@ describe('compact machine connection', () => {
     expect(document.querySelector('[aria-label="Machine details"]')).toBeNull();
     expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe('Connected');
     expect(host.querySelectorAll('[role="alert"]')).toHaveLength(0);
-    await act(async () =>
-      host
-        .querySelector<HTMLButtonElement>('[aria-label="Controller notification"] button')
-        ?.click(),
-    );
+    expect(host.querySelector('[aria-label="Controller notification"]')).toBeNull();
+    await openMenu(host);
+    await act(async () => menuItem('Controller info')?.click());
     expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1);
     expect(document.body.textContent).toContain('The settings response timed out.');
     await act(async () => button(document.body, 'Retry reading controller settings')?.click());
@@ -179,13 +177,17 @@ describe('compact machine connection', () => {
     expect(document.querySelector('[aria-label="Machine details"]')).not.toBeNull();
   });
 
-  it('keeps the pending settings read visible on an open connection', async () => {
+  it('keeps the pending settings read in Controller info on an open connection', async () => {
     const host = await renderBar({
       connection: { kind: 'connected' },
       qualification: { kind: 'qualifying', epoch: 4, phase: 'settings-read' },
     });
-    expect(host.textContent).toContain('Reading controller settings…');
+    expect(host.textContent).not.toContain('Reading controller settings…');
     expect(host.querySelectorAll('[role="status"]')).toHaveLength(2);
+    await openMenu(host);
+    await act(async () => menuItem('Controller info')?.click());
+    expect(document.body.textContent).toContain('Reading controller settings…');
+    await act(async () => button(document.body, 'Close')?.click());
     expect(document.querySelector('[aria-label="Machine details"]')).toBeNull();
     expect(button(host, 'Disconnect')).toBeInstanceOf(HTMLButtonElement);
   });

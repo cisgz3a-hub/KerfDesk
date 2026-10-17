@@ -131,10 +131,10 @@ async function render(platform: PlatformAdapter): Promise<HTMLElement> {
       </PlatformProvider>,
     );
   });
-  const notice = host.querySelector<HTMLButtonElement>('.lf-controller-toolbar-notice button');
-  expect(notice).not.toBeNull();
-  await act(async () => notice?.click());
-  // Recovery details are explicitly requested and portaled outside the toolbar.
+  // Recovery details are requested from the connection menu (ADR-607).
+  const options = '[aria-label="More connection options"]';
+  await act(async () => host?.querySelector<HTMLButtonElement>(options)?.click());
+  await act(async () => button(document.body, 'Controller info').click());
   return document.body;
 }
 

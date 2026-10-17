@@ -38,6 +38,8 @@ export type ConnectionBarProps = {
   readonly qualification?: ControllerQualification;
   readonly qualificationReadBlockReason?: string | null;
   readonly reconnectRecommended?: boolean;
+  /** The controller stopped answering status queries; only this pops up (ADR-607). */
+  readonly controllerStoppedResponding?: boolean;
   readonly onRetryQualification?: () => void;
   readonly onReconnectQualification?: () => void;
   /** Show the port picker even when a remembered port is attached. */

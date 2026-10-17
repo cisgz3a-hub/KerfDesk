@@ -47,6 +47,7 @@ import {
   streamWriteOwner,
 } from './laser-stream-heartbeat-containment';
 import { observeStreamHoldTick } from './laser-stream-hold';
+import { reconcileLostStreamAcknowledgements } from './laser-lost-ack-reconcile';
 import { observeSerialLineErrors } from './laser-serial-line-errors';
 import {
   canSendQueuedStatusQuery,
@@ -423,6 +424,9 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     if (containLostStreamHeartbeat(set, s, refs, safeWrite)) return;
     // Preserve the existing hold telemetry and its non-dwell grace period.
     // A wait that reaches the warning threshold now freezes refill before reset.
+    // Replies lost on the link at the end of a job finish it on the
+    // controller's own evidence, long before the watchdog would reset it.
+    if (reconcileLostStreamAcknowledgements(set, get, refs, safeWrite, Date.now())) return;
     if (observeStreamHoldTick(set, s, refs, Date.now())) {
       containStalledStreamAcknowledgements(set, refs, safeWrite);
       return;

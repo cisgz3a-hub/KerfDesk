@@ -78,22 +78,20 @@ for (const viewport of [
     await expect(toast).toHaveCount(0);
     await expect(disconnect).toBeFocused();
 
+    // Reading settings after a reset is routine: it never pops up (ADR-607).
     for (const phase of ['controller-response', 'reset-cleanup', 'settings-read'] as const) {
       await setQualification(page, 'qualifying', phase);
-      const progress = page.getByRole('group', { name: 'Controller notification', exact: true });
-      await expect(progress).toBeVisible();
-      await expect(progress).toContainText(
-        phase === 'settings-read'
-          ? 'Reading controller settings…'
-          : 'Waiting to read controller settings…',
-      );
+      await expect(
+        page.getByRole('group', { name: 'Controller notification', exact: true }),
+      ).toHaveCount(0);
       await expect(
         page.getByRole('dialog', { name: 'Controller information', exact: true }),
       ).toHaveCount(0);
       await unchanged();
     }
     await page.screenshot({ path: test.info().outputPath('controller-waiting-toolbar.png') });
-    await brief.getByRole('button').click();
+    await trigger.click();
+    await info.click();
     await expect(
       page.getByRole('dialog', { name: 'Controller information', exact: true }),
     ).toContainText('Reading controller settings…');
