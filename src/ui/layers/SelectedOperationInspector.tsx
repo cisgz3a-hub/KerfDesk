@@ -14,6 +14,7 @@ import { useStore } from '../state';
 import { CncLayerFields } from './CncLayerFields';
 import { CncSelectionDepthField } from './CncSelectionDepthField';
 import { hasMixedFields, mixedOperationFields } from './selected-operation-mixed';
+import { LayerFocusTestNotice } from './LayerFocusTestNotice';
 import { LaserOperationFields } from './SelectedLaserOperationFields';
 import {
   OperationFooter,
@@ -111,6 +112,7 @@ function SelectedOperationEditor(props: {
         onSelect={props.onSelect}
       />
       <OperationIdentity operation={props.active} onRename={renameOperation} />
+      <LayerFocusTestNotice layer={props.active} />
       <OperationScope
         affected={affected}
         selectedUsingActive={activeObjects.length}

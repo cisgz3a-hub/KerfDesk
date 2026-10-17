@@ -73,6 +73,7 @@ import {
   type LayerSettingsClipboard,
   type LayerSubLayerPatch,
 } from './layer-actions';
+import { layerFocusTestActions } from './layer-focus-test-actions';
 import { fillSelectionActions, type FillSelectionActions } from './fill-selection-actions';
 import { vectorPathActions, type VectorPathActions } from './vector-path-pro-admission';
 import { editingToolsActions, type EditingToolsActions } from './editing-tools-actions';
@@ -356,6 +357,7 @@ export type AppState = PartGeneratorActions &
       patch: LayerSubLayerPatch,
     ) => void;
     readonly deleteLayerSubLayer: (layerId: string, subLayerId: string) => void;
+    readonly removeLayerFocusTest: (layerId: string) => void;
     readonly makeLayerDefault: (layerId: string) => void;
     readonly makeLayerDefaultForAll: (layerId: string) => void;
     readonly resetLayerToDefault: (layerId: string) => void;
@@ -443,6 +445,7 @@ export const useStore = create<AppState>((rawSet, get) => {
     ...cncLibraryActions(set),
     ...cncLiveCapsActions(set),
     ...layerActions(proOperationMutationSetter(set, get)),
+    ...layerFocusTestActions(set),
     ...machineActions(set, get),
     ...airAssistDefaultActions(set, get),
     ...fillSelectionActions(set),
