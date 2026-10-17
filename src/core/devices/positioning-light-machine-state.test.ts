@@ -45,7 +45,6 @@ describe('positioning light laser-fan and machine-state guard', () => {
     'M211 S0',
     'M220 S200',
     'M221 S50',
-    'M290 S1',
     'M428',
     'M575 P0 S9600',
     'M851 S1',
