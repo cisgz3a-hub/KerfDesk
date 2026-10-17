@@ -33,7 +33,9 @@ web app. An audit of the desktop shell on 2026-10-18 found these gaps on macOS a
    the MIME type `application/x-kerfdesk-project`, so the desktop entry claims `.lf2` and nothing
    else (LightBurn files stay LightBurn's, as ADR-378 says). `desktopName` in `package.json`
    (`kerfdesk.desktop`) with `syncDesktopName` keeps the running window grouped with its entry on
-   X11 and Wayland.
+   X11 and Wayland. `linux.publish: null` writes no updater metadata: no Linux update feed exists
+   yet, and without it electron-builder would derive one from the git remote, or inherit the
+   stable config's Windows feed.
 2. **Chromium's sandbox stays on where Linux allows it.** The `.deb` keeps electron-builder's
    install scripts, which set up `chrome-sandbox` and, on Ubuntu 24.04 and newer, an AppArmor
    profile that lets the sandbox use user namespaces. electron-builder writes `--no-sandbox` into
