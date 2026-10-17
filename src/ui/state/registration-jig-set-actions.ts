@@ -53,10 +53,16 @@ export function registrationJigSetActions(set: Setter): RegistrationJigSetAction
   };
 }
 
+/** Where a replaced grid goes: 'corner' keeps the first slot in place, so slots
+ *  that may already be burned stay put; 'centre' keeps a set that was never
+ *  saved centred where it was. Either way the grid is kept on the bed. */
+export type RegistrationJigAnchor = 'corner' | 'centre';
+
 export function applyReplaceRegistrationJigSet(
   state: Pick<AppState, 'project' | 'undoStack'>,
   spec: RegistrationJigSetSpec,
   idFactory: () => string,
+  anchor: RegistrationJigAnchor = 'corner',
 ): Pick<AppState, 'project' | 'undoStack'> | Partial<AppState> {
   const issue = registrationJigSetIssue(spec, state.project.scene);
   if (issue !== null) throw new Error(issue);
@@ -71,19 +77,25 @@ export function applyReplaceRegistrationJigSet(
     width: dimensions.width * columns + spacingX * (columns - 1),
     height: dimensions.height * rows + spacingY * (rows - 1),
   };
+  const { bedWidth, bedHeight } = state.project.device;
   const existingBounds = findRegistrationBoxBounds(state.project.scene);
   const origin =
-    existingBounds ??
-    registrationBoxDefaultPosition(
-      state.project.device.bedWidth,
-      state.project.device.bedHeight,
-      footprint.width,
-      footprint.height,
-    );
+    existingBounds === null
+      ? registrationBoxDefaultPosition(bedWidth, bedHeight, footprint.width, footprint.height)
+      : keepOnBed(
+          anchor === 'centre'
+            ? {
+                x: (existingBounds.minX + existingBounds.maxX - footprint.width) / 2,
+                y: (existingBounds.minY + existingBounds.maxY - footprint.height) / 2,
+              }
+            : { x: existingBounds.minX, y: existingBounds.minY },
+          footprint,
+          { width: bedWidth, height: bedHeight },
+        );
   const boxes = createRegistrationJigOutlines(
     spec.outline,
     { rows, columns, spacingX, spacingY },
-    { x: 'minX' in origin ? origin.minX : origin.x, y: 'minY' in origin ? origin.minY : origin.y },
+    origin,
     existing,
     idFactory,
   );
@@ -224,6 +236,21 @@ function createOutline(
         ...position,
         id,
       });
+}
+
+// A grid that grows past the bed edge cannot be burned. Shift it back just far
+// enough to fit; a grid larger than the bed starts at the bed origin.
+function keepOnBed(
+  origin: { readonly x: number; readonly y: number },
+  footprint: { readonly width: number; readonly height: number },
+  bed: { readonly width: number; readonly height: number },
+): { readonly x: number; readonly y: number } {
+  const axis = (start: number, span: number, limit: number): number =>
+    Number.isFinite(limit) && limit > 0 ? Math.max(0, Math.min(start, limit - span)) : start;
+  return {
+    x: axis(origin.x, footprint.width, bed.width),
+    y: axis(origin.y, footprint.height, bed.height),
+  };
 }
 
 function outlineDimensions(outline: RegistrationJigOutlineSpec): {

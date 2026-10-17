@@ -7,10 +7,14 @@ import {
 } from '../../../core/scene';
 import { useStore } from '../../state';
 import { reportDependencyRepairs } from '../../state/object-delete-actions';
+import type { RegistrationJigSetSpec } from '../../state/registration-jig-set-actions';
 import {
   changeJigDraft,
   commitJigEditorSession,
   createJigEditorSession,
+  jigDraftDirty,
+  removeJigLayout,
+  replaceJigLayout,
   selectedJigIds,
   selectJigObjects,
   undoJigDraft,
@@ -21,13 +25,16 @@ import {
   importJigArtwork,
   nudgeJigSelection,
   upsertJigText,
+  type JigImportPlacement,
 } from './jig-editor-artwork';
+import { useJigArtworkImport } from './JigArtworkImport';
 
 export function useJigEditor(onClose: () => void) {
   const [session, setSession] = useState(() => createJigEditorSession(useStore.getState()));
   const [pendingLayout, setPendingLayout] = useState(false);
-  const [working, setWorking] = useState({ import: false, text: false, trace: false });
-  const [error, setError] = useState('');
+  const working = useJigWorking();
+  // Bumped when the outline layout is rebuilt, so the canvas refits to the new grid.
+  const [fitRequest, setFitRequest] = useState(0);
   const onCommit = useCallback(
     (project: Project) => setSession((current) => changeJigDraft(current, { project })),
     [],
@@ -37,13 +44,56 @@ export function useJigEditor(onClose: () => void) {
     [],
   );
   const onImport = useCallback(
-    (object: SceneObject) => setSession((current) => importJigArtwork(current, object)),
+    (object: SceneObject, placement?: JigImportPlacement) =>
+      setSession((current) => importJigArtwork(current, object, placement)),
     [],
   );
   const onUpsert = useCallback(
     (object: TextObject) => setSession((current) => upsertJigText(current, object)),
     [],
   );
+  const artworkImport = useJigArtworkImport(onImport, working.onImportBusy);
+  const onReplaceLayout = useCallback((spec: RegistrationJigSetSpec) => {
+    setSession((current) => replaceJigLayout(current, spec));
+    setFitRequest((request) => request + 1);
+  }, []);
+  const onRemoveLayout = useCallback(() => setSession(removeJigLayout), []);
+  const captured = findRegistrationBoxes(session.baseProject.scene).some(
+    (box) => box.provenance === 'captured-board',
+  );
+  const closing = useJigEditorClose({
+    session,
+    pendingLayout,
+    busy: working.busy,
+    captured,
+    onClose,
+    onSelect,
+  });
+  return {
+    ...closing,
+    session,
+    setSession,
+    pendingLayout,
+    setPendingLayout,
+    busy: working.busy,
+    captured,
+    fitRequest,
+    importing: artworkImport.busy,
+    importFiles: artworkImport.importFiles,
+    ids: selectedJigIds(session.draft),
+    onCommit,
+    onSelect,
+    onImport,
+    onUpsert,
+    onReplaceLayout,
+    onRemoveLayout,
+    onTextBusy: working.onTextBusy,
+    onTraceBusy: working.onTraceBusy,
+  };
+}
+
+function useJigWorking() {
+  const [working, setWorking] = useState({ import: false, text: false, trace: false });
   const onImportBusy = useCallback(
     (value: boolean) => setWorking((current) => ({ ...current, import: value })),
     [],
@@ -56,45 +106,71 @@ export function useJigEditor(onClose: () => void) {
     (value: boolean) => setWorking((current) => ({ ...current, trace: value })),
     [],
   );
-  const captured = findRegistrationBoxes(session.baseProject.scene).some(
-    (box) => box.provenance === 'captured-board',
-  );
   const busy = working.import || working.text || working.trace;
-  const save = (): void => {
-    if (busy || pendingLayout || captured) return;
+  return { busy, onImportBusy, onTextBusy, onTraceBusy };
+}
+
+// Saving, closing and Escape. Closing with unsaved edits asks first: Escape or
+// one stray click must not throw away a whole jig.
+function useJigEditorClose(args: {
+  readonly session: JigEditorSession;
+  readonly pendingLayout: boolean;
+  readonly busy: boolean;
+  readonly captured: boolean;
+  readonly onClose: () => void;
+  readonly onSelect: (ids: ReadonlySet<string>) => void;
+}) {
+  const { session, pendingLayout, busy, captured, onClose, onSelect } = args;
+  const [error, setError] = useState('');
+  const [confirmingClose, setConfirmingClose] = useState(false);
+  const dirty = jigDraftDirty(session) || pendingLayout;
+  const canSave = !busy && !pendingLayout && !captured;
+  const save = (): boolean => {
+    if (!canSave) return false;
+    // Nothing to publish: closing must not add an undo step or dirty the project.
+    if (!jigDraftDirty(session) && !session.firstSave) {
+      onClose();
+      return true;
+    }
     const change = commitJigEditorSession(useStore.getState(), session);
     if (change === null) {
+      setConfirmingClose(false);
       setError(
-        'The main project changed while this editor was open. Close without saving and reopen to use the current project.',
+        'The main project changed while this editor was open. Choose Close without saving, then Discard changes, and reopen to use the current project.',
       );
-      return;
+      return false;
     }
     useStore.setState(change);
     onClose();
+    return true;
+  };
+  const requestClose = (): void => {
+    if (dirty && !captured) setConfirmingClose(true);
+    else onClose();
+  };
+  // Escape first drops the selection, as on the main canvas; only an Escape
+  // with nothing selected asks to leave the editor.
+  const onEscape = (): void => {
+    if (confirmingClose) return;
+    if (selectedJigIds(session.draft).size > 0) onSelect(new Set());
+    else requestClose();
   };
   return {
-    session,
-    setSession,
-    pendingLayout,
-    setPendingLayout,
     error,
-    busy,
-    captured,
+    dirty,
+    canSave,
     save,
-    ids: selectedJigIds(session.draft),
-    onCommit,
-    onSelect,
-    onImport,
-    onUpsert,
-    onImportBusy,
-    onTextBusy,
-    onTraceBusy,
+    requestClose,
+    onEscape,
+    confirmingClose,
+    keepEditing: () => setConfirmingClose(false),
+    discard: onClose,
   };
 }
 
 export type JigEditorController = ReturnType<typeof useJigEditor>;
 
-function isTextInput(target: EventTarget): boolean {
+export function isTextInput(target: EventTarget): boolean {
   return (
     target instanceof HTMLElement &&
     (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName))

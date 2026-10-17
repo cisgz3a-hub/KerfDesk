@@ -69,16 +69,39 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function Harness(): JSX.Element {
+function Harness(props: {
+  readonly fitRequest?: number;
+  readonly onDropFiles?: (files: ReadonlyArray<File>, outlineId: string | null) => void;
+}): JSX.Element {
   const [selectedIds, onSelectionChange] = useState<ReadonlySet<string>>(new Set());
   return (
     <RegistrationJigCanvas
       project={project}
       selectedIds={selectedIds}
+      fitRequest={props.fitRequest}
       onSelectionChange={onSelectionChange}
       onCommit={commit}
+      onDropFiles={props.onDropFiles}
     />
   );
+}
+
+function jigProject(x: number, y: number): Project {
+  return {
+    ...project,
+    scene: {
+      layers: [createRegistrationLayer()],
+      objects: [createRegistrationBox({ widthMm: 80, heightMm: 40, x, y })],
+    },
+  };
+}
+
+function stubCanvasGeometry(): HTMLCanvasElement {
+  const canvas = host.querySelector('canvas')!;
+  canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600 }) as DOMRect;
+  canvas.setPointerCapture = vi.fn();
+  canvas.hasPointerCapture = () => false;
+  return canvas;
 }
 
 function pointer(type: string, x: number, y: number, state?: ViewState): void {
@@ -117,6 +140,67 @@ describe('registration jig canvas drag transactions', () => {
     expect(moved.transform.x).toBeCloseTo(35);
     expect(moved.transform.y).toBeCloseTo(62);
     expect(host.textContent).toContain('Fit jig');
+  });
+
+  it('refits to a rebuilt layout once, and keeps the view for ordinary edits', () => {
+    project = jigProject(30, 60);
+    act(() => root.render(<Harness key="refit" fitRequest={0} />));
+    // An ordinary edit elsewhere on the bed does not chase the view: the
+    // pointer still maps through the view fitted to the original outline.
+    project = jigProject(250, 300);
+    act(() => root.render(<Harness key="refit" fitRequest={0} />));
+    stubCanvasGeometry();
+    const original = fitJigCanvasView(jigProject(30, 60), { width: 800, height: 600 });
+    const rebuilt = fitJigCanvasView(project, { width: 800, height: 600 });
+    pointer('pointerdown', 250, 320, original);
+    pointer('pointerup', 255, 322, original);
+    expect(commit).toHaveBeenCalledTimes(1);
+    pointer('pointerdown', 250, 320, rebuilt);
+    pointer('pointerup', 255, 322, rebuilt);
+    expect(commit).toHaveBeenCalledTimes(1);
+
+    // Rebuilding the layout refits once; later renders keep that view.
+    act(() => root.render(<Harness key="refit" fitRequest={1} />));
+    act(() => root.render(<Harness key="refit" fitRequest={1} />));
+    pointer('pointerdown', 250, 320, rebuilt);
+    pointer('pointerup', 255, 322, rebuilt);
+    expect(commit).toHaveBeenCalledTimes(2);
+    const moved = (commit.mock.calls[1]![0] as Project).scene.objects[0]!;
+    expect(moved.transform.x).toBeCloseTo(255);
+    expect(moved.transform.y).toBeCloseTo(302);
+  });
+
+  it('hands dropped artwork files to the editor with the outline under the drop', () => {
+    project = jigProject(30, 60);
+    const onDropFiles = vi.fn();
+    act(() => root.render(<Harness key="drop" onDropFiles={onDropFiles} />));
+    const canvas = stubCanvasGeometry();
+    const view = computeView(
+      800,
+      600,
+      project.device.bedWidth,
+      project.device.bedHeight,
+      fitJigCanvasView(project, { width: 800, height: 600 }),
+    );
+    const drop = (x: number, y: number, files: ReadonlyArray<File>): void => {
+      const event = new MouseEvent('drop', {
+        bubbles: true,
+        cancelable: true,
+        clientX: view.offsetX + x * view.scale,
+        clientY: view.offsetY + y * view.scale,
+      });
+      Object.defineProperty(event, 'dataTransfer', { value: { files, dropEffect: 'none' } });
+      act(() => {
+        canvas.dispatchEvent(event);
+      });
+    };
+    const logo = new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' });
+    drop(70, 80, [logo, new File(['x'], 'notes.txt', { type: 'text/plain' })]);
+    expect(onDropFiles).toHaveBeenCalledWith([logo], project.scene.objects[0]!.id);
+    drop(5, 5, [logo]);
+    expect(onDropFiles).toHaveBeenLastCalledWith([logo], null);
+    drop(70, 80, [new File(['x'], 'notes.txt')]);
+    expect(onDropFiles).toHaveBeenCalledTimes(2);
   });
 
   it('previews movement locally and commits exactly once on release', () => {
