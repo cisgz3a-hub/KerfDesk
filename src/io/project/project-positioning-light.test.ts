@@ -45,12 +45,14 @@ describe('positioning light persistence', () => {
       expect(result.document.profile.positioningLight).toEqual(positioningLight);
   });
 
-  it.each(['M3 S1', 'M64 P0\nM3', 'G0 X10'])(
-    'rejects executable injection in project and profile imports: %s',
+  it.each(['M3 S1', 'M64 P0\nM3', 'G0 X10', 'M106 S255', 'M42 P4 S255'])(
+    'drops executable injection from project and profile imports without refusing them: %s',
     (onCommand) => {
       const light = { ...positioningLight, onCommand };
       const project = createProject({ ...DEFAULT_DEVICE_PROFILE, positioningLight: light });
-      expect(deserializeProject(serializeProject(project)).kind).toBe('invalid');
+      const loaded = deserializeProject(serializeProject(project));
+      expect(loaded.kind).toBe('ok');
+      if (loaded.kind === 'ok') expect(loaded.project.device.positioningLight).toBeUndefined();
       const result = deserializeMachineProfileDocument(
         JSON.stringify({
           format: MACHINE_PROFILE_FORMAT,
@@ -60,7 +62,24 @@ describe('positioning light persistence', () => {
           reviewNotes: [],
         }),
       );
-      expect(result.kind).toBe('invalid');
+      expect(result.kind).toBe('ok');
+      if (result.kind !== 'ok') return;
+      expect(result.document.profile.positioningLight).toBeUndefined();
+      expect(result.document.reviewNotes).toContainEqual(
+        expect.stringContaining('Positioning light removed'),
+      );
     },
   );
+
+  it('drops an M106/M107 light mapping from a Marlin fan-mosfet project', () => {
+    const device = {
+      ...DEFAULT_DEVICE_PROFILE,
+      controllerKind: 'marlin' as const,
+      gcodeDialect: { dialectId: 'marlin-fan' as const },
+      positioningLight: { ...positioningLight, onCommand: 'M106 P1 S255', offCommand: 'M107 P1' },
+    };
+    const loaded = deserializeProject(serializeProject(createProject(device)));
+    expect(loaded.kind).toBe('ok');
+    if (loaded.kind === 'ok') expect(loaded.project.device.positioningLight).toBeUndefined();
+  });
 });

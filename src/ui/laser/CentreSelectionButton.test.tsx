@@ -66,7 +66,7 @@ beforeEach(() => {
     motionOperation: null,
     controllerOperation: null,
     centrePositioningLight: jog,
-    setPositioningLightEnabled: off,
+    switchPositioningLightOff: off,
     positioningLightEnabled: false,
   });
   useJogControlPreferences.setState({ requestedFeedMmPerMin: 1200 });
@@ -170,7 +170,7 @@ describe('Centre selection in the jog pad', () => {
     expect(button).not.toBeNull();
     expect(button?.disabled).toBe(false);
     await act(async () => button?.click());
-    expect(off).toHaveBeenCalledExactlyOnceWith(false);
+    expect(off).toHaveBeenCalledExactlyOnceWith();
     expect(jog).not.toHaveBeenCalled();
   });
 

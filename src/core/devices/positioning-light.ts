@@ -21,6 +21,7 @@ const RESERVED_M_CODES = new Set([
 export function positioningLightIssue(
   value: unknown,
   controllerKind?: ControllerKind,
+  gcodeDialectId?: string,
 ): string | null {
   if (value === undefined) return null;
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -31,6 +32,12 @@ export function positioningLightIssue(
     if (!isPositioningLightCommand(light[field])) {
       return `Positioning light ${field === 'onCommand' ? 'on' : 'off'} command must be one documented accessory M-code, without motion or cutting-beam commands.`;
     }
+    const stateIssue = machineStateCommandIssue(
+      light[field] as string,
+      controllerKind,
+      gcodeDialectId,
+    );
+    if (stateIssue !== null) return stateIssue;
     const outputIssue = digitalOutputIssue(light[field] as string, controllerKind);
     if (outputIssue !== null) return outputIssue;
   }
@@ -81,8 +88,13 @@ function isPositioningLightCommand(value: unknown): value is string {
   return match !== null && !RESERVED_M_CODES.has(Number(match[1]));
 }
 
-export function normalizePositioningLight(value: unknown): PositioningLight | undefined {
-  if (value === undefined || positioningLightIssue(value) !== null) return undefined;
+export function normalizePositioningLight(
+  value: unknown,
+  controllerKind?: ControllerKind,
+  gcodeDialectId?: string,
+): PositioningLight | undefined {
+  if (value === undefined || positioningLightIssue(value, controllerKind, gcodeDialectId) !== null)
+    return undefined;
   const light = value as PositioningLight;
   return {
     onCommand: light.onCommand.trim(),
@@ -90,4 +102,35 @@ export function normalizePositioningLight(value: unknown): PositioningLight | un
     offsetXmm: light.offsetXmm,
     offsetYmm: light.offsetYmm,
   };
+}
+
+// Accessory-shaped codes that change machine state a light must never touch:
+// raw pin writes/toggles, PSU power, steps/mm, endstop and soft-limit
+// enforcement, feedrate/flow overrides, acceleration and jerk, home and probe
+// offsets, babystepping, microstepping, serial baud and motor current.
+const STATE_CHANGING_M_CODES = new Set([
+  42, 43, 80, 92, 120, 121, 201, 202, 203, 204, 205, 206, 211, 220, 221, 290, 350, 351, 428, 575,
+  851, 906, 907,
+]);
+
+function machineStateCommandIssue(
+  command: string,
+  kind: ControllerKind | undefined,
+  gcodeDialectId: string | undefined,
+): string | null {
+  const [head = '', ...words] = command.trim().toUpperCase().split(/ +/);
+  const code = Number(/^M(\d+)/.exec(head)?.[1]);
+  if (STATE_CHANGING_M_CODES.has(code))
+    return 'Positioning light commands cannot change pins, limits, overrides or motion settings.';
+  // Smoothieware's M106/M107 are configurable switch commands; elsewhere they
+  // address Marlin fans. KerfDesk's 'marlin-fan' dialect fires the laser with
+  // a bare M106 S<n> (fan 0), so only an explicit non-zero fan index is a
+  // separate output, and a fan-mosfet profile refuses them outright.
+  if ((code !== 106 && code !== 107) || kind === 'smoothieware') return null;
+  if (gcodeDialectId === 'marlin-fan')
+    return 'Positioning light cannot use M106/M107 on a Marlin fan-mosfet profile: they fire the laser.';
+  const fan = Number(words.find((word) => word.startsWith('P'))?.slice(1));
+  return Number.isInteger(fan) && fan > 0
+    ? null
+    : 'Positioning light M106/M107 must name a non-zero P fan index; fan 0 can be the laser.';
 }

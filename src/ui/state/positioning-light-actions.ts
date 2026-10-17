@@ -13,6 +13,7 @@ import { warnJogMotionPolicy } from './laser-jog-warnings';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWrite } from './laser-safe-write';
 import { useStore } from './store';
+import { ControllerCommandRefusedError } from './laser-interactive-command';
 import {
   positioningLightCommand,
   positioningLightFence,
@@ -22,7 +23,11 @@ import {
 } from './positioning-light-transaction';
 
 type SetFn = (patch: Partial<LaserState> | ((state: LaserState) => Partial<LaserState>)) => void;
-type LightSnapshot = { readonly mapping: PositioningLight; readonly session: () => boolean };
+type LightSnapshot = {
+  readonly mapping: PositioningLight;
+  readonly session: () => boolean;
+  readonly connection: LiveRefs['connection'];
+};
 const lightSnapshots = new WeakMap<LiveRefs, LightSnapshot>();
 
 export function positioningLightActions(
@@ -30,12 +35,24 @@ export function positioningLightActions(
   get: () => LaserState,
   refs: LiveRefs,
   write: SafeWrite,
-): Pick<LaserState, 'centrePositioningLight' | 'setPositioningLightEnabled'> {
+): Pick<LaserState, 'centrePositioningLight' | 'switchPositioningLightOff'> {
   return {
     centrePositioningLight: (x, y, feed) =>
       runPositioningLight(set, get, refs, write, { x, y, feed }),
-    setPositioningLightEnabled: () => runPositioningLight(set, get, refs, write),
+    switchPositioningLightOff: () => runPositioningLight(set, get, refs, write),
   };
+}
+
+/** The captured off command while the light may still be on over this same
+ * connection, for Disconnect's best-effort cleanup; null otherwise. */
+export function positioningLightDisconnectOff(state: LaserState, refs: LiveRefs): string | null {
+  const snapshot = lightSnapshots.get(refs);
+  return state.positioningLightEnabled &&
+    snapshot !== undefined &&
+    refs.connection !== null &&
+    snapshot.connection === refs.connection
+    ? snapshot.mapping.offCommand
+    : null;
 }
 
 function assertAdmission(state: LaserState, refs: LiveRefs): void {
@@ -87,7 +104,7 @@ async function runPositioningLight(
         mayHaveMoved = true;
       });
       settled = true;
-      lightSnapshots.set(refs, { mapping: { ...mapping }, session });
+      lightSnapshots.set(refs, { mapping: { ...mapping }, session, connection: refs.connection });
       // May have reached hardware even if its acknowledgement is subsequently
       // lost. Keep Off available until a positively acknowledged off or reset.
       set({ positioningLightEnabled: true });
@@ -105,20 +122,33 @@ async function runPositioningLight(
       set({ lastWriteError: message, log: pushLog(get(), `[lf2] Positioning light: ${message}`) });
       // An unresolved move keeps the ordinary Abort lifecycle as its owner.
       // Never send recovery commands to a replacement connection.
-      if (mayHaveMoved && !settled)
-        await get()
-          .stopJob()
-          .then(() => {
-            // No-reset controllers quick-stop without replacing an interactive
-            // owner. Retire ours only after Abort finishes; a newer operation
-            // or controller session must keep its own lifecycle untouched.
-            if (owns()) set({ controllerOperation: null });
-          })
-          .catch(() => undefined);
+      if (mayHaveMoved && !settled) await containUnsettledMove(set, get, refs, owns);
       else set({ controllerOperation: null });
     }
     throw error;
   }
+}
+
+async function containUnsettledMove(
+  set: SetFn,
+  get: () => LaserState,
+  refs: LiveRefs,
+  owns: () => boolean,
+): Promise<void> {
+  // A native jog the controller reports as Jog is stopped like any other jog:
+  // once released, Abort's unowned-motion path sends the jog cancel (0x85)
+  // and keeps position instead of a soft reset that forgets the work origin.
+  if (refs.driver.realtime.jogCancel !== null && get().statusReport?.state === 'Jog')
+    set({ controllerOperation: null });
+  await get()
+    .stopJob()
+    .then(() => {
+      // No-reset controllers quick-stop without replacing an interactive
+      // owner. Retire ours only after Abort finishes; a newer operation
+      // or controller session must keep its own lifecycle untouched.
+      if (owns()) set({ controllerOperation: null });
+    })
+    .catch(() => undefined);
 }
 
 async function turnOffPreviousLight(context: PositioningLightTransaction): Promise<void> {
@@ -149,8 +179,9 @@ function resolveMapping(
   const previous = lightSnapshots.get(refs);
   if (target === undefined && previous?.session() === true) return previous.mapping;
   assertProfileDriver(refs);
-  const mapping = useStore.getState().project.device.positioningLight;
-  const issue = positioningLightIssue(mapping, refs.driver.kind);
+  const device = useStore.getState().project.device;
+  const mapping = device.positioningLight;
+  const issue = positioningLightIssue(mapping, refs.driver.kind, device.gcodeDialect?.dialectId);
   if (mapping === undefined || issue !== null)
     throw new Error(issue ?? 'Configure the separate positioning light in Device Profile first.');
   if (target === undefined && state.positioningLightEnabled && previous?.session() !== true)
@@ -230,8 +261,17 @@ async function moveToLightTarget(
       .buildJog(params)
       .split('\n')
       .filter((line) => line.trim() !== '');
-    onMotion();
-    for (const line of commands) await positioningLightCommand(context, line);
+    for (const line of commands) {
+      try {
+        await positioningLightCommand(context, line);
+      } catch (error) {
+        // A refused line (GRBL error:15 soft limit) never started; any other
+        // failure leaves the line's fate unknown and is contained as motion.
+        if (!(error instanceof ControllerCommandRefusedError)) onMotion();
+        throw error;
+      }
+      onMotion();
+    }
     await settlePositioningLightMove(context);
   }
   assertLightTargetReached(context, target);
