@@ -108,7 +108,7 @@ function isPositive(value: number | undefined): boolean {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
-const panelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 };
+const panelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3 };
 const headerStyle: React.CSSProperties = { display: 'flex', alignItems: 'flex-end', gap: 8 };
 const controlRowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
 const hintStyle: React.CSSProperties = {
@@ -117,4 +117,11 @@ const hintStyle: React.CSSProperties = {
   fontSize: 12,
   lineHeight: 1.3,
 };
-const buttonStyle: React.CSSProperties = { width: 36, height: 36, fontSize: 16, cursor: 'pointer' };
+// Same size as the jog arrows (--lf-jog-button, LaserWindow.css).
+const buttonStyle: React.CSSProperties = {
+  width: 'var(--lf-jog-button, 36px)',
+  height: 'var(--lf-jog-button, 36px)',
+  padding: 0,
+  fontSize: 14,
+  cursor: 'pointer',
+};

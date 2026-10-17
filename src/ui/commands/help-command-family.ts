@@ -1,6 +1,18 @@
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { useTutorialStore } from '../tutorials/tutorial-store';
+import { openCommandSearch } from './command-search-store';
+
+export function findCommandCommand(): AppCommand {
+  return enabled(
+    'help.find-command',
+    'help',
+    'Find a command…',
+    'Search every menu command by name or by what it does',
+    openCommandSearch,
+    'Ctrl+K',
+  );
+}
 
 export function tutorialsCommand(): AppCommand {
   return enabled(

@@ -1,0 +1,13 @@
+## ADR-604 - Frame can finish with Centre & LED, keeping the Absolute Frame
+
+**Status:** Accepted by the maintainer's explicit instruction on 2026-10-17 (an optional per-machine setting that keeps Frame valid). Amends ADR-565 and ADR-603. Software verification only; physical controller, accessory and air-cut qualification remain separate evidence.
+
+**Context.** The maintainer wanted the head to frame the artwork, then stop at its centre with the separate positioning light on, so the operator can see where the middle is. ADR-603 added a manual **Centre & LED** button. Its beam-off travel voided the completed Frame, so Start would have needed another Frame, which moves the head away from the centre again.
+
+**Decision.** Machine Setup → Positioning LED / crosshair gains **Centre & LED after Frame** (`positioningLight.afterFrame`, off by default, saved with the device profile). When it is on and Centre & LED is usable (configured light, live controller family, laser mode, Cartesian Absolute Coords), a clean Frame started from the Frame button is followed by Centre & LED at the centre of the framed job bounds, converted from work coordinates to the bed axes the light offset uses. This runs as a separate action after the permit exists. Its failure is reported, but never revokes the Frame or retries it. Remote-control and transient Frames do not chain the light.
+
+The positioning-light travel (whether chained or from the button) keeps the completed Frame only when all of these hold: the Frame used Absolute placement (not Current Position, and no transient or second-pass authorization); the head verifiably reached its target in the same controller session, origin, report units and work-Z evidence; and the open project and job placement are the same objects as when the travel began. The Frame then records the new head position, exactly as ADR-565 already does after a settled, app-owned run. An edit during the travel, even one that is undone, an interrupted or failed travel, Current Position placement, or a split trace still awaiting its program, leaves the Frame void, as before.
+
+This adds no Start guard and no policy refusal. Start still prepares, reviews and claims the current exact program, and the ordinary drift subscription still expires the rebased Frame on any later drift.
+
+**Verification.** Unit tests cover: the setting's validation and normalization; the Frame button chaining only after a clean Frame and only when it is wanted; a light failure not escaping into the Frame result; an Absolute Frame surviving a verified light travel with Start's handoff accepting the rebased Frame and refusing the old one; and Current Position, a mid-travel canvas edit, and a failed travel each voiding it.

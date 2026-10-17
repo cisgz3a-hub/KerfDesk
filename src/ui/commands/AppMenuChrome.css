@@ -45,6 +45,25 @@
   padding: 0;
 }
 
+.lf-menu-search-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 26px;
+  padding: 0 8px;
+  color: var(--lf-text-muted);
+}
+
+.lf-menu-search-button__keys {
+  padding: 0 4px;
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-sm);
+  color: var(--lf-text-faint);
+  font-family: inherit;
+  font-size: var(--lf-text-xs);
+}
+
 /* Project workflows share the existing header instead of taking a canvas row. */
 .lf-menu-project-controls {
   flex-shrink: 0;
@@ -76,6 +95,11 @@
   }
 
   .lf-menu-build {
+    display: none;
+  }
+
+  .lf-menu-search-button__label,
+  .lf-menu-search-button__keys {
     display: none;
   }
 }

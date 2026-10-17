@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useArtworkCreationStore } from '../layers/artwork-creation-store';
 import { useTutorialStore } from '../tutorials/tutorial-store';
+import { useCommandSearchStore } from './command-search-store';
 import { AppMenuBar } from './AppMenuBar';
 import { buildAppCommands } from './command-registry';
 import { baseCtx } from './command-registry-test-helpers';
@@ -14,7 +15,13 @@ type Outcome = {
   readonly args?: ReadonlyArray<string | number | boolean>;
   readonly guard?: string;
   readonly url?: string;
-  readonly special?: 'tutorials' | 'unavailable' | 'licence' | 'support-report' | 'check-updates';
+  readonly special?:
+    | 'tutorials'
+    | 'command-search'
+    | 'unavailable'
+    | 'licence'
+    | 'support-report'
+    | 'check-updates';
 };
 
 // Independent command-to-action expectations. Each command is clicked through
@@ -214,6 +221,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'window.undo-history': { callback: 'undoHistory' },
   'help.about': { callback: 'showAbout' },
   'help.licence': { special: 'licence' },
+  'help.find-command': { special: 'command-search' },
   'help.tutorials': { special: 'tutorials' },
   'help.connection': { callback: 'showConnectionHelp' },
   'help.safety': { callback: 'showSafety' },
@@ -237,6 +245,7 @@ beforeEach(() => {
   document.body.appendChild(host);
   root = createRoot(host);
   useTutorialStore.setState({ isOpen: false, tutorialId: null });
+  useCommandSearchStore.setState({ open: false });
   useArtworkCreationStore.getState().close();
 });
 
@@ -246,6 +255,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   useTutorialStore.setState({ isOpen: false, tutorialId: null });
+  useCommandSearchStore.setState({ open: false });
 });
 
 function availableContext(id: CommandId): AppCommandContext {
@@ -343,6 +353,7 @@ describe('every registered application menu action', () => {
       if (outcome.special === 'tutorials')
         expect(useTutorialStore.getState()).toMatchObject({ isOpen: true, tutorialId: null });
       else expect(useTutorialStore.getState().isOpen).toBe(false);
+      expect(useCommandSearchStore.getState().open).toBe(outcome.special === 'command-search');
       expect(opened).toEqual(
         outcome.url === undefined
           ? []

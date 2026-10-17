@@ -9,12 +9,14 @@ import {
 import { jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { frameProofReset } from './laser-session-reset';
+import { rebasedLightMoveFramePatch, type StashedFrameProof } from './completed-frame-run';
 import { warnJogMotionPolicy } from './laser-jog-warnings';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWrite } from './laser-safe-write';
 import { useStore } from './store';
 import { ControllerCommandRefusedError } from './laser-interactive-command';
 import {
+  positioningLightBatch,
   positioningLightCommand,
   positioningLightFence,
   positioningLightStatus,
@@ -254,27 +256,60 @@ async function moveToLightTarget(
   if (current === null) throw new Error('Positioning light needs a live machine position.');
   const params = { dx: target.x - current.x, dy: target.y - current.y, feed: target.feed };
   const moving = Math.abs(params.dx) >= 0.001 || Math.abs(params.dy) >= 0.001;
-  if (moving) {
-    warnJogMotionPolicy(set, context.get, params);
-    set(frameProofReset());
-    const commands = context.refs.driver.commands
-      .buildJog(params)
-      .split('\n')
-      .filter((line) => line.trim() !== '');
-    for (const line of commands) {
-      try {
-        await positioningLightCommand(context, line);
-      } catch (error) {
-        // A refused line (GRBL error:15 soft limit) never started; any other
-        // failure leaves the line's fate unknown and is contained as motion.
-        if (!(error instanceof ControllerCommandRefusedError)) onMotion();
-        throw error;
-      }
-      onMotion();
-    }
-    await settlePositioningLightMove(context);
+  if (!moving) {
+    assertLightTargetReached(context, target);
+    return;
   }
+  warnJogMotionPolicy(set, context.get, params);
+  const proof = stashFrameProof(context.get());
+  set(frameProofReset());
+  const commands = context.refs.driver.commands
+    .buildJog(params)
+    .split('\n')
+    .filter((line) => line.trim() !== '');
+  try {
+    // One owned write, like an ordinary jog: Marlin's G91/G0/G90 is queued
+    // together, so an Abort cannot land between the lines and leave G91 modal.
+    await positioningLightBatch(context, commands);
+  } catch (error) {
+    // A refused single native jog (GRBL error:15 soft limit) never started;
+    // any other failure leaves the move's fate unknown and is contained.
+    if (!(commands.length === 1 && error instanceof ControllerCommandRefusedError)) onMotion();
+    throw error;
+  }
+  onMotion();
+  await settlePositioningLightMove(context);
   assertLightTargetReached(context, target);
+  restoreFrameProof(context, set, proof);
+}
+
+type LightMoveFrameProof = StashedFrameProof & {
+  readonly project: unknown;
+  readonly jobPlacement: unknown;
+};
+
+function stashFrameProof(state: LaserState): LightMoveFrameProof {
+  const app = useStore.getState();
+  return {
+    framedRun: state.framedRun,
+    completedFrame: state.completedFrame ?? null,
+    frameVerification: state.frameVerification,
+    project: app.project,
+    jobPlacement: app.jobPlacement,
+  };
+}
+
+// The proof was voided for the move itself, so the drift subscription could
+// not watch the canvas meanwhile; any edit, even one undone, keeps it void.
+function restoreFrameProof(
+  context: PositioningLightTransaction,
+  set: SetFn,
+  proof: LightMoveFrameProof,
+): void {
+  const app = useStore.getState();
+  if (app.project !== proof.project || app.jobPlacement !== proof.jobPlacement) return;
+  context.assertCurrent();
+  set((state) => rebasedLightMoveFramePatch(proof, state));
 }
 
 function assertLightTargetReached(context: PositioningLightTransaction, target: Target): void {

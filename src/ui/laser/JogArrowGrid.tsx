@@ -96,17 +96,20 @@ function JogArrowButton(
       title={props.continuousJogSupported ? `${hinted}. Hold for continuous jog.` : hinted}
       {...handlers}
     >
-      <Icon name={props.icon} size={20} />
+      <Icon name={props.icon} size={18} />
     </button>
   );
 }
 
+// The Machine panel's jog pad sets a compact --lf-jog-button (LaserWindow.css);
+// other hosts, such as board capture, keep the 36px default.
+const JOG_BUTTON = 'var(--lf-jog-button, 36px)';
 const gridStyle: React.CSSProperties = {
   gridArea: 'arrows',
   display: 'grid',
-  gridTemplateColumns: 'repeat(3, 36px)',
-  gridTemplateRows: 'repeat(3, 36px)',
-  gap: 4,
+  gridTemplateColumns: `repeat(3, ${JOG_BUTTON})`,
+  gridTemplateRows: `repeat(3, ${JOG_BUTTON})`,
+  gap: 3,
   justifyContent: 'center',
 };
 const centerStyle: React.CSSProperties = {
@@ -115,8 +118,9 @@ const centerStyle: React.CSSProperties = {
   color: 'var(--lf-text-faint)',
 };
 const btnStyle: React.CSSProperties = {
-  width: 36,
-  height: 36,
+  width: JOG_BUTTON,
+  height: JOG_BUTTON,
+  padding: 0,
   fontSize: 16,
   cursor: 'pointer',
 };

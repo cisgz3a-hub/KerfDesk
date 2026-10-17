@@ -2,8 +2,9 @@
 // Keyboard Shortcuts dialog.
 //
 // Keep in sync with shortcuts.ts, nudge-step.ts, arrange-shortcut-keys.ts,
-// settings-shortcut.ts, use-job-shortcuts.ts, use-jog-shortcuts.ts,
-// jog-keyboard-map.ts, drag-state.ts, and workspace-pointer-snap.ts —
+// settings-shortcut.ts, command-search-shortcut.ts, use-job-shortcuts.ts,
+// use-jog-shortcuts.ts, jog-keyboard-map.ts, drag-state.ts, and
+// workspace-pointer-snap.ts —
 // the audit (M27/A.5) caught the old hint omitting four shipped shortcuts.
 // The job-control family is machine-aware (ADR-101 §7): same keys, right noun.
 
@@ -109,6 +110,7 @@ export function shortcutFamilies(
         { keys: 'Alt+D', action: 'delete duplicates' },
         { keys: 'Escape', action: 'deselect' },
         { keys: 'Ctrl+,', action: 'settings' },
+        { keys: 'Ctrl+K', action: 'find a command' },
       ],
     },
     {

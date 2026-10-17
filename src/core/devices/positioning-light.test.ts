@@ -79,3 +79,21 @@ describe('separate positioning light configuration', () => {
     expect(controllerCompatibleProfile(profile, 'grblhal').profile.positioningLight).toEqual(light);
   });
 });
+
+describe('Centre & LED after Frame setting (ADR-604)', () => {
+  it('accepts a boolean and keeps only an enabled setting when normalizing', () => {
+    expect(positioningLightIssue({ ...light, afterFrame: true }, 'grblhal')).toBeNull();
+    expect(positioningLightIssue({ ...light, afterFrame: false }, 'grblhal')).toBeNull();
+    expect(normalizePositioningLight({ ...light, afterFrame: true })).toEqual({
+      ...light,
+      afterFrame: true,
+    });
+    expect(normalizePositioningLight({ ...light, afterFrame: false })).toEqual(light);
+  });
+
+  it('rejects a non-boolean setting from a saved file', () => {
+    expect(positioningLightIssue({ ...light, afterFrame: 'yes' }, 'grblhal')).toMatch(
+      /after Frame/,
+    );
+  });
+});

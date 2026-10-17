@@ -47,6 +47,40 @@ export function settledCompletedFramePatch(
   };
 }
 
+export type StashedFrameProof = Pick<
+  LaserState,
+  'framedRun' | 'frameVerification' | 'completedFrame'
+>;
+
+/** A verified, beam-off positioning-light move keeps an Absolute footprint
+ * (ADR-604): it observes the new head exactly as owned-run settlement does.
+ * Current Position, transient permits, a split trace awaiting its program, or
+ * any newer Frame evidence stay void. */
+export function rebasedLightMoveFramePatch(
+  stash: StashedFrameProof,
+  state: LaserState,
+): Partial<
+  Pick<LaserState, 'framedRun' | 'completedFrame' | 'completedFrameRunOwner' | 'frameVerification'>
+> {
+  const frame = stash.completedFrame ?? null;
+  if (
+    frame === null ||
+    frame.candidate.authorizationContext !== undefined ||
+    frame.candidate.preparedStart.jobOrigin?.startFrom === 'current-position' ||
+    state.framedRun !== null ||
+    (state.completedFrame ?? null) !== null ||
+    !sameSpatialControllerAfterRun(frame, state)
+  )
+    return {};
+  const rebased: FramedRunPermit = { ...frame, controller: framedRunControllerSnapshot(state) };
+  return {
+    completedFrame: rebased,
+    completedFrameRunOwner: null,
+    framedRun: stash.framedRun === frame ? rebased : null,
+    frameVerification: stash.frameVerification,
+  };
+}
+
 function sameSpatialControllerAfterRun(frame: FramedRunPermit, state: LaserState): boolean {
   return (
     state.connection.kind === 'connected' &&
