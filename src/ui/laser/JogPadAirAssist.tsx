@@ -287,9 +287,9 @@ const airAssistTitleStyle: React.CSSProperties = {
   lineHeight: 1.15,
 };
 const compactAirAssistStyle: React.CSSProperties = {
-  minHeight: 36,
+  minHeight: 'var(--lf-jog-button, 36px)',
   alignSelf: 'start',
-  padding: '3px 6px',
+  padding: '2px 6px',
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1fr) auto',
   columnGap: 4,
