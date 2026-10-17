@@ -41,17 +41,21 @@
     <!-- The wordmark, credit and activity indicator paint before JS or artwork.
          main.tsx dismisses the screen when the workspace is ready (F-A1); the
          desktop app holds it briefly first (ADR-049 Amendment 1).
-         Activity is indeterminate: no simulated percentage.
+         Activity is indeterminate: no simulated percentage. A laser pulse runs
+         edge to edge along the loading rail and lights the artwork it passes.
+         It animates only transform and opacity, so it stays smooth while the
+         main thread is busy loading the workspace.
          Inline CSS is allowed by the CSP; startup code stays in the bundle. -->
     <style>
       #app-splash {
+        --app-splash-gutter: clamp(28px, 7.5vw, 144px);
         position: fixed;
         inset: 0;
         z-index: 2147483000;
         display: flex;
         align-items: center;
         box-sizing: border-box;
-        padding: 56px clamp(28px, 7.5vw, 144px) 110px;
+        padding: 56px var(--app-splash-gutter) 110px;
         overflow: hidden;
         isolation: isolate;
         background: #101113;
@@ -127,18 +131,129 @@
         width: min(244px, 100%);
         margin-top: 54px;
       }
+      /* The rail runs edge to edge, starting at the viewport's left edge. */
       #app-splash .app-splash__track {
+        position: relative;
+        width: 100vw;
         height: 2px;
-        overflow: hidden;
-        background: #4b4540;
+        margin-left: calc(-1 * var(--app-splash-gutter));
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgb(214 173 123 / 30%) 12%,
+          rgb(214 173 123 / 18%) 62%,
+          transparent
+        );
+      }
+      /* The beam is a zero-size point at the pulse head; its tail, flare and
+         sparks hang off it. The glow rides the same keyframes in step. */
+      #app-splash .app-splash__beam,
+      #app-splash .app-splash__glow {
+        position: absolute;
+        transform: translateX(-6vw);
+        animation: app-splash-pulse 1900ms cubic-bezier(0.45, 0, 0.8, 0.6) -300ms infinite;
       }
       #app-splash .app-splash__beam {
-        display: block;
-        width: 32%;
-        height: 100%;
-        background: #d6ad7b;
-        transform: translateX(106%);
-        animation: app-splash-loading 1500ms ease-in-out infinite;
+        top: 1px;
+        left: 0;
+      }
+      #app-splash .app-splash__beam::before {
+        content: '';
+        position: absolute;
+        top: -14px;
+        right: 0;
+        width: 44vw;
+        height: 28px;
+        background:
+          linear-gradient(90deg, transparent, rgb(226 176 118 / 70%) 72%, #fff3e2) center / 100% 2px
+            no-repeat,
+          radial-gradient(
+            ellipse 100% 50% at 100% 50%,
+            rgb(255 190 120 / 42%),
+            rgb(220 150 86 / 12%) 55%,
+            transparent
+          );
+      }
+      #app-splash .app-splash__beam::after {
+        content: '';
+        position: absolute;
+        top: -60px;
+        left: -340px;
+        width: 680px;
+        height: 120px;
+        background:
+          radial-gradient(
+            circle 56px,
+            #fff 0,
+            #fff 2px,
+            rgb(255 238 214 / 95%) 4px,
+            rgb(255 196 128 / 62%) 9px,
+            rgb(236 158 88 / 22%) 24px,
+            transparent
+          ),
+          radial-gradient(
+            340px 2.5px,
+            rgb(255 240 222 / 95%),
+            rgb(255 196 128 / 40%) 35%,
+            transparent
+          ),
+          radial-gradient(150px 9px, rgb(255 214 166 / 40%), transparent),
+          radial-gradient(1.5px 54px, rgb(255 236 210 / 70%), transparent),
+          radial-gradient(110px 60px, rgb(240 160 90 / 16%), transparent);
+        animation: app-splash-flicker 90ms steps(2, jump-none) infinite alternate;
+      }
+      /* Sparks fly off the head and fall away behind it. */
+      #app-splash .app-splash__beam i {
+        position: absolute;
+        top: -1.5px;
+        left: -1.5px;
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: #fff1dc;
+        box-shadow: 0 0 6px 2px rgb(255 166 84 / 85%);
+        opacity: 0;
+        animation: app-splash-spark 420ms linear infinite;
+      }
+      #app-splash .app-splash__beam i:nth-child(2) {
+        --app-splash-spark-x: -22vw;
+        --app-splash-spark-y: 34px;
+        animation-duration: 520ms;
+        animation-delay: -130ms;
+      }
+      #app-splash .app-splash__beam i:nth-child(3) {
+        --app-splash-spark-x: -15vw;
+        --app-splash-spark-y: -18px;
+        animation-duration: 380ms;
+        animation-delay: -260ms;
+      }
+      #app-splash .app-splash__beam i:nth-child(4) {
+        --app-splash-spark-x: -30vw;
+        --app-splash-spark-y: 46px;
+        animation-duration: 610ms;
+        animation-delay: -330ms;
+      }
+      #app-splash .app-splash__beam i:nth-child(5) {
+        --app-splash-spark-x: -12vw;
+        --app-splash-spark-y: 22px;
+        animation-duration: 340ms;
+        animation-delay: -60ms;
+      }
+      /* A pool of light centred on the head lifts the artwork and text it passes. */
+      #app-splash .app-splash__glow {
+        top: calc(1px - 60vh);
+        left: -50vw;
+        width: 70vw;
+        height: 120vh;
+        background:
+          radial-gradient(
+            18vw 30vh at 71.43% 50%,
+            rgb(255 210 156 / 38%),
+            rgb(255 176 104 / 12%) 48%,
+            transparent
+          ),
+          radial-gradient(34vw 48vh at 50% 50%, rgb(255 186 116 / 13%), transparent);
+        mix-blend-mode: screen;
       }
       #app-splash .app-splash__status {
         margin: 16px 0 0;
@@ -159,9 +274,9 @@
       }
       #app-splash .app-splash__footer {
         position: absolute;
-        right: clamp(28px, 7.5vw, 144px);
+        right: var(--app-splash-gutter);
         bottom: max(32px, env(safe-area-inset-bottom));
-        left: clamp(28px, 7.5vw, 144px);
+        left: var(--app-splash-gutter);
         display: flex;
         align-items: flex-end;
         justify-content: space-between;
@@ -189,12 +304,38 @@
         letter-spacing: 2px;
         line-height: 1.6;
       }
-      @keyframes app-splash-loading {
+      /* Head positions are in viewport units, so the beam and the glow stay in
+         step. The head launches from the left edge and accelerates across;
+         the tail clears the right edge before the next pulse. */
+      @keyframes app-splash-pulse {
+        0% {
+          transform: translateX(-6vw);
+        }
+        79%,
+        100% {
+          transform: translateX(150vw);
+        }
+      }
+      @keyframes app-splash-flicker {
         from {
-          transform: translateX(-110%);
+          opacity: 0.82;
         }
         to {
-          transform: translateX(320%);
+          opacity: 1;
+        }
+      }
+      @keyframes app-splash-spark {
+        0% {
+          opacity: 1;
+          transform: translate(0, 0) scale(1.2);
+        }
+        40% {
+          opacity: 0.9;
+        }
+        100% {
+          opacity: 0;
+          transform: translate(var(--app-splash-spark-x, -18vw), var(--app-splash-spark-y, 28px))
+            scale(0.4);
         }
       }
       @media (max-width: 600px) {
@@ -242,8 +383,9 @@
         #app-splash {
           transition: none;
         }
-        #app-splash .app-splash__beam {
-          animation: none;
+        #app-splash .app-splash__beam,
+        #app-splash .app-splash__glow {
+          display: none;
         }
       }
       @media (forced-colors: active) {
@@ -257,7 +399,14 @@
         #app-splash .app-splash__track {
           background: GrayText;
         }
-        #app-splash .app-splash__beam {
+        #app-splash .app-splash__glow,
+        #app-splash .app-splash__beam::after,
+        #app-splash .app-splash__beam i {
+          display: none;
+        }
+        #app-splash .app-splash__beam::before {
+          top: -1px;
+          height: 2px;
           background: Highlight;
         }
       }
@@ -281,7 +430,8 @@
         <p class="app-splash__tagline">Your ideas. Beautifully made.</p>
         <div class="app-splash__loading">
           <div class="app-splash__track" aria-hidden="true">
-            <span class="app-splash__beam"></span>
+            <span class="app-splash__glow"></span>
+            <span class="app-splash__beam"><i></i><i></i><i></i><i></i><i></i></span>
           </div>
           <p class="app-splash__status">Opening your workspace…</p>
         </div>
