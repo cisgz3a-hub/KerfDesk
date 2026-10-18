@@ -19,6 +19,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  /* A whole-pixel height keeps the 3D view below it on a pixel boundary
+     (tokens.css, .lf-dialog--gcode-inspector). */
+  box-sizing: border-box;
+  min-height: 62px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--lf-border);
   background: var(--lf-bg-1);
@@ -146,12 +150,20 @@
   z-index: 1;
   display: grid;
   gap: 5px;
+  /* One whole-pixel size while playback moves: whole-pixel line boxes, and a
+     width that holds the usual readouts ("Line 23", "X 27.00 Y 27.00 ..."),
+     so the card does not resize between the start and end of a program. A
+     card that resizes over the WebGL canvas can re-composite its edges one
+     level differently in Chrome's software renderer. */
+  box-sizing: border-box;
+  min-width: 208px;
   max-width: calc(100% - 24px);
   padding: 9px 11px;
   border: 1px solid var(--lf-border);
   border-radius: 8px;
   background: var(--lf-bg-1);
   font-size: var(--lf-text-xs);
+  line-height: 16px;
   pointer-events: none;
 }
 

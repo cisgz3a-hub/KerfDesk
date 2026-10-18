@@ -2,9 +2,11 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { speedSliderStops } from '../../core/devices/working-speed-range';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
+import { mmPerSecReading } from './LayerSpeedInput';
 import { OperationSliderField } from './OperationSliderField';
 
 (
@@ -201,6 +203,62 @@ describe('OperationSliderField', () => {
       expect(commit).toHaveBeenCalledExactlyOnceWith(45);
     },
   );
+
+  describe('with log-scale stops (Speed)', () => {
+    const stops = speedSliderStops({ min: 60, max: 10_000 });
+
+    async function renderSpeed(value = 3000): Promise<void> {
+      await act(async () =>
+        root.render(
+          <OperationSliderField
+            label="Speed"
+            unit="mm/min"
+            ariaContext="selected objects"
+            title="Feed rate"
+            value={value}
+            min={1}
+            max={36_000}
+            stops={stops}
+            describe={mmPerSecReading}
+            reconcileKey="initial"
+            parse={(text) => Math.max(1, Math.min(36_000, Number(text)))}
+            commit={commit}
+          />,
+        ),
+      );
+    }
+
+    it('drags through round speeds and commits the stop it lands on', async () => {
+      await renderSpeed();
+      expect(input('range').max).toBe(String(stops.length - 1));
+      expect(input('range').value).toBe(String(stops.indexOf(3000)));
+      expect(input('range').getAttribute('aria-valuetext')).toBe('3000 mm/min (50 mm/s)');
+
+      await startDrag();
+      await change('range', String(stops.indexOf(600)));
+      expect(input('number').value).toBe('600');
+      await act(async () => Simulate.pointerUp(input('range')));
+      expect(commit).toHaveBeenCalledExactlyOnceWith(600);
+    });
+
+    it('takes a typed speed above the slider and pins the thumb at its end', async () => {
+      await renderSpeed();
+      await change('number', '15000');
+      await act(async () => vi.advanceTimersByTime(300));
+      expect(commit).toHaveBeenCalledExactlyOnceWith(15_000);
+      expect(input('range').value).toBe(String(stops.length - 1));
+      expect(input('range').getAttribute('aria-valuetext')).toBe('15000 mm/min (250 mm/s)');
+    });
+
+    it('labels the ends and the decade between them', async () => {
+      await renderSpeed();
+      const labels = [...host.querySelectorAll('.lf-operation-slider__scale span')].map(
+        (span) => span.textContent,
+      );
+      expect(labels).toEqual(['60', '', '1,000', '10,000']);
+      expect(host.querySelector('.lf-operation-slider__reading')?.textContent).toBe('50 mm/s');
+    });
+  });
 
   it.each(['new', 'open'] as const)(
     '%s prevents a stale release from committing into a replacement document',

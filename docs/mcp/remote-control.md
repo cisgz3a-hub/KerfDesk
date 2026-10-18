@@ -59,7 +59,7 @@ ChatGPT's custom-server controls depend on the current plan, workspace and clien
 
 ## What connections can do
 
-Viewing connections can read bounded artwork and operation summaries, machine limits, edition/update status, bundled fonts, material recipes and the current prepared job review. In **Settings > Phone & MCP** on the PC, separately enable **Share artwork previews and text with approved phones and MCP apps** to allow PNG previews and existing text reads. This preference starts off; pairing alone does not enable it. Approved MCP apps may send shared content to their AI provider.
+Viewing connections can read bounded artwork and operation summaries, machine limits, edition/update status, bundled fonts, material recipes and the current prepared job review. In **Settings > Phone & MCP** on the PC, separately enable **Share artwork previews and text with approved phones and MCP apps** to allow PNG previews and existing text reads, plus camera stills for connections that also have machine control. This preference starts off; pairing alone does not enable it. Approved MCP apps may send shared content to their AI provider.
 
 Editing connections can also:
 
