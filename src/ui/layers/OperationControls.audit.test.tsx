@@ -31,7 +31,7 @@ async function openDisclosure(host: HTMLElement, label: string): Promise<void> {
 }
 
 describe('artwork control audit: operations', () => {
-  it('toggles card visibility without output and keeps Show / Output out of More', async () => {
+  it('toggles card visibility and output independently, with no Show copy in More', async () => {
     arrangeTwo();
     const name = layer().name;
     const host = await mount(<CutsLayersPanel />);
@@ -45,8 +45,11 @@ describe('artwork control audit: operations', () => {
     const summary = card.querySelector('summary')!;
     await click(summary);
     expect(card.querySelector('details')?.open).toBe(true);
-    // The eye and the editor own visibility and output (ADR-616).
-    expect(card.querySelector('details input[type="checkbox"]')).toBeNull();
+    // The eye owns visibility; output keeps its one row switch (ADR-616).
+    expect(card.querySelectorAll('details input[type="checkbox"]')).toHaveLength(1);
+    await click(input(card, `input[aria-label="Include in output: ${name}"]`));
+    expect(layer().output).toBe(false);
+    expect(layer().visible).toBe(true);
     const remove = button(card, `Delete operation ${name}`);
     expect(remove.classList.contains('lf-btn--danger')).toBe(true);
     expect(remove.closest('.lf-operation-menu__danger')).not.toBeNull();
@@ -55,6 +58,28 @@ describe('artwork control audit: operations', () => {
     ).toBeNull();
     await click(summary);
     expect(card.querySelector('details')?.open).toBe(false);
+  });
+
+  it('switches output for an operation whose artwork is all locked', async () => {
+    arrangeTwo();
+    const target = layer();
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          objects: state.project.scene.objects.map((object) =>
+            object.id === 'First' ? { ...object, locked: true } : object,
+          ),
+        },
+      },
+    }));
+    const host = await mount(<CutsLayersPanel />);
+    await openDisclosure(host, 'All operations');
+    await openDisclosure(host, `More controls for ${target.name}`);
+    await click(input(host, `input[aria-label="Include in output: ${target.name}"]`));
+    expect(layer().output).toBe(false);
+    expect(layer(1).output).toBe(true);
   });
 
   it('changes selected inspector Show and Output on the owning operation', async () => {

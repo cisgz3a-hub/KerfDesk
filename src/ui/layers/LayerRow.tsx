@@ -62,8 +62,9 @@ export function LayerRow(props: {
   );
 }
 
-// Visibility and output are not repeated here: the eye on the row and the
-// editor's Show on canvas / Include in output already own them.
+// Visibility is not repeated here: the eye on the row owns it. Output stays,
+// because the editor cannot reach an operation whose artwork is all locked,
+// or one with no artwork (ADR-616).
 function OperationManagement(props: {
   readonly layer: Layer;
   readonly canMoveUp: boolean;
@@ -73,7 +74,7 @@ function OperationManagement(props: {
     <details className="lf-operation-card__management">
       <summary
         aria-label={`More controls for ${props.layer.name}`}
-        title="Operation order, selection, clipboard and delete controls"
+        title="Operation order, output, selection, clipboard and delete controls"
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
         }}
@@ -85,6 +86,7 @@ function OperationManagement(props: {
           <span className="lf-operation-menu__label">Order</span>
           <LayerOrderControls {...props} />
         </div>
+        <OperationOutputToggle layer={props.layer} />
         <div className="lf-operation-menu__actions">
           <SelectLayerObjectsButton layer={props.layer} />
           <ShowOnlyLayerButton layer={props.layer} />
@@ -97,6 +99,23 @@ function OperationManagement(props: {
         </div>
       </div>
     </details>
+  );
+}
+
+function OperationOutputToggle({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((state) => state.setLayerParam);
+  const title = 'Include this operation in preview and machine output';
+  return (
+    <label className="lf-operation-menu__toggle" title={title}>
+      <input
+        type="checkbox"
+        checked={layer.output}
+        aria-label={`Include in output: ${layer.name}`}
+        title={title}
+        onChange={(event) => setLayerParam(layer.id, { output: event.target.checked })}
+      />
+      Include in output
+    </label>
   );
 }
 

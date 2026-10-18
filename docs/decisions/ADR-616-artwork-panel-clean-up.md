@@ -37,7 +37,9 @@ A UI audit of the Artwork panel found:
 1. **The panel is called Artwork everywhere a user sees it**: the toggle, heading, compact tab,
    collapsed rail and Window menu (Artwork Panel). Its accessible names follow ("Artwork panel",
    "Collapse Artwork panel"). Layers are **operations** in the panel and the status bar
-   ("Operations: 3 (3 output)").
+   ("Operations: 3 (3 output)"), and in Optimization Settings (**Operation priority**: Operation
+   order or Reverse operation order) and the LightBurn Cut Planner import warning. Stored values
+   (`project-order`, `reverse-project-order`) do not change.
 2. **The first tab is Properties**, chosen by the maintainer: Properties | Run order |
    Materials (Recipes in CNC).
 3. **A process warning appears under the Line / Fill / Image switch**, never above it, so the
@@ -45,8 +47,10 @@ A UI audit of the Artwork panel found:
    CNC fields.
 4. **The Artwork picker lists artwork names**, numbered when two share a name, the same names
    the header shows.
-5. **The row ••• menu no longer repeats Show and Output.** The row's eye and the editor's Show on
-   canvas and Include in output own them; the bulk tools still switch every operation at once.
+5. **The row ••• menu no longer repeats Show.** The row's eye owns visibility. It keeps one
+   **Include in output** switch: the editor cannot reach an operation whose artwork is all
+   locked, or one with no artwork, so the row is the only place that operation's output can be
+   switched on its own. The bulk tools still switch every operation at once.
 6. **The ••• menus use the shared button styles.** Bulk tools show their group names (Output,
    Visibility, Order) above `lf-btn` buttons; each button keeps its full action as its accessible
    name, which contains the shorter visible word. In a row menu Delete is on its own row, apart
@@ -70,16 +74,14 @@ A UI audit of the Artwork panel found:
   (first field at 320 px instead of 357 px at 1280 × 720). Power, Speed and Passes are visible
   without scrolling at 1280 × 720 and 1366 × 768. A longer scope line or mixed-settings note can
   still push them down; the panel scrolls as before.
-- An operation's output is switched from its editor (select its artwork, or pick it in the
-  Artwork picker) or from the bulk tools, no longer from its row menu.
 - Run order cards for unnamed shapes read "Rectangle"; the #N badge and the operation line tell
   them apart, as the picker numbers them.
 - Lessons and docs say Properties and Artwork panel.
 
 ### Verification
 
-- Unit tests cover the picker labels, the warning under the switch, the trimmed row menu, the
-  labelled bulk-tool groups, the Run order card's step and operation lines, and the renamed
+- Unit tests cover the picker labels, the warning under the switch, the trimmed row menu and its
+  output switch for locked artwork, the labelled bulk-tool groups, the Run order card's step and operation lines, and the renamed
   labels.
 - Browser screenshots before (current main) and after at 1600 × 960, 1280 × 720 and 1366 × 768
   in the desktop-mode dev server, kept in `docs/audits/2026-10-18-artwork-panel/`. Choosing Image

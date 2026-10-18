@@ -185,6 +185,18 @@
   gap: 4px;
 }
 
+.lf-operation-menu__toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--lf-text-sm);
+  cursor: pointer;
+}
+
+.lf-operation-menu__toggle > input {
+  margin: 0;
+}
+
 .lf-operation-list-tools__buttons,
 .lf-operation-menu__actions {
   display: flex;
