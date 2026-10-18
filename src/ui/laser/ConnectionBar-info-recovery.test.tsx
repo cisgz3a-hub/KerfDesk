@@ -18,7 +18,7 @@ const baseProps: Props = {
   qualification: { kind: 'failed', epoch: 4, message: 'The settings response was empty.' },
 };
 
-/** The one controller state that announces itself unasked (ADR-607). */
+/** The one controller state that announces itself unasked (ADR-612). */
 const silent = { controllerStoppedResponding: true } satisfies Partial<Props>;
 
 let host: HTMLDivElement | null = null;

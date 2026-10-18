@@ -1,4 +1,4 @@
-## ADR-606 - A job whose last replies were lost finishes without a controller reset (2026-10-17)
+## ADR-611 - A job whose last replies were lost finishes without a controller reset (2026-10-17)
 
 **Status:** Accepted. | **Date:** 2026-10-17
 
