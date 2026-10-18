@@ -176,6 +176,23 @@ describe('evaluateNumericEntry in an inch box (ADR-629)', () => {
     expect(valueOf('50%', INCH_SIZE)).toBe(40);
   });
 
+  it('preserves typed units inside groups, powers and functions', () => {
+    expect(valueOf('(10mm)', INCH)).toBe(10);
+    expect(valueOf('2*(10mm)', INCH)).toBe(20);
+    expect(valueOf('((1in))', INCH)).toBe(25.4);
+    expect(valueOf('1in^1', INCH)).toBe(25.4);
+    expect(valueOf('abs(-10mm)', INCH)).toBe(10);
+    expect(valueOf('(10mm) + 1', INCH)).toBeCloseTo(35.4, 12);
+    expect(valueOf('1 + (10mm)', INCH)).toBeCloseTo(35.4, 12);
+  });
+
+  it('preserves percentage dimensions through groups and powers', () => {
+    expect(valueOf('(50%)', INCH_SIZE)).toBe(40);
+    expect(valueOf('2*(25%)', INCH_SIZE)).toBe(40);
+    expect(valueOf('50%^1', INCH_SIZE)).toBe(40);
+    expect(valueOf('(50%) + 1', INCH_SIZE)).toBeCloseTo(65.4, 12);
+  });
+
   it('leaves millimetre boxes and angle boxes as they were', () => {
     expect(valueOf('1', { kind: 'length', lengthUnit: 'mm' })).toBe(1);
     expect(valueOf('90', { kind: 'angle', lengthUnit: 'in' })).toBe(90);

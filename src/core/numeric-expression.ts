@@ -63,6 +63,8 @@ type Cursor = {
   failure: string | null;
   /** Bracket nesting; the default length unit applies only at depth 0. */
   depth: number;
+  /** Explicit suffixes consumed, including those inside groups and powers. */
+  unitsRead: number;
 };
 
 const LENGTH_UNITS: ReadonlyMap<string, number> = new Map([
@@ -107,7 +109,14 @@ export function evaluateNumericEntry(
   const tokens = tokenize(text);
   if (tokens.kind === 'invalid') return tokens;
   if (tokens.tokens.length === 0) return invalid('the box is empty');
-  const cursor: Cursor = { tokens: tokens.tokens, options, index: 0, failure: null, depth: 0 };
+  const cursor: Cursor = {
+    tokens: tokens.tokens,
+    options,
+    index: 0,
+    failure: null,
+    depth: 0,
+    unitsRead: 0,
+  };
   const value = parseSum(cursor);
   const extra = cursor.tokens[cursor.index];
   if (cursor.failure === null && extra !== undefined) fail(cursor, strayTokenMessage(extra, true));
@@ -196,6 +205,7 @@ type Factor = { readonly value: number; readonly scale: number | null };
 // without units while no factor has carried one; when the last factor brings
 // the only unit, `whole` applies it to that product instead (see the header).
 function parseProduct(cursor: Cursor): number {
+  const unitsBefore = cursor.unitsRead;
   const first = parseUnary(cursor);
   let value = scaled(first);
   let unitless = first.scale === null ? first.value : null;
@@ -210,7 +220,9 @@ function parseProduct(cursor: Cursor): number {
     unitless = right.scale === null ? combined : null;
     op = takeSymbol(cursor, PRODUCT_OPERATORS);
   }
-  if (whole === null && unitless !== null) return value * defaultLengthScale(cursor);
+  // Groups, functions and powers return an already-scaled number rather than
+  // a suffix. Only a product that consumed no suffix anywhere is still bare.
+  if (cursor.unitsRead === unitsBefore) return value * defaultLengthScale(cursor);
   return whole ?? value;
 }
 
@@ -253,6 +265,7 @@ function parsePostfix(cursor: Cursor): Factor {
   const scale = unitScale(cursor, token);
   if (scale === null) return { value, scale: null };
   cursor.index += 1;
+  cursor.unitsRead += 1;
   return { value, scale };
 }
 
