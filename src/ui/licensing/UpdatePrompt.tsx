@@ -105,7 +105,10 @@ function OfferBody(
         <Button
           variant="primary"
           disabled={busy}
-          onClick={() => run(controls.download)}
+          // On macOS and Linux the page opens in the browser: nothing follows here.
+          onClick={() =>
+            run(controls.download, status.delivery === 'download-page' ? dismiss : undefined)
+          }
           title={
             status.delivery === 'download-page'
               ? `Open the download page for KerfDesk ${view.version} in your browser. Install it after you close KerfDesk.`
