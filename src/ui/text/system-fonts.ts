@@ -9,7 +9,7 @@ import {
   extractCollectionFace,
   fontEmbeddingRestricted,
   isFontCollection,
-} from '../../core/text';
+} from '../../core/text/font-collection';
 
 /** One installed face as the browser describes it. */
 export type SystemFontFace = {
