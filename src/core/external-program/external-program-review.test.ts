@@ -57,6 +57,26 @@ describe('external G-code program review (ADR-630)', () => {
     expect(review('G21\nG0 X53 Y92\nG1 X28 F100 S60\nM5\n').warnings).toEqual([]);
   });
 
+  it.each(['G10 L20 P1 X0 Y0', 'n12g010.0l020p1x0y0', 'L20 P0 G 1 0 X 0'])(
+    'warns precisely about unmodelled work-offset writes, including aliases: %s',
+    (line) => {
+      const warnings = review(`G21 G90\nG0 X0 Y0\n${line}\nG1 X20 F600\nM5\n`).warnings.join();
+      expect(warnings).toContain('work-coordinate offsets (G10 L20)');
+      expect(warnings).toContain('may be displaced from the traced outline');
+    },
+  );
+
+  it('names direct offset writes and leaves numeric lookalikes alone', () => {
+    expect(review('G21\nG0 X0\nG10L2P1X5\nG1X20F600\nM5\n').warnings.join()).toContain('G10 L2');
+    expect(review('G21\nG0 X10 Y20\nG1 X20 F600\nM5\n').warnings).toEqual([]);
+  });
+
+  it('ignores offset-write words that occur only in comments', () => {
+    expect(
+      review('G21\n(G10 L20 P1 X0 Y0)\nG0 X0 Y0 ; G10 L2 P1 X5\nG1 X20 F600\nM5\n').warnings,
+    ).toEqual([]);
+  });
+
   it('warns when the laser or spindle is still on at the end', () => {
     const warnings = review('G21 G90\nM3 S500\nG1 X10 F600\n').warnings.join('\n');
     expect(warnings).toContain('never sends M5');

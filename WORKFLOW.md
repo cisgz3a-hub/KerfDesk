@@ -9019,7 +9019,7 @@ The G-code Inspector is free in every edition (ADR-627).
    program (Inspect G-code) does not offer it: it already has Frame and Start.
 2. **Run on machine...** opens **Run *file name***. It lists what is sent (lines and bytes; the
    file's comments, `%` markers and blank lines are left out and nothing else changes), the
-   Inspector's estimated time, the Frame outline (its size and lowest corner in work
+   estimated time from a fresh parse of those exact sendable bytes, the Frame outline (its size and lowest corner in work
    coordinates, travel moves included), the units the program declares and whether it runs as a laser or a CNC job
    (the current machine mode).
 3. **Frame** is enabled while connected, Idle and with no other motion running; its tooltip
@@ -9036,7 +9036,8 @@ The G-code Inspector is free in every edition (ADR-627).
 #### Warnings (never refuse)
 
 Moves in machine coordinates (`G53`), a work coordinate switch away from `G54`, `G92`,
-`G28`/`G30`, relative moves (`G91`), inches (`G20`, which also leaves the controller in
+`G28`/`G30`, work-offset writes (`G10 L2`/`G10 L20`, explicitly warning that later moves may
+be displaced from the traced outline), relative moves (`G91`), inches (`G20`, which also leaves the controller in
 inches), the laser or spindle still on at the end, a tool change (`M6`), a program that looks
 like the other machine mode, and the Inspector's Program Health notices and warnings.
 

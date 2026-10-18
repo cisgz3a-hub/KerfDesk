@@ -5,6 +5,8 @@
 // Frame traces the same outline the Inspector draws.
 
 import type { GcodeRenderModel, ProgramFinding } from '../gcode-view';
+import { scanGcodeWords } from '../gcode/word-scan';
+import { stripComments } from './normalize-external-program';
 
 export type ExternalProgramEnvelope = {
   readonly minX: number;
@@ -68,6 +70,7 @@ export function reviewExternalProgram(
   const warnings = [
     ...WORD_WARNINGS.filter((check) => check.pattern.test(gcode)).map((check) => check.warning),
     ...coordinateSystemWarnings(model),
+    ...coordinateWriteWarnings(gcode),
     ...(units === 'inch' || units === 'both' ? [INCH_WARNING] : []),
     ...toolLeftOnWarnings(model),
     ...machineModeWarnings(model, context),
@@ -80,6 +83,21 @@ export function reviewExternalProgram(
 
 const INCH_WARNING =
   'The program is in inches (G20). It also leaves the controller in inches until a program sends G21.';
+
+function coordinateWriteWarnings(gcode: string): ReadonlyArray<string> {
+  const modes = new Set<number>();
+  for (const line of gcode.split('\n')) {
+    const words = scanGcodeWords(stripComments(line).replace(/[ \t]/g, ''));
+    if (!words.some((word) => word.letter === 'G' && Math.round(word.value * 100) === 1000))
+      continue;
+    const mode = words.find((word) => word.letter === 'L')?.value;
+    if (mode === 2 || mode === 20) modes.add(mode);
+  }
+  return [...modes].map(
+    (mode) =>
+      `The program writes work-coordinate offsets (G10 L${mode}). The Frame used the current work origin and does not model this write; subsequent moves may be displaced from the traced outline.`,
+  );
+}
 
 function envelopeOf(model: ReviewModel): ExternalProgramEnvelope | null {
   const bounds = model.stats.programBounds;

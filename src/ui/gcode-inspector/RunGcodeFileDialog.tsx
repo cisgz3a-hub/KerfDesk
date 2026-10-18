@@ -3,7 +3,11 @@
 // warnings. Refusals are only what the controller cannot take as a job.
 
 import { useMemo, useState } from 'react';
-import { reviewExternalProgram } from '../../core/external-program';
+import {
+  normalizeExternalProgram,
+  reviewExternalProgram,
+  type ExternalProgram,
+} from '../../core/external-program';
 import { formatDuration } from '../../core/job/format-duration';
 import { machineKindOf } from '../../core/scene';
 import { formatLengthWithUnit } from '../display-length';
@@ -19,7 +23,9 @@ import {
   type ExternalFrame,
 } from './external-run';
 import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
-import type { InspectorRenderModel } from './inspector-model';
+import { deviceInspectionContext } from './gcode-inspection-source';
+import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
+import { useGcodeInspection } from './use-gcode-inspection';
 import { prepareExternalRun, type PreparedExternalRun } from './prepare-external-run';
 import { RunGcodeFileSummary } from './RunGcodeFileSummary';
 import './run-gcode-file.css';
@@ -27,38 +33,71 @@ import './run-gcode-file.css';
 export type RunGcodeFileDialogProps = {
   readonly name: string;
   readonly text: string;
-  readonly model: InspectorRenderModel;
-  readonly analysis: GcodeInspectorAnalysis;
   readonly onClose: () => void;
   /** The job is streaming; the caller closes the Inspector too. */
   readonly onStarted: () => void;
 };
 
 export function RunGcodeFileDialog(props: RunGcodeFileDialogProps): JSX.Element {
-  const project = useStore((state) => state.project);
-  const prepared = useMemo(
-    () =>
-      prepareExternalRun(props.name, props.text, (gcode) =>
-        reviewExternalProgram(
-          gcode,
-          props.model,
-          {
-            machineKind: machineKindOf(project.machine),
-            laserMaxPowerS: project.device.maxPowerS,
-          },
-          props.analysis.findings,
-        ),
-      ),
-    [props.name, props.text, props.model, props.analysis, project.machine, project.device],
-  );
+  const normalized = useMemo(() => normalizeExternalProgram(props.text), [props.text]);
   return (
     <Dialog title={`Run ${props.name}`} size="md" onClose={props.onClose}>
-      {prepared.kind === 'refused' ? (
-        <RefusedRun reasons={prepared.reasons} onClose={props.onClose} />
+      {normalized.kind === 'refused' ? (
+        <RefusedRun reasons={normalized.reasons} onClose={props.onClose} />
       ) : (
-        <RunControls {...props} prepared={prepared} />
+        <InspectExternalRun {...props} program={normalized.program} />
       )}
     </Dialog>
+  );
+}
+
+// Normalization can join numeric fragments across a comment. Parse and time
+// precisely those sendable bytes through the existing cancellable worker;
+// the original file's Inspector model cannot authorize this executable.
+function InspectExternalRun(
+  props: RunGcodeFileDialogProps & { readonly program: ExternalProgram },
+): JSX.Element {
+  const project = useStore((state) => state.project);
+  const source = useMemo(
+    () => ({
+      ...deviceInspectionContext(project.device, machineKindOf(project.machine)),
+      kind: 'text' as const,
+      text: props.program.gcode,
+    }),
+    [props.program, project.device, project.machine],
+  );
+  const inspection = useGcodeInspection(source);
+  if (inspection.kind === 'error')
+    return <RefusedRun reasons={[inspection.reason]} onClose={props.onClose} />;
+  if (inspection.kind !== 'ready' || inspection.source !== source)
+    return (
+      <>
+        <p role="status">Preparing the exact program to send…</p>
+        <DialogActions>
+          <Button type="button" onClick={props.onClose}>
+            Close
+          </Button>
+        </DialogActions>
+      </>
+    );
+  const result = inspection.result;
+  if (!hasGcodeInspectorAnalysis(result))
+    return <RefusedRun reasons={[result.parsed.reason]} onClose={props.onClose} />;
+  const prepared = prepareExternalRun(props.name, props.program, (gcode) =>
+    reviewExternalProgram(
+      gcode,
+      result.parsed.model,
+      {
+        machineKind: machineKindOf(project.machine),
+        laserMaxPowerS: project.device.maxPowerS,
+      },
+      result.analysis.findings,
+    ),
+  );
+  return prepared.kind === 'refused' ? (
+    <RefusedRun reasons={prepared.reasons} onClose={props.onClose} />
+  ) : (
+    <RunControls {...props} prepared={prepared} analysis={result.analysis} />
   );
 }
 
@@ -119,6 +158,7 @@ function useExternalRunActions(
 function RunControls(
   props: RunGcodeFileDialogProps & {
     readonly prepared: Extract<PreparedExternalRun, { readonly kind: 'ready' }>;
+    readonly analysis: GcodeInspectorAnalysis;
   },
 ): JSX.Element {
   const { prepared } = props;

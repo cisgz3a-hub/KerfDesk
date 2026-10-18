@@ -16,7 +16,7 @@ The G-code Inspector shows **Run on machine...** for a file the operator opened 
 
 ### What is sent
 
-The program the controller receives is the opened file with comments (`(...)` and `;` to the end of the line), `%` tape markers, blank lines and surrounding spaces removed. Nothing else is changed: no line is added, reordered, rescaled or rewritten. The dialog shows the number of lines and bytes that will be sent, and the run streams exactly those bytes. Comments are removed because the controller would still receive them, they use buffer space, and characters such as `!`, `~` and `?` inside a comment are realtime commands to GRBL.
+The program the controller receives is the opened file with comments (`(...)` and `;` to the end of the line), `%` tape markers, blank lines and surrounding spaces removed. Nothing else is changed: no line is added, reordered, rescaled or rewritten. The normalized bytes are parsed and timed again by the cancellable Inspector worker; the Run review, Frame envelope and Start all use that executable, rather than the original file's model. Removing a comment can join numeric fragments, so the original model is not interchangeable. The dialog shows the number of lines and bytes that will be sent, and the run streams exactly those bytes. Comments are removed because the controller would still receive them, they use buffer space, and characters such as `!`, `~` and `?` inside a comment are realtime commands to GRBL.
 
 Factual refusals, because the program cannot be streamed as written (no policy refusal is added):
 
@@ -37,7 +37,7 @@ A clean completion records a Frame for this exact program: its fingerprint, its 
 
 The **Run** dialog is the one review for the file: name, lines and bytes to send, estimated time, the envelope and its size, the units the program declares, and the machine mode it will run in. Findings are warnings that never refuse:
 
-- moves in machine coordinates (`G53`), a work coordinate change away from `G54`, `G92`, or `G28`/`G30`, which the Frame could not trace against the current work origin;
+- moves in machine coordinates (`G53`), a work coordinate change away from `G54`, `G92`, `G28`/`G30`, or work-offset writes (`G10 L2`/`G10 L20`), which the Frame could not trace against the current work origin. Offset writes carry an explicit displacement warning, including compact and padded numeric aliases; their bytes remain unchanged and they do not add a refusal;
 - relative moves (`G91`): the Inspector reads them from the work origin, while the program really starts wherever the head is;
 - a program in inches (`G20`), which also leaves the controller in inches until the next program sets `G21`;
 - the laser or spindle still on at the end of the program (no `M5`);

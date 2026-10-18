@@ -9,8 +9,7 @@ import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { resetStore } from '../state/test-helpers';
 import { EXTERNAL_FRAME_FIRST } from './external-run';
-import { analyzeGcodeModel } from './gcode-inspector-analysis';
-import { inspectorRenderModel } from './inspector-model';
+import * as externalRun from './external-run';
 import { RunGcodeFileDialog } from './RunGcodeFileDialog';
 
 (
@@ -33,24 +32,16 @@ afterEach(async () => {
   root = null;
   useLaserStore.setState(initialLaserState());
   document.body.innerHTML = '';
+  vi.restoreAllMocks();
 });
 
 async function show(text: string): Promise<HTMLElement> {
-  const parsed = buildGcodeRenderModel(text, { machineKind: 'laser' });
-  if (parsed.kind !== 'ok') throw new Error(parsed.reason);
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
   await act(async () =>
     root?.render(
-      <RunGcodeFileDialog
-        name="part.nc"
-        text={text}
-        model={inspectorRenderModel(parsed.model)}
-        analysis={analyzeGcodeModel(parsed.model)}
-        onClose={vi.fn()}
-        onStarted={vi.fn()}
-      />,
+      <RunGcodeFileDialog name="part.nc" text={text} onClose={vi.fn()} onStarted={vi.fn()} />,
     ),
   );
   return document.body;
@@ -84,11 +75,49 @@ describe('Run G-code file dialog (ADR-630)', () => {
     expect(button(body, 'Frame').disabled).toBe(false);
   });
 
+  it('reviews and Frames the normalized executable bytes, not the original inspection', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>'),
+    });
+    const text = 'G21 G90\nG0 X0 Y0\nM4 S500\nG1 X10 F600\nG1 X1(note)00\nM5\n';
+    const original = buildGcodeRenderModel(text);
+    if (original.kind !== 'ok') throw new Error(original.reason);
+    expect(original.model.stats.programBounds?.maxX).toBe(10);
+    const body = await show(text);
+    expect(body.textContent).toContain('100 mm × 0 mm');
+    expect(body.textContent).not.toContain('unreadable line');
+    expect(button(body, 'Frame').disabled).toBe(false);
+    const frame = vi.spyOn(externalRun, 'frameExternalProgram').mockResolvedValue(null);
+    await act(async () => button(body, 'Frame').click());
+    expect(frame).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gcode: text.replace('(note)', ''),
+        envelope: { minX: 0, minY: 0, maxX: 100, maxY: 0 },
+      }),
+    );
+  });
+
   it('lists warnings without blocking anything', async () => {
     const body = await show('G20 G90\nG0 X1 Y1\nM3 S500\nG1 X2 F20\n');
     expect(body.textContent).toContain('Warnings');
     expect(body.textContent).toContain('inches (G20)');
     expect(body.textContent).toContain('never sends M5');
+  });
+
+  it('shows the G10 displacement warning while preserving Frame and exact sendable bytes', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>'),
+    });
+    const text = 'G21 G90\nG0 X10 Y0\nG10L20P1X0Y0\nM4 S500\nG1 X20 F600\nM5\n';
+    const body = await show(text);
+    expect(body.textContent).toContain('work-coordinate offsets (G10 L20)');
+    expect(body.textContent).toContain('may be displaced from the traced outline');
+    expect(button(body, 'Frame').disabled).toBe(false);
+    const frame = vi.spyOn(externalRun, 'frameExternalProgram').mockResolvedValue(null);
+    await act(async () => button(body, 'Frame').click());
+    expect(frame).toHaveBeenCalledWith(expect.objectContaining({ gcode: text }));
   });
 
   it('explains a file it cannot send, with no Frame or Start', async () => {

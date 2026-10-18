@@ -8,7 +8,7 @@ import { useCallback, useState } from 'react';
 import { open2dSimulatorFromSource } from '../app/gcode-open-action';
 import { createImportWorkerControls } from '../app/import-worker-controls';
 import { GcodeInspectorDialog, RunGcodeFileDialog, withCurrentDevice } from '../gcode-inspector';
-import type { GcodeInspectionSource, InspectedProgram } from '../gcode-inspector';
+import type { GcodeInspectionSource } from '../gcode-inspector';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 
@@ -36,14 +36,14 @@ function InspectorHost(props: {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const openExternalGcodePreview = useStore((s) => s.openExternalGcodePreview);
   const pushToast = useToastStore((s) => s.pushToast);
-  const [run, setRun] = useState<(InspectedProgram & { readonly text: string }) | null>(null);
+  const [run, setRun] = useState<string | null>(null);
   const source = props.program.source;
   const runHandoff =
     source.openedFile === true
       ? {
-          onRunOnMachine: (inspected: InspectedProgram) => {
+          onRunOnMachine: () => {
             void sourceText(source)
-              .then((text) => setRun({ ...inspected, text }))
+              .then(setRun)
               .catch((error: unknown) =>
                 pushToast(error instanceof Error ? error.message : String(error), 'error'),
               );
@@ -80,9 +80,7 @@ function InspectorHost(props: {
       {run === null ? null : (
         <RunGcodeFileDialog
           name={props.program.name}
-          text={run.text}
-          model={run.model}
-          analysis={run.analysis}
+          text={run}
           onClose={() => setRun(null)}
           onStarted={() => {
             setRun(null);

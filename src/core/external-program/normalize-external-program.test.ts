@@ -49,6 +49,13 @@ describe('external G-code program normalization (ADR-630)', () => {
     expect(found[0]).toContain('Line 2 is a $ controller command ($H)');
   });
 
+  it('keeps supported advisory coordinate findings and ignores commented writes', () => {
+    expect(sent('G21\nG53 G0 X1\nG55\nG92 X0\nG28\n')).toContain('G92 X0');
+    expect(sent('G0 X1 (G10 L20 P1 X0)\n')).toBe('G0 X1\n');
+    expect(sent('G0 X10 Y20\n')).toBe('G0 X10 Y20\n');
+    expect(sent('G10L20P1X0Y0\nG1X20F600\n')).toBe('G10L20P1X0Y0\nG1X20F600\n');
+  });
+
   it('refuses realtime command characters outside comments', () => {
     expect(reasons('G0 X1 !\n')[0]).toContain('Line 1 holds "!"');
     expect(reasons('G0 X1\n?\n')[0]).toContain('Line 2 holds "?"');
