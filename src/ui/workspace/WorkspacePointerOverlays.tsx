@@ -1,6 +1,7 @@
 // The pointer-following canvas overlays (ADR-348), composed in one place so
-// Workspace.tsx stays a layout shell: the ruler-strip cursor marks, the hover
-// size readout, and the Trim Shapes highlight (LBG-T04).
+// Workspace.tsx stays a layout shell: the operation colour pulse (ADR-620),
+// the ruler-strip cursor marks, the hover size readout, and the Trim Shapes
+// highlight (LBG-T04).
 //
 // Both are display-only DOM over the canvas, `pointer-events: none`, and
 // neither participates in the scene redraw. They read the scene, view and tool
@@ -10,6 +11,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { ArtworkPulseOverlay } from './ArtworkPulseOverlay';
 import { HoverSizeReadout } from './HoverSizeReadout';
 import { MeasureHoverReadout } from './MeasureHoverReadout';
 import { RulerCursorOverlay } from './RulerCursorOverlay';
@@ -29,6 +31,14 @@ export function WorkspacePointerOverlays(props: {
   const viewState = usePointerViewState();
   return (
     <>
+      {!previewMode && (
+        <ArtworkPulseOverlay
+          project={project}
+          canvasSize={props.canvasSize}
+          viewState={viewState}
+          canvasHoverEnabled={!props.dragging && toolMode.kind === 'select'}
+        />
+      )}
       <RulerCursorOverlay project={project} canvasSize={props.canvasSize} viewState={viewState} />
       <HoverSizeReadout
         project={project}

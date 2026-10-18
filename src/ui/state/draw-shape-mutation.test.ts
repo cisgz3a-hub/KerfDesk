@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createProject, primaryOperationForObject } from '../../core/scene';
+import { createProject, nextOperationColor, primaryOperationForObject } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
 import { applyDrawShape } from './draw-shape-mutation';
 
@@ -20,7 +20,7 @@ describe('applyDrawShape', () => {
     expect(result.additionalSelectedIds.size).toBe(0);
   });
 
-  it('auto-creates the first line operation in black', () => {
+  it('auto-creates the first line operation in the first palette colour', () => {
     const shape = createRectangle({
       id: 'S2',
       color: '#123456',
@@ -31,7 +31,8 @@ describe('applyDrawShape', () => {
     const layer =
       stored === undefined ? null : primaryOperationForObject(stored, result.project.scene.layers);
     expect(layer).not.toBeNull();
-    expect(layer?.color).toBe('#000000');
+    // Blue since ADR-620; derived so the palette order is pinned in one place.
+    expect(layer?.color).toBe(nextOperationColor([]));
     // Drawn vectors default to a line/cut layer (LightBurn parity).
     expect(layer?.mode).toBe('line');
   });

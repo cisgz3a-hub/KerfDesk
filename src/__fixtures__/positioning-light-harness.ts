@@ -16,7 +16,18 @@ import type { SafeWrite } from '../ui/state/laser-safe-write';
 // A scripted controller for the positioning-light transaction tests.
 export const originalProject = useStore.getState().project;
 
-export function harness(kind: ControllerKind = 'grbl-v1.1', commandSet?: ControllerCommandSet) {
+export function harness(
+  kind: ControllerKind = 'grbl-v1.1',
+  commandSet?: ControllerCommandSet,
+  reportOptions: { readonly workOnly?: boolean; readonly reportInches?: boolean } = {},
+) {
+  let workOnly = reportOptions.workOnly === true;
+  const formatPosition = (value: number) =>
+    reportOptions.reportInches === true
+      ? (value / 25.4).toFixed(6)
+      : kind === 'marlin'
+        ? value.toFixed(2)
+        : String(value);
   const driver = selectControllerDriver(kind, commandSet);
   const mapping =
     kind === 'marlin'
@@ -35,7 +46,9 @@ export function harness(kind: ControllerKind = 'grbl-v1.1', commandSet?: Control
     connection: { kind: 'connected' },
     activeControllerKind: kind,
     capabilities: driver.capabilities,
-    statusReport: parseStatusReport('<Idle|MPos:0,0,0|WCO:0,0,0>'),
+    statusReport: parseStatusReport(workOnly ? '<Idle|WPos:0,0,0>' : '<Idle|MPos:0,0,0|WCO:0,0,0>'),
+    controllerSettings: { reportInches: reportOptions.reportInches === true },
+    ...(workOnly ? { workOriginActive: true, workOriginSource: 'unknown' as const } : {}),
     controllerSessionEpoch: 3,
   };
   const refs = {
@@ -58,8 +71,19 @@ export function harness(kind: ControllerKind = 'grbl-v1.1', commandSet?: Control
   };
   const emitStatus = (): void => {
     const motionState = movingPolls-- > 0 ? 'Jog' : 'Idle';
+    const field = workOnly ? 'WPos' : 'MPos';
     const report = parseStatusReport(
-      `<${motionState}|MPos:${kind === 'marlin' ? head.x.toFixed(2) : head.x},${kind === 'marlin' ? head.y.toFixed(2) : head.y},0|WCO:0,0,0>`,
+      '<' +
+        motionState +
+        '|' +
+        field +
+        ':' +
+        formatPosition(head.x) +
+        ',' +
+        formatPosition(head.y) +
+        ',0' +
+        (workOnly ? '' : '|WCO:0,0,0') +
+        '>',
     )!;
     state = { ...state, statusReport: report, statusSequence: state.statusSequence + 1 };
     consumeControllerCommandResponse(refs, { kind: 'status', report }, 'status');
@@ -124,5 +148,8 @@ export function harness(kind: ControllerKind = 'grbl-v1.1', commandSet?: Control
       movingPolls = count;
     },
     hasMoved: () => moved,
+    reportWorkOnly: (value: boolean) => {
+      workOnly = value;
+    },
   };
 }
