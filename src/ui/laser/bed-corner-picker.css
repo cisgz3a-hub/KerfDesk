@@ -1,0 +1,96 @@
+/* BedCornerPicker — the Machine Setup bed diagram for the origin and the
+ * recorded homing corner. Theme tokens only, so light and dark both work. */
+.lf-bed-picker {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lf-bed-picker__diagram {
+  position: relative;
+  display: block;
+  flex: none;
+}
+.lf-bed-picker__diagram > svg {
+  display: block;
+  overflow: visible;
+}
+.lf-bed-picker__bed {
+  fill: var(--lf-bg-input);
+  stroke: var(--lf-border-strong);
+  stroke-width: 1;
+}
+.lf-bed-picker__front {
+  stroke: var(--lf-text-muted);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.lf-bed-picker__edge-label {
+  fill: var(--lf-text-faint);
+  font-size: 10px;
+}
+.lf-bed-picker__arrow line {
+  stroke: var(--lf-accent-fg);
+  stroke-width: 1.75;
+}
+.lf-bed-picker__arrow path {
+  fill: var(--lf-accent-fg);
+}
+.lf-bed-picker__arrow text {
+  fill: var(--lf-accent-fg);
+  font-size: 10px;
+  font-weight: 600;
+}
+.lf-bed-picker__target {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  padding: 0;
+  color: var(--lf-text);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+/* Scoped twice to outrank the dialog-wide focus ring and its 3px offset. */
+.lf-bed-picker .lf-bed-picker__target:focus-visible {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: -2px;
+}
+.lf-bed-picker__dot {
+  box-sizing: border-box;
+  width: 9px;
+  height: 9px;
+  background: var(--lf-bg-1);
+  border: 1.5px solid var(--lf-border-strong);
+  border-radius: 50%;
+  transition: border-color 80ms;
+}
+.lf-bed-picker__target:hover .lf-bed-picker__dot {
+  border-color: var(--lf-accent-fg);
+}
+.lf-bed-picker__target[aria-checked='true'] .lf-bed-picker__dot {
+  width: 11px;
+  height: 11px;
+  background: var(--lf-accent);
+  border-color: var(--lf-accent);
+}
+.lf-bed-picker__home {
+  display: block;
+  width: 17px;
+  height: 17px;
+}
+.lf-bed-picker__home path {
+  fill: var(--lf-accent);
+  stroke: var(--lf-bg-1);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+.lf-bed-picker__caption {
+  max-width: 156px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--lf-text-muted);
+}

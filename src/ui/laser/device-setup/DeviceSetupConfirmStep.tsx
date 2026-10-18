@@ -6,7 +6,7 @@ import type { DeviceProfile } from '../../../core/devices';
 import {
   BedRows,
   FeedRows,
-  HomingCornerSelect,
+  HomingCornerPicker,
   NameRow,
   OriginCornerRow,
 } from '../DeviceProfileFields';
@@ -54,7 +54,7 @@ export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps
           </span>
         </label>
         {state.draft.homing.enabled ? (
-          <HomingCornerSelect
+          <HomingCornerPicker
             value={state.draft.homing.direction}
             onChange={(direction) => update({ homing: { ...state.draft.homing, direction } })}
           />

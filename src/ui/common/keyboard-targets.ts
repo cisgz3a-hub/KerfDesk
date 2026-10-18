@@ -47,6 +47,18 @@ export function isKeyboardActivationTarget(target: EventTarget | null): boolean 
   );
 }
 
+/**
+ * Enter on a focused control (a button, link or menu item) activates that
+ * control, so a window-level Enter binding such as finishing the pen must leave
+ * it alone rather than swallow the activation.
+ */
+export function isEnterActivationTarget(target: EventTarget | null): boolean {
+  if (isKeyboardActivationTarget(target)) return true;
+  return (
+    target instanceof HTMLElement && target.matches('a[href], [role^="menuitem"], [role="tab"]')
+  );
+}
+
 function isFormEditingTag(tagName: string): boolean {
   return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT';
 }

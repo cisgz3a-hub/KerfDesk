@@ -83,7 +83,8 @@ export type LaserStoreActions = {
     feed: number,
     assertTargetCurrent?: () => void,
   ) => Promise<void>;
-  readonly setPositioningLightEnabled: (enabled: boolean) => Promise<void>;
+  readonly switchPositioningLightOn: () => Promise<void>;
+  readonly switchPositioningLightOff: () => Promise<void>;
   readonly setAirAssistEnabled: (enabled: boolean) => Promise<void>;
   readonly setFireActive: (active: boolean, requestedPercent?: number) => Promise<void>;
   readonly markJobStart: (request: JobStartMarkRequest) => Promise<void>;

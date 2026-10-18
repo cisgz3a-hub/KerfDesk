@@ -128,3 +128,19 @@ it('replaces stale notes with loading or legacy fallback and hides them without 
     expect(host.querySelectorAll('li')).toHaveLength(0);
   }
 });
+
+it('offers the download page, never a download or install, on macOS and Linux (ADR-613)', async () => {
+  await render(candidate({ delivery: 'download-page', installOnQuit: false }));
+  expect(button('Download update')).toBeUndefined();
+  const page = button('Open download page')!;
+  expect(page.title).toContain('does not download or install it itself');
+  expect(host.textContent).toContain('Open its download page to get it');
+  expect(host.textContent).toContain('never downloads or installs it by itself');
+  await act(async () => page.click());
+  expect(onDownload).toHaveBeenCalledOnce();
+  for (const state of ['up-to-date', 'not-covered', 'failed'] as const) {
+    await render(candidate({ delivery: 'download-page', state }));
+    expect(button('Open download page')).toBeUndefined();
+    expect(button('Install when I close KerfDesk')).toBeUndefined();
+  }
+});

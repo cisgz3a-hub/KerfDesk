@@ -70,7 +70,8 @@ beforeEach(() => {
     motionOperation: null,
     controllerOperation: null,
     centrePositioningLight: jog,
-    setPositioningLightEnabled: off,
+    switchPositioningLightOn: () => off(true),
+    switchPositioningLightOff: () => off(false),
     positioningLightEnabled: false,
   });
   useJogControlPreferences.setState({ requestedFeedMmPerMin: 1200 });
@@ -295,6 +296,35 @@ describe('Centre selection in the jog pad', () => {
     expect(centreButton().disabled).toBe(true);
     // Off remains callable even when reset/no feedback makes the tracked state false.
     expect(turnOff.disabled).toBe(false);
+  });
+  it('shows no LED controls at all on a Marlin fan-mosfet laser, even while lit', async () => {
+    useLaserStore.setState({ positioningLightEnabled: true });
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: {
+          ...state.project.device,
+          controllerKind: 'marlin',
+          gcodeDialect: { dialectId: 'marlin-fan' },
+        },
+      },
+    }));
+    await act(async () => root.render(<JogPad disabled={false} />));
+    expect(host.querySelector('button[aria-label="Artwork centre & LED"]')).toBeNull();
+    expect(host.querySelector('button[aria-label="LED off"]')).toBeNull();
+    expect(host.querySelector('button[aria-label="LED on"]')).toBeNull();
+    expect(host.textContent).not.toContain('Set up LED');
+    await act(async () =>
+      useStore.setState((state) => ({
+        project: {
+          ...state.project,
+          device: { ...state.project.device, gcodeDialect: { dialectId: 'marlin-inline' } },
+        },
+      })),
+    );
+    expect(host.querySelector('button[aria-label="Artwork centre & LED"]')).not.toBeNull();
+    expect(jog).not.toHaveBeenCalled();
+    expect(off).not.toHaveBeenCalled();
   });
 });
 

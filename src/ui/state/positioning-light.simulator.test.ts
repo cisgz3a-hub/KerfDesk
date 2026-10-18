@@ -97,9 +97,42 @@ describe('positioning light through real store serial and ACK ownership', () => 
     await vi.advanceTimersByTimeAsync(60_000);
     expect(useLaserStore.getState().positioningLightEnabled).toBe(true);
     expect(sim.outbound().slice(lastOn).join('')).not.toContain('M9\n');
-    await finish(useLaserStore.getState().setPositioningLightEnabled(false));
+    await finish(useLaserStore.getState().switchPositioningLightOff());
     expect(useLaserStore.getState().positioningLightEnabled).toBe(false);
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+  });
+
+  it.each(families)('switches a lit light off as part of Disconnect on %s', async (kind) => {
+    const offLinesAtDisconnect = async (mode: 'off' | 'centre' | 'on'): Promise<number> => {
+      resetStore();
+      const sim =
+        kind === 'marlin'
+          ? createMarlinSimulator()
+          : kind === 'smoothieware'
+            ? createSmoothieSimulator()
+            : createGrblSimulator();
+      useStore.getState().updateDeviceProfile({
+        controllerKind: kind,
+        positioningLight: { onCommand: 'M7', offCommand: 'M9', offsetXmm: 0, offsetYmm: 0 },
+      });
+      await useLaserStore.getState().connect(sim.adapter, { controllerKind: kind });
+      await vi.advanceTimersByTimeAsync(1500);
+      if (mode === 'centre')
+        await finish(useLaserStore.getState().centrePositioningLight(10, 15, 1000));
+      else if (mode === 'on') await finish(useLaserStore.getState().switchPositioningLightOn());
+      const before = sim.outbound().length;
+      await disconnectOnTestClock();
+      await vi.advanceTimersByTimeAsync(5000);
+      return sim
+        .outbound()
+        .slice(before)
+        .join('')
+        .split('\n')
+        .filter((line) => line.trim() === 'M9').length;
+    };
+    const unlit = await offLinesAtDisconnect('off');
+    expect(await offLinesAtDisconnect('centre')).toBe(unlit + 1);
+    expect(await offLinesAtDisconnect('on')).toBe(unlit + 1);
   });
 });
 
@@ -119,7 +152,7 @@ describe('independent LED switching with a real completed Frame', () => {
       );
       const origin = permit.candidate.preparedStart.jobOrigin;
       const firstWrite = sim.outbound().length;
-      await finish(useLaserStore.getState().setPositioningLightEnabled(true));
+      await finish(useLaserStore.getState().switchPositioningLightOn());
       await vi.advanceTimersByTimeAsync(60_000);
       expect(useLaserStore.getState().positioningLightEnabled).toBe(true);
       expect(sim.outbound().slice(firstWrite).join('')).toContain('M7\n');
@@ -127,7 +160,7 @@ describe('independent LED switching with a real completed Frame', () => {
       expect(afterOn).not.toContain('M9\n');
       expect(useLaserStore.getState().completedFrame).toBe(permit);
       expect(useLaserStore.getState().framedRun).toBe(permit);
-      await finish(useLaserStore.getState().setPositioningLightEnabled(false));
+      await finish(useLaserStore.getState().switchPositioningLightOff());
       const laser = useLaserStore.getState();
       expect(laser.positioningLightEnabled).toBe(false);
       expect(laser.completedFrame).toBe(permit);

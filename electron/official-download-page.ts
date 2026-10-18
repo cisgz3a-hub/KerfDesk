@@ -18,3 +18,16 @@ export function canonicalOfficialDesktopDownloadUrl(url: string): string | null 
 export function isOfficialDesktopDownloadUrl(url: string): boolean {
   return canonicalOfficialDesktopDownloadUrl(url) !== null;
 }
+
+const STABLE_VERSION = /^(0|[1-9][0-9]{0,15}).(0|[1-9][0-9]{0,15}).(0|[1-9][0-9]{0,15})$/;
+
+/**
+ * The download page section for one verified commercial version on macOS or
+ * Linux (ADR-613). Main builds it from the version it verified itself; the
+ * renderer never supplies it.
+ */
+export function officialPlatformDownloadUrl(version: string, platform: 'macos' | 'linux'): string {
+  if (!STABLE_VERSION.test(version) || !['macos', 'linux'].includes(platform))
+    throw new Error('Invalid download page');
+  return `${OFFICIAL_DESKTOP_RELEASE_BASE_URL}${version}#${platform}`;
+}

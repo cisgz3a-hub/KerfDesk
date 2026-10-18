@@ -1,6 +1,9 @@
 import { rotaryAppliesTo } from '../../core/job/rotary-job';
 import { machineKindOf } from '../../core/scene';
-import { positioningLightIssue } from '../../core/devices/positioning-light';
+import {
+  positioningLightIssue,
+  positioningLightSupported,
+} from '../../core/devices/positioning-light';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { headMoveBlockMessage } from './head-move-dispatch';
@@ -18,9 +21,7 @@ export function CentreSelectionButton({
   const project = useStore((state) => state.project);
   const { targets, target, chooseTarget } = useArtworkLightChoice();
   const laserMode = machineKindOf(project.machine) === 'laser';
-  const needsSetup =
-    project.device.positioningLight === undefined ||
-    positioningLightIssue(project.device.positioningLight, project.device.controllerKind) !== null;
+  const needsSetup = positioningSetupNeeded(project.device);
   const fileOnly = project.device.controllerKind === 'ruida';
   const lightEnabled = useLaserStore((state) => state.positioningLightEnabled);
   const machineBlocked = useLaserStore((state) => headMoveBlockMessage(state));
@@ -35,7 +36,8 @@ export function CentreSelectionButton({
     machineBlocked,
     disabled,
   });
-  if (!laserMode && !lightEnabled) return null;
+  if (!positioningControlsVisible(laserMode, lightEnabled, project.device.gcodeDialect?.dialectId))
+    return null;
   return (
     <div className="lf-jog-light-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
       {laserMode && targets.length > 1 ? (
@@ -116,11 +118,14 @@ function PositioningLightControls({
   readonly configured: boolean;
 }): JSX.Element | null {
   const lightEnabled = useLaserStore((state) => state.positioningLightEnabled);
-  const setEnabled = useLaserStore((state) => state.setPositioningLightEnabled);
+  const on = useLaserStore((state) => state.switchPositioningLightOn);
+  const off = useLaserStore((state) => state.switchPositioningLightOff);
   const blocked = useLaserStore((state) => headMoveBlockMessage(state));
   if (!lightEnabled && !configured) return null;
   const switchLight = (enabled: boolean): void => {
-    void setEnabled(enabled).catch(controllerActionFailureHandler(enabled ? 'LED on' : 'LED off'));
+    void (enabled ? on() : off()).catch(
+      controllerActionFailureHandler(enabled ? 'LED on' : 'LED off'),
+    );
   };
   return (
     <div
@@ -164,4 +169,25 @@ function usePlacementBlockMessage(): string | null {
   return !absolute && !hasFrame
     ? 'Frame the job once to locate this artwork on the board, then choose Artwork centre & LED.'
     : null;
+}
+
+function positioningControlsVisible(
+  laserMode: boolean,
+  enabled: boolean,
+  dialect: string | undefined,
+): boolean {
+  return positioningLightSupported(dialect) && (laserMode || enabled);
+}
+
+function positioningSetupNeeded(
+  device: ReturnType<typeof useStore.getState>['project']['device'],
+): boolean {
+  return (
+    device.positioningLight === undefined ||
+    positioningLightIssue(
+      device.positioningLight,
+      device.controllerKind,
+      device.gcodeDialect?.dialectId,
+    ) !== null
+  );
 }

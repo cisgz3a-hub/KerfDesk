@@ -15,7 +15,13 @@ for (const width of [390, 1280]) {
       page.getByRole('alert').filter({ hasText: 'Positioning light on command' }),
     ).toBeVisible();
     await page.getByLabel('Light on command', { exact: true }).fill('M64 P0');
-    await page.getByLabel('Light off command', { exact: true }).fill('M65 P0');
+    const offCommand = page.getByLabel('Light off command', { exact: true });
+    await offCommand.fill('M064 P00');
+    await expect(page.getByRole('alert')).toContainText('on and off commands must be different');
+    await offCommand.fill('M65 P1');
+    await expect(page.getByRole('alert')).toContainText('same output');
+    await offCommand.fill('M65 P0');
+    await expect(page.getByRole('alert')).toBeHidden();
     await page.getByRole('button', { name: 'Cancel without saving', exact: true }).click();
     await page.getByRole('button', { name: 'Load configured fixture', exact: true }).click();
     await expect(centre).toBeEnabled();
@@ -32,6 +38,10 @@ for (const width of [390, 1280]) {
     await centre.click();
     await expect(page.locator('#result')).toHaveText('Simulated centre 88, 68');
     await expect(page.locator('#centre-count')).toHaveText('2');
+    await info.attach('selected-artwork-controls', {
+      body: await page.screenshot({ path: info.outputPath('selected-artwork-controls.png') }),
+      contentType: 'image/png',
+    });
     await page.getByRole('button', { name: 'Deselect fixture', exact: true }).click();
     await expect(centre).toBeDisabled();
     const off = page.getByRole('button', { name: 'LED off', exact: true });
@@ -49,7 +59,7 @@ for (const width of [390, 1280]) {
     if (rail === null || button === null) throw new Error('Machine controls are not rendered.');
     expect(button.x + button.width).toBeLessThanOrEqual(rail.x + rail.width);
     await info.attach('positioning-light-controls', {
-      body: await page.screenshot(),
+      body: await page.screenshot({ path: info.outputPath('positioning-light-controls.png') }),
       contentType: 'image/png',
     });
   });

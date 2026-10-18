@@ -1,6 +1,11 @@
 import { rotaryAppliesTo } from '../../core/job';
-import { positioningLightIssue } from '../../core/devices/positioning-light';
+import {
+  POSITIONING_LIGHT_UNSUPPORTED_MESSAGE,
+  positioningLightIssue,
+  positioningLightSupported,
+} from '../../core/devices/positioning-light';
 import type { PositioningLight } from '../../core/devices/positioning-light';
+import type { DeviceProfile } from '../../core/devices/device-profile';
 import { inferCurrentMachinePosition } from './infer-machine-position';
 import {
   controllerOperationOwner,
@@ -14,7 +19,9 @@ import { warnJogMotionPolicy } from './laser-jog-warnings';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWrite } from './laser-safe-write';
 import { useStore } from './store';
+import { ControllerCommandRefusedError } from './laser-interactive-command';
 import {
+  positioningLightBatch,
   positioningLightCommand,
   positioningLightFence,
   positioningLightStatus,
@@ -23,7 +30,11 @@ import {
 } from './positioning-light-transaction';
 
 type SetFn = (patch: Partial<LaserState> | ((state: LaserState) => Partial<LaserState>)) => void;
-type LightSnapshot = { readonly mapping: PositioningLight; readonly session: () => boolean };
+type LightSnapshot = {
+  readonly mapping: PositioningLight;
+  readonly session: () => boolean;
+  readonly connection: LiveRefs['connection'];
+};
 const lightSnapshots = new WeakMap<LiveRefs, LightSnapshot>();
 
 export function positioningLightActions(
@@ -31,12 +42,30 @@ export function positioningLightActions(
   get: () => LaserState,
   refs: LiveRefs,
   write: SafeWrite,
-): Pick<LaserState, 'centrePositioningLight' | 'setPositioningLightEnabled'> {
+): Pick<
+  LaserState,
+  'centrePositioningLight' | 'switchPositioningLightOn' | 'switchPositioningLightOff'
+> {
   return {
     centrePositioningLight: (x, y, feed, assertTargetCurrent) =>
       runPositioningLight(set, get, refs, write, true, { x, y, feed, assertTargetCurrent }),
-    setPositioningLightEnabled: (enabled) => runPositioningLight(set, get, refs, write, enabled),
+    switchPositioningLightOn: () => runPositioningLight(set, get, refs, write, true),
+    switchPositioningLightOff: () => runPositioningLight(set, get, refs, write, false),
   };
+}
+
+/** The captured off command while the light may still be on over this same
+ * connection, for Disconnect's best-effort cleanup; null otherwise. */
+export function positioningLightDisconnectOff(state: LaserState, refs: LiveRefs): string | null {
+  const snapshot = lightSnapshots.get(refs);
+  const dialect = useStore.getState().project.device.gcodeDialect?.dialectId;
+  return positioningLightSupported(dialect) &&
+    state.positioningLightEnabled &&
+    snapshot !== undefined &&
+    refs.connection !== null &&
+    snapshot.connection === refs.connection
+    ? snapshot.mapping.offCommand
+    : null;
 }
 
 function assertAdmission(state: LaserState, refs: LiveRefs): void {
@@ -49,6 +78,7 @@ function assertAdmission(state: LaserState, refs: LiveRefs): void {
   if (
     state.autofocusBusy ||
     state.probeBusy ||
+    refs.controllerStatusWait != null ||
     state.pendingUntrackedAcks > 0 ||
     pendingTransportWriteCount(state) > 0
   )
@@ -96,7 +126,7 @@ async function runPositioningLight(
           mayHaveMoved = true;
         });
       settled = true;
-      lightSnapshots.set(refs, { mapping: { ...mapping }, session });
+      lightSnapshots.set(refs, { mapping: { ...mapping }, session, connection: refs.connection });
       // May have reached hardware even if its acknowledgement is subsequently
       // lost. Keep Off available until a positively acknowledged off or reset.
       set({ positioningLightEnabled: true });
@@ -114,20 +144,33 @@ async function runPositioningLight(
       set({ lastWriteError: message, log: pushLog(get(), `[lf2] Positioning light: ${message}`) });
       // An unresolved move keeps the ordinary Abort lifecycle as its owner.
       // Never send recovery commands to a replacement connection.
-      if (mayHaveMoved && !settled)
-        await get()
-          .stopJob()
-          .then(() => {
-            // No-reset controllers quick-stop without replacing an interactive
-            // owner. Retire ours only after Abort finishes; a newer operation
-            // or controller session must keep its own lifecycle untouched.
-            if (owns()) set({ controllerOperation: null });
-          })
-          .catch(() => undefined);
+      if (mayHaveMoved && !settled) await containUnsettledMove(set, get, refs, owns);
       else set({ controllerOperation: null });
     }
     throw error;
   }
+}
+
+async function containUnsettledMove(
+  set: SetFn,
+  get: () => LaserState,
+  refs: LiveRefs,
+  owns: () => boolean,
+): Promise<void> {
+  // A native jog the controller reports as Jog is stopped like any other jog:
+  // once released, Abort's unowned-motion path sends the jog cancel (0x85)
+  // and keeps position instead of a soft reset that forgets the work origin.
+  if (refs.driver.realtime.jogCancel !== null && get().statusReport?.state === 'Jog')
+    set({ controllerOperation: null });
+  await get()
+    .stopJob()
+    .then(() => {
+      // No-reset controllers quick-stop without replacing an interactive
+      // owner. Retire ours only after Abort finishes; a newer operation
+      // or controller session must keep its own lifecycle untouched.
+      if (owns()) set({ controllerOperation: null });
+    })
+    .catch(() => undefined);
 }
 
 async function turnOffPreviousLight(context: PositioningLightTransaction): Promise<void> {
@@ -151,12 +194,22 @@ function assertProfileDriver(refs: LiveRefs): void {
     throw new Error('The selected device profile does not match the connected controller.');
 }
 
+// Nothing at all is sent on a Marlin fan-mosfet profile, not even an off
+// command captured before the profile changed: its laser is the fan output.
+function assertLightSupported(): DeviceProfile {
+  const device = useStore.getState().project.device;
+  if (!positioningLightSupported(device.gcodeDialect?.dialectId))
+    throw new Error(POSITIONING_LIGHT_UNSUPPORTED_MESSAGE);
+  return device;
+}
+
 function resolveMapping(state: LaserState, refs: LiveRefs, enabled: boolean): PositioningLight {
+  const device = assertLightSupported();
   const previous = lightSnapshots.get(refs);
   if (!enabled && previous?.session() === true) return previous.mapping;
   assertProfileDriver(refs);
-  const mapping = useStore.getState().project.device.positioningLight;
-  const issue = positioningLightIssue(mapping, refs.driver.kind);
+  const mapping = device.positioningLight;
+  const issue = positioningLightIssue(mapping, refs.driver.kind, device.gcodeDialect?.dialectId);
   if (mapping === undefined || issue !== null)
     throw new Error(issue ?? 'Configure the separate positioning light in Device Profile first.');
   if (state.positioningLightEnabled && previous?.session() !== true)
@@ -207,6 +260,7 @@ function createTransaction(
       get().mpgActive
     )
       throw new Error('Positioning light was cancelled or its controller session changed.');
+    assertLightSupported();
     target?.assertTargetCurrent?.();
     if (enabled && useStore.getState().project.device !== device)
       throw new Error('Device settings changed during positioning.');
@@ -246,8 +300,17 @@ async function moveToLightTarget(
     .buildJog(params)
     .split('\n')
     .filter((line) => line.trim() !== '');
+  try {
+    // One owned write, like an ordinary jog: Marlin's G91/G0/G90 is queued
+    // together, so an Abort cannot land between the lines and leave G91 modal.
+    await positioningLightBatch(context, commands);
+  } catch (error) {
+    // A refused single native jog (GRBL error:15 soft limit) never started;
+    // any other failure leaves the move's fate unknown and is contained.
+    if (!(commands.length === 1 && error instanceof ControllerCommandRefusedError)) onMotion();
+    throw error;
+  }
   onMotion();
-  for (const line of commands) await positioningLightCommand(context, line);
   await settlePositioningLightMove(context);
   assertLightTargetReached(context, target);
   restoreFrameProof(context, set, proof);

@@ -65,7 +65,8 @@ export function Workspace(): JSX.Element {
   const cncRemovalGrid = cncRemoval.grid;
   const canvasSize = useCanvasBitmapSize(ref);
   const previewBitmap = usePreviewBitmapRenderer(previewMode);
-  const display = useCanvasDisplay(project, previewMode, selectedObjectId, additionalSelectedIds);
+  const canvas = useCanvasDisplay(project, previewMode, selectedObjectId, additionalSelectedIds);
+  const { warpDeformFailure, ...display } = canvas;
   useWorkspaceDraw({
     ref,
     ...display,
@@ -110,7 +111,7 @@ export function Workspace(): JSX.Element {
           viewState={viewState}
         />
         <WorkspacePointerOverlays canvasSize={canvasSize} dragging={dragKind !== null} />
-        <WorkspaceDesignChrome previewMode={previewMode} overlay={canvasMotionOverlay} />
+        <WorkspaceDesignChrome overlay={canvasMotionOverlay} warpFailure={warpDeformFailure} />
       </div>
       <WorkspacePreviewDock
         previewMode={previewMode}
@@ -135,10 +136,11 @@ function useWorkspaceSelection() {
 }
 
 function WorkspaceDesignChrome(props: {
-  readonly previewMode: boolean;
   readonly overlay: ReturnType<typeof useCanvasMotionOverlay>;
+  readonly warpFailure: string | null;
 }): JSX.Element | null {
-  if (props.previewMode) return null;
+  const previewMode = useStore((s) => s.previewMode);
+  if (previewMode) return null;
   return (
     <>
       <CanvasMotionBadge overlay={props.overlay} />
@@ -148,7 +150,7 @@ function WorkspaceDesignChrome(props: {
       <TrimShapesHint />
       <TwoPointHint />
       <ExtendShapesHint />
-      <WarpDeformHint />
+      <WarpDeformHint failure={props.warpFailure} />
       <ZoomControls />
     </>
   );

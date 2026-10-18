@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { framedRunControllerSnapshot, type FramedRunPermit } from './framed-run';
 import type { LiveRefs } from './laser-store';
-import { harness, originalProject } from './positioning-light.test-support';
+import { harness, originalProject } from '../../__fixtures__/positioning-light-harness';
 import { useStore } from './store';
+import {
+  cancelFreshControllerStatusWait,
+  waitForFreshControllerStatus,
+} from './laser-controller-status-wait';
 
 afterEach(() => {
   useStore.setState({ project: originalProject });
@@ -36,7 +40,7 @@ describe('independent positioning LED switch', () => {
       const h = harness(kind);
       const permit = frame(h);
       const controllerBefore = h.get().statusReport;
-      await h.actions.setPositioningLightEnabled(true);
+      await h.actions.switchPositioningLightOn();
       const lines = h.writes.map((line) => line.trim());
       expect(lines.indexOf(h.mapping.onCommand)).toBeGreaterThan(
         lines.indexOf(h.refs.driver.commands.frameToolOffLines[0]!),
@@ -52,7 +56,7 @@ describe('independent positioning LED switch', () => {
       await vi.advanceTimersByTimeAsync(60_000);
       expect(h.get().positioningLightEnabled).toBe(true);
       expect(h.writes).toHaveLength(sent);
-      await h.actions.setPositioningLightEnabled(false);
+      await h.actions.switchPositioningLightOff();
       expect(h.get().positioningLightEnabled).toBe(false);
       expect(h.get().framedRun).toBe(permit);
       expect(h.get().completedFrame).toBe(permit);
@@ -61,32 +65,67 @@ describe('independent positioning LED switch', () => {
     },
   );
 
+  it('leaves an incumbent readiness wait untouched when switching On', async () => {
+    const h = harness();
+    const waiting = waitForFreshControllerStatus(h.refs, {
+      after: { sessionEpoch: h.get().controllerSessionEpoch, sequence: h.get().statusSequence },
+      accept: () => true,
+      timeoutMs: 1_000,
+      timeoutMessage: 'Incumbent timed out',
+    }).catch(() => undefined);
+    const owner = h.refs.controllerStatusWait;
+    try {
+      await expect(h.actions.switchPositioningLightOn()).rejects.toThrow(
+        'current controller command',
+      );
+      expect(h.refs.controllerStatusWait).toBe(owner);
+      expect(h.get().controllerOperation).toBeNull();
+      expect(h.writes).toEqual([]);
+    } finally {
+      cancelFreshControllerStatusWait(h.refs);
+      await waiting;
+    }
+  });
+
+  it('sends no captured Off after the profile changes to a fan-mosfet laser during its status wait', async () => {
+    const h = harness('marlin');
+    await h.actions.switchPositioningLightOn();
+    const start = h.writes.length;
+    h.after((line) => {
+      if (line === 'M114')
+        useStore.getState().updateDeviceProfile({ gcodeDialect: { dialectId: 'marlin-fan' } });
+    });
+    await expect(h.actions.switchPositioningLightOff()).rejects.toThrow('fan-mosfet');
+    expect(h.writes.slice(start)).toEqual(['M114\n']);
+    expect(h.get().positioningLightEnabled).toBe(true);
+    expect(h.get().controllerOperation).toBeNull();
+    expect(h.stop).not.toHaveBeenCalled();
+  });
+
   it('turns the captured output off before enabling a changed mapping', async () => {
     const h = harness();
-    await h.actions.setPositioningLightEnabled(true);
+    await h.actions.switchPositioningLightOn();
     const next = { ...h.mapping, onCommand: 'M64 P1', offCommand: 'M65 P1' };
     useStore.getState().updateDeviceProfile({ positioningLight: next });
     const start = h.writes.length;
-    await h.actions.setPositioningLightEnabled(true);
+    await h.actions.switchPositioningLightOn();
     const lines = h.writes.slice(start).map((line) => line.trim());
     expect(lines.indexOf(h.mapping.offCommand)).toBeGreaterThanOrEqual(0);
     expect(lines.indexOf(h.mapping.offCommand)).toBeLessThan(lines.indexOf(next.onCommand));
     expect(lines.at(-1)).toBe(next.onCommand);
     useStore.getState().updateDeviceProfile({ controllerKind: 'marlin' });
-    await h.actions.setPositioningLightEnabled(false);
+    await h.actions.switchPositioningLightOff();
     expect(h.writes.at(-1)?.trim()).toBe(next.offCommand);
   });
 
   it('keeps the old Off mapping if its acknowledgement fails during a mapping change', async () => {
     const h = harness();
-    await h.actions.setPositioningLightEnabled(true);
-    useStore
-      .getState()
-      .updateDeviceProfile({
-        positioningLight: { ...h.mapping, onCommand: 'M64 P1', offCommand: 'M65 P1' },
-      });
+    await h.actions.switchPositioningLightOn();
+    useStore.getState().updateDeviceProfile({
+      positioningLight: { ...h.mapping, onCommand: 'M64 P1', offCommand: 'M65 P1' },
+    });
     h.fail(h.mapping.offCommand);
-    await expect(h.actions.setPositioningLightEnabled(true)).rejects.toThrow('handoff');
+    await expect(h.actions.switchPositioningLightOn()).rejects.toThrow('handoff');
     expect(h.get().positioningLightEnabled).toBe(true);
     expect(h.writes).not.toContain('M64 P1\n');
     expect(h.writes.at(-1)?.trim()).toBe(h.mapping.offCommand);
@@ -97,7 +136,7 @@ describe('independent positioning LED switch', () => {
     const h = harness();
     const permit = frame(h);
     h.hold(h.mapping.onCommand);
-    const pending = h.actions.setPositioningLightEnabled(true);
+    const pending = h.actions.switchPositioningLightOn();
     const rejected = expect(pending).rejects.toThrow('timed out');
     await vi.advanceTimersByTimeAsync(9000);
     await rejected;
@@ -107,7 +146,7 @@ describe('independent positioning LED switch', () => {
     expect(h.stop).not.toHaveBeenCalled();
     h.hold();
     useStore.getState().updateDeviceProfile({ positioningLight: undefined });
-    await h.actions.setPositioningLightEnabled(false);
+    await h.actions.switchPositioningLightOff();
     expect(h.writes.at(-1)?.trim()).toBe(h.mapping.offCommand);
     expect(h.get().positioningLightEnabled).toBe(false);
   });
@@ -115,29 +154,29 @@ describe('independent positioning LED switch', () => {
   it('requires fresh Idle and does not take over queued replies', async () => {
     const h = harness();
     h.set({ pendingUntrackedAcks: 1 });
-    await expect(h.actions.setPositioningLightEnabled(true)).rejects.toThrow(/settle|replies/);
+    await expect(h.actions.switchPositioningLightOn()).rejects.toThrow(/settle|replies/);
     expect(h.writes).toEqual([]);
     h.set({ pendingUntrackedAcks: 0 });
     h.moving(1);
-    await expect(h.actions.setPositioningLightEnabled(true)).rejects.toThrow('fresh Idle');
+    await expect(h.actions.switchPositioningLightOn()).rejects.toThrow('fresh Idle');
     expect(h.writes).toEqual(['?']);
     expect(h.get().positioningLightEnabled).toBe(false);
   });
 
   it('rejects unsupported or mismatched profiles before sending On', async () => {
     const file = harness('ruida');
-    await expect(file.actions.setPositioningLightEnabled(true)).rejects.toThrow('file export');
+    await expect(file.actions.switchPositioningLightOn()).rejects.toThrow('file export');
     expect(file.writes).toEqual([]);
     const h = harness();
     useStore.getState().updateDeviceProfile({ controllerKind: 'marlin' });
-    await expect(h.actions.setPositioningLightEnabled(true)).rejects.toThrow('does not match');
+    await expect(h.actions.switchPositioningLightOn()).rejects.toThrow('does not match');
     expect(h.writes).toEqual([]);
   });
 
   it('refuses to enable an edited profile after a pending beam-off acknowledgement', async () => {
     const h = harness();
     h.hold('M5');
-    const pending = h.actions.setPositioningLightEnabled(true);
+    const pending = h.actions.switchPositioningLightOn();
     const rejected = expect(pending).rejects.toThrow('Device settings changed');
     await vi.waitFor(() => expect(h.writes).toContain('M5\n'));
     useStore
@@ -154,7 +193,7 @@ describe('independent positioning LED switch', () => {
   it('never continues On or reuses a captured Off across controller sessions', async () => {
     const h = harness();
     h.hold('M5');
-    const pending = h.actions.setPositioningLightEnabled(true);
+    const pending = h.actions.switchPositioningLightOn();
     const rejected = expect(pending).rejects.toThrow('session changed');
     await vi.waitFor(() => expect(h.writes).toContain('M5\n'));
     h.refs.connection = {} as LiveRefs['connection'];
@@ -162,13 +201,14 @@ describe('independent positioning LED switch', () => {
     await rejected;
     expect(h.writes).not.toContain(`${h.mapping.onCommand}\n`);
     const on = harness();
-    await on.actions.setPositioningLightEnabled(true);
+    await on.actions.switchPositioningLightOn();
     on.refs.connection = {} as LiveRefs['connection'];
     const sent = on.writes.length;
-    for (const enabled of [false, true])
-      await expect(on.actions.setPositioningLightEnabled(enabled)).rejects.toThrow(
-        'earlier connection',
-      );
+    for (const action of [
+      on.actions.switchPositioningLightOff,
+      on.actions.switchPositioningLightOn,
+    ])
+      await expect(action()).rejects.toThrow('earlier connection');
     expect(on.writes).toHaveLength(sent);
   });
 

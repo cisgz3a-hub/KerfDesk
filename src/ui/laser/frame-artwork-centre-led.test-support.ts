@@ -143,6 +143,7 @@ function projectFor(kind: ControllerKind, origin: Origin): Project {
     device: {
       ...base.device,
       controllerKind: kind,
+      ...(kind === 'marlin' ? { gcodeDialect: { dialectId: 'marlin-inline' as const } } : {}),
       origin,
       homing: { ...base.device.homing, enabled: false },
       maxPowerS: kind === 'smoothieware' ? 1 : 1000,

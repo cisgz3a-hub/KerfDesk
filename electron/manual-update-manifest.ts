@@ -5,11 +5,22 @@ import {
   verifyManualDownload,
   type ManualDownload,
 } from '../public/desktop-manual-download.mjs';
+import {
+  DOWNLOAD_PLATFORMS,
+  PLATFORM_DOWNLOAD_LIMIT,
+  platformLatestUrl,
+  verifyPlatformDownload,
+  type DownloadPlatform,
+  type PlatformDownload,
+} from '../public/desktop-platform-download.mjs';
 import { readBoundedManifest } from '../public/desktop-release-manifest.mjs';
 import type { LicensingConfig } from './licensing-config.js';
 import { record, verifyLicenceRelease, type PublicKeys } from './licensing-verification.js';
 
 export type ManualCandidate = { readonly envelope: string; readonly release: ManualDownload };
+export type PlatformCandidate = { readonly envelope: string; readonly release: PlatformDownload };
+/** Which signed download document a packaged commercial build reads (ADR-613). */
+export type ManualPlatform = 'windows' | DownloadPlatform;
 export type UpdateFetch = (url: string, init: RequestInit) => Promise<Response>;
 
 export function manualReleaseKeySet(keys: PublicKeys): unknown {
@@ -46,6 +57,14 @@ export function pinnedStableReleaseKeys(): PublicKeys {
   return keys;
 }
 
+/** Windows x64 reads latest.json; macOS (x64, arm64) and Linux x64 read their own document. */
+export function manualUpdatePlatform(platform: string, arch: string): ManualPlatform | null {
+  if (platform === 'win32' && arch === 'x64') return 'windows';
+  if (platform === 'darwin' && (arch === 'x64' || arch === 'arm64')) return 'macos';
+  if (platform === 'linux' && arch === 'x64') return 'linux';
+  return null;
+}
+
 export function manualUpdatesOffered(
   config: LicensingConfig,
   build: {
@@ -58,8 +77,7 @@ export function manualUpdatesOffered(
 ): boolean {
   if (
     !build.packaged ||
-    build.platform !== 'win32' ||
-    build.arch !== 'x64' ||
+    manualUpdatePlatform(build.platform, build.arch) === null ||
     config.channel !== 'commercial' ||
     config.manualUpdates !== true ||
     config.sandbox === true
@@ -101,4 +119,51 @@ export async function fetchManualCandidate(
     envelope,
     release: await verifyManualDownload(envelope, manualReleaseKeySet(keys), now),
   };
+}
+
+/** The newest verified release for this system, or null when none is published. */
+export async function fetchPlatformCandidate(
+  fetch: UpdateFetch,
+  keys: PublicKeys,
+  platform: DownloadPlatform,
+  now: number,
+): Promise<PlatformCandidate | null> {
+  const url = platformLatestUrl(platform);
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(15_000),
+    redirect: 'error',
+    credentials: 'omit',
+    cache: 'no-store',
+  });
+  if (response.status === 404) return null;
+  if (response.redirected || (response.url !== '' && response.url !== url))
+    throw new Error('Unexpected update destination');
+  const envelope = await readBoundedManifest(response, PLATFORM_DOWNLOAD_LIMIT);
+  return {
+    envelope,
+    release: await verifyPlatformDownload(envelope, manualReleaseKeySet(keys), platform, now),
+  };
+}
+
+/**
+ * The version and date of any verified manual download document, for licence
+ * update coverage: the Windows one, or a macOS or Linux one.
+ */
+export async function verifyAnyManualDownload(
+  envelope: string,
+  keySet: unknown,
+  now: number,
+): Promise<ManualDownload | PlatformDownload> {
+  try {
+    return await verifyManualDownload(envelope, keySet, now);
+  } catch (error) {
+    for (const platform of DOWNLOAD_PLATFORMS) {
+      try {
+        return await verifyPlatformDownload(envelope, keySet, platform, now);
+      } catch {
+        // Not this system's document either.
+      }
+    }
+    throw error;
+  }
 }
