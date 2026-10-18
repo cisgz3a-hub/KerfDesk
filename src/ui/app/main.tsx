@@ -136,4 +136,4 @@ createRoot(rootElement).render(
 
 // Static timber and branding paint together before JS. Hold from the first
 // startup frame in both editions, excluding time the document is hidden.
-dismissStartupSplash();
+dismissStartupSplash({ desktop: adapter.id === 'electron' });

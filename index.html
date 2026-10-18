@@ -56,7 +56,10 @@
         color: #f6f1e9;
         color-scheme: dark;
         font-family: 'Segoe UI', system-ui, sans-serif;
-        pointer-events: none;
+        pointer-events: auto;
+        /* The final inline rule reveals this only after the complete artwork
+           token and branding have arrived, including streamed HTML. */
+        visibility: hidden;
         transition: opacity 750ms ease-out;
       }
       #app-splash .app-splash__art {
@@ -427,7 +430,7 @@
          Neither surface permits inline scripts. -->
   </head>
   <body>
-    <div id="app-root"></div>
+    <div id="app-root" inert></div>
     <div id="app-splash" role="status" aria-label="Loading KerfDesk workspace">
       <img class="app-splash__art" src="/startup-craft.webp" alt="" decoding="sync" />
       <div class="app-splash__flow" aria-hidden="true">
@@ -545,6 +548,11 @@
         <p class="app-splash__signature" aria-hidden="true">DESIGN / ENGRAVE / CARVE</p>
       </div>
     </div>
+    <style>
+      #app-splash {
+        visibility: visible;
+      }
+    </style>
     <script type="module" src="/src/ui/app/browser-entry.ts"></script>
   </body>
 </html>

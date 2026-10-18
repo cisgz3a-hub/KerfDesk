@@ -47,6 +47,7 @@ import electronUpdater from 'electron-updater';
 import * as appMenu from './application-menu-policy.js';
 import { installDesktopArtcraftWindow, detachDesktopArtcraftWindows } from './desktop-artcraft.js';
 import { mainWindowWebPreferences } from './desktop-window-options.js';
+import { createStartupWindow } from './startup-window-visibility.js';
 import {
   PACKAGED_RENDERER_URL,
   resolveRendererRuntime,
@@ -265,7 +266,7 @@ function makeAppProtocolHandler(distRoot: string) {
 }
 
 function createMainWindow(bounds: ReturnType<typeof loadWindowPlacement>['bounds']): BrowserWindow {
-  return new BrowserWindow({
+  return createStartupWindow({
     ...bounds,
     show: false,
     autoHideMenuBar: true,

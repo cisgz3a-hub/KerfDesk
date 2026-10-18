@@ -16,11 +16,17 @@ Vite embeds the existing `public/startup-craft.webp` in the entry HTML for devel
 desktop builds. The image requests synchronous decoding, so artwork and branding paint
 together without an independent artwork request or runtime image-loading script. The original
 asset remains the editable source. Existing image CSP rules already permit data URLs.
+The splash stays hidden until a final inline style after its complete artwork and branding
+has been parsed, so a streamed HTML response cannot reveal an empty container first. The
+workspace remains inert and the splash consumes pointer and keyboard input until removal.
 
 Both browser and desktop hold the splash for four visible seconds, starting at the first
 animation frame after the workspace module installs its dismissal lifecycle, then fade over
 750 ms. Hidden document intervals do not consume that hold. The fade also waits for a successful
-workspace paint. The five-second missing-workspace fallback still starts when the workspace
+workspace paint. In Electron, native BrowserWindow show/hide/minimize/restore events publish
+actual window visibility with monotonic revisions; document visibility alone remains unsuitable
+because background throttling stays off to preserve running-job wake locks. The five-second
+missing-workspace fallback still starts when the workspace
 module installs dismissal. A root startup error bypasses the minimum. Reduced motion removes
 the fade and animated light, while retaining the hold.
 

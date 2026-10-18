@@ -1,4 +1,7 @@
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
+import type { Route } from '@playwright/test';
+import { createServer } from 'node:http';
+import { once } from 'node:events';
 
 test('paints the splash before the bundle and honours reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -75,12 +78,8 @@ test('paints the wood with the splash without a separate artwork request', async
     await expect(page.locator('#app-root')).toBeEmpty();
     await expect(page.locator('#app-splash')).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('splash-before-workspace.png') });
-    await main.release();
-    await expect(page.locator('canvas[aria-label="KerfDesk workspace"]')).toHaveAttribute(
-      'data-workspace-painted',
-      'true',
-    );
-    await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 7000 });
+    // This first-paint case finishes with the workspace bundle held. Its
+    // successful paint and splash dismissal are covered by the adjacent cases.
   } finally {
     await main.release();
   }
@@ -93,7 +92,16 @@ for (const edition of ['browser', 'desktop']) {
     });
 
     test('retains a full hold after a slow entry and uses the longer fade', async ({ page }) => {
+      if (edition === 'desktop')
+        await page.addInitScript(() => {
+          // This browser uses the desktop UA; simulate its native visibility signal.
+          document.addEventListener('DOMContentLoaded', () => {
+            document.documentElement.dataset.desktopWindowVisible = 'true';
+            window.dispatchEvent(new Event('kerfdesk:window-visibility'));
+          });
+        });
       await page.emulateMedia({ reducedMotion: 'no-preference' });
+      const waitForDesktopModule = await observeDesktopModule(page);
       const main = await holdRequest(page, /\/src\/ui\/app\/main\.tsx(?:\?|$)/);
       try {
         await page.goto('/', { waitUntil: 'commit' });
@@ -113,6 +121,7 @@ for (const edition of ['browser', 'desktop']) {
           }).observe(splash, { attributes: true, attributeFilter: ['class'] });
         });
         await main.release();
+        await waitForDesktopModule();
         await expect(page.locator('canvas[data-workspace-painted="true"]')).toBeVisible();
         await expect(page.locator('html')).toHaveAttribute('data-splash-fade-at', /\d/, {
           timeout: 7000,
@@ -128,7 +137,88 @@ for (const edition of ['browser', 'desktop']) {
   });
 }
 
+test('blocks pointer and keyboard input behind the opaque splash, then releases it', async ({
+  page,
+}) => {
+  const waitForDesktopModule = await observeDesktopModule(page);
+  await page.route(/\/src\/ui\/app\/main\.tsx(?:\?|$)/, (route) =>
+    route.fulfill({
+      contentType: 'text/javascript',
+      // Exercise the real HTML and dismissal lifecycle with a small painted
+      // workspace, independently of the full app's cold dependency graph.
+      body: `import { dismissStartupSplash } from '/src/ui/app/startup-splash.ts';
+        document.getElementById('app-root').innerHTML = '<button id="under-splash" style="position:fixed;left:20px;top:20px;width:150px;height:40px">Hidden control</button><canvas data-workspace-painted="true"></canvas>';
+        document.getElementById('under-splash').onclick = () => document.documentElement.dataset.splashClick = 'true';
+        window.onkeydown = () => document.documentElement.dataset.splashKey = 'true';
+        dismissStartupSplash();`,
+    }),
+  );
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await waitForDesktopModule();
+  await expect(page.locator('#under-splash')).toHaveCount(1);
+  await expect(page.locator('#app-root')).toHaveAttribute('inert', '');
+  await page.locator('#under-splash').evaluate((button: HTMLButtonElement) => button.focus());
+  await page.keyboard.press('Space');
+  await page.mouse.click(40, 35);
+  expect(await page.locator('html').getAttribute('data-splash-click')).toBeNull();
+  expect(await page.locator('html').getAttribute('data-splash-key')).toBeNull();
+  await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 7000 });
+  await page.locator('#under-splash').click();
+  await page.keyboard.press('x');
+  await expect(page.locator('html')).toHaveAttribute('data-splash-click', 'true');
+  await expect(page.locator('html')).toHaveAttribute('data-splash-key', 'true');
+});
+
+test('does not paint a partial splash while embedded HTML artwork is still streaming', async ({
+  page,
+}) => {
+  const response = await page.request.get('/');
+  const html = (await response.text()).replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '');
+  const split = html.indexOf('data:image/webp;base64,') + 40_000;
+  expect(split).toBeGreaterThan(40_000);
+  let release = () => {};
+  const continuation = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const server = createServer(async (request, reply) => {
+    if (request.url !== '/') {
+      reply.writeHead(204).end();
+      return;
+    }
+    reply.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    reply.write(html.slice(0, split));
+    await continuation;
+    reply.end(html.slice(split));
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const address = server.address();
+  if (address === null || typeof address === 'string')
+    throw new Error('missing stream fixture port');
+  try {
+    await page.goto(`http://127.0.0.1:${address.port}/`, { waitUntil: 'commit' });
+    await expect(page.locator('#app-splash')).toHaveCount(1);
+    await expect(page.locator('#app-splash')).toBeHidden();
+    release();
+    await expect(page.locator('#app-splash')).toBeVisible();
+    await expect(page.getByText('Created by Ons Houtkombuis', { exact: true })).toBeVisible();
+    await expect
+      .poll(() =>
+        page
+          .locator('.app-splash__art')
+          .evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0),
+      )
+      .toBe(true);
+    await page.screenshot({ path: test.info().outputPath('complete-streamed-splash.png') });
+  } finally {
+    release();
+    server.closeAllConnections();
+    server.close();
+  }
+});
+
 test('reveals the actual root error boundary without waiting for a canvas', async ({ page }) => {
+  const waitForDesktopModule = await observeDesktopModule(page);
   // Replace only App: the real entry point and ErrorBoundary still run.
   await page.route(/\/src\/ui\/app\/App\.tsx(?:\?|$)/, (route) =>
     route.fulfill({
@@ -137,6 +227,7 @@ test('reveals the actual root error boundary without waiting for a canvas', asyn
     }),
   );
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await waitForDesktopModule();
   await expect(page.locator('#app-root > [role="alert"]')).toContainText('Startup fixture crash');
   await expect(page.locator('#app-root canvas')).toHaveCount(0);
   // A canvas-only implementation would leave the crash hidden for the five-second cap.
@@ -192,16 +283,17 @@ async function holdRequest(page: Page, url: RegExp) {
   const gate = new Promise<void>((resolve) => {
     resume = resolve;
   });
-  await page.route(url, async (route) => {
+  const handler = async (route: Route): Promise<void> => {
     requested = true;
     await gate;
     await route.continue();
-  });
+  };
+  await page.route(url, handler);
   return {
     requested: () => requested,
     release: async (): Promise<void> => {
       resume?.();
-      await page.unrouteAll({ behavior: 'wait' });
+      await page.unroute(url, handler);
     },
   };
 }

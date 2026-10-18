@@ -40,6 +40,7 @@ beforeEach(() => {
   nextFrame = 0;
   visibility = 'visible';
   reducedMotion = false;
+  delete document.documentElement.dataset.desktopWindowVisible;
   vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback): number => {
     frames.set(++nextFrame, callback);
@@ -130,6 +131,47 @@ describe('startup splash', () => {
     frame(1);
     frame();
     expect(splash()).toBeNull();
+    expect(document.getElementById('app-root')?.hasAttribute('inert')).toBe(false);
+  });
+
+  it('keeps the mounted workspace inert until the splash is removed', () => {
+    const shortcut = vi.fn();
+    window.addEventListener('keydown', shortcut);
+    paintWorkspace();
+    dismissStartupSplash();
+    expect(document.getElementById('app-root')?.hasAttribute('inert')).toBe(true);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', cancelable: true }));
+    expect(shortcut).not.toHaveBeenCalled();
+    frame();
+    frame(4000);
+    frame();
+    expect(document.getElementById('app-root')?.hasAttribute('inert')).toBe(true);
+    vi.advanceTimersByTime(800);
+    expect(document.getElementById('app-root')?.hasAttribute('inert')).toBe(false);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', cancelable: true }));
+    expect(shortcut).toHaveBeenCalledOnce();
+    window.removeEventListener('keydown', shortcut);
+  });
+
+  it('uses native desktop visibility while document visibility remains visible', () => {
+    const nativeVisible = (visible: boolean): void => {
+      document.documentElement.dataset.desktopWindowVisible = String(visible);
+      window.dispatchEvent(new Event('kerfdesk:window-visibility'));
+    };
+    nativeVisible(false);
+    paintWorkspace();
+    dismissStartupSplash({ desktop: true });
+    frame(20_000);
+    nativeVisible(true);
+    frame(1500);
+    nativeVisible(false);
+    frame(20_000);
+    nativeVisible(true);
+    frame(2499);
+    expect(splash()?.classList.contains('app-splash--hidden')).toBe(false);
+    frame(1);
+    frame();
+    expect(splash()?.classList.contains('app-splash--hidden')).toBe(true);
   });
 
   it('waits for a successful workspace paint after the minimum hold has elapsed', () => {
