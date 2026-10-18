@@ -44,6 +44,10 @@ missing at that moment was lost on the link.
   span 1 s after the last reply, KerfDesk writes one `$G`. It is the only `$`
   line allowed while a job is active (`'stream-probe'`), and only once the
   whole program is on the wire, so no job reply can be credited to it.
+- The detected firmware must be one of those three as well. The profile's
+  driver stays in use when a banner names other firmware, which is only an
+  advisory, so a GRBL profile on a Smoothieware board falls back to the
+  sustained-Idle rule.
 - The `[GC:` line proves the job lines written before the probe were read.
   The probe's own next reply settles the probe's reservation, never a job line.
   Then the still-missing replies are applied and the ordinary settle runs.

@@ -227,6 +227,11 @@ describe('lost-reply proof rules', () => {
     expect(hasOrderedProbe(selectControllerDriver('grblhal', 'creality-falcon-a1-pro'))).toBe(true);
     expect(hasOrderedProbe(selectControllerDriver('smoothieware'))).toBe(false);
     expect(hasOrderedProbe(selectControllerDriver('marlin'))).toBe(false);
+    // The profile's driver stays in use when a banner names other firmware.
+    const grbl = selectControllerDriver('grbl-v1.1');
+    expect(hasOrderedProbe(grbl, 'grblhal')).toBe(true);
+    expect(hasOrderedProbe(grbl, 'smoothieware')).toBe(false);
+    expect(hasOrderedProbe(grbl, 'marlin')).toBe(false);
   });
 
   it('accepts only a current-session Idle report', () => {

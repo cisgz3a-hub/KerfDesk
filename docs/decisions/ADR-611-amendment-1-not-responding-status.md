@@ -18,6 +18,9 @@ Other senders show such a link as stalled.
 - The 8 s count only time the status poll ran on schedule (ADR-356
   Amendment 1): a hidden, throttled or sleeping page asked nothing, so the
   label waits for 8 s of on-schedule polling after the page resumes.
+- The connection bar re-reads the rule on every store write and on its own
+  1 s timer. A status write stuck in a wedged transport stops the poll from
+  writing to the store, which is the case this label exists for.
 - It does not apply before the session's first reply (connect-time silence
   keeps its own report), while a controller operation runs (GRBL may leave `?`
   unanswered while it homes), or to a queued-poll controller (Marlin is not

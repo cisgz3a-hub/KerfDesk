@@ -19,6 +19,7 @@ import { DeviceSetupControls } from './device-setup';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { MachineNetworkConnect } from './MachineNetworkConnect';
+import { useControllerWentSilent } from './use-controller-went-silent';
 import { isApplePlatform, isLinuxDesktop } from '../common/operating-system';
 
 type Props = {
@@ -38,8 +39,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   );
   const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
   const stoppedResponding = useLaserStore((state) => controllerStoppedResponding(state));
-  // Re-read on every store write; the idle status poll writes each second.
-  const wentSilent = useLaserStore((state) => state.getControllerWentSilent());
+  const wentSilent = useControllerWentSilent(connection.kind === 'connected');
   const connectController = useLaserStore((state) => state.connect);
   const disconnectController = useLaserStore((state) => state.disconnect);
   const retryQualification = useLaserStore((state) => state.retryControllerQualification);

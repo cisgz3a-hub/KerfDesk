@@ -102,7 +102,7 @@ export function reconcileLostStreamAcknowledgements(
   }
   const tracker = currentTracker(refs, state, streamer);
   observeReport(tracker, state);
-  const probe = hasOrderedProbe(refs.driver);
+  const probe = hasOrderedProbe(refs.driver, state.detectedControllerKind);
   const proof = { probe, kind: state.activeControllerKind, schedule: refs.statusPollSchedule };
   if (!proofComplete(tracker, proof, streamer, now)) return false;
   refs.lostAckTracker = null;
@@ -182,8 +182,14 @@ function nothingElseOwesReplies(
   );
 }
 
-/** A controller whose `$G` answer is ordered behind every earlier line. */
-export function hasOrderedProbe(driver: Pick<ControllerDriver, 'kind' | 'commands'>): boolean {
+/** A controller whose `$G` answer is ordered behind every earlier line. The
+ *  profile's driver stays in use when a banner names other firmware (only an
+ *  advisory), so the detected firmware must have that ordering too. */
+export function hasOrderedProbe(
+  driver: Pick<ControllerDriver, 'kind' | 'commands'>,
+  detectedKind: ControllerKind | null = null,
+): boolean {
+  if (detectedKind !== null && !ORDERED_PROBE_KINDS.includes(detectedKind)) return false;
   return ORDERED_PROBE_KINDS.includes(driver.kind) && driver.commands.modalStateQuery === '$G';
 }
 
