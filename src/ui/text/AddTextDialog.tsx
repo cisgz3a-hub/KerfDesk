@@ -46,11 +46,7 @@ function DialogForm(props: {
   const request = useRef(0);
   const submission = useRef<AbortController | null>(null);
   useEffect(() => {
-    const retire = (): void => {
-      request.current += 1;
-      submission.current?.abort();
-      submission.current = null;
-    };
+    const retire = (): void => retireSubmission(request, submission);
     const unsubscribeDialog = useUiStore.subscribe((next) => {
       if (next.textDialog !== state) retire();
     });
@@ -115,6 +111,15 @@ function DialogForm(props: {
       />
     </Dialog>
   );
+}
+
+function retireSubmission(
+  request: { current: number },
+  submission: { current: AbortController | null },
+): void {
+  request.current += 1;
+  submission.current?.abort();
+  submission.current = null;
 }
 
 async function commitText(

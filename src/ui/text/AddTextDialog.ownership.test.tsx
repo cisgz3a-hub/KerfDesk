@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { TextRenderResult } from '../../core/text';
+import type * as TextWorkerSessionModule from './text-worker-session';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
@@ -10,7 +11,7 @@ import { useUiStore } from '../state/ui-store';
 
 const mocks = vi.hoisted(() => ({ render: vi.fn() }));
 vi.mock('./text-worker-session', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./text-worker-session')>()),
+  ...(await importOriginal<typeof TextWorkerSessionModule>()),
   renderTextGeometryOffThread: mocks.render,
 }));
 vi.mock('./font-loader', () => ({
