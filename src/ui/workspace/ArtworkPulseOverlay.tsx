@@ -106,7 +106,16 @@ function useCanvasHoverObject(
       paused.current = false;
       setHovered(null);
     };
+    let releasedPointer: number | null = null;
+    // The canvas loses capture after every ordinary release too; only a loss
+    // with no release before it is a cancelled drag (as the workspace's own
+    // pointer owner treats it), and that ends the hover.
+    const lostCapture = (event: PointerEvent): void => {
+      if (event.pointerId === releasedPointer) releasedPointer = null;
+      else leave();
+    };
     const release = (event: PointerEvent): void => {
+      releasedPointer = event.pointerId;
       const bounds = canvas.getBoundingClientRect();
       if (
         event.clientX < bounds.left ||
@@ -119,10 +128,12 @@ function useCanvasHoverObject(
     };
     canvas.addEventListener('pointerleave', leave);
     canvas.addEventListener('pointercancel', leave);
+    canvas.addEventListener('lostpointercapture', lostCapture);
     canvas.addEventListener('pointerup', release);
     return () => {
       canvas.removeEventListener('pointerleave', leave);
       canvas.removeEventListener('pointercancel', leave);
+      canvas.removeEventListener('lostpointercapture', lostCapture);
       canvas.removeEventListener('pointerup', release);
     };
   }, [canvasRef]);

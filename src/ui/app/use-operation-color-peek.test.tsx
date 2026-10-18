@@ -83,6 +83,26 @@ describe('useOperationColorPeek', () => {
     expect(peek()).toBe(false);
   });
 
+  it('never peeks when Alt joins a drag already under way', () => {
+    // A plain press starts a snapping drag; Alt pressed later turns snapping off.
+    window.dispatchEvent(new MouseEvent('pointerdown', { buttons: 1, bubbles: true }));
+    key('keydown', { key: 'Alt', altKey: true });
+    vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS * 2);
+    expect(peek()).toBe(false);
+    key('keyup', { key: 'Alt' });
+    window.dispatchEvent(new MouseEvent('pointerup', { buttons: 0, bubbles: true }));
+
+    // With the mouse up again, holding Alt peeks as usual.
+    key('keydown', { key: 'Alt', altKey: true });
+    vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS);
+    expect(peek()).toBe(true);
+    // An Alt-modified move with a button held ends it.
+    window.dispatchEvent(
+      new MouseEvent('pointermove', { altKey: true, buttons: 1, bubbles: true }),
+    );
+    expect(peek()).toBe(false);
+  });
+
   it('ends the peek when the window loses focus mid-hold', () => {
     key('keydown', { key: 'Alt', altKey: true });
     vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS);

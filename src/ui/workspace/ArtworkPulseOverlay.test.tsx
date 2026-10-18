@@ -74,6 +74,12 @@ async function render(canvasHoverEnabled: boolean, dragging = !canvasHoverEnable
   );
 }
 
+// jsdom has no PointerEvent; the overlay only reads pointerId and coordinates.
+function withPointerId(event: MouseEvent, pointerId = 1): MouseEvent {
+  Object.defineProperty(event, 'pointerId', { value: pointerId });
+  return event;
+}
+
 async function pointAt(point: { x: number; y: number } | null): Promise<void> {
   await act(async () => useStore.getState().setCursorMm(point));
   await act(async () => vi.advanceTimersByTime(PULSE_HOVER_DWELL_MS + 10));
@@ -127,15 +133,33 @@ describe('ArtworkPulseOverlay (ADR-620)', () => {
     // although the pointer has not moved.
     await render(false);
     await act(async () => useStore.getState().setCursorMm(null));
-    await act(async () =>
-      canvas.dispatchEvent(new MouseEvent('pointerup', { clientX: 50, clientY: 50 })),
-    );
+    await act(async () => {
+      canvas.dispatchEvent(
+        withPointerId(new MouseEvent('pointerup', { clientX: 50, clientY: 50 })),
+      );
+      // The browser drops capture after every release; that is still just a click.
+      canvas.dispatchEvent(withPointerId(new MouseEvent('lostpointercapture')));
+    });
     await render(true);
     expect(pulses()).toEqual([true, false]);
 
     // The next small move on the same piece is still the same hover.
     await pointAt({ x: 5.5, y: 5 });
     expect(pulses()).toEqual([true, false]);
+  });
+
+  it('ends a paused hover when capture is lost without a release (a cancelled drag)', async () => {
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    await render(false);
+    await act(async () => useStore.getState().setCursorMm(null));
+    await act(async () =>
+      canvas.dispatchEvent(withPointerId(new MouseEvent('lostpointercapture'))),
+    );
+    await render(true);
+    expect(pulses()).toEqual([true]);
+    await pointAt({ x: 5, y: 5 });
+    expect(pulses()).toEqual([true, true]);
   });
 
   it('ends the hover when the Select tool is left, rather than pausing it', async () => {

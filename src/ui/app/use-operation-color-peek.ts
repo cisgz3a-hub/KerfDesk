@@ -13,6 +13,9 @@ export function useOperationColorPeek(): void {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     let chord = false;
+    // Buttons held, from the latest pointer event: Alt pressed mid-drag serves
+    // that drag (no snapping), however late in the gesture it joins.
+    let buttons = 0;
     const cancel = (): void => {
       if (timer !== null) clearTimeout(timer);
       timer = null;
@@ -30,6 +33,10 @@ export function useOperationColorPeek(): void {
         return;
       }
       if (e.repeat || timer !== null || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (buttons !== 0) {
+        altUsedElsewhere();
+        return;
+      }
       chord = false;
       timer = setTimeout(() => {
         timer = null;
@@ -45,8 +52,10 @@ export function useOperationColorPeek(): void {
       e.preventDefault();
       setPeek(false);
     };
-    const onPointerDown = (e: PointerEvent): void => {
-      if (e.altKey) altUsedElsewhere();
+    const onPointer = (e: PointerEvent): void => {
+      buttons = e.buttons;
+      const gesture = e.type === 'pointerdown' || e.buttons !== 0;
+      if (e.altKey && gesture && !chord) altUsedElsewhere();
     };
     const onBlur = (): void => {
       cancel();
@@ -54,14 +63,15 @@ export function useOperationColorPeek(): void {
     };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
-    // Capture: the canvas may stop the press from bubbling.
-    window.addEventListener('pointerdown', onPointerDown, true);
+    // Capture: the canvas may stop pointer events from bubbling.
+    const pointerEvents = ['pointerdown', 'pointermove', 'pointerup'] as const;
+    for (const type of pointerEvents) window.addEventListener(type, onPointer, true);
     window.addEventListener('blur', onBlur);
     return (): void => {
       cancel();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('pointerdown', onPointerDown, true);
+      for (const type of pointerEvents) window.removeEventListener(type, onPointer, true);
       window.removeEventListener('blur', onBlur);
     };
   }, [setPeek]);
