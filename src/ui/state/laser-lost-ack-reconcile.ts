@@ -102,7 +102,11 @@ export function reconcileLostStreamAcknowledgements(
   }
   const tracker = currentTracker(refs, state, streamer);
   observeReport(tracker, state);
-  const probe = hasOrderedProbe(refs.driver, state.detectedControllerKind);
+  const probe = hasOrderedProbe(
+    refs.driver,
+    state.detectedControllerKind,
+    grblBuildInfoThisSession(state),
+  );
   const proof = { probe, kind: state.activeControllerKind, schedule: refs.statusPollSchedule };
   if (!proofComplete(tracker, proof, streamer, now)) return false;
   refs.lostAckTracker = null;
@@ -183,14 +187,30 @@ function nothingElseOwesReplies(
 }
 
 /** A controller whose `$G` answer is ordered behind every earlier line. The
- *  profile's driver stays in use when a banner names other firmware (only an
- *  advisory), so the detected firmware must have that ordering too. */
+ *  profile's driver stays in use whatever firmware actually answers (a banner
+ *  mismatch is only an advisory), so the firmware itself must be identified as
+ *  GRBL, grblHAL or FluidNC in this session: by its banner or, when it printed
+ *  none, by a stock GRBL `$I` reply. Unidentified firmware gets the sustained-
+ *  Idle rule. */
 export function hasOrderedProbe(
   driver: Pick<ControllerDriver, 'kind' | 'commands'>,
-  detectedKind: ControllerKind | null = null,
+  detectedKind: ControllerKind | null,
+  grblBuildInfoSeen = false,
 ): boolean {
-  if (detectedKind !== null && !ORDERED_PROBE_KINDS.includes(detectedKind)) return false;
-  return ORDERED_PROBE_KINDS.includes(driver.kind) && driver.commands.modalStateQuery === '$G';
+  const identified =
+    detectedKind !== null ? ORDERED_PROBE_KINDS.includes(detectedKind) : grblBuildInfoSeen;
+  return (
+    identified &&
+    ORDERED_PROBE_KINDS.includes(driver.kind) &&
+    driver.commands.modalStateQuery === '$G'
+  );
+}
+
+function grblBuildInfoThisSession(state: LaserState): boolean {
+  return (
+    state.controllerBuildInfo !== null &&
+    state.controllerBuildInfoObservation?.sessionEpoch === state.controllerSessionEpoch
+  );
 }
 
 /** A current-session Idle report: the controller has nothing left to run. */
@@ -303,6 +323,7 @@ function sendLostReplyProbe(
     streamerEpoch: state.streamerEpoch,
     linesBefore: streamer.completed + streamer.inFlight.length,
     sentAt: now,
+    writtenAt: null,
     provenAt: null,
   };
   refs.lostReplyProbe = probe;
@@ -314,11 +335,18 @@ function sendLostReplyProbe(
         'missing. Asking it to confirm it has read every line ($G).',
     ),
   }));
-  void safeWrite('$G\n', 'stream-probe', 'system').catch(() => {
-    // The transport's own failure handling owns the connection; the probe's
-    // reservation goes with the session.
-    if (refs.lostReplyProbe === probe) refs.lostReplyProbe = null;
-  });
+  void safeWrite('$G\n', 'stream-probe', 'system').then(
+    () => {
+      // Until the transport accepts the probe no reply can be due, so the
+      // give-up below counts from here.
+      if (refs.lostReplyProbe === probe) probe.writtenAt = Date.now();
+    },
+    () => {
+      // The transport's own failure handling owns the connection; the probe's
+      // reservation goes with the session.
+      if (refs.lostReplyProbe === probe) refs.lostReplyProbe = null;
+    },
+  );
 }
 
 /** The probe's reply is overdue: its `ok` after `[GC:` was lost, or the job
@@ -337,8 +365,9 @@ function resolveOverdueProbe(
   const schedule = refs.statusPollSchedule;
   const overdue =
     probe.provenAt === null
-      ? state.streamer?.status === 'done' &&
-        onScheduleElapsed(schedule, probe.sentAt, LOST_REPLY_PROBE_GIVE_UP_MS, now)
+      ? probe.writtenAt !== null &&
+        state.streamer?.status === 'done' &&
+        onScheduleElapsed(schedule, probe.writtenAt, LOST_REPLY_PROBE_GIVE_UP_MS, now)
       : onScheduleElapsed(schedule, probe.provenAt, LOST_REPLY_PROBE_REPLY_GRACE_MS, now);
   if (!overdue) return false;
   set((current) => ({

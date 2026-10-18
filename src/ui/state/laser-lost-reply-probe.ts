@@ -10,6 +10,8 @@ export type LostReplyProbe = {
   /** Job lines written before the probe. Each is answered before its `[GC:`. */
   readonly linesBefore: number;
   readonly sentAt: number;
+  /** When the transport accepted the probe; null while its write is pending. */
+  writtenAt: number | null;
   /** When the `[GC:` report arrived; null until then. */
   provenAt: number | null;
 };

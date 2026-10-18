@@ -222,16 +222,23 @@ describe('lost job-line replies at the end of a job', () => {
 describe('lost-reply proof rules', () => {
   it('probes only controllers that answer $G in order behind job lines', () => {
     for (const kind of ['grbl-v1.1', 'grblhal', 'fluidnc'] as const) {
-      expect(hasOrderedProbe(selectControllerDriver(kind))).toBe(true);
+      expect(hasOrderedProbe(selectControllerDriver(kind), kind)).toBe(true);
     }
-    expect(hasOrderedProbe(selectControllerDriver('grblhal', 'creality-falcon-a1-pro'))).toBe(true);
-    expect(hasOrderedProbe(selectControllerDriver('smoothieware'))).toBe(false);
-    expect(hasOrderedProbe(selectControllerDriver('marlin'))).toBe(false);
-    // The profile's driver stays in use when a banner names other firmware.
+    const falcon = selectControllerDriver('grblhal', 'creality-falcon-a1-pro');
+    expect(hasOrderedProbe(falcon, 'grblhal')).toBe(true);
+    expect(hasOrderedProbe(selectControllerDriver('smoothieware'), 'smoothieware')).toBe(false);
+    expect(hasOrderedProbe(selectControllerDriver('marlin'), 'marlin')).toBe(false);
+  });
+
+  it('requires the firmware itself to be identified, not only the profile', () => {
     const grbl = selectControllerDriver('grbl-v1.1');
+    // The profile's driver stays in use when a banner names other firmware.
     expect(hasOrderedProbe(grbl, 'grblhal')).toBe(true);
-    expect(hasOrderedProbe(grbl, 'smoothieware')).toBe(false);
+    expect(hasOrderedProbe(grbl, 'smoothieware', true)).toBe(false);
     expect(hasOrderedProbe(grbl, 'marlin')).toBe(false);
+    // No banner: only a stock GRBL $I reply this session identifies it.
+    expect(hasOrderedProbe(grbl, null)).toBe(false);
+    expect(hasOrderedProbe(grbl, null, true)).toBe(true);
   });
 
   it('accepts only a current-session Idle report', () => {
@@ -258,6 +265,7 @@ describe('lost-reply proof rules', () => {
       streamerEpoch: 1,
       linesBefore: 7,
       sentAt: 0,
+      writtenAt: 0,
       provenAt: null,
     };
     const done = { streamer: { status: 'done' } as never, controllerOperation: null };
@@ -283,16 +291,24 @@ describe('probe deadlines on the status poll schedule', () => {
     streamerEpoch: 1,
     linesBefore: 7,
     sentAt: 0,
-    provenAt: 0,
+    writtenAt: 0,
+    provenAt: 0 as number | null,
   };
-  const run = (schedule: { lastTickAt: number; resumedAt: number }, now: number) => {
+  const run = (
+    schedule: { lastTickAt: number; resumedAt: number },
+    now: number,
+    probe: typeof proven = proven,
+    streamer: unknown = null,
+  ) => {
     const refs = {
       writeEpoch: 1,
-      lostReplyProbe: { ...proven },
+      lostReplyProbe: { ...probe },
       statusPollSchedule: schedule,
       untrackedAckReservations: [{ writeEpoch: 1, motionOperationId: null, remaining: 1 }],
     } as never as Parameters<typeof reconcileLostStreamAcknowledgements>[2];
-    const store = { ...initialLaserState(), pendingUntrackedAcks: 1 };
+    const store = { ...initialLaserState(), pendingUntrackedAcks: 1, streamer } as never as {
+      pendingUntrackedAcks: number;
+    };
     const set = (patch: unknown) =>
       Object.assign(store, typeof patch === 'function' ? patch(store) : patch);
     const finished = reconcileLostStreamAcknowledgements(
@@ -321,5 +337,52 @@ describe('probe deadlines on the status poll schedule', () => {
     expect(onSchedule.finished).toBe(true);
     expect(onSchedule.refs.lostReplyProbe).toBeNull();
     expect(onSchedule.store.pendingUntrackedAcks).toBe(0);
+  });
+});
+
+describe('probe give-up waits for the probe to reach the controller', () => {
+  it('keeps an unanswered probe whose write is still pending', () => {
+    const now = 60_000;
+    const onSchedule = { lastTickAt: now - 250, resumedAt: Number.NEGATIVE_INFINITY };
+    const base = {
+      writeEpoch: 1,
+      sessionEpoch: 1,
+      streamerEpoch: 0,
+      linesBefore: 7,
+      sentAt: 0,
+      provenAt: null,
+    };
+    const refsFor = (writtenAt: number | null) =>
+      ({
+        writeEpoch: 1,
+        lostReplyProbe: { ...base, writtenAt },
+        statusPollSchedule: onSchedule,
+        untrackedAckReservations: [{ writeEpoch: 1, motionOperationId: null, remaining: 1 }],
+      }) as never as Parameters<typeof reconcileLostStreamAcknowledgements>[2];
+    const store = {
+      ...initialLaserState(),
+      pendingUntrackedAcks: 1,
+      streamer: { status: 'done', inFlight: [] },
+    } as never as { pendingUntrackedAcks: number };
+    const set = (patch: unknown) =>
+      Object.assign(store, typeof patch === 'function' ? patch(store) : patch);
+    const tick = (refs: Parameters<typeof reconcileLostStreamAcknowledgements>[2]) =>
+      reconcileLostStreamAcknowledgements(
+        set as never,
+        () => store as never,
+        refs,
+        (async () => undefined) as never,
+        now,
+      );
+
+    const pending = refsFor(null);
+    expect(tick(pending)).toBe(false);
+    expect(pending.lostReplyProbe).not.toBeNull();
+    expect(store.pendingUntrackedAcks).toBe(1);
+
+    const written = refsFor(0);
+    expect(tick(written)).toBe(true);
+    expect(written.lostReplyProbe).toBeNull();
+    expect(store.pendingUntrackedAcks).toBe(0);
   });
 });

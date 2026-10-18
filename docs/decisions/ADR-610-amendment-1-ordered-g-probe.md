@@ -44,10 +44,11 @@ missing at that moment was lost on the link.
   span 1 s after the last reply, KerfDesk writes one `$G`. It is the only `$`
   line allowed while a job is active (`'stream-probe'`), and only once the
   whole program is on the wire, so no job reply can be credited to it.
-- The detected firmware must be one of those three as well. The profile's
-  driver stays in use when a banner names other firmware, which is only an
-  advisory, so a GRBL profile on a Smoothieware board falls back to the
-  sustained-Idle rule.
+- The firmware itself must be identified as one of those three in this
+  session: by its banner or, when it printed none, by a stock GRBL `$I` reply.
+  The profile's driver stays in use whatever firmware answers (a banner
+  mismatch is only an advisory), so unidentified firmware, or a GRBL profile on
+  a Smoothieware board, gets the sustained-Idle rule instead.
 - The `[GC:` line proves the job lines written before the probe were read.
   The probe's own next reply settles the probe's reservation, never a job line.
   Then the still-missing replies are applied and the ordinary settle runs.
@@ -60,7 +61,8 @@ missing at that moment was lost on the link.
   wait that never ends.
 - If the probe's `ok` after `[GC:` is lost too, the probe finishes 2 s after
   the proof. If the job's last reply consumed the probe's `ok` because the
-  `[GC:` was lost, the probe is released 10 s after it was sent.
+  `[GC:` was lost, the probe is released 10 s after the transport accepted it;
+  while its write is still pending, no reply can be due and nothing is released.
 - Every window above counts only time the status poll ran on schedule
   (ADR-356 Amendment 1). After a hidden, throttled or sleeping page resumes,
   replies queued meanwhile are still being read, so the Idle windows and both
