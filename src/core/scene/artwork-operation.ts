@@ -11,10 +11,12 @@ import type { Scene } from './scene';
 import type { SceneObject } from './scene-object';
 import { effectiveOperationForObject } from '../effective-output';
 
-// New artwork starts in black; later operations receive distinct colors in
-// this stable order so the canvas stays readable as the design grows.
+// Each new operation receives a distinct color in this stable order. The
+// workspace draws artwork in plain ink and shows these colors on hover, as one
+// pulse, or while Alt is held (ADR-620), so the first entry is a real color:
+// black would pulse invisibly against the ink. Black stays last so artwork
+// drawn in black elsewhere still has a palette slot.
 export const OPERATION_PALETTE = [
-  '#000000',
   '#2563eb',
   '#dc2626',
   '#16a34a',
@@ -27,6 +29,7 @@ export const OPERATION_PALETTE = [
   '#d97706',
   '#0f766e',
   '#be123c',
+  '#000000',
 ] as const;
 
 export type ArtworkOperationResult = {
