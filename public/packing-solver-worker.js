@@ -7,13 +7,13 @@ const mainScript = new URL('./vendor/packingsolver/49bf6c7/packingsolver.js', se
 // This build boots pthreads from the enclosing worker URL. Its module installs
 // the pthread handler when imported in a worker named em-pthread.
 if (self.name === 'em-pthread') importScripts(mainScript);
-// Chromium drops a nested worker's termination notice when it reaches this
-// worker during this worker's own shutdown, and then waits for that pthread
-// forever: this thread, its Wasm memory and the pthread's thread are never
+// Chromium can drop a pthread's termination notice when the pthread finishes
+// while this worker is itself shutting down, and this worker then waits for it
+// forever: its thread, its Wasm memory and the pthread's thread are never
 // released. So the host terminates its own pthread workers first and stays idle
-// past Chromium's 2 s forcible-termination delay, letting every notice reach a
-// live host, before it reports that the client may terminate it.
-const RETIRE_MS = 2_500;
+// past Chromium's 2 s forcible-termination delay plus teardown, letting every
+// notice reach a live host, before it reports that the client may terminate it.
+const RETIRE_MS = 3_000;
 const pthreads = [];
 let started = false;
 let retiring = false;
