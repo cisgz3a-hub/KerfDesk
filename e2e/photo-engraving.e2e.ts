@@ -28,8 +28,9 @@ test('portrait photo workflow previews real dots, cancels, persists and undoes o
   const baseline = await savedProject(page, kerfdesk);
   await photoButton.click();
   const dialog = page.getByRole('dialog', { name: 'Photo engraving', exact: true });
-  await expect(dialog.getByRole('combobox', { name: 'Photo processing' })).toBeVisible();
-  await dialog.getByRole('combobox', { name: 'Photo processing' }).selectOption('jarvis');
+  const processing = dialog.getByRole('radiogroup', { name: 'Photo processing' });
+  await expect(processing.getByRole('radio')).toHaveCount(3);
+  await processing.getByRole('radio', { name: 'Jarvis', exact: true }).check({ force: true });
   await dialog.getByRole('spinbutton', { name: 'Photo engraving DPI' }).fill('127');
   await dialog.getByRole('spinbutton', { name: 'Photo engraving DPI' }).blur();
   const canvas = dialog.getByLabel('Photo engraving preview', { exact: true });
@@ -74,7 +75,7 @@ test('portrait photo workflow previews real dots, cancels, persists and undoes o
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await (await toolbarCommand(page, 'Photo engraving...')).click();
-  await dialog.getByRole('combobox', { name: 'Photo processing' }).selectOption('stucki');
+  await processing.getByRole('radio', { name: 'Stucki', exact: true }).check({ force: true });
   await dialog.getByRole('combobox', { name: 'Material marking' }).selectOption('light');
   await dialog.getByRole('spinbutton', { name: 'Photo midtones (gamma)' }).fill('1.2');
   await dialog.getByRole('spinbutton', { name: 'Photo midtones (gamma)' }).blur();

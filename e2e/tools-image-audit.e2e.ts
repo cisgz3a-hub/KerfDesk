@@ -113,7 +113,10 @@ test('Adjust Image and Photo engraving apply settings through their dialogs and 
   expect((await project(page)).scene).toEqual(before.scene);
   await command(page, 'photo-engraving');
   const photo = page.getByRole('dialog', { name: 'Photo engraving', exact: true });
-  await photo.getByRole('combobox', { name: 'Photo processing' }).selectOption('stucki');
+  await photo
+    .getByRole('radiogroup', { name: 'Photo processing' })
+    .getByRole('radio', { name: 'Stucki', exact: true })
+    .check({ force: true });
   await photo.getByRole('spinbutton', { name: 'Photo midtones (gamma)' }).fill('1.2');
   await photo.getByRole('spinbutton', { name: 'Photo midtones (gamma)' }).blur();
   await photo.getByRole('button', { name: 'Apply photo settings' }).click();
@@ -121,17 +124,19 @@ test('Adjust Image and Photo engraving apply settings through their dialogs and 
   expect((await project(page)).scene.objects[0]).toMatchObject({ gamma: 1.2 });
   expect((await project(page)).scene.layers).toEqual(before.scene.layers);
   await command(page, 'adjust-image');
-  const dither = adjust.getByRole('combobox', { name: 'Adjust image dither', exact: true });
-  await expect(dither).toHaveValue('stucki');
-  await dither.selectOption('jarvis');
+  const dither = adjust.getByRole('radiogroup', { name: 'Adjust image dither', exact: true });
+  const stucki = dither.getByRole('radio', { name: 'Stucki', exact: true });
+  const jarvis = dither.getByRole('radio', { name: 'Jarvis', exact: true });
+  await expect(stucki).toBeChecked();
+  await jarvis.check({ force: true });
   await adjust.getByRole('button', { name: 'OK', exact: true }).click();
   expect((await project(page)).scene.layers).toEqual(before.scene.layers);
   await command(page, 'adjust-image');
-  await expect(dither).toHaveValue('jarvis');
+  await expect(jarvis).toBeChecked();
   await adjust.getByRole('button', { name: 'Cancel', exact: true }).click();
   await undo(page);
   await command(page, 'adjust-image');
-  await expect(dither).toHaveValue('stucki');
+  await expect(stucki).toBeChecked();
   await adjust.getByRole('button', { name: 'Cancel', exact: true }).click();
   await undo(page);
   expect((await project(page)).scene).toEqual(before.scene);

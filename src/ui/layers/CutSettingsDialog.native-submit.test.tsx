@@ -45,6 +45,14 @@ async function change(field: HTMLInputElement, value: string): Promise<void> {
   });
 }
 
+function swatch(host: HTMLElement, algorithm: string): HTMLInputElement {
+  const radio = host.querySelector(
+    `[role="radiogroup"][aria-label="Cut settings dither"] input[type="radio"][value="${algorithm}"]`,
+  );
+  if (!(radio instanceof HTMLInputElement)) throw new Error(`missing ${algorithm} swatch`);
+  return radio;
+}
+
 async function submit(form: HTMLFormElement, method: 'click' | 'requestSubmit'): Promise<void> {
   expect(form.checkValidity()).toBe(true);
   await act(async () => {
@@ -114,6 +122,75 @@ describe('native cut-settings submission', () => {
       expect(view.onApply).toHaveBeenCalledWith(
         expect.objectContaining({ power: 80, minPower: 50 }),
       );
+    } finally {
+      await view.close();
+    }
+  });
+
+  it.each(['click', 'requestSubmit'] as const)(
+    'submits the dither swatch chosen in the form (%s)',
+    async (method) => {
+      const view = await renderDialog({ mode: 'image', ditherAlgorithm: 'floyd-steinberg' });
+      try {
+        expect(swatch(view.host, 'floyd-steinberg').checked).toBe(true);
+        await act(async () => swatch(view.host, 'atkinson').click());
+        expect(new FormData(view.form).getAll('ditherAlgorithm')).toEqual(['atkinson']);
+        await submit(view.form, method);
+        expect(view.onApply).toHaveBeenCalledWith(
+          expect.objectContaining({ ditherAlgorithm: 'atkinson' }),
+        );
+      } finally {
+        await view.close();
+      }
+    },
+  );
+
+  it('adds Min Power for the Grayscale swatch and submits both', async () => {
+    const view = await renderDialog({
+      mode: 'image',
+      ditherAlgorithm: 'jarvis',
+      power: 60,
+      minPower: 10,
+    });
+    try {
+      expect(view.host.querySelector('input[aria-label="Cut settings minPower"]')).toBeNull();
+      await act(async () => swatch(view.host, 'grayscale').click());
+      await change(input(view.host, 'minPower'), '25');
+      await submit(view.form, 'click');
+      expect(view.onApply).toHaveBeenCalledWith(
+        expect.objectContaining({ ditherAlgorithm: 'grayscale', minPower: 25 }),
+      );
+    } finally {
+      await view.close();
+    }
+  });
+
+  it('says original pixels burn as Grayscale whatever binary swatch is chosen', async () => {
+    const view = await renderDialog({ mode: 'image', ditherAlgorithm: 'jarvis' });
+    const notice = () => view.host.querySelector('.lf-dither-picker__notice')?.textContent ?? null;
+    try {
+      expect(notice()).toBeNull();
+      const original = view.host.querySelector<HTMLInputElement>('input[name="passThrough"]');
+      if (original === null) throw new Error('missing Use original pixels');
+      await act(async () => original.click());
+      expect(notice()).toMatch(/^Use original pixels is on, so this burns as Grayscale/);
+      await act(async () => swatch(view.host, 'grayscale').click());
+      expect(notice()).toBeNull();
+    } finally {
+      await view.close();
+    }
+  });
+
+  it('keeps the chosen dither when its row name is clicked', async () => {
+    const view = await renderDialog({ mode: 'image', ditherAlgorithm: 'ordered' });
+    try {
+      const name = [...view.host.querySelectorAll<HTMLElement>('.lf-field-label')].find(
+        (label) => label.textContent === 'Dither',
+      );
+      if (name === undefined) throw new Error('missing Dither name');
+      await act(async () => name.click());
+      expect(swatch(view.host, 'ordered').checked).toBe(true);
+      expect(swatch(view.host, 'threshold').checked).toBe(false);
     } finally {
       await view.close();
     }
