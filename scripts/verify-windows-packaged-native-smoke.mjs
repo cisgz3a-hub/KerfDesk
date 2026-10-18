@@ -26,7 +26,7 @@ export function validateNativeSmokeResult(result, expectedUserData, options = {}
     ...(result?.windowVisible === true ? [] : ['window did not become visible']),
     ...(failures.length === 0 ? [] : [`runtime failures: ${failures.join(' / ')}`]),
     ...(renderer?.readyToShow === true ? [] : ['ready-to-show was not reached']),
-    ...(behindLicence ? [] : workspaceProblems(renderer)),
+    ...(behindLicence ? noWorkspaceProblems(renderer) : workspaceProblems(renderer)),
     ...(expectLicenceWindow ? licenceWindowProblems(renderer) : []),
     ...(freshSandbox && !behindLicence
       ? ['fresh sandbox must open behind the licence window, not the workspace']
@@ -37,6 +37,16 @@ export function validateNativeSmokeResult(result, expectedUserData, options = {}
   ];
   if (problems.length > 0) throw new Error(problems.join('; '));
   return result;
+}
+
+/** Behind the licence window no workspace exists, so nothing may claim I/O there. */
+function noWorkspaceProblems(renderer) {
+  return renderer.imported === false &&
+    renderer.saved === false &&
+    renderer.savedBytes === undefined &&
+    renderer.fileAccess === undefined
+    ? []
+    : ['the licence window reported workspace import, save or file access'];
 }
 
 function licenceWindowProblems(renderer) {

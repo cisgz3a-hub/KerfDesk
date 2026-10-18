@@ -12,6 +12,7 @@ import {
 import { createLicensingStore } from './licensing-store.js';
 import { createLicensingRuntime, type LicensingRuntime } from './licensing-runtime.js';
 import { scheduleLicenceChecks } from './licensing-schedule.js';
+import { createStartupSignals } from './licensing-startup-signals.js';
 import {
   checkCommercialUpdates,
   commercialUpdatesOffered,
@@ -29,6 +30,10 @@ import { createProjectSealKey } from './project-seal-key.js';
 import { officialPlatformDownloadUrl } from './official-download-page.js';
 
 // A plain label for the device list; the computer's own name is never sent.
+// The startup licence confirmation waits this long for the renderer's first
+// status read before running anyway (ADR-623).
+export const FIRST_STATUS_GRACE_MS = 10_000;
+
 const DEVICE_NAMES: Readonly<Record<string, string>> = {
   win32: 'Windows computer',
   darwin: 'Mac',
@@ -88,7 +93,12 @@ export function createDesktopLicensing(options: Options) {
     fetch: (url, init) => net.fetch(url, init),
     ...browserOpeners(config.channel === 'commercial' && config.sandbox === true),
   });
-  const entry = licenceEntry(config, desktopLicenceLink(config, options.packaged), options);
+  // What the licence window is sent decides when desktop services start (ADR-623).
+  const signals = createStartupSignals(config.channel === 'free');
+  const entry = {
+    ...licenceEntry(config, desktopLicenceLink(config, options.packaged), options),
+    observeStatus: signals.observe,
+  };
   const rings = createUpdateRingStore(options.userDataPath);
   const { manual, installer } = manualUpdateChecks(config, options, runtime);
   /** Beta remains exclusive to the trusted signed updater (ADR-541). */
@@ -106,6 +116,8 @@ export function createDesktopLicensing(options: Options) {
     runtime,
     config,
     updates,
+    /** Settles once this device may use the workspace (ADR-623). */
+    admitted: signals.admitted,
     /** The licensing and update routes in front of the app's own files. */
     routes: (fallback: ProtocolHandler): ProtocolHandler =>
       withLicensingRoutes(
@@ -118,13 +130,15 @@ export function createDesktopLicensing(options: Options) {
       ),
     /**
      * Runs once the window is open: a quiet weekly licence confirmation, then
-     * the update check. The workspace never waits for either (ADR-540).
+     * the update check. Neither holds the licence window: the confirmation
+     * starts once the renderer has read the saved status (ADR-623).
      * Licence confirmation and manual release discovery repeat every 30 minutes.
      */
     start: (): void => {
       if (config.channel !== 'commercial' || stopChecks !== null) return;
-      void runtime
-        .refreshInBackground()
+      void signals
+        .afterFirstStatusRead(FIRST_STATUS_GRACE_MS)
+        .then(() => runtime.refreshInBackground())
         .catch(() => undefined)
         .then(() => {
           updates.check();

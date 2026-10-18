@@ -44,6 +44,33 @@ describe('native background startup after the workspace opening gates', () => {
     expect(updater.autoDownload).toBe(channel === 'free');
   });
 
+  it('starts the camera bridge only once the licence window lets the device in', async () => {
+    let admit: () => void = () => undefined;
+    const admitted = new Promise<void>((resolve) => (admit = resolve));
+    const licence = { config: { channel: 'commercial' }, start: vi.fn(), admitted };
+    const startCamera = vi.fn();
+    const updater = {
+      autoDownload: false,
+      autoInstallOnAppQuit: false,
+      disableWebInstaller: false,
+      checkForUpdatesAndNotify: vi.fn(async () => null),
+    };
+    const startup = createDesktopBackgroundStartup(licence, updater, {
+      isPackaged: true,
+      trustedUpdates: true,
+      startCamera,
+    });
+    await startup.routes(async () => new Response('app route'))(
+      request('/api/desktop/workspace-ready'),
+    );
+    expect(licence.start).toHaveBeenCalledOnce();
+    expect(startCamera).not.toHaveBeenCalled();
+    admit();
+    await admitted;
+    await Promise.resolve();
+    expect(startCamera).toHaveBeenCalledOnce();
+  });
+
   it('serves the agreement UI, but starts no licence or update work before readiness', async () => {
     const app = fixture();
     expect(await (await app.handle(request('/index.html', { method: 'GET' }))).text()).toBe(

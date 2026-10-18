@@ -58,6 +58,10 @@ link, and LightBurn has no free tier.
 
 - `EditionProvider` renders `DesktopLicenceGate` in place of the app until the
   first Pro status in a commercial build, and latches the session in after that.
+  The main process holds its own services the same way: the RTSP camera bridge
+  starts once the licensing routes first send the renderer a Pro status (at once
+  in a build without licensing), and the startup licence confirmation, which may
+  wait on the network, queues after the window's first local status read.
 - PROJECT non-negotiable 21 is unchanged: the window is not a Start guard. It
   stands before the workspace exists, and nothing in a running session gates
   Frame, Start, output or a job.

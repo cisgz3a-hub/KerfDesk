@@ -13,13 +13,20 @@ type BackgroundOptions = {
 };
 
 export function createDesktopBackgroundStartup(
-  licence: { readonly config: { readonly channel: string }; readonly start: () => void },
+  licence: {
+    readonly config: { readonly channel: string };
+    readonly start: () => void;
+    /** The workspace's admission: the camera bridge waits on it (ADR-623). */
+    readonly admitted?: Promise<void>;
+  },
   updater: DesktopUpdater,
   options: BackgroundOptions,
 ) {
   return createDesktopStartup(() => {
     licence.start();
-    void options.startCamera?.();
+    const startCamera = (): void => void options.startCamera?.();
+    if (licence.admitted === undefined) startCamera();
+    else void licence.admitted.then(startCamera);
     configureAutoUpdater(updater, {
       isPackaged: options.isPackaged,
       isChannelTrusted: options.trustedUpdates && licence.config.channel === 'free',

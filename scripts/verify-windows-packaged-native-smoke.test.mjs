@@ -106,6 +106,40 @@ test('fresh-sandbox and default workspace smoke retain their distinct expectatio
   assert.throws(() => validateNativeSmokeResult(gated, userData), /SVG import was not observed/);
 });
 
+test('every licence-window expectation rejects workspace I/O reported behind the window', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  const sandboxLicensing = {
+    kind: 'observed',
+    channel: 'commercial',
+    state: 'activation-required',
+    edition: 'free',
+    proEnabled: false,
+    updateState: 'unavailable',
+  };
+  for (const options of [
+    { expectFreshSandbox: true },
+    { expectLicenceWindow: true },
+    { acceptLicenceWindow: true },
+  ]) {
+    const clean = licenceWindowResult(userData);
+    clean.renderer.licensing = sandboxLicensing;
+    assert.equal(validateNativeSmokeResult(clean, userData, options), clean);
+    for (const patch of [
+      { imported: true },
+      { saved: true },
+      { savedBytes: 10 },
+      { fileAccess: { openPicker: 'stubbed', savePicker: 'stubbed', writeTarget: 'memory' } },
+    ]) {
+      const leaked = licenceWindowResult(userData);
+      leaked.renderer = { ...leaked.renderer, licensing: sandboxLicensing, ...patch };
+      assert.throws(
+        () => validateNativeSmokeResult(leaked, userData, options),
+        /licence window reported workspace|no workspace I\/O/,
+      );
+    }
+  }
+});
+
 test('rejects readiness evidence when the packaged window never became visible', () => {
   const userData = resolve('tmp', 'native-smoke');
   assert.throws(
