@@ -254,3 +254,20 @@ describe('silence measured on the status poll schedule (ADR-356, ADR-611 Amendme
     ).toBe(false);
   });
 });
+
+describe('a line still owed its reply (Console $H homing)', () => {
+  it('does not read silent while GRBL may be busy with a line it has not answered', () => {
+    const homing = state({
+      controllerQualification: { kind: 'qualified', epoch: 4, settings: 'verified' },
+      pendingUntrackedAcks: 1,
+      statusObservation: {
+        sessionEpoch: 4,
+        positionEpoch: 1,
+        sequence: 7,
+        observedAt: now - 30_000,
+      },
+    });
+    expect(controllerWentSilent(homing, now)).toBe(false);
+    expect(controllerWentSilent({ ...homing, pendingUntrackedAcks: 0 }, now)).toBe(true);
+  });
+});

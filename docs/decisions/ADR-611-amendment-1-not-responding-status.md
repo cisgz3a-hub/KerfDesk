@@ -21,6 +21,9 @@ Other senders show such a link as stalled.
 - The connection bar re-reads the rule on every store write and on its own
   1 s timer. A status write stuck in a wedged transport stops the poll from
   writing to the store, which is the case this label exists for.
+- It does not apply while a sent line is still owed its reply. GRBL answers
+  neither `?` nor a Console `$H` until homing ends, and a Console `$H` owns
+  no controller operation.
 - It does not apply before the session's first reply (connect-time silence
   keeps its own report), while a controller operation runs (GRBL may leave `?`
   unanswered while it homes), or to a queued-poll controller (Marlin is not

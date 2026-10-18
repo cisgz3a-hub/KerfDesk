@@ -295,6 +295,8 @@ describe('lost-reply proof rules', () => {
       sentAt: 0,
       writtenAt: 0,
       provenAt: null,
+      streamEndedAt: null,
+      replied: false,
     };
     const done = { streamer: { status: 'done' } as never, controllerOperation: null };
     const errored = { streamer: { status: 'errored' } as never, controllerOperation: null };
@@ -321,6 +323,8 @@ describe('probe deadlines on the status poll schedule', () => {
     sentAt: 0,
     writtenAt: 0,
     provenAt: 0 as number | null,
+    streamEndedAt: null,
+    replied: false,
   };
   const run = (
     schedule: { lastTickAt: number; resumedAt: number },
@@ -368,49 +372,80 @@ describe('probe deadlines on the status poll schedule', () => {
   });
 });
 
-describe('probe give-up waits for the probe to reach the controller', () => {
-  it('keeps an unanswered probe whose write is still pending', () => {
-    const now = 60_000;
-    const onSchedule = { lastTickAt: now - 250, resumedAt: Number.NEGATIVE_INFINITY };
-    const base = {
+describe('probe give-up starts once the job has ended and the probe is on the wire', () => {
+  type Refs = Parameters<typeof reconcileLostStreamAcknowledgements>[2];
+  const onSchedule = (now: number) => ({
+    lastTickAt: now - 250,
+    resumedAt: Number.NEGATIVE_INFINITY,
+  });
+  const harness = (streamer: unknown, writtenAt: number | null) => {
+    const refs = {
       writeEpoch: 1,
-      sessionEpoch: 1,
-      streamerEpoch: 0,
-      linesBefore: 7,
-      sentAt: 0,
-      provenAt: null,
-    };
-    const refsFor = (writtenAt: number | null) =>
-      ({
+      lostReplyProbe: {
         writeEpoch: 1,
-        lostReplyProbe: { ...base, writtenAt },
-        statusPollSchedule: onSchedule,
-        untrackedAckReservations: [{ writeEpoch: 1, motionOperationId: null, remaining: 1 }],
-      }) as never as Parameters<typeof reconcileLostStreamAcknowledgements>[2];
-    const store = {
-      ...initialLaserState(),
-      pendingUntrackedAcks: 1,
-      streamer: { status: 'done', inFlight: [] },
-    } as never as { pendingUntrackedAcks: number };
+        sessionEpoch: 0,
+        streamerEpoch: 0,
+        linesBefore: 7,
+        sentAt: 0,
+        writtenAt,
+        provenAt: null,
+        streamEndedAt: null,
+        replied: false,
+      },
+      statusPollSchedule: onSchedule(0),
+      untrackedAckReservations: [{ writeEpoch: 1, motionOperationId: null, remaining: 1 }],
+    } as never as Refs;
+    const store = { ...initialLaserState(), pendingUntrackedAcks: 1, streamer } as never as {
+      pendingUntrackedAcks: number;
+      streamer: unknown;
+    };
     const set = (patch: unknown) =>
       Object.assign(store, typeof patch === 'function' ? patch(store) : patch);
-    const tick = (refs: Parameters<typeof reconcileLostStreamAcknowledgements>[2]) =>
-      reconcileLostStreamAcknowledgements(
+    const tick = (now: number): boolean => {
+      Object.assign(refs, { statusPollSchedule: onSchedule(now) });
+      return reconcileLostStreamAcknowledgements(
         set as never,
         () => store as never,
         refs,
         (async () => undefined) as never,
         now,
       );
+    };
+    return { refs, store, tick };
+  };
+  const streaming = {
+    status: 'streaming',
+    inFlight: [{ line: 'M5\n', bytes: 3 }],
+    queued: [],
+    queueIndex: 0,
+  };
 
-    const pending = refsFor(null);
-    expect(tick(pending)).toBe(false);
-    expect(pending.lostReplyProbe).not.toBeNull();
-    expect(store.pendingUntrackedAcks).toBe(1);
+  it('does not age the give-up while a held program keeps the job streaming', () => {
+    const run = harness(streaming, 0);
+    expect(run.tick(60_000)).toBe(false);
+    expect(run.refs.lostReplyProbe?.streamEndedAt).toBeNull();
+    // The held replies arrive: the job ends now, so the clock starts now.
+    run.store.streamer = { status: 'done', inFlight: [], queued: [], queueIndex: 0 };
+    expect(run.tick(60_250)).toBe(false);
+    expect(run.tick(65_000)).toBe(false);
+    expect(run.refs.lostReplyProbe).not.toBeNull();
+    expect(run.tick(70_500)).toBe(true);
+    expect(run.refs.lostReplyProbe).toBeNull();
+    expect(run.store.pendingUntrackedAcks).toBe(0);
+  });
 
-    const written = refsFor(0);
-    expect(tick(written)).toBe(true);
-    expect(written.lostReplyProbe).toBeNull();
-    expect(store.pendingUntrackedAcks).toBe(0);
+  it('retires an unanswered probe after the job errored and was released', () => {
+    const run = harness(null, 0);
+    expect(run.tick(1_000)).toBe(false);
+    expect(run.tick(12_000)).toBe(true);
+    expect(run.store.pendingUntrackedAcks).toBe(0);
+  });
+
+  it('keeps an unanswered probe whose write is still pending', () => {
+    const run = harness({ status: 'done', inFlight: [], queued: [], queueIndex: 0 }, null);
+    expect(run.tick(1_000)).toBe(false);
+    expect(run.tick(60_000)).toBe(false);
+    expect(run.refs.lostReplyProbe).not.toBeNull();
+    expect(run.store.pendingUntrackedAcks).toBe(1);
   });
 });

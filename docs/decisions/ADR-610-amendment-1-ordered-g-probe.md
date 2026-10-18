@@ -49,9 +49,12 @@ missing at that moment was lost on the link.
   The profile's driver stays in use whatever firmware answers (a banner
   mismatch is only an advisory), so unidentified firmware, or a GRBL profile on
   a Smoothieware board, gets the sustained-Idle rule instead.
-- The `[GC:` line proves the job lines written before the probe were read.
-  The probe's own next reply settles the probe's reservation, never a job line.
-  Then the still-missing replies are applied and the ordinary settle runs.
+- The `[GC:` line proves the job lines written before the probe were read, so
+  the still-missing replies are applied at once and the job claims no further
+  reply. The probe's own next reply then goes through ordinary settlement as
+  the oldest reservation, and a command written behind the probe (an MPG
+  fail-off) keeps its own reply and owner. The ordinary settle runs after the
+  probe's reply is settled.
 - While the probe owes its reply, the post-job settle and the Idle release
   wait, because either would take the probe's `ok` as its own. Replies that
   arrive meanwhile complete the job normally, and the probe then starts the
@@ -60,9 +63,11 @@ missing at that moment was lost on the link.
   lines. The job is never finished early; the ADR-345 watchdog still governs a
   wait that never ends.
 - If the probe's `ok` after `[GC:` is lost too, the probe finishes 2 s after
-  the proof. If the job's last reply consumed the probe's `ok` because the
-  `[GC:` was lost, the probe is released 10 s after the transport accepted it;
-  while its write is still pending, no reply can be due and nothing is released.
+  the proof. If every line of its answer was lost, the probe is released 10 s
+  after both the transport accepted it and the job stopped streaming (done,
+  errored or released). A held program can keep the job streaming for longer
+  than any grace, so that time does not count, and while the write is still
+  pending no reply can be due, so nothing is released.
   A rejected probe write may still have reached the controller, so the probe
   keeps its owner alongside the reply reservation safeWrite quarantines; its
   late reply or a new serial epoch retires both.

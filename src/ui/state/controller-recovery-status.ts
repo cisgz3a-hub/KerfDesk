@@ -67,6 +67,10 @@ export function controllerWentSilent(
   if (state.capabilities.statusQuery !== 'realtime-report' || state.controllerOperation !== null) {
     return false;
   }
+  // A line still owed its reply may be what the controller is busy with: a
+  // Console `$H` owns no operation, and GRBL answers neither `?` nor the `$H`
+  // until homing ends.
+  if (state.pendingUntrackedAcks > 0) return false;
   const observed = state.statusResponseObservation ?? state.statusObservation;
   if (observed === null || observed.sessionEpoch !== state.controllerSessionEpoch) return false;
   // Only time the status poll ran on schedule counts: a hidden, throttled or

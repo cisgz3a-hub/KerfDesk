@@ -113,7 +113,7 @@ function handleNonBannerLine(
   line: string,
   state: LaserState,
 ): void {
-  if (handleLostReplyProbeLine(set, get, refs, safeWrite, cls.kind, line)) return;
+  handleLostReplyProbeLine(set, get, refs, safeWrite, cls.kind, line);
   const acknowledgesLine = cls.kind !== 'error' || cls.acknowledgesLine !== false;
   const ackSettlement = settleUntrackedAck(set, state, cls.kind, refs, acknowledgesLine);
   const ownedCommandLine = activeControllerCommandLine(refs);

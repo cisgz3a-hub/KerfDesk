@@ -14,6 +14,10 @@ export type LostReplyProbe = {
   writtenAt: number | null;
   /** When the `[GC:` report arrived; null until then. */
   provenAt: number | null;
+  /** When the job stopped streaming (done, errored or released); null until then. */
+  streamEndedAt: number | null;
+  /** The probe's own reply arrived and ordinary settlement took it. */
+  replied: boolean;
 };
 
 export type LostReplyProbeRefs = {

@@ -121,10 +121,12 @@ export function reconcileLostStreamAcknowledgements(
 }
 
 /**
- * Called for every line before acknowledgement ownership is settled. Records
- * the probe's `[GC:` proof, and takes the probe's own reply so it settles the
- * probe's reservation instead of a job line. Returns true when it consumed
- * the line.
+ * Called for every line before acknowledgement ownership is settled; it never
+ * consumes a line. On the probe's `[GC:` it applies the job's lost replies at
+ * once, so the job no longer claims the next terminal reply. That reply then
+ * goes through ordinary settlement, which gives it to the oldest reservation:
+ * the probe's own. A command written behind the probe (an MPG fail-off) keeps
+ * its reply and its owner. The probe finishes after that reply is settled.
  */
 export function handleLostReplyProbeLine(
   set: SetFn,
@@ -133,24 +135,44 @@ export function handleLostReplyProbeLine(
   safeWrite: SafeWriteFn,
   kind: string,
   line: string,
-): boolean {
-  if (!lostReplyProbeOutstanding(refs)) return false;
+): void {
+  if (!lostReplyProbeOutstanding(refs)) return;
   const probe = refs.lostReplyProbe;
-  if (probe == null) return false;
+  if (probe == null || probe.replied) return;
   if (get().controllerSessionEpoch !== probe.sessionEpoch) {
     refs.lostReplyProbe = null;
-    return false;
+    return;
   }
   if (probe.provenAt === null && line.trim().startsWith('[GC:')) {
     probe.provenAt = Date.now();
-    return false; // The report still updates the active work offset.
+    applyProvenLostReplies(set, get, refs, safeWrite, probe);
+    return; // The report still updates the active work offset.
   }
-  if (kind !== 'ok' && kind !== 'error') return false;
+  if (kind !== 'ok' && kind !== 'error') return;
   // FIFO: after `[GC:` the next terminal reply is the probe's. Without it, a
   // reply the job no longer awaits is the probe's too (its `[GC:` was lost).
-  if (probe.provenAt === null && hasUnsettledStreamAcks(get().streamer)) return false;
-  finishProbe(set, get, refs, safeWrite, probe);
-  return true;
+  if (probe.provenAt === null && hasUnsettledStreamAcks(get().streamer)) return;
+  probe.replied = true;
+  queueMicrotask(() => {
+    if (refs.lostReplyProbe === probe) finishProbe(set, get, refs, safeWrite, probe, false);
+  });
+}
+
+function applyProvenLostReplies(
+  set: SetFn,
+  get: GetFn,
+  refs: LostAckReconcileRefs,
+  safeWrite: SafeWriteFn,
+  probe: LostReplyProbe,
+): void {
+  const state = get();
+  const streamer = state.streamer;
+  if (streamer?.status !== 'streaming' || state.streamerEpoch !== probe.streamerEpoch) return;
+  const lost = Math.max(0, probe.linesBefore - streamer.completed);
+  if (lost === 0) return;
+  set((current) => ({ log: pushLog(current, provenLostLogLine(lost)) }));
+  // The stream reaches 'done'; its settle and Idle release wait for the probe.
+  applyLostReplies(set, get, refs, safeWrite, lost);
 }
 
 /** The whole program is on the wire, only job lines are owed replies, and
@@ -325,6 +347,8 @@ function sendLostReplyProbe(
     sentAt: now,
     writtenAt: null,
     provenAt: null,
+    streamEndedAt: null,
+    replied: false,
   };
   refs.lostReplyProbe = probe;
   const waiting = streamer.inFlight.length;
@@ -350,9 +374,9 @@ function sendLostReplyProbe(
   );
 }
 
-/** The probe's reply is overdue: its `ok` after `[GC:` was lost, or the job
- *  took it as a line reply after its `[GC:` was lost. Other waits stay with
- *  the existing watchdog. */
+/** The probe's reply is overdue: its `ok` after `[GC:` was lost, or every
+ *  line of its answer was lost once the job had ended. While the job still
+ *  streams, the existing watchdog governs instead. */
 function resolveOverdueProbe(
   set: SetFn,
   get: GetFn,
@@ -361,15 +385,25 @@ function resolveOverdueProbe(
   now: number,
 ): boolean {
   const probe = refs.lostReplyProbe;
-  if (probe == null) return false;
+  if (probe == null || probe.replied) return false;
   const state = get();
   const schedule = refs.statusPollSchedule;
+  const streaming =
+    state.streamer?.status === 'streaming' && state.streamerEpoch === probe.streamerEpoch;
+  // A held program may keep the job streaming far longer than any grace; the
+  // clock starts only once the job has ended (done, errored or released).
+  if (!streaming) probe.streamEndedAt ??= now;
   const overdue =
-    probe.provenAt === null
-      ? probe.writtenAt !== null &&
-        state.streamer?.status === 'done' &&
-        onScheduleElapsed(schedule, probe.writtenAt, LOST_REPLY_PROBE_GIVE_UP_MS, now)
-      : onScheduleElapsed(schedule, probe.provenAt, LOST_REPLY_PROBE_REPLY_GRACE_MS, now);
+    probe.provenAt !== null
+      ? onScheduleElapsed(schedule, probe.provenAt, LOST_REPLY_PROBE_REPLY_GRACE_MS, now)
+      : probe.writtenAt !== null &&
+        probe.streamEndedAt !== null &&
+        onScheduleElapsed(
+          schedule,
+          Math.max(probe.writtenAt, probe.streamEndedAt),
+          LOST_REPLY_PROBE_GIVE_UP_MS,
+          now,
+        );
   if (!overdue) return false;
   set((current) => ({
     log: pushLog(
@@ -377,32 +411,32 @@ function resolveOverdueProbe(
       '[lf2] The reply to the $G confirmation was lost on the serial link too.',
     ),
   }));
-  finishProbe(set, get, refs, safeWrite, probe);
+  finishProbe(set, get, refs, safeWrite, probe, true);
   return true;
 }
 
+/** Retires the probe. `replyLost`: its reply never came, so its reservation is
+ *  released here; otherwise ordinary settlement already took it. */
 function finishProbe(
   set: SetFn,
   get: GetFn,
   refs: LostAckReconcileRefs,
   safeWrite: SafeWriteFn,
   probe: LostReplyProbe,
+  replyLost: boolean,
 ): void {
   refs.lostReplyProbe = null;
-  // Nothing was owed a reply when the probe was written, so its reservation
-  // heads the ledger.
-  consumeUntrackedAck(refs);
-  set((state) => ({ pendingUntrackedAcks: Math.max(0, state.pendingUntrackedAcks - 1) }));
-  const streamer = get().streamer;
-  if (streamer === null || get().streamerEpoch !== probe.streamerEpoch) return;
-  const lost = probe.provenAt === null ? 0 : Math.max(0, probe.linesBefore - streamer.completed);
-  if (lost > 0) {
-    set((current) => ({ log: pushLog(current, provenLostLogLine(lost)) }));
-    applyLostReplies(set, get, refs, safeWrite, lost);
-    return;
+  if (replyLost) {
+    // Nothing was owed a reply when the probe was written, so its
+    // reservation heads the ledger.
+    consumeUntrackedAck(refs);
+    set((state) => ({ pendingUntrackedAcks: Math.max(0, state.pendingUntrackedAcks - 1) }));
   }
-  // The job's own replies arrived while the probe was out; its settle waited.
-  if (streamer.status === 'done') beginPostJobSettle(set, get, refs, safeWrite);
+  // The job ended while the probe was out; its settle waited for this.
+  const state = get();
+  if (state.streamer?.status === 'done' && state.streamerEpoch === probe.streamerEpoch) {
+    beginPostJobSettle(set, get, refs, safeWrite);
+  }
 }
 
 function applyLostReplies(
