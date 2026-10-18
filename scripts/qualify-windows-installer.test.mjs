@@ -648,3 +648,32 @@ test(
     }
   },
 );
+
+test('the qualification licence reaches only the historical profile child, which releases its seat', async () => {
+  const { readFileSync } = await import('node:fs');
+  const parent = readFileSync(script, 'utf8');
+  const profile = readFileSync(
+    fileURLToPath(new URL('./installed-upgrade-profile.ps1', import.meta.url)),
+    'utf8',
+  );
+  // ADR-623: installers and other children never inherit the secret.
+  const taken = parent.indexOf('Remove-Item Env:KERFDESK_NATIVE_QUALIFICATION_LICENCE');
+  assert.ok(taken > 0 && taken < parent.indexOf('Install-Candidate'));
+  assert.match(
+    parent,
+    /EnvironmentVariables\['KERFDESK_QUALIFICATION_LICENCE_KEY'\] = \$qualificationLicence/,
+  );
+  // The profile child drops it before starting KerfDesk and never records it.
+  const dropped = profile.indexOf('Remove-Item Env:KERFDESK_QUALIFICATION_LICENCE_KEY');
+  assert.ok(
+    dropped > 0 && dropped < profile.indexOf('[Diagnostics.ProcessStartInfo]::new($Executable)'),
+  );
+  assert.doesNotMatch(profile, /\$receipt\.[\w.]+\s*=\s*\$(licenceKey|Key)\b/);
+  assert.doesNotMatch(profile, /return[^\n]*\$(licenceKey|Key)\b/);
+  // The seat is released before the final uninstall, and on failure too.
+  const release = parent.indexOf("'historical-licence-release' 'release'");
+  assert.ok(
+    release > 0 && release < parent.indexOf("Uninstall-Candidate 'historical-final-uninstall'"),
+  );
+  assert.match(parent, /'historical-licence-cleanup' 'release'/);
+});

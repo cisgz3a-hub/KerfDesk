@@ -1,5 +1,6 @@
 param(
-  [Parameter(Mandatory = $true)][ValidateSet('create', 'reopen')][string]$Phase,
+  # release: frees the developer qualification licence's seat (ADR-623).
+  [Parameter(Mandatory = $true)][ValidateSet('create', 'reopen', 'release')][string]$Phase,
   [Parameter(Mandatory = $true)][string]$Executable,
   [Parameter(Mandatory = $true)][string]$EvidenceRoot,
   [Parameter(Mandatory = $true)][string]$ExpectedProfile,
@@ -9,6 +10,11 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+# The parent hands only this child the developer qualification licence. Take it
+# out of the environment before anything starts, so KerfDesk and the file
+# helpers never inherit it, and never write it to evidence (ADR-623).
+$licenceKey = $env:KERFDESK_QUALIFICATION_LICENCE_KEY
+Remove-Item Env:KERFDESK_QUALIFICATION_LICENCE_KEY -ErrorAction SilentlyContinue
 if ($env:OS -ne 'Windows_NT' -or $env:GITHUB_ACTIONS -ne 'true' -or
     $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or -not $env:RUNNER_TEMP -or -not $env:GITHUB_WORKSPACE) {
   throw 'Historical profile qualification requires a disposable GitHub-hosted Windows runner.'
@@ -38,7 +44,7 @@ $receipt = [ordered]@{
   phase = $Phase; expectedVersion = $ExpectedVersion; expectedCommit = $ExpectedCommit
   executable = $Executable; expectedProfile = $ExpectedProfile; project = $Project
   mode = 'normal installed launch, Windows accessibility and real native file dialogs; no CDP or smoke mode'
-  limitations = @('Free licence state only; no paid credential is activated.', 'No hardware is connected or operated.')
+  limitations = @('A build behind the licence window is opened with the developer qualification licence, released in the final phase; no paid credential is used (ADR-623).', 'No hardware is connected or operated.')
 }
 function Write-UpgradeReceipt {
   $receipt | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $EvidenceRoot 'result.json') -Encoding utf8
@@ -91,6 +97,66 @@ function Wait-UpgradeTitle([string]$File) {
   } while ([DateTime]::UtcNow -lt $deadline)
   throw 'Saved project was not reflected in the normal window title.'
 }
+$proEdition = 'Edition: Pro. Open licence settings'
+function Close-UpgradeAppNormally {
+  Assert-UpgradeApp
+  if (-not $app.CloseMainWindow() -or -not $app.WaitForExit(30000)) { throw 'Owned app did not close normally.' }
+  $app.Refresh()
+  if ($app.ExitCode -ne 0) { throw 'Owned app exited unsuccessfully.' }
+  $receipt.exitCode = $app.ExitCode; $receipt.status = 'passed'
+}
+function Wait-UpgradeEnabled($Control, [string]$Name) {
+  $deadline = [DateTime]::UtcNow.AddSeconds(10)
+  while (-not $Control.Current.IsEnabled) {
+    if ([DateTime]::UtcNow -ge $deadline) { throw "Native control stayed disabled: $Name" }
+    Start-Sleep -Milliseconds 150
+  }
+}
+# The workspace, or the settled licence window that stands in its place: its key
+# field, or its retry for a seat still signing out. Opens the workspace with the
+# qualification licence when the window appears; the key is never recorded.
+function Enter-UpgradeWorkspace([string]$Key, [switch]$ReleaseOnly) {
+  $deadline = [DateTime]::UtcNow.AddSeconds(60)
+  $window = $null; $keyField = $null; $retry = $null
+  do {
+    if ($null -ne (Get-UpgradeControl 'Edition:' 'Button' -Prefix -TimeoutSeconds 0 -Optional)) {
+      return [ordered]@{ licenceWindow = $false; activated = $false }
+    }
+    $window = Get-UpgradeControl 'Activate KerfDesk' 'Window' -TimeoutSeconds 0 -Optional
+    if ($null -ne $window) {
+      $keyField = Get-UpgradeControl 'Licence key' 'Edit' $window -TimeoutSeconds 0 -Optional
+      $retry = Get-UpgradeControl 'Retry device deactivation' 'Button' $window -TimeoutSeconds 0 -Optional
+      if ($null -ne $keyField -or $null -ne $retry) { break }
+    }
+    Start-Sleep -Milliseconds 200
+  } while ([DateTime]::UtcNow -lt $deadline)
+  if ($null -eq $keyField -and $null -eq $retry) { throw 'Neither the workspace nor a settled licence window opened.' }
+  if ($ReleaseOnly) {
+    if ($null -eq $retry) { return [ordered]@{ licenceWindow = $true; activated = $false; release = 'nothing to release' } }
+    Invoke-UpgradeControl 'Retry device deactivation' 'Button' $window
+    $null = Get-UpgradeControl 'Licence key' 'Edit' $window -TimeoutSeconds 60
+    return [ordered]@{ licenceWindow = $true; activated = $false; release = 'retried and released' }
+  }
+  if ($null -ne $retry) { throw 'A previous qualification seat is still signing out; run the release phase first.' }
+  if ([string]::IsNullOrEmpty($Key)) { throw 'The licence window opened, but this run has no qualification licence.' }
+  Set-UpgradeValue 'Licence key' 'Edit' $Key $window
+  $activate = Get-UpgradeControl 'Activate licence' 'Button' $window
+  Wait-UpgradeEnabled $activate 'Activate licence'
+  Invoke-UpgradeControl 'Activate licence' 'Button' $window
+  $null = Get-UpgradeControl $proEdition 'Button' -TimeoutSeconds 90
+  return [ordered]@{ licenceWindow = $true; activated = $true }
+}
+# Frees this runner's seat: Help > Licence > Deactivate this device. The session
+# keeps its workspace until KerfDesk closes (ADR-623).
+function Exit-UpgradeLicence {
+  $edition = Get-UpgradeControl 'Edition:' 'Button' -Prefix
+  if ($edition.Current.Name -ne $proEdition) { return 'nothing to release' }
+  Invoke-UpgradeControl 'Edition:' 'Button' -Prefix
+  Invoke-UpgradeControl 'Deactivate this device' 'Button'
+  $null = Get-UpgradeControl 'Edition: Licence needed. Open licence settings' 'Button' -TimeoutSeconds 60
+  Invoke-UpgradeControl 'Close licence settings' 'Button'
+  return 'released'
+}
 Write-UpgradeReceipt
 try {
   $receipt.preflight = Invoke-UpgradeHelper 'Preflight' 'preflight'
@@ -117,10 +183,20 @@ try {
   $app = [Diagnostics.Process]::Start($info)
   Initialize-UpgradeControls $app $Executable
   $receipt.pid = $app.Id
+  # ADR-623: a build without a trial or licence opens behind its licence window.
+  $receipt.licence = Enter-UpgradeWorkspace $licenceKey -ReleaseOnly:($Phase -eq 'release')
+  if ($Phase -eq 'release') {
+    if (-not $receipt.licence.licenceWindow) { $receipt.licence.release = Exit-UpgradeLicence }
+    Close-UpgradeAppNormally
+    return
+  }
   $build = Get-UpgradeControl 'Build version' 'Group'
   $null = Get-UpgradeControl $ExpectedVersion 'Text' $build
-  $edition = Get-UpgradeControl 'Edition: Free' 'Button' -Prefix
-  $receipt.freeLicenceObservation = $edition.Current.Name
+  $edition = Get-UpgradeControl 'Edition:' 'Button' -Prefix
+  $receipt.licenceObservation = $edition.Current.Name
+  if ($receipt.licence.activated -and $edition.Current.Name -ne $proEdition) {
+    throw 'The qualification licence did not open KerfDesk Pro.'
+  }
   $receipt.initialWindow = Invoke-UpgradeHelper 'Inspect' 'initial-window'
   $settings = Open-UpgradeSettings
   if ($Phase -eq 'create') { Set-UpgradePreferences $settings }
@@ -162,11 +238,7 @@ try {
   Invoke-UpgradeControl 'Cancel without saving' 'Button' $machine
   $receipt.savedProject = @{ path = $saved; bytes = (Get-Item -LiteralPath $saved).Length; sha256 = (Get-FileHash -LiteralPath $saved -Algorithm SHA256).Hash.ToLowerInvariant() }
   $receipt.finalWindow = Invoke-UpgradeHelper 'Inspect' 'final-window'
-  Assert-UpgradeApp
-  if (-not $app.CloseMainWindow() -or -not $app.WaitForExit(30000)) { throw 'Owned app did not close normally after saving.' }
-  $app.Refresh()
-  if ($app.ExitCode -ne 0) { throw 'Owned app exited unsuccessfully.' }
-  $receipt.exitCode = $app.ExitCode; $receipt.status = 'passed'
+  Close-UpgradeAppNormally
 } catch {
   $receipt.status = 'failed'; $receipt.error = $_.ToString()
   throw

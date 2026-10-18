@@ -40,6 +40,12 @@ if ($Scenario -eq 'HistoricalUpgrade' -and
   throw 'Historical qualification needs distinct commercial versions and exact source commits.'
 }
 
+# ADR-623: a build that opens behind the licence window is qualified with the
+# developer qualification licence. Take it out of this environment so installers
+# and other children never inherit it; only the historical profile child gets it.
+$qualificationLicence = $env:KERFDESK_NATIVE_QUALIFICATION_LICENCE
+Remove-Item Env:KERFDESK_NATIVE_QUALIFICATION_LICENCE -ErrorAction SilentlyContinue
+
 function Assert-ChildPath([string]$Path, [string]$Parent) {
   $full = [IO.Path]::GetFullPath($Path)
   $prefix = [IO.Path]::GetFullPath($Parent).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
@@ -357,6 +363,9 @@ function Invoke-HistoricalProfile([string]$Label, [string]$Phase, [string]$Expec
     '-Project', $project, '-ExpectedVersion', $ExpectedVersion, '-ExpectedCommit', $ExpectedSourceCommit)) {
     $info.ArgumentList.Add($argument)
   }
+  if (-not [string]::IsNullOrEmpty($qualificationLicence)) {
+    $info.EnvironmentVariables['KERFDESK_QUALIFICATION_LICENCE_KEY'] = $qualificationLicence
+  }
   $process = [Diagnostics.Process]::Start($info)
   $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
   $finished = $process.WaitForExit(300000)
@@ -395,22 +404,32 @@ try {
     return
   }
   if ($Scenario -eq 'HistoricalUpgrade') {
-    Install-Candidate 'historical-baseline-install' $Installer $Version $SourceCommit
-    Invoke-HistoricalProfile 'native-historical-create' 'create' $Version $SourceCommit
-    @{ sourceCommit = $SourceCommit; marker = [Guid]::NewGuid().ToString() } | ConvertTo-Json | Set-Content -LiteralPath $sentinel -Encoding utf8
-    $projectHash = (Get-FileEvidence $project).sha256
-    $sentinelHash = (Get-FileEvidence $sentinel).sha256
-    Invoke-HistoricalProfile 'historical-restart-reopen' 'reopen' $Version $SourceCommit
-    Install-Candidate 'historical-upgrade-install' $UpgradeInstaller $UpgradeVersion $UpgradeSourceCommit
-    Assert-DataRetained $projectHash $sentinelHash
-    Invoke-HistoricalProfile 'historical-upgrade-reopen' 'reopen' $UpgradeVersion $UpgradeSourceCommit
-    Install-Candidate 'historical-same-version-reinstall' $UpgradeInstaller $UpgradeVersion $UpgradeSourceCommit
-    Assert-DataRetained $projectHash $sentinelHash
-    Invoke-HistoricalProfile 'historical-reinstall-reopen' 'reopen' $UpgradeVersion $UpgradeSourceCommit
-    Uninstall-Candidate 'historical-uninstall-retaining-data'
-    Assert-DataRetained $projectHash $sentinelHash
-    Install-Candidate 'historical-install-after-uninstall' $UpgradeInstaller $UpgradeVersion $UpgradeSourceCommit
-    Invoke-HistoricalProfile 'historical-restore-reopen' 'reopen' $UpgradeVersion $UpgradeSourceCommit
+    try {
+      Install-Candidate 'historical-baseline-install' $Installer $Version $SourceCommit
+      Invoke-HistoricalProfile 'native-historical-create' 'create' $Version $SourceCommit
+      @{ sourceCommit = $SourceCommit; marker = [Guid]::NewGuid().ToString() } | ConvertTo-Json | Set-Content -LiteralPath $sentinel -Encoding utf8
+      $projectHash = (Get-FileEvidence $project).sha256
+      $sentinelHash = (Get-FileEvidence $sentinel).sha256
+      Invoke-HistoricalProfile 'historical-restart-reopen' 'reopen' $Version $SourceCommit
+      Install-Candidate 'historical-upgrade-install' $UpgradeInstaller $UpgradeVersion $UpgradeSourceCommit
+      Assert-DataRetained $projectHash $sentinelHash
+      Invoke-HistoricalProfile 'historical-upgrade-reopen' 'reopen' $UpgradeVersion $UpgradeSourceCommit
+      Install-Candidate 'historical-same-version-reinstall' $UpgradeInstaller $UpgradeVersion $UpgradeSourceCommit
+      Assert-DataRetained $projectHash $sentinelHash
+      Invoke-HistoricalProfile 'historical-reinstall-reopen' 'reopen' $UpgradeVersion $UpgradeSourceCommit
+      Uninstall-Candidate 'historical-uninstall-retaining-data'
+      Assert-DataRetained $projectHash $sentinelHash
+      Install-Candidate 'historical-install-after-uninstall' $UpgradeInstaller $UpgradeVersion $UpgradeSourceCommit
+      Invoke-HistoricalProfile 'historical-restore-reopen' 'reopen' $UpgradeVersion $UpgradeSourceCommit
+      # Frees the developer seat any licence window was opened with (ADR-623).
+      Invoke-HistoricalProfile 'historical-licence-release' 'release' $UpgradeVersion $UpgradeSourceCommit
+    } catch {
+      # Best effort: never leave the developer licence holding a runner's seat.
+      if (Test-Path -LiteralPath $executable) {
+        try { Invoke-HistoricalProfile 'historical-licence-cleanup' 'release' $UpgradeVersion $UpgradeSourceCommit } catch { }
+      }
+      throw
+    }
     Uninstall-Candidate 'historical-final-uninstall'
     Assert-DataRetained $projectHash $sentinelHash
     Copy-Item -LiteralPath $project -Destination (Join-Path $EvidenceRoot 'persisted-project.lf2')
