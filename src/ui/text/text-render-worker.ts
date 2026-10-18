@@ -3,7 +3,11 @@
 // Lays out canvas text off the UI thread (ADR-624): opentype.js parsing,
 // HarfBuzz shaping for complex scripts, and the outline conversion.
 
-import type { TextWorkerRequest, TextWorkerResponse } from './text-render-worker-protocol';
+import type {
+  TextWorkerMessage,
+  TextWorkerRequest,
+  TextWorkerResponse,
+} from './text-render-worker-protocol';
 import { createTextWorkerRuntime } from './text-render-worker-runtime';
 
 const runtime = createTextWorkerRuntime();
@@ -22,3 +26,7 @@ self.onmessage = (event: MessageEvent<TextWorkerRequest>): void => {
     },
   );
 };
+
+// The client counts an error before this as a worker that never started.
+const ready: TextWorkerMessage = { kind: 'ready' };
+self.postMessage(ready);

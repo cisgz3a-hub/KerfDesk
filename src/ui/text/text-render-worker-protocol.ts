@@ -15,7 +15,12 @@ export type TextWorkerRequest = {
   readonly task: TextWorkerTask;
 };
 
+/** Posted once the worker's script has loaded, before any reply. */
+export type TextWorkerReady = { readonly kind: 'ready' };
+
 export type TextWorkerResponse =
   | { readonly id: number; readonly kind: 'rendered'; readonly result: TextRenderResultMessage }
   | { readonly id: number; readonly kind: 'missing'; readonly characters: ReadonlyArray<string> }
   | { readonly id: number; readonly kind: 'fatal'; readonly message: string };
+
+export type TextWorkerMessage = TextWorkerReady | TextWorkerResponse;

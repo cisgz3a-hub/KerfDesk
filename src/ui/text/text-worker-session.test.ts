@@ -4,7 +4,7 @@ import { IDENTITY_TRANSFORM, type TextObject } from '../../core/scene';
 import { buildTextObject } from './build-text-object';
 import type * as RenderTextGeometryModule from './render-text-geometry';
 import { renderTextGeometry, type RenderTextGeometryInput } from './render-text-geometry';
-import type { TextWorkerRequest, TextWorkerResponse } from './text-render-worker-protocol';
+import type { TextWorkerMessage, TextWorkerRequest } from './text-render-worker-protocol';
 import { createTextWorkerRuntime } from './text-render-worker-runtime';
 import { createTextWorkerSession, renderTextGeometryOffThread } from './text-worker-session';
 import type { TextDialogState } from '../state/ui-store';
@@ -40,8 +40,10 @@ vi.mock('./render-text-geometry', async (importOriginal) => {
 });
 
 // Answers with the real worker runtime, but only when the test delivers it.
+// Like the real worker it announces itself once its script has run, unless
+// the test models a script that never loads.
 class FakeWorker {
-  onmessage: ((event: MessageEvent<TextWorkerResponse>) => void) | null = null;
+  onmessage: ((event: MessageEvent<TextWorkerMessage>) => void) | null = null;
   onerror: (() => void) | null = null;
   onmessageerror: (() => void) | null = null;
   readonly requests: TextWorkerRequest[] = [];
@@ -51,7 +53,10 @@ class FakeWorker {
   constructor(
     private readonly auto: boolean,
     private readonly unpostable = false,
-  ) {}
+    loads = true,
+  ) {
+    if (loads) queueMicrotask(() => this.send({ kind: 'ready' }));
+  }
 
   postMessage(request: TextWorkerRequest): void {
     if (this.unpostable) throw new DOMException('cannot clone', 'DataCloneError');
@@ -66,8 +71,8 @@ class FakeWorker {
     this.send(structuredClone(response, { transfer }));
   }
 
-  send(response: TextWorkerResponse): void {
-    this.onmessage?.({ data: response } as MessageEvent<TextWorkerResponse>);
+  send(message: TextWorkerMessage): void {
+    this.onmessage?.({ data: message } as MessageEvent<TextWorkerMessage>);
   }
 
   terminate(): void {
@@ -80,13 +85,18 @@ function harness(
     readonly auto?: boolean;
     readonly explicit?: boolean;
     readonly unpostable?: boolean;
+    readonly scriptFails?: boolean;
   } = {},
 ) {
   const workers: FakeWorker[] = [];
   const session = createTextWorkerSession({
     ...(options.explicit === true ? { inThreadIfUnavailable: true } : {}),
     spawn: () => {
-      const worker = new FakeWorker(options.auto ?? false, options.unpostable ?? false);
+      const worker = new FakeWorker(
+        options.auto ?? false,
+        options.unpostable ?? false,
+        options.scriptFails !== true,
+      );
       workers.push(worker);
       return worker as unknown as Worker;
     },
@@ -275,6 +285,27 @@ describe('text worker session (ADR-624)', () => {
       expect(renderTextGeometry).not.toHaveBeenCalled();
     },
   );
+
+  it('treats a worker whose script never loads as unavailable, not failed', async () => {
+    vi.stubGlobal('Worker', vi.fn());
+    const preview = harness({ scriptFails: true });
+    const running = preview.session.render(input());
+    await posted(() => preview.workers[0], 1);
+    preview.workers[0]!.onerror?.();
+    await expect(running).rejects.toMatchObject({
+      name: 'TextWorkerError',
+      outcome: 'unavailable',
+      message: 'The text could not be laid out in the background.',
+    });
+    expect(preview.workers[0]!.terminated).toBe(true);
+    expect(renderTextGeometry).not.toHaveBeenCalled();
+    // Save and Add Text, which the operator chose, lay the text out in thread.
+    const explicit = harness({ scriptFails: true, explicit: true });
+    const saving = explicit.session.render(input());
+    await posted(() => explicit.workers[0], 1);
+    explicit.workers[0]!.onerror?.();
+    await expect(saving).resolves.toStrictEqual(await renderTextGeometry(input()));
+  });
 
   it('in a browser, reports an unpostable request as unavailable', async () => {
     vi.stubGlobal('Worker', vi.fn());

@@ -16,10 +16,14 @@
 // be handed the work, is `unavailable`; work that started and then failed (a
 // thrown error, a crashed worker, an unreadable reply) is `failed`, and is
 // never repeated on this thread, where it would fail again and freeze input.
+// A module worker whose script cannot be fetched or evaluated still constructs
+// and reports that later through onerror, so the worker announces itself once
+// its script has run; an error before that is `unavailable`.
 
 import type { TextRenderResult } from '../../core/text/text-to-polylines';
 import { unpackTextRenderResult } from './text-render-result-transfer';
 import type {
+  TextWorkerMessage,
   TextWorkerRequest,
   TextWorkerResponse,
   TextWorkerTask,
@@ -41,10 +45,10 @@ export type TextWorkerFont = { readonly token: number; readonly buffer: ArrayBuf
 
 const UNAVAILABLE_MESSAGE = 'The text could not be laid out in the background.';
 
-export const TEXT_WORKER_UNAVAILABLE: TextWorkerOutcome<never> = {
+export const TEXT_WORKER_UNAVAILABLE = {
   kind: 'unavailable',
   message: UNAVAILABLE_MESSAGE,
-};
+} as const satisfies TextWorkerOutcome<never>;
 const WORKER_ERROR_MESSAGE = 'The background text layout stopped unexpectedly.';
 const MESSAGE_ERROR_MESSAGE = 'The background text layout reply could not be read.';
 
@@ -71,6 +75,8 @@ export function textWorkerFont(buffer: ArrayBuffer): TextWorkerFont {
 
 export class TextWorkerClient {
   private worker: Worker | null = null;
+  /** The current worker's script has run (it posted `ready`). */
+  private started = false;
   private loadedFont: number | null = null;
   private active: ActiveRequest | null = null;
   private nextId = 0;
@@ -136,7 +142,7 @@ export class TextWorkerClient {
       try {
         this.post(target, id, task, font);
       } catch {
-        this.end({ kind: 'unavailable', message: UNAVAILABLE_MESSAGE });
+        this.end(TEXT_WORKER_UNAVAILABLE);
       }
     });
   }
@@ -166,6 +172,7 @@ export class TextWorkerClient {
     worker.onmessageerror = null;
     worker.terminate();
     this.worker = null;
+    this.started = false;
     this.loadedFont = null;
   }
 
@@ -174,7 +181,12 @@ export class TextWorkerClient {
     this.settleActive(outcome);
   }
 
-  private receive(response: TextWorkerResponse): void {
+  private receive(message: TextWorkerMessage): void {
+    if (message.kind === 'ready') {
+      this.started = true;
+      return;
+    }
+    const response = message;
     const current = this.active;
     if (current === null || response.id !== current.id) return;
     if (response.kind === 'fatal') {
@@ -195,8 +207,11 @@ export class TextWorkerClient {
     if (this.worker !== null) return this.worker;
     const created = this.spawn();
     if (created === null) return null;
-    created.onmessage = (event: MessageEvent<TextWorkerResponse>) => this.receive(event.data);
-    created.onerror = () => this.end({ kind: 'failed', message: WORKER_ERROR_MESSAGE });
+    created.onmessage = (event: MessageEvent<TextWorkerMessage>) => this.receive(event.data);
+    created.onerror = () =>
+      this.end(
+        this.started ? { kind: 'failed', message: WORKER_ERROR_MESSAGE } : TEXT_WORKER_UNAVAILABLE,
+      );
     created.onmessageerror = () => this.end({ kind: 'failed', message: MESSAGE_ERROR_MESSAGE });
     this.worker = created;
     return created;

@@ -80,10 +80,14 @@ Two further findings shaped the decision.
    an idle worker that keeps its parsed font. A request superseded while its font file was loading
    is never posted.
 6. **No silent fallback onto the UI thread.** Only SSR and Vitest compute in process. In a real
-   browser, a worker that cannot start or cannot be handed the work is `unavailable`: the
-   previews and the missing-glyph check say so, while Save and Add Text, which the operator chose,
-   lay the text out on the UI thread as they did before. Work that started and failed is reported
-   and never rerun in thread. Every failure retires the worker.
+   browser, a worker that cannot start or cannot be handed the work is `unavailable`. A module
+   worker whose script cannot be fetched or evaluated still constructs and reports that later
+   through `onerror`, so the worker posts `ready` once its script has run, and an error before
+   that counts as `unavailable` too. The previews say so, while Save and Add Text, which the
+   operator chose, lay the text out on the UI thread as they did before. Work that started and
+   failed is reported and never rerun in thread. Every failure retires the worker. When the
+   missing-glyph check's worker fails, the hint says the check did not run rather than reporting
+   full coverage. A font that cannot load stays with the dialog's own font check, as before.
 7. **Output keeps the UI-thread path.** `renderTextGeometry` is unchanged and still serves
    variable text at output, DXF export, remote control and the registration jig. No G-code,
    Frame, Start, machine output or licence behaviour changes.
@@ -144,8 +148,10 @@ thread after the layout; a 90° bend of 450 Roboto characters measured 16 ms.
   once, a font change, supersede terminating busy work, a request superseded while its font
   loaded, stale reply ids, an aborted caller leaving a warm worker, a newer request retiring a
   worker still busy with aborted work, release, failed layouts, crashed workers and unreadable
-  or mismatched replies (never rerun in thread), an unpostable request, and a browser without
-  workers (previews report it; explicit actions lay out in thread).
+  or mismatched replies (never rerun in thread), an unpostable request, a worker whose script
+  never loads, and a browser without workers (previews report it; explicit actions lay out in
+  thread). `FontUsageHint.test.tsx` shows a failed missing-glyph check as unchecked and keeps
+  font-load errors silent.
 - `src/core/text/reusable-outline-font.test.ts` covers the bundled and fixture fonts, each
   excluded table, WOFF, WOFF2, CFF and collection signatures, truncated files, and synthetic
   fonts with acyclic composites, two- and three-glyph cycles, a self-reference and a missing

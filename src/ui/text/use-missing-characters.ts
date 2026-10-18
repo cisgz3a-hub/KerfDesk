@@ -3,7 +3,7 @@ import type { EmbeddedFont, VariableCsvDataset } from '../../core/scene';
 import { DEFAULT_TEXT_COLOR, findFontEntry } from '../../core/text';
 import { cncStrokeTextToPolylines } from '../../core/text/cnc-stroke-font';
 import { parseVariableTemplateSource } from '../../core/variables';
-import type { TextWorkerSession } from './text-worker-session';
+import { TextWorkerError, type TextWorkerSession } from './text-worker-session';
 import { useTextWorkerSession } from './use-text-worker-session';
 
 // Checking an outline font parses it, so the check waits for typing to settle,
@@ -21,10 +21,22 @@ export type MissingCharacterQuery = {
   readonly enabled: boolean;
 };
 
-type FontCheck = { readonly fontKey: string; readonly missing: ReadonlyArray<string> };
+type FontCheck = {
+  readonly fontKey: string;
+  readonly missing: ReadonlyArray<string>;
+  /** Why the check could not run, when the text worker failed. */
+  readonly unchecked: string | null;
+};
+
+export type MissingCharacters = {
+  readonly missing: ReadonlyArray<string>;
+  readonly unchecked: string | null;
+};
+
+const NOT_CHECKED: MissingCharacters = { missing: [], unchecked: null };
 
 /** The characters this text will engrave that the chosen font has no glyph for. */
-export function useMissingCharacters(query: MissingCharacterQuery): ReadonlyArray<string> {
+export function useMissingCharacters(query: MissingCharacterQuery): MissingCharacters {
   const { fontKey, embeddedFonts, content, variable, csv, enabled } = query;
   const engraved = useMemo(() => engravedSource(content, variable), [content, variable]);
   const csvCharacters = useMemo(
@@ -38,21 +50,29 @@ export function useMissingCharacters(query: MissingCharacterQuery): ReadonlyArra
     if (!enabled || characters === '') return undefined;
     let active = true;
     const timer = window.setTimeout(() => {
-      void fontMissingCharacters(textWorker, fontKey, embeddedFonts, characters)
-        // A font that cannot load is reported by the dialog's own font check.
-        .catch((): ReadonlyArray<string> => [])
-        .then((missing) => {
-          if (active) setChecked({ fontKey, missing });
-        });
+      void fontMissingCharacters(textWorker, fontKey, embeddedFonts, characters).then(
+        (missing) => {
+          if (active) setChecked({ fontKey, missing, unchecked: null });
+        },
+        (error: unknown) => {
+          // A font that cannot load is reported by the dialog's own font check.
+          // A failed worker is not full coverage: say the check did not run.
+          const unchecked = error instanceof TextWorkerError ? error.message : null;
+          if (active) setChecked({ fontKey, missing: [], unchecked });
+        },
+      );
     }, CHECK_DELAY_MS);
     return () => {
       active = false;
       window.clearTimeout(timer);
     };
   }, [enabled, fontKey, embeddedFonts, characters, textWorker]);
-  if (!enabled || checked?.fontKey !== fontKey) return [];
+  if (!enabled || checked?.fontKey !== fontKey) return NOT_CHECKED;
   // A character deleted since the last check leaves the warning at once.
-  return checked.missing.filter((character) => characters.includes(character));
+  return {
+    missing: checked.missing.filter((character) => characters.includes(character)),
+    unchecked: checked.unchecked,
+  };
 }
 
 async function fontMissingCharacters(

@@ -29,6 +29,17 @@ import {
   type TextWorkerSpawner,
 } from './text-worker-client';
 
+/** The text worker could not start, or its work failed, as opposed to the text or font. */
+export class TextWorkerError extends Error {
+  constructor(
+    message: string,
+    readonly outcome: 'unavailable' | 'failed',
+  ) {
+    super(message);
+    this.name = 'TextWorkerError';
+  }
+}
+
 export type TextGeometryRenderer = (
   input: RenderTextGeometryInput,
   signal?: AbortSignal,
@@ -67,9 +78,9 @@ export function createTextWorkerSession(options: TextWorkerSessionOptions = {}):
         throw cancelled();
       case 'unavailable':
         if (inProcessAllowed() || options.inThreadIfUnavailable === true) return inThread();
-        throw new Error(outcome.message);
+        throw new TextWorkerError(outcome.message, 'unavailable');
       case 'failed':
-        throw new Error(outcome.message);
+        throw new TextWorkerError(outcome.message, 'failed');
     }
   };
   return {
