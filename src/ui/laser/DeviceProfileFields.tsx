@@ -155,7 +155,7 @@ const textInputStyle: React.CSSProperties = { width: 140 };
 const timesStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-faint)' };
 const homingStyle: React.CSSProperties = {
   display: 'inline-flex',
-  alignItems: 'flex-start',
+  alignItems: 'center',
   gap: 6,
   fontSize: 12,
 };

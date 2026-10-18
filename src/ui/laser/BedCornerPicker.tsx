@@ -271,6 +271,8 @@ export function BedCornerPicker(props: {
 function pickerCaption(marker: 'origin' | 'home', value: Origin): string {
   const label = bedPositionLabel(value);
   if (marker === 'home') return `Home: ${label.toLowerCase()}`;
+  // Loaders validate origins; an unknown one still must not throw inside Machine Setup.
+  if (!BED_POSITIONS.some((position) => position.value === value)) return label;
   const words = originAxisWords(value);
   return `${label}: +X ${words.x}, +Y ${words.y}`;
 }

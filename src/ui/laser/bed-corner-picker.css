@@ -79,8 +79,8 @@
 }
 .lf-bed-picker__home {
   display: block;
-  width: 15px;
-  height: 15px;
+  width: 17px;
+  height: 17px;
 }
 .lf-bed-picker__home path {
   fill: var(--lf-accent);
