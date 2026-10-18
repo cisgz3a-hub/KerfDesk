@@ -108,7 +108,10 @@ it('opens a commercial build behind the licence window until a trial starts', as
 });
 it('mounts nothing until the first licence status, and offers a retry if it fails', async () => {
   const api = client(trial);
-  vi.mocked(api.status).mockRejectedValueOnce(new Error('offline'));
+  let fail: (error: Error) => void = () => undefined;
+  vi.mocked(api.status).mockImplementationOnce(
+    () => new Promise((_resolve, reject) => (fail = reject)),
+  );
   await act(async () =>
     root.render(
       <EditionProvider client={api}>
@@ -117,6 +120,9 @@ it('mounts nothing until the first licence status, and offers a retry if it fail
     ),
   );
   expect(licenceWindow()?.dataset.licenceState).toBe('checking');
+  await act(async () => fail(new Error('offline')));
+  // A failed first read is settled: the splash and qualification see Retry at once.
+  expect(licenceWindow()?.dataset.licenceState).toBe('unreachable');
   expect(host.querySelector('[data-workspace]')).toBeNull();
   expect(document.body.textContent).toContain('could not be reached');
   await act(async () => button('Retry licence check').click());

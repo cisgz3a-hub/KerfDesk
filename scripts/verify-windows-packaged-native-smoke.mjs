@@ -10,9 +10,11 @@ export function validateNativeSmokeResult(result, expectedUserData, options = {}
   const renderer = object(result?.renderer);
   const failures = Array.isArray(result?.failures) ? result.failures : ['invalid failures field'];
   const freshSandbox = options.expectFreshSandbox === true;
-  // A fresh commercial sandbox opens behind its licence window, with no
-  // workspace to import into or save from (ADR-623).
-  const behindLicence = freshSandbox && renderer?.licenceWindow === true;
+  // A fresh commercial sandbox, or a qualification profile still signing out
+  // of its seat, opens behind its licence window, with no workspace to import
+  // into or save from (ADR-623).
+  const behindLicence =
+    (freshSandbox || options.acceptLicenceWindow === true) && renderer?.licenceWindow === true;
   const problems = [
     ...(result?.ok === true ? [] : ['result was not ok']),
     ...(result?.isPackaged === true ? [] : ['app was not packaged']),

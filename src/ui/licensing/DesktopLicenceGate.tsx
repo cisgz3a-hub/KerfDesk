@@ -59,8 +59,9 @@ export function DesktopLicenceGate({
         aria-modal="true"
         aria-label={LICENCE_GATE_LABEL}
         aria-busy={busy}
-        // Native qualification waits for a settled state, not the first check.
-        data-licence-state={status === null ? 'checking' : status.state}
+        // The splash and native qualification wait for a settled state: a
+        // status, or a failed first read showing Retry, not the first check.
+        data-licence-state={settledState(status, failure)}
         tabIndex={-1}
         style={card}
       >
@@ -127,6 +128,11 @@ function GateExits(): JSX.Element {
       </button>
     </div>
   );
+}
+
+function settledState(status: LicenceStatus | null, failure: string | null): string {
+  if (status !== null) return status.state;
+  return failure === null ? 'checking' : 'unreachable';
 }
 
 function gateLead(status: LicenceStatus | null): string {

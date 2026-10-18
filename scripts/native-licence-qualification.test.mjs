@@ -289,6 +289,36 @@ test('an already Free local profile never claims that a server seat was released
   assert.equal(receipt.cleanup.serverSeatReleaseUnknown, true);
 });
 
+/** A profile without developer rights opens behind the licence window (ADR-623). */
+function licenceWindowResult(phase) {
+  const result = nativeResult(phase);
+  const renderer = { ...result.renderer, licenceWindow: true, imported: false, saved: false };
+  delete renderer.fileAccess;
+  delete renderer.savedBytes;
+  result.renderer = renderer;
+  return result;
+}
+
+test('a deactivation retried from the licence window is valid cleanup evidence', () => {
+  const result = licenceWindowResult('deactivate');
+  result.renderer.licenceQualification.before = { ...state(null), deactivationPending: true };
+  const observed = publicNativePhase(result, processResult, profile, 'deactivate', 'cleanup');
+  assert.equal(observed.passed, true);
+  assert.equal(observed.nativeDeactivationObserved, true);
+});
+
+test('only cleanup without developer rights may skip the workspace', () => {
+  const developerCleanup = licenceWindowResult('deactivate');
+  assert.equal(
+    publicNativePhase(developerCleanup, processResult, profile, 'deactivate', 'cleanup').passed,
+    false,
+  );
+  for (const phase of ['activate', 'offline']) {
+    const result = licenceWindowResult(phase);
+    assert.equal(publicNativePhase(result, processResult, profile, phase, 'test').passed, false);
+  }
+});
+
 test('cleanup never launches another copy when phase throws with an unclosed owned process', async () => {
   let calls = 0;
   const receipt = await retainedDeveloperSequence({
