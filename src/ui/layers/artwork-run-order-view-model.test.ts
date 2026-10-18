@@ -33,6 +33,30 @@ describe('artwork run order view model', () => {
     ]);
   });
 
+  it('numbers artwork that shares a name, in canvas order, so each run has its own name', () => {
+    const base = projectWithJobs('laser');
+    const [lid, tray] = base.scene.objects;
+    const unnamed = (object: SceneObject | undefined): SceneObject => {
+      if (object === undefined) throw new Error('fixture object missing');
+      return Object.fromEntries(
+        Object.entries(object).filter(([key]) => key !== 'name'),
+      ) as SceneObject;
+    };
+    const project: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        objects: [unnamed(lid), unnamed(tray)],
+        artworkOrder: ['pocket-object', 'profile-object'],
+      },
+    };
+
+    expect(artworkRunOrderRows(project).map((row) => [row.position, row.name])).toEqual([
+      [1, 'Rectangle (2)'],
+      [2, 'Rectangle (1)'],
+    ]);
+  });
+
   it('shows requested CNC positions alongside clearing-before-profile steps', () => {
     const project = projectWithJobs('cnc');
 

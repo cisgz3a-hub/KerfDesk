@@ -2,7 +2,6 @@ import { artworkRunUnits } from '../../core/artwork-run-units';
 import { compileCncJob } from '../../core/cnc';
 import { compileJob } from '../../core/job';
 import {
-  artworkOperationName,
   cutTypeLabel,
   DEFAULT_CNC_LAYER_SETTINGS,
   layerCncTool,
@@ -12,6 +11,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { artworkDisplayName, artworkDisplayNames } from './artwork-display-names';
 
 export type ArtworkRunOrderRowModel = {
   readonly key: string;
@@ -32,6 +32,7 @@ export function artworkRunOrderRows(project: Project): ReadonlyArray<ArtworkRunO
   const objectById = new Map(project.scene.objects.map((object) => [object.id, object]));
   const layerById = new Map(project.scene.layers.map((layer) => [layer.id, layer]));
   const effectiveSteps = effectiveStepsByObject(project);
+  const names = artworkDisplayNames(project.scene.objects);
   return artworkRunUnits(project.scene).map((unit, index) => {
     const objects = unit.objectIds.flatMap((id) => {
       const object = objectById.get(id);
@@ -41,10 +42,11 @@ export function artworkRunOrderRows(project: Project): ReadonlyArray<ArtworkRunO
       const layer = layerById.get(id);
       return layer === undefined ? [] : [layer];
     });
-    // A run is artwork, so it carries the artwork's name, the same name the
-    // Properties header and artwork picker show; operationSummary names the operation.
+    // A run is artwork, so it carries the artwork's name, numbered like the
+    // Properties header and artwork picker; operationSummary names the operation.
     const first = objects[0];
-    const name = first === undefined ? (layers[0]?.name ?? 'Artwork') : artworkOperationName(first);
+    const name =
+      first === undefined ? (layers[0]?.name ?? 'Artwork') : artworkDisplayName(names, first);
     return {
       key: unit.key,
       objectIds: unit.objectIds,

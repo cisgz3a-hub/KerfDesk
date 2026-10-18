@@ -45,8 +45,10 @@ A UI audit of the Artwork panel found:
 3. **A process warning appears under the Line / Fill / Image switch**, never above it, so the
    control the operator just clicked does not move. CNC's raster note keeps its place above the
    CNC fields.
-4. **The Artwork picker lists artwork names**, numbered when two share a name, the same names
-   the header shows.
+4. **The Artwork picker lists artwork names.** One shared helper (`artwork-display-names.ts`)
+   names each artwork, numbered in canvas order when several share a name ("Rectangle (2)"),
+   and the header, the picker and Run order all use it, so a number means the same artwork
+   everywhere.
 5. **The row ••• menu no longer repeats Show.** The row's eye owns visibility. It keeps one
    **Include in output** switch: the editor cannot reach an operation whose artwork is all
    locked, or one with no artwork, so the row is the only place that operation's output can be
@@ -74,8 +76,8 @@ A UI audit of the Artwork panel found:
   (first field at 320 px instead of 357 px at 1280 × 720). Power, Speed and Passes are visible
   without scrolling at 1280 × 720 and 1366 × 768. A longer scope line or mixed-settings note can
   still push them down; the panel scrolls as before.
-- Run order cards for unnamed shapes read "Rectangle"; the #N badge and the operation line tell
-  them apart, as the picker numbers them.
+- Run order cards for unnamed shapes read "Rectangle (1)", "Rectangle (2)", as the picker
+  numbers them, so each run's Select and Run position controls have their own accessible name.
 - Lessons and docs say Properties and Artwork panel.
 
 ### Verification
