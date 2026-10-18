@@ -28,7 +28,6 @@ import { findLicenceKey } from '../public/licence-key-text.mjs';
 import { manageLicenceDevices, type DeviceInput } from './licensing-devices.js';
 import { saveTrialClock, TrialSessionClock, withTrialBudget } from './licensing-trial-clock.js';
 import { PaidClockMark } from './licensing-paid-clock.js';
-import { licenceRefreshDue } from './licensing-schedule.js';
 import { clockErrorMessage, LicenceClockError } from './licensing-clock.js';
 import {
   activationBody,
@@ -42,6 +41,7 @@ import {
   type VerifiedGrant,
 } from './licensing-grant.js';
 import { deactivateDevice, resetSavedLicence } from './licensing-signout.js';
+import * as backgroundRefresh from './licensing-background-refresh.js';
 import type { DeactivationAccess } from './licensing-signout.js';
 export type { LicenceStatus } from './licensing-status.js';
 
@@ -185,6 +185,7 @@ class LicensingService {
     action: GrantAction,
     licenseKey?: string,
     onAccepted?: () => void,
+    reply?: backgroundRefresh.RefreshReply,
   ): Promise<LicenceStatus> => {
     if (this.config.channel !== 'commercial') return this.readStatus();
     const { saved, device } = await this.load();
@@ -203,7 +204,9 @@ class LicensingService {
     if (call === null) return current;
     let value: unknown;
     try {
-      value = await this.request(call.path, call.body);
+      value = await backgroundRefresh.readGrantReply(reply, () =>
+        this.request(call.path, call.body),
+      );
     } catch (error) {
       this.updateCache.failAuthentication();
       if (action === 'refresh' && error instanceof LicenceServiceError)
@@ -298,14 +301,19 @@ class LicensingService {
    * trial's clock mark on. Runs at launch and every 30 minutes while KerfDesk is
    * open; it never blocks or interrupts work.
    */
-  readonly refreshInBackground = () =>
-    this.safe(async () => {
-      if (this.config.channel !== 'commercial') return this.readStatus();
-      const { saved, device } = await this.load();
-      const current = this.evaluate(saved, device);
-      if (licenceRefreshDue(current, saved, this.now())) return this.acquire('refresh');
-      return current;
-    }, true);
+  readonly refreshInBackground = backgroundRefresh.createBackgroundLicenceRefresh({
+    config: () => this.config,
+    deviceName: () => this.options.deviceName,
+    load: this.load,
+    evaluate: this.evaluate,
+    safe: this.safe,
+    readStatus: this.readStatus,
+    now: this.now,
+    request: this.request,
+    apply: (reply) => this.acquire('refresh', undefined, undefined, reply),
+    mutation: (active) =>
+      active ? this.updateCache.beginMutation() : this.updateCache.endMutation(),
+  });
   readonly deactivate = () =>
     this.safe(async () => {
       if (this.config.channel !== 'commercial') return this.readStatus();
@@ -410,15 +418,7 @@ class LicensingService {
   private readonly manageDevices = (input: DeviceInput) =>
     this.serial(() => manageLicenceDevices(this.config, this.options.store, this.request, input));
   readonly isReleaseEligible = (releaseEnvelope: unknown, expectedVersion: string) =>
-    this.serial(async () => {
-      if (this.config.channel !== 'commercial') return false;
-      try {
-        await this.load();
-        return this.updateCache.eligible(releaseEnvelope, expectedVersion);
-      } catch {
-        return false;
-      }
-    });
+    this.serial(() => this.updateCache.readEligible(this.load, releaseEnvelope, expectedVersion));
   readonly isReleaseEligibleCached = (releaseEnvelope: unknown, expectedVersion: string): boolean =>
     this.updateCache.eligible(releaseEnvelope, expectedVersion);
   readonly isManualReleaseEligible = (envelope: string, version: string): Promise<boolean> =>

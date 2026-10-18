@@ -24,7 +24,8 @@ export type LicenceEntry = {
    * Watches one renderer request from its start: the status it is sent tells
    * the licence window's reads and admission apart from a reloaded renderer's (ADR-623).
    */
-  readonly observeRequest?: (() => (status: LicenceStatus) => void) | undefined;
+  readonly observeRequest?: (() => (status: LicenceStatus) => number | null) | undefined;
+  readonly admitWorkspace?: ((generation: number) => void) | undefined;
 };
 
 export function withLicensingRoutes(
@@ -40,6 +41,7 @@ export function withLicensingRoutes(
     if (!url.pathname.startsWith(PREFIX)) return fallback(request);
     if (!trustedAppRequest(request, url, 'X-KerfDesk-Licensing')) return missing();
     const action = url.pathname.slice(PREFIX.length);
+    if (action === 'workspace-admitted') return workspaceAdmissionRoute(request, entry);
     if (action === 'early-updates') return earlyUpdateRoute(request, earlyUpdates);
     if (
       [
@@ -53,8 +55,8 @@ export function withLicensingRoutes(
       return updateRoute(action, request, updates, requestUpdateClose);
     const observe = entry.observeRequest?.();
     const sent = (status: LicenceStatus): Response => {
-      observe?.(status);
-      return response(status);
+      const generation = observe?.(status);
+      return response(generation == null ? status : { ...status, admissionGeneration: generation });
     };
     if (action === 'status' && request.method === 'GET') return sent(await runtime.status());
     if (ENTRY_ACTIONS.has(action)) return entryRoute(action as EntryAction, request, entry);
@@ -63,6 +65,20 @@ export function withLicensingRoutes(
     if (!record(body)) return response({ error: 'invalid_request' }, 400);
     return dispatch(action, body, runtime, sent);
   };
+}
+
+async function workspaceAdmissionRoute(request: Request, entry: LicenceEntry): Promise<Response> {
+  if (!jsonPost(request) || entry.admitWorkspace === undefined) return missing();
+  const body = await readBody(request);
+  if (
+    !record(body) ||
+    Object.keys(body).length !== 1 ||
+    !Number.isSafeInteger(body.generation) ||
+    Number(body.generation) < 0
+  )
+    return response({ error: 'invalid_request' }, 400);
+  entry.admitWorkspace(Number(body.generation));
+  return response({ ok: true });
 }
 
 function jsonPost(request: Request): boolean {

@@ -78,6 +78,27 @@ function button(text: string): HTMLButtonElement {
 }
 const licenceWindow = () =>
   document.querySelector<HTMLElement>('[role="dialog"][aria-label="Activate KerfDesk"]');
+it.each([0, 10_000])(
+  'acknowledges services only after a normalized trial admits the workspace (budget %s)',
+  async (budget) => {
+    const workspaceAdmitted = vi.fn(async () => {
+      expect(host.querySelector('[data-workspace]')).not.toBeNull();
+    });
+    const api = {
+      ...client({ ...trial, trialExpiresInMs: budget, admissionGeneration: 7 }),
+      workspaceAdmitted,
+    };
+    await act(async () =>
+      root.render(
+        <EditionProvider client={api}>
+          <div data-workspace />
+        </EditionProvider>,
+      ),
+    );
+    expect(workspaceAdmitted).toHaveBeenCalledTimes(budget === 0 ? 0 : 1);
+    if (budget === 0) expect(licenceWindow()).not.toBeNull();
+  },
+);
 it('opens a commercial build behind the licence window until a trial starts', async () => {
   const api = client();
   const mounted = vi.fn();

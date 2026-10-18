@@ -127,6 +127,7 @@ export function createDesktopLicensing(options: Options) {
   const entry = {
     ...licenceEntry(config, desktopLicenceLink(config, options.packaged), options),
     observeRequest: signals.observeRequest,
+    admitWorkspace: signals.admitWorkspace,
   };
   const rings = createUpdateRingStore(options.userDataPath);
   const { manual, installer } = manualUpdateChecks(config, options, runtime);

@@ -13,12 +13,14 @@ async function settled(promise: Promise<void>): Promise<boolean> {
 afterEach(() => vi.useRealTimers());
 
 describe('startup signals for the licence window (ADR-623)', () => {
-  it('admits once the renderer is sent Pro, and re-gates each opening renderer', () => {
+  it('admits only after the mounted renderer acknowledges, and re-gates each opening', () => {
     const signals = createStartupSignals(false);
     const seen: boolean[] = [];
     signals.admission.onChange((admitted) => seen.push(admitted));
     signals.observeRequest()({ edition: 'free' });
-    signals.observeRequest()({ edition: 'pro' });
+    const generation = signals.observeRequest()({ edition: 'pro' });
+    expect(seen).toEqual([false]);
+    signals.admitWorkspace(generation!);
     signals.observeRequest()({ edition: 'pro' });
     // A reopened macOS window, or a reload, opens behind the window again.
     signals.admission.rendererOpening();
@@ -33,8 +35,9 @@ describe('startup signals for the licence window (ADR-623)', () => {
     const staleRequest = signals.observeRequest();
     signals.admission.rendererOpening();
     staleRequest({ edition: 'pro' });
+    signals.admitWorkspace(0);
     expect(seen).toEqual([false]);
-    signals.observeRequest()({ edition: 'pro' });
+    signals.admitWorkspace(signals.observeRequest()({ edition: 'pro' })!);
     expect(seen).toEqual([false, true]);
   });
 
@@ -43,7 +46,7 @@ describe('startup signals for the licence window (ADR-623)', () => {
     const seen: boolean[] = [];
     signals.admission.onChange((admitted) => seen.push(admitted));
     const inFlight = signals.observeRequest();
-    signals.observeRequest()({ edition: 'pro' });
+    signals.admitWorkspace(signals.observeRequest()({ edition: 'pro' })!);
     signals.admission.rendererGone();
     // A reply to the dead renderer cannot restart anything.
     inFlight({ edition: 'pro' });

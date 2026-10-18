@@ -84,7 +84,7 @@ function LicensedEdition({
   // A desktop build without commercial metadata cannot take a licence.
   const freeBuild = unlicensedRunsFree && channel === 'free';
   // Until the first status, the build's channel is unknown, so nothing mounts.
-  const gated = !useSessionAdmission(session.status) && channel !== 'free';
+  const gated = !useSessionAdmission(session.status, client) && channel !== 'free';
   const { load, isPro } = session;
   const { showAll } = desktop;
   const { managing, closeManager } = useLicenceManager(
@@ -178,9 +178,18 @@ function PendingProDialog({
  * in until KerfDesk closes: a licence change never unmounts a running job or an
  * open project (ADR-623).
  */
-function useSessionAdmission(status: LicenceStatus | null): boolean {
+function useSessionAdmission(status: LicenceStatus | null, client: LicenceAdapter): boolean {
   const [admitted, setAdmitted] = useState(false);
+  const acknowledged = useRef<number | null>(null);
   if (!admitted && status?.edition === 'pro') setAdmitted(true);
+  useEffect(() => {
+    const generation = status?.admissionGeneration;
+    if (!admitted || generation === undefined || acknowledged.current === generation) return;
+    acknowledged.current = generation;
+    void client.workspaceAdmitted?.(generation).catch(() => {
+      acknowledged.current = null;
+    });
+  }, [admitted, client, status]);
   return admitted || status?.edition === 'pro';
 }
 
