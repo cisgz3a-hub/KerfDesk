@@ -125,6 +125,7 @@ describe('explicit machine-control pairing permission', () => {
       .find((label) => label.textContent?.includes('Allow Connect, Home, Jog'))
       ?.querySelector<HTMLInputElement>('input');
     expect(control).toBeDefined();
+    expect(host.textContent).toContain('still photos from this computer’s live camera');
     await act(async () => control?.click());
     await clickApprove(host);
     const body = JSON.parse(fetcher.mock.calls[0]?.[1]?.body as string) as Record<string, unknown>;
@@ -147,6 +148,8 @@ describe('explicit machine-control pairing permission', () => {
   it('does not offer machine control to an existing read/edit request', async () => {
     const host = await renderRequest(['read', 'edit']);
     expect(host.textContent).not.toContain('Allow Connect, Home, Jog');
+    expect(host.textContent).not.toContain('camera');
+    expect(host.textContent).toContain('save over this project’s file');
     expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
   });
 

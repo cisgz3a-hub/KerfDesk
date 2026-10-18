@@ -39,7 +39,7 @@ export function ArtworkSharingConsent(): JSX.Element {
       <label style={settingsRowStyle}>
         <input
           type="checkbox"
-          title="Allow approved connections to receive artwork previews and existing text."
+          title="Allow approved connections to receive artwork previews, existing text and, with machine control, camera stills."
           checked={sharing}
           disabled={!available}
           onChange={(event) => {
@@ -50,8 +50,10 @@ export function ArtworkSharingConsent(): JSX.Element {
       </label>
       <p style={remoteNoteStyle}>
         This is off by default. Turning it on lets approved connections see your artwork and read
-        its text. An MCP app can send this content to its AI provider. Turn it off to stop sharing
-        future previews and text; it cannot erase content already received by a client.
+        its text. Connections approved for machine control can also take still photos from this
+        computer’s camera while it is live. An MCP app can send this content to its AI provider.
+        Turn it off to stop sharing future previews, text and photos; it cannot erase content
+        already received by a client.
       </p>
       {failed ? <p role="alert">Artwork sharing could not be saved and is off.</p> : null}
     </section>
@@ -75,9 +77,11 @@ function RemoteConsent(): JSX.Element {
       </p>
       <p style={remoteNoteStyle}>
         Viewing shows workspace summaries, machine limits, recipes and job review. Editing lets an
-        approved connection change artwork, layers and operation settings. Separately approving
-        machine control enables Connect, Home, Jog, Frame, Start, Pause and Abort from that
-        connection. Phones open KerfDesk Remote, which can be added to the home screen.
+        approved connection add, change and delete artwork, layers and operation settings, import
+        designs, and save over the open project’s file. Separately approving machine control enables
+        Connect, Home, Set origin, Jog, Frame, Start, Pause, Resume and Abort from that connection,
+        plus camera stills while artwork sharing is on. Phones open KerfDesk Remote, which can be
+        added to the home screen.
       </p>
       <p style={remoteNoteStyle}>
         Requests and these summaries pass through KerfDesk’s Cloudflare service. An MCP client may

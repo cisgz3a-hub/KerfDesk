@@ -14,8 +14,8 @@ a mutation that already committed. A retry after a timeout must retain the
 same UUID `requestId` until its outcome is known.
 
 Every artwork write requires `expectedRevision` (1–200 characters) and a UUID
-`requestId`. Machine actions use the same revision fence except Abort, which
-must remain reachable after an artwork change. IDs are 1–128 characters; arrays are bounded to 200 entries.
+`requestId`. Machine actions use the same revision fence except Abort, Pause and
+Resume, which must remain reachable after an artwork change. IDs are 1–128 characters; arrays are bounded to 200 entries.
 Objects reject unrecognised fields, including nested transform/operation
 fields. All numbers must be finite. Coordinates are ±100000 mm, positive
 dimensions at most 100000 mm and positive font sizes at most 1000 mm.
@@ -123,7 +123,7 @@ design coordinates; review bounds use output coordinates. Compilation
 readiness and spatial Frame completion are independent facts. No review read
 approves, Frames, starts or dispatches output.
 
-The static `ui://kerfdesk/workspace/v4.html` resource uses
+The static `ui://kerfdesk/workspace/v6.html` resource uses
 `text/html;profile=mcp-app`. Preview and machine tools advertise
 `_meta.ui.resourceUri`; enclosing OAuth metadata is retained. Design, Machine
 and Settings separate the preview, controls and connection options. Visible
@@ -154,8 +154,8 @@ status, connection or purchase object.
 
 Backend failures may throw `KerfDeskMcpError` or an object with one of
 `unavailable`, `stale_revision`, `needs_pro`, `unsupported_operation`,
-`invalid_input`, `cancelled` or `failed`. Only a fixed code/message pair is
-returned. Exception messages, stacks and validation input values are excluded.
+`invalid_input`, `cancelled`, `control_limit` or `failed`. Only a fixed
+code/message pair is returned. Exception messages, stacks and validation input values are excluded.
 Licence keys, payment records, device identities, native paths, serial ports
 and camera credentials have no output fields. User-authored artwork labels and
 recipe notes remain untrusted content for clients to interpret.
@@ -165,11 +165,14 @@ advertise non-idempotence; transforms and operation edits can modify existing
 data. Annotations are client hints, never authorisation. This factory performs
 no authentication and binds no network listener. The enclosing connection must
 authenticate and scope the backend to the chosen paired desktop, with bounded
-request bodies, before dispatch. It exposes no shell, file access, raw G-code,
-arbitrary laser firing, homing or machine connection controls. Jog, Frame,
-review, Start and Abort require separate `control` approval and current bounded
-grant lifetime, independent of artwork editing (ADR-569). A completed Frame
-for unchanged placement remains the sole ordinary Start policy gate. The
+request bodies, before dispatch. It exposes no shell, file browsing or native
+paths, raw G-code, arbitrary laser firing or port selection. The machine
+actions (connect, disconnect, Home, work origin, Jog, Frame, review, Start,
+Pause, Resume and Abort) and `get_camera_snapshot` require separate `control`
+approval and current bounded grant lifetime, independent of artwork editing
+(ADR-569); `mcpCommandScope` in `input-schemas.ts` is the classification.
+`get_camera_snapshot` also needs the desktop artwork-sharing opt-in and a
+camera already live on the PC. A completed Frame for unchanged placement remains the sole ordinary Start policy gate. The
 existing exact-program Job Review and licence policy remain authoritative.
 
 Machine action receipts distinguish admission, preparation, review, handoff,
