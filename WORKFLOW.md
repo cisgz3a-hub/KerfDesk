@@ -2684,6 +2684,13 @@ authorization, Frame proof, controller command, or safety boundary.
    Escape with nothing selected, or **Close without saving**, closes at once when
    nothing changed; otherwise it asks **Save jig changes?** with **Save to canvas**,
    **Discard changes** and **Keep editing**. Discarding leaves the main canvas unchanged.
+   On the jig canvas, drag a selection to move it. Drag a corner handle to resize it
+   proportionally (Shift resizes freely), an edge handle to stretch one side, or the
+   round handle above it to rotate it about its centre (Shift snaps to 15°). Each drag
+   is one undoable draft edit. Drag on empty canvas to box-select: left to right selects
+   what the box encloses, right to left what it touches. Shift-drag or Shift-click adds
+   to the selection, and Ctrl+A selects all the artwork (not the outlines) unless a field
+   has focus. Locked or hidden objects, including locked outlines, are never selected.
 2. In **Jig layout**, choose Rectangle or Circle, enter the outline size, then enter
    rows, columns, and horizontal/vertical spacing. Apply the layout before saving;
    until then the tab reads **Jig layout •**. A 1 x 5 grid creates five independently
@@ -2696,7 +2703,8 @@ authorization, Frame proof, controller command, or safety boundary.
    image** and use the existing tracers directly in the editor. Imported and traced
    artwork fits inside the outline it was dropped on, else the selected outline, else
    the outline holding the selected artwork, else the first outline. Several files at
-   once fill consecutive outlines in grid order from there.
+   once fill consecutive outlines in grid order from there. While files are dragged
+   over the canvas, the outline that would receive them is highlighted.
    **Line / Fill settings** controls the selected artwork's operation, power, speed and
    passes; Fill also exposes line interval, scan angle, fill style and cross-hatch.
    Use Line for open traced paths. These edits remain in the draft until saved.
