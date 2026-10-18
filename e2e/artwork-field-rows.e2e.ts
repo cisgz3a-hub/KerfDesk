@@ -157,11 +157,14 @@ test('Image dither swatches fit and stay keyboard-operable at every panel width'
         outside: tiles.filter(
           (tile) => tile.left < bounds.left - 1 || tile.right > bounds.right + 1,
         ).length,
+        rows: new Set(tiles.map((tile) => Math.round(tile.top))).size,
         thumbnails,
       };
     });
     expect(layout.outside).toBe(0);
-    expect(layout.thumbnails).toEqual(Array.from({ length: 11 }, () => 48));
+    // Three swatches a row even at 240 px keeps the picker to four rows.
+    expect(layout.rows).toBeLessThanOrEqual(4);
+    expect(layout.thumbnails).toEqual(Array.from({ length: 11 }, () => 44));
   }
 
   const grayscale = dither.getByRole('radio', { name: 'Grayscale', exact: true });

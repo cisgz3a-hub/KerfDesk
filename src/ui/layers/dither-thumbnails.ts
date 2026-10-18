@@ -6,8 +6,8 @@
 import { dither } from '../../core/raster';
 import type { DitherAlgorithm } from '../../core/scene';
 
-export const DITHER_THUMBNAIL_COLUMNS = 24;
-export const DITHER_THUMBNAIL_ROWS = 12;
+export const DITHER_THUMBNAIL_COLUMNS = 22;
+export const DITHER_THUMBNAIL_ROWS = 11;
 
 const S_MAX = 255;
 

@@ -11,8 +11,8 @@
 
 .lf-dither-swatches {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 3px;
   min-width: 0;
 }
 
