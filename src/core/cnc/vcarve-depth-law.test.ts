@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pointInPolygon } from '../geometry/point-in-polygon';
 import { normalizeClosedPolylinesEvenOddChecked } from '../geometry/polygon-difference';
 import type { CncTool, Polyline, Vec2 } from '../scene';
 import { conicalRadialEnvelope, radialEnvelopeDepthMm } from './radial-envelope';
@@ -166,13 +167,15 @@ function auditDepthLaw(shape: ReadonlyArray<Polyline>, options: VCarveOptions): 
   let worstOverDepthMm = Number.NEGATIVE_INFINITY;
   let deepestMm = 0;
   for (const pass of plan.passes) {
-    if (pass.kind !== 'path3d') continue;
+    if (pass.kind !== 'path3d') throw new Error(`Unaudited V-carve pass kind: ${pass.kind}`);
     for (const point of pass.points) {
       points += 1;
-      const allowedMm = Math.min(
-        options.maxDepthMm,
-        radialEnvelopeDepthMm(envelope, nearestBoundaryDistance(point, boundary)),
+      const distance = nearestBoundaryDistance(point, boundary);
+      const inside = boundary.filter((loop) => pointInPolygon(point, loop.points)).length % 2 === 1;
+      expect(inside || distance <= MAX_OVER_DEPTH_MM, 'V-carve point is outside the region').toBe(
+        true,
       );
+      const allowedMm = Math.min(options.maxDepthMm, radialEnvelopeDepthMm(envelope, distance));
       worstOverDepthMm = Math.max(worstOverDepthMm, -point.z - allowedMm);
       deepestMm = Math.max(deepestMm, -point.z);
     }

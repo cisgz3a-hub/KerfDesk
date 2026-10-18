@@ -172,6 +172,10 @@ describe('planHelicalPocketPasses', () => {
         minDiameterMm: 2,
         angleDeg: 0.2,
       }),
-    ).toMatchObject({ ok: false, reason: 'Helix entry angle must be at least 0.5 degrees.' });
+    ).toMatchObject({
+      ok: false,
+      reason: 'Helix entry angle must be at least 0.5 degrees. This pocket uses plunge entry.',
+      fallback: 'plunge',
+    });
   });
 });

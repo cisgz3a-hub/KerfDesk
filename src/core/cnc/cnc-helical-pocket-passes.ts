@@ -14,7 +14,7 @@ export function helicalPocketPassesBySourceRegion(
   const passes: CncPass[] = [];
   for (const bucket of sourceRegionToolpathBuckets(sourceContours, toolpaths)) {
     const plan = planHelicalPocketPasses(bucket, depths, settings.helixEntry);
-    if (!plan.ok) return [];
+    if (!plan.ok) return plan.fallback === 'plunge' ? null : [];
     passes.push(...plan.passes);
   }
   return passes;
