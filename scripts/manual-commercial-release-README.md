@@ -123,20 +123,33 @@ from a different run, source or installer. Do not fabricate a success receipt
 for evidence that has expired or checks that did not run.
 
 For the separate signed-beta train, a missing authenticated observation holds
-automatic promotion. An authorised operator can record current public
-availability with `node scripts/release-train.mjs observe --version=<X.Y.Z>
---expected-catalog-sha256=<64-hex>`, using the existing protected signing and
-storage configuration. This observes the exact newest beta and starts its
-waiting period now; it does not publish or promote the release, change its
-licence date, or accept `--now`. Keep all release enablement variables off until
-the fixes and the intended publication are approved.
+automatic promotion. An authorised operator can run **Release train** on `main`
+with `action=observe`, the exact `version` and the reviewed
+`beta_catalog_sha256`. This manual-only job uses the existing protected
+`desktop-commercial` signing and storage configuration and the shared
+publication lock. It requires the train enablement switch and canonical
+repository; schedules never select it. It calls the existing authenticated
+`release-train.mjs observe` command without exporting protected credentials.
+This observes the exact newest beta and starts its waiting period now; it does
+not build, publish or promote the release, change its licence date, or accept
+`--now`. Keep all release enablement variables off until the fixes and the
+intended provider action are approved.
 ## macOS and Linux (ADR-613)
 
 The same workflow publishes the commercial Mac and Linux builds of each Windows release, under the same version, once Windows is published. Each system is off until its repository variable is `on`: `KERFDESK_UNSIGNED_MACOS_RELEASES` (Apple silicon and Intel DMGs) and `KERFDESK_UNSIGNED_LINUX_RELEASES` (x64 `.deb` and AppImage). The Windows documents above, and their single writer, are unchanged: installed Windows copies never see a Mac or Linux file.
 
 The ADR-616 public-delivery verifier and signed success receipt above cover Windows and Preview only. The commercial Mac/Linux jobs currently prove package qualification and authenticated R2 readback, retain native artifacts for seven days, and do not yet prove public CDN/page delivery or retain a durable success receipt. Windows success must not depend on an absent platform feed. Keep the separate platform switches disabled until their publication and qualification are explicitly authorised.
 
-The build jobs hold no secret. The Windows job hands them its public signed release identity; `scripts/build-commercial-platform.sh` prepares from it (`prepare-commercial-desktop.mjs --release-identity`), packages, and qualifies the package (contract, fuses, launch, import and save; ASAR tamper refusal on macOS; `.deb` install and AppImage launch on Ubuntu 24.04). The publish jobs, in the `desktop-commercial` environment, accept only the files whose SHA-256 their build jobs reported and run:
+The build jobs hold no secret. Immediately after confirmed Windows publication,
+the workflow captures the public signed identity before public delivery and
+receipt checks. Enabled companion jobs can use that confirmed identity even if a
+later Windows audit step fails; cancellation, absent identity and failed or
+skipped companion builds still prevent their publication. Windows audit or
+receipt failure remains a failed workflow and requires the recovery above. This
+handoff does not rebuild or republish Windows. It prevents later audit failures
+from discarding a confirmed handoff; it does not repair historical runs or a
+cancellation between publication and handoff. The Windows job hands the
+companion jobs its public signed release identity; `scripts/build-commercial-platform.sh` prepares from it (`prepare-commercial-desktop.mjs --release-identity`), packages, and qualifies the package (contract, fuses, launch, import and save; ASAR tamper refusal on macOS; `.deb` install and AppImage launch on Ubuntu 24.04). The publish jobs, in the `desktop-commercial` environment, accept only the files whose SHA-256 their build jobs reported and run:
 
 ```text
 node scripts/publish-platform-commercial-release.mjs --platform <macos|linux> --sha256 <file>=<64-hex> [...] <release-directory> <commercial-release-identity.json>

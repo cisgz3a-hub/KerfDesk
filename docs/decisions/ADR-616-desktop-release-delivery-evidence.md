@@ -39,13 +39,21 @@ through the public download domain.
   original observation. Explicit `release-train observe` recovery starts the
   clock when the operator actually observes publication; it cannot backdate
   evidence. Release identity dates and licence eligibility do not change.
-  Deliberate manual promotion retains its existing timer override.
+  Deliberate manual promotion retains its existing timer override. Expose
+  recovery as an explicit `action=observe` workflow dispatch with exact version
+  and reviewed beta catalogue digest. Require the train switch, canonical
+  repository, `main`, protected environment and shared publication lock. No
+  schedule selects recovery; protected credentials remain in the workflow.
 
 Publication can succeed before a later delivery/evidence step fails. That run
 must report failure without rolling back immutable objects or pretending the
 customer pointer was unchanged. Recovery requires reviewing the actual
 publication and retained evidence; duplicate-source planning does not rerun
-post-publication checks automatically.
+post-publication checks automatically. Capture the authenticated Windows
+release identity immediately after confirmed publication so enabled companion
+platforms retain a handoff even when a later Windows delivery or receipt audit
+fails. Such an audit still fails the run. Cancellation, missing handoff or
+failed/skipped companion builds cannot authorise companion publication.
 
 The Preview feed must be created by an approved current Preview publication.
 Do not fall back to GitHub downloads, invent a feed, or relax signature checks.

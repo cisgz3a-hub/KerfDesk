@@ -31,6 +31,16 @@ type Workflow = {
     readonly workflow_dispatch: {
       readonly inputs: {
         readonly action: { readonly options: readonly string[]; readonly default: string };
+        readonly version: {
+          readonly type: string;
+          readonly required: boolean;
+          readonly default: string;
+        };
+        readonly beta_catalog_sha256: {
+          readonly type: string;
+          readonly required: boolean;
+          readonly default: string;
+        };
       };
     };
   };
@@ -99,6 +109,7 @@ describe('Release train workflow gate (ADR-541)', () => {
       'status',
       'cut',
       'promote',
+      'observe',
     ]);
     expect(workflow.on.workflow_dispatch.inputs.action.default).toBe('status');
     expect(jobs.decide?.if).toContain(`github.event.schedule == '${CUT_CRON}'`);
@@ -109,8 +120,58 @@ describe('Release train workflow gate (ADR-541)', () => {
       expect(jobs[name]?.if).toContain("github.ref == 'refs/heads/main'");
   });
 
+  it('recovers only an explicitly reviewed beta through the protected manual route', () => {
+    const inputs = workflow.on.workflow_dispatch.inputs;
+    for (const input of [inputs.version, inputs.beta_catalog_sha256]) {
+      expect(input).toMatchObject({ type: 'string', required: false, default: '' });
+    }
+    expect(Object.keys(inputs)).toEqual(['action', 'version', 'beta_catalog_sha256']);
+    const observe = jobs.observe!;
+    expect(observe).toBeDefined();
+    // These conjuncts exclude schedules, other actions, forks, branch dispatches
+    // and disabled trains. Recovery never starts the cut or promotion jobs.
+    expect(observe.if).toBe(
+      `${TRAIN_ON} && github.repository == 'cisgz3a-hub/KerfDesk' && ` +
+        "github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && " +
+        "inputs.action == 'observe'",
+    );
+    expect(needsOf(observe)).toEqual([]);
+    expect(observe.environment).toBe('desktop-commercial');
+    expect(observe.permissions).toEqual({ contents: 'read' });
+    expect(observe.steps?.[0]?.with).toEqual({
+      ref: '${{ github.sha }}',
+      'persist-credentials': false,
+    });
+    const steps = observe.steps ?? [];
+    const recovery = steps.find((step) =>
+      (step.run ?? '').includes('node scripts/release-train.mjs observe'),
+    );
+    expect(recovery?.run).toBe(
+      'node scripts/release-train.mjs observe ' +
+        '--version="${VERSION}" --expected-catalog-sha256="${BETA_CATALOG_SHA256}" ' +
+        '--summary="${GITHUB_STEP_SUMMARY}"',
+    );
+    expect(recovery?.env).toEqual({
+      VERSION: '${{ inputs.version }}',
+      BETA_CATALOG_SHA256: '${{ inputs.beta_catalog_sha256 }}',
+      DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: '${{ secrets.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY }}',
+      DESKTOP_STABLE_MANIFEST_KEY_ID: '${{ vars.DESKTOP_STABLE_MANIFEST_KEY_ID }}',
+      COMMERCIAL_R2_API_TOKEN: '${{ secrets.COMMERCIAL_R2_API_TOKEN }}',
+      COMMERCIAL_CLOUDFLARE_ACCOUNT_ID: '${{ secrets.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID }}',
+    });
+    expect(steps.filter((step) => step.run).map((step) => step.run)).toEqual([
+      'pnpm install --frozen-lockfile',
+      recovery?.run,
+    ]);
+    for (const step of steps) expect(step.run ?? '').not.toContain('${{ inputs.');
+    for (const [name, job] of Object.entries(jobs).filter(([name]) => name !== 'observe')) {
+      expect(job.if ?? '', name).not.toContain("inputs.action == 'observe'");
+      expect(needsOf(job), name).not.toContain('observe');
+    }
+  });
+
   it('decides on Linux and starts paid runners only when a release is due', () => {
-    for (const name of ['off', 'decide', 'preflight', 'promote', 'status'])
+    for (const name of ['off', 'decide', 'preflight', 'promote', 'status', 'observe'])
       expect(jobs[name]?.['runs-on'], name).toBe('ubuntu-latest');
     expect(Object.values(jobs).filter((job) => job['runs-on'] === 'windows-latest')).toEqual([
       jobs.build,
@@ -219,7 +280,7 @@ describe('Release train workflow gate (ADR-541)', () => {
     expect(workflow.concurrency.group).toBe(
       `release-train-\${{ inputs.action || (github.event.schedule == '${CUT_CRON}' && 'cut') || 'promote' }}`,
     );
-    for (const name of ['build', 'promote'])
+    for (const name of ['build', 'promote', 'observe'])
       expect(jobs[name]?.concurrency, name).toEqual({
         group: 'kerfdesk-commercial-publication',
         'cancel-in-progress': false,
@@ -232,7 +293,7 @@ describe('Release train workflow gate (ADR-541)', () => {
       for (const [scope, access] of Object.entries(job.permissions ?? {}))
         expect(`${name} ${scope} ${access}`).toMatch(/ read$/u);
       const usesSecrets = stepText(job).includes('secrets.');
-      expect(usesSecrets, name).toBe(['preflight', 'build', 'promote'].includes(name));
+      expect(usesSecrets, name).toBe(['preflight', 'build', 'promote', 'observe'].includes(name));
       if (usesSecrets) expect(job.environment, name).toBe('desktop-commercial');
     }
     // Secrets reach commands only through step environments, never inline.

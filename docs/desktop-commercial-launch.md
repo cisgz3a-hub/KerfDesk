@@ -212,9 +212,10 @@ Once on, it works like this:
   and macOS package checks on that commit, then builds, signs and publishes it to the
   beta ring as `<ISO week-year>.<ISO week>.<patch>`, for example `2026.40.0`. A week
   with nothing user-facing builds nothing and uses only Linux minutes.
-- **Every day, 09:43 UTC.** Once the newest beta has stayed the newest for 4 days,
-  and nothing holds it, it reaches everyone: the stable ring and the download page.
-  A Tuesday beta is promoted from Saturday.
+- **Every day, 09:43 UTC.** Once the newest beta has had 4 quiet days since its
+  authenticated public observation, and nothing holds it, it reaches everyone:
+  the stable ring and the download page. Missing or invalid observation evidence
+  holds promotion. A beta observed on Tuesday can be promoted from Saturday.
 - It never tags, pushes or uploads to GitHub. Customers download only from
   `dl.kerfdesk.com`, and licensed devices still install updates only when they quit.
 
@@ -271,7 +272,7 @@ Linux job, not a Windows build.
   Promotion waits while either holds.
 - Closing the last labelled issue, or removing the variable, releases the hold. The
   next daily run promotes the beta if it is still the newest and has had its 4
-  quiet days.
+  quiet days since authenticated public observation.
 - A published beta cannot be withdrawn: its files are immutable, and beta devices
   may already have installed it. Fix forward: merge the fix, then run the workflow
   with `cut` rather than waiting for Tuesday. The new beta replaces the held one,
@@ -285,6 +286,13 @@ In Actions > Release train > Run workflow, on `main`:
   secrets.
 - `cut` makes the Tuesday decision now, and builds only if a beta is due.
 - `promote` makes the daily decision now; the quiet days and holds still apply.
+- `observe` repairs a missing beta-observation receipt after an interrupted
+  publication. Supply the exact `version` and the reviewed
+  `beta_catalog_sha256`. Only an explicit dispatch on `main` in the canonical
+  repository with the train enabled can enter this protected
+  `desktop-commercial` job. It shares the publication lock, verifies current
+  public availability, preserves an existing observation and cannot backdate
+  one. It does not build, publish or promote a release.
 
 To put one release on the stable ring at once, for example an urgent fix, run
 `node scripts/promote-commercial-release.mjs --expected-catalog-sha256 <sha256> <version>`

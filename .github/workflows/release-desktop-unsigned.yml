@@ -231,6 +231,7 @@ jobs:
         if: steps.plan.outputs.publish == 'true'
         run: node --input-type=module -e "const { chromium } = await import('@playwright/test'); const browser = await chromium.launch({ channel:'chrome', headless:true, timeout:30000 }); await browser.close();"
       - name: Publish immutable installer, verified history and notification manifest
+        id: publish-windows
         if: steps.plan.outputs.publish == 'true'
         env:
           DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: ${{ secrets.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY }}
@@ -254,6 +255,18 @@ jobs:
             --expected-latest-sha256 $env:EXPECTED_LATEST_SHA256 $release $identity "$release/win-unpacked/resources"
           if ($LASTEXITCODE -ne 0) { throw 'Unsigned publication was not confirmed.' }
           "Published Windows $env:RELEASE_VERSION with verified download history. Installed apps check at startup and every 30 minutes; download and installation require user choices." >> $env:GITHUB_STEP_SUMMARY
+      - name: Hand the published release identity to the macOS and Linux builds
+        id: share
+        if: steps.plan.outputs.publish == 'true' && steps.publish-windows.outcome == 'success'
+        shell: pwsh
+        run: |
+          # Capture confirmed publication before the later delivery/receipt checks.
+          # Their failure still fails the Windows job, but cannot undo this release.
+          # Public signed data, embedded in every installer; the key stays here.
+          $identity = Join-Path $env:RUNNER_TEMP 'commercial-preparation/commercial-release-identity.json'
+          $encoded = [Convert]::ToBase64String([IO.File]::ReadAllBytes($identity))
+          "identity=$encoded" >> $env:GITHUB_OUTPUT
+          'published=true' >> $env:GITHUB_OUTPUT
       - name: Verify customer delivery through the public CDN and download page
         if: steps.plan.outputs.publish == 'true'
         env:
@@ -303,16 +316,6 @@ jobs:
             ${{ runner.temp }}/commercial-preparation/commercial-release-identity.json
           retention-days: 90
           if-no-files-found: error
-      - name: Hand the published release identity to the macOS and Linux builds
-        id: share
-        if: steps.plan.outputs.publish == 'true'
-        shell: pwsh
-        run: |
-          # Public signed data, embedded in every installer; the key stays here.
-          $identity = Join-Path $env:RUNNER_TEMP 'commercial-preparation/commercial-release-identity.json'
-          $encoded = [Convert]::ToBase64String([IO.File]::ReadAllBytes($identity))
-          "identity=$encoded" >> $env:GITHUB_OUTPUT
-          'published=true' >> $env:GITHUB_OUTPUT
       - name: Preserve a failed release for inspection
         if: failure() && steps.plan.outputs.publish == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -330,9 +333,14 @@ jobs:
   # is off until its repository variable is `on`. The build jobs hold no
   # secret: they reuse the identity the Windows job signed. A failure here never
   # changes the Windows release; re-running the failed jobs repeats this version.
+  # Explicit status checks let a confirmed Windows publication hand off even if
+  # its subsequent public-delivery check or success-receipt upload fails.
+  # Those checks still fail the workflow; cancellation still stops companion work.
   build-macos-arm64:
     needs: publish
-    if: needs.publish.outputs.published == 'true' && vars.KERFDESK_UNSIGNED_MACOS_RELEASES == 'on'
+    if: >-
+      !cancelled() && needs.publish.outputs.published == 'true' &&
+      vars.KERFDESK_UNSIGNED_MACOS_RELEASES == 'on'
     runs-on: macos-15
     timeout-minutes: 60
     outputs:
@@ -393,7 +401,9 @@ jobs:
 
   build-macos-x64:
     needs: publish
-    if: needs.publish.outputs.published == 'true' && vars.KERFDESK_UNSIGNED_MACOS_RELEASES == 'on'
+    if: >-
+      !cancelled() && needs.publish.outputs.published == 'true' &&
+      vars.KERFDESK_UNSIGNED_MACOS_RELEASES == 'on'
     runs-on: macos-15-intel
     timeout-minutes: 60
     outputs:
@@ -402,7 +412,9 @@ jobs:
 
   build-linux:
     needs: publish
-    if: needs.publish.outputs.published == 'true' && vars.KERFDESK_UNSIGNED_LINUX_RELEASES == 'on'
+    if: >-
+      !cancelled() && needs.publish.outputs.published == 'true' &&
+      vars.KERFDESK_UNSIGNED_LINUX_RELEASES == 'on'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     outputs:
@@ -411,6 +423,10 @@ jobs:
 
   publish-macos:
     needs: [publish, build-macos-arm64, build-macos-x64]
+    if: >-
+      !cancelled() && needs.publish.outputs.published == 'true' &&
+      vars.KERFDESK_UNSIGNED_MACOS_RELEASES == 'on' &&
+      needs.build-macos-arm64.result == 'success' && needs.build-macos-x64.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: desktop-commercial
@@ -456,6 +472,9 @@ jobs:
 
   publish-linux:
     needs: [publish, build-linux]
+    if: >-
+      !cancelled() && needs.publish.outputs.published == 'true' &&
+      vars.KERFDESK_UNSIGNED_LINUX_RELEASES == 'on' && needs.build-linux.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: desktop-commercial
