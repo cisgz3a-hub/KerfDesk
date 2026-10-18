@@ -40,9 +40,19 @@ test('accepts an observed available manual update without treating it as downloa
   assert.throws(() => validateNativeSmokeResult(result, userData), /local licensing status/);
 });
 
+/** A fresh commercial build settles behind its licence window, with no workspace (ADR-623). */
+function licenceWindowResult(userData) {
+  const result = validResult(userData);
+  const renderer = { ...result.renderer, licenceWindow: true, imported: false, saved: false };
+  delete renderer.fileAccess;
+  delete renderer.savedBytes;
+  result.renderer = renderer;
+  return result;
+}
+
 test('fresh-sandbox expectation requires the commercial Free state and unavailable updates', () => {
   const userData = resolve('tmp', 'native-smoke');
-  const result = validResult(userData);
+  const result = licenceWindowResult(userData);
   const expected = {
     kind: 'observed',
     channel: 'commercial',
@@ -64,6 +74,27 @@ test('fresh-sandbox expectation requires the commercial Free state and unavailab
     result.renderer.licensing = { ...expected, ...patch };
     assert.throws(() => validateNativeSmokeResult(result, userData, options), /fresh sandbox/);
   }
+});
+
+test('a fresh sandbox must open behind the licence window, and only a sandbox may', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  const sandboxLicensing = {
+    kind: 'observed',
+    channel: 'commercial',
+    state: 'activation-required',
+    edition: 'free',
+    proEnabled: false,
+    updateState: 'unavailable',
+  };
+  const workspace = validResult(userData);
+  workspace.renderer.licensing = sandboxLicensing;
+  assert.throws(
+    () => validateNativeSmokeResult(workspace, userData, { expectFreshSandbox: true }),
+    /behind the licence window/,
+  );
+  // Preview has no licence window: missing import and save still fail there.
+  const gated = licenceWindowResult(userData);
+  assert.throws(() => validateNativeSmokeResult(gated, userData), /SVG import was not observed/);
 });
 
 test('rejects readiness evidence when the packaged window never became visible', () => {

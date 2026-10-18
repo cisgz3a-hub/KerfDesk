@@ -99,7 +99,7 @@ function DesktopDownloadCard({ download, onClose, retry }: DesktopDownloadCardPr
         </span>
         <div>
           <h3>KerfDesk for Windows</h3>
-          <span>Free workspace. More possibilities with Pro.</span>
+          <span>Every tool, free for 30 days. Then a one-time licence.</span>
         </div>
       </div>
       <ul className="lf-desktop-welcome__features" aria-label="Desktop Pro highlights">
@@ -108,7 +108,7 @@ function DesktopDownloadCard({ download, onClose, retry }: DesktopDownloadCardPr
         <li>Camera alignment</li>
         <li>Box generator &amp; more</li>
       </ul>
-      <p className="lf-desktop-welcome__licence">Pro tools unlock with a desktop licence.</p>
+      <p className="lf-desktop-welcome__licence">The desktop app needs a trial or licence.</p>
       {download.status === 'ready' ? (
         <a
           className="lf-desktop-welcome__download"
@@ -117,7 +117,7 @@ function DesktopDownloadCard({ download, onClose, retry }: DesktopDownloadCardPr
           target="_blank"
           rel="noopener noreferrer"
           onClick={onClose}
-          title="Download the Windows app, which starts in Free until you unlock Pro"
+          title="Download the Windows app, which opens with a free 30-day trial or your licence"
         >
           <DownloadIcon /> Download for Windows <Icon name="arrow-up-right" size={18} />
         </a>

@@ -147,10 +147,11 @@ After packaging, run the native smoke against the actual executable:
 node scripts/verify-windows-packaged-native-smoke.mjs <absolute-sandbox-executable> --expect-fresh-sandbox --output=<external-evidence-directory>
 ```
 
-This creates a disposable profile, verifies startup and SVG import/project save,
-and checks the local licence and update status without starting a trial, creating
-a checkout or contacting hardware. File pickers and the save destination are
-stubbed; this is not installed-app native-dialog qualification. Windows may warn
+This creates a disposable profile, verifies that the fresh sandbox opens behind
+its licence window with no workspace mounted (ADR-623), and checks the local
+licence and update status without starting a trial, creating a checkout or
+contacting hardware. Import and save need a licensed profile, so this sandbox
+check does not cover them; this is not installed-app native-dialog qualification. Windows may warn
 about the unsigned installer, and some policies can prevent it from running.
 Test payments use Paddle sandbox; this package is not a customer purchase build.
 

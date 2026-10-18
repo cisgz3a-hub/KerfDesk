@@ -155,7 +155,7 @@ it('does not erase a draft when an unrelated licence action completes', async ()
   const adapter = client(offered(false));
   await show(adapter);
   await enterKey('synthetic-key-to-correct');
-  await act(async () => button('Start free 30-day Pro trial').click());
+  await act(async () => button('Start free 30-day trial').click());
   expect(adapter.startTrial).toHaveBeenCalledOnce();
   expect(activationInput().value).toBe('synthetic-key-to-correct');
 });

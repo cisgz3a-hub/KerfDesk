@@ -200,7 +200,7 @@ export async function nativePhase(
             input.output,
             child,
             label,
-            phase === 'deactivate' ? 'Free' : 'Pro',
+            phase === 'deactivate' ? 'Licence needed' : 'Pro',
           );
         });
         return child;

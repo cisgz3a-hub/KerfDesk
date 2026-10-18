@@ -9,6 +9,10 @@ export function validateNativeSmokeResult(result, expectedUserData, options = {}
   const expected = normalizedPath(expectedUserData);
   const renderer = object(result?.renderer);
   const failures = Array.isArray(result?.failures) ? result.failures : ['invalid failures field'];
+  const freshSandbox = options.expectFreshSandbox === true;
+  // A fresh commercial sandbox opens behind its licence window, with no
+  // workspace to import into or save from (ADR-623).
+  const behindLicence = freshSandbox && renderer?.licenceWindow === true;
   const problems = [
     ...(result?.ok === true ? [] : ['result was not ok']),
     ...(result?.isPackaged === true ? [] : ['app was not packaged']),
@@ -18,21 +22,30 @@ export function validateNativeSmokeResult(result, expectedUserData, options = {}
     ...(result?.windowVisible === true ? [] : ['window did not become visible']),
     ...(failures.length === 0 ? [] : [`runtime failures: ${failures.join(' / ')}`]),
     ...(renderer?.readyToShow === true ? [] : ['ready-to-show was not reached']),
+    ...(behindLicence ? [] : workspaceProblems(renderer)),
+    ...(freshSandbox && !behindLicence
+      ? ['fresh sandbox must open behind the licence window, not the workspace']
+      : []),
+    ...(renderer?.url === 'app://app/index.html' ? [] : ['unexpected renderer URL']),
+    ...nativeSmokeSecurityProblems(result),
+    ...nativeSmokeLicensingProblems(renderer?.licensing, freshSandbox),
+  ];
+  if (problems.length > 0) throw new Error(problems.join('; '));
+  return result;
+}
+
+function workspaceProblems(renderer) {
+  return [
     ...(renderer?.imported === true ? [] : ['SVG import was not observed']),
     ...(renderer?.saved === true && Number(renderer?.savedBytes) > 0
       ? []
       : ['project save was not observed']),
-    ...(renderer?.url === 'app://app/index.html' ? [] : ['unexpected renderer URL']),
-    ...nativeSmokeSecurityProblems(result),
-    ...nativeSmokeLicensingProblems(renderer?.licensing, options.expectFreshSandbox === true),
     ...(renderer?.fileAccess?.openPicker === 'stubbed' &&
     renderer?.fileAccess?.savePicker === 'stubbed' &&
     renderer?.fileAccess?.writeTarget === 'memory'
       ? []
       : ['file access evidence must identify stubbed pickers and an in-memory save']),
   ];
-  if (problems.length > 0) throw new Error(problems.join('; '));
-  return result;
 }
 
 function nativeSmokeLicensingProblems(observed, expectFreshSandbox) {

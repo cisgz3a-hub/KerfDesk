@@ -534,8 +534,9 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
         trustedUpdates: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
         startCamera: NATIVE_SMOKE_CONFIG === null ? startCameraBridgeSafely : undefined,
       });
-      // The workspace, projects, serial ports and camera never wait on a licence:
-      // every build opens, and Pro tools unlock only in the renderer (ADR-540).
+      // The routes never wait on a licence. A commercial build's renderer keeps
+      // its workspace behind the licence window until a trial or licence is
+      // active (ADR-623); a running session never loses it.
       protocol.handle(
         'app',
         startup.routes(

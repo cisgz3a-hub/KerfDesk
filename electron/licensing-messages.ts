@@ -30,17 +30,20 @@ const PROTOCOL_CODES = [
 /** A Map, so a code such as `constructor` can never reach an inherited member. */
 export const ERRORS: ReadonlyMap<string, string> = new Map([
   ['device_limit_reached', DEVICE_LIMIT],
-  ['trial_expired', 'The Pro trial on this device has ended. KerfDesk Free keeps working.'],
+  [
+    'trial_expired',
+    'The trial on this device has ended. Buy a licence or enter your licence key to keep using KerfDesk.',
+  ],
   [
     'trial_already_used',
-    'A Pro trial has already been used on this computer, so another cannot start. KerfDesk Free keeps working. Buy Pro or enter your licence key, or email support@kerfdesk.com if you have never tried Pro here.',
+    'A trial has already been used on this computer, so another cannot start. Buy a licence or enter your licence key, or email support@kerfdesk.com if you have never tried KerfDesk here.',
   ],
   ['invalid_credentials', KEY_REFUSED],
   ['invalid_license_tier', KEY_REFUSED],
   ['license_not_found', KEY_REFUSED],
   [
     'license_revoked',
-    'This licence has been cancelled, so Pro tools are locked. KerfDesk Free keeps working. Contact KerfDesk support if this is unexpected.',
+    'This licence has been cancelled. Contact KerfDesk support if this is unexpected.',
   ],
   [
     'license_inactive',
@@ -105,14 +108,14 @@ export function errorMessage(code: string): string | null {
 export const RELEASED = new Set(['activation_released', 'activation_inactive']);
 export const REVOKED = new Set(['license_revoked']);
 const FREE_HERE =
-  'Enter your licence key to use Pro here again, or contact KerfDesk support to free the seat.';
+  'Enter your licence key to use KerfDesk here again, or contact KerfDesk support to free the seat.';
 export const MESSAGES = {
   invalidKey:
     'That is not a whole KerfDesk licence key. A key starts with KD1. and is 84 characters long. Copy it again from the purchase page or your email, then paste it here.',
   unreadable:
-    'The licence saved on this computer can’t be read, for example after a Windows account or password reset, so Pro tools are locked. Everything else works. Reset it, then enter your licence key again; this computer keeps its licence seat.',
+    'The licence saved on this computer can’t be read, for example after a Windows account or password reset. Reset it, then enter your licence key again; this computer keeps its licence seat.',
   unavailable:
-    'The licence service or this computer’s secure storage is unavailable, so Pro tools may be locked. Everything else works. Check your connection and that you are signed in to your operating-system account, then try again.',
+    'The licence service or this computer’s secure storage is unavailable. Check your connection and that you are signed in to your operating-system account, then try again.',
   unconfirmed:
     'The licence service could not confirm this licence. Your saved licence keeps working.',
   deactivated: 'This device has been deactivated and its licence seat is free for another device.',

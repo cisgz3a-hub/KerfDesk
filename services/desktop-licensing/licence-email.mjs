@@ -61,7 +61,7 @@ export function licenceEmailMessage(licenseKey, orderId) {
     '',
     'To activate it on a Windows computer:',
     '1. Copy the key above.',
-    '2. In KerfDesk, open Help > Licence, or click Free · Try Pro in the status bar.',
+    '2. Open KerfDesk. In the licence window it opens with, or in Help > Licence:',
     '3. Choose Paste key, then Activate licence.',
     '',
     'The key works on three computers at a time. Keep this email: it is how you activate KerfDesk again after replacing or reinstalling a computer.',
@@ -74,7 +74,7 @@ export function licenceEmailMessage(licenseKey, orderId) {
 <p>Your licence key:</p>
 <p style="font-family:monospace;font-size:15px;word-break:break-all">${licenseKey}</p>
 <p>To activate it on a Windows computer:</p>
-<ol><li>Copy the key above.</li><li>In KerfDesk, open <b>Help &gt; Licence</b>, or click <b>Free · Try Pro</b> in the status bar.</li><li>Choose <b>Paste key</b>, then <b>Activate licence</b>.</li></ol>
+<ol><li>Copy the key above.</li><li>Open KerfDesk. In the licence window it opens with, or in <b>Help &gt; Licence</b>:</li><li>Choose <b>Paste key</b>, then <b>Activate licence</b>.</li></ol>
 <p>The key works on three computers at a time. Keep this email: it is how you activate KerfDesk again after replacing or reinstalling a computer.</p>
 <p>Order number: ${orderId}<br>Help: support@kerfdesk.com. Never send your full key or card details in an email.</p>`;
   return { subject: 'Your KerfDesk Pro licence key', text, html };

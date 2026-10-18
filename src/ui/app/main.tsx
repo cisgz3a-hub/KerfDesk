@@ -165,7 +165,11 @@ function fadeOutSplash(): void {
 
 function dismissWhenBoardReady(): void {
   const boardPainted =
-    document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null;
+    document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null ||
+    // A commercial build without a trial or licence opens to its licence window (ADR-623).
+    document.querySelector(
+      '#app-root [data-licence-state]:not([data-licence-state="checking"])',
+    ) !== null;
   const startupCrashed = document.querySelector('#app-root > [role="alert"]') !== null;
   const timedOut = performance.now() - splashStartedAt > SPLASH_MAX_WAIT_MS;
   // performance.now() counts from navigation, when the static splash first paints.
