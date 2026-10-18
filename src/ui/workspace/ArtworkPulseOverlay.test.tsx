@@ -162,6 +162,27 @@ describe('ArtworkPulseOverlay (ADR-620)', () => {
     expect(pulses()).toEqual([true, true]);
   });
 
+  it('does not let an uncaptured click mask a later cancelled drag', async () => {
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    // A Shift-click selection releases without ever holding capture.
+    await act(async () =>
+      canvas.dispatchEvent(
+        withPointerId(new MouseEvent('pointerup', { clientX: 50, clientY: 50 })),
+      ),
+    );
+    // The next drag with the same mouse is then cancelled.
+    await act(async () => canvas.dispatchEvent(withPointerId(new MouseEvent('pointerdown'))));
+    await render(false);
+    await act(async () => useStore.getState().setCursorMm(null));
+    await act(async () =>
+      canvas.dispatchEvent(withPointerId(new MouseEvent('lostpointercapture'))),
+    );
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    expect(pulses()).toEqual([true, true]);
+  });
+
   it('ends the hover when the Select tool is left, rather than pausing it', async () => {
     await render(true);
     await pointAt({ x: 5, y: 5 });

@@ -53,18 +53,20 @@ export function useOperationColorPeek(): void {
       setPeek(false);
     };
     const onPointer = (e: PointerEvent): void => {
-      buttons = e.buttons;
-      const gesture = e.type === 'pointerdown' || e.buttons !== 0;
+      buttons = e.type === 'pointercancel' ? 0 : e.buttons;
+      const gesture = e.type === 'pointerdown' || buttons !== 0;
       if (e.altKey && gesture && !chord) altUsedElsewhere();
     };
     const onBlur = (): void => {
       cancel();
+      buttons = 0;
       setPeek(false);
     };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     // Capture: the canvas may stop pointer events from bubbling.
-    const pointerEvents = ['pointerdown', 'pointermove', 'pointerup'] as const;
+    // pointercancel ends a press with no pointerup, and clears the buttons.
+    const pointerEvents = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] as const;
     for (const type of pointerEvents) window.addEventListener(type, onPointer, true);
     window.addEventListener('blur', onBlur);
     return (): void => {

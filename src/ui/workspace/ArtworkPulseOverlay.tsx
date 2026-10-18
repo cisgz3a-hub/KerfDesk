@@ -4,7 +4,7 @@
 // outward, and keeps a soft colour edge while the pointer stays. Drawn on its
 // own pointer-transparent canvas, so a pulse never redraws the scene.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   hitTest,
   machineKindOf,
@@ -94,49 +94,16 @@ function useCanvasHoverObject(
   // Set while a click or drag owns the pointer, until the pointer reports again.
   const paused = useRef(false);
   const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas === null) return;
-    // Cursor null also means an ordinary click finished. Physical leave and
-    // cancellation must independently end a paused hover, even if cursor null
-    // has already been reported by pointer-up.
-    const leave = (): void => {
-      if (dwellTimer.current !== null) clearTimeout(dwellTimer.current);
-      dwellTimer.current = null;
-      paused.current = false;
-      setHovered(null);
-    };
-    let releasedPointer: number | null = null;
-    // The canvas loses capture after every ordinary release too; only a loss
-    // with no release before it is a cancelled drag (as the workspace's own
-    // pointer owner treats it), and that ends the hover.
-    const lostCapture = (event: PointerEvent): void => {
-      if (event.pointerId === releasedPointer) releasedPointer = null;
-      else leave();
-    };
-    const release = (event: PointerEvent): void => {
-      releasedPointer = event.pointerId;
-      const bounds = canvas.getBoundingClientRect();
-      if (
-        event.clientX < bounds.left ||
-        event.clientX >= bounds.right ||
-        event.clientY < bounds.top ||
-        event.clientY >= bounds.bottom
-      ) {
-        leave();
-      }
-    };
-    canvas.addEventListener('pointerleave', leave);
-    canvas.addEventListener('pointercancel', leave);
-    canvas.addEventListener('lostpointercapture', lostCapture);
-    canvas.addEventListener('pointerup', release);
-    return () => {
-      canvas.removeEventListener('pointerleave', leave);
-      canvas.removeEventListener('pointercancel', leave);
-      canvas.removeEventListener('lostpointercapture', lostCapture);
-      canvas.removeEventListener('pointerup', release);
-    };
-  }, [canvasRef]);
+  // Cursor null also means an ordinary click finished. Physical leave and
+  // cancellation must independently end a paused hover, even if cursor null
+  // has already been reported by pointer-up.
+  const leave = useCallback((): void => {
+    if (dwellTimer.current !== null) clearTimeout(dwellTimer.current);
+    dwellTimer.current = null;
+    paused.current = false;
+    setHovered(null);
+  }, []);
+  usePointerEnded(canvasRef, leave);
   const x = cursor?.x ?? null;
   const y = cursor?.y ?? null;
   useEffect(() => {
@@ -173,6 +140,55 @@ function useCanvasHoverObject(
     };
   }, [x, y, scene, scale, enabled, dragging]);
   return hovered;
+}
+
+/** Calls `leave` when the pointer physically leaves the canvas or its gesture is cancelled. */
+function usePointerEnded(
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  leave: () => void,
+): void {
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas === null) return;
+    let releasedPointer: number | null = null;
+    // The canvas loses capture after every ordinary release too; only a loss
+    // with no release before it is a cancelled drag (as the workspace's own
+    // pointer owner treats it), and that ends the hover.
+    const lostCapture = (event: PointerEvent): void => {
+      if (event.pointerId === releasedPointer) releasedPointer = null;
+      else leave();
+    };
+    const release = (event: PointerEvent): void => {
+      releasedPointer = event.pointerId;
+      const bounds = canvas.getBoundingClientRect();
+      if (
+        event.clientX < bounds.left ||
+        event.clientX >= bounds.right ||
+        event.clientY < bounds.top ||
+        event.clientY >= bounds.bottom
+      ) {
+        leave();
+      }
+    };
+    // A release with no capture (Shift- or Alt-click selection) has no capture
+    // loss to pair with; a new press starts afresh so it cannot mask a later
+    // cancelled drag.
+    const press = (): void => {
+      releasedPointer = null;
+    };
+    canvas.addEventListener('pointerdown', press);
+    canvas.addEventListener('pointerleave', leave);
+    canvas.addEventListener('pointercancel', leave);
+    canvas.addEventListener('lostpointercapture', lostCapture);
+    canvas.addEventListener('pointerup', release);
+    return () => {
+      canvas.removeEventListener('pointerdown', press);
+      canvas.removeEventListener('pointerleave', leave);
+      canvas.removeEventListener('pointercancel', leave);
+      canvas.removeEventListener('lostpointercapture', lostCapture);
+      canvas.removeEventListener('pointerup', release);
+    };
+  }, [canvasRef, leave]);
 }
 
 function pointNearObject(scene: Scene, id: string, point: Vec2, toleranceMm: number): boolean {
