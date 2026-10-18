@@ -14,6 +14,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
+import { canvasTheme } from '../theme/canvas-theme';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import { drawArtworkSprite, SPRITE_MIN_DISPLAY_SEGMENTS } from './artwork-sprite-cache';
 import { artworkStrokeWidthPx, countPolylineSegments } from './draw-complexity';
@@ -44,6 +45,8 @@ export type PathPaint =
 export type PathDisplay = {
   readonly display: DisplayPolylines;
   readonly paint: PathPaint;
+  /** The operation that styles this path; null for a colour no operation owns. */
+  readonly operationId: string | null;
 };
 
 export type ObjectDisplay = {
@@ -61,6 +64,12 @@ export type ObjectDisplay = {
 // in its operation colour and never fills.
 export type ObjectDisplayMode = 'design' | 'wireframe' | 'faint';
 
+// 'operation' paints each path in its operation colour. 'ink' paints artwork
+// that an operation owns in plain artwork ink, so the workspace reads as the
+// design itself; the colours appear on hover or while Alt is held (ADR-620).
+// The faint Preview underlay always uses operation colours.
+export type ArtworkPalette = 'operation' | 'ink';
+
 export function isVectorSceneObject(obj: SceneObject): obj is VectorSceneObject {
   return (
     obj.kind === 'imported-svg' ||
@@ -76,6 +85,7 @@ export function resolveObjectDisplay(
   view: ViewTransform,
   cache: DisplayPolylineCache | undefined,
   mode: ObjectDisplayMode,
+  palette: ArtworkPalette = 'operation',
 ): ObjectDisplay {
   const paths: PathDisplay[] = [];
   let displaySegmentCount = 0;
@@ -84,12 +94,12 @@ export function resolveObjectDisplay(
   for (const path of obj.paths) {
     const resolution = sceneLayerVisibility.resolvePath(obj, path, layerByColor);
     if (!resolution.visible) continue;
-    const paint = resolvePaint(obj, path, resolution.operation, mode);
+    const paint = resolvePaint(obj, path, resolution.operation, mode, palette);
     const display = displayPathFor(path, obj, view, cache, paint.kind === 'fill');
     displaySegmentCount += countPolylineSegments(display.polylines);
     isSimplified ||= display.isSimplified;
     styleParts.push(paintKey(paint));
-    paths.push({ display, paint });
+    paths.push({ display, paint, operationId: resolution.operation?.id ?? null });
   }
   return {
     paths,
@@ -180,6 +190,7 @@ function resolvePaint(
   path: ColoredPath,
   layer: Layer | undefined,
   mode: ObjectDisplayMode,
+  palette: ArtworkPalette,
 ): PathPaint {
   if (mode === 'faint') {
     return {
@@ -192,7 +203,7 @@ function resolvePaint(
     return { kind: 'stroke', color: canvasVectorDisplayColor(path.color), output: true };
   }
   const effective = effectiveOperationForObject(layer, obj);
-  const color = canvasVectorDisplayColor(layer.color);
+  const color = palette === 'ink' ? canvasTheme.artworkInk : canvasVectorDisplayColor(layer.color);
   if (effective.mode === 'fill' && mode !== 'wireframe') {
     return {
       kind: 'fill',
