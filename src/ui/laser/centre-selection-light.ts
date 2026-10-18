@@ -6,7 +6,8 @@ import { positioningLightIssue } from '../../core/devices/positioning-light';
 import { rotaryAppliesTo } from '../../core/job/rotary-job';
 import { machineKindOf, type Vec2 } from '../../core/scene';
 import { useStore } from '../state';
-import { useLaserStore } from '../state/laser-store';
+import { useLaserStore, type LaserState } from '../state/laser-store';
+import { framedRunStartHandoffIssue, type FramedRunPermit } from '../state/framed-run';
 import { selectedObjectIds } from '../state/scene-group-actions';
 import { useToastStore } from '../state/toast-store';
 import { headFrameContext, HEAD_MOVE_UNVERIFIED_BED } from './head-move-dispatch';
@@ -14,6 +15,7 @@ import { clampJogFeed } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
 import { selectionAnchorScenePoint } from './move-laser-to-selection';
 import { resolveFrameCandidate } from './frame-candidate';
+import { frameControllerQueueIssue } from './frame-controller-readiness';
 
 /** Resolve the pointer's spot, not the cutting head, to the selected world bounds. */
 export async function centreSelectionLight(): Promise<void> {
@@ -29,7 +31,7 @@ export async function centreSelectionLight(): Promise<void> {
 export function centreLightAfterFrameWanted(): boolean {
   if (useStore.getState().project.device.positioningLight?.afterFrame !== true) return false;
   try {
-    assertCentreLightAvailable();
+    assertCentreLightAvailable(true);
     return true;
   } catch {
     return false;
@@ -38,14 +40,25 @@ export function centreLightAfterFrameWanted(): boolean {
 
 /** Point the light at the centre of the job the completed Frame traced (ADR-605). */
 export async function centreLightOnFramedArtwork(): Promise<void> {
-  assertCentreLightAvailable();
+  assertCentreLightAvailable(true);
   const laser = useLaserStore.getState();
+  const app = useStore.getState();
   const frame = laser.framedRun ?? laser.completedFrame ?? null;
   if (frame === null) throw new Error('Frame the job before centring the light on it.');
+  if (frame.candidate.authorizationContext !== undefined)
+    throw new Error('Centre the light only after framing the ordinary artwork job.');
+  assertFramedLightCurrent(frame, laser, app);
+  // A queued M114 can publish Frame's final position before its terminal ACK.
+  // Drain that reply before the light claims the controller; never adopt a new Frame.
+  if ((await frameControllerQueueIssue()) !== null)
+    throw new Error(
+      'The final controller reply is still missing; the positioning light stays off.',
+    );
+  const current = assertFramedLightCurrent(frame, laser, app);
   const bounds = resolveFrameCandidate(frame.candidate.preparedStart);
   if (!bounds.ok) throw new Error(bounds.messages.join(' '));
   const { jobBounds } = bounds;
-  const context = headFrameContext(laser);
+  const context = headFrameContext(current);
   if (context.workOffsetMm === null) throw new Error('Wait for the controller work offset.');
   // Job bounds are G-code work coordinates; the light offset is along the bed axes.
   const bed = nativeToHeadPosition(
@@ -60,7 +73,26 @@ export async function centreLightOnFramedArtwork(): Promise<void> {
   await centreLightOnBedPoint({ x: bed.xMm, y: bed.yMm });
 }
 
-function assertCentreLightAvailable(): void {
+function assertFramedLightCurrent(
+  frame: FramedRunPermit,
+  laser: LaserState,
+  app: ReturnType<typeof useStore.getState>,
+): LaserState {
+  const current = useLaserStore.getState();
+  const currentApp = useStore.getState();
+  if (
+    (current.framedRun ?? current.completedFrame) !== frame ||
+    current.manualMotionCancelEpoch !== laser.manualMotionCancelEpoch ||
+    currentApp.project !== app.project ||
+    currentApp.jobPlacement !== app.jobPlacement
+  )
+    throw new Error('The framed artwork or positioning request changed before the LED move.');
+  const changed = framedRunStartHandoffIssue(frame, current);
+  if (changed !== null) throw new Error(changed);
+  return current;
+}
+
+function assertCentreLightAvailable(framed = false): void {
   const { project, jobPlacement } = useStore.getState();
   const issue = positioningLightIssue(
     project.device.positioningLight,
@@ -74,7 +106,7 @@ function assertCentreLightAvailable(): void {
     );
   if (machineKindOf(project.machine) !== 'laser')
     throw new Error('Centre & LED is available in Laser mode.');
-  if (jobPlacement.startFrom !== 'absolute')
+  if (!framed && jobPlacement.startFrom !== 'absolute')
     throw new Error('Centre & LED needs Absolute Coords. Use Frame for origin-based placement.');
   if (rotaryAppliesTo(project.device, project.machine))
     throw new Error('Centre & LED needs a flat bed; a rotary canvas Y is not a bed position.');

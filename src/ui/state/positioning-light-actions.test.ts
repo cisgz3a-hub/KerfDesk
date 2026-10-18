@@ -342,12 +342,40 @@ describe('Frame evidence across a positioning-light move (ADR-605)', () => {
     expect(h.get().positioningLightEnabled).toBe(true);
   });
 
-  it('voids a Current Position Frame, whose placement follows the head', async () => {
+  it('voids an incomplete Current Position Frame without a captured origin', async () => {
     const h = harness();
     completeFrame(h, 'current-position');
     await h.actions.centrePositioningLight(40, 45, 1200);
     expect(h.get().completedFrame).toBeNull();
     expect(h.get().framedRun).toBeNull();
+  });
+
+  it('keeps the captured Current Position origin after verified light travel', async () => {
+    const h = harness();
+    const initial = completeFrame(h, 'current-position');
+    const permit = {
+      ...initial,
+      candidate: {
+        ...initial.candidate,
+        preparedStart: {
+          ...initial.candidate.preparedStart,
+          jobOrigin: {
+            startFrom: 'current-position' as const,
+            anchor: 'front-left' as const,
+            currentPosition: { x: 0, y: 0 },
+          },
+        },
+      },
+    };
+    h.set({ framedRun: permit, completedFrame: permit });
+    await h.actions.centrePositioningLight(40, 45, 1200);
+    const kept = h.get().completedFrame!;
+    expect(kept.candidate).toBe(permit.candidate);
+    expect(kept.candidate.preparedStart.jobOrigin).toMatchObject({
+      currentPosition: { x: 0, y: 0 },
+    });
+    expect(framedRunStartHandoffIssue(kept, h.get())).toBeNull();
+    expect(framedRunStartHandoffIssue(permit, h.get())).not.toBeNull();
   });
 
   it('voids the Frame when the canvas changes during the move, even if changed back', async () => {
