@@ -73,7 +73,7 @@ describe('projectPathsFromArgv', () => {
     expect(paths.filter((file) => file === '/p/0.lf2')).toHaveLength(1);
   });
 
-  it('takes the file:// link a Linux file manager passes for a double-clicked project (ADR-606)', () => {
+  it('takes the file:// link a Linux file manager passes for a double-clicked project (ADR-607)', () => {
     const argv = [
       '/opt/KerfDesk/kerfdesk',
       'file:///home/maker/Laser%20jobs/sign.lf2',
