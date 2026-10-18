@@ -246,6 +246,7 @@ export function BedCornerPicker(props: {
               role="radio"
               aria-checked={isChecked}
               aria-label={position.label}
+              title={`${position.label}: ${props.title}`}
               tabIndex={index === focusIndex ? 0 : -1}
               className="lf-bed-picker__target"
               style={{ left: position.point.x, top: position.point.y }}
