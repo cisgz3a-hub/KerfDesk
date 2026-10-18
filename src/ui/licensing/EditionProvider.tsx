@@ -24,6 +24,9 @@ import { useLicenceLink } from './use-licence-link';
 
 export { LICENCE_SETTINGS_EVENT };
 
+/** The main process's data-free signal that a quiet licence confirmation finished. */
+export const LICENCE_REFRESHED_EVENT = 'kerfdesk:licence-refreshed';
+
 type PendingPro = { readonly feature: ProFeature; readonly onAllowed?: (() => void) | undefined };
 
 function openLicence(): void {
@@ -278,11 +281,15 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
     const checkVisible = (): void => {
       if (document.visibilityState !== 'hidden') void load();
     };
+    // A quiet confirmation that just finished may open the licence window (ADR-623).
+    const refreshed = (): void => void load();
     window.addEventListener('focus', checkVisible);
+    window.addEventListener(LICENCE_REFRESHED_EVENT, refreshed);
     document.addEventListener('visibilitychange', checkVisible);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener('focus', checkVisible);
+      window.removeEventListener(LICENCE_REFRESHED_EVENT, refreshed);
       document.removeEventListener('visibilitychange', checkVisible);
     };
   }, [load]);

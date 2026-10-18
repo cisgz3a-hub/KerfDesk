@@ -13,16 +13,26 @@ async function settled(promise: Promise<void>): Promise<boolean> {
 afterEach(() => vi.useRealTimers());
 
 describe('startup signals for the licence window (ADR-623)', () => {
-  it('admits once the renderer is sent Pro, never for an unlicensed status', async () => {
+  it('admits once the renderer is sent Pro, and re-gates each opening renderer', () => {
     const signals = createStartupSignals(false);
+    const seen: boolean[] = [];
+    signals.admission.onChange((admitted) => seen.push(admitted));
     signals.observe({ edition: 'free' });
-    expect(await settled(signals.admitted)).toBe(false);
     signals.observe({ edition: 'pro' });
-    expect(await settled(signals.admitted)).toBe(true);
+    signals.observe({ edition: 'pro' });
+    // A reopened macOS window, or a reload, opens behind the window again.
+    signals.admission.rendererOpening();
+    signals.observe({ edition: 'free' });
+    expect(seen).toEqual([false, true, false]);
   });
 
-  it('admits a build without licensing at once, as it has no licence window', async () => {
-    expect(await settled(createStartupSignals(true).admitted)).toBe(true);
+  it('always admits a build without licensing, as it has no licence window', () => {
+    const signals = createStartupSignals(true);
+    const seen: boolean[] = [];
+    signals.admission.onChange((admitted) => seen.push(admitted));
+    signals.admission.rendererOpening();
+    signals.observe({ edition: 'free' });
+    expect(seen).toEqual([true]);
   });
 
   it('waits for the first status sent, or the grace when none is', async () => {

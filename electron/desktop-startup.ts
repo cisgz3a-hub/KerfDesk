@@ -1,6 +1,7 @@
 import { trustedAppRequest } from './app-route-guard.js';
 import type { ProtocolHandler } from './licensing-routes.js';
 import { configureAutoUpdater, type DesktopUpdater } from './auto-update.js';
+import type { WorkspaceAdmission } from './licensing-startup-signals.js';
 
 const READY_PATH = '/api/desktop/workspace-ready';
 const HEADERS = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
@@ -9,6 +10,7 @@ type BackgroundOptions = {
   readonly isPackaged: boolean;
   readonly trustedUpdates: boolean;
   readonly startCamera?: (() => void | Promise<void>) | undefined;
+  readonly stopCamera?: (() => void | Promise<void>) | undefined;
   readonly reportError?: (error: unknown) => void;
 };
 
@@ -16,25 +18,31 @@ export function createDesktopBackgroundStartup(
   licence: {
     readonly config: { readonly channel: string };
     readonly start: () => void;
-    /** The workspace's admission: the camera bridge waits on it (ADR-623). */
-    readonly admitted?: Promise<void>;
+    /** Whether a workspace is admitted: the camera bridge runs only then (ADR-623). */
+    readonly admission?: WorkspaceAdmission;
   },
   updater: DesktopUpdater,
   options: BackgroundOptions,
 ) {
-  return createDesktopStartup(() => {
-    licence.start();
-    const startCamera = (): void => void options.startCamera?.();
-    if (licence.admitted === undefined) startCamera();
-    else void licence.admitted.then(startCamera);
-    configureAutoUpdater(updater, {
-      isPackaged: options.isPackaged,
-      isChannelTrusted: options.trustedUpdates && licence.config.channel === 'free',
-      onError:
-        options.reportError ??
-        ((error: unknown) => console.warn('Desktop update check failed:', error)),
-    });
-  });
+  const runCamera = (admitted: boolean): void => {
+    void (admitted ? options.startCamera?.() : options.stopCamera?.());
+  };
+  return createDesktopStartup(
+    () => {
+      licence.start();
+      if (licence.admission === undefined) runCamera(true);
+      else licence.admission.onChange(runCamera);
+      configureAutoUpdater(updater, {
+        isPackaged: options.isPackaged,
+        isChannelTrusted: options.trustedUpdates && licence.config.channel === 'free',
+        onError:
+          options.reportError ??
+          ((error: unknown) => console.warn('Desktop update check failed:', error)),
+      });
+    },
+    // Each renderer, a reopened macOS window or a reload, opens behind the licence window.
+    () => licence.admission?.rendererOpening(),
+  );
 }
 
 /**
@@ -42,7 +50,7 @@ export function createDesktopBackgroundStartup(
  * publishing first-use terms must not start a saved licence refresh underneath
  * its agreement screen. This does not make a licence a workspace or job guard.
  */
-export function createDesktopStartup(start: () => void) {
+export function createDesktopStartup(start: () => void, eachRenderer?: () => void) {
   let ready = false;
   const open = (): void => {
     if (ready) return;
@@ -64,6 +72,7 @@ export function createDesktopStartup(start: () => void) {
           )
             return new Response('Not Found', { status: 404, headers: HEADERS });
           try {
+            eachRenderer?.();
             open();
           } catch {
             return new Response('Startup unavailable', { status: 503, headers: HEADERS });

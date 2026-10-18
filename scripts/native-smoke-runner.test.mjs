@@ -195,7 +195,8 @@ test('records and validates the commercial licence-window flow selected by CLI a
         licensing: {
           kind: 'observed',
           channel: 'commercial',
-          state: 'unavailable',
+          // Activatable on every platform: a trial or key can open this package.
+          state: 'activation-required',
           edition: 'free',
           proEnabled: false,
           updateState: 'up-to-date',

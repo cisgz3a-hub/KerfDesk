@@ -132,6 +132,23 @@ it('mounts nothing until the first licence status, and offers a retry if it fail
   expect(licenceWindow()).toBeNull();
   expect(host.querySelector('[data-workspace]')).not.toBeNull();
 });
+it('opens the workspace as soon as a quiet confirmation restores the licence', async () => {
+  const paid = { ...trial, tier: 'paid' as const, accessExpiresAt: null };
+  const api = client({ ...paid, edition: 'free', state: 'checkin-required' });
+  await act(async () =>
+    root.render(
+      <EditionProvider client={api}>
+        <div data-workspace>workspace</div>
+      </EditionProvider>,
+    ),
+  );
+  expect(licenceWindow()?.dataset.licenceState).toBe('checkin-required');
+  vi.mocked(api.status).mockResolvedValue(paid);
+  // The main process's data-free signal after its startup confirmation (ADR-623).
+  await act(async () => window.dispatchEvent(new CustomEvent('kerfdesk:licence-refreshed')));
+  expect(licenceWindow()).toBeNull();
+  expect(host.querySelector('[data-workspace]')).not.toBeNull();
+});
 it('opens a build that cannot take a licence without the licence window', async () => {
   const api = client({ ...free, channel: 'free', state: 'ready' });
   await act(async () =>

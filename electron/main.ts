@@ -55,11 +55,7 @@ import {
   shouldGrantPermissionCheck,
   shouldGrantPermissionRequest,
 } from './trusted-renderer-policy.js';
-import {
-  CAMERA_BRIDGE_PORT,
-  startLocalRtspCameraBridge,
-  type RtspCameraBridgeHandle,
-} from './rtsp-camera-bridge.js';
+import { CAMERA_BRIDGE_PORT, startLocalRtspCameraBridge } from './rtsp-camera-bridge.js';
 import { installApplicationFinalCleanup } from './application-final-cleanup.js';
 import { desktopRuntimeIdentity } from './desktop-identity.js';
 import * as nativeSmoke from './native-smoke.js';
@@ -93,6 +89,7 @@ import { installSessionEndGuard } from './session-end-guard.js';
 import { installTaskbarJobProgress } from './taskbar-job-progress.js';
 import { withDesktopWorkspaceRoutes } from './desktop-routes.js';
 import { createDesktopBackgroundStartup } from './desktop-startup.js';
+import { cameraBridgeLifecycle } from './camera-bridge-lifecycle.js';
 import { createDesktopRemoteAccess } from './remote-access/desktop.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -208,7 +205,11 @@ const CSP_POLICY = [
   "form-action 'none'",
   "frame-ancestors 'none'",
 ].join('; ');
-let cameraBridge: RtspCameraBridgeHandle | null = null;
+// Runs only while a workspace is admitted past the licence window (ADR-623).
+const cameraBridge = cameraBridgeLifecycle(
+  () => startLocalRtspCameraBridge(),
+  (message, error) => console.warn(message, error),
+);
 app.on('before-quit', () => {
   prepareLicenceQuit?.();
   quitRequested = true;
@@ -499,15 +500,6 @@ async function createWindow(): Promise<void> {
   installDevTools(window);
 }
 
-async function startCameraBridgeSafely(): Promise<void> {
-  try {
-    cameraBridge = await startLocalRtspCameraBridge();
-  } catch (err) {
-    console.warn('RTSP camera bridge could not start:', err);
-    cameraBridge = null;
-  }
-}
-
 if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
   void app
     .whenReady()
@@ -532,7 +524,12 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
       const startup = createDesktopBackgroundStartup(licence, autoUpdater, {
         isPackaged: app.isPackaged,
         trustedUpdates: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
-        startCamera: NATIVE_SMOKE_CONFIG === null ? startCameraBridgeSafely : undefined,
+        ...(NATIVE_SMOKE_CONFIG === null
+          ? {
+              startCamera: () => cameraBridge.setRunning(true),
+              stopCamera: () => cameraBridge.setRunning(false),
+            }
+          : {}),
       });
       // The routes never wait on a licence. A commercial build's renderer keeps
       // its workspace behind the licence window until a trial or licence is
@@ -565,7 +562,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-const closeDesktopServices = remoteAccess.cleanup(() => cameraBridge?.close());
+const closeDesktopServices = remoteAccess.cleanup(() => cameraBridge.close());
 installApplicationFinalCleanup(app, closeDesktopServices, {
   reportFailure: (error: unknown) => console.warn('RTSP camera bridge cleanup failed:', error),
 });

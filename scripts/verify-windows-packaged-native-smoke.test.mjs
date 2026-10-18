@@ -218,7 +218,8 @@ test('rejects a legacy or mismatched profile before accepting UI evidence', () =
 test('commercial licence-window expectation accepts a settled unlicensed gate without workspace I/O', () => {
   const userData = resolve('tmp', 'native-smoke');
   const result = licenceWindowResult(userData);
-  assert.equal(validateNativeSmokeResult(result, userData, { expectLicenceWindow: true }), result);
+  const linux = { expectLicenceWindow: true, platform: 'linux' };
+  assert.equal(validateNativeSmokeResult(result, userData, linux), result);
   assert.throws(() => validateNativeSmokeResult(result, userData), /SVG import was not observed/);
   assert.throws(
     () => validateNativeSmokeResult(result, userData, { expectFreshSandbox: true }),
@@ -226,9 +227,35 @@ test('commercial licence-window expectation accepts a settled unlicensed gate wi
   );
 });
 
+test('a commercial package must be one a trial or key can open', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  for (const platform of ['darwin', 'win32']) {
+    const options = { expectLicenceWindow: true, platform };
+    // Unavailable: an unusable release identity or keychain could never admit anyone.
+    assert.throws(
+      () => validateNativeSmokeResult(licenceWindowResult(userData), userData, options),
+      /commercial licence window/,
+    );
+    const fresh = licenceWindowResult(userData);
+    fresh.renderer.licensing.state = 'activation-required';
+    assert.equal(validateNativeSmokeResult(fresh, userData, options), fresh);
+  }
+  // A headless Linux runner has no Secret Service keyring; other states still fail there.
+  const expired = licenceWindowResult(userData);
+  expired.renderer.licensing.state = 'trial-expired';
+  assert.throws(
+    () =>
+      validateNativeSmokeResult(expired, userData, {
+        expectLicenceWindow: true,
+        platform: 'linux',
+      }),
+    /commercial licence window/,
+  );
+});
+
 test('commercial licence-window expectation rejects wrong licensing and workspace evidence', () => {
   const userData = resolve('tmp', 'native-smoke');
-  const options = { expectLicenceWindow: true };
+  const options = { expectLicenceWindow: true, platform: 'linux' };
   for (const patch of [
     { channel: 'free' },
     { edition: 'pro', proEnabled: true },

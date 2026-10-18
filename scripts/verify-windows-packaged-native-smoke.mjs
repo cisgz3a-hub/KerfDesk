@@ -27,7 +27,9 @@ export function validateNativeSmokeResult(result, expectedUserData, options = {}
     ...(failures.length === 0 ? [] : [`runtime failures: ${failures.join(' / ')}`]),
     ...(renderer?.readyToShow === true ? [] : ['ready-to-show was not reached']),
     ...(behindLicence ? noWorkspaceProblems(renderer) : workspaceProblems(renderer)),
-    ...(expectLicenceWindow ? licenceWindowProblems(renderer) : []),
+    ...(expectLicenceWindow
+      ? licenceWindowProblems(renderer, options.platform ?? process.platform)
+      : []),
     ...(freshSandbox && !behindLicence
       ? ['fresh sandbox must open behind the licence window, not the workspace']
       : []),
@@ -49,7 +51,17 @@ function noWorkspaceProblems(renderer) {
     : ['the licence window reported workspace import, save or file access'];
 }
 
-function licenceWindowProblems(renderer) {
+/**
+ * A fresh commercial package must be one a trial or key can open. Linux keeps
+ * licences only in a Secret Service keyring (licensing-store.ts), which a
+ * headless runner lacks, so there the window may also report secure storage
+ * unavailable; verify-linux-package.sh checks the package's release identity.
+ */
+function activatableStates(platform) {
+  return platform === 'linux' ? ['activation-required', 'unavailable'] : ['activation-required'];
+}
+
+function licenceWindowProblems(renderer, platform) {
   const licensing = renderer?.licensing;
   return renderer?.licenceWindow === true &&
     renderer.imported === false &&
@@ -59,7 +71,7 @@ function licenceWindowProblems(renderer) {
     licensing?.channel === 'commercial' &&
     licensing.edition === 'free' &&
     licensing.proEnabled === false &&
-    licensing.state !== 'ready'
+    activatableStates(platform).includes(licensing.state)
     ? []
     : ['commercial licence window must report unlicensed commercial status and no workspace I/O'];
 }

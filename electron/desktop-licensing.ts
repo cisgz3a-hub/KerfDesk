@@ -40,6 +40,35 @@ const DEVICE_NAMES: Readonly<Record<string, string>> = {
   linux: 'Linux computer',
 };
 
+/** Fixed, data-free signal: the renderer reads the refreshed status itself (ADR-623). */
+export const LICENCE_REFRESHED_SIGNAL =
+  "window.dispatchEvent(new CustomEvent('kerfdesk:licence-refreshed')); undefined";
+
+/**
+ * A quiet confirmation can turn an overdue check-in back into a licence, so the
+ * licence window, or Help > Licence, reads the status again at once.
+ */
+function announceLicenceRefresh(): void {
+  try {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (window.isDestroyed() || !isAppRenderer(window.webContents.getURL())) continue;
+      void window.webContents.executeJavaScript(LICENCE_REFRESHED_SIGNAL).catch(() => undefined);
+    }
+  } catch {
+    // Only a convenience: the renderer also rereads its status every 30 seconds.
+  }
+}
+
+// A packaged build only ever shows its own app://app renderer.
+function isAppRenderer(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'app:' && parsed.host === 'app';
+  } catch {
+    return false;
+  }
+}
+
 function announceDownloadedUpdate(version: string): void {
   if (Notification.isSupported())
     new Notification({
@@ -116,8 +145,8 @@ export function createDesktopLicensing(options: Options) {
     runtime,
     config,
     updates,
-    /** Settles once this device may use the workspace (ADR-623). */
-    admitted: signals.admitted,
+    /** Whether a workspace is admitted past the licence window (ADR-623). */
+    admission: signals.admission,
     /** The licensing and update routes in front of the app's own files. */
     routes: (fallback: ProtocolHandler): ProtocolHandler =>
       withLicensingRoutes(
@@ -141,10 +170,12 @@ export function createDesktopLicensing(options: Options) {
         .then(() => runtime.refreshInBackground())
         .catch(() => undefined)
         .then(() => {
+          announceLicenceRefresh();
           updates.check();
         });
       stopChecks = scheduleLicenceChecks(async () => {
         await runtime.refreshInBackground().catch(() => undefined);
+        announceLicenceRefresh();
         manual?.check();
       });
       app.once('will-quit', () => stopChecks?.());
@@ -186,15 +217,7 @@ function desktopLicenceLink(config: LicensingConfig, packaged: boolean) {
     argv: process.argv,
     readClipboard: () => clipboard.readText(),
     primaryWindow: () => BrowserWindow.getAllWindows()[0],
-    // A packaged build only ever shows its own app://app renderer.
-    isTrustedRenderer: (url) => {
-      try {
-        const parsed = new URL(url);
-        return parsed.protocol === 'app:' && parsed.host === 'app';
-      } catch {
-        return false;
-      }
-    },
+    isTrustedRenderer: isAppRenderer,
   });
 }
 
