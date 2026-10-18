@@ -128,7 +128,7 @@ function pickJigGesture(
   const { project, selectedIds } = context;
   const pxToMm = pxToMmForCanvas(context.ref.current, project, context.view);
   const handle = jigHandleAt(jigEditableSelection(project, selectedIds), point, pxToMm);
-  if (handle !== null) return { kind: handle.kind, selectedIds, handle: handle.handle };
+  if (handle !== null) return { ...handle, selectedIds };
   const hit = hitTest(project.scene, point);
   const nextIds = selectionAtHit(project, hit, selectedIds, additive);
   context.onSelectionChange(nextIds);

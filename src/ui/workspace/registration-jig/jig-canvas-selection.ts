@@ -97,7 +97,7 @@ export function jigSelectionInMarquee(
 
 export type JigHandle =
   | { readonly kind: 'resize'; readonly handle: HandleKind }
-  | { readonly kind: 'rotate'; readonly handle?: undefined };
+  | { readonly kind: 'rotate' };
 
 /** The resize or rotate handle of the selection bounds under `point`. */
 export function jigHandleAt(
