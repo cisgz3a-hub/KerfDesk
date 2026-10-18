@@ -1,4 +1,5 @@
 import { useId, useRef, useState } from 'react';
+import { nearestSpeedStopIndex } from '../../core/devices/working-speed-range';
 import { useStore } from '../state/store';
 import { useMixedOperationNumber } from './mixed-operation-input';
 import './operation-slider-field.css';
@@ -9,14 +10,26 @@ type OperationSliderFieldProps = {
   readonly ariaContext: string;
   readonly title: string;
   readonly value: number;
+  /** Exact entry's limits; also the slider's unless `stops` is given. */
   readonly min: number;
   readonly max: number;
+  /**
+   * The values the slider can land on, ascending, spaced as the track should
+   * show them (Speed's log scale). Exact entry still spans min to max.
+   */
+  readonly stops?: ReadonlyArray<number> | undefined;
+  /** A second reading of the value beside the label, such as mm/s. */
+  readonly describe?: ((value: number) => string) | undefined;
   readonly mixed?: boolean | undefined;
   readonly reconcileKey?: unknown;
   readonly parse: (value: string) => number;
   readonly commit: (value: number) => void;
   readonly observe?: (value: string) => void;
 };
+
+const scaleFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+// Decade labels closer than this to an end label would overlap it.
+const TICK_END_CLEARANCE = 0.12;
 
 function useSliderDraft(props: OperationSliderFieldProps) {
   const [dragging, setDragging] = useState(false);
@@ -33,10 +46,17 @@ function useSliderDraft(props: OperationSliderFieldProps) {
     commit: props.commit,
     commitOnBlur: dragging,
   });
-  const onChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+  const change = (text: string, input: HTMLInputElement): void => {
     if (!ownsGesture()) return;
-    props.observe?.(event.target.value);
-    draft.onChange(event);
+    props.observe?.(text);
+    draft.changeText(text, input);
+  };
+  const onChange: React.ChangeEventHandler<HTMLInputElement> = (event) =>
+    change(event.target.value, event.target);
+  // With stops the range's value is a stop index, not the setting itself.
+  const onRangeChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+    const stop = props.stops?.[Number(event.target.value)];
+    change(stop === undefined ? event.target.value : String(stop), event.target);
   };
   const finishDrag = (): void => {
     if (ownsGesture()) draft.onBlur();
@@ -64,7 +84,52 @@ function useSliderDraft(props: OperationSliderFieldProps) {
       gesture.current.awaitingFocus = false;
     }
   };
-  return { ...draft, onChange, startDrag, finishDrag, focusSlider };
+  return { ...draft, onChange, onRangeChange, startDrag, finishDrag, focusSlider };
+}
+
+type SliderTrack = {
+  readonly min: number;
+  readonly max: number;
+  readonly position: number;
+  /** 0..1 along the track. */
+  readonly fraction: number;
+  readonly low: number;
+  readonly high: number;
+  readonly ticks: ReadonlyArray<{ readonly value: number; readonly fraction: number }>;
+};
+
+function sliderTrack(props: OperationSliderFieldProps, value: number): SliderTrack {
+  const stops = props.stops;
+  if (stops === undefined || stops.length === 0) {
+    const position = Math.max(props.min, Math.min(props.max, value));
+    const fraction = (position - props.min) / Math.max(1, props.max - props.min);
+    return {
+      min: props.min,
+      max: props.max,
+      position,
+      fraction,
+      low: props.min,
+      high: props.max,
+      ticks: [],
+    };
+  }
+  const last = stops.length - 1;
+  const position = nearestSpeedStopIndex(stops, value);
+  const ticks = stops.flatMap((stop, index) => {
+    const fraction = last === 0 ? 0 : index / last;
+    const decade = 10 ** Math.round(Math.log10(stop)) === stop;
+    const clear = fraction > TICK_END_CLEARANCE && fraction < 1 - TICK_END_CLEARANCE;
+    return decade && clear ? [{ value: stop, fraction }] : [];
+  });
+  return {
+    min: 0,
+    max: last,
+    position,
+    fraction: last === 0 ? 1 : position / last,
+    low: stops[0]!,
+    high: stops[last]!,
+    ticks,
+  };
 }
 
 /** A quick adjustment plus exact entry, sharing one document-owned draft. */
@@ -77,12 +142,18 @@ export function OperationSliderField(props: OperationSliderFieldProps): JSX.Elem
     props.min,
     Math.min(props.max, Number.isFinite(parsed) ? parsed : props.value),
   );
-  const fill = ((value - props.min) / Math.max(1, props.max - props.min)) * 100;
+  const track = sliderTrack(props, value);
+  const reading = mixed ? undefined : props.describe?.(value);
   return (
     <div className="lf-operation-slider" role="group" aria-labelledby={`${id}-label`}>
       <div className="lf-operation-slider__heading">
         <label id={`${id}-label`} htmlFor={`${id}-number`}>
           {props.label} <span className="lf-operation-slider__unit">{props.unit}</span>
+          {reading === undefined ? null : (
+            <span className="lf-operation-slider__reading" aria-hidden="true">
+              {reading}
+            </span>
+          )}
         </label>
         <input
           id={`${id}-number`}
@@ -100,29 +171,42 @@ export function OperationSliderField(props: OperationSliderFieldProps): JSX.Elem
       <input
         className="lf-operation-slider__range"
         type="range"
-        min={props.min}
-        max={props.max}
+        min={track.min}
+        max={track.max}
         step={1}
-        value={value}
+        value={track.position}
         disabled={mixed}
         aria-label={`${props.label} slider for ${props.ariaContext}`}
         aria-valuetext={
-          mixed ? 'Mixed; enter a number to set all selected artworks' : `${value} ${props.unit}`
+          mixed
+            ? 'Mixed; enter a number to set all selected artworks'
+            : `${value} ${props.unit}${reading === undefined ? '' : ` (${reading})`}`
         }
         title={mixed ? 'Mixed values. Enter a number to set all selected artworks.' : props.title}
-        style={{ '--slider-fill': `${fill}%` } as React.CSSProperties}
+        style={{ '--slider-fill': `${track.fraction * 100}%` } as React.CSSProperties}
         onPointerDown={draft.startDrag}
         onFocus={draft.focusSlider}
-        onChange={draft.onChange}
+        onChange={draft.onRangeChange}
         onPointerUp={draft.finishDrag}
         onPointerCancel={draft.finishDrag}
         onLostPointerCapture={draft.finishDrag}
         onBlur={draft.finishDrag}
       />
       <div className="lf-operation-slider__scale" aria-hidden="true">
-        <span>{props.min.toLocaleString('en-US')}</span>
+        <span>{scaleFormat.format(track.low)}</span>
         <span>{mixed ? 'Mixed' : null}</span>
-        <span>{props.max.toLocaleString('en-US')}</span>
+        {mixed
+          ? null
+          : track.ticks.map((tick) => (
+              <span
+                key={tick.value}
+                className="lf-operation-slider__tick"
+                style={{ '--tick': tick.fraction } as React.CSSProperties}
+              >
+                {scaleFormat.format(tick.value)}
+              </span>
+            ))}
+        <span>{scaleFormat.format(track.high)}</span>
       </div>
     </div>
   );

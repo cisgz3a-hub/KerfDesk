@@ -1,0 +1,16 @@
+## ADR-613 - The Speed slider spans the machine's working speeds on a log scale
+
+**Status:** Accepted on 2026-10-18 at the maintainer's request ("the slider for speed can be set to unrealistic numbers ... create realistic numbers maybe per machine"). Amends the slider behaviour ADR-430 and its WORKFLOW.md entry describe. Software verification only; no material or hardware qualification.
+
+**Context.** The Power and Speed sliders (#1193) ran from their exact-entry limits with one step per unit. For Speed that was 1 mm/min to Output max feed (`device.maxFeed`). Output max feed is a motion ceiling, not a working speed. The Falcon A1 Pro profile follows Creality's rated 600 mm/s (36000 mm/min), and Machine Setup allows up to 100000. On a linear track that tall, every cutting speed (about 2-20 mm/s) fits into the first few percent, and most of the slider gives speeds no material guide uses.
+
+**Decision.** Speed's slider covers this machine's working range, while exact entry keeps its limits.
+
+- **Range** (`core/devices/working-speed-range.ts`). From 60 mm/min (1 mm/s, slower than every cut in the guides checked) to the lower of Output max feed and a working maximum. The working maximum is set per catalogued machine where its maker publishes one, and otherwise by laser type. The Falcon A1 Pro uses 10000 mm/min, the top of Creality's consumable parameter guide, whichever module is fitted. Diodes also use 10000; xTool's D1 Pro 20 W table engraves at 100 mm/s (6000 mm/min). CO2 uses 30000 mm/min (500 mm/s), the top of the usual 300-500 mm/s engraving range. Fiber and unknown take the CO2 figure, because no gantry fiber guide was found. Sources are cited in the module.
+- **Scale.** The slider's positions are round values spaced evenly on a log scale: about 70 per decade, in steps of 5%, 10% and 25% of the decade start, and always including the two exact ends. 600 mm/min therefore sits near the middle of a 60-10000 track instead of at 6%. Decades between the ends are labelled under the track.
+- **Reading.** The label also gives the speed in mm/s, because xTool, OMTech and most CO2 charts publish speeds that way.
+- **Unchanged.** Exact entry still accepts 1 mm/min up to Output max feed. A typed speed above the slider's range is kept, and the thumb rests at the track's end. Compile still caps at Output max feed, and the Output max feed notice and its Raise button are unchanged. Power's slider keeps its linear 0-100%. Nothing here blocks an edit, Frame or Start.
+
+**Consequences.** A machine with a published working maximum adds one entry to the profile table with its source. The range is a convenience for dragging, so a value outside it is never refused or rewritten.
+
+**Verification.** Unit tests cover the per-machine and per-type maximums, the Output max feed cap, degenerate ceilings, the stop series and its spacing, an odd controller-reported ceiling, and nearest-stop lookup. Component tests cover dragging to a stop and committing it, a typed speed above the range pinning the thumb, and the decade and mm/s labels.

@@ -111,11 +111,40 @@ input.lf-operation-slider__range {
   background: transparent;
 }
 
+.lf-operation-slider__reading {
+  margin-left: 6px;
+  color: var(--lf-text-faint);
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .lf-operation-slider__scale {
+  position: relative;
   display: flex;
   justify-content: space-between;
   color: var(--lf-text-muted);
   font-size: 10px;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
+}
+
+/* A decade on a log-scale track; 8px is half the thumb, which never leaves the track. */
+.lf-operation-slider__tick {
+  position: absolute;
+  top: 0;
+  left: calc(8px + (100% - 16px) * var(--tick));
+  transform: translateX(-50%);
+  padding-top: 3px;
+}
+
+.lf-operation-slider__tick::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 1px;
+  height: 4px;
+  background: var(--lf-border-strong);
 }

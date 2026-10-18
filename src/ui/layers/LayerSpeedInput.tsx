@@ -2,10 +2,20 @@
 // share. Speed lives apart from the other essentials because it carries the
 // Output max feed ceiling notice (feed-ceiling.tsx, controller audit speed-3).
 
+import { useMemo } from 'react';
+import { speedSliderRange, speedSliderStops } from '../../core/devices/working-speed-range';
 import type { Layer } from '../../core/scene';
-import type { FeedCeiling } from './feed-ceiling';
+import { useStore } from '../state';
+import { formatFeed, type FeedCeiling } from './feed-ceiling';
 import type { LayerOperationControlTarget } from './LayerRowFields';
 import { OperationSliderField } from './OperationSliderField';
+
+const mmPerSecFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
+
+/** Vendor material guides often give speed in mm/s; show the same speed that way. */
+export function mmPerSecReading(mmPerMin: number): string {
+  return `${mmPerSecFormat.format(mmPerMin / 60)} mm/s`;
+}
 
 export function SpeedInput(props: {
   readonly layer: Layer;
@@ -14,6 +24,14 @@ export function SpeedInput(props: {
 }): JSX.Element {
   const { layer, operationTarget, ceiling } = props;
   const maxFeed = ceiling.maxFeed;
+  const profileId = useStore((state) => state.project.device.profileId);
+  const laserSubProfile = useStore((state) => state.project.device.laserSubProfile);
+  // Slider over this machine's working speeds (ADR-613); typing still reaches maxFeed.
+  const range = useMemo(
+    () => speedSliderRange({ profileId, laserSubProfile, maxFeed }),
+    [profileId, laserSubProfile, maxFeed],
+  );
+  const stops = useMemo(() => speedSliderStops(range), [range]);
   return (
     <OperationSliderField
       label="Speed"
@@ -27,7 +45,9 @@ export function SpeedInput(props: {
       observe={ceiling.observe}
       min={1}
       max={maxFeed}
-      title={`Feed rate in millimeters per minute for this layer. Capped at this machine's Output max feed, ${maxFeed} mm/min (Machine Setup).`}
+      stops={stops}
+      describe={mmPerSecReading}
+      title={`Feed rate in millimeters per minute for this layer. The slider covers this machine's usual working speeds, ${formatFeed(range.min)} to ${formatFeed(range.max)} mm/min; type any speed up to its Output max feed, ${formatFeed(maxFeed)} mm/min (Machine Setup).`}
     />
   );
 }
