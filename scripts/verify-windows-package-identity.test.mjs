@@ -24,3 +24,13 @@ test('checks the executable product and truthful author metadata', () => {
   assert.match(verifier, /\$versionInfo\.LegalCopyright/);
   assert.doesNotMatch(verifier, /Get-AuthenticodeSignature/);
 });
+
+// The installer's FileDescription comes from package.json; only a native
+// Windows release packages it, so a drifted pin otherwise fails at release.
+test('pins the installer description that package.json builds', () => {
+  const { description } = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+  );
+  const pinned = verifier.match(/\$installerFileDescription = '([^']*)'/)?.[1];
+  assert.equal(pinned, description);
+});
