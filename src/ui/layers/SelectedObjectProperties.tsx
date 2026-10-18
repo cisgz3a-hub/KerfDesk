@@ -196,7 +196,7 @@ function artworkInspectorContext(
 }
 
 // One line: a short word for where the artwork came from, then its name, so
-// the settings start higher on a short window (ADR-616).
+// the settings start higher on a short window (ADR-631).
 function ArtworkContextTitle(props: {
   readonly context: ArtworkInspectorContext;
   readonly names: ReadonlyMap<string, string>;

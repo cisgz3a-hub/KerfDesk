@@ -64,7 +64,7 @@ export function LayerRow(props: {
 
 // Visibility is not repeated here: the eye on the row owns it. Output stays,
 // because the editor cannot reach an operation whose artwork is all locked,
-// or one with no artwork (ADR-616).
+// or one with no artwork (ADR-631).
 function OperationManagement(props: {
   readonly layer: Layer;
   readonly canMoveUp: boolean;

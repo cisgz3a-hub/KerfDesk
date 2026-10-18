@@ -3,7 +3,7 @@ import { artworkOperationName, isRegistrationBox, type SceneObject } from '../..
 // One name per artwork for every place that lists it: the Properties header,
 // the Artwork picker and Run order. It is the artwork's own name, numbered in
 // canvas order when several share it, so "Rectangle (2)" is the same artwork
-// everywhere and each run's controls have their own accessible name (ADR-616).
+// everywhere and each run's controls have their own accessible name (ADR-631).
 export function artworkDisplayNames(
   objects: ReadonlyArray<SceneObject>,
 ): ReadonlyMap<string, string> {

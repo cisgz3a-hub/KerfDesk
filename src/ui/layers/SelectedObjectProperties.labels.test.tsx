@@ -1,5 +1,5 @@
 // The inspector names artwork by its own name and keeps the process switch
-// still when a click raises a warning (ADR-616).
+// still when a click raises a warning (ADR-631).
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';

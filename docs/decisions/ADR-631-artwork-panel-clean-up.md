@@ -1,4 +1,4 @@
-## ADR-616 - The Artwork panel has one name, one disclosure style and room for Power and Speed (2026-10-18)
+## ADR-631 - The Artwork panel has one name, one disclosure style and room for Power and Speed (2026-10-18)
 
 **Status:** Accepted. | **Date:** 2026-10-18
 

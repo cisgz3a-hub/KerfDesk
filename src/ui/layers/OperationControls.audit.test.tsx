@@ -45,7 +45,7 @@ describe('artwork control audit: operations', () => {
     const summary = card.querySelector('summary')!;
     await click(summary);
     expect(card.querySelector('details')?.open).toBe(true);
-    // The eye owns visibility; output keeps its one row switch (ADR-616).
+    // The eye owns visibility; output keeps its one row switch (ADR-631).
     expect(card.querySelectorAll('details input[type="checkbox"]')).toHaveLength(1);
     await click(input(card, `input[aria-label="Include in output: ${name}"]`));
     expect(layer().output).toBe(false);

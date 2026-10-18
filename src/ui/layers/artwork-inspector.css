@@ -7,7 +7,7 @@
 
 /* One line names the artwork; the Operation | Artwork switch is a light tab
    row under it, not a second boxed control, so the settings start higher
-   (ADR-430 rule 1, amended by ADR-616). */
+   (ADR-430 rule 1, amended by ADR-631). */
 .lf-artwork-context {
   display: flex;
   flex-direction: column;

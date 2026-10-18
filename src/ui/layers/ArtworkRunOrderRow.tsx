@@ -132,7 +132,7 @@ function runCardClassName(active: boolean, detailed: boolean, hasSteps: boolean)
 }
 
 // The title already names an artwork whose operation shares its name, so the
-// operation line appears only when it says something new (ADR-616).
+// operation line appears only when it says something new (ADR-631).
 function RunCardSummary(props: {
   readonly row: ArtworkRunOrderRowModel;
   readonly showSettings: boolean;
@@ -153,7 +153,7 @@ function RunCardSummary(props: {
 }
 
 // A laser run whose one output step is its own run number says nothing the #N
-// badge does not (ADR-616). CNC always shows its steps: clearing before
+// badge does not (ADR-631). CNC always shows its steps: clearing before
 // profiles can move them away from the requested number (ADR-211).
 function effectiveOrderText(
   row: Pick<ArtworkRunOrderRowModel, 'effectiveSteps' | 'output' | 'position'>,
