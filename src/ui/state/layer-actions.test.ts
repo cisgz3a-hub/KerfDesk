@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { IDENTITY_TRANSFORM, operationIdsForObject, type RasterImage } from '../../core/scene';
+import {
+  IDENTITY_TRANSFORM,
+  nextOperationColor,
+  operationIdsForObject,
+  type RasterImage,
+} from '../../core/scene';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
@@ -317,7 +322,7 @@ describe('layer store actions', () => {
 
     expect(useStore.getState().project.scene.layers[0]).toMatchObject({
       id: 'operation-O1',
-      color: '#000000',
+      color: nextOperationColor([]),
       mode: 'fill',
       power: 22,
     });
