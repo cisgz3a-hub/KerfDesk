@@ -56,6 +56,36 @@ permissions:
   contents: read
 
 jobs:
+  desktop-packaging-gate:
+    name: Desktop packaging gate
+    if: always()
+    needs:
+      [
+        linux-package,
+        linux-installers,
+        commercial-linux,
+        commercial-macos,
+        windows-package,
+        macos-package,
+      ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - name: Require all selected packaging jobs to pass
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          NATIVE_PACKAGING: ${{ inputs.native == true }}
+        run: node scripts/desktop-packaging-gate.mjs
+
   linux-package:
     name: Package, check and launch the desktop app
     runs-on: ubuntu-latest
