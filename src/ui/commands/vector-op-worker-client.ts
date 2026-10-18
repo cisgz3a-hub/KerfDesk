@@ -13,8 +13,13 @@
 // also terminates any running work.
 //
 // Only SSR and Vitest, which have no Worker runtime, compute in process. A real
-// browser whose worker cannot start reports the preview unavailable instead of
-// moving the work back onto the UI thread.
+// browser whose worker cannot start, or cannot be handed the work, reports
+// `unavailable` instead of moving the work back onto the UI thread; the
+// operator's explicit action may still run in thread, as it did before. Work
+// that started and then failed (a thrown error, a crashed worker, an unreadable
+// reply) reports `failed`: running it again in thread would repeat the failure
+// and freeze the window while it did. Every failure retires the worker, so a
+// later request never meets a worker whose sources the client no longer knows.
 
 import type { VectorSceneObject } from '../../core/geometry';
 import { packSceneObjectsMessage } from '../packed-scene-objects-transfer';
@@ -28,7 +33,8 @@ import {
 export type VectorOpOutcome<R> =
   | { readonly kind: 'done'; readonly result: R }
   | { readonly kind: 'superseded' }
-  | { readonly kind: 'unavailable'; readonly message: string };
+  | { readonly kind: 'unavailable'; readonly message: string }
+  | { readonly kind: 'failed'; readonly message: string };
 
 export type VectorOpSession = {
   readonly run: <T extends VectorOpTask>(
@@ -41,9 +47,9 @@ export type VectorOpSession = {
 
 export type VectorOpWorkerSpawner = () => Worker | null;
 
-const UNAVAILABLE_MESSAGE = 'The preview could not run in the background.';
-const WORKER_ERROR_MESSAGE = 'The background preview stopped unexpectedly.';
-const MESSAGE_ERROR_MESSAGE = 'The background preview reply could not be read.';
+const UNAVAILABLE_MESSAGE = 'The geometry could not be worked out in the background.';
+const WORKER_ERROR_MESSAGE = 'The background geometry work stopped unexpectedly.';
+const MESSAGE_ERROR_MESSAGE = 'The background geometry reply could not be read.';
 
 type ActiveRequest = {
   readonly id: number;
@@ -89,7 +95,7 @@ class VectorOpWorkerSession {
       try {
         this.post(target, id, sources, task);
       } catch {
-        this.fail(UNAVAILABLE_MESSAGE);
+        this.end({ kind: 'unavailable', message: UNAVAILABLE_MESSAGE });
       }
     });
   }
@@ -116,23 +122,23 @@ class VectorOpWorkerSession {
     this.loaded = null;
   }
 
-  private fail(message: string): void {
+  private end(outcome: Extract<VectorOpOutcome<unknown>, { readonly message: string }>): void {
     this.retire();
-    this.settleActive({ kind: 'unavailable', message });
+    this.settleActive(outcome);
   }
 
   private receive(response: VectorOpResponse): void {
     const current = this.active;
     if (current === null || response.id !== current.id) return;
     if (response.kind === 'fatal') {
-      this.settleActive({ kind: 'unavailable', message: response.message });
+      this.end({ kind: 'failed', message: response.message });
       return;
     }
     let result: unknown;
     try {
       result = vectorOpResult(current.task, response);
     } catch {
-      this.fail(MESSAGE_ERROR_MESSAGE);
+      this.end({ kind: 'failed', message: MESSAGE_ERROR_MESSAGE });
       return;
     }
     this.settleActive({ kind: 'done', result });
@@ -143,8 +149,8 @@ class VectorOpWorkerSession {
     const created = this.spawn();
     if (created === null) return null;
     created.onmessage = (event: MessageEvent<VectorOpResponse>) => this.receive(event.data);
-    created.onerror = () => this.fail(WORKER_ERROR_MESSAGE);
-    created.onmessageerror = () => this.fail(MESSAGE_ERROR_MESSAGE);
+    created.onerror = () => this.end({ kind: 'failed', message: WORKER_ERROR_MESSAGE });
+    created.onmessageerror = () => this.end({ kind: 'failed', message: MESSAGE_ERROR_MESSAGE });
     this.worker = created;
     return created;
   }

@@ -118,25 +118,40 @@ describe('vector worker session (ADR-609)', () => {
     await expect(next).resolves.toMatchObject({ kind: 'done' });
   });
 
-  it('reports a failed task as unavailable and keeps the healthy worker', async () => {
+  it('reports a failed task as failed and resends the selection to a fresh worker', async () => {
     const { session, workers } = harness();
     const sources = parityObjects();
     const failed = session.run(sources, offset(1));
     workers[0]!.send({ id: 1, kind: 'fatal', message: 'Out of memory.' });
-    await expect(failed).resolves.toStrictEqual({ kind: 'unavailable', message: 'Out of memory.' });
+    await expect(failed).resolves.toStrictEqual({ kind: 'failed', message: 'Out of memory.' });
+    // The failed worker may not hold this selection (an unpack can be what failed).
+    expect(workers[0]!.terminated).toBe(true);
     const next = session.run(sources, offset(1));
-    expect(workers).toHaveLength(1);
-    expect(workers[0]!.requests[1]!.sources).toBeUndefined();
-    workers[0]!.reply();
+    expect(workers).toHaveLength(2);
+    expect(workers[1]!.requests[0]!.sources).toBeDefined();
+    workers[1]!.reply();
     await expect(next).resolves.toMatchObject({ kind: 'done' });
   });
 
-  it('retires a worker that errors', async () => {
+  it.each(['onerror', 'onmessageerror'] as const)('retires a worker after %s', async (handler) => {
     const { session, workers } = harness();
     const running = session.run(parityObjects(), offset(1));
-    workers[0]!.onerror?.();
-    await expect(running).resolves.toMatchObject({ kind: 'unavailable' });
+    workers[0]![handler]?.();
+    await expect(running).resolves.toMatchObject({ kind: 'failed' });
     expect(workers[0]!.terminated).toBe(true);
+  });
+
+  it('reports a request it could not post as unavailable', async () => {
+    const failing = createVectorOpSession(() => {
+      const worker = new FakeWorker();
+      worker.postMessage = () => {
+        throw new DOMException('Data cannot be cloned.', 'DataCloneError');
+      };
+      return worker as unknown as Worker;
+    });
+    await expect(failing.run(parityObjects(), offset(1))).resolves.toMatchObject({
+      kind: 'unavailable',
+    });
   });
 
   it('computes in process only where no Worker runtime exists (Vitest)', async () => {

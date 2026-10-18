@@ -1,7 +1,8 @@
 // Offset outlines and Cut Shapes, computed in the vector worker (ADR-609).
 // A selection the action refuses outright (nothing eligible, locked, a live
 // compound, too few shapes) goes straight to the action, which explains why
-// at once; only real geometry work goes to the worker.
+// at once; only real geometry work goes to the worker. Either way the click is
+// the newest command, so it first cancels any one still running.
 
 import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
 import { isUnlockedVectorArtwork } from '../../core/geometry/trim-contours';
@@ -10,7 +11,13 @@ import { useStore } from '../state';
 import { cutShapesSelection, cutShapesUsedIds } from '../state/cut-shapes-actions';
 import { selectedObjectIds } from '../state/scene-group-actions';
 import { uniqueObjectId } from '../state/vector-path-selection';
-import { runVectorCommandInBackground } from './background-vector-command';
+import {
+  cancelBackgroundVectorCommand,
+  runVectorCommandInBackground,
+} from './background-vector-command';
+
+const OFFSET_OUTLINES = 'Offset outlines';
+const CUT_SHAPES = 'Cut Shapes';
 
 /** The Offset outlines row: a new outline `deltaMm` outside (or, negative, inside). */
 export function offsetOutlinesInBackground(deltaMm: number): Promise<boolean> {
@@ -24,12 +31,13 @@ export function offsetOutlinesInBackground(deltaMm: number): Promise<boolean> {
     sources.length === 0 ||
     sources.some((object) => object.locked === true || isBooleanCompoundObject(object));
   if (refused) {
+    cancelBackgroundVectorCommand(OFFSET_OUTLINES);
     state.offsetSelection(deltaMm);
     return Promise.resolve(true);
   }
   const id = uniqueObjectId(scene, 'offset');
   return runVectorCommandInBackground({
-    label: 'Offset outlines',
+    label: OFFSET_OUTLINES,
     sources,
     task: { kind: 'offset-paths', deltaMm, id },
     commit: (result) =>
@@ -45,11 +53,12 @@ export function cutShapesInBackground(): Promise<boolean> {
     isUnlockedVectorArtwork,
   );
   if (sources.length < 2) {
+    cancelBackgroundVectorCommand(CUT_SHAPES);
     state.cutSelectedShapes();
     return Promise.resolve(true);
   }
   return runVectorCommandInBackground({
-    label: 'Cut Shapes',
+    label: CUT_SHAPES,
     sources,
     task: { kind: 'cut-shapes', usedIds: [...cutShapesUsedIds(scene)] },
     commit: (result) => useStore.getState().cutSelectedShapes({ scene, sources, result }),

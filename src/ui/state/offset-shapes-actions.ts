@@ -112,9 +112,11 @@ function offsetShapesMutation(
 ): OffsetShapesMutation | OffsetShapesState {
   const targets = offsetShapesTargets(state.project.scene, selectedObjectIds(state));
   const scene0 = state.project.scene;
-  const ids = offsetShapesResultIds(scene0);
-  const reused = reusableOffsetShapes(prepared, targets, request, ids);
-  const result = reused === undefined ? offsetShapes(targets, request, ids) : ok(reused);
+  const reused = reusableOffsetShapes(prepared, scene0, targets, request);
+  const result =
+    reused === undefined
+      ? offsetShapes(targets, request, offsetShapesResultIds(scene0))
+      : ok(reused.result);
   if (result.kind === 'error') {
     afterCommit(() => useToastStore.getState().pushToast(result.error.message, 'warning'));
     return state;

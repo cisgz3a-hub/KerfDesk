@@ -235,7 +235,7 @@ function useBooleanPreview(session: BooleanSession, operation: BooleanPreviewOpe
   const result: Result<ImportedSvg | WeldSelectionPlan, VectorOpError> | undefined =
     settled === undefined || weld === null ? settled : finishWeldSelection(weld, settled);
   const preview: BooleanPreviewState = {
-    ...previewStatus(result, vector.unavailable),
+    ...previewStatus(result, vector.unavailable, vector.failed),
     prepared: preparedCombine(session, sources, task, result),
   };
   // The last settled result stays visible, marked as updating, while the next one runs.
@@ -247,6 +247,7 @@ function useBooleanPreview(session: BooleanSession, operation: BooleanPreviewOpe
 function previewStatus(
   result: Result<unknown, VectorOpError> | undefined,
   unavailable: string | null,
+  failed: string | null,
 ): Omit<BooleanPreviewState, 'prepared'> {
   if (result !== undefined) {
     return {
@@ -255,6 +256,8 @@ function previewStatus(
       canApply: result.kind === 'ok',
     };
   }
+  // Work that ran and failed is not retried in thread (ADR-609).
+  if (failed !== null) return { problem: failed, updating: false, canApply: false };
   // Where the background preview cannot run, Apply computes in thread as before.
   if (unavailable !== null) {
     return { problem: `${unavailable} Apply still works.`, updating: false, canApply: true };

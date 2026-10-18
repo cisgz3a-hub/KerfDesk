@@ -39,18 +39,25 @@ menus and typing were frozen, and an open dialog froze again on every edit and o
    and Combine Shapes keep the last settled preview on screen, marked "Updating preview…", until
    the current request settles. Apply is enabled only for the current request's result and
    passes it to the action. The action commits it only when its inputs are still exactly the
-   action's own: the same source objects by identity and in order, the same options and the
-   same result ids. A weld or cut plan also needs the identical scene. The core calls are pure,
-   so that result is the one the action would compute. Any mismatch computes in thread, as
-   before.
+   action's own: the same source objects by identity and in order, the same options, and
+   result ids the scene would still give. That last test is `objectIdStillFree`: the numbered
+   id `uniqueObjectId` would return, or, once its 1,000 numbered ids run out, any unused random
+   one. Without it, a fresh random id would never match and the action would rerun the work. A
+   weld or cut plan also needs the identical scene. The core calls are pure, so that result is
+   the one the action would compute. Any mismatch computes in thread, as before.
 3. **Weld splits at the union.** `planWeldSelection` becomes `prepareWeldSelection` (operation
    buckets and cloned layers, cheap, on the UI thread), then the union in the worker, then
    `finishWeldSelection`. `planWeldSelection` is that composition, so its output is unchanged.
 4. **One-click commands run in the background too.** Offset outlines and Cut Shapes post their
-   selection, show "working…" after 400 ms, and commit through the ordinary action, as one undo
-   step, when the result arrives. If the project or selection changed in the meantime, nothing
-   is applied and a notice says why. A selection the action refuses outright (nothing eligible,
-   locked, a live compound, too few shapes) goes straight to the action, which explains at once.
+   selection. They show "working…" after 400 ms, refreshed until the work settles so the notice
+   outlives the toast timeout. They commit through the ordinary action, as one undo step, when
+   the result arrives. If the project or selection changed in the meantime, nothing is applied
+   and a notice says why. A selection the action refuses outright (nothing eligible, locked, a
+   live compound, too few shapes) goes straight to the action, which explains at once. The two
+   commands share one slot. A newer click of either, refused or not, terminates the running one
+   and says so when it was the other command. So at most one background result is ever
+   committing, and two commits cannot both ask for Pro admission, which holds a single pending
+   request.
 5. **Newer work cancels older work.** Clipper cannot be interrupted, and these runs last
    seconds to minutes. A newer request therefore terminates a busy worker and starts at once in
    a fresh one, instead of queuing behind work whose answer is no longer wanted. This differs
@@ -65,9 +72,14 @@ menus and typing were frozen, and an open dialog froze again on every edit and o
    clone. A committed result is therefore byte-identical to the in-thread one, including the
    bytes a saved project writes.
 7. **No silent fallback onto the UI thread.** Only SSR and Vitest, which have no Worker, compute
-   in process. In a real browser where the worker cannot start, the preview says so and Apply
-   computes in thread, as it did before this decision. The operator chose that action. The
-   preview never moves back onto the UI thread on its own.
+   in process. Two failures are told apart. If the worker cannot start, or cannot be handed the
+   work, it is `unavailable`. The preview says so, and Apply or the one-click command computes
+   in thread, as it did before this decision. The operator chose that action. If the work started
+   and then failed (a thrown error, a crashed worker, an unreadable reply), it is `failed`. The
+   message is shown, Apply stays disabled, and nothing reruns the work on the UI thread, where
+   it would fail again and freeze the window while doing so. Every failure retires the worker,
+   so a later request never reaches a worker whose selection the client no longer knows. A
+   failure belongs to the exact sources and task that met it, like a settled result.
 8. **Desktop.** The worker is a same-origin Vite module worker
    (`new Worker(new URL(...), { type: 'module' })`). The renderer CSP (`worker-src 'self' data:
    blob:`, `script-src 'self' 'wasm-unsafe-eval'`) already admits it, and the desktop build
@@ -90,15 +102,15 @@ The UI thread now does only these parts of each operation, for the same fixture:
 
 "After, first run" adds packing the selection (2.2 to 3.4 ms), weld's bookkeeping (0.2 ms) and
 rebuilding the result from the reply. The rebuild is an upper bound: the benchmark copies the
-reply's buffers, which a real reply transfers. "Apply, after" is the geometry work left before the ordinary commit, which
-reuses the settled result (for weld, the whole settled plan).
-Both columns were measured the same way, in Node on the same PC.
+reply's buffers, which a real reply transfers. "Apply, after" is the geometry work left before
+the ordinary commit, which reuses the settled result (for weld, the whole settled plan). Both
+columns were measured the same way, in Node on the same PC.
 
 What remains on the UI thread scales with the size of the selection and of the result, not with
 clipper's work.
 
 Other vector commands (Optimize Shapes, which already time-slices, Trim and Extend, Dogbone,
-path cleanup, text shaping) still run in thread. Text rendering costs about 50 to 200 ms per
+path cleanup, text shaping) still run in thread. Text rendering costs about 16 to 58 ms per
 debounced edit, mostly opentype.js parsing the font each time. It is the next candidate.
 
 ### Verification
@@ -114,8 +126,15 @@ debounced edit, mostly opentype.js parsing the font each time. It is the next ca
 - `src/ui/state/vector-op-prepared.test.ts` commits worker results through the real store
   actions. The resulting project JSON must equal the JSON of the in-thread action. Results for
   other options, sources or scenes must be recomputed.
+- `src/ui/state/vector-op-prepared.test.ts` also checks `objectIdStillFree`, including reuse of a
+  random id once the numbered ids run out.
 - `src/ui/commands/vector-op-worker-client.test.ts` covers the selection being posted once,
-  supersede terminating the busy worker, stale ids, release, fatal replies and worker errors.
-  `src/ui/commands/vector-background-commands.test.ts` covers the one-click commands, a
-  selection changed mid-run, and refusals.
+  supersede terminating the busy worker, and stale ids. It also covers release, failed replies
+  and worker errors retiring the worker, and an unpostable request reported as unavailable.
+  `src/ui/commands/use-vector-op-preview.test.tsx` keys failures and results to their own
+  request.
+- `src/ui/commands/vector-background-commands.test.ts` and `background-vector-command.test.ts`
+  cover the one-click commands: a selection changed mid-run, refusals cancelling a running
+  command, one command cancelling the other, failures not retried in thread, and the notice
+  lasting until the work settles.
 - The existing dialog, action, weld-plan and cut suites pass unchanged in behaviour.

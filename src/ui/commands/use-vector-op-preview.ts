@@ -21,11 +21,20 @@ export type VectorOpPreview<T extends VectorOpTask> = {
   readonly current: VectorOpSettled<T> | null;
   /** Set when the background preview cannot run; the in-thread action still can. */
   readonly unavailable: string | null;
+  /** Set when the current request ran and failed; nothing should retry it in thread. */
+  readonly failed: string | null;
+};
+
+type PreviewProblem<T extends VectorOpTask> = {
+  readonly kind: 'unavailable' | 'failed';
+  readonly sources: ReadonlyArray<VectorSceneObject>;
+  readonly task: T;
+  readonly message: string;
 };
 
 type PreviewState<T extends VectorOpTask> = {
   readonly settled: VectorOpSettled<T> | null;
-  readonly unavailable: { readonly task: T; readonly message: string } | null;
+  readonly problem: PreviewProblem<T> | null;
 };
 
 /** Callers pass a task memoized by value, so an unchanged request does not rerun. */
@@ -34,17 +43,18 @@ export function useVectorOpPreview<T extends VectorOpTask>(
   task: T,
 ): VectorOpPreview<T> {
   const [session] = useState(createVectorOpSession);
-  const [state, setState] = useState<PreviewState<T>>({ settled: null, unavailable: null });
+  const [state, setState] = useState<PreviewState<T>>({ settled: null, problem: null });
   useEffect(() => () => session.release(), [session]);
   useEffect(() => {
     let active = true;
     void session.run(sources, task).then((outcome) => {
       if (!active || outcome.kind === 'superseded') return;
-      if (outcome.kind === 'unavailable') {
-        setState((previous) => ({ ...previous, unavailable: { task, message: outcome.message } }));
+      if (outcome.kind === 'done') {
+        setState({ settled: { sources, task, result: outcome.result }, problem: null });
         return;
       }
-      setState({ settled: { sources, task, result: outcome.result }, unavailable: null });
+      const problem = { kind: outcome.kind, sources, task, message: outcome.message };
+      setState((previous) => ({ ...previous, problem }));
     });
     return () => {
       active = false;
@@ -54,10 +64,16 @@ export function useVectorOpPreview<T extends VectorOpTask>(
     state.settled !== null && state.settled.sources === sources && state.settled.task === task
       ? state.settled
       : null;
+  // A problem belongs to the exact request that met it, like a settled result.
+  const problem =
+    state.problem !== null && state.problem.sources === sources && state.problem.task === task
+      ? state.problem
+      : null;
   return {
     settled: state.settled,
     current,
-    unavailable: state.unavailable?.task === task ? state.unavailable.message : null,
+    unavailable: problem?.kind === 'unavailable' ? problem.message : null,
+    failed: problem?.kind === 'failed' ? problem.message : null,
   };
 }
 

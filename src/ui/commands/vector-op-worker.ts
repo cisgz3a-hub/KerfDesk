@@ -14,7 +14,11 @@ let sources: ReadonlyArray<VectorSceneObject> = [];
 self.onmessage = (event: MessageEvent<VectorOpRequest>): void => {
   const request = event.data;
   try {
-    if (request.sources !== undefined) sources = unpackSceneObjectsMessage(request.sources);
+    if (request.sources !== undefined) {
+      // A failed unpack must not leave the previous selection behind.
+      sources = [];
+      sources = unpackSceneObjectsMessage(request.sources);
+    }
     const { response, transfer } = vectorOpResponse(request.id, sources, request.task);
     self.postMessage(response, transfer);
   } catch (error) {

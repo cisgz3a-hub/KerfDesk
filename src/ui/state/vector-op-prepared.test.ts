@@ -6,6 +6,7 @@ import {
   createProject,
   type ImportedSvg,
   type Project,
+  type Scene,
   type SceneObject,
 } from '../../core/scene';
 import { parityObjects, throughWorkerBoundary } from '../commands/vector-op-worker.test-fixture';
@@ -17,8 +18,12 @@ import {
 import { selectedObjectIds } from './scene-group-actions';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
-import type { PreparedOffsetShapes, PreparedVectorCombine } from './vector-op-prepared';
-import { uniqueObjectId, uniqueWeldId } from './vector-path-selection';
+import {
+  reusableCombine,
+  type PreparedOffsetShapes,
+  type PreparedVectorCombine,
+} from './vector-op-prepared';
+import { objectIdStillFree, uniqueObjectId, uniqueWeldId } from './vector-path-selection';
 import { finishWeldSelection, prepareWeldSelection } from './vector-path-weld-plan';
 
 const REQUEST: OffsetShapesRequest = {
@@ -179,5 +184,37 @@ describe('committing a background vector result (ADR-609)', () => {
       prepared: { kind: 'weld', scene: { ...scene }, sources, plan: stale },
     });
     expect(sourceOf(useStore.getState().project.scene.objects.at(-1))).toBe('Welded paths');
+  });
+});
+
+describe('background result ids (ADR-609)', () => {
+  const sceneWith = (ids: ReadonlyArray<string>): Scene =>
+    ({ objects: ids.map((id) => ({ id })), layers: [], groups: [] }) as unknown as Scene;
+  const exhausted = sceneWith([
+    'subtract-paths',
+    ...Array.from({ length: 999 }, (_, index) => `subtract-paths-${index + 2}`),
+  ]);
+
+  it('accepts the numbered id the scene would give, and only that one', () => {
+    const scene = sceneWith(['subtract-paths']);
+    expect(objectIdStillFree(scene, 'subtract', 'subtract-paths-2')).toBe(true);
+    expect(objectIdStillFree(scene, 'subtract', 'subtract-paths')).toBe(false);
+    expect(objectIdStillFree(scene, 'subtract', 'subtract-paths-3')).toBe(false);
+  });
+
+  it('accepts an unused random id once the numbered ids run out', () => {
+    expect(uniqueObjectId(exhausted, 'subtract')).not.toBe(uniqueObjectId(exhausted, 'subtract'));
+    expect(objectIdStillFree(exhausted, 'subtract', 'subtract-paths-1a2b')).toBe(true);
+    expect(objectIdStillFree(exhausted, 'subtract', 'subtract-paths-1000')).toBe(false);
+    expect(objectIdStillFree(exhausted, 'subtract', 'offset-paths-1a2b')).toBe(false);
+  });
+
+  it('reuses a combine result carrying a random id instead of recomputing', () => {
+    const [subject] = parityObjects();
+    const sources = parityObjects();
+    const object = { ...(subject as ImportedSvg), id: 'subtract-paths-1a2b' };
+    const prepared: PreparedVectorCombine = { kind: 'combine', sources, op: 'subtract', object };
+    expect(reusableCombine(prepared, exhausted, sources, 'subtract')).toBe(object);
+    expect(reusableCombine(prepared, exhausted, sources, 'intersect')).toBeUndefined();
   });
 });

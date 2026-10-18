@@ -185,6 +185,7 @@ function offsetStatus(preview: VectorOpPreview<OffsetShapesTask>): string {
   const result = preview.current?.result;
   if (result !== undefined)
     return result.kind === 'ok' ? summary(result.value) : result.error.message;
+  if (preview.failed !== null) return `${preview.failed} Change the settings to try again.`;
   if (preview.unavailable !== null) return `${preview.unavailable} Offset still works.`;
   return 'Updating preview…';
 }
