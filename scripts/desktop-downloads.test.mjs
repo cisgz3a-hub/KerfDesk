@@ -5,8 +5,16 @@ import test from 'node:test';
 import { JSDOM } from 'jsdom';
 import {
   populateCommercialDownload,
+  populatePlatformDownloads,
   populatePreviewDownloads,
 } from '../public/desktop-downloads.mjs';
+import {
+  platformArtifactNames,
+  platformDownloadUrl,
+  platformLatestUrl,
+} from '../public/desktop-platform-download.mjs';
+import { platformDownloadPayload, signPlatformDownload } from './platform-commercial-publisher.mjs';
+import { digest } from './commercial-release-manifest.mjs';
 import { verifyCommercialCatalog } from '../public/desktop-commercial-catalog.mjs';
 import {
   MANUAL_DOWNLOAD_LATEST_URL,
@@ -624,4 +632,177 @@ test('stable and Preview anchors authorize only their own channel', async () => 
     /wrong-purpose/u,
   );
   assert.equal((await verifyPreviewManifest(rawEnvelope(), anchors)).channel, 'preview');
+});
+
+// --- Mac and Linux (ADR-613) ---
+async function platformDocument(platform, version = '1.2.3') {
+  const files = new Map(
+    platformArtifactNames(platform, version).map((name) => [name, Buffer.from(`file ${name}`)]),
+  );
+  const expected = new Map([...files].map(([name, bytes]) => [name, digest(bytes)]));
+  const payload = platformDownloadPayload(
+    stable.fixture(version).identity,
+    platform,
+    files,
+    expected,
+    stable.keySet,
+  );
+  return JSON.stringify(
+    await signPlatformDownload(payload, stable.privateKeyPem, stable.keyId, stable.keySet),
+  );
+}
+
+function platformServer(documents) {
+  const requests = [];
+  return {
+    requests,
+    fetchRequest: async (url, options) => {
+      requests.push({ url, options });
+      if (url === '/desktop-release-keys.json') return new Response(JSON.stringify(anchors));
+      return documents[url] === undefined
+        ? new Response('Not found', { status: 404 })
+        : new Response(documents[url]);
+    },
+  };
+}
+
+function platformCard(document, platform) {
+  const card = document.getElementById(platform);
+  return {
+    status: card.querySelector('[data-platform-status]').textContent,
+    links: [...card.querySelectorAll('[data-platform-file]')].map((link) => ({
+      hidden: link.hidden,
+      href: link.getAttribute('href'),
+      label: link.textContent.trim(),
+    })),
+    hashes: [...card.querySelectorAll('[data-platform-hash]')].map((item) => item.textContent),
+    manifest: card.querySelector('[data-platform-manifest]').getAttribute('href'),
+    edition: card.querySelector('[data-platform-edition]').hidden,
+    pro: card.querySelector('[data-platform-pro]').hidden,
+  };
+}
+
+test('Mac and Linux say plainly that nothing is released yet, and show no link', async () => {
+  const document = new JSDOM(html).window.document;
+  const server = platformServer({});
+  await populatePlatformDownloads(document, server.fetchRequest, '');
+  for (const [platform, name] of [
+    ['macos', 'Mac'],
+    ['linux', 'Linux'],
+  ]) {
+    const card = platformCard(document, platform);
+    assert.ok(card.status.startsWith(`KerfDesk for ${name} has not been released yet`));
+    assert.ok(card.links.every((link) => link.hidden && link.href === null));
+    assert.equal(card.manifest, null);
+    assert.equal(card.edition, true);
+    assert.equal(card.pro, true);
+  }
+  const urls = server.requests.map(({ url }) => url);
+  assert.ok(urls.includes(platformLatestUrl('macos')));
+  assert.ok(urls.includes(platformLatestUrl('linux')));
+  for (const { options } of server.requests) {
+    assert.equal(options.credentials, 'omit');
+    assert.equal(options.redirect, 'error');
+  }
+});
+
+test('each system shows its own verified files, sizes and digests, with the Pro line only then', async () => {
+  const document = new JSDOM(html).window.document;
+  const server = platformServer({
+    [platformLatestUrl('macos')]: await platformDocument('macos'),
+    [platformLatestUrl('linux')]: await platformDocument('linux'),
+  });
+  await populatePlatformDownloads(document, server.fetchRequest, '');
+  const mac = platformCard(document, 'macos');
+  assert.equal(
+    mac.status,
+    'KerfDesk 1.2.3 · Released 2026-01-01 · Not yet code-signed · Download details signature verified.',
+  );
+  assert.deepEqual(
+    mac.links.map(({ href, label }) => [href, label]),
+    [
+      [
+        platformDownloadUrl('macos', '1.2.3', 'KerfDesk-1.2.3-macos-arm64.dmg'),
+        'Download for Apple silicon',
+      ],
+      [
+        platformDownloadUrl('macos', '1.2.3', 'KerfDesk-1.2.3-macos-x64.dmg'),
+        'Download for Intel Mac',
+      ],
+    ],
+  );
+  const arm = digest(Buffer.from('file KerfDesk-1.2.3-macos-arm64.dmg'));
+  assert.equal(mac.hashes[0], `KerfDesk-1.2.3-macos-arm64.dmg · 0 MB · SHA-256: ${arm}`);
+  assert.equal(mac.manifest, platformDownloadUrl('macos', '1.2.3', 'download-manifest-macos.json'));
+  assert.equal(mac.edition, false);
+  assert.equal(mac.pro, false);
+  const linux = platformCard(document, 'linux');
+  assert.deepEqual(
+    linux.links.map(({ href }) => href),
+    [
+      platformDownloadUrl('linux', '1.2.3', 'KerfDesk-1.2.3-linux-amd64.deb'),
+      platformDownloadUrl('linux', '1.2.3', 'KerfDesk-1.2.3-linux-x86_64.AppImage'),
+    ],
+  );
+  // The Windows panel is untouched by these documents.
+  assert.equal(document.getElementById('commercial-download').hidden, true);
+});
+
+test('a wrong, forged or other-system document shows no link for that system only', async () => {
+  const linux = await platformDocument('linux');
+  const forged = JSON.parse(await platformDocument('macos'));
+  forged.signature = Buffer.alloc(64).toString('base64');
+  for (const macDocument of [linux, JSON.stringify(forged), '{"not":"signed"}']) {
+    const document = new JSDOM(html).window.document;
+    const server = platformServer({
+      [platformLatestUrl('macos')]: macDocument,
+      [platformLatestUrl('linux')]: linux,
+    });
+    await populatePlatformDownloads(document, server.fetchRequest, '');
+    const mac = platformCard(document, 'macos');
+    assert.ok(mac.status.startsWith('No verified Mac download is available right now'));
+    assert.ok(mac.links.every((link) => link.hidden && link.href === null));
+    assert.ok(mac.hashes.every((hash) => hash === ''));
+    assert.equal(mac.pro, true);
+    assert.equal(platformCard(document, 'linux').links[0].hidden, false);
+  }
+});
+
+test('an exact version opens that version per system and refuses a mismatch', async () => {
+  const exact = platformDownloadUrl('macos', '1.2.2', 'download-manifest-macos.json');
+  const document = new JSDOM(html).window.document;
+  const server = platformServer({
+    [exact]: await platformDocument('macos', '1.2.2'),
+    [platformLatestUrl('macos')]: await platformDocument('macos', '1.2.3'),
+  });
+  await populatePlatformDownloads(document, server.fetchRequest, '?version=1.2.2');
+  assert.ok(platformCard(document, 'macos').status.startsWith('KerfDesk 1.2.2 '));
+  assert.equal(
+    server.requests.some(({ url }) => url === platformLatestUrl('macos')),
+    false,
+  );
+  // Linux has no 1.2.2: that version is not verified, rather than offering another.
+  assert.ok(
+    platformCard(document, 'linux').status.startsWith('That Linux version could not be verified'),
+  );
+  const wrong = new JSDOM(html).window.document;
+  await populatePlatformDownloads(
+    wrong,
+    platformServer({ [exact]: await platformDocument('macos', '1.2.3') }).fetchRequest,
+    '?version=1.2.2',
+  );
+  assert.ok(platformCard(wrong, 'macos').status.includes('could not be verified'));
+  for (const search of ['?version=1.2', '?version=1.2.2&version=1.2.3']) {
+    const page = new JSDOM(html).window.document;
+    await populatePlatformDownloads(page, platformServer({}).fetchRequest, search);
+    assert.ok(platformCard(page, 'macos').status.includes('could not be verified'));
+  }
+  // A Preview version in the link belongs to the Preview section; this shows latest.
+  const preview = new JSDOM(html).window.document;
+  await populatePlatformDownloads(
+    preview,
+    platformServer({}).fetchRequest,
+    '?version=0.2.0-preview.13',
+  );
+  assert.ok(platformCard(preview, 'macos').status.includes('has not been released yet'));
 });

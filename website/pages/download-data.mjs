@@ -10,8 +10,9 @@ import { statusPill } from '../lib/components.mjs';
 import { formatPrice } from '../lib/commerce.mjs';
 import { html } from '../lib/html.mjs';
 
-// Installer names from public/desktop-release-manifest.mjs; `<version>` is the
-// release tag without its leading v.
+// Installer names from public/desktop-release-manifest.mjs and, for Linux,
+// public/desktop-platform-download.mjs (ADR-613); `<version>` is the version
+// number without a leading v.
 export const DESKTOP_FILES = [
   {
     computer: 'Windows PC',
@@ -27,6 +28,16 @@ export const DESKTOP_FILES = [
     computer: 'Mac with Apple Silicon',
     needs: 'macOS 13 or newer, Apple Silicon (arm64)',
     file: 'KerfDesk-<version>-macos-arm64.dmg',
+  },
+  {
+    computer: 'Ubuntu or Debian',
+    needs: '64-bit (x64) Linux; recommended on Ubuntu 24.04 and newer',
+    file: 'KerfDesk-<version>-linux-amd64.deb',
+  },
+  {
+    computer: 'Other Linux distributions',
+    needs: '64-bit (x64) Linux',
+    file: 'KerfDesk-<version>-linux-x86_64.AppImage',
   },
 ];
 
@@ -75,6 +86,11 @@ export function updateItems(site) {
         opens the <a href="${site.downloadPageUrl}">download page</a> for that version in your
         browser. KerfDesk never downloads or installs a Preview on its own. Finish any machine work,
         close KerfDesk, then install the new version yourself.`,
+    },
+    {
+      icon: 'laptop',
+      title: 'Mac and Linux editions',
+      body: 'They check for covered updates as the Windows edition does. When one is out, Help > Check for Updates opens its download page in your browser; close KerfDesk, then install it. They never download or install an update by themselves.',
     },
     {
       icon: 'refresh-cw',

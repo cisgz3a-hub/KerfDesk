@@ -30,7 +30,7 @@ import { handleUnifiedArtworkImport } from './import-dispatch';
 import { useStore } from '../state';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { finishPen } from '../workspace/pen-tool';
-import { isEditableShortcutTarget } from '../common/keyboard-targets';
+import { isEditableShortcutTarget, isEnterActivationTarget } from '../common/keyboard-targets';
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import type { NudgeSteps } from '../state/nudge-preferences';
 import { tryNudge } from './nudge-step';
@@ -315,6 +315,7 @@ const EDIT_BINDINGS: ReadonlyArray<KeyBinding<EditCtx>> = [
       return (
         !hasMeta(e) &&
         e.key === 'Enter' &&
+        !isEnterActivationTarget(e.target) &&
         ui.toolMode.kind === 'draw' &&
         ui.toolMode.shape === 'polyline' &&
         ui.penDraft !== null &&

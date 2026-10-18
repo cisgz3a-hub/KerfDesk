@@ -94,15 +94,17 @@ class DesktopMachineConnection implements SerialConnection {
       while (!this.closed) {
         const result = await this.request('read', { sessionId: this.id });
         if (this.closed) return;
-        if (result['closed'] === true) {
-          await this.close();
-          return;
-        }
         const payload = result['data'];
         if (typeof payload !== 'string' || payload.length > 700_000)
           throw new Error('Invalid network read response.');
-        const chunk = this.decoder.decode(decodeBase64(payload), { stream: true });
-        this.deliverLines(chunk);
+        // A closing read still carries the controller's last lines (ALARM, error).
+        this.deliverLines(this.decoder.decode(decodeBase64(payload), { stream: true }));
+        if (result['closed'] === true) {
+          const reason = result['error'];
+          if (typeof reason === 'string') console.warn(`Network controller session: ${reason}`);
+          await this.close();
+          return;
+        }
       }
     } catch {
       await this.close();

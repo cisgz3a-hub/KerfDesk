@@ -15,7 +15,13 @@ for (const width of [390, 1280]) {
       page.getByRole('alert').filter({ hasText: 'Positioning light on command' }),
     ).toBeVisible();
     await page.getByLabel('Light on command', { exact: true }).fill('M64 P0');
-    await page.getByLabel('Light off command', { exact: true }).fill('M65 P0');
+    const offCommand = page.getByLabel('Light off command', { exact: true });
+    await offCommand.fill('M064 P00');
+    await expect(page.getByRole('alert')).toContainText('on and off commands must be different');
+    await offCommand.fill('M65 P1');
+    await expect(page.getByRole('alert')).toContainText('same output');
+    await offCommand.fill('M65 P0');
+    await expect(page.getByRole('alert')).toBeHidden();
     await page.getByRole('button', { name: 'Cancel without saving', exact: true }).click();
     await page.getByRole('button', { name: 'Load configured fixture', exact: true }).click();
     await expect(centre).toBeEnabled();
