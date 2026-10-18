@@ -43,6 +43,8 @@ const GLOW_GROW_OFFSETS: ReadonlyArray<readonly [number, number]> = Array.from(
 const BITMAP_PAD_PX = 8;
 /** Recent pieces kept after their pulse ends, so pointing again is instant. */
 const RETAINED_PIECES = 8;
+/** About 64 MB of RGBA pixels; live pieces are kept even above this budget. */
+const RETAINED_PIXELS = 16_000_000;
 /** Raster and relief artwork pulse as a tinted frame: tint strength and outline width. */
 const FRAME_TINT_ALPHA = 0.28;
 const FRAME_LINE_PX = 2;
@@ -61,6 +63,8 @@ type CacheEntry = {
   readonly layer: Layer;
   /** …in this operation's colour (the one the pointer is on). */
   readonly colorLayer: Layer;
+  /** Other bound operations can change the path's visible fill/stroke style. */
+  readonly lookup: ReadonlyMap<string, Layer>;
   readonly viewKey: string;
   readonly bitmap: PieceBitmap | null;
 };
@@ -74,6 +78,11 @@ type Region = {
 
 export class ArtworkPulsePainter {
   private readonly entries = new Map<string, CacheEntry>();
+  private layers: ReadonlyArray<Layer> | undefined;
+  private objects: ReadonlyArray<SceneObject> | undefined;
+  private layerById = new Map<string, Layer>();
+  private objectById = new Map<string, SceneObject>();
+  private lookup: ReadonlyMap<string, Layer> = new Map();
   private readonly displayCache = createDisplayPolylineCache();
   private readonly objectOperations = new WeakMap<
     SceneObject,
@@ -89,9 +98,8 @@ export class ArtworkPulsePainter {
     const { width, height } = ctx.canvas;
     ctx.clearRect(0, 0, width, height);
     const layers = project.scene.layers;
-    const layerById = new Map(layers.map((layer) => [layer.id, layer]));
-    const objectById = new Map(project.scene.objects.map((object) => [object.id, object]));
-    const lookup = sceneLayerVisibility.lookup(layers);
+    this.indexScene(project);
+    const { layerById, objectById, lookup } = this;
     const viewKey = `${view.scale}|${view.offsetX}|${view.offsetY}|${width}x${height}|${getCanvasColorScheme()}`;
     const live = new Set<string>();
     for (const piece of pieces) {
@@ -107,12 +115,26 @@ export class ArtworkPulsePainter {
         const colorLayer = layerById.get(sourceId) ?? layer;
         const key = `${object.id}\u0000${operationId}`;
         live.add(key);
-        const identity = { object, layer, colorLayer, viewKey };
+        const identity = { object, layer, colorLayer, lookup, viewKey };
         const bitmap = this.bitmapFor(key, identity, lookup, view, ctx.canvas);
         if (bitmap !== null) drawPiece(ctx, bitmap, piece);
       }
     }
     this.retain(live);
+  }
+
+  /** Immutable scene arrays let animation frames reuse their scene-wide indexes. */
+  private indexScene(project: Project): void {
+    const { layers, objects } = project.scene;
+    if (layers !== this.layers) {
+      this.layers = layers;
+      this.layerById = new Map(layers.map((layer) => [layer.id, layer]));
+      this.lookup = sceneLayerVisibility.lookup(layers);
+    }
+    if (objects !== this.objects) {
+      this.objects = objects;
+      this.objectById = new Map(objects.map((object) => [object.id, object]));
+    }
   }
 
   /** The operations an object's artwork uses, kept until the object or the operations change. */
@@ -127,10 +149,23 @@ export class ArtworkPulsePainter {
   /** Keep every live piece and the most recently used others, oldest out first. */
   private retain(live: ReadonlySet<string>): void {
     let spare = RETAINED_PIECES;
+    let pixels = RETAINED_PIXELS;
+    for (const key of live) pixels -= bitmapPixels(this.entries.get(key)?.bitmap);
     for (const key of [...this.entries.keys()].reverse()) {
       if (live.has(key)) continue;
-      if (spare > 0) spare -= 1;
-      else this.entries.delete(key);
+      const bitmap = this.entries.get(key)?.bitmap;
+      const size = bitmapPixels(bitmap);
+      if (spare > 0 && size <= pixels) {
+        spare -= 1;
+        pixels -= size;
+      } else {
+        this.entries.delete(key);
+        // Release the backing stores immediately, without waiting for canvas GC.
+        if (bitmap != null) {
+          bitmap.flood.width = 0;
+          bitmap.glow.width = 0;
+        }
+      }
     }
   }
 
@@ -149,6 +184,7 @@ export class ArtworkPulsePainter {
       cached.object === identity.object &&
       cached.layer === identity.layer &&
       cached.colorLayer === identity.colorLayer &&
+      cached.lookup === identity.lookup &&
       cached.viewKey === identity.viewKey
     ) {
       this.entries.set(key, cached);
@@ -167,6 +203,12 @@ export class ArtworkPulsePainter {
     this.entries.set(key, { ...identity, bitmap });
     return bitmap;
   }
+}
+
+function bitmapPixels(bitmap: PieceBitmap | null | undefined): number {
+  return bitmap == null
+    ? 0
+    : bitmap.flood.width * bitmap.flood.height + bitmap.glow.width * bitmap.glow.height;
 }
 
 function drawPiece(

@@ -3,10 +3,10 @@
 // the ruler-strip cursor marks, the hover size readout, and the Trim Shapes
 // highlight (LBG-T04).
 //
-// Both are display-only DOM over the canvas, `pointer-events: none`, and
-// neither participates in the scene redraw. They read the scene, view and tool
-// from the stores themselves — Workspace only owns the two facts they cannot
-// see: the canvas bitmap size and whether a drag is in progress.
+// These are display-only DOM over the canvas, `pointer-events: none`, and do
+// not participate in the scene redraw. They read the scene, view and tool
+// from the stores; Workspace supplies the canvas, its bitmap size and whether
+// a drag is in progress.
 
 import { useMemo } from 'react';
 import { useStore } from '../state';
@@ -22,6 +22,7 @@ import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import type { ViewState } from './view-transform';
 
 export function WorkspacePointerOverlays(props: {
+  readonly canvasRef: React.RefObject<HTMLCanvasElement | null>;
   readonly canvasSize: CanvasBitmapSize;
   readonly dragging: boolean;
 }): JSX.Element {
@@ -33,6 +34,7 @@ export function WorkspacePointerOverlays(props: {
     <>
       {!previewMode && (
         <ArtworkPulseOverlay
+          canvasRef={props.canvasRef}
           project={project}
           canvasSize={props.canvasSize}
           viewState={viewState}

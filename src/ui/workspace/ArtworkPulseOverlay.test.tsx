@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import {
   createLayer,
   createProject,
+  DEFAULT_CNC_MACHINE_CONFIG,
   IDENTITY_TRANSFORM,
   type ImportedSvg,
   type Project,
@@ -52,6 +53,8 @@ function project(): Project {
 }
 
 let host: HTMLDivElement;
+let canvas: HTMLCanvasElement;
+let canvasRef: { current: HTMLCanvasElement };
 let root: Root;
 let hover: MockInstance<ArtworkPulseClock['hover']>;
 
@@ -59,6 +62,7 @@ async function render(canvasHoverEnabled: boolean): Promise<void> {
   await act(async () =>
     root.render(
       <ArtworkPulseOverlay
+        canvasRef={canvasRef}
         project={useStore.getState().project}
         canvasSize={SIZE}
         viewState={VIEW}
@@ -82,6 +86,20 @@ beforeEach(() => {
   vi.stubGlobal('cancelAnimationFrame', () => undefined);
   hover = vi.spyOn(ArtworkPulseClock.prototype, 'hover');
   useStore.setState({ project: project(), cursorMm: null });
+  canvas = document.createElement('canvas');
+  canvasRef = { current: canvas };
+  vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+    x: 0,
+    y: 0,
+    left: 0,
+    top: 0,
+    right: SIZE.width,
+    bottom: SIZE.height,
+    width: SIZE.width,
+    height: SIZE.height,
+    toJSON: () => ({}),
+  });
+  document.body.appendChild(canvas);
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
@@ -90,6 +108,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  canvas.remove();
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -106,6 +125,9 @@ describe('ArtworkPulseOverlay (ADR-620)', () => {
     // although the pointer has not moved.
     await render(false);
     await act(async () => useStore.getState().setCursorMm(null));
+    await act(async () =>
+      canvas.dispatchEvent(new MouseEvent('pointerup', { clientX: 50, clientY: 50 })),
+    );
     await render(true);
     expect(pulses()).toEqual([true, false]);
 
@@ -128,6 +150,83 @@ describe('ArtworkPulseOverlay (ADR-620)', () => {
     expect(layer?.style.visibility).not.toBe('hidden');
     await act(async () => useUiStore.getState().setOperationColorPeek(true));
     expect(layer?.style.visibility).toBe('hidden');
+  });
+
+  it.each(['pointerleave', 'pointercancel', 'pointerup'])(
+    'ends a paused hover on %s outside the canvas',
+    async (eventType) => {
+      await render(true);
+      await pointAt({ x: 5, y: 5 });
+      const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+      const highlighted = (): ReadonlyArray<string> =>
+        clock.frame(performance.now(), true).pieces.map((piece) => piece.objectId);
+      expect(highlighted()).toEqual(['heart']);
+      await render(false);
+      await act(async () => useStore.getState().setCursorMm(null));
+      await render(true);
+      expect(highlighted()).toEqual(['heart']);
+
+      // Captured release already cleared cursorMm; leaving cannot change it again.
+      await act(async () =>
+        canvas.dispatchEvent(new MouseEvent(eventType, { clientX: 900, clientY: 700 })),
+      );
+      expect(highlighted()).toEqual([]);
+      await pointAt({ x: 5, y: 5 });
+      expect(pulses()).toEqual([true, false, true]);
+    },
+  );
+
+  it.each(['pointerleave', 'pointercancel', 'pointerup'])(
+    'starts a fresh pulse after %s during a drag and returning to the same piece',
+    async (eventType) => {
+      await render(true);
+      await pointAt({ x: 5, y: 5 });
+      await render(false);
+      await act(async () => useStore.getState().setCursorMm(null));
+      await act(async () =>
+        canvas.dispatchEvent(new MouseEvent(eventType, { clientX: 900, clientY: 700 })),
+      );
+      await render(true);
+      expect(pulses()).toEqual([true]);
+      await pointAt({ x: 5, y: 5 });
+      expect(pulses()).toEqual([true, true]);
+    },
+  );
+
+  it('cancels the pending dwell when the pointer leaves', async () => {
+    await render(true);
+    await act(async () => useStore.getState().setCursorMm({ x: 5, y: 5 }));
+    await act(async () => canvas.dispatchEvent(new MouseEvent('pointerleave')));
+    await act(async () => vi.advanceTimersByTime(PULSE_HOVER_DWELL_MS + 10));
+    expect(pulses()).toEqual([]);
+  });
+
+  it('regroups when the machine changes while the scene stays identical', async () => {
+    const base = project();
+    const heart = base.scene.objects[0];
+    const engrave = base.scene.layers[0];
+    if (heart === undefined || engrave === undefined) throw new Error('missing artwork fixture');
+    const scene = {
+      ...base.scene,
+      layers: [
+        { ...engrave, parkedOutput: engrave.output },
+        { ...engrave, id: 'sibling', power: engrave.power / 2, parkedOutput: engrave.output },
+      ],
+      objects: [heart, { ...heart, id: 'other-heart', operationIds: ['sibling'] }],
+    };
+    useStore.setState({ project: { ...base, scene, machine: DEFAULT_CNC_MACHINE_CONFIG } });
+    useUiStore.getState().setHoveredOperationId('engrave');
+    await render(true);
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    const highlighted = (): ReadonlyArray<string> =>
+      clock.frame(performance.now(), true).pieces.map((piece) => piece.objectId);
+    expect(highlighted()).toEqual(['heart', 'other-heart']);
+
+    await act(async () => useStore.getState().setMachineKind('laser'));
+    expect(useStore.getState().project.scene).toBe(scene);
+    await render(true);
+    expect(highlighted()).toEqual(['heart']);
+    expect(pulses()).toEqual([true, false]);
   });
 
   it('regroups after Paste settings on the hovered row without another pulse', async () => {
