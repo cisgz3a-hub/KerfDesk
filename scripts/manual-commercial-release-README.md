@@ -88,3 +88,45 @@ When an authenticated previous release exists, the same job also installs that i
 For a published pair, run **Qualify published Windows upgrade** on `main`, selecting the previous and target versions. This read-only workflow authenticates both immutable installers and performs the same native retention scenario. It publishes nothing and needs no provider secrets. These NSIS exercises refuse developer machines and persistent or self-hosted runners because same-app installers share registry keys. The current scenario proves Free licence state only; paid credential retention, consumer Windows, standard-user UAC, SmartScreen and hardware require separate evidence. See [historical qualification scope](../docs/audits/2026-10-01-historical-windows-upgrade-qualification.md).
 
 Follow the workflow to successful publication, then verify the public download. Users can use **Help > Check for Updates** immediately or wait for the startup/30-minute check; they choose the download and installation themselves.
+
+## Delivery evidence and recovery
+
+ADR-612 adds required public verification after storage publication. To repeat
+the read-only check with the exact published version and source, use a fresh
+absolute evidence directory:
+
+```text
+node scripts/verify-public-desktop-release.mjs --expected-version <X.Y.Z> --expected-source-sha <40-hex> --output-dir <absolute-directory> --website
+```
+
+The website probe requires Chrome. Preview uses
+`scripts/verify-public-preview-release.mjs` with the same arguments and an exact
+Preview version; it verifies all seven artifacts. A missing Preview feed remains
+unavailable until an approved Preview publication succeeds. Neither verifier
+publishes files or executes an installer.
+
+The unsigned workflow keeps native qualification, dependency and delivery
+evidence for 90 days. After all checks pass it signs a compact receipt at
+`desktop/commercial-manual/releases/<version>/release-receipts/<runId>-<attempt>.json`.
+The receipt proves only the recorded workflow checks and excludes raw logs,
+paths, screenshots and credentials. It remains available with the immutable
+release after GitHub's raw artifacts expire.
+
+A failed public check or receipt upload may occur **after latest has advanced**.
+Inspect the publication step, signed public manifest and retained evidence
+before acting. Do not rebuild the same version, delete immutable objects or
+assume a workflow retry will repair it: the planner skips an already published
+source. Rerun the public verifier read-only; any receipt recovery requires an
+explicitly authorised protected workflow with the exact source, original
+run/attempt evidence and signing identity. The receipt helper refuses evidence
+from a different run, source or installer. Do not fabricate a success receipt
+for evidence that has expired or checks that did not run.
+
+For the separate signed-beta train, a missing authenticated observation holds
+automatic promotion. An authorised operator can record current public
+availability with `node scripts/release-train.mjs observe --version=<X.Y.Z>
+--expected-catalog-sha256=<64-hex>`, using the existing protected signing and
+storage configuration. This observes the exact newest beta and starts its
+waiting period now; it does not publish or promote the release, change its
+licence date, or accept `--now`. Keep all release enablement variables off until
+the fixes and the intended publication are approved.

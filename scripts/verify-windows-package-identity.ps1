@@ -2,16 +2,30 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$Executable,
   [ValidateSet('App', 'Installer')]
-  [string]$Kind = 'App'
+  [string]$Kind = 'App',
+  [string]$SourceCommit
 )
 
 $ErrorActionPreference = 'Stop'
 $expectedCompanyName = 'Johann Stolk'
 $expectedProductName = 'KerfDesk'
 $appFileDescription = 'KerfDesk'
-$installerFileDescription = 'Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows desktop from one codebase.'
 $expectedFileDescription = if ($Kind -eq 'Installer') {
-  $installerFileDescription
+  # NSIS takes FileDescription from package.json. Historical upgrade baselines
+  # must use their authenticated source, not today's package description.
+  $repository = Split-Path -Parent $PSScriptRoot
+  $metadata = if ($SourceCommit) {
+    if ($SourceCommit -notmatch '^[a-f0-9]{40}$') { throw 'Expected a full package source commit.' }
+    $text = & git -C $repository show "${SourceCommit}:package.json"
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot read package metadata at the expected source.' }
+    ($text -join "`n") | ConvertFrom-Json
+  } else {
+    Get-Content -LiteralPath (Join-Path $repository 'package.json') -Raw | ConvertFrom-Json
+  }
+  if ($metadata.description -isnot [string] -or [string]::IsNullOrWhiteSpace($metadata.description)) {
+    throw 'Package metadata must declare the installer description.'
+  }
+  $metadata.description
 } else {
   $appFileDescription
 }

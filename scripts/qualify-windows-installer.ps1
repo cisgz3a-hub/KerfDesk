@@ -69,10 +69,14 @@ $shortcutPaths = @(
   (Join-Path ([Environment]::GetFolderPath('Programs')) 'KerfDesk.lnk')
 )
 $steps = [Collections.Generic.List[object]]::new()
+$qualificationSource = & git -C (Split-Path -Parent $PSScriptRoot) rev-parse HEAD
+if ($LASTEXITCODE -ne 0 -or $qualificationSource -notmatch '^[a-f0-9]{40}$') {
+  throw 'Cannot bind qualification to the checked-out source.'
+}
 $receipt = [ordered]@{
   schemaVersion = 1; status = 'running'; startedAt = [DateTime]::UtcNow.ToString('o')
   sourceCommit = $SourceCommit; runId = $env:GITHUB_RUN_ID; runAttempt = $env:GITHUB_RUN_ATTEMPT
-  qualificationSourceCommit = $env:GITHUB_SHA; upgradeSourceCommit = $UpgradeSourceCommit
+  qualificationSourceCommit = $qualificationSource; upgradeSourceCommit = $UpgradeSourceCommit
   runnerImage = $env:ImageOS; runnerImageVersion = $env:ImageVersion
   toolchain = @{
     node = (& node --version); pnpm = (& pnpm --version)
@@ -375,10 +379,16 @@ try {
       @(Get-Process -Name KerfDesk, LaserForge -ErrorAction SilentlyContinue).Count -ne 0) {
     throw 'Runner already contains KerfDesk installation, profile, shortcuts or processes; refusing.'
   }
-  $candidates = foreach ($candidate in @($Installer, $UpgradeInstaller | Where-Object { $_ })) {
+  $candidateSources = @(@{ file = $Installer; source = $SourceCommit })
+  if ($UpgradeInstaller) {
+    $upgradeSource = if ($UpgradeSourceCommit) { $UpgradeSourceCommit } else { $SourceCommit }
+    $candidateSources += @{ file = $UpgradeInstaller; source = $upgradeSource }
+  }
+  $candidates = foreach ($entry in $candidateSources) {
+    $candidate = $entry.file
     $signature = (Get-AuthenticodeSignature -LiteralPath $candidate).Status.ToString()
     if ($signature -ne 'NotSigned') { throw "Expected unsigned test candidate, found $signature" }
-    & (Join-Path $PSScriptRoot 'verify-windows-package-identity.ps1') -Executable $candidate -Kind Installer | Out-Null
+    & (Join-Path $PSScriptRoot 'verify-windows-package-identity.ps1') -Executable $candidate -Kind Installer -SourceCommit $entry.source | Out-Null
     [pscustomobject]@{ file = (Get-FileEvidence $candidate); signature = $signature }
   }
   $receipt.candidates = @($candidates)
