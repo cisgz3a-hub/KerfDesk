@@ -5,11 +5,13 @@
 
 import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
 import { offsetShapes, type OffsetShapesOptions } from '../../core/geometry/offset-shapes';
+import { ok } from '../../core/result';
 import { addObject, type ImportedSvg, type Project, type Scene } from '../../core/scene';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 import { useToastStore } from './toast-store';
+import { reusableOffsetShapes, type PreparedOffsetShapes } from './vector-op-prepared';
 import { prepareIndependentArtwork, uniqueObjectId } from './vector-path-actions';
 
 export type OffsetShapesRequest = OffsetShapesOptions & {
@@ -18,8 +20,15 @@ export type OffsetShapesRequest = OffsetShapesOptions & {
 };
 
 export type OffsetShapesActions = {
-  /** Returns true when the offset was added; false leaves the project as it was. */
-  readonly offsetShapesSelection: (request: OffsetShapesRequest) => boolean;
+  /**
+   * Returns true when the offset was added; false leaves the project as it was.
+   * A dialog's settled background result is committed when its inputs still
+   * match (ADR-609); otherwise the offset is computed here.
+   */
+  readonly offsetShapesSelection: (
+    request: OffsetShapesRequest,
+    prepared?: PreparedOffsetShapes,
+  ) => boolean;
 };
 
 type OffsetShapesState = StateSlice & {
@@ -47,12 +56,17 @@ export function offsetShapesActions(
   get: () => OffsetShapesState,
 ): OffsetShapesActions {
   return {
-    offsetShapesSelection: (request) => {
+    offsetShapesSelection: (request, prepared) => {
       const state = get();
       // The guard evaluates a proposed edit before admitting it. Keep messages
       // about that edit out of the preview phase, just like the scene itself.
       const notifications: Array<() => void> = [];
-      const next = offsetShapesMutation(state, request, (notify) => notifications.push(notify));
+      const next = offsetShapesMutation(
+        state,
+        request,
+        (notify) => notifications.push(notify),
+        prepared,
+      );
       if (next === state) {
         notifications.forEach((notify) => notify());
         return false;
@@ -64,6 +78,17 @@ export function offsetShapesActions(
       notifications.forEach((notify) => notify());
       return true;
     },
+  };
+}
+
+/** The ids Offset Shapes gives its new objects in this scene. */
+export function offsetShapesResultIds(scene: Scene): {
+  readonly outward: string;
+  readonly inward: string;
+} {
+  return {
+    outward: uniqueObjectId(scene, 'offset'),
+    inward: uniqueObjectId(scene, 'offset-inward'),
   };
 }
 
@@ -83,13 +108,15 @@ function offsetShapesMutation(
   state: OffsetShapesState,
   request: OffsetShapesRequest,
   afterCommit: (notify: () => void) => void,
+  prepared?: PreparedOffsetShapes,
 ): OffsetShapesMutation | OffsetShapesState {
   const targets = offsetShapesTargets(state.project.scene, selectedObjectIds(state));
   const scene0 = state.project.scene;
-  const result = offsetShapes(targets, request, {
-    outward: uniqueObjectId(scene0, 'offset'),
-    inward: uniqueObjectId(scene0, 'offset-inward'),
-  });
+  const reused = reusableOffsetShapes(prepared, scene0, targets, request);
+  const result =
+    reused === undefined
+      ? offsetShapes(targets, request, offsetShapesResultIds(scene0))
+      : ok(reused.result);
   if (result.kind === 'error') {
     afterCommit(() => useToastStore.getState().pushToast(result.error.message, 'warning'));
     return state;

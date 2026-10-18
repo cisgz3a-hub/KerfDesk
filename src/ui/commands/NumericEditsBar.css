@@ -4,11 +4,11 @@
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
-  min-height: 42px;
-  padding: 5px 12px;
+  min-height: 32px;
+  padding: 2px 8px;
   background: var(--lf-bg-1);
   border-bottom: 1px solid var(--lf-border);
-  font-size: 13px;
+  font-size: var(--lf-text-sm);
 }
 .lf-numeric-edits-fields {
   display: flex;
@@ -16,16 +16,16 @@
   flex: 1 1 auto;
   flex-wrap: wrap;
   min-width: 0;
-  gap: 6px 10px;
+  gap: 4px 8px;
 }
 .lf-transform-anchor-trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 4px 8px;
-  font-size: 13px;
+  gap: 5px;
+  min-height: 24px;
+  padding: 2px 6px;
+  font-size: var(--lf-text-sm);
   background: var(--lf-bg-1);
   white-space: nowrap;
 }
@@ -47,23 +47,23 @@
 }
 .lf-transform-anchor-grid button {
   min-width: 0;
-  height: 32px;
+  height: 28px;
   padding: 0;
-  font-size: 18px;
+  font-size: 16px;
 }
 .lf-numeric-edit-field {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 .lf-numeric-field-group {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 .lf-numeric-edit-divider {
   width: 1px;
-  height: 22px;
+  height: 18px;
   background: var(--lf-border);
 }
 .lf-numeric-edit-caption {
@@ -71,39 +71,41 @@
   font-weight: 500;
 }
 .lf-numeric-edit-field .lf-input {
-  width: 70px;
+  width: 62px;
   min-width: 0;
-  min-height: 28px;
-  padding: 4px 6px;
-  font-size: 13px;
+  min-height: 24px;
+  padding: 2px 5px;
+  font-size: var(--lf-text-sm);
   box-sizing: border-box;
   font-variant-numeric: tabular-nums;
 }
 .lf-numeric-edit-unit {
   color: var(--lf-text-faint);
-  font-size: 12px;
+  font-size: var(--lf-text-xs);
 }
 .lf-numeric-aspect-lock {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 3px;
   border-color: transparent;
   background: transparent;
 }
 .lf-numeric-aspect-lock svg {
   display: block;
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
 }
-@media (max-width: 900px) {
+/* Up to laptop widths the transforms stay narrow enough (about 660 px) to share
+   one row with the machine group (MachineConnectionToolbar.css) at 1280 px. */
+@media (max-width: 1366px) {
   .lf-numeric-edits-fields {
-    gap: 6px 8px;
+    gap: 4px 6px;
   }
   .lf-numeric-edit-field .lf-input {
-    width: 64px;
+    width: 58px;
   }
 }
 @media (max-width: 700px) {
@@ -113,13 +115,13 @@
     padding-left: 8px;
   }
   .lf-numeric-edits-fields {
-    gap: 6px 4px;
+    gap: 4px;
   }
   .lf-numeric-field-group {
     gap: 4px;
   }
   .lf-numeric-edit-field .lf-input {
-    width: 58px;
+    width: 54px;
   }
   .lf-numeric-edit-divider {
     display: none;

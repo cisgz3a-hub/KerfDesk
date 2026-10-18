@@ -9,6 +9,7 @@ import { installFramedRunPermitForCurrentState } from '../../ui/laser/framed-run
 import { frameProofReset } from '../../ui/state/laser-session-reset';
 import { installAutoJobReview, useJobReviewStore } from '../../ui/laser/job-review';
 import { currentReplayExecutionSignature, RunAgainControl } from '../../ui/laser/RunAgainControl';
+import { hashOnSimulatedClock } from '../../ui/laser/host-sha256-testing';
 import { runCompletedJobAgainFlow, runStartJobFlow } from '../../ui/laser/start-job-flow';
 import { jobAwareAlert, jobAwareConfirm } from '../../ui/state/job-aware-dialogs';
 import { initialLaserState } from '../../ui/state/laser-store-helpers';
@@ -37,6 +38,9 @@ let uninstallReview: (() => void) | null = null;
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // Archive and settlement SHA-256 must not let the simulated machine stream on
+  // while WebCrypto waits for a real event-loop turn (see host-sha256-testing).
+  hashOnSimulatedClock();
   resetStore();
   useLaserStore.setState(initialLaserState());
   useJobReviewStore.getState().close();

@@ -58,7 +58,10 @@ const labelStyle: React.CSSProperties = {
   gap: 6,
   fontSize: 12,
 };
-const selectStyle: React.CSSProperties = { flex: 1, minWidth: 120 };
+// Never narrower than its longest option: when the label and the whole value
+// do not fit on one line (a narrow machine panel), the select wraps below the
+// label instead of clipping "Use existing planner".
+const selectStyle: React.CSSProperties = { flex: 1, minWidth: 'max-content' };
 const scopeStyle: React.CSSProperties = {
   margin: 0,
   fontSize: 11,

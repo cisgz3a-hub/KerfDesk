@@ -11,11 +11,11 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 6px 8px;
   background: var(--lf-bg-0);
   border: 1px solid var(--lf-border);
-  border-radius: 10px;
+  border-radius: var(--lf-radius-lg);
 }
 
 .lf-artwork-editor-tabs {
@@ -23,7 +23,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2px;
   padding: 2px;
-  border-radius: 8px;
+  border-radius: var(--lf-radius-lg);
   border: 1px solid var(--lf-border);
 }
 
@@ -32,11 +32,11 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-height: 30px;
-  padding: 5px;
+  min-height: 24px;
+  padding: 3px;
   border: 0;
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: var(--lf-radius-md);
+  font-size: var(--lf-text-sm);
 }
 
 .lf-artwork-editor-tabs [aria-selected='true'] {
@@ -102,7 +102,7 @@
 }
 .lf-artwork-tool__actions button {
   flex: 1 1 0;
-  min-height: 32px;
+  min-height: 26px;
 }
 
 /* Artwork tools use the panel's text size, so a button reads as one line. */
@@ -385,7 +385,7 @@
 
 .lf-artwork-panel input:not([type='checkbox']):not([type='range']):not([type='color']),
 .lf-artwork-panel select {
-  min-height: 32px;
+  min-height: 26px;
   max-width: 100%;
   box-sizing: border-box;
 }
@@ -398,28 +398,28 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   text-align: center;
-  padding: 28px 14px;
+  padding: 16px 12px;
   border: 1px dashed var(--lf-border-strong);
-  border-radius: 12px;
+  border-radius: var(--lf-radius-lg);
   margin-top: 4px;
 }
 
 .lf-artwork-empty__illustration {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px 12px;
+  gap: 12px;
+  padding: 8px 12px;
   color: var(--lf-accent-fg);
 }
 
 .lf-artwork-empty h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--lf-text-lg);
 }
 .lf-artwork-empty p {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: var(--lf-text-sm);
+  line-height: 1.45;
 }

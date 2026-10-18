@@ -38,14 +38,15 @@ function PairingRequest({ request, busy, act }: PairingRequestProps): JSX.Elemen
       </p>
       <p>
         View access shares artwork summaries, machine limits, recipes, edition and update status
-        through KerfDesk’s remote service. Editing access can change artwork and laser operation
-        settings. Machine control is a separate permission.
+        through KerfDesk’s remote service. Editing access can add, change and delete artwork and
+        layers, import designs, and save over this project’s file. Machine control is a separate
+        permission.
       </p>
       {request.requestedScopes.includes('edit') ? (
         <label style={{ display: 'flex', gap: 8, padding: '8px 0', alignItems: 'start' }}>
           <input
             type="checkbox"
-            title="Approve artwork and laser-setting edits for this connection."
+            title="Approve artwork, layer and laser-setting edits, including deleting and saving, for this connection."
             checked={edit}
             disabled={busy}
             onChange={(event) => setEdit(event.currentTarget.checked)}
@@ -58,7 +59,7 @@ function PairingRequest({ request, busy, act }: PairingRequestProps): JSX.Elemen
           <label style={{ display: 'flex', gap: 8, padding: '8px 0', alignItems: 'start' }}>
             <input
               type="checkbox"
-              title="Approve this connection to connect, home, jog, frame, start, pause and abort machine work."
+              title="Approve this connection to connect, home, set origin, jog, frame, start, pause, resume and abort machine work, and to take camera stills while artwork sharing is on."
               checked={control}
               disabled={busy}
               onChange={(event) => setControl(event.currentTarget.checked)}
@@ -66,8 +67,9 @@ function PairingRequest({ request, busy, act }: PairingRequestProps): JSX.Elemen
             <span>Allow Connect, Home, Jog, Frame, Start, Pause and Abort</span>
           </label>
           <p>
-            This connection can move the machine and start a laser or spindle job. Keep the machine
-            in view while controlling it.
+            This connection can move the machine and start a laser or spindle job. While artwork
+            sharing is on, it can also take still photos from this computer’s live camera. Keep the
+            machine in view while controlling it.
           </p>
         </>
       ) : null}
