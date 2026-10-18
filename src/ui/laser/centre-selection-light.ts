@@ -3,8 +3,8 @@ import {
   nativeToHeadPosition,
 } from '../../core/devices/head-position-frames';
 import { positioningLightIssue } from '../../core/devices/positioning-light';
-import { toMachineCoords } from '../../core/devices/origin-transform';
-import { computeFrameBounds } from '../../core/job';
+import { toMachineCoords, toSceneCoords } from '../../core/devices/origin-transform';
+import { computeFrameBounds, type JobBounds } from '../../core/job';
 import { rotaryAppliesTo } from '../../core/job/rotary-job';
 import { machineKindOf, type Vec2 } from '../../core/scene';
 import { useStore } from '../state';
@@ -74,20 +74,41 @@ function selectedCentre(
   framedOutput = false,
 ): Vec2 {
   const objects = new Map(project.scene.objects.map((object) => [object.id, object]));
-  if (
-    ids.some((id) => {
-      const object = objects.get(id);
-      // Prepared scenes also retain disabled artwork and placement dependencies.
-      // Use Frame's own inclusion rules, including per-path/sub-operation binding.
-      return (
-        object === undefined ||
-        (framedOutput &&
-          computeFrameBounds({ ...project.scene, objects: [object] }, project.device) === null)
+  let bounds: JobBounds | null = null;
+  for (const id of ids) {
+    const object = objects.get(id);
+    // Prepared scenes retain disabled artwork and paths. Frame's output bounds
+    // prove membership and measure only the enabled paths of every chosen member.
+    const output =
+      framedOutput && object !== undefined
+        ? computeFrameBounds({ ...project.scene, objects: [object] }, project.device)
+        : null;
+    if (object === undefined || (framedOutput && output === null))
+      throw new Error(
+        'The chosen artwork was not included in this Frame. Frame that artwork first.',
       );
-    })
-  )
-    throw new Error('The chosen artwork was not included in this Frame. Frame that artwork first.');
-  const centre = selectionAnchorScenePoint(project, ids, 'c');
+    if (output !== null)
+      bounds =
+        bounds === null
+          ? output
+          : {
+              minX: Math.min(bounds.minX, output.minX),
+              minY: Math.min(bounds.minY, output.minY),
+              maxX: Math.max(bounds.maxX, output.maxX),
+              maxY: Math.max(bounds.maxY, output.maxY),
+            };
+  }
+  const centre =
+    bounds === null
+      ? selectionAnchorScenePoint(project, ids, 'c')
+      : toSceneCoords(
+          { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 },
+          project.device,
+        );
+  return requireFiniteArtworkCentre(centre);
+}
+
+function requireFiniteArtworkCentre(centre: Vec2 | null): Vec2 {
   if (centre === null || !Number.isFinite(centre.x) || !Number.isFinite(centre.y))
     throw new Error('The chosen artwork has no finite centre to position the light on.');
   return centre;

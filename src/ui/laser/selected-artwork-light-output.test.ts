@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prepareOutputRequestForTest } from '../../__fixtures__/output-preparation-request';
 import { createLayerSubLayer } from '../../core/scene';
+import { inferCurrentMachinePosition } from '../state/infer-machine-position';
 import { disconnectOnTestClock } from '../state/laser-disconnect-testing';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
@@ -68,7 +69,79 @@ async function expectOutputRejected(ids: ReadonlyArray<string>) {
   });
 }
 
+async function mixedPathFixture(
+  mode: 'absolute' | 'user-origin' | 'verified-origin' | 'current-position',
+) {
+  const fixture = await connectedFixture('grbl-v1.1', mode);
+  const { project } = fixture;
+  useStore.setState({
+    project: {
+      ...project,
+      scene: {
+        ...project.scene,
+        objects: project.scene.objects.map((object) =>
+          object.id === 'selected' && object.kind === 'imported-svg'
+            ? {
+                ...object,
+                bounds: { minX: 30, minY: 40, maxX: 140, maxY: 130 },
+                paths: [
+                  ...object.paths,
+                  {
+                    color: project.scene.layers[0]!.color,
+                    operationIds: ['disabled'],
+                    polylines: [
+                      {
+                        closed: false,
+                        points: [
+                          { x: 120, y: 120 },
+                          { x: 140, y: 130 },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              }
+            : object,
+        ),
+      },
+    },
+  });
+  return fixture;
+}
+
 describe('selected LED target belongs to the framed output', () => {
+  it.each(['absolute', 'user-origin', 'verified-origin', 'current-position'] as const)(
+    '%s centres only the enabled path inside one mixed-output imported artwork',
+    async (mode) => {
+      const { project } = await mixedPathFixture(mode);
+      const permit = await frame();
+      await centre(['selected']);
+      const laser = useLaserStore.getState();
+      const head = inferCurrentMachinePosition(laser.statusReport, laser.wcoCache);
+      // The enabled path is 30..50 by 40..50; its disabled sibling is 120..140 by 120..130.
+      // Frame's whole output remains 30..80 by 40..70, so placement must remain unchanged.
+      expect(head).toMatchObject(
+        mode === 'absolute'
+          ? { x: 33, y: project.device.bedHeight - 49 }
+          : mode === 'current-position'
+            ? { x: 178, y: 116 }
+            : { x: 103, y: 71 },
+      );
+      expect(laser.framedRun?.candidate).toBe(permit.candidate);
+      expect(laser.positioningLightEnabled).toBe(true);
+    },
+  );
+
+  it('retains the whole-artwork canvas centre for a direct Absolute action before Frame', async () => {
+    const { project } = await mixedPathFixture('absolute');
+    await centre(['selected']);
+    const laser = useLaserStore.getState();
+    expect(inferCurrentMachinePosition(laser.statusReport, laser.wcoCache)).toMatchObject({
+      x: 78,
+      y: project.device.bedHeight - 89,
+    });
+  });
+
   it.each(['absolute', 'user-origin', 'verified-origin', 'current-position'] as const)(
     '%s rejects visible artwork bound only to disabled output',
     async (mode) => {
