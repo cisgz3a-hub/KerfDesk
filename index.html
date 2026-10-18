@@ -41,7 +41,11 @@
     <!-- The wordmark, credit and activity indicator paint before JS or artwork.
          main.tsx dismisses the screen when the workspace is ready (F-A1); the
          desktop app holds it briefly first (ADR-049 Amendment 1).
-         Activity is indeterminate: no simulated percentage.
+         Activity is indeterminate: no simulated percentage. Soft light flows
+         along the artwork's wood grooves: the grooves were traced from
+         startup-craft.webp into the SVG below, in that image's pixels, so
+         retrace them if the artwork changes. The lights animate only transform
+         and opacity, so the flow stays smooth while the workspace loads.
          Inline CSS is allowed by the CSP; startup code stays in the bundle. -->
     <style>
       #app-splash {
@@ -69,6 +73,75 @@
         height: 100%;
         object-fit: cover;
         object-position: 64% center;
+      }
+      /* The flow frame fills the same box as the artwork. Inside it, the grain
+         box repeats the artwork's object-fit cover (1672x941, 64% across), so
+         the traced grooves land on the real ones. Lights pass over black, the
+         grooves multiply them, and the frame adds the result onto the art. It
+         sits above the shading so the grooves glow out of it, below the text. */
+      #app-splash .app-splash__flow {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        container-type: size;
+        /* Screen where the additive plus-lighter is not supported. */
+        mix-blend-mode: screen;
+        mix-blend-mode: plus-lighter;
+      }
+      #app-splash .app-splash__grain {
+        position: absolute;
+        top: calc((100cqh - max(100cqh, 56.28cqw)) / 2);
+        left: calc((100cqw - max(100cqw, 177.683cqh)) * 0.64);
+        width: max(100cqw, 177.683cqh);
+        height: max(100cqh, 56.28cqw);
+        /* Chromium needs this group for the grooves to multiply the lights. */
+        isolation: isolate;
+        background: #000;
+      }
+      #app-splash .app-splash__flow i {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 13%;
+        aspect-ratio: 1;
+        margin: -6.5% 0 0 -6.5%;
+        border-radius: 50%;
+        background: radial-gradient(
+          closest-side,
+          #fff4e2,
+          rgb(255 204 136 / 90%) 26%,
+          rgb(255 164 92 / 42%) 58%,
+          transparent
+        );
+        opacity: 0;
+        animation: app-splash-flow-1 7000ms linear infinite;
+      }
+      #app-splash .app-splash__flow i:nth-child(1) {
+        animation-name: app-splash-flow-1;
+        animation-delay: -6000ms;
+      }
+      #app-splash .app-splash__flow i:nth-child(2) {
+        animation-name: app-splash-flow-2;
+        animation-delay: -4600ms;
+      }
+      #app-splash .app-splash__flow i:nth-child(3) {
+        animation-name: app-splash-flow-3;
+        animation-delay: -3200ms;
+      }
+      #app-splash .app-splash__flow i:nth-child(4) {
+        animation-name: app-splash-flow-4;
+        animation-delay: -1800ms;
+      }
+      #app-splash .app-splash__flow i:nth-child(5) {
+        animation-name: app-splash-flow-5;
+        animation-delay: -400ms;
+      }
+      #app-splash .app-splash__grooves {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        mix-blend-mode: multiply;
       }
       #app-splash::before {
         content: '';
@@ -127,21 +200,8 @@
         width: min(244px, 100%);
         margin-top: 54px;
       }
-      #app-splash .app-splash__track {
-        height: 2px;
-        overflow: hidden;
-        background: #4b4540;
-      }
-      #app-splash .app-splash__beam {
-        display: block;
-        width: 32%;
-        height: 100%;
-        background: #d6ad7b;
-        transform: translateX(106%);
-        animation: app-splash-loading 1500ms ease-in-out infinite;
-      }
       #app-splash .app-splash__status {
-        margin: 16px 0 0;
+        margin: 18px 0 0;
         color: #bfb8ae;
         font-size: 12px;
         letter-spacing: 0.4px;
@@ -189,13 +249,118 @@
         letter-spacing: 2px;
         line-height: 1.6;
       }
-      @keyframes app-splash-loading {
-        from {
-          transform: translateX(-110%);
-        }
-        to {
-          transform: translateX(320%);
-        }
+      /* Each light rises from the foot of the wave and follows one groove over
+         the crest. Stops are points along that groove (translate is in units
+         of the light's own size), eased in and out by their spacing in time. */
+      /* prettier-ignore */
+      @keyframes app-splash-flow-1 {
+        0% { opacity: 0; transform: translate(246.14%, 349.19%); }
+        10.25% { transform: translate(254.88%, 306.4%); }
+        14.65% { transform: translate(268.68%, 264.54%); }
+        18.14% { opacity: 0.2; transform: translate(285.7%, 224.05%); }
+        21.19% { transform: translate(311%, 188.17%); }
+        23.98% { transform: translate(348.27%, 165.16%); }
+        26.61% { opacity: 0.5; transform: translate(391.52%, 165.62%); }
+        29.15% { transform: translate(427.4%, 189.55%); }
+        31.63% { opacity: 1; transform: translate(456.39%, 223.13%); }
+        34.09% { transform: translate(479.39%, 260.4%); }
+        36.57% { transform: translate(501.93%, 298.12%); }
+        39.1% { transform: translate(529.54%, 332.17%); }
+        41.73% { transform: translate(566.34%, 355.63%); }
+        44.53% { transform: translate(609.59%, 363.91%); }
+        47.58% { opacity: 1; transform: translate(652.83%, 356.09%); }
+        51.07% { transform: translate(692.4%, 337.69%); }
+        55.47% { transform: translate(730.13%, 315.15%); }
+        65.71% { opacity: 0; transform: translate(768.31%, 293.06%); }
+        100% { opacity: 0; transform: translate(768.31%, 293.06%); }
+      }
+      /* prettier-ignore */
+      @keyframes app-splash-flow-2 {
+        0% { opacity: 0; transform: translate(243.84%, 341.37%); }
+        10.25% { transform: translate(254.42%, 297.2%); }
+        14.65% { transform: translate(268.22%, 253.96%); }
+        18.14% { opacity: 0.2; transform: translate(285.7%, 212.55%); }
+        21.19% { transform: translate(313.77%, 177.13%); }
+        23.98% { transform: translate(352.41%, 153.66%); }
+        26.61% { opacity: 0.5; transform: translate(397.04%, 150.9%); }
+        29.15% { transform: translate(442.12%, 153.66%); }
+        31.63% { opacity: 1; transform: translate(481.23%, 131.12%); }
+        34.09% { transform: translate(510.67%, 96.61%); }
+        36.57% { transform: translate(541.04%, 63.95%); }
+        39.1% { transform: translate(583.82%, 49.23%); }
+        41.73% { transform: translate(627.07%, 38.65%); }
+        44.53% { transform: translate(667.1%, 58.89%); }
+        47.58% { opacity: 1; transform: translate(696.08%, 93.39%); }
+        51.07% { transform: translate(717.7%, 133.42%); }
+        55.47% { transform: translate(738.87%, 173.44%); }
+        65.71% { opacity: 0; transform: translate(768.31%, 207.49%); }
+        100% { opacity: 0; transform: translate(768.31%, 207.49%); }
+      }
+      /* prettier-ignore */
+      @keyframes app-splash-flow-3 {
+        0% { opacity: 0; transform: translate(247.98%, 348.73%); }
+        10.25% { transform: translate(256.26%, 307.78%); }
+        14.65% { transform: translate(270.52%, 268.68%); }
+        18.14% { opacity: 0.2; transform: translate(288.92%, 231.41%); }
+        21.19% { transform: translate(322.51%, 207.03%); }
+        23.98% { transform: translate(363.45%, 203.81%); }
+        26.61% { opacity: 0.5; transform: translate(397.96%, 226.35%); }
+        29.15% { transform: translate(421.88%, 260.86%); }
+        31.63% { opacity: 1; transform: translate(445.8%, 294.9%); }
+        34.09% { transform: translate(468.81%, 329.87%); }
+        36.57% { transform: translate(496.87%, 361.15%); }
+        39.1% { transform: translate(532.3%, 382.78%); }
+        41.73% { transform: translate(573.24%, 391.52%); }
+        44.53% { transform: translate(614.65%, 386.46%); }
+        47.58% { opacity: 1; transform: translate(653.75%, 372.65%); }
+        51.07% { transform: translate(691.48%, 354.25%); }
+        55.47% { transform: translate(728.74%, 335.85%); }
+        65.71% { opacity: 0; transform: translate(768.31%, 321.59%); }
+        100% { opacity: 0; transform: translate(768.31%, 321.59%); }
+      }
+      /* prettier-ignore */
+      @keyframes app-splash-flow-4 {
+        0% { opacity: 0; transform: translate(245.22%, 349.19%); }
+        10.25% { transform: translate(254.42%, 305.02%); }
+        14.65% { transform: translate(268.22%, 261.32%); }
+        18.14% { opacity: 0.2; transform: translate(285.7%, 219.45%); }
+        21.19% { transform: translate(312.38%, 183.11%); }
+        23.98% { transform: translate(351.03%, 158.72%); }
+        26.61% { opacity: 0.5; transform: translate(395.66%, 155.04%); }
+        29.15% { transform: translate(440.74%, 162.4%); }
+        31.63% { opacity: 1; transform: translate(481.69%, 157.8%); }
+        34.09% { transform: translate(509.29%, 121.92%); }
+        36.57% { transform: translate(535.06%, 84.65%); }
+        39.1% { transform: translate(576.92%, 73.61%); }
+        41.73% { transform: translate(616.95%, 93.39%); }
+        44.53% { transform: translate(648.23%, 126.52%); }
+        47.58% { opacity: 1; transform: translate(674.46%, 163.32%); }
+        51.07% { transform: translate(696.54%, 202.43%); }
+        55.47% { transform: translate(727.36%, 235.55%); }
+        65.71% { opacity: 0; transform: translate(768.31%, 254.42%); }
+        100% { opacity: 0; transform: translate(768.31%, 254.42%); }
+      }
+      /* prettier-ignore */
+      @keyframes app-splash-flow-5 {
+        0% { opacity: 0; transform: translate(246.6%, 349.65%); }
+        10.25% { transform: translate(255.8%, 306.86%); }
+        14.65% { transform: translate(269.6%, 265.92%); }
+        18.14% { opacity: 0.2; transform: translate(287.08%, 225.89%); }
+        21.19% { transform: translate(312.85%, 191.39%); }
+        23.98% { transform: translate(352.87%, 177.13%); }
+        26.61% { opacity: 0.5; transform: translate(395.2%, 186.33%); }
+        29.15% { transform: translate(428.32%, 213.47%); }
+        31.63% { opacity: 1; transform: translate(454.09%, 248.44%); }
+        34.09% { transform: translate(475.71%, 286.16%); }
+        36.57% { transform: translate(499.17%, 322.97%); }
+        39.1% { transform: translate(529.54%, 353.79%); }
+        41.73% { transform: translate(568.64%, 372.19%); }
+        44.53% { transform: translate(611.43%, 373.11%); }
+        47.58% { opacity: 1; transform: translate(653.29%, 362.07%); }
+        51.07% { transform: translate(692.4%, 342.75%); }
+        55.47% { transform: translate(729.67%, 320.21%); }
+        65.71% { opacity: 0; transform: translate(767.85%, 299.96%); }
+        100% { opacity: 0; transform: translate(767.85%, 299.96%); }
       }
       @media (max-width: 600px) {
         #app-splash {
@@ -203,6 +368,13 @@
         }
         #app-splash .app-splash__art {
           object-position: 58% center;
+        }
+        /* On phones the crest sits behind the text, so keep the shading on top. */
+        #app-splash .app-splash__flow {
+          z-index: -3;
+        }
+        #app-splash .app-splash__grain {
+          left: calc((100cqw - max(100cqw, 177.683cqh)) * 0.58);
         }
         #app-splash::before {
           background: linear-gradient(90deg, rgb(13 15 18 / 88%), rgb(13 15 18 / 38%));
@@ -242,8 +414,8 @@
         #app-splash {
           transition: none;
         }
-        #app-splash .app-splash__beam {
-          animation: none;
+        #app-splash .app-splash__flow {
+          display: none;
         }
       }
       @media (forced-colors: active) {
@@ -251,14 +423,9 @@
           background: Canvas;
         }
         #app-splash::before,
-        #app-splash .app-splash__art {
+        #app-splash .app-splash__art,
+        #app-splash .app-splash__flow {
           display: none;
-        }
-        #app-splash .app-splash__track {
-          background: GrayText;
-        }
-        #app-splash .app-splash__beam {
-          background: Highlight;
         }
       }
     </style>
@@ -275,14 +442,97 @@
         fetchpriority="high"
         decoding="async"
       />
+      <div class="app-splash__flow" aria-hidden="true">
+        <div class="app-splash__grain">
+          <i></i><i></i><i></i><i></i><i></i>
+          <svg
+            class="app-splash__grooves"
+            viewBox="0 0 1672 941"
+            preserveAspectRatio="none"
+            focusable="false"
+          >
+            <rect width="1672" height="941" fill="#000" />
+            <defs>
+              <g id="app-splash-groove-paths">
+                <path
+                  d="M530 742C533 728 541 690 549 658C558 627 573 580 582 553C591 527 595 516 603 497C612 478 626 454 635 439C644 425 649 419 656 410C663 402 664 399 677 389C690 379 716 358 734 348C751 338 771 333 784 330C797 326 800 327 812 326C824 326 831 325 854 327C877 329 926 338 949 337C972 336 978 328 992 321C1007 314 1022 304 1035 294C1047 285 1058 275 1067 265C1077 255 1080 251 1092 236C1104 220 1125 187 1137 172C1149 157 1155 153 1164 146C1173 139 1178 136 1191 132C1203 127 1220 127 1241 119C1262 112 1299 92 1318 86C1337 80 1346 83 1358 84C1370 85 1378 87 1391 92C1403 98 1420 106 1434 116C1449 126 1466 142 1477 153C1488 163 1492 170 1499 181C1506 191 1502 182 1520 215C1538 248 1588 345 1607 379C1627 413 1628 408 1639 420C1649 432 1665 446 1670 451"
+                />
+                <path
+                  d="M533 759C534 752 536 732 539 718C542 703 540 705 550 673C560 641 585 563 599 527C612 491 623 474 632 457C642 439 649 432 656 422C664 413 668 408 678 399C688 390 703 378 714 370C725 363 733 358 743 353C753 348 763 345 773 342C784 339 791 337 805 336C818 335 835 336 853 337C870 338 894 341 908 343C923 345 923 344 940 348C956 352 994 364 1007 366C1020 369 1011 369 1017 365C1023 362 1037 353 1046 344C1055 336 1059 335 1073 315C1087 295 1117 246 1132 224C1147 203 1152 196 1161 186C1170 176 1179 171 1188 166C1196 161 1202 158 1212 157C1222 155 1236 157 1248 158C1260 160 1273 163 1283 167C1293 170 1297 173 1309 181C1321 189 1341 202 1354 214C1368 226 1377 236 1393 254C1409 273 1440 309 1452 325C1464 341 1461 342 1465 352C1469 362 1461 362 1475 384C1489 406 1532 463 1550 485C1568 507 1575 507 1585 515C1595 522 1597 524 1611 530C1625 536 1660 549 1670 553"
+                />
+                <path
+                  d="M1000 773C1010 783 1041 818 1057 833C1073 847 1080 853 1096 860C1111 868 1136 874 1151 878C1165 881 1169 881 1183 883C1196 884 1214 885 1230 885C1247 884 1266 883 1282 881C1298 879 1312 876 1327 872C1343 868 1347 868 1373 858C1399 848 1455 823 1482 812C1509 802 1502 802 1533 796C1565 789 1647 775 1669 771"
+                />
+                <path
+                  d="M535 759C536 750 539 724 544 704C549 684 554 667 563 639C572 611 587 566 599 537C610 508 621 486 633 465C646 445 659 428 672 414C684 400 698 390 710 382C722 373 732 368 745 363C758 358 773 355 786 353C798 351 809 351 822 353C834 354 847 358 858 362C869 367 876 371 886 377C897 384 907 391 920 403C932 414 948 432 961 446C974 461 975 458 996 490C1017 523 1065 608 1087 643C1109 678 1118 685 1129 699C1140 712 1144 716 1153 724C1161 732 1172 740 1182 747C1192 754 1200 759 1212 764C1223 770 1236 776 1250 780C1264 785 1281 788 1295 789C1310 791 1324 791 1339 790C1354 789 1369 787 1385 783C1401 780 1417 775 1435 769C1452 762 1450 765 1489 743C1528 721 1640 655 1670 637"
+                />
+                <path
+                  d="M536 760C538 750 541 724 546 704C550 685 555 667 564 641C572 615 586 574 598 547C609 520 620 497 631 479C641 460 652 448 661 436C671 425 678 417 688 410C698 402 711 396 722 392C733 388 743 387 755 386C767 385 780 384 793 385C806 386 821 390 832 393C843 397 847 398 860 405C872 413 893 427 907 438C921 450 932 465 942 477C952 488 947 478 966 509C985 539 1034 624 1056 660C1079 695 1089 707 1102 723C1115 738 1124 745 1133 754C1143 763 1150 769 1160 775C1169 782 1178 787 1189 792C1200 798 1212 803 1224 806C1236 810 1248 812 1262 814C1275 815 1291 815 1305 814C1320 813 1335 811 1351 808C1367 804 1381 801 1401 794C1421 786 1436 783 1471 764C1506 745 1579 699 1612 681C1645 662 1660 657 1669 652"
+                />
+                <path
+                  d="M538 759C540 750 543 726 547 707C551 688 556 671 564 646C573 620 589 577 599 554C608 531 614 522 622 510C629 497 634 490 643 481C651 471 663 459 673 452C684 445 694 440 706 437C717 433 731 431 743 430C756 429 770 428 781 430C792 431 797 432 808 436C819 440 835 447 848 454C861 462 874 472 886 481C897 491 905 500 915 511C925 522 927 520 944 547C961 573 997 636 1019 670C1041 703 1061 729 1076 746C1091 764 1098 768 1108 777C1118 786 1126 792 1137 799C1147 805 1160 812 1172 817C1184 823 1195 827 1208 830C1220 833 1233 835 1247 836C1262 837 1279 837 1293 836C1308 835 1321 832 1335 829C1348 826 1356 825 1375 818C1395 811 1414 805 1451 787C1488 769 1560 727 1597 708C1633 689 1658 681 1670 675"
+                />
+                <path
+                  d="M539 758C540 749 543 724 548 705C552 686 557 669 565 644C574 618 590 576 600 554C609 532 615 523 622 512C629 500 634 494 644 485C653 476 669 464 680 458C692 451 701 450 714 447C727 444 747 441 758 440C769 439 774 440 782 441C790 442 798 445 807 449C815 452 823 456 831 462C839 467 836 457 856 482C876 507 926 578 949 612C972 645 976 657 994 683C1012 708 1044 746 1059 764C1074 782 1075 781 1085 789C1095 797 1108 806 1120 813C1131 820 1142 825 1153 830C1165 835 1177 839 1189 843C1201 846 1211 848 1224 849C1238 851 1254 852 1268 851C1283 851 1296 849 1310 846C1324 844 1334 842 1355 835C1375 828 1390 824 1431 806C1472 787 1560 741 1600 723C1640 705 1658 703 1670 699"
+                />
+                <path
+                  d="M541 759C543 751 545 726 550 708C554 689 559 670 567 648C574 626 588 594 596 576C604 558 608 549 615 539C622 528 630 520 639 512C647 504 656 496 666 491C675 486 685 482 695 479C705 476 715 474 725 474C735 474 745 475 755 476C764 478 775 480 784 483C793 487 799 490 809 496C818 502 834 514 841 519C848 525 847 524 850 530C854 536 851 538 862 557C874 577 897 614 918 645C939 676 970 722 988 745C1006 768 1014 772 1026 783C1039 794 1049 803 1062 812C1075 821 1089 829 1104 836C1118 843 1131 848 1146 852C1162 857 1182 860 1197 863C1213 865 1223 865 1237 865C1251 865 1266 865 1281 863C1296 861 1305 861 1328 853C1352 846 1378 838 1422 820C1466 801 1549 758 1591 741C1632 723 1657 719 1670 714"
+                />
+                <path
+                  d="M1001 778C1010 788 1040 823 1056 839C1072 855 1087 864 1099 872C1110 879 1116 881 1126 885C1136 888 1141 892 1159 894C1176 897 1205 900 1230 900C1255 900 1290 897 1310 893C1330 888 1336 881 1350 875C1365 870 1381 868 1398 861C1415 854 1438 840 1450 835C1462 831 1458 836 1472 832C1485 829 1509 818 1532 812C1555 806 1587 798 1610 794C1633 790 1660 789 1670 788"
+                />
+                <path
+                  d="M1375 904C1385 900 1421 884 1437 878C1454 872 1461 873 1473 867C1485 861 1500 846 1510 840C1520 833 1511 834 1532 830C1552 825 1611 813 1634 811C1657 808 1663 815 1669 816"
+                />
+                <path
+                  d="M1196 207C1193 210 1184 217 1178 223C1172 229 1169 232 1162 243C1154 255 1143 273 1135 292C1126 312 1116 345 1111 360C1107 375 1108 378 1109 384C1109 390 1102 387 1114 394C1127 401 1149 413 1185 428C1220 443 1300 475 1328 484C1355 494 1336 486 1347 485C1359 484 1384 480 1397 477C1409 474 1413 468 1423 467C1432 466 1446 470 1454 472C1463 475 1467 478 1473 483C1480 487 1478 483 1494 499C1509 515 1546 558 1565 577C1584 596 1597 603 1608 611C1619 618 1621 621 1631 621C1642 620 1664 609 1671 607"
+                />
+                <path
+                  d="M530 691C538 666 563 580 575 545C586 510 588 501 599 479C609 458 625 432 636 416C648 400 653 394 667 382C681 369 708 349 721 341C734 332 734 333 742 329C751 326 758 323 771 320C783 317 790 313 818 313C846 314 912 322 938 321C963 321 960 315 971 309C983 304 1000 292 1005 288"
+                />
+                <path
+                  d="M1372 263C1369 266 1361 273 1355 280C1350 288 1344 298 1340 306C1336 314 1333 321 1330 330C1328 339 1326 349 1325 358C1324 366 1324 373 1325 381C1326 390 1328 399 1331 407C1334 415 1337 422 1341 429C1345 435 1350 442 1355 448C1361 454 1368 462 1373 466C1379 471 1383 472 1388 473C1392 475 1392 475 1399 473C1407 470 1424 461 1432 459C1441 457 1445 460 1450 461C1456 462 1456 462 1465 467C1473 472 1484 476 1501 492C1518 508 1552 548 1569 565C1587 582 1594 588 1606 595C1618 603 1630 608 1641 610C1652 612 1666 606 1670 606"
+                />
+                <path
+                  d="M1393 273C1390 278 1378 291 1373 298C1367 305 1365 310 1362 317C1359 325 1355 334 1353 344C1351 353 1349 364 1349 373C1349 383 1350 392 1351 401C1353 410 1356 419 1360 428C1363 436 1369 445 1374 452C1379 458 1386 464 1390 467C1394 469 1395 468 1398 467C1401 467 1400 468 1407 463C1414 457 1432 442 1439 433C1446 424 1448 418 1451 410C1454 402 1457 394 1457 385C1458 377 1458 368 1456 359C1455 350 1455 344 1448 332C1441 321 1423 299 1415 290C1407 281 1402 279 1400 277"
+                />
+                <path
+                  d="M1062 377C1077 352 1129 255 1147 225C1165 196 1161 207 1170 200C1179 193 1191 186 1199 183C1208 179 1212 179 1221 179C1229 178 1235 177 1249 180C1262 184 1287 192 1303 199C1320 206 1334 214 1349 224C1363 235 1382 257 1389 264"
+                />
+                <path
+                  d="M1401 273C1406 278 1422 293 1431 303C1439 313 1448 325 1453 334C1458 343 1458 346 1460 357C1461 368 1461 390 1463 399C1464 408 1461 403 1467 410C1473 417 1482 423 1497 442C1512 460 1544 504 1558 521C1572 539 1573 538 1581 546C1589 553 1599 560 1607 565C1614 570 1616 571 1626 576C1636 580 1662 589 1669 592"
+                />
+                <path
+                  d="M1394 457C1392 455 1386 451 1382 446C1378 441 1374 437 1371 427C1367 417 1361 400 1360 387C1359 373 1360 359 1364 345C1367 332 1376 314 1381 305C1386 297 1389 295 1393 294C1397 293 1396 292 1403 299C1410 306 1428 327 1435 338C1441 349 1441 358 1442 367C1444 375 1444 382 1441 391C1439 400 1437 410 1430 420C1422 431 1402 448 1396 454"
+                />
+                <path
+                  d="M1420 905C1428 902 1451 894 1468 885C1486 876 1497 859 1525 852C1554 846 1620 845 1639 844"
+                />
+              </g>
+            </defs>
+            <use
+              href="#app-splash-groove-paths"
+              fill="none"
+              stroke="#fff"
+              stroke-linecap="round"
+              stroke-opacity="0.32"
+              stroke-width="16"
+            />
+            <use
+              href="#app-splash-groove-paths"
+              fill="none"
+              stroke="#fff"
+              stroke-linecap="round"
+              stroke-width="3.6"
+            />
+          </svg>
+        </div>
+      </div>
       <div class="app-splash__content">
         <p class="app-splash__eyebrow">LASER &amp; CNC SOFTWARE</p>
         <h1 class="app-splash__name">Kerf<span>Desk</span></h1>
         <p class="app-splash__tagline">Your ideas. Beautifully made.</p>
         <div class="app-splash__loading">
-          <div class="app-splash__track" aria-hidden="true">
-            <span class="app-splash__beam"></span>
-          </div>
           <p class="app-splash__status">Opening your workspace…</p>
         </div>
         <!-- Crawlers and script-free visitors read this summary instead of only
