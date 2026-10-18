@@ -12,15 +12,28 @@
 import type { compileJob } from '../../core/job';
 import { assertNever } from '../../core/scene';
 import { formatFeatureMm } from './job-review/min-feature-warnings';
+import { isLaserLeadDiagnostic, laserLeadWarnings } from './laser-lead-warnings';
 
 type CompiledJob = ReturnType<typeof compileJob>;
-type CompileDiagnostic = NonNullable<CompiledJob['diagnostics']>[number];
+type AnyCompileDiagnostic = NonNullable<CompiledJob['diagnostics']>[number];
+// Laser lead diagnostics (ADR-626) have their own wording and merging.
+type CompileDiagnostic = Exclude<
+  AnyCompileDiagnostic,
+  { readonly kind: 'laser-leads-perforated' | 'laser-leads-tabbed' | 'laser-leads-adjusted' }
+>;
 
 const FILL_COLLAPSED_AT_PRECISION_WARNING = (layerName: string): string =>
   `Fill on layer "${layerName}" is missing from the job because every hatch sweep rounds to a stationary point at emitted G-code precision. Check the preview, and enlarge the artwork or use a Line operation if this microscopic detail must remain visible.`;
 
 export function compileDiagnosticWarnings(job: CompiledJob): ReadonlyArray<string> {
-  return mergeClosedUpCounts(job.diagnostics ?? []).map(diagnosticWarning);
+  const diagnostics = job.diagnostics ?? [];
+  const others = diagnostics.filter(
+    (diagnostic): diagnostic is CompileDiagnostic => !isLaserLeadDiagnostic(diagnostic),
+  );
+  return [
+    ...mergeClosedUpCounts(others).map(diagnosticWarning),
+    ...laserLeadWarnings(diagnostics.filter(isLaserLeadDiagnostic)),
+  ];
 }
 
 // A layer compiled one object at a time (objects with their own power scale)

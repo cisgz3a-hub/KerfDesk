@@ -11,6 +11,7 @@ import {
   effectiveOperationForObject,
   operationOverrideForObject,
 } from '../../core/effective-output';
+import { MIN_LEAD_LENGTH_MM } from '../../core/job/laser-lead-settings';
 import { rematerializeParametricShape, type ParametricShapeSpec } from '../../core/shapes';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
@@ -272,7 +273,19 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   setBoolean(out, 'imageCrossHatch', patch.imageCrossHatch);
   setFiniteNumber(out, 'passAngleStepDeg', patch.passAngleStepDeg);
   setBoolean(out, 'autoOverscan', patch.autoOverscan);
+  setLeadFields(out, patch);
   return out as ObjectOperationOverride;
+}
+
+// ADR-626 lead-in and lead-out.
+function setLeadFields(out: Record<string, unknown>, patch: ObjectOperationOverride): void {
+  setBoolean(out, 'leadInEnabled', patch.leadInEnabled);
+  setBoolean(out, 'leadOutEnabled', patch.leadOutEnabled);
+  if (patch.leadStyle === 'arc' || patch.leadStyle === 'line') out.leadStyle = patch.leadStyle;
+  setMinimumNumber(out, 'leadLengthMm', patch.leadLengthMm, MIN_LEAD_LENGTH_MM);
+  setFiniteNumber(out, 'leadAngleDeg', patch.leadAngleDeg);
+  if (patch.leadSide === 'auto' || patch.leadSide === 'outside' || patch.leadSide === 'inside')
+    out.leadSide = patch.leadSide;
 }
 
 // ADR-494 tab layout and tab power.

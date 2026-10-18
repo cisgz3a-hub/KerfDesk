@@ -74,7 +74,22 @@ export type LayerOperationSettings = {
   // runway from its speed and the machine's acceleration at compile time; an
   // older build uses the stored overscan instead.
   readonly autoOverscan?: boolean | undefined;
+  // ADR-626 (LBG-C14). Optional for the same reason: absent means no lead-in
+  // or lead-out, which compiles byte-identically to the output before them.
+  // An older build ignores them and cuts the same contours without leads.
+  readonly leadInEnabled?: boolean | undefined;
+  readonly leadOutEnabled?: boolean | undefined;
+  readonly leadStyle?: LaserLeadStyle | undefined;
+  readonly leadLengthMm?: number | undefined;
+  readonly leadAngleDeg?: number | undefined;
+  readonly leadSide?: LaserLeadSide | undefined;
 };
+
+// ADR-626: an arc meets the cut tangentially; a line meets it at an angle.
+export type LaserLeadStyle = 'arc' | 'line';
+// ADR-626: 'auto' puts each lead on the scrap side, outside an outer contour
+// and inside a hole; the other two put every lead of the operation on that side.
+export type LaserLeadSide = 'auto' | 'outside' | 'inside';
 
 // ADR-494: 'count' puts tabsPerShape tabs on every contour; 'spacing' puts one
 // tab per tabSpacingMm of perimeter, at most tabMaxPerShape when that is set.
@@ -188,6 +203,12 @@ const LAYER_OPERATION_SETTING_KEYS = [
   'imageCrossHatch',
   'passAngleStepDeg',
   'autoOverscan',
+  'leadInEnabled',
+  'leadOutEnabled',
+  'leadStyle',
+  'leadLengthMm',
+  'leadAngleDeg',
+  'leadSide',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -274,6 +295,12 @@ export const OPTIONAL_CUT_SETTING_KEYS = [
   'imageCrossHatch',
   'passAngleStepDeg',
   'autoOverscan',
+  'leadInEnabled',
+  'leadOutEnabled',
+  'leadStyle',
+  'leadLengthMm',
+  'leadAngleDeg',
+  'leadSide',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 // Written only when set, so a capture of an operation that never used them

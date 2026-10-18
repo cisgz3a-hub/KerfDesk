@@ -6,7 +6,7 @@ import { hasExecutableFillSweep } from './fill-group-emission';
 import { contourEntryRunwayMm } from './contour-entry';
 import type { CutGroup, JobDiagnostic } from './job';
 import { fillPassLayers } from './scan-pass-angles';
-import { lineOvercutFields } from './line-cut-extras';
+import { lineLeadDiagnostics, lineLeadFields, lineOvercutFields } from './line-cut-extras';
 import { lineTabSpanGroups } from './line-tabs';
 import { offsetFillDiagnostics } from './offset-fill-diagnostics';
 import { commonVectorGroupFields } from './vector-group-fields';
@@ -185,7 +185,10 @@ function lineGroups(
   // Reported even when no segments survived: a failed kerf offset takes every
   // closed contour on the layer with it, which is precisely the case where the
   // layer would otherwise vanish from the job without a trace.
-  const diagnostics = line.kerfDiagnostics;
+  const diagnostics = [
+    ...line.kerfDiagnostics,
+    ...lineLeadDiagnostics(layer, line.tabbedContours ?? 0),
+  ];
   if (line.segments.length === 0 && line.tabSpans.length === 0) return { groups: [], diagnostics };
   const common = {
     ...commonVectorGroupFields(layer, device, powerSource, sourceObjectId),
@@ -202,6 +205,7 @@ function lineGroups(
             kind: 'cut' as const,
             ...runway,
             ...lineOvercutFields(layer, line.segments),
+            ...lineLeadFields(layer, line.segments),
             segments: line.segments,
           },
         ];

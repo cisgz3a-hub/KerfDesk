@@ -24,11 +24,19 @@ function collectGroupCoordinates(
   switch (group.kind) {
     case 'cut':
     case 'fill':
-      group.segments.forEach((segment, segmentIndex) =>
+      group.segments.forEach((segment, segmentIndex) => {
         segment.polyline.forEach((point, pointIndex) =>
           pushPoint(values, `${path}.segments[${segmentIndex}].polyline[${pointIndex}]`, point),
-        ),
-      );
+        );
+        // ADR-626: the final pass's own lead-out after an overcut.
+        segment.finalPassBurn?.polyline.forEach((point, pointIndex) =>
+          pushPoint(
+            values,
+            `${path}.segments[${segmentIndex}].finalPassBurn.polyline[${pointIndex}]`,
+            point,
+          ),
+        );
+      });
       return;
     case 'raster':
       collectRasterCoordinates(group, path, values);

@@ -3,6 +3,10 @@
 // on past the start by the group's overcut. Every consumer that walks a Line
 // group's passes (G-code emission, the Ruida motion plan, the preview route)
 // takes the final pass's segments from here, so they cannot disagree.
+//
+// A contour with laser leads (ADR-626) is already open, lead-in to lead-out;
+// preparation worked out its final pass, with the overcut before the lead-out,
+// and stored it as `finalPassBurn`.
 
 import { overcutClosedPolyline } from '../geometry/overcut';
 import type { CutGroup, CutSegment } from './job';
@@ -12,11 +16,12 @@ export function finalPassCutSegments(
 ): ReadonlyArray<CutSegment> {
   const overcutMm = group.finalPassOvercutMm ?? 0;
   if (!(overcutMm > 0)) return group.segments;
-  return group.segments.map((segment) =>
-    segment.closed
+  return group.segments.map((segment) => {
+    if (segment.finalPassBurn !== undefined) return finalPassBurnSegment(segment);
+    return segment.closed
       ? { ...segment, polyline: overcutClosedPolyline(segment.polyline, overcutMm) }
-      : segment,
-  );
+      : segment;
+  });
 }
 
 /** The segments pass `passIndex` (0-based) of `passes` cuts. */
@@ -27,4 +32,14 @@ export function cutSegmentsForPass(
   passes: number,
 ): ReadonlyArray<CutSegment> {
   return passIndex === passes - 1 ? finalPass : group.segments;
+}
+
+function finalPassBurnSegment(segment: CutSegment): CutSegment {
+  const { finalPassBurn, arcMoves: _ordinaryPassArcs, ...rest } = segment;
+  if (finalPassBurn === undefined) return segment;
+  return {
+    ...rest,
+    polyline: finalPassBurn.polyline,
+    ...(finalPassBurn.arcMoves === undefined ? {} : { arcMoves: finalPassBurn.arcMoves }),
+  };
 }

@@ -56,6 +56,7 @@ import { hasContributingFocusMotion } from '../../core/preflight/focus-contribut
 import { contourEntryBoundsForDevice, withContourEntryBounds } from '../../core/job/contour-entry';
 import { placeCncParks } from '../../core/job/job-origin';
 import { placeLaserFinish } from '../../core/job/laser-finish';
+import { applyLaserLeads } from '../../core/job/apply-laser-leads';
 import {
   CURRENT_LASER_POWER_SCALE_VERSION,
   type LaserPowerScaleVersion,
@@ -275,11 +276,15 @@ export function completePreparedOutput(
     input.project.device,
   );
   const target = jobStartTarget(input.project, optimized, offset, startOptions);
+  const started = target === null ? optimized : applyJobStartPoint(optimized, target, startOptions);
   return {
     ok: true,
     project: input.project,
     laserPowerScaleVersion: CURRENT_LASER_POWER_SCALE_VERSION,
-    job: target === null ? optimized : applyJobStartPoint(optimized, target, startOptions),
+    // ADR-626: leads join each contour where the beam really starts, so they
+    // follow the planner and the job start point. A job without leads is
+    // returned as is.
+    job: applyLaserLeads(started, { bed: entryBounds }),
     jobOriginOffset: offset,
     advisories: input.advisories,
   };

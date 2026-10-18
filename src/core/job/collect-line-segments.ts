@@ -29,6 +29,8 @@ export type LineSegmentCollection = {
   readonly segments: ReadonlyArray<CutSegment>;
   readonly tabSpans: ReadonlyArray<CutSegment>;
   readonly kerfDiagnostics: ReadonlyArray<JobDiagnostic>;
+  /** Closed contours split at tabs (ADR-494); laser leads skip them. */
+  readonly tabbedContours?: number;
 };
 
 // Line segments as collected, with the machine-space centres of any tabs

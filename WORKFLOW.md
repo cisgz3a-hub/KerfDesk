@@ -1153,6 +1153,33 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 5. Refresh and the stale-preset notice work as for a hand-linked preset. The job material is saved
    with the project.
 
+### F-A7h. Laser lead-in and lead-out (ADR-626)
+
+1. **More cut settings → Line detail → Lead-in / Lead-out**: **Lead-in** and **Lead-out** switch
+   each on. Both are off by default; while both are off the output is unchanged.
+2. **Style**: **Arc** joins the cut along its edge without slowing down; **Line** joins it at an
+   angle. **Length** (0.1 to 20 mm, default 2) is the lead's own length. **Arc angle** (10° to
+   180°, default 90°, a quarter circle) is how far an arc turns before it meets the cut; **Angle**
+   (10° to 90°, default 45°) is the angle a line meets the cut at, 90° coming straight in from the
+   side.
+3. **Side**: **Scrap side (automatic)** puts the leads outside a shape and inside a hole, judged
+   across every Line operation in the job, so a hole cut by its own operation still counts as a hole.
+   **Always outside** and **Always inside** put every lead of the operation on that side.
+4. Leads join each closed shape where it really starts, so they follow **Start closed shapes**
+   (F-A9e) and the job start point. Where no lead fits there (a hole that starts at a corner), the
+   shape starts in the middle of a nearby edge instead.
+5. A lead keeps 0.2 mm, or one kerf width (twice the Kerf Offset) when that is wider, up to 1 mm,
+   from every other cut line, ends on the scrap side and stays on the bed when the bed position is
+   known. A lead that does not fit is shortened, down to a quarter, or left out, and Job Review says
+   how many shapes that affects. That shape is cut as it would be without leads.
+6. Every pass cuts lead-in, shape, lead-out. With **Overcut** the final pass runs past the start
+   first and leaves by a lead-out from where the overcut ends. Leads follow the kerf-offset path.
+   Shapes with tabs and perforated lines get no leads, and Job Review says so. Open paths get none.
+7. Preview, Frame, both time estimates, Job Review and every output format (GRBL, Marlin,
+   Smoothieware, Ruida) show the leads. On machines that take arcs, a shape that goes out as arcs
+   keeps them and its arc leads go out as arcs too. CNC output never changes.
+8. Material presets do not store them; Copy and Paste settings and process recipes do.
+
 ---
 
 ### F-A8. Preview

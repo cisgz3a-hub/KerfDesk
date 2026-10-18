@@ -66,6 +66,7 @@ export function lineTopologyCollections(
       segments: perforateLineSegments(tabbed.segments, bucket.layer),
       tabSpans: tabbed.tabSpans,
       kerfDiagnostics: layerKerfDiagnostics(line, bucket.layer),
+      ...(tabbed.tabbedContours === undefined ? {} : { tabbedContours: tabbed.tabbedContours }),
     });
   }
   return result;

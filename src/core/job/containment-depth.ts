@@ -116,6 +116,16 @@ const ON_OUTLINE_MM = 1e-4;
 // shared with the container's outline cannot hide every one of them.
 const MAX_PROBE_VERTICES = 16;
 
+/** Whether the closed outline `target` lies inside `container`, judged as
+ * inside-first ordering judges it. Shared with laser leads (ADR-626). */
+export function outlineInsideContainer(
+  target: ReadonlyArray<Vec2>,
+  container: ReadonlyArray<Vec2>,
+): boolean {
+  const center = boundsCenter(polylineBounds(target));
+  return center !== null && targetInside(target, center, container);
+}
+
 // Probes with the first sampled vertex that is off the container's outline.
 // When every sample touches it (two coincident copies), the centre of the
 // target's bounds decides, as it always did.
