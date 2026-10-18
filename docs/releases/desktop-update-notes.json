@@ -3,7 +3,7 @@
   "sinceSourceSha": "cbc7a91fa00452f0b171172307ac3fe5e5d8457b",
   "highlights": [
     "Registration Jig has its own editor page: add text, import or trace artwork, then Save to canvas. Escape no longer discards your edits, and after a complete outline burn the jig switches to Artwork only and reminds you to refocus.",
-    "Artwork centre & LED points at the centre of the artwork you choose and leaves the LED on until you switch it off; LED on needs no head move. Optional centring after Frame works in every placement mode. Marlin fan lasers get no LED.",
+    "Artwork centre & LED lights the centre of the selected artwork you pick, and the LED stays on until LED off. An option centres it on the whole framed job after Frame in any placement mode. Marlin fan-laser profiles have no pointer light.",
     "Find any command with Ctrl+K (Cmd+K on Mac). The workspace is denser and fits smaller screens, the jog pad is more compact, most dialogs keep their buttons visible, and Settings no longer changes size between sections.",
     "Offset, Combine, Weld and Cut Shapes now run in the background so the app stays responsive. The artwork settings panel shows dither options as visual swatches, and the Material Test dialog previews its grid as you edit it.",
     "On GRBL and Smoothieware controllers, jobs no longer hang when the last replies are lost. Reconnect pop-ups are quieter, speed sliders use realistic ranges, and a bed diagram sets the origin and records the homing corner.",
