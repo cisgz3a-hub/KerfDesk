@@ -67,7 +67,11 @@ link, and LightBurn has no free tier.
 - The native licence qualification activates from the window, not from Help >
   Licence, because an unlicensed profile no longer reaches the workspace. The
   fresh sandbox smoke now proves the window stands alone instead of importing and
-  saving. The historical Free upgrade qualification (`installed-upgrade-profile.ps1`)
+  saving, and the commercial release packaging smoke
+  (`build-commercial-platform.sh`, `--expect-licence-window`) does the same for
+  each unlicensed Mac and Linux package. The window answers the main process's
+  close requests, so Quit and the window's X close the app before the workspace
+  exists. The historical Free upgrade qualification (`installed-upgrade-profile.ps1`)
   still expects a Free workspace: once its target carries this decision, it needs
   a licensed profile.
 - The startup splash fades for the settled licence window as it does for the
