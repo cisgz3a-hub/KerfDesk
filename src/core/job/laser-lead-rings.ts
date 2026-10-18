@@ -21,6 +21,7 @@
 import type { Vec2 } from '../scene';
 import { containmentDepths } from './containment-depth';
 import type { CutSegment, Job } from './job';
+import { chainPieces } from './laser-lead-chain';
 import type { LeadRing } from './laser-lead-obstacles';
 import { polylineBounds } from './segment-bounds';
 
@@ -140,14 +141,49 @@ function earlierCopy(
   return null;
 }
 
+// Same bounds and length first, cheaply; then the outlines themselves, so two
+// different shapes that happen to share both (mirrored L shapes) stay apart.
 function ringsAreCopies(a: LeadRing, b: LeadRing): boolean {
   return (
     Math.abs(a.bounds.minX - b.bounds.minX) <= COPY_MM &&
     Math.abs(a.bounds.minY - b.bounds.minY) <= COPY_MM &&
     Math.abs(a.bounds.maxX - b.bounds.maxX) <= COPY_MM &&
     Math.abs(a.bounds.maxY - b.bounds.maxY) <= COPY_MM &&
-    Math.abs(a.lengthMm - b.lengthMm) <= COPY_MM + a.lengthMm * COPY_LENGTH_RELATIVE
+    Math.abs(a.lengthMm - b.lengthMm) <= COPY_MM + a.lengthMm * COPY_LENGTH_RELATIVE &&
+    outlineRidesOn(a.points, b.points) &&
+    outlineRidesOn(b.points, a.points)
   );
+}
+
+// Probes spread along an outline; each must lie on the other within COPY_MM.
+const COPY_PROBES = 32;
+
+function outlineRidesOn(probe: ReadonlyArray<Vec2>, outline: ReadonlyArray<Vec2>): boolean {
+  const stride = Math.max(1, Math.floor(probe.length / COPY_PROBES));
+  for (let index = 0; index < probe.length; index += stride) {
+    const point = probe[index] as Vec2;
+    if (distanceToOutline(point, outline) > COPY_MM) return false;
+  }
+  return true;
+}
+
+function distanceToOutline(point: Vec2, outline: ReadonlyArray<Vec2>): number {
+  let bestSq = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < outline.length; index += 1) {
+    const a = outline[index] as Vec2;
+    const b = outline[(index + 1) % outline.length] as Vec2;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const lengthSq = dx * dx + dy * dy;
+    const t =
+      lengthSq === 0
+        ? 0
+        : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSq));
+    const ox = point.x - (a.x + t * dx);
+    const oy = point.y - (a.y + t * dy);
+    bestSq = Math.min(bestSq, ox * ox + oy * oy);
+  }
+  return Math.sqrt(bestSq);
 }
 
 function copyLists(representatives: ReadonlyArray<number>): number[][] {
@@ -175,45 +211,6 @@ function ring(
     lineIds,
     ...(nesting === undefined ? {} : { nesting: { forest: nesting.forest, depth: nesting.depth } }),
   };
-}
-
-// Greedy: from the first piece, always continue with the unused piece whose
-// nearer end is closest to where the outline has got to, reversed when its far
-// end is the nearer one. The pieces of one contour meet across tab or dash
-// gaps, so this recovers their order whatever order the planner left them in.
-function chainPieces(pieces: ReadonlyArray<ReadonlyArray<Vec2>>): ReadonlyArray<Vec2> {
-  const used = new Array<boolean>(pieces.length).fill(false);
-  const outline: Vec2[] = [...(pieces[0] ?? [])];
-  used[0] = true;
-  for (let step = 1; step < pieces.length; step += 1) {
-    const tail = outline[outline.length - 1];
-    if (tail === undefined) break;
-    let best = -1;
-    let bestReversed = false;
-    let bestSq = Number.POSITIVE_INFINITY;
-    pieces.forEach((piece, index) => {
-      if (used[index] === true) return;
-      const startSq = distanceSq(tail, piece[0]);
-      const endSq = distanceSq(tail, piece[piece.length - 1]);
-      if (Math.min(startSq, endSq) < bestSq) {
-        best = index;
-        bestReversed = endSq < startSq;
-        bestSq = Math.min(startSq, endSq);
-      }
-    });
-    if (best < 0) break;
-    used[best] = true;
-    const piece = pieces[best] ?? [];
-    outline.push(...(bestReversed ? [...piece].reverse() : piece));
-  }
-  return outline;
-}
-
-function distanceSq(a: Vec2, b: Vec2 | undefined): number {
-  if (b === undefined) return Number.POSITIVE_INFINITY;
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  return dx * dx + dy * dy;
 }
 
 function outlineLength(points: ReadonlyArray<Vec2>): number {

@@ -14,7 +14,9 @@ import {
   MIN_LEAD_ANGLE_DEG,
   MIN_LEAD_LENGTH_MM,
 } from '../../core/job/laser-lead-settings';
-import type { LaserLeadStyle, Layer } from '../../core/scene';
+import type { Layer } from '../../core/scene';
+// Deep import: core/scene's barrel is ratcheted and may only shrink.
+import type { LaserLeadStyle } from '../../core/scene/layer';
 import { Field, NumberInput } from './CutSettingsInputs';
 
 export function LineLeadFields(props: { readonly layer: Layer }): JSX.Element {

@@ -45,7 +45,7 @@ export function lineOvercutFields(
 /** The group field for the operation's leads; empty when it asks for none or
  * nothing it cuts is closed. A perforated cut never is. */
 export function lineLeadFields(
-  settings: LayerOperationSettings & { readonly name: string },
+  settings: LayerOperationSettings & { readonly id: string; readonly name: string },
   segments: ReadonlyArray<CutSegment>,
 ): Pick<CutGroup, 'laserLeads'> {
   const spec = laserLeadSpecFor(settings);
@@ -55,13 +55,20 @@ export function lineLeadFields(
 
 /** What Job Review says when an operation asks for leads its cuts cannot take. */
 export function lineLeadDiagnostics(
-  settings: LayerOperationSettings & { readonly name: string },
+  settings: LayerOperationSettings & { readonly id: string; readonly name: string },
   tabbedContours: number,
 ): ReadonlyArray<JobDiagnostic> {
   if (laserLeadSpecFor(settings) === null) return [];
   if (perforationPatternFor(settings) !== null)
-    return [{ kind: 'laser-leads-perforated', layerName: settings.name }];
+    return [{ kind: 'laser-leads-perforated', layerId: settings.id, layerName: settings.name }];
   return tabbedContours > 0
-    ? [{ kind: 'laser-leads-tabbed', layerName: settings.name, count: tabbedContours }]
+    ? [
+        {
+          kind: 'laser-leads-tabbed',
+          layerId: settings.id,
+          layerName: settings.name,
+          count: tabbedContours,
+        },
+      ]
     : [];
 }

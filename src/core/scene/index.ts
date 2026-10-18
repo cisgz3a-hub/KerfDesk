@@ -3,8 +3,6 @@
 // boundaries enforced). Cross-module callers import only from this index.
 
 export type {
-  LaserLeadSide,
-  LaserLeadStyle,
   Layer,
   LayerFillStyle,
   LayerMode,

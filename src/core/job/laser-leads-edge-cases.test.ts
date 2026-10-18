@@ -93,7 +93,7 @@ describe('laser lead edge cases (ADR-626)', () => {
     );
     for (const point of firstSegment(done).polyline) expect(point.x).toBeGreaterThan(edge);
     expect(done.diagnostics).toEqual([
-      { kind: 'laser-leads-adjusted', layerName: 'Cut', shortened: 1, omitted: 0 },
+      { kind: 'laser-leads-adjusted', layerId: 'L', layerName: 'Cut', shortened: 1, omitted: 0 },
     ]);
   });
 

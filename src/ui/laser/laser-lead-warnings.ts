@@ -3,10 +3,20 @@
 // be with leads off, so nothing here can refuse Frame or Start.
 
 type LeadDiagnostic =
-  | { readonly kind: 'laser-leads-perforated'; readonly layerName: string }
-  | { readonly kind: 'laser-leads-tabbed'; readonly layerName: string; readonly count: number }
+  | {
+      readonly kind: 'laser-leads-perforated';
+      readonly layerId: string;
+      readonly layerName: string;
+    }
+  | {
+      readonly kind: 'laser-leads-tabbed';
+      readonly layerId: string;
+      readonly layerName: string;
+      readonly count: number;
+    }
   | {
       readonly kind: 'laser-leads-adjusted';
+      readonly layerId: string;
       readonly layerName: string;
       readonly shortened: number;
       readonly omitted: number;
@@ -22,13 +32,13 @@ export function isLaserLeadDiagnostic<T extends { readonly kind: string }>(
   );
 }
 
-/** One warning per operation and kind: an operation compiled object by object
- * reports once per object. */
+/** One warning per operation (by id: names can repeat) and kind; an operation
+ * compiled object by object reports once per object. */
 export function laserLeadWarnings(diagnostics: ReadonlyArray<LeadDiagnostic>): string[] {
   const merged: LeadDiagnostic[] = [];
   for (const diagnostic of diagnostics) {
     const index = merged.findIndex(
-      (earlier) => earlier.kind === diagnostic.kind && earlier.layerName === diagnostic.layerName,
+      (earlier) => earlier.kind === diagnostic.kind && earlier.layerId === diagnostic.layerId,
     );
     const earlier = merged[index];
     if (earlier === undefined) merged.push(diagnostic);

@@ -25,6 +25,14 @@ const KEY_SPAN = 2 ** 22;
 // A chord is registered piece by piece, each piece at most half a cell long,
 // so it sits in every cell it passes through and in few others.
 const PIECE_MM = CELL_MM / 2;
+// A chord longer than this many pieces (1 m) is checked by every query
+// instead, so one very long line cannot fill the grid.
+const MAX_GRID_PIECES = 2000;
+
+type Grid = {
+  readonly cells: ReadonlyMap<number, ReadonlyArray<number>>;
+  readonly wide: ReadonlyArray<number>;
+};
 
 type Chords = {
   readonly ax: Float64Array;
@@ -37,7 +45,7 @@ type Chords = {
 export class LeadObstacles {
   private constructor(
     private readonly chords: Chords,
-    private readonly cells: ReadonlyMap<number, ReadonlyArray<number>>,
+    private readonly grid: Grid,
     private readonly ringIndex: ContourBoxIndex<SegmentBounds & { readonly ring: number }> | null,
     readonly rings: ReadonlyArray<LeadRing>,
   ) {}
@@ -52,7 +60,7 @@ export class LeadObstacles {
     );
     return new LeadObstacles(
       chords,
-      gridCells(chords),
+      chordGrid(chords),
       boxes.length === 0 ? null : ContourBoxIndex.create(boxes),
       rings,
     );
@@ -66,32 +74,41 @@ export class LeadObstacles {
     own: number,
     ignored: ReadonlySet<number>,
   ): { readonly ownMm: number; readonly otherMm: number } {
-    const { ax, ay, bx, by, line } = this.chords;
-    let ownSq = capMm * capMm;
-    let otherSq = ownSq;
+    const nearest = { ownSq: capMm * capMm, otherSq: capMm * capMm };
+    const visit = (chord: number): void => this.visitChord(chord, point, own, ignored, nearest);
     const loX = cellOf(point.x - capMm);
     const hiX = cellOf(point.x + capMm);
     const loY = cellOf(point.y - capMm);
     const hiY = cellOf(point.y + capMm);
     for (let cx = loX; cx <= hiX; cx += 1) {
       for (let cy = loY; cy <= hiY; cy += 1) {
-        for (const chord of this.cells.get(cellKey(cx, cy)) ?? []) {
-          const owner = line[chord] as number;
-          const isOwn = owner === own;
-          if (!isOwn && ignored.has(owner)) continue;
-          const distSq = segmentDistanceSq(
-            point,
-            ax[chord] as number,
-            ay[chord] as number,
-            bx[chord] as number,
-            by[chord] as number,
-          );
-          if (isOwn) ownSq = Math.min(ownSq, distSq);
-          else otherSq = Math.min(otherSq, distSq);
-        }
+        for (const chord of this.grid.cells.get(cellKey(cx, cy)) ?? []) visit(chord);
       }
     }
-    return { ownMm: Math.sqrt(ownSq), otherMm: Math.sqrt(otherSq) };
+    for (const chord of this.grid.wide) visit(chord);
+    return { ownMm: Math.sqrt(nearest.ownSq), otherMm: Math.sqrt(nearest.otherSq) };
+  }
+
+  private visitChord(
+    chord: number,
+    point: Vec2,
+    own: number,
+    ignored: ReadonlySet<number>,
+    nearest: { ownSq: number; otherSq: number },
+  ): void {
+    const { ax, ay, bx, by, line } = this.chords;
+    const owner = line[chord] as number;
+    const isOwn = owner === own;
+    if (!isOwn && ignored.has(owner)) return;
+    const distSq = segmentDistanceSq(
+      point,
+      ax[chord] as number,
+      ay[chord] as number,
+      bx[chord] as number,
+      by[chord] as number,
+    );
+    if (isOwn) nearest.ownSq = Math.min(nearest.ownSq, distSq);
+    else nearest.otherSq = Math.min(nearest.otherSq, distSq);
   }
 
   /** The rings whose bounds hold `point`. */
@@ -129,8 +146,9 @@ function collectChords(lines: ReadonlyArray<ReadonlyArray<Vec2>>): Chords {
   return chords;
 }
 
-function gridCells(chords: Chords): ReadonlyMap<number, ReadonlyArray<number>> {
+function chordGrid(chords: Chords): Grid {
   const cells = new Map<number, number[]>();
+  const wide: number[] = [];
   const add = (cx: number, cy: number, chord: number): void => {
     const key = cellKey(cx, cy);
     const list = cells.get(key);
@@ -144,6 +162,10 @@ function gridCells(chords: Chords): ReadonlyMap<number, ReadonlyArray<number>> {
     const by = chords.by[chord] as number;
     if (![ax, ay, bx, by].every(Number.isFinite)) continue;
     const pieces = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / PIECE_MM));
+    if (pieces > MAX_GRID_PIECES) {
+      wide.push(chord);
+      continue;
+    }
     for (let piece = 0; piece < pieces; piece += 1) {
       const t0 = piece / pieces;
       const t1 = (piece + 1) / pieces;
@@ -158,7 +180,7 @@ function gridCells(chords: Chords): ReadonlyMap<number, ReadonlyArray<number>> {
       }
     }
   }
-  return cells;
+  return { cells, wide };
 }
 
 function cellOf(value: number): number {

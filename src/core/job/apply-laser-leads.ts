@@ -52,7 +52,20 @@ type LeadWorld = LeadJobLines & {
   readonly bed: JobBounds | null;
 };
 
-type LeadCounts = { shortened: number; omitted: number };
+type LeadCounts = { readonly layerName: string; shortened: number; omitted: number };
+
+/** The bed a lead must stay on: the program's bed, but on an active rotary
+ * only its X limits. The rotary rebases Y and flat-bed Y placement means
+ * nothing there, so the same artwork gets the same leads wherever it sits. */
+export function laserLeadBed(bed: JobBounds | null, rotary: boolean): JobBounds | null {
+  if (bed === null || !rotary) return bed;
+  return {
+    minX: bed.minX,
+    maxX: bed.maxX,
+    minY: Number.NEGATIVE_INFINITY,
+    maxY: Number.POSITIVE_INFINITY,
+  };
+}
 
 export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   if (!job.groups.some((group) => group.kind === 'cut' && group.laserLeads !== undefined))
@@ -66,7 +79,7 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   const counts = new Map<string, LeadCounts>();
   const groups = job.groups.map((group, groupIndex) => {
     if (group.kind !== 'cut' || group.laserLeads === undefined) return group;
-    const tally = countsFor(counts, group.laserLeads.operationName);
+    const tally = countsFor(counts, group.layerId, group.laserLeads.operationName);
     return {
       ...group,
       segments: group.segments.map((segment, segmentIndex) =>
@@ -86,18 +99,25 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   };
 }
 
-function countsFor(counts: Map<string, LeadCounts>, name: string): LeadCounts {
-  const existing = counts.get(name);
+// By operation id: two operations can share a name (each parent's Sub-layer 1).
+function countsFor(counts: Map<string, LeadCounts>, layerId: string, name: string): LeadCounts {
+  const existing = counts.get(layerId);
   if (existing !== undefined) return existing;
-  const created = { shortened: 0, omitted: 0 };
-  counts.set(name, created);
+  const created = { layerName: name, shortened: 0, omitted: 0 };
+  counts.set(layerId, created);
   return created;
 }
 
 function leadDiagnostics(counts: ReadonlyMap<string, LeadCounts>): JobDiagnostic[] {
   return [...counts.entries()]
     .filter(([, tally]) => tally.shortened > 0 || tally.omitted > 0)
-    .map(([layerName, tally]) => ({ kind: 'laser-leads-adjusted', layerName, ...tally }));
+    .map(([layerId, tally]) => ({
+      kind: 'laser-leads-adjusted',
+      layerId,
+      layerName: tally.layerName,
+      shortened: tally.shortened,
+      omitted: tally.omitted,
+    }));
 }
 
 function leadSegment(
@@ -122,7 +142,7 @@ function leadSegment(
   tallyContour(tally, attempt);
   const { leadIn, leadOut, finalPass } = attempt;
   if (leadIn === null && leadOut === null) return segment;
-  return leadedSegment(attempt.segment, leadIn, leadOut, finalPass);
+  return leadedSegment(attempt.segment, leadIn, leadOut, finalPass, group.passes);
 }
 
 type LeadAttempt = {
@@ -244,6 +264,7 @@ function leadedSegment(
   leadIn: LeadFit | null,
   leadOut: LeadFit | null,
   finalPass: FinalPass | null,
+  passes: number,
 ): CutSegment {
   const ring = segment.polyline;
   const head = leadIn === null ? ring.slice(0, 1) : leadIn.path.points;
@@ -258,12 +279,22 @@ function leadedSegment(
           ...contourMoves,
           ...(leadOut?.path.moves ?? []),
         ]);
-  if (finalPass === null) return withArcs;
+  return finalPass === null ? withArcs : withFinalPass(open, withArcs, head, finalPass, passes);
+}
+
+// The final pass's own burn: lead-in, the overcut contour, its own lead-out.
+// With one pass the final pass is the only one, so it is the segment's burn
+// and no reader can count a path that never runs.
+function withFinalPass(
+  open: CutSegment,
+  withArcs: CutSegment,
+  head: ReadonlyArray<Vec2>,
+  finalPass: FinalPass,
+  passes: number,
+): CutSegment {
   const tail = finalPass.fit?.path.points.slice(1) ?? [];
-  return {
-    ...withArcs,
-    finalPassBurn: { polyline: [...head, ...finalPass.points.slice(1), ...tail] },
-  };
+  const polyline = [...head, ...finalPass.points.slice(1), ...tail];
+  return passes <= 1 ? { ...open, polyline } : { ...withArcs, finalPassBurn: { polyline } };
 }
 
 function fitContext(

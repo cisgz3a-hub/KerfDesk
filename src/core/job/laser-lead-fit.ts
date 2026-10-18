@@ -20,6 +20,7 @@ import { extendBoundsByEmittedArcMoves } from './cut-arc-moves';
 import type { JobBounds } from './job-bounds';
 import type { LeadObstacles } from './laser-lead-obstacles';
 import {
+  ARC_SAMPLE_SAGITTA_MM,
   leadPath,
   type LeadJoin,
   type LeadKind,
@@ -74,21 +75,30 @@ export function leadFits(
 ): boolean {
   if (!onBed(path, context.bed)) return false;
   const outward = kind === 'in' ? [...path.points].reverse() : path.points;
-  if (!clearOfCutLines(walkSamples(outward), at, context)) return false;
+  // An arc written as G2/G3 bulges up to the sampling sag past the chords
+  // checked here, so it keeps that much more clearance from other cut lines.
+  const reserveMm = path.moves.some((move) => move.kind === 'arc') ? ARC_SAMPLE_SAGITTA_MM : 0;
+  if (!clearOfCutLines(walkSamples(outward), at, context, reserveMm)) return false;
   return freeEndInScrap(path.freeEnd, at, context);
 }
 
-function clearOfCutLines(samples: ReadonlyArray<Vec2>, at: Vec2, context: LeadFitContext): boolean {
+function clearOfCutLines(
+  samples: ReadonlyArray<Vec2>,
+  at: Vec2,
+  context: LeadFitContext,
+  reserveMm: number,
+): boolean {
   const { obstacles, ownLine, ignoredLines, clearanceMm } = context;
+  const keepOutMm = clearanceMm + reserveMm;
   let reached = 0;
   let freeEndMm = 0;
   for (const sample of samples) {
-    const { ownMm, otherMm } = obstacles.distancesMm(sample, clearanceMm, ownLine, ignoredLines);
+    const { ownMm, otherMm } = obstacles.distancesMm(sample, keepOutMm, ownLine, ignoredLines);
     if (ownMm < Math.min(reached, clearanceMm) - TOLERANCE_MM) return false;
     reached = Math.max(reached, ownMm);
     freeEndMm = ownMm;
     const fromJoin = Math.hypot(sample.x - at.x, sample.y - at.y);
-    if (fromJoin >= clearanceMm && otherMm < clearanceMm) return false;
+    if (fromJoin >= clearanceMm && otherMm < keepOutMm) return false;
   }
   // The last sample is the free end, where the start or stop mark lands.
   return freeEndMm >= clearanceMm;

@@ -450,13 +450,24 @@ export type JobDiagnostic =
   // ADR-626: the operation asks for leads, but some contours get none or a
   // shorter one. A perforated cut has no closed contour to lead into, and
   // `count` tabbed contours start and stop at their tabs instead.
-  | { readonly kind: 'laser-leads-perforated'; readonly layerName: string }
-  | { readonly kind: 'laser-leads-tabbed'; readonly layerName: string; readonly count: number }
+  // `layerId` tells operations that share a name apart; `layerName` is shown.
+  | {
+      readonly kind: 'laser-leads-perforated';
+      readonly layerId: string;
+      readonly layerName: string;
+    }
+  | {
+      readonly kind: 'laser-leads-tabbed';
+      readonly layerId: string;
+      readonly layerName: string;
+      readonly count: number;
+    }
   // `shortened` leads were cut down and `omitted` left out because the full
   // lead would leave the scrap side, come too close to another cut line or
   // leave the bed.
   | {
       readonly kind: 'laser-leads-adjusted';
+      readonly layerId: string;
       readonly layerName: string;
       readonly shortened: number;
       readonly omitted: number;

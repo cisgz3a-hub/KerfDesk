@@ -315,6 +315,34 @@ function captureOptionalCutSettings(
   return out as Partial<LayerOperationSettings>;
 }
 
+const LASER_LEAD_SETTING_KEYS = [
+  'leadInEnabled',
+  'leadOutEnabled',
+  'leadStyle',
+  'leadLengthMm',
+  'leadAngleDeg',
+  'leadSide',
+] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
+
+/** ADR-626: the settings without leads. A stored setting set (saved defaults,
+ * a recipe) holds lead fields only when it has leads, so before one is laid
+ * over an operation its own leads are cleared: absent means no leads. */
+export function withoutLaserLeadSettings<T extends Partial<LayerOperationSettings>>(
+  settings: T,
+): T {
+  if (LASER_LEAD_SETTING_KEYS.every((key) => !(key in settings))) return settings;
+  const {
+    leadInEnabled: _leadIn,
+    leadOutEnabled: _leadOut,
+    leadStyle: _style,
+    leadLengthMm: _length,
+    leadAngleDeg: _angle,
+    leadSide: _side,
+    ...rest
+  } = settings;
+  return rest as T;
+}
+
 export function createLayerSubLayer(
   layer: Layer,
   args: {

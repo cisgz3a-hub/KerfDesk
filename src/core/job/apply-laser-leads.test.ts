@@ -198,7 +198,7 @@ describe('applyLaserLeads (ADR-626)', () => {
     // Nothing fits a hole 0.4 mm across: it is cut as before.
     expect(lead(done, 0, 1)).toBe(tinyHole);
     expect(done.diagnostics).toEqual([
-      { kind: 'laser-leads-adjusted', layerName: 'Cut', shortened: 1, omitted: 1 },
+      { kind: 'laser-leads-adjusted', layerId: 'L', layerName: 'Cut', shortened: 1, omitted: 1 },
     ]);
   });
 
@@ -218,7 +218,7 @@ describe('applyLaserLeads (ADR-626)', () => {
     );
     expect(lead(roomy).polyline[0]).toEqual({ x: 11, y: 5 });
     expect(roomy.diagnostics).toEqual([
-      { kind: 'laser-leads-adjusted', layerName: 'Cut', shortened: 1, omitted: 0 },
+      { kind: 'laser-leads-adjusted', layerId: 'L', layerName: 'Cut', shortened: 1, omitted: 0 },
     ]);
     // No room at all: the contour starts on a nearby edge with room instead.
     const neighbour = square(10.5, 0, 10);

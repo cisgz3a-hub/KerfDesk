@@ -13,7 +13,9 @@
 // without a gap.
 
 import { ARC_FIT_MAX_RADIUS_MM, ARC_FIT_MIN_RADIUS_MM, type ArcMove } from '../geometry/arc-fit';
-import type { LaserLeadStyle, Vec2 } from '../scene';
+import type { Vec2 } from '../scene';
+// Deep import: core/scene's barrel is ratcheted and may only shrink.
+import type { LaserLeadStyle } from '../scene/layer';
 
 export type LeadShape = {
   readonly style: LaserLeadStyle;
@@ -43,7 +45,7 @@ export type LeadKind = 'in' | 'out';
 
 const DEG = Math.PI / 180;
 // Chord sag of a sampled lead arc: below what a beam or the preview shows.
-const ARC_SAMPLE_SAGITTA_MM = 0.005;
+export const ARC_SAMPLE_SAGITTA_MM = 0.005;
 // One arc move covers at most a quarter turn, far inside the fitter's 179 degrees.
 const MAX_ARC_MOVE_RAD = Math.PI / 2;
 

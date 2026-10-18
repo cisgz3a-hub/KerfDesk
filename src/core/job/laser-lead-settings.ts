@@ -8,7 +8,9 @@
 // meets the cut (90 degrees is a quarter circle); for a line, the angle it
 // meets the cut at (90 degrees comes straight in from the side).
 
-import type { LaserLeadSide, LaserLeadStyle, LayerOperationSettings } from '../scene';
+import type { LayerOperationSettings } from '../scene';
+// Deep import: core/scene's barrel is ratcheted and may only shrink.
+import type { LaserLeadSide, LaserLeadStyle } from '../scene/layer';
 
 export const DEFAULT_LEAD_LENGTH_MM = 2;
 export const MIN_LEAD_LENGTH_MM = 0.1;
