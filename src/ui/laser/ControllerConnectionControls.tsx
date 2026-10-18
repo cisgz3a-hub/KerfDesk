@@ -7,10 +7,7 @@ import { machineNoun } from '../machine/machine-labels';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { browserLocalStorage } from '../state/browser-local-storage';
-import {
-  controllerStoppedResponding,
-  controllerWentSilent,
-} from '../state/controller-recovery-status';
+import { controllerStoppedResponding } from '../state/controller-recovery-status';
 import { useLaserStore } from '../state/laser-store';
 import type { ConnectControllerOptions } from '../state/laser-store';
 import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
@@ -42,7 +39,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
   const stoppedResponding = useLaserStore((state) => controllerStoppedResponding(state));
   // Re-read on every store write; the idle status poll writes each second.
-  const wentSilent = useLaserStore((state) => controllerWentSilent(state));
+  const wentSilent = useLaserStore((state) => state.getControllerWentSilent());
   const connectController = useLaserStore((state) => state.connect);
   const disconnectController = useLaserStore((state) => state.disconnect);
   const retryQualification = useLaserStore((state) => state.retryControllerQualification);

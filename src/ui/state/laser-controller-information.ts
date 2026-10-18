@@ -1,11 +1,12 @@
 import type { StoreApi } from 'zustand';
 import type { LaserState } from './laser-store';
-import { controllerReconnectRecommended } from './controller-recovery-status';
+import { controllerReconnectRecommended, controllerWentSilent } from './controller-recovery-status';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
 import {
   scheduleControllerQualification,
   type ControllerQualificationScheduleRefs,
 } from './laser-controller-qualification';
+import type { StatusPollScheduleRefs } from './laser-status-poll-schedule';
 
 export type {
   ControllerQualification,
@@ -14,8 +15,13 @@ export type {
 
 export function controllerInformationStatusActions(
   get: () => LaserState,
-  refs: ControllerQualificationScheduleRefs,
-): Pick<LaserState, 'getMachineSettingsReadBlockReason' | 'getControllerReconnectRecommended'> {
+  refs: ControllerQualificationScheduleRefs & StatusPollScheduleRefs,
+): Pick<
+  LaserState,
+  | 'getMachineSettingsReadBlockReason'
+  | 'getControllerReconnectRecommended'
+  | 'getControllerWentSilent'
+> {
   return {
     getMachineSettingsReadBlockReason: () =>
       machineSettingsReadBlockReason(get(), {
@@ -23,6 +29,8 @@ export function controllerInformationStatusActions(
         resetCleanupPending: refs.pendingResetCleanup != null,
       }),
     getControllerReconnectRecommended: () => controllerReconnectRecommended(get()),
+    // Silence counts only time the status poll ran on schedule (ADR-356).
+    getControllerWentSilent: () => controllerWentSilent(get(), Date.now(), refs.statusPollSchedule),
   };
 }
 

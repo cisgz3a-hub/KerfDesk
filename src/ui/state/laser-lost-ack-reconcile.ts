@@ -42,6 +42,11 @@ import { programmedDwellSeconds } from './laser-stream-dwell';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { consumeUntrackedAck } from './laser-untracked-ack-ledger';
 import { lostReplyProbeOutstanding, type LostReplyProbe } from './laser-lost-reply-probe';
+import {
+  hostAwareSilenceRemainingMs,
+  type StatusPollSchedule,
+  type StatusPollScheduleRefs,
+} from './laser-status-poll-schedule';
 import type { GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import type { LaserState } from './laser-store';
 import { hasUnsettledStreamAcks, pushLog } from './laser-store-helpers';
@@ -70,10 +75,11 @@ export type LostAckTracker = {
   reports: number;
 };
 
-export type LostAckReconcileRefs = HandlerRefs & {
-  lostAckTracker?: LostAckTracker | null;
-  lostReplyProbe?: LostReplyProbe | null;
-};
+export type LostAckReconcileRefs = HandlerRefs &
+  StatusPollScheduleRefs & {
+    lostAckTracker?: LostAckTracker | null;
+    lostReplyProbe?: LostReplyProbe | null;
+  };
 
 /**
  * One status-poll tick. Returns true when it applied lost acknowledgements
@@ -97,7 +103,8 @@ export function reconcileLostStreamAcknowledgements(
   const tracker = currentTracker(refs, state, streamer);
   observeReport(tracker, state);
   const probe = hasOrderedProbe(refs.driver);
-  if (!proofComplete(tracker, probe, state.activeControllerKind, streamer, now)) return false;
+  const proof = { probe, kind: state.activeControllerKind, schedule: refs.statusPollSchedule };
+  if (!proofComplete(tracker, proof, streamer, now)) return false;
   refs.lostAckTracker = null;
   if (probe) {
     sendLostReplyProbe(set, get, refs, safeWrite, streamer, now);
@@ -230,22 +237,40 @@ function observeReport(tracker: LostAckTracker, state: LaserState): void {
   tracker.reports += 1;
 }
 
+type ProofRule = {
+  readonly probe: boolean;
+  readonly kind: ControllerKind;
+  readonly schedule: StatusPollSchedule | null | undefined;
+};
+
 function proofComplete(
   tracker: LostAckTracker,
-  probe: boolean,
-  controllerKind: ControllerKind,
+  rule: ProofRule,
   streamer: StreamerState,
   now: number,
 ): boolean {
   if (tracker.firstAt === null) return false;
   // The probe is answered in order, behind a running G4, so it needs no
   // allowance for one; a timed proof does.
-  if (probe)
-    return tracker.reports >= PROBE_REPORTS && now - tracker.firstAt >= LOST_REPLY_PROBE_AFTER_MS;
+  const reports = rule.probe ? PROBE_REPORTS : IDLE_PROOF_REPORTS;
+  const window = rule.probe
+    ? LOST_REPLY_PROBE_AFTER_MS
+    : LOST_ACK_IDLE_PROOF_MS + inFlightDwellMs(rule.kind, streamer);
   return (
-    tracker.reports >= IDLE_PROOF_REPORTS &&
-    now - tracker.firstAt >= LOST_ACK_IDLE_PROOF_MS + inFlightDwellMs(controllerKind, streamer)
+    tracker.reports >= reports && onScheduleElapsed(rule.schedule, tracker.firstAt, window, now)
   );
+}
+
+// Only time the status poll ran on schedule counts: after a hidden, throttled
+// or sleeping page resumes, replies queued meanwhile are still being read, so
+// every window restarts from that tick (ADR-356 Amendment 1).
+function onScheduleElapsed(
+  schedule: StatusPollSchedule | null | undefined,
+  since: number,
+  windowMs: number,
+  now: number,
+): boolean {
+  return hostAwareSilenceRemainingMs(schedule, since, windowMs, now) === 0;
 }
 
 // GRBL may report Idle while it runs a G4, and answers the G4 only after it.
@@ -303,10 +328,12 @@ function resolveOverdueProbe(
   const probe = refs.lostReplyProbe;
   if (probe == null) return false;
   const state = get();
+  const schedule = refs.statusPollSchedule;
   const overdue =
     probe.provenAt === null
-      ? state.streamer?.status === 'done' && now - probe.sentAt >= LOST_REPLY_PROBE_GIVE_UP_MS
-      : now - probe.provenAt >= LOST_REPLY_PROBE_REPLY_GRACE_MS;
+      ? state.streamer?.status === 'done' &&
+        onScheduleElapsed(schedule, probe.sentAt, LOST_REPLY_PROBE_GIVE_UP_MS, now)
+      : onScheduleElapsed(schedule, probe.provenAt, LOST_REPLY_PROBE_REPLY_GRACE_MS, now);
   if (!overdue) return false;
   set((current) => ({
     log: pushLog(

@@ -222,3 +222,35 @@ describe('a controller that went silent (ADR-611 Amendment 1)', () => {
     expect(controllerWentSilent(silent({ connection: { kind: 'disconnected' } }), now)).toBe(false);
   });
 });
+
+describe('silence measured on the status poll schedule (ADR-356, ADR-611 Amendment 1)', () => {
+  const quiet = (): RecoveryStatus =>
+    state({
+      controllerQualification: { kind: 'qualified', epoch: 4, settings: 'verified' },
+      statusObservation: {
+        sessionEpoch: 4,
+        positionEpoch: 1,
+        sequence: 7,
+        observedAt: now - 9_000,
+      },
+    });
+
+  it('does not read silent on the first tick after a hidden or sleeping page resumes', () => {
+    expect(controllerWentSilent(quiet(), now, { lastTickAt: now, resumedAt: now })).toBe(false);
+  });
+
+  it('does not read silent while the page is not running the poll', () => {
+    expect(controllerWentSilent(quiet(), now, { lastTickAt: now - 5_000, resumedAt: 0 })).toBe(
+      false,
+    );
+  });
+
+  it('reads silent after the window of on-schedule polling without a reply', () => {
+    expect(
+      controllerWentSilent(quiet(), now, { lastTickAt: now - 250, resumedAt: now - 30_000 }),
+    ).toBe(true);
+    expect(
+      controllerWentSilent(quiet(), now, { lastTickAt: now - 250, resumedAt: now - 3_000 }),
+    ).toBe(false);
+  });
+});

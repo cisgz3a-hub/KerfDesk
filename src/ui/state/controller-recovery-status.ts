@@ -1,6 +1,7 @@
 import { controllerInformationActivityIsBusy } from './controller-information-activity';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import type { LaserState } from './laser-store';
+import { hostAwareSilenceRemainingMs, type StatusPollSchedule } from './laser-status-poll-schedule';
 
 type RecoveryStatus = Pick<
   LaserState,
@@ -60,16 +61,23 @@ export function controllerStoppedResponding(state: RecoveryStatus, now = Date.no
 export function controllerWentSilent(
   state: RecoveryStatus & Pick<LaserState, 'capabilities'>,
   now = Date.now(),
+  schedule: StatusPollSchedule | null = null,
 ): boolean {
   if (state.connection.kind !== 'connected') return false;
   if (state.capabilities.statusQuery !== 'realtime-report' || state.controllerOperation !== null) {
     return false;
   }
   const observed = state.statusResponseObservation ?? state.statusObservation;
+  if (observed === null || observed.sessionEpoch !== state.controllerSessionEpoch) return false;
+  // Only time the status poll ran on schedule counts: a hidden, throttled or
+  // sleeping page asked nothing, so its gap is not the controller's silence.
   return (
-    observed !== null &&
-    observed.sessionEpoch === state.controllerSessionEpoch &&
-    now - observed.observedAt >= CONTROLLER_RESPONSE_WINDOW_MS
+    hostAwareSilenceRemainingMs(
+      schedule,
+      observed.observedAt,
+      CONTROLLER_RESPONSE_WINDOW_MS,
+      now,
+    ) === 0
   );
 }
 

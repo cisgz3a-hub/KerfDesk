@@ -57,6 +57,10 @@ missing at that moment was lost on the link.
 - If the probe's `ok` after `[GC:` is lost too, the probe finishes 2 s after
   the proof. If the job's last reply consumed the probe's `ok` because the
   `[GC:` was lost, the probe is released 10 s after it was sent.
+- Every window above counts only time the status poll ran on schedule
+  (ADR-356 Amendment 1). After a hidden, throttled or sleeping page resumes,
+  replies queued meanwhile are still being read, so the Idle windows and both
+  probe deadlines restart from the resumed tick rather than expiring at once.
 - `$G` cannot complete a truncated motion line, unlike a bare newline. A probe
   merged with a half-received line is rejected as that line's `error:N`, which
   the existing stream-error path handles.

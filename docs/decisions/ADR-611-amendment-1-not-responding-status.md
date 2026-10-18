@@ -15,6 +15,9 @@ Other senders show such a link as stalled.
   and amber text, once a controller that answered status queries in this
   session has sent no status reply for the existing 8 s window
   (`controllerWentSilent`). Alarm and Sleep replies count as answers.
+- The 8 s count only time the status poll ran on schedule (ADR-356
+  Amendment 1): a hidden, throttled or sleeping page asked nothing, so the
+  label waits for 8 s of on-schedule polling after the page resumes.
 - It does not apply before the session's first reply (connect-time silence
   keeps its own report), while a controller operation runs (GRBL may leave `?`
   unanswered while it homes), or to a queued-poll controller (Marlin is not

@@ -9,6 +9,8 @@ import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import {
   hasOrderedProbe,
   LOST_REPLY_PROBE_AFTER_MS,
+  LOST_REPLY_PROBE_REPLY_GRACE_MS,
+  reconcileLostStreamAcknowledgements,
   reportShowsIdle,
 } from './laser-lost-ack-reconcile';
 import { useLaserStore } from './laser-store';
@@ -266,5 +268,53 @@ describe('lost-reply proof rules', () => {
     expect(
       shouldReleaseStreamerAtIdle(errored, idle, { writeEpoch: 2, lostReplyProbe: probe }),
     ).toBe(true);
+  });
+});
+
+describe('probe deadlines on the status poll schedule', () => {
+  const proven = {
+    writeEpoch: 1,
+    sessionEpoch: 1,
+    streamerEpoch: 1,
+    linesBefore: 7,
+    sentAt: 0,
+    provenAt: 0,
+  };
+  const run = (schedule: { lastTickAt: number; resumedAt: number }, now: number) => {
+    const refs = {
+      writeEpoch: 1,
+      lostReplyProbe: { ...proven },
+      statusPollSchedule: schedule,
+      untrackedAckReservations: [{ writeEpoch: 1, motionOperationId: null, remaining: 1 }],
+    } as never as Parameters<typeof reconcileLostStreamAcknowledgements>[2];
+    const store = { ...initialLaserState(), pendingUntrackedAcks: 1 };
+    const set = (patch: unknown) =>
+      Object.assign(store, typeof patch === 'function' ? patch(store) : patch);
+    const finished = reconcileLostStreamAcknowledgements(
+      set as never,
+      () => store as never,
+      refs,
+      (async () => undefined) as never,
+      now,
+    );
+    return { finished, refs, store };
+  };
+
+  it('keeps a proven probe waiting for its reply after a scheduling gap', () => {
+    // The page slept past the grace period; its queued replies are still being read.
+    const resumed = run({ lastTickAt: 60_000, resumedAt: 60_000 }, 60_000);
+    expect(resumed.finished).toBe(false);
+    expect(resumed.refs.lostReplyProbe).not.toBeNull();
+    expect(resumed.store.pendingUntrackedAcks).toBe(1);
+  });
+
+  it('retires the probe once its grace has run on schedule', () => {
+    const onSchedule = run(
+      { lastTickAt: LOST_REPLY_PROBE_REPLY_GRACE_MS - 250, resumedAt: Number.NEGATIVE_INFINITY },
+      LOST_REPLY_PROBE_REPLY_GRACE_MS,
+    );
+    expect(onSchedule.finished).toBe(true);
+    expect(onSchedule.refs.lostReplyProbe).toBeNull();
+    expect(onSchedule.store.pendingUntrackedAcks).toBe(0);
   });
 });
