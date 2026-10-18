@@ -13,8 +13,9 @@
 //   speeds up to 10000 mm/min (falcon-profiles.ts evidence; source
 //   https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/consumable-parameter-guide).
 //   That covers the machine whichever module is fitted.
-// - Diode: the same 10000 mm/min. xTool's own D1 Pro 20 W table engraves
-//   basswood plywood at 100 mm/s (6000 mm/min) and cuts at 2-6 mm/s
+// - Diode: the same 10000 mm/min. xTool's D1 Pro table engraves basswood
+//   plywood at 100 mm/s (6000 mm/min) with the 20 W module, and its cuts run
+//   at 2-6 mm/s across the 5, 10 and 40 W modules
 //   (https://uk.xtool.com/pages/material-settings, checked 2026-10-18).
 // - CO2: 500 mm/s (30000 mm/min), the top of the usual 300-500 mm/s engraving
 //   range; a 150 W chart engraves birch plywood at 350 mm/s and cuts at
