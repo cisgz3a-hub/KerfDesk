@@ -23,7 +23,7 @@ export function CommandSearchButton(): JSX.Element {
       data-help-id={helpId}
       onClick={openCommandSearch}
     >
-      <Icon name="search" size={16} />
+      <Icon name="search" size={14} />
       <span className="lf-menu-search-button__label">Search</span>
       <kbd className="lf-menu-search-button__keys">{shortcutLabel('Ctrl+K')}</kbd>
     </button>
