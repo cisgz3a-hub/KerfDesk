@@ -39,6 +39,8 @@ export function ArtworkPulseOverlay(props: {
   readonly viewState: ViewState;
   /** Pointing at artwork counts only for the select tool at rest; operation rows always count. */
   readonly canvasHoverEnabled: boolean;
+  /** A click or drag owns the pointer: the hover pauses rather than ends. */
+  readonly dragging?: boolean;
 }): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const { width, height } = props.canvasSize;
@@ -55,6 +57,7 @@ export function ArtworkPulseOverlay(props: {
     props.project.scene,
     view.scale,
     props.canvasHoverEnabled,
+    props.dragging === true,
   );
   const seed: PulseSeed | null =
     rowOperationId !== null
@@ -85,6 +88,7 @@ function useCanvasHoverObject(
   scene: Scene,
   scale: number,
   enabled: boolean,
+  dragging: boolean,
 ): string | null {
   const [hovered, setHovered] = useState<string | null>(null);
   // Set while a click or drag owns the pointer, until the pointer reports again.
@@ -125,9 +129,11 @@ function useCanvasHoverObject(
   const x = cursor?.x ?? null;
   const y = cursor?.y ?? null;
   useEffect(() => {
-    // A click or drag owns the pointer: keep what was hovered and wait.
     if (!enabled) {
-      paused.current = true;
+      // A click or drag owns the pointer: keep what was hovered and wait.
+      // Leaving the Select tool is not a pause: the hover is over.
+      paused.current = dragging;
+      if (!dragging) setHovered(null);
       return;
     }
     if (x === null || y === null) {
@@ -154,7 +160,7 @@ function useCanvasHoverObject(
       if (dwellTimer.current !== null) clearTimeout(dwellTimer.current);
       dwellTimer.current = null;
     };
-  }, [x, y, scene, scale, enabled]);
+  }, [x, y, scene, scale, enabled, dragging]);
   return hovered;
 }
 

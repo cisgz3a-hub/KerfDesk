@@ -58,7 +58,8 @@ let canvasRef: { current: HTMLCanvasElement };
 let root: Root;
 let hover: MockInstance<ArtworkPulseClock['hover']>;
 
-async function render(canvasHoverEnabled: boolean): Promise<void> {
+// Hover off means a click or drag owns the pointer unless a test says otherwise.
+async function render(canvasHoverEnabled: boolean, dragging = !canvasHoverEnabled): Promise<void> {
   await act(async () =>
     root.render(
       <ArtworkPulseOverlay
@@ -67,6 +68,7 @@ async function render(canvasHoverEnabled: boolean): Promise<void> {
         canvasSize={SIZE}
         viewState={VIEW}
         canvasHoverEnabled={canvasHoverEnabled}
+        dragging={dragging}
       />,
     ),
   );
@@ -134,6 +136,19 @@ describe('ArtworkPulseOverlay (ADR-620)', () => {
     // The next small move on the same piece is still the same hover.
     await pointAt({ x: 5.5, y: 5 });
     expect(pulses()).toEqual([true, false]);
+  });
+
+  it('ends the hover when the Select tool is left, rather than pausing it', async () => {
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    // Another tool: not a drag, so the hover is over.
+    await render(false, false);
+    expect(hover.mock.calls).toHaveLength(1);
+    await render(true);
+    // Nothing returns until the pointer settles on artwork again, which pulses afresh.
+    expect(hover.mock.calls).toHaveLength(1);
+    await pointAt({ x: 5.5, y: 5 });
+    expect(pulses()).toEqual([true, true]);
   });
 
   it('pulses again after the pointer really leaves and comes back', async () => {

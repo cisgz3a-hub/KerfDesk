@@ -68,6 +68,21 @@ describe('useOperationColorPeek', () => {
     expect(peek()).toBe(false);
   });
 
+  it('never peeks during an Alt click or drag, where Alt serves the gesture', () => {
+    key('keydown', { key: 'Alt', altKey: true });
+    window.dispatchEvent(new MouseEvent('pointerdown', { altKey: true, bubbles: true }));
+    vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS * 2);
+    expect(peek()).toBe(false);
+    key('keyup', { key: 'Alt' });
+
+    // An Alt-drag begun after the peek showed ends it.
+    key('keydown', { key: 'Alt', altKey: true });
+    vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS);
+    expect(peek()).toBe(true);
+    window.dispatchEvent(new MouseEvent('pointerdown', { altKey: true, bubbles: true }));
+    expect(peek()).toBe(false);
+  });
+
   it('ends the peek when the window loses focus mid-hold', () => {
     key('keydown', { key: 'Alt', altKey: true });
     vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS);
