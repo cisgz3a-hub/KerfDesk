@@ -25,6 +25,11 @@ export type UpdateStatus = {
   /** When the last check finished, in milliseconds since 1970. */
   readonly checkedAt: number | null;
   readonly mode?: 'manual';
+  /**
+   * macOS and Linux (ADR-613): the action opens the verified download page in
+   * the browser, and the app never downloads or installs the update itself.
+   */
+  readonly delivery?: 'download-page';
   readonly installOnQuit?: boolean;
   /** Verified, release-bound plain text; absent in older update services. */
   readonly releaseNotes?: readonly string[];
