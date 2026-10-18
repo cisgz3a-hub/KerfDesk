@@ -29,10 +29,15 @@ mock-up, with a 1400 ms pulse.
    the settings you point at". The pulse ripples outward from the hovered piece (at most 420 ms of
    stagger). A piece already mid-pulse finishes its pulse rather than restarting, and a click or
    drag on the hovered piece pauses the hover without starting a second pulse. While the pointer
-   stays, a soft colour edge remains; it fades when the pointer leaves the piece's box.
+   stays, a soft colour edge remains; it fades when the pointer leaves the piece's box. Locked
+   artwork pulses too: the hover is display only, and the piece under a locked one must not answer
+   for it (`hitTest` takes `includeLocked` for this; selection still skips locked artwork). An
+   edit during a hover, such as Paste settings on the hovered row, regroups the pieces without a
+   second pulse.
 3. **Same settings** means `layerOperationSettingsEqual` plus equal sub-operations for a laser
-   project, or equal CNC settings for a CNC project. Name, colour and visibility do not count.
-   Per-artwork setting overrides are not considered.
+   project, or equal CNC settings for a CNC project, where an operation with no CNC block counts
+   as the CNC defaults as it does in output. Settings compare with object keys sorted. Name, colour
+   and visibility do not count. Per-artwork setting overrides are not considered.
 4. **Operation rows.** Resting the pointer (90 ms) on an operation row in the Artwork panel pulses
    that operation's artwork and its same-settings siblings in the row's colour, sweeping left to
    right. Passing over rows without settling pulses nothing.

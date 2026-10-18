@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createLayer, IDENTITY_TRANSFORM, type Layer, type TracedImage } from '../../core/scene';
+import {
+  createLayer,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  IDENTITY_TRANSFORM,
+  type Layer,
+  type TracedImage,
+} from '../../core/scene';
 import {
   ArtworkPulseClock,
   pulseColorSources,
@@ -69,6 +75,16 @@ describe('which artwork pulses together', () => {
     expect(group.get('cut')).toBe('cut');
     expect(group.get('engrave-2')).toBe('engrave-2');
     expect(group.get('engrave')).toBe('engrave-2');
+  });
+
+  it('treats an operation with no CNC block as the CNC defaults', () => {
+    const legacy = layer('legacy', '#2563eb');
+    const explicit = layer('explicit', '#dc2626', { cnc: DEFAULT_CNC_LAYER_SETTINGS });
+    const deeper = layer('deeper', '#16a34a', {
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm: DEFAULT_CNC_LAYER_SETTINGS.depthMm + 1 },
+    });
+    const group = pulseColorSources([legacy, explicit, deeper], ['legacy'], 'cnc');
+    expect([...group.keys()]).toEqual(['legacy', 'explicit']);
   });
 
   it('compares CNC operations by their CNC settings only', () => {

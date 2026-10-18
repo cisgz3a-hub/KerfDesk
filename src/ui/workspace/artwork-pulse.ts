@@ -5,6 +5,7 @@
 // edge stays while the pointer rests there. Pure: no DOM, no canvas.
 
 import {
+  DEFAULT_CNC_LAYER_SETTINGS,
   layerOperationSettingsEqual,
   operationIdsForObject,
   type Layer,
@@ -45,9 +46,24 @@ export type MachineKind = 'laser' | 'cnc';
 
 /** Same settings for the active machine; name, colour and visibility do not count. */
 export function sameOperationSettings(a: Layer, b: Layer, machine: MachineKind): boolean {
-  if (machine === 'cnc') return JSON.stringify(a.cnc) === JSON.stringify(b.cnc);
+  if (machine === 'cnc') {
+    // An operation with no CNC block cuts with the CNC defaults, as output does.
+    return (
+      canonicalJson(a.cnc ?? DEFAULT_CNC_LAYER_SETTINGS) ===
+      canonicalJson(b.cnc ?? DEFAULT_CNC_LAYER_SETTINGS)
+    );
+  }
   return (
-    layerOperationSettingsEqual(a, b) && JSON.stringify(a.subLayers) === JSON.stringify(b.subLayers)
+    layerOperationSettingsEqual(a, b) && canonicalJson(a.subLayers) === canonicalJson(b.subLayers)
+  );
+}
+
+/** JSON with object keys sorted, so the same settings saved in another key order still match. */
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, entry: unknown) =>
+    entry !== null && typeof entry === 'object' && !Array.isArray(entry)
+      ? Object.fromEntries(Object.entries(entry).sort(([a], [b]) => (a < b ? -1 : 1)))
+      : entry,
   );
 }
 

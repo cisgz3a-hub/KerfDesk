@@ -8,6 +8,7 @@
 
 import {
   applyTransform,
+  operationIdsForObject,
   sceneLayerVisibility,
   sceneObjectUsesOperation,
   transformedBBox,
@@ -73,6 +74,10 @@ type Region = {
 export class ArtworkPulsePainter {
   private readonly entries = new Map<string, CacheEntry>();
   private readonly displayCache = createDisplayPolylineCache();
+  private readonly objectOperations = new WeakMap<
+    SceneObject,
+    { readonly layers: ReadonlyArray<Layer>; readonly ids: ReadonlyArray<string> }
+  >();
 
   draw(
     ctx: CanvasRenderingContext2D,
@@ -91,9 +96,13 @@ export class ArtworkPulsePainter {
     for (const piece of pieces) {
       const object = objectById.get(piece.objectId);
       if (object === undefined) continue;
-      for (const [operationId, sourceId] of piece.colorSources) {
+      // Only the piece's own operations: a group of N same-settings imports
+      // carries N operations, and pairing every piece with every one of them
+      // would render N² empty bitmaps.
+      for (const operationId of this.operationsOf(object, layers)) {
+        const sourceId = piece.colorSources.get(operationId);
         const layer = layerById.get(operationId);
-        if (layer === undefined || !layer.visible) continue;
+        if (sourceId === undefined || layer === undefined || !layer.visible) continue;
         const colorLayer = layerById.get(sourceId) ?? layer;
         const key = `${object.id}\u0000${operationId}`;
         live.add(key);
@@ -103,6 +112,15 @@ export class ArtworkPulsePainter {
       }
     }
     this.retain(live);
+  }
+
+  /** The operations an object's artwork uses, kept until the object or the operations change. */
+  private operationsOf(object: SceneObject, layers: ReadonlyArray<Layer>): ReadonlyArray<string> {
+    const cached = this.objectOperations.get(object);
+    if (cached?.layers === layers) return cached.ids;
+    const ids = operationIdsForObject(object, layers);
+    this.objectOperations.set(object, { layers, ids });
+    return ids;
   }
 
   /** Keep every live piece and the most recently used others, oldest out first. */

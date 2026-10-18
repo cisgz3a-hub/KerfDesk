@@ -96,7 +96,12 @@ function useCanvasHoverObject(
     );
     // Hit-testing a dense trace flattens its curves, so it waits for the
     // pointer to settle rather than running on every move.
-    const timer = setTimeout(() => setHovered(hitTest(scene, point)), PULSE_HOVER_DWELL_MS);
+    // Locked artwork still shows its settings, and must not let the piece
+    // beneath it answer for it.
+    const timer = setTimeout(
+      () => setHovered(hitTest(scene, point, { includeLocked: true })),
+      PULSE_HOVER_DWELL_MS,
+    );
     return () => clearTimeout(timer);
   }, [x, y, scene, scale, enabled]);
   return hovered;
@@ -133,10 +138,17 @@ function usePulseLoop(
   );
   const seedKey =
     seed === null ? '' : seed.kind === 'object' ? `o:${seed.objectId}` : `r:${seed.operationId}`;
+  const lastSeedKey = useRef('');
+  const scene = project.scene;
   useEffect(() => {
+    // An edit during the hover (Paste settings on the hovered row, say) can
+    // change which operations share its settings: regroup without pulsing again.
+    const sameHover = seedKey !== '' && seedKey === lastSeedKey.current;
+    lastSeedKey.current = seedKey;
     // A click or drag pauses the canvas hover. Coming back to the same piece
     // is still the same hover: its edge returns without a second pulse.
-    const resumed = seed?.kind === 'object' && seed.objectId === pulsedObjectId.current;
+    const resumed =
+      sameHover || (seed?.kind === 'object' && seed.objectId === pulsedObjectId.current);
     if (seed?.kind === 'object') pulsedObjectId.current = seed.objectId;
     else if (canvasObjectId === null) pulsedObjectId.current = null;
     const target =
@@ -152,10 +164,10 @@ function usePulseLoop(
     if (target === null) loop.clock.leave();
     else loop.clock.hover(target, performance.now(), { pulse: !resumed });
     loop.kick();
-    // Only a new hover starts a pulse; edits and view changes while hovering
-    // repaint through the effect below instead.
+    // Keyed on the hover and the scene only: a view change repaints through
+    // the effect below and must not regroup or restart anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seedKey]);
+  }, [seedKey, scene]);
   useEffect(() => {
     loop.kick();
   }, [project, view, reducedMotion, loop]);
