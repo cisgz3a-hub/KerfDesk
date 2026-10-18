@@ -1,6 +1,6 @@
 // Hold Alt (Option on a Mac) to see every operation colour on the canvas, and
 // let go to return to plain ink (ADR-620). The peek waits a moment and is
-// cancelled by any other key, so Alt shortcuts such as Alt+Left (align left)
+// cancelled by another key or pointer gesture, so shortcuts such as Alt+Left
 // never flash the colours on the way through.
 
 import { useEffect } from 'react';
@@ -47,14 +47,24 @@ export function useOperationColorPeek(): void {
       cancel();
       setPeek(false);
     };
+    const onPointerDown = (e: PointerEvent): void => {
+      if (!e.altKey) return;
+      // Alt-click cycles overlapping artwork and Alt-drag suppresses snapping.
+      // Neither is a standalone colour peek, even if its delay already elapsed.
+      chord = true;
+      cancel();
+      setPeek(false);
+    };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
+    window.addEventListener('pointerdown', onPointerDown, true);
     return (): void => {
       cancel();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
+      window.removeEventListener('pointerdown', onPointerDown, true);
     };
   }, [setPeek]);
 }

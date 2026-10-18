@@ -308,6 +308,8 @@ function useJigCanvasPaint(
       drawScene(ctx, size.width, size.height, displayed, {
         selectedId: null,
         preview: false,
+        // This dedicated editor has no hover pulse or Alt-peek overlay.
+        operationColors: true,
         view,
         displayPolylineCache: cache.current,
         onRasterBitmapReady: () => setPaintRevision((revision) => revision + 1),

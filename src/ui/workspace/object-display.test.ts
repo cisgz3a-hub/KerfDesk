@@ -231,6 +231,52 @@ describe('object display resolution', () => {
 });
 
 describe('object display painting', () => {
+  it('repaints a dense ink sprite when equal-style operations swap their visible paths', () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 600;
+    const main = recordingContext();
+    Object.assign(main.ctx, { canvas });
+    const sprite = recordingContext();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(sprite.ctx);
+    const first = zigzag(SPRITE_MIN_DISPLAY_SEGMENTS + 1);
+    const second = {
+      ...first,
+      points: first.points.map(({ x, y }) => ({ x, y: y + 10 })),
+    };
+    const object = traced([], {
+      paths: [
+        { color: '#dc2626', operationIds: ['first'], polylines: [first] },
+        { color: '#16a34a', operationIds: ['second'], polylines: [second] },
+      ],
+    });
+    const display = (firstVisible: boolean) =>
+      resolveObjectDisplay(
+        object,
+        sceneLayerVisibility.lookup([
+          { ...createLayer({ id: 'first', color: '#dc2626' }), visible: firstVisible },
+          { ...createLayer({ id: 'second', color: '#16a34a' }), visible: !firstVisible },
+        ]),
+        view,
+        undefined,
+        'design',
+        'ink',
+      );
+    const before = display(true);
+    const after = display(false);
+    expect(before.paths[0]?.path).toBe(object.paths[0]);
+    expect(after.paths[0]?.path).toBe(object.paths[1]);
+    expect(before.paths[0]?.paint).toEqual(after.paths[0]?.paint);
+    drawObjectDisplay(main.ctx, object, before, view);
+    expect(sprite.calls.lineTo).toBe(SPRITE_MIN_DISPLAY_SEGMENTS);
+    drawObjectDisplay(main.ctx, object, after, view);
+    expect(sprite.calls.lineTo).toBe(SPRITE_MIN_DISPLAY_SEGMENTS * 2);
+    drawObjectDisplay(main.ctx, object, display(false), view);
+    expect(sprite.calls.lineTo).toBe(SPRITE_MIN_DISPLAY_SEGMENTS * 2);
+    expect(main.calls.drawImage).toBe(3);
+    expect(main.calls.lineTo).toBe(0);
+  });
+
   it('paints sparse artwork directly at the ordinary weight', () => {
     const { ctx, widths, calls } = recordingContext();
     const object = traced([zigzag(50)]);

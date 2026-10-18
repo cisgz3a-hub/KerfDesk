@@ -64,6 +64,30 @@ function canvas2d(): CanvasRenderingContext2D {
 afterEach(() => vi.restoreAllMocks());
 
 describe('ArtworkPulsePainter (ADR-620)', () => {
+  it('keeps Fill artwork outlined in wireframe and invalidates cached design geometry', () => {
+    const fill = createLayer({ id: 'fill', color: '#2563eb', mode: 'fill' });
+    const base = createProject();
+    const project = {
+      ...base,
+      scene: { ...base.scene, objects: [square('piece', 'fill', 10)], layers: [fill] },
+    };
+    const painter = new ArtworkPulsePainter();
+    const painted = vi.spyOn(objectDisplay, 'paintObjectDisplay');
+    const ctx = canvas2d();
+    const pieces = [pulse('piece', 'fill')];
+    painter.draw(ctx, project, view, pieces, 'design');
+    expect(painted.mock.calls.at(-1)?.[2].paths[0]?.paint.kind).toBe('fill');
+    painted.mockClear();
+    painter.draw(ctx, project, view, pieces, 'wireframe');
+    expect(painted).toHaveBeenCalledOnce();
+    expect(painted.mock.calls.at(-1)?.[2].paths[0]?.paint.kind).toBe('stroke');
+    painted.mockClear();
+    painter.draw(ctx, project, view, pieces, 'wireframe');
+    expect(painted).not.toHaveBeenCalled();
+    painter.draw(ctx, project, view, pieces, 'design');
+    expect(painted.mock.calls.at(-1)?.[2].paths[0]?.paint.kind).toBe('fill');
+  });
+
   it('does not rebuild scene-wide indexes on unchanged animation frames', () => {
     const { project } = repeatedImports(30);
     const lookup = vi.spyOn(sceneLayerVisibility, 'lookup');

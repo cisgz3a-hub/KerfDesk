@@ -17,6 +17,7 @@ import {
 import { usePrefersReducedMotion } from '../common/use-prefers-reduced-motion';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { useCanvasColorScheme } from '../theme/use-canvas-color-scheme';
 import {
   ArtworkPulseClock,
   PULSE_HOVER_DWELL_MS,
@@ -24,6 +25,7 @@ import {
   type PulseSeed,
 } from './artwork-pulse';
 import { ArtworkPulsePainter } from './draw-artwork-pulse';
+import type { ObjectDisplayMode } from './object-display';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
 
@@ -38,6 +40,8 @@ export function ArtworkPulseOverlay(props: {
   readonly viewState: ViewState;
   /** Pointing at artwork counts only for the select tool at rest; operation rows always count. */
   readonly canvasHoverEnabled: boolean;
+  /** Only a pointer gesture may retain its hover until the pointer reports again. */
+  readonly canvasHoverPaused?: boolean;
 }): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const { width, height } = props.canvasSize;
@@ -54,6 +58,7 @@ export function ArtworkPulseOverlay(props: {
     props.project.scene,
     view.scale,
     props.canvasHoverEnabled,
+    props.canvasHoverPaused ?? false,
   );
   const seed: PulseSeed | null =
     rowOperationId !== null
@@ -84,6 +89,7 @@ function useCanvasHoverObject(
   scene: Scene,
   scale: number,
   enabled: boolean,
+  pauseHover: boolean,
 ): string | null {
   const [hovered, setHovered] = useState<string | null>(null);
   // Set while a click or drag owns the pointer, until the pointer reports again.
@@ -124,9 +130,10 @@ function useCanvasHoverObject(
   const x = cursor?.x ?? null;
   const y = cursor?.y ?? null;
   useEffect(() => {
-    // A click or drag owns the pointer: keep what was hovered and wait.
+    // Only a click or drag keeps its hover. Another tool ends it outright.
     if (!enabled) {
-      paused.current = true;
+      paused.current = pauseHover;
+      if (!pauseHover) setHovered(null);
       return;
     }
     if (x === null || y === null) {
@@ -153,7 +160,7 @@ function useCanvasHoverObject(
       if (dwellTimer.current !== null) clearTimeout(dwellTimer.current);
       dwellTimer.current = null;
     };
-  }, [x, y, scene, scale, enabled]);
+  }, [x, y, scene, scale, enabled, pauseHover]);
   return hovered;
 }
 
@@ -177,9 +184,12 @@ function usePulseLoop(
   canvasObjectId: string | null,
 ): void {
   const reducedMotion = usePrefersReducedMotion();
+  const colorScheme = useCanvasColorScheme();
+  const wireframe = useUiStore((state) => state.wireframeView);
+  const displayMode = wireframe ? 'wireframe' : 'design';
   const pulsedObjectId = useRef<string | null>(null);
-  const latest = useRef<PulseLoopState>({ project, view, reducedMotion });
-  latest.current = { project, view, reducedMotion };
+  const latest = useRef<PulseLoopState>({ project, view, reducedMotion, displayMode });
+  latest.current = { project, view, reducedMotion, displayMode };
   const [loop] = useState(() =>
     createPulseLoop(() => ({
       ctx: ref.current?.getContext('2d') ?? null,
@@ -217,7 +227,7 @@ function usePulseLoop(
   }, [seedKey, scene, machineKind, canvasObjectId]);
   useEffect(() => {
     loop.kick();
-  }, [project, view, reducedMotion, loop]);
+  }, [project, view, reducedMotion, colorScheme, displayMode, loop]);
   useEffect(() => () => loop.dispose(), [loop]);
 }
 
@@ -225,6 +235,7 @@ type PulseLoopState = {
   readonly project: Project;
   readonly view: ViewTransform;
   readonly reducedMotion: boolean;
+  readonly displayMode: ObjectDisplayMode;
 };
 
 /** Runs animation frames only while a pulse or an edge fade is in flight. */
@@ -239,7 +250,7 @@ function createPulseLoop(
     const { ctx, state } = read();
     if (ctx === null) return;
     const frame = clock.frame(now, state.reducedMotion);
-    painter.draw(ctx, state.project, state.view, frame.pieces);
+    painter.draw(ctx, state.project, state.view, frame.pieces, state.displayMode);
     if (frame.busy) kick();
   }
   function kick(): void {

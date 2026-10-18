@@ -75,4 +75,22 @@ describe('useOperationColorPeek', () => {
     window.dispatchEvent(new Event('blur'));
     expect(peek()).toBe(false);
   });
+
+  it.each([0, OPERATION_COLOR_PEEK_DELAY_MS])(
+    'cancels an Alt pointer gesture after %i ms until Alt is released',
+    (delay) => {
+      key('keydown', { key: 'Alt', altKey: true });
+      vi.advanceTimersByTime(delay);
+      window.dispatchEvent(new MouseEvent('pointerdown', { altKey: true, buttons: 1 }));
+      expect(peek()).toBe(false);
+      vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS * 2);
+      expect(peek()).toBe(false);
+      key('keydown', { key: 'Alt', altKey: true, repeat: true });
+      expect(peek()).toBe(false);
+      key('keyup', { key: 'Alt' });
+      key('keydown', { key: 'Alt', altKey: true });
+      vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS);
+      expect(peek()).toBe(true);
+    },
+  );
 });

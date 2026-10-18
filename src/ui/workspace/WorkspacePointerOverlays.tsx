@@ -39,6 +39,7 @@ export function WorkspacePointerOverlays(props: {
           canvasSize={props.canvasSize}
           viewState={viewState}
           canvasHoverEnabled={!props.dragging && toolMode.kind === 'select'}
+          canvasHoverPaused={props.dragging && toolMode.kind === 'select'}
         />
       )}
       <RulerCursorOverlay project={project} canvasSize={props.canvasSize} viewState={viewState} />

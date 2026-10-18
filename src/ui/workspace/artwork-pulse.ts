@@ -9,8 +9,15 @@ import {
   layerOperationSettingsEqual,
   operationIdsForObject,
   type Layer,
+  type LayerOperationSettings,
   type SceneObject,
 } from '../../core/scene';
+import { DEFAULT_OVERSCAN_MM } from '../../core/job/compile-job-defaults';
+import {
+  DEFAULT_PERFORATION_CUT_MM,
+  DEFAULT_PERFORATION_SKIP_MM,
+  DEFAULT_TAB_SPACING_MM,
+} from '../../core/job/operation-cut-extras';
 
 export const PULSE_DURATION_MS = 1400;
 /** The pointer must settle this long before a hover counts, so a sweep across the bed stays calm. */
@@ -54,8 +61,49 @@ export function sameOperationSettings(a: Layer, b: Layer, machine: MachineKind):
     );
   }
   return (
-    layerOperationSettingsEqual(a, b) && canonicalJson(a.subLayers) === canonicalJson(b.subLayers)
+    sameLaserSettings(a, b) &&
+    a.subLayers.length === b.subLayers.length &&
+    a.subLayers.every((subLayer, index) => {
+      const other = b.subLayers[index];
+      return (
+        other !== undefined &&
+        subLayer.enabled === other.enabled &&
+        sameLaserSettings(subLayer.settings, other.settings)
+      );
+    })
   );
+}
+
+function sameLaserSettings(a: LayerOperationSettings, b: LayerOperationSettings): boolean {
+  return layerOperationSettingsEqual(laserSettingsWithDefaults(a), laserSettingsWithDefaults(b));
+}
+
+/** Match the optional defaults in cut extras, scan pass angles and scan direction policy.
+ * Power mode and scan offset stay absent: those fall back to the device, not a fixed value. */
+function laserSettingsWithDefaults(settings: LayerOperationSettings): LayerOperationSettings {
+  return {
+    ...settings,
+    ...laserCutDefaults(settings),
+    allowUncalibratedBidirectionalScan: settings.allowUncalibratedBidirectionalScan ?? false,
+    imageScanAngleDeg: settings.imageScanAngleDeg ?? 0,
+    imageCrossHatch: settings.imageCrossHatch ?? false,
+    passAngleStepDeg: settings.passAngleStepDeg ?? 0,
+    autoOverscan: settings.autoOverscan ?? false,
+  };
+}
+
+function laserCutDefaults(settings: LayerOperationSettings): Partial<LayerOperationSettings> {
+  return {
+    perforationEnabled: settings.perforationEnabled ?? false,
+    perforationCutMm: settings.perforationCutMm ?? DEFAULT_PERFORATION_CUT_MM,
+    perforationSkipMm: settings.perforationSkipMm ?? DEFAULT_PERFORATION_SKIP_MM,
+    overcutMm: settings.overcutMm ?? 0,
+    imageOverscanMm: settings.imageOverscanMm ?? DEFAULT_OVERSCAN_MM,
+    tabLayout: settings.tabLayout ?? 'count',
+    tabSpacingMm: settings.tabSpacingMm ?? DEFAULT_TAB_SPACING_MM,
+    tabMaxPerShape: settings.tabMaxPerShape ?? 0,
+    tabCutPowerPercent: settings.tabCutPowerPercent ?? 0,
+  };
 }
 
 /** JSON with object keys sorted, so the same settings saved in another key order still match. */

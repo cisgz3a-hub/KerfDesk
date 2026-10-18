@@ -11,8 +11,10 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { setAppThemePreference } from '../theme/app-theme';
 import { ArtworkPulseClock, PULSE_HOVER_DWELL_MS } from './artwork-pulse';
 import { ArtworkPulseOverlay } from './ArtworkPulseOverlay';
+import { ArtworkPulsePainter } from './draw-artwork-pulse';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -58,7 +60,10 @@ let canvasRef: { current: HTMLCanvasElement };
 let root: Root;
 let hover: MockInstance<ArtworkPulseClock['hover']>;
 
-async function render(canvasHoverEnabled: boolean): Promise<void> {
+async function render(
+  canvasHoverEnabled: boolean,
+  canvasHoverPaused = !canvasHoverEnabled,
+): Promise<void> {
   await act(async () =>
     root.render(
       <ArtworkPulseOverlay
@@ -67,6 +72,7 @@ async function render(canvasHoverEnabled: boolean): Promise<void> {
         canvasSize={SIZE}
         viewState={VIEW}
         canvasHoverEnabled={canvasHoverEnabled}
+        canvasHoverPaused={canvasHoverPaused}
       />,
     ),
   );
@@ -81,6 +87,7 @@ const pulses = (): ReadonlyArray<unknown> =>
   hover.mock.calls.map((call) => (call[2] as { pulse?: boolean } | undefined)?.pulse ?? true);
 
 beforeEach(() => {
+  setAppThemePreference('light');
   vi.useFakeTimers();
   vi.stubGlobal('requestAnimationFrame', () => 1);
   vi.stubGlobal('cancelAnimationFrame', () => undefined);
@@ -112,10 +119,57 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  useUiStore.setState({ operationColorPeek: false, hoveredOperationId: null });
+  useUiStore.setState({
+    operationColorPeek: false,
+    hoveredOperationId: null,
+    wireframeView: false,
+  });
+  setAppThemePreference('light');
 });
 
 describe('ArtworkPulseOverlay (ADR-620)', () => {
+  it('clears a canvas hover when another tool takes over and waits for a fresh dwell', async () => {
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    expect(pulses()).toEqual([true]);
+    await render(false, false);
+    await pointAt({ x: 6, y: 5 });
+    await render(true);
+    // A pointer within the old object's box must not restore the stale hover.
+    expect(pulses()).toEqual([true]);
+    await act(async () => vi.advanceTimersByTime(PULSE_HOVER_DWELL_MS + 10));
+    expect(pulses()).toEqual([true, true]);
+  });
+
+  it.each(['theme', 'wireframe'] as const)(
+    'repaints a settled hover after a %s change without another pulse',
+    async (change) => {
+      const frames: FrameRequestCallback[] = [];
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+        frames.push(callback);
+        return frames.length;
+      });
+      const painted = vi.spyOn(ArtworkPulsePainter.prototype, 'draw');
+      await render(true);
+      await pointAt({ x: 5, y: 5 });
+      // Finish the pulse; the clock then has no scheduled animation frames.
+      frames.shift()?.(performance.now() + 5000);
+      frames.shift()?.(performance.now() + 6000);
+      expect(frames).toHaveLength(0);
+      painted.mockClear();
+      await act(async () => {
+        if (change === 'theme') setAppThemePreference('dark');
+        else useUiStore.setState({ wireframeView: true });
+      });
+      expect(frames).toHaveLength(1);
+      frames.shift()?.(performance.now() + 7000);
+      expect(painted).toHaveBeenCalledOnce();
+      expect(painted.mock.calls[0]?.[3].map((piece) => piece.objectId)).toEqual(['heart']);
+      expect(painted.mock.calls[0]?.[4]).toBe(change === 'wireframe' ? 'wireframe' : 'design');
+      expect(pulses()).toEqual([true]);
+    },
+  );
+
   it('pulses once on hover and resumes without a second pulse after a click', async () => {
     await render(true);
     await pointAt({ x: 5, y: 5 });
