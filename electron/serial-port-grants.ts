@@ -1,5 +1,5 @@
 // The serial ports the operator picked, remembered across restarts in the
-// desktop app (ADR-552, ADR-606), as Chrome remembers them. Electron keeps picks
+// desktop app (ADR-552, ADR-607), as Chrome remembers them. Electron keeps picks
 // in memory for the run. Once a device permission handler is installed,
 // Electron 44 asks it about every port it could remember and stops recording
 // picks itself (shell/browser/serial/serial_chooser_context.cc and

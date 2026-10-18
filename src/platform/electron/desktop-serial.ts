@@ -1,7 +1,7 @@
 // The desktop app's serial adapter: the web one (the window runs Chromium's
 // Web Serial), plus whether a pick outlives a restart. The desktop app on
 // Windows, macOS and Linux remembers the ports picked in its Select dialog, as
-// Chrome does (ADR-552, ADR-606). As in Chrome, macOS and Linux cannot
+// Chrome does (ADR-552, ADR-607). As in Chrome, macOS and Linux cannot
 // remember an adapter with no serial number (most CH340 boards), so Connect
 // asks for that one again after each start.
 

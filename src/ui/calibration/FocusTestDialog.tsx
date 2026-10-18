@@ -10,6 +10,7 @@ import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { formatGcodeFeedMmPerMin } from '../../core/gcode/feed-word';
+import { focusTestPowerIssue } from '../../core/output/focus-test-power';
 
 const DEFAULTS: FocusTestOptions = {
   steps: 9,
@@ -45,7 +46,10 @@ export function FocusTestDialog(props: { readonly onClose: () => void }): JSX.El
   const options = Object.fromEntries(
     FIELDS.map(([key]) => [key, draft[key].trim() === '' ? Number.NaN : Number(draft[key])]),
   ) as FocusTestOptions;
-  const issue = focusTestOptionsIssue(options) ?? focusTestProfileIssue(device);
+  const issue =
+    focusTestOptionsIssue(options) ??
+    focusTestProfileIssue(device) ??
+    focusTestPowerIssue(options.power, device);
   return (
     <Dialog
       title="Focus Test"

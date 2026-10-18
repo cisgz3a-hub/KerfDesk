@@ -1,6 +1,7 @@
 import {
   createLayer,
   IDENTITY_TRANSFORM,
+  nextOperationColor,
   type ImportedSvg,
   type Layer,
   type Scene,
@@ -36,7 +37,9 @@ export function focusTestOptionsIssue(options: FocusTestOptions): string | null 
   if (geometryIssue !== null) return geometryIssue;
   if (options.speed <= 0 || options.travelFeedMmPerMin <= 0)
     return 'Cut and Z travel speeds must be greater than zero.';
-  if (options.power < 0 || options.power > 100) return 'Power must be from 0 to 100 percent.';
+  // A zero-power sample burns nothing, so compilation drops it and its Z move.
+  if (options.power <= 0 || options.power > 100)
+    return 'Power must be greater than 0 and at most 100 percent.';
   const offsets = focusTestOffsets(options);
   if (new Set(offsets).size !== options.steps)
     return 'Samples must have distinct Z offsets at 0.001 mm output precision.';
@@ -76,7 +79,8 @@ export function generateFocusTest(options: FocusTestOptions): Scene {
   const objects: ImportedSvg[] = [];
   for (const [index, offsetMm] of focusTestOffsets(options).entries()) {
     const id = `focus-test-${index + 1}`;
-    const color = `#${(0x880000 + index * 0x100).toString(16).padStart(6, '0')}`;
+    // Distinct, unique operation colours (the editor palette, then a hue walk).
+    const color = nextOperationColor(layers);
     layers.push({
       ...createLayer({
         id,
@@ -121,6 +125,18 @@ export function focusTestProfileIssue(device: DeviceProfile): string | null {
     : 'Focus Test Z output currently supports GRBL, grblHAL and FluidNC only.';
 }
 
+export const FOCUS_TEST_Z_UNCONFIRMED_WARNING =
+  'The profile does not confirm a controllable Z axis and usable travel. Check the machine before running Focus Test.';
+export const FOCUS_TEST_Z_TRAVEL_EXCEEDED_WARNING =
+  'The focus sweep span exceeds the configured Z travel.';
+
+/** Machine findings Job Review opens its warning list for (never a refusal). */
+export function isFocusTestMachineWarning(warning: string): boolean {
+  return (
+    warning === FOCUS_TEST_Z_UNCONFIRMED_WARNING || warning === FOCUS_TEST_Z_TRAVEL_EXCEEDED_WARNING
+  );
+}
+
 export function focusTestWarnings(
   layers: ReadonlyArray<Pick<Layer, 'output' | 'focusTest'>>,
   device: DeviceProfile,
@@ -132,18 +148,19 @@ export function focusTestWarnings(
     return [
       'The 2D estimate excludes Focus Test laser-off returns. Inspect G-code (3D) shows the exact emitted motion and its playback estimate. Sample labels are operation names, not engraved marks.',
     ];
-  const warnings = [
-    `Focus Test moves Z from ${Math.min(...offsets).toFixed(3)} to ${Math.max(...offsets).toFixed(3)} mm relative to starting focus. Positive Z follows the controller axis direction. Each completed sample returns to starting Z; an interrupted job may not. Frame traces XY only: verify material clearance and both Z directions. Physical focus and travel remain unqualified.`,
-    'The 2D estimate excludes Focus Test Z travel and laser-off returns. Inspect G-code (3D) shows the exact emitted motion and its playback estimate. Sample labels are operation names, not engraved marks.',
-  ];
+  // Machine findings lead: Job Review lists Focus warnings first, so an
+  // unconfirmed Z axis or a sweep beyond travel is the first thing it shows.
+  const machine: string[] = [];
   if (!device.capabilities?.includes('z-axis') || device.zTravelConfirmed !== true)
-    warnings.push(
-      'The profile does not confirm a controllable Z axis and usable travel. Check the machine before running Focus Test.',
-    );
+    machine.push(FOCUS_TEST_Z_UNCONFIRMED_WARNING);
   if (
     device.zTravelMm !== undefined &&
     Math.max(0, ...offsets) - Math.min(0, ...offsets) > device.zTravelMm
   )
-    warnings.push('The focus sweep span exceeds the configured Z travel.');
-  return warnings;
+    machine.push(FOCUS_TEST_Z_TRAVEL_EXCEEDED_WARNING);
+  return [
+    ...machine,
+    `Focus Test moves Z from ${Math.min(...offsets).toFixed(3)} to ${Math.max(...offsets).toFixed(3)} mm relative to starting focus. Positive Z follows the controller axis direction. Each completed sample returns to starting Z; an interrupted job may not. Frame traces XY only: verify material clearance and both Z directions. Physical focus and travel remain unqualified.`,
+    'The 2D estimate excludes Focus Test Z travel and laser-off returns. Inspect G-code (3D) shows the exact emitted motion and its playback estimate. Sample labels are operation names, not engraved marks.',
+  ];
 }
