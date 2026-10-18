@@ -65,6 +65,7 @@ export function harness(
   let moved = false;
   let holdLine: string | undefined;
   let failLine: string | undefined;
+  let refuseLine: string | undefined;
   let afterWrite: ((line: string) => void) | undefined;
   const set = (patch: Partial<LaserState> | ((state: LaserState) => Partial<LaserState>)): void => {
     state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) };
@@ -115,6 +116,10 @@ export function harness(
       afterWrite?.(line);
       if (line === failLine) throw new Error('wire handoff failed');
       if (line === holdLine) return;
+      if (line === refuseLine) {
+        consumeControllerCommandResponse(refs, driver.classifyLine('error:20'), 'error:20');
+        continue;
+      }
       if (line === '?' || line === 'M114') emitStatus();
       acceptMotion(line);
       if (line !== '?') ack(line);
@@ -140,6 +145,10 @@ export function harness(
     },
     fail: (line: string) => {
       failLine = line;
+    },
+    /** Answer this line with a GRBL-style error:N refusal instead of ok. */
+    refuse: (line?: string) => {
+      refuseLine = line;
     },
     after: (fn: (line: string) => void) => {
       afterWrite = fn;

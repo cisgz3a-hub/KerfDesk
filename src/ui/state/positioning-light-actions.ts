@@ -144,10 +144,7 @@ async function runPositioningLight(
         });
       settled = true;
       lightSnapshots.set(refs, { mapping: { ...mapping }, session, connection: refs.connection });
-      // May have reached hardware even if its acknowledgement is subsequently
-      // lost. Keep Off available until a positively acknowledged off or reset.
-      set({ positioningLightEnabled: true });
-      await positioningLightCommand(context, mapping.onCommand);
+      await sendLightOn(context, set, mapping, owns);
     } else {
       await positioningLightCommand(context, mapping.offCommand);
       set({ positioningLightEnabled: false });
@@ -190,6 +187,27 @@ async function containUnsettledMove(
       if (owns()) set({ controllerOperation: null });
     })
     .catch(() => undefined);
+}
+
+// On may have reached hardware even if its acknowledgement is subsequently
+// lost. Keep Off available until a positively acknowledged off or reset. An
+// error:N refuses the line before it runs, so the acknowledged Off still holds.
+async function sendLightOn(
+  context: PositioningLightTransaction,
+  set: SetFn,
+  mapping: PositioningLight,
+  owns: () => boolean,
+): Promise<void> {
+  set({ positioningLightEnabled: true });
+  try {
+    await positioningLightCommand(context, mapping.onCommand);
+  } catch (error) {
+    if (error instanceof ControllerCommandRefusedError && owns()) {
+      set({ positioningLightEnabled: false });
+      lightSnapshots.delete(context.refs);
+    }
+    throw error;
+  }
 }
 
 async function turnOffPreviousLight(context: PositioningLightTransaction): Promise<void> {

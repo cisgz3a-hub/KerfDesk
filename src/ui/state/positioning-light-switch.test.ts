@@ -7,6 +7,8 @@ import {
   cancelFreshControllerStatusWait,
   waitForFreshControllerStatus,
 } from './laser-controller-status-wait';
+import { ControllerCommandRefusedError } from './laser-interactive-command';
+import { positioningLightDisconnectOff } from './positioning-light-actions';
 
 afterEach(() => {
   useStore.setState({ project: originalProject });
@@ -152,6 +154,22 @@ describe('independent positioning LED switch', () => {
     expect(h.get().positioningLightEnabled).toBe(true);
     expect(h.writes).not.toContain('M64 P1\n');
     expect(h.writes.at(-1)?.trim()).toBe(h.mapping.offCommand);
+  });
+
+  it('clears On tracking when the controller refuses the on command', async () => {
+    const h = harness();
+    h.refuse(h.mapping.onCommand);
+    await expect(h.actions.switchPositioningLightOn()).rejects.toBeInstanceOf(
+      ControllerCommandRefusedError,
+    );
+    const lines = h.writes.map((line) => line.trim());
+    expect(lines.indexOf(h.mapping.offCommand)).toBeLessThan(lines.indexOf(h.mapping.onCommand));
+    expect(h.get().positioningLightEnabled).toBe(false);
+    expect(positioningLightDisconnectOff(h.get(), h.refs)).toBeNull();
+    expect(h.get().controllerOperation).toBeNull();
+    h.refuse();
+    await h.actions.switchPositioningLightOn();
+    expect(h.get().positioningLightEnabled).toBe(true);
   });
 
   it('keeps Off available when the on acknowledgement is lost', async () => {
