@@ -30,6 +30,8 @@ type Link = {
    * report, as a controller holding the tail of its program would. */
   holding: boolean;
   held: string[];
+  /** Reject the `$G` write after its bytes reached the controller (an ambiguous failure). */
+  rejectProbeWrite: boolean;
   deliverHeld: (() => void) | null;
 };
 
@@ -40,6 +42,7 @@ const link = (dropOks: ReadonlyArray<number> = []): Link => ({
   sawGc: false,
   holding: false,
   held: [],
+  rejectProbeWrite: false,
   deliverHeld: null,
 });
 
@@ -98,6 +101,12 @@ function lossyAdapter(sim: GrblSimulator, wire: Link): PlatformAdapter {
             const connection = await port.open(...openArgs);
             const lossy: SerialConnection = {
               ...connection,
+              write: async (data) => {
+                await connection.write(data);
+                if (wire.rejectProbeWrite && data === '$G\n') {
+                  throw new Error('USB adapter failed after sending');
+                }
+              },
               onLine: (handler) => connection.onLine((line) => deliver(line, handler)),
             };
             return lossy;
@@ -201,6 +210,25 @@ describe('lost job-line replies at the end of a job', () => {
     expect(await msUntilReleased(20_000)).not.toBeNull();
     expectCleanFinish(sim);
     expect(useLaserStore.getState().log.join('\n')).toMatch(/\$G confirmation was lost/);
+  });
+
+  it('keeps the probe owner through an ambiguous write failure and finishes on its late reply', async () => {
+    const wire = link([5]);
+    const sim = await connectIdle(wire);
+    wire.okCount = 0;
+    wire.rejectProbeWrite = true;
+    await startTestLaserJobOnClock(JOB);
+
+    expect(await msUntilReleased(20_000)).not.toBeNull();
+    const state = useLaserStore.getState();
+    expect(probesSent(sim)).toBe(1);
+    // The failure is reported, but the probe's reply still settled its own reservation.
+    expect(state.safetyNotice).toMatchObject({ kind: 'write-failed', action: 'stream-probe' });
+    expect(state.pendingUntrackedAcks).toBe(0);
+    expect(sentSoftReset(sim)).toBe(false);
+    expect(sim.outbound()).toContain('G4 P0.01\n');
+    expect(state.log.join('\n')).toMatch(/Controller settled after job/);
+    expect(state.log.join('\n')).toMatch(/1 job line reply was lost on the serial link/);
   });
 
   it('completes an undisturbed job exactly as before, without a probe', async () => {

@@ -63,6 +63,9 @@ missing at that moment was lost on the link.
   the proof. If the job's last reply consumed the probe's `ok` because the
   `[GC:` was lost, the probe is released 10 s after the transport accepted it;
   while its write is still pending, no reply can be due and nothing is released.
+  A rejected probe write may still have reached the controller, so the probe
+  keeps its owner alongside the reply reservation safeWrite quarantines; its
+  late reply or a new serial epoch retires both.
 - Every window above counts only time the status poll ran on schedule
   (ADR-356 Amendment 1). After a hidden, throttled or sleeping page resumes,
   replies queued meanwhile are still being read, so the Idle windows and both

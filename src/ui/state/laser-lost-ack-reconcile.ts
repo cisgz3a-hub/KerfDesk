@@ -342,9 +342,10 @@ function sendLostReplyProbe(
       if (refs.lostReplyProbe === probe) probe.writtenAt = Date.now();
     },
     () => {
-      // The transport's own failure handling owns the connection; the probe's
-      // reservation goes with the session.
-      if (refs.lostReplyProbe === probe) refs.lostReplyProbe = null;
+      // Keep the probe. A rejected write may still have reached the
+      // controller, and safeWrite then keeps the probe's reply reservation in
+      // quarantine; its late `[GC:` and `ok` must still find their owner. Every
+      // other rejection moves the write epoch, which retires both together.
     },
   );
 }
