@@ -80,6 +80,6 @@ describe('useStore multi-select', () => {
         .getState()
         .project.scene.layers.map((layer) => layer.color)
         .sort(),
-    ).toEqual(['#000000', '#2563eb']);
+    ).toEqual(['#2563eb', '#dc2626']);
   });
 });
