@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import type { EmbeddedFont, VariableCsvDataset } from '../../core/scene';
 import { DEFAULT_TEXT_COLOR, findFontEntry } from '../../core/text';
 import { cncStrokeTextToPolylines } from '../../core/text/cnc-stroke-font';
-import { outlineFontMissingCharacters } from '../../core/text/text-to-polylines';
 import { parseVariableTemplateSource } from '../../core/variables';
-import { loadFont } from './font-loader';
+import type { TextWorkerSession } from './text-worker-session';
+import { useTextWorkerSession } from './use-text-worker-session';
 
-// Checking an outline font parses it, so the check waits for typing to settle.
+// Checking an outline font parses it, so the check waits for typing to settle,
+// and runs in the text worker (ADR-616).
 const CHECK_DELAY_MS = 300;
 const COLUMN_SEPARATOR = '\u0000';
 
@@ -32,11 +33,12 @@ export function useMissingCharacters(query: MissingCharacterQuery): ReadonlyArra
   );
   const characters = distinctCharacters(`${engraved.literal}${csvCharacters}`);
   const [checked, setChecked] = useState<FontCheck | null>(null);
+  const textWorker = useTextWorkerSession();
   useEffect(() => {
     if (!enabled || characters === '') return undefined;
     let active = true;
     const timer = window.setTimeout(() => {
-      void fontMissingCharacters(fontKey, embeddedFonts, characters)
+      void fontMissingCharacters(textWorker, fontKey, embeddedFonts, characters)
         // A font that cannot load is reported by the dialog's own font check.
         .catch((): ReadonlyArray<string> => [])
         .then((missing) => {
@@ -47,19 +49,20 @@ export function useMissingCharacters(query: MissingCharacterQuery): ReadonlyArra
       active = false;
       window.clearTimeout(timer);
     };
-  }, [enabled, fontKey, embeddedFonts, characters]);
+  }, [enabled, fontKey, embeddedFonts, characters, textWorker]);
   if (!enabled || checked?.fontKey !== fontKey) return [];
   // A character deleted since the last check leaves the warning at once.
   return checked.missing.filter((character) => characters.includes(character));
 }
 
 async function fontMissingCharacters(
+  textWorker: TextWorkerSession,
   fontKey: string,
   embeddedFonts: ReadonlyArray<EmbeddedFont>,
   characters: string,
 ): Promise<ReadonlyArray<string>> {
   if (findFontEntry(fontKey)?.geometry !== 'single-line') {
-    return outlineFontMissingCharacters(await loadFont(fontKey, embeddedFonts), characters);
+    return textWorker.missingCharacters({ fontKey, embeddedFonts, content: characters });
   }
   const rendered = await cncStrokeTextToPolylines({
     fontKey,

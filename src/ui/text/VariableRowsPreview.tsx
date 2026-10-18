@@ -8,7 +8,7 @@ import {
 import { Button } from '../kit';
 import { useStore } from '../state';
 import { DEFAULT_TEXT_COLOR } from '../../core/text';
-import { renderTextGeometry } from './render-text-geometry';
+import { useTextWorkerSession } from './use-text-worker-session';
 import type { DialogValues } from './use-text-dialog-fields';
 
 type Row = {
@@ -102,6 +102,7 @@ function useRowLayout(
   values: DialogValues | undefined,
 ): Readonly<Record<number, string>> {
   const [layouts, setLayouts] = useState<Readonly<Record<number, string>>>({});
+  const textWorker = useTextWorkerSession();
   useEffect(() => {
     let current = true;
     setLayouts({});
@@ -121,7 +122,7 @@ function useRowLayout(
         if (!current) return;
         if (!row.valid) continue;
         try {
-          const rendered = await renderTextGeometry({ ...values, content: row.value });
+          const rendered = await textWorker.render({ ...values, content: row.value });
           const layout = rendered.textBoxLayout;
           result[row.index] =
             layout === undefined
@@ -140,7 +141,7 @@ function useRowLayout(
       current = false;
       window.clearTimeout(timer);
     };
-  }, [rows, values]);
+  }, [rows, values, textWorker]);
   return layouts;
 }
 

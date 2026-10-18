@@ -111,8 +111,26 @@ export type TextRenderResult = {
 
 export async function textToPolylines(input: TextRenderInput): Promise<TextRenderResult> {
   if (input.geometry === 'single-line') return cncStrokeTextToPolylines(input);
-  const ot = await loadOpentype();
-  const font = ot.parse(input.fontBuffer);
+  return outlineTextToPolylines(input, await parseOutlineFont(input.fontBuffer));
+}
+
+export type OutlineTextRenderInput = Extract<TextRenderInput, { readonly fontBuffer: ArrayBuffer }>;
+
+/** Parses an outline font as textToPolylines does, once per call. */
+export async function parseOutlineFont(fontBuffer: ArrayBuffer): Promise<opentype.Font> {
+  return (await loadOpentype()).parse(fontBuffer);
+}
+
+/**
+ * textToPolylines' outline route on a font already parsed from
+ * `input.fontBuffer`. opentype.js fills parts of a Font in lazily while it
+ * draws, and some of that changes later layouts, so a parsed font may serve
+ * more than one render only where reusableOutlineFont allows it (ADR-616).
+ */
+export function outlineTextToPolylines(
+  input: OutlineTextRenderInput,
+  font: opentype.Font,
+): TextRenderResult {
   const source = textForLayout(input.content);
   const shaping = input.shaping;
   validateShaping(input.fontBuffer, source, shaping);
@@ -222,7 +240,14 @@ export async function outlineFontMissingCharacters(
   fontBuffer: ArrayBuffer,
   content: string,
 ): Promise<ReadonlyArray<string>> {
-  const font = (await loadOpentype()).parse(fontBuffer);
+  return parsedFontMissingCharacters(await parseOutlineFont(fontBuffer), content);
+}
+
+/** outlineFontMissingCharacters on a parsed font. It reads only the character map. */
+export function parsedFontMissingCharacters(
+  font: opentype.Font,
+  content: string,
+): ReadonlyArray<string> {
   return missingCharacters(textForLayout(content), outlineGlyphCoverage(font), true);
 }
 
