@@ -127,9 +127,9 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Machine connection toolbar**: the machine name and connection status sit beside the numeric transforms, with Connect/Disconnect, the Machine Setup icon and the connection-options menu. The machine-name dropdown shows the full profile, bed size, controller, connected port, fitted Laser module selector and supported FluidNC or grblHAL network connection form. Tab moves between its fields; Escape closes it and returns focus to the machine name. Field input stays inside the dropdown while the existing Abort shortcut remains available. Connection failures and qualification/recovery notices remain visible outside the dropdown. On narrow windows the machine controls wrap onto a second top row, and remain available when either sidebar is collapsed. Detected-settings notifications also remain active with the sidebar closed.
 - **Artwork panel**: docked right with **Properties**, **Run order**, and **Materials** views in Laser mode (**Recipes** in CNC). Properties is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
-- **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power and Speed each pair a full-width slider with exact numeric entry; Passes remains a numeric field; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
+- **Laser artwork settings (ADR-430)**: one line names the selected artwork at the top of the Properties view, with a light Operation | Artwork tab row under it (ADR-616). The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power and Speed each pair a full-width slider with exact numeric entry; Passes remains a numeric field; Fill adds Line spacing and Angle, and Image adds Dither (swatches that preview each mode on a grey ramp), Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
 - **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). An adaptive pocket's Entry & travel names its own helix ("Climb · Adaptive helix"), and names the Ramp entry angle only as the entry of reliefs on the same operation ("Relief ramp 5°", ADR-481 Amendment 1). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only. Closed-only operations also show the exact count of omitted open contours, including mixed closed/open artwork; all-open vector operations without assigned relief retain the no-toolpath explanation (ADR-481 Amendment 2).
-- **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
+- **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, artwork selection, settings clipboard, and delete controls; Delete sits apart in danger style. Output is switched in the operation editor or with the list-wide tools (ADR-616).
 - **Machine controls panel (ADR-593 Amendment 1)**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. The current machine state shares the heading, and the existing jog group stays above three softly glowing utility buttons: **Origin**, **Placement** and **Console**. Each expands its section directly below the buttons inside Machine, leaving Artwork and the canvas unobscured. Escape, the close button or clicking the selected button collapses it; working in neighbouring settings leaves it open. Typed positions, unsent commands, filters and disclosures survive closing or switching tools. Full coordinates, work-origin identity and feed/power details are in Origin. The positioning group has no separate scroller; Step and Speed follow the arrow grid. The open utility uses the remaining panel height and scrolls only when needed. When the fixed controls and an open utility cannot fit, short bodies use one full rail scroller; expanded recovery notices also retain that fallback. Frame and Start remain outside it. Both panels can be resized or hidden independently. The machine panel may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
 - **Placement & output**: the **Placement** utility button opens the existing placement and output settings, plus CNC maintenance tools when applicable. Mouse, Space, Enter and Arrow Down open it without activating canvas or job shortcuts. Tab moves through its fields and Escape closes it.
@@ -813,8 +813,11 @@ the linked artwork.
   artwork without an enabled compatible operation shows an empty-state explanation.
 - Laser settings offer **Line**, **Fill** and **Image**, then show power, speed and passes
   together, followed only by the settings that process needs (ADR-430). Power and Speed use
-  full-width sliders with exact numeric entry; Passes remains numeric. Sliders show their endpoints,
-  use the existing power and Output max feed limits, and commit one edit when a drag ends.
+  full-width sliders with exact numeric entry; Passes remains numeric. Sliders show their endpoints
+  and commit one edit when a drag ends. Power spans 0-100%. Speed's slider spans the machine's
+  usual working speeds on a log scale of round values, labelled at each decade, from 60 mm/min to
+  the lower of Output max feed and the machine's working maximum (ADR-615); its label also reads
+  the speed in mm/s. Exact entry still accepts 1 mm/min up to Output max feed.
   Numeric typing retains the 300 ms debounce. Mixed values show a neutral, disabled slider until
   an exact value is entered. **More cut settings**
   opens the full draft editor grouped by purpose; **Apply settings** commits the draft and
@@ -2736,6 +2739,16 @@ authorization, Frame proof, controller command, or safety boundary.
    artwork stays in place and can still output; removed artwork and group/order edits
    are restored together by Undo. A retained relief's linked source cannot be silently
    removed. Exact artwork-size controls also appear for a single fitted jig (ADR-599).
+9. The draft survives changes the main project makes while the editor is open, such as
+   variable text advancing after a job (ADR-606 Amendment 1). **Save to canvas** carries
+   over main-project changes to artwork, operations and project settings the draft did
+   not touch, and the draft's own edits win for what it changed. A finished outline run
+   that selects **Artwork only** meanwhile is still adopted. Saving is refused, with a
+   message naming the cause, only when another project was opened, the main project
+   gained a captured board, the jig outlines changed there, artwork the draft changed
+   was also changed or removed there, or the same operation setting was changed
+   differently on both sides. Then choose **Close without saving**, **Discard changes**,
+   and reopen the editor.
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 
@@ -3917,8 +3930,12 @@ correct M4-mode raster G-code from Compile.
    images bypass color-based layer creation and land on a default
    "Image" layer that the auto-create pass tags `mode = 'image'`.
 5. Operator selects the Image layer, sees the new fields appear:
-   - **Dither**: dropdown of `threshold` / `floyd-steinberg` /
-     `grayscale`. Default `floyd-steinberg`.
+   - **Dither**: a wrapping grid of swatches, one per mode (Threshold, the eight
+     error-diffusion kernels, Ordered and Grayscale). Each swatch is the same
+     dark-to-light ramp run through that mode's real `dither()`; Grayscale shows a
+     smooth ramp. A caption names the chosen mode and says what it is for, the
+     arrow keys move and select like radios, and artwork with different dithers
+     shows **Mixed** with no swatch chosen. Default `floyd-steinberg`.
    - **Lines/mm**: number input, 5..25, default 10.
 6. Workspace shows the image where it will burn; no separate "preview
    the dither" overlay in v1 — the image itself is the preview.

@@ -36,6 +36,21 @@ describe('Toolbar icon presentation', () => {
     }
   });
 
+  it('labels Import image so it does not read as a second Import', async () => {
+    const view = await renderToolbarCommands([
+      command('file.import', 'Import...'),
+      command('file.import-image', 'Import Image...'),
+    ]);
+    try {
+      const labels = [...view.host.querySelectorAll('button[data-help-id]')].map(
+        (button) => button.querySelector('.lf-toolbar-command-label')?.textContent,
+      );
+      expect(labels).toEqual(['Import', 'Import image']);
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it('keeps specialist labels available in More', async () => {
     const view = await renderToolbar(command('tools.box-generator', 'Box Generator...'));
     try {

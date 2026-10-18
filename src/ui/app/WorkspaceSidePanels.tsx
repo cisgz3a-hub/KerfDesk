@@ -206,7 +206,7 @@ function PanelTab(props: {
         !props.expanded
           ? 'lf-btn lf-panel-expand-hint'
           : props.selected
-            ? 'lf-btn lf-btn--primary'
+            ? 'lf-btn lf-workspace-panel-tab--selected'
             : 'lf-btn lf-btn--ghost'
       }
       onClick={props.onSelect}

@@ -4,8 +4,6 @@ import {
   replaceIdsAtEarliest,
   selectedVectorObjects,
   expectedSelection,
-  uniqueWeldId,
-  uniqueObjectId,
   placeRetainedCompound,
   compoundSceneBudgetIsValid,
 } from './vector-path-selection';
@@ -14,9 +12,7 @@ export { uniqueObjectId } from './vector-path-selection';
 import { retainBooleanCompoundResult } from '../../core/geometry/boolean-compound';
 import { booleanCompoundActions, type BooleanCompoundActions } from './boolean-compound-actions';
 import {
-  combineVectorObjects,
   isVectorPathObject,
-  offsetVectorObjects,
   type VectorBooleanOp,
   type VectorSceneObject,
 } from '../../core/geometry';
@@ -43,7 +39,13 @@ import type { PathNodeRef } from './path-node-edit-actions';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { useToastStore } from './toast-store';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
-import { planWeldSelection } from './vector-path-weld-plan';
+import {
+  combineForSelection,
+  offsetOutlinesForSelection,
+  weldPlanForSelection,
+  type PreparedOffsetPaths,
+  type PreparedVectorCombine,
+} from './vector-op-prepared';
 import { vectorRepairActions, type VectorRepairActions } from './vector-repair-actions';
 import { convertVectorObjectToPath } from './vector-path-conversion';
 
@@ -53,6 +55,8 @@ export type VectorCombineOptions = {
   readonly expectedProject?: Project;
   readonly expectedIds?: ReadonlyArray<string>;
   readonly isCurrent?: () => boolean;
+  /** A dialog's settled background result, committed when its inputs still match (ADR-609). */
+  readonly prepared?: PreparedVectorCombine;
 };
 
 export type VectorPathActions = VectorRepairActions &
@@ -62,7 +66,7 @@ export type VectorPathActions = VectorRepairActions &
     // ADR-103 G1 â€” subject = bottom-most selected object, clips = the rest.
     readonly booleanSelection: (op: VectorBooleanOp, options?: VectorCombineOptions) => void;
     // ADR-103 G1 â€” adds a NEW offset object; the sources stay.
-    readonly offsetSelection: (deltaMm: number) => void;
+    readonly offsetSelection: (deltaMm: number, prepared?: PreparedOffsetPaths) => void;
     // ADR-103 G6 â€” relieve sharp corners in place, one undo step.
     readonly dogboneSelection: (bitDiameterMm: number) => void;
   };
@@ -108,6 +112,7 @@ export function vectorPathActions(
                 state,
                 options.keepOperands === true,
                 options.retainCompound === true,
+                options.prepared,
               )
             : state,
         undefined,
@@ -122,12 +127,14 @@ export function vectorPathActions(
                 op,
                 options.keepOperands === true,
                 options.retainCompound === true,
+                options.prepared,
               )
             : state,
         undefined,
         options.isCurrent,
       ),
-    offsetSelection: (deltaMm) => copySet((state) => offsetSelectionMutation(state, deltaMm)),
+    offsetSelection: (deltaMm, prepared) =>
+      copySet((state) => offsetSelectionMutation(state, deltaMm, prepared)),
     dogboneSelection: (bitDiameterMm) =>
       set((state) => dogboneSelectionMutation(state, bitDiameterMm)),
   };
@@ -202,14 +209,11 @@ function weldSelectionMutation(
   state: VectorPathState,
   keepOperands = false,
   retainCompound = false,
+  background?: PreparedVectorCombine,
 ): VectorPathMutation | VectorPathState {
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length === 0 || selected.some((object) => object.locked === true)) return state;
-  const weldResult = planWeldSelection(
-    state.project.scene,
-    selected,
-    uniqueWeldId(state.project.scene),
-  );
+  const weldResult = weldPlanForSelection(state.project.scene, selected, background);
   if (weldResult.kind === 'error') {
     // The core op returns a user-worded message for reachable failures the menu
     // gating can't pre-detect (empty intersect of disjoint shapes, a collapsing
@@ -268,10 +272,11 @@ function booleanSelectionMutation(
   op: VectorBooleanOp,
   keepOperands = false,
   retainCompound = false,
+  background?: PreparedVectorCombine,
 ): VectorPathMutation | VectorPathState {
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length < 2 || selected.some((object) => object.locked === true)) return state;
-  const combineResult = combineVectorObjects(selected, op, uniqueObjectId(state.project.scene, op));
+  const combineResult = combineForSelection(state.project.scene, selected, op, background);
   if (combineResult.kind === 'error') {
     useToastStore.getState().pushToast(combineResult.error.message, 'warning');
     return state;
@@ -315,13 +320,15 @@ function booleanSelectionMutation(
 function offsetSelectionMutation(
   state: VectorPathState,
   deltaMm: number,
+  background?: PreparedOffsetPaths,
 ): VectorPathMutation | VectorPathState {
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length === 0 || selected.some((object) => object.locked === true)) return state;
-  const offsetResult = offsetVectorObjects(
+  const offsetResult = offsetOutlinesForSelection(
+    state.project.scene,
     selected,
     deltaMm,
-    uniqueObjectId(state.project.scene, 'offset'),
+    background,
   );
   if (offsetResult.kind === 'error') {
     useToastStore.getState().pushToast(offsetResult.error.message, 'warning');

@@ -8,6 +8,7 @@ import { installJobCheckpointTracking } from '../../ui/app/use-job-checkpoint';
 import { installFramedRunPermitForCurrentState } from '../../ui/laser/framed-run-testing';
 import { LiveJobTimeBadge } from '../../ui/laser/LiveJobTimeBadge';
 import { installAutoJobReview, useJobReviewStore } from '../../ui/laser/job-review';
+import { hashOnSimulatedClock } from '../../ui/laser/host-sha256-testing';
 import { runStartJobFlow } from '../../ui/laser/start-job-flow';
 import { initialLaserState } from '../../ui/state/laser-store-helpers';
 import { useLaserStore } from '../../ui/state/laser-store';
@@ -30,6 +31,9 @@ let uninstallReview: (() => void) | null = null;
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // Archive and settlement SHA-256 must not let the simulated machine stream on
+  // while WebCrypto waits for a real event-loop turn (see host-sha256-testing).
+  hashOnSimulatedClock();
   resetStore();
   useLaserStore.setState(initialLaserState());
   localStorage.clear();

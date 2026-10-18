@@ -67,17 +67,17 @@ async function consentPage(
     .map((scope) => `<input type="hidden" name="scope" value="${escapeHtml(scope)}">`)
     .join('');
   const editDescription = requested.includes(OAUTH_EDIT)
-    ? '<li>Add text and rectangles, select artwork, move or rotate it, and change existing laser operation settings.</li>'
+    ? '<li>Add, select, move, change and delete artwork, including SVG, DXF, PNG and JPEG designs this client sends.</li><li>Create, reorder, change and delete layers and their laser or CNC settings, apply saved recipes, and undo or redo.</li><li>Save the project over its existing file on the PC.</li>'
     : '';
   const controlDescription = requested.includes(OAUTH_CONTROL)
-    ? '<li>Jog the machine, Frame the current job, confirm its exact Job Review and Start cutting, or invoke software Abort. These actions affect the physical machine.</li>'
+    ? '<li>Connect or disconnect the machine on the port already chosen on the PC, Home, set the work origin or Zero Z, Jog, Frame the current job, confirm its exact Job Review and Start cutting, Pause, Resume, or invoke software Abort. These actions affect the physical machine.</li><li>Take still photos from the PC camera, only while artwork sharing is on in KerfDesk and the camera is already live on the PC.</li>'
     : '';
   const limitsDescription = requested.includes(OAUTH_CONTROL)
     ? 'A completed Frame and the exact current Job Review remain required before Start. Software Abort is not a hardware emergency stop.'
     : 'This access cannot start a job or move a machine.';
   return html(
     'Approve MCP access',
-    `<section class="card"><p class="eyebrow">Computer approval</p><h1>Allow ${escapeHtml(description.clientName)}?</h1><p>This client will connect to <strong>${escapeHtml(session.info.deviceLabel)}</strong>.</p><dl><dt>Client</dt><dd>${escapeHtml(description.clientDomain ?? description.clientId)}</dd><dt>Return address</dt><dd>${escapeHtml(description.redirectHost)}${description.redirectIsLoopback ? ' (local app on this device)' : ''}</dd></dl><p>Only continue if you recognise this client and return address.</p><ul><li>Read the open workspace, machine profile, job review and app status.</li>${editDescription}${controlDescription}${requested.includes('offline_access') ? '<li>Reconnect with this approval for up to 30 days. You can revoke access in KerfDesk at any time.</li>' : ''}</ul><p>KerfDesk must be open on the PC. ${limitsDescription} This access cannot open files or change your licence.</p><form method="post" action="/authorize"><input type="hidden" name="handle" value="${escapeHtml(transaction.handle)}">${scopeInputs}<div class="actions"><button name="decision" value="allow">Allow access</button><button class="secondary" name="decision" value="deny">Decline</button></div></form></section>`,
+    `<section class="card"><p class="eyebrow">Computer approval</p><h1>Allow ${escapeHtml(description.clientName)}?</h1><p>This client will connect to <strong>${escapeHtml(session.info.deviceLabel)}</strong>.</p><dl><dt>Client</dt><dd>${escapeHtml(description.clientDomain ?? description.clientId)}</dd><dt>Return address</dt><dd>${escapeHtml(description.redirectHost)}${description.redirectIsLoopback ? ' (local app on this device)' : ''}</dd></dl><p>Only continue if you recognise this client and return address.</p><ul><li>Read the open workspace, machine profile, job review and app status, plus artwork previews and text while artwork sharing is on in KerfDesk.</li>${editDescription}${controlDescription}${requested.includes('offline_access') ? '<li>Reconnect with this approval for up to 30 days. You can revoke access in KerfDesk at any time.</li>' : ''}</ul><p>KerfDesk must be open on the PC. ${limitsDescription} This access cannot open or browse files on the PC or change your licence.</p><form method="post" action="/authorize"><input type="hidden" name="handle" value="${escapeHtml(transaction.handle)}">${scopeInputs}<div class="actions"><button name="decision" value="allow">Allow access</button><button class="secondary" name="decision" value="deny">Decline</button></div></form></section>`,
     transaction.headers,
   );
 }

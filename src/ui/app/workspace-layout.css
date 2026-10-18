@@ -26,8 +26,8 @@
 }
 
 .lf-workspace-panels--compact {
-  width: clamp(320px, 34vw, 400px);
-  max-width: min(430px, calc(100% - 100px));
+  width: clamp(290px, 27vw, 360px);
+  max-width: min(400px, calc(100% - 100px));
 }
 
 .lf-workspace-panels--compact[data-collapsed='false'] {
@@ -59,15 +59,21 @@
   container-name: machine-rail-body;
 }
 
+/* When a short window makes the rail scroll, Frame and Start stay pinned to
+   its bottom edge instead of scrolling out of view, or stopping a fraction of
+   a pixel past it when a scroll lands on a whole pixel. */
 .lf-workspace-panels--compact > .lf-workspace-job-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   flex-shrink: 0;
 }
 
 .lf-workspace-panel-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  padding: 5px;
+  gap: 3px;
+  padding: 3px;
   flex-shrink: 0;
   background: var(--lf-bg-0);
   border-bottom: 1px solid var(--lf-border);
@@ -79,35 +85,24 @@
   justify-content: center;
   gap: 6px;
   min-width: 0;
-  min-height: 38px;
+  min-height: 28px;
   font-size: var(--lf-text-md);
   font-weight: 600;
 }
 
 .lf-workspace-panel-tabs > button > svg {
-  width: 19px;
-  height: 19px;
-}
-
-/* Short windows give the side panel's settings the height (ADR-616). */
-@media (max-height: 820px) {
-  .lf-workspace-panel-tabs:not(.lf-workspace-panel-tabs--collapsed) {
-    padding: 4px;
-  }
-
-  .lf-workspace-panel-tabs:not(.lf-workspace-panel-tabs--collapsed) > button {
-    min-height: 32px;
-  }
+  width: 16px;
+  height: 16px;
 }
 
 .lf-workspace-panel-tabs--collapsed {
   grid-template-columns: minmax(0, 1fr);
-  padding: 4px;
+  padding: 3px;
 }
 
 .lf-workspace-panel-tabs--collapsed > button {
-  min-height: 36px;
-  padding: 6px;
+  min-height: 28px;
+  padding: 4px;
 }
 
 .lf-workspace-panel-tabs--collapsed .lf-workspace-panel-label {
@@ -148,8 +143,8 @@
 .lf-workspace-panel-toggles {
   display: flex;
   justify-content: flex-end;
-  gap: 6px;
-  padding: 4px;
+  gap: 4px;
+  padding: 3px;
   border-bottom: 1px solid var(--lf-border);
   background: var(--lf-bg-0);
 }
@@ -158,6 +153,19 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* A shown panel and the selected panel tab use the copper tint, not the solid
+   fill, so solid copper keeps marking the one main action nearby (Connect).
+   The shared aria-pressed fill (tokens.css) is unchanged elsewhere. */
+.lf-workspace-panel-toggles > .lf-btn[aria-pressed='true'],
+.lf-workspace-panel-toggles > .lf-btn[aria-pressed='true']:hover:not(:disabled),
+.lf-workspace-panel-toggles > .lf-btn[aria-pressed='true']:active:not(:disabled),
+.lf-workspace-panel-tabs > .lf-workspace-panel-tab--selected,
+.lf-workspace-panel-tabs > .lf-workspace-panel-tab--selected:active:not(:disabled) {
+  background: var(--lf-tint-accent);
+  border-color: var(--lf-accent);
+  color: var(--lf-accent-fg);
 }
 
 @media (max-width: 700px) {

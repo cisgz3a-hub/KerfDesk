@@ -44,12 +44,12 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-height: 30px;
-  padding: 4px 5px;
+  min-height: 26px;
+  padding: 3px 5px;
   border: 0;
-  border-radius: 6px 6px 0 0;
+  border-radius: var(--lf-radius-md) var(--lf-radius-md) 0 0;
   color: var(--lf-text-muted);
-  font-size: 13px;
+  font-size: var(--lf-text-sm);
 }
 
 .lf-artwork-editor-tabs [aria-selected='true'] {
@@ -115,7 +115,7 @@
 }
 .lf-artwork-tool__actions button {
   flex: 1 1 0;
-  min-height: 32px;
+  min-height: 26px;
 }
 
 /* Artwork tools use the panel's text size, so a button reads as one line. */
@@ -242,39 +242,6 @@
   border: 1px solid var(--lf-border);
   border-radius: 10px;
   background: var(--lf-bg-1);
-}
-
-/* A 720 to 820 px tall window still shows Power and Speed without scrolling
-   (ADR-616). Only spacing changes; every control stays. */
-@media (max-height: 820px) {
-  .lf-operation-inspector,
-  .lf-operation-inspector .lf-laser-operation-fields {
-    gap: 8px;
-  }
-
-  .lf-operation-inspector {
-    padding: 8px;
-  }
-
-  .lf-operation-inspector .lf-process-segment {
-    min-height: 30px;
-  }
-
-  .lf-artwork-inspector {
-    gap: 6px;
-  }
-
-  .lf-artwork-editor-tabs .lf-btn {
-    min-height: 28px;
-  }
-
-  /* Outranks the rail-wide 32 px input rule further down this file. */
-  .lf-artwork-panel
-    .lf-operation-inspector
-    .lf-operation-identity
-    input:not([type='checkbox']):not([type='range']) {
-    min-height: 28px;
-  }
 }
 
 [data-artwork-organise].lf-btn {
@@ -427,7 +394,7 @@
 
 .lf-artwork-panel input:not([type='checkbox']):not([type='range']):not([type='color']),
 .lf-artwork-panel select {
-  min-height: 32px;
+  min-height: 26px;
   max-width: 100%;
   box-sizing: border-box;
 }
@@ -440,28 +407,28 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   text-align: center;
-  padding: 28px 14px;
+  padding: 16px 12px;
   border: 1px dashed var(--lf-border-strong);
-  border-radius: 12px;
+  border-radius: var(--lf-radius-lg);
   margin-top: 4px;
 }
 
 .lf-artwork-empty__illustration {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px 12px;
+  gap: 12px;
+  padding: 8px 12px;
   color: var(--lf-accent-fg);
 }
 
 .lf-artwork-empty h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--lf-text-lg);
 }
 .lf-artwork-empty p {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: var(--lf-text-sm);
+  line-height: 1.45;
 }

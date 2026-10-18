@@ -583,7 +583,7 @@ test('post-release workerd: hidden form changes cannot grant edit or offline sco
     desktop = await connectDesktop(worker);
     const phone = await pairPhone(worker, desktop);
     const readConsent = await prepareConsent(worker, phone, { scope: 'kerfdesk:read' });
-    assert.equal(readConsent.html.includes('Add text and rectangles'), false);
+    assert.equal(readConsent.html.includes('Save the project over its existing file'), false);
     assert.equal(
       readConsent.html.includes('Reconnect with this approval for up to 30 days'),
       false,
@@ -605,6 +605,31 @@ test('post-release workerd: hidden form changes cannot grant edit or offline sco
       303,
       'PC permission is a ceiling; OAuth consent must only grant the scopes actually shown.',
     );
+  } finally {
+    closeSocket(desktop?.socket);
+    await worker.dispose();
+  }
+});
+
+test('post-release workerd: consent discloses deletion, saving and camera stills for the scopes shown', async () => {
+  const worker = start();
+  let desktop;
+  try {
+    desktop = await connectDesktop(worker);
+    const phone = await pairPhone(worker, desktop, ['read', 'edit', 'control']);
+    const edit = await prepareConsent(worker, phone);
+    assert.match(edit.html, /change and delete artwork/);
+    assert.match(edit.html, /change and delete layers/);
+    assert.match(edit.html, /Save the project over its existing file on the PC/);
+    assert.match(edit.html, /cannot open or browse files on the PC/);
+    assert.doesNotMatch(edit.html, /PC camera/);
+    const control = await prepareConsent(worker, phone, {
+      scope: 'kerfdesk:read kerfdesk:control',
+    });
+    assert.match(control.html, /Home, set the work origin or Zero Z/);
+    assert.match(control.html, /Pause, Resume, or invoke software Abort/);
+    assert.match(control.html, /still photos from the PC camera, only while artwork sharing is on/);
+    assert.doesNotMatch(control.html, /Save the project/);
   } finally {
     closeSocket(desktop?.socket);
     await worker.dispose();
