@@ -15,8 +15,8 @@ export const PULSE_DURATION_MS = 1400;
 /** The pointer must settle this long before a hover counts, so a sweep across the bed stays calm. */
 export const PULSE_HOVER_DWELL_MS = 90;
 /** Strength of the soft colour edge while the pointer rests on the artwork. */
-export const PULSE_EDGE_ALPHA = 0.55;
-export const PULSE_EDGE_BLUR_PX = 6;
+export const PULSE_EDGE_ALPHA = 0.85;
+export const PULSE_EDGE_BLUR_PX = 5;
 
 const RISE_END = 0.16;
 const HOLD_END = 0.3;

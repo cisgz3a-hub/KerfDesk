@@ -2,7 +2,9 @@
 // canvas above the workspace, so a pulse never redraws the scene. Each piece's
 // colour geometry is rendered once into a small bitmap; every frame then only
 // blits it at the pulse strength, and blits a blurred outline copy for the
-// glow and the soft edge.
+// glow and the soft edge. The outline is grown from the bitmap itself, so its
+// cost follows the piece's pixels, not its segment count: a dense trace is
+// painted once per hover, never stroked again for the glow.
 
 import {
   applyTransform,
@@ -17,9 +19,7 @@ import {
 import { getCanvasColorScheme } from '../theme/canvas-color-scheme';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import { PULSE_EDGE_BLUR_PX, type PulsePieceFrame } from './artwork-pulse';
-import { artworkStrokeWidthPx } from './draw-complexity';
 import { createDisplayPolylineCache, type DisplayPolylineCache } from './display-polylines';
-import { strokePolylinesBatched } from './draw-vector-strokes';
 import {
   isVectorSceneObject,
   paintObjectDisplay,
@@ -28,10 +28,19 @@ import {
 } from './object-display';
 import type { ViewTransform } from './view-transform';
 
-/** The glow is cast by an outline this much wider than the artwork's own line. */
-const GLOW_OUTLINE_EXTRA_PX = 5;
+/** How far the glow outline is grown out from the artwork, in pixels. */
+const GLOW_OUTLINE_GROW_PX = 2.5;
+const GLOW_GROW_OFFSETS: ReadonlyArray<readonly [number, number]> = Array.from(
+  { length: 8 },
+  (_, index) => {
+    const angle = (index * Math.PI) / 4;
+    return [GLOW_OUTLINE_GROW_PX * Math.cos(angle), GLOW_OUTLINE_GROW_PX * Math.sin(angle)];
+  },
+);
 /** Room around a piece for that outline and the antialiased edge. */
 const BITMAP_PAD_PX = 8;
+/** Recent pieces kept after their pulse ends, so pointing again is instant. */
+const RETAINED_PIECES = 8;
 /** Raster and relief artwork pulse as a tinted frame: tint strength and outline width. */
 const FRAME_TINT_ALPHA = 0.28;
 const FRAME_LINE_PX = 2;
@@ -93,7 +102,17 @@ export class ArtworkPulsePainter {
         if (bitmap !== null) drawPiece(ctx, bitmap, piece);
       }
     }
-    for (const key of this.entries.keys()) if (!live.has(key)) this.entries.delete(key);
+    this.retain(live);
+  }
+
+  /** Keep every live piece and the most recently used others, oldest out first. */
+  private retain(live: ReadonlySet<string>): void {
+    let spare = RETAINED_PIECES;
+    for (const key of [...this.entries.keys()].reverse()) {
+      if (live.has(key)) continue;
+      if (spare > 0) spare -= 1;
+      else this.entries.delete(key);
+    }
   }
 
   private bitmapFor(
@@ -104,6 +123,8 @@ export class ArtworkPulsePainter {
     canvas: HTMLCanvasElement,
   ): PieceBitmap | null {
     const cached = this.entries.get(key);
+    // Re-inserting marks the entry most recently used for `retain`.
+    this.entries.delete(key);
     if (
       cached !== undefined &&
       cached.object === identity.object &&
@@ -111,6 +132,7 @@ export class ArtworkPulsePainter {
       cached.colorLayer === identity.colorLayer &&
       cached.viewKey === identity.viewKey
     ) {
+      this.entries.set(key, cached);
       return cached.bitmap;
     }
     const color = canvasVectorDisplayColor(identity.colorLayer.color);
@@ -176,10 +198,14 @@ function renderPiece(
   const flood = createBitmap(region);
   const glow = createBitmap(region);
   if (flood === null || glow === null) return null;
-  const painted = isVectorSceneObject(object)
-    ? paintVectorPiece(object, layer, color, lookup, local, displayCache, flood.ctx, glow.ctx)
-    : paintFramePiece(object, layer, local, color, flood.ctx, glow.ctx);
-  if (!painted) return null;
+  if (isVectorSceneObject(object)) {
+    if (!paintVectorPiece(object, layer, color, lookup, local, displayCache, flood.ctx)) {
+      return null;
+    }
+    growOutline(glow.ctx, flood.canvas);
+  } else if (!paintFramePiece(object, layer, local, color, flood.ctx, glow.ctx)) {
+    return null;
+  }
   return { color, left: region.left, top: region.top, flood: flood.canvas, glow: glow.canvas };
 }
 
@@ -191,7 +217,6 @@ function paintVectorPiece(
   view: ViewTransform,
   displayCache: DisplayPolylineCache,
   flood: CanvasRenderingContext2D,
-  glow: CanvasRenderingContext2D,
 ): boolean {
   const resolved = resolveObjectDisplay(object, lookup, view, displayCache, 'design', 'operation');
   const paths = resolved.paths
@@ -199,15 +224,19 @@ function paintVectorPiece(
     .map((path) => ({ ...path, paint: { ...path.paint, color } }));
   if (paths.length === 0) return false;
   paintObjectDisplay(flood, object, { ...resolved, paths }, view);
-  glow.lineJoin = 'round';
-  glow.lineCap = 'round';
-  glow.strokeStyle = color;
-  for (const { display, paint } of paths) {
-    glow.lineWidth =
-      artworkStrokeWidthPx(resolved.displaySegmentCount, paint.output) + GLOW_OUTLINE_EXTRA_PX;
-    strokePolylinesBatched(glow, object, display.polylines, view);
-  }
   return true;
+}
+
+/**
+ * The band just outside and inside the artwork's edge: the colour bitmap
+ * smeared a few pixels in every direction, less the bitmap itself. A filled
+ * shape's interior drops out, so its edge glows without tinting the fill.
+ */
+function growOutline(glow: CanvasRenderingContext2D, flood: HTMLCanvasElement): void {
+  for (const [dx, dy] of GLOW_GROW_OFFSETS) glow.drawImage(flood, dx, dy);
+  glow.globalCompositeOperation = 'destination-out';
+  glow.drawImage(flood, 0, 0);
+  glow.globalCompositeOperation = 'source-over';
 }
 
 function paintFramePiece(
@@ -234,7 +263,7 @@ function paintFramePiece(
   traceClosed(glow, corners);
   glow.strokeStyle = color;
   glow.lineJoin = 'round';
-  glow.lineWidth = FRAME_LINE_PX + GLOW_OUTLINE_EXTRA_PX;
+  glow.lineWidth = FRAME_LINE_PX + 2 * GLOW_OUTLINE_GROW_PX;
   glow.stroke();
   return true;
 }
