@@ -6,13 +6,13 @@ import {
   MAX_RASTER_LINES_PER_MM,
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster';
-import { DITHER_ALGORITHMS, type Layer, type LayerOperationSettings } from '../../core/scene';
+import type { Layer, LayerOperationSettings } from '../../core/scene';
+import { DitherSwatchPicker } from './DitherSwatchPicker';
 import { mixedCheckboxProps, useMixedOperationNumber } from './mixed-operation-input';
 import type { MixedOperationFields } from './selected-operation-mixed';
 
 const inputStyle: React.CSSProperties = { width: 88, minWidth: 0 };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
-const ditherSelectStyle: React.CSSProperties = { flex: 1, minWidth: 0, width: '100%' };
 
 export function LayerImageFields(props: {
   readonly layer: Layer;
@@ -38,9 +38,12 @@ export function LayerImageFields(props: {
       <p className="lf-laser-help">
         Dither creates a pattern of dots. Grayscale varies the laser power with image brightness.
       </p>
-      <FieldRow label="Dither">
-        <DitherSelect {...controlProps} />
-      </FieldRow>
+      <div className="lf-laser-field lf-laser-field--stacked">
+        <span className="lf-laser-field__label">Dither</span>
+        <div className="lf-laser-field__value">
+          <DitherSelect {...controlProps} />
+        </div>
+      </div>
       {!props.mixedFields?.ditherAlgorithm && settings.ditherAlgorithm === 'grayscale' ? (
         <FieldRow label="Minimum power">
           <MinPowerInput {...controlProps} maxPower={minPowerMax} />
@@ -96,12 +99,12 @@ export function LayerImageEssentials(props: {
   const grayscale = !props.mixedFields?.ditherAlgorithm && settings.ditherAlgorithm === 'grayscale';
   return (
     <div className="lf-laser-process-fields">
-      <label className="lf-laser-field lf-laser-field--wide">
+      <div className="lf-laser-field lf-laser-field--wide">
         <span className="lf-laser-field__label">Dither</span>
-        <span className="lf-laser-field__value">
+        <div className="lf-laser-field__value">
           <DitherSelect {...controlProps} />
-        </span>
-      </label>
+        </div>
+      </div>
       <label className="lf-laser-field">
         <span className="lf-laser-field__label">
           Line interval<small>mm</small>
@@ -139,6 +142,8 @@ function FieldRow(props: {
   );
 }
 
+// Its row is a div, not a label: a label would hand a click on "Dither" to the
+// first swatch.
 function DitherSelect(props: {
   readonly labelContext: string;
   readonly settings: LayerOperationSettings;
@@ -148,44 +153,14 @@ function DitherSelect(props: {
 }): JSX.Element {
   const { labelContext, settings, commit } = props;
   return (
-    <select
-      value={props.mixedFields?.ditherAlgorithm ? '' : settings.ditherAlgorithm}
-      onChange={(e) =>
-        commit({
-          ditherAlgorithm: e.target.value as Layer['ditherAlgorithm'],
-        })
-      }
+    <DitherSwatchPicker
+      value={props.mixedFields?.ditherAlgorithm ? null : settings.ditherAlgorithm}
+      onChange={(ditherAlgorithm) => commit({ ditherAlgorithm })}
       title="Binary modes emit off/max dots. Grayscale maps luma between Min Power and Power."
-      aria-label={`Dither for ${labelContext}`}
-      style={ditherSelectStyle}
-    >
-      {props.mixedFields?.ditherAlgorithm ? (
-        <option value="" disabled>
-          Mixed
-        </option>
-      ) : null}
-      {DITHER_ALGORITHMS.map((algorithm) => (
-        <option key={algorithm} value={algorithm}>
-          {DITHER_LABELS[algorithm]}
-        </option>
-      ))}
-    </select>
+      ariaLabel={`Dither for ${labelContext}`}
+    />
   );
 }
-
-const DITHER_LABELS: Readonly<Record<Layer['ditherAlgorithm'], string>> = {
-  threshold: 'Threshold',
-  'floyd-steinberg': 'Floyd-Steinberg',
-  jarvis: 'Jarvis',
-  stucki: 'Stucki',
-  atkinson: 'Atkinson',
-  burkes: 'Burkes',
-  sierra3: 'Sierra 3',
-  sierra2: 'Sierra 2',
-  'sierra-lite': 'Sierra Lite',
-  ordered: 'Ordered',
-  grayscale: 'Grayscale',
-};
 
 function LineIntervalInput(props: {
   readonly labelContext: string;

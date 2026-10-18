@@ -124,6 +124,59 @@ test('laser settings keep stacked sliders and exact entries aligned at every pan
   }
 });
 
+// The Dither swatches wrap onto more rows rather than overflow the rail, keep
+// every thumbnail at full size, and answer the arrow keys like radios.
+test('Image dither swatches fit and stay keyboard-operable at every panel width', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+  const panel = await addTextArtwork(page);
+  await panel
+    .getByRole('radiogroup', { name: /^Mode for/ })
+    .getByRole('radio', { name: /^Image/ })
+    .check({ force: true });
+  const dither = panel.getByRole('radiogroup', { name: /^Dither for/ });
+  await expect(dither.getByRole('radio')).toHaveCount(11);
+
+  for (const width of [240, 260, 280, 300, 320, 360, 400]) {
+    await setPanelWidth(page, panel, width);
+    const horizontalOverflow = await panel.evaluate(
+      (element) => element.scrollWidth - element.clientWidth,
+    );
+    expect(horizontalOverflow).toBeLessThanOrEqual(1);
+    const layout = await dither.evaluate((group) => {
+      const bounds = group.getBoundingClientRect();
+      const tiles = [...group.querySelectorAll('.lf-dither-swatch')].map((tile) =>
+        tile.getBoundingClientRect(),
+      );
+      const thumbnails = [...group.querySelectorAll('svg')].map(
+        (svg) => svg.getBoundingClientRect().width,
+      );
+      return {
+        outside: tiles.filter(
+          (tile) => tile.left < bounds.left - 1 || tile.right > bounds.right + 1,
+        ).length,
+        thumbnails,
+      };
+    });
+    expect(layout.outside).toBe(0);
+    expect(layout.thumbnails).toEqual(Array.from({ length: 11 }, () => 48));
+  }
+
+  const grayscale = dither.getByRole('radio', { name: 'Grayscale', exact: true });
+  await grayscale.check({ force: true });
+  await expect(panel.getByRole('spinbutton', { name: /^Minimum power for/ })).toBeVisible();
+  await grayscale.focus();
+  await page.keyboard.press('ArrowRight');
+  const threshold = dither.getByRole('radio', { name: 'Threshold', exact: true });
+  await expect(threshold).toBeChecked();
+  await expect(threshold).toBeFocused();
+  await expect(panel.getByRole('spinbutton', { name: /^Minimum power for/ })).toHaveCount(0);
+  await page.keyboard.press('ArrowRight');
+  await expect(dither.getByRole('radio', { name: 'Floyd-Steinberg', exact: true })).toBeChecked();
+});
+
 // ADR-431: Cut depth and Depth per pass share one row, Feed, Plunge and
 // Spindle speed the next. Each row's boxes stay level and even at every width;
 // at the narrowest width Spindle speed wraps under Feed.
