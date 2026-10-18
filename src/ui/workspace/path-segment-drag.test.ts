@@ -64,4 +64,24 @@ describe('segment drag', () => {
   it('starts no drag away from any segment', () => {
     expect(beginPathSegmentDrag(useStore.getState().project, { x: 50, y: 50 }, 0.1)).toBeNull();
   });
+
+  it('leaves a straight line straight while the pointer stays within the click slop', () => {
+    const project = useStore.getState().project;
+    // 0.1 mm per canvas pixel: the 3 px slop is 0.3 mm.
+    const drag = beginPathSegmentDrag(project, { x: 110, y: 0.1 }, 0.1);
+    if (drag === null) throw new Error('expected a segment drag');
+    const reshape = useStore.getState().reshapePathSegmentDuringInteraction;
+    const firstCurve = () => {
+      const object = useStore.getState().project.scene.objects[0];
+      return object !== undefined && 'paths' in object ? object.paths[0]?.curves?.[0] : undefined;
+    };
+    updatePathSegmentDrag(drag, { x: 110.1, y: 0.25 }, reshape);
+    expect(firstCurve()?.segments[0]?.kind).toBe('line');
+    // Past the slop the drag reshapes, and coming back inside it keeps reshaping.
+    updatePathSegmentDrag(drag, { x: 110, y: 1 }, reshape);
+    updatePathSegmentDrag(drag, { x: 110, y: 0.2 }, reshape);
+    const curve = firstCurve();
+    expect(curve?.segments[0]?.kind).toBe('cubic');
+    expect(curveSegmentPoint(curve as CurveSubpath, 0, drag.segment.t)?.y).toBeCloseTo(0.05, 6);
+  });
 });

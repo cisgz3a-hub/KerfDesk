@@ -6,6 +6,7 @@ import {
   CNC_LASER_MODE_UNVERIFIED_MESSAGE,
   FLUIDNC_CNC_LASER_MODE_ENABLED_MESSAGE,
 } from '../../../core/preflight/controller-readiness';
+import { FOCUS_TEST_Z_UNCONFIRMED_WARNING } from '../../../core/job/focus-test';
 import { jobAwareConfirm } from '../../state/job-aware-dialogs';
 import { useLaserStore } from '../../state/laser-store';
 import { useToastStore } from '../../state/toast-store';
@@ -71,6 +72,10 @@ describe('JobReviewWarnings', () => {
   it('opens for a router job whose controller has laser mode on or unconfirmed', async () => {
     expect(await listOpens(['Other advisory.', CNC_LASER_MODE_ENABLED_MESSAGE])).toBe(true);
     expect(await listOpens([CNC_LASER_MODE_UNVERIFIED_MESSAGE])).toBe(true);
+  });
+
+  it('opens for a Focus Test on a profile without confirmed Z travel', async () => {
+    expect(await listOpens(['Other advisory.', FOCUS_TEST_Z_UNCONFIRMED_WARNING])).toBe(true);
   });
 
   // ADR-180 Amendment 6: the laser-mode-on row fixes itself in place, through

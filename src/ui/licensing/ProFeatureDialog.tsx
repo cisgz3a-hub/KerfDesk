@@ -100,8 +100,19 @@ function UnlockButtons({
   readonly run: (work: () => Promise<LicenceStatus>) => Promise<void>;
 }): JSX.Element {
   const trial = offersTrial(status);
+  const checkIn = needsCheckIn(status);
   return (
     <>
+      {checkIn ? (
+        <Button
+          variant="primary"
+          disabled={busy}
+          onClick={() => void run(client.refresh)}
+          title="Ask the licence service to confirm this device's licence now"
+        >
+          Refresh licence
+        </Button>
+      ) : null}
       {trial ? (
         <Button
           variant="primary"
@@ -112,9 +123,9 @@ function UnlockButtons({
           Start free 30-day trial
         </Button>
       ) : null}
-      {offersPurchase(status) ? (
+      {offersPurchase(status) && !(checkIn && status.tier === 'paid') ? (
         <Button
-          variant={trial ? 'default' : 'primary'}
+          variant={trial || checkIn ? 'default' : 'primary'}
           disabled={busy}
           onClick={() => void run(() => startPurchase(client, status))}
           title={purchaseTitle(status)}
@@ -123,6 +134,15 @@ function UnlockButtons({
         </Button>
       ) : null}
     </>
+  );
+}
+
+/** Saved rights wait only on the licence service, so checking again comes first. */
+function needsCheckIn(status: LicenceStatus): boolean {
+  return (
+    (status.state === 'checkin-required' || status.state === 'clock-error') &&
+    status.tier !== null &&
+    !status.deactivationPending
   );
 }
 
@@ -158,7 +178,7 @@ function lead(status: LicenceStatus): string {
     case 'activation-required':
       return `Try every Pro tool free for 30 days on this device, no card needed, or buy Pro once for ${PRO_PRICE_LABEL}. It includes a year of updates and runs on three devices.`;
     case 'checkin-required':
-      return 'This device needs to reach the licence service before Pro tools open again. Connect to the internet, then open Help > Licence and choose Refresh licence.';
+      return 'This device needs to reach the licence service before Pro tools open again. Connect to the internet, then choose Refresh licence.';
     case 'ready':
     case 'invalid-licence':
     case 'unavailable':

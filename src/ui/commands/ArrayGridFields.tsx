@@ -2,10 +2,20 @@
 // the spacing as an edge gap or a centre distance, alternate-row and
 // alternate-column shifts and mirrors, and which way the grid builds.
 
+import { useState } from 'react';
+import { gridCellSize } from '../../core/scene/array-grid-layout';
 import type { ArrayMirrorAxes } from '../../core/scene/array-layout-types';
 import type { Bounds } from '../../core/scene/scene-object';
 import { spacingForTotal, type ArrayForm } from './array-dialog-form';
-import { Check, Choice, Field, fieldsStyle, type ArrayFormPatch } from './ArrayDialogFields';
+import { NumberInput } from '../kit';
+import {
+  Check,
+  Choice,
+  Field,
+  fieldStyle,
+  fieldsStyle,
+  type ArrayFormPatch,
+} from './ArrayDialogFields';
 
 const SPACE_BY: ReadonlyArray<readonly [ArrayForm['spaceBy'], string]> = [
   ['gap', 'Gap between copies'],
@@ -143,34 +153,89 @@ function GridTotalFields(props: {
   readonly bounds: Bounds;
 }): JSX.Element {
   const { form, onChange, bounds } = props;
-  const width = bounds.maxX - bounds.minX;
-  const height = bounds.maxY - bounds.minY;
-  const total = (count: string, size: number, spacing: string): string => {
-    const n = Math.max(1, Math.trunc(Number(count)) || 1);
-    const gap = Number(spacing) || 0;
-    const value = form.spaceBy === 'centres' ? size + (n - 1) * gap : n * size + (n - 1) * gap;
-    return value.toFixed(2);
-  };
-  const apply = (value: string, count: string, size: number, key: 'spacingX' | 'spacingY') => {
-    const spacing = spacingForTotal(Number(value), Math.trunc(Number(count)), size, form.spaceBy);
-    if (spacing !== null) onChange({ [key]: spacing.toFixed(3) });
-  };
+  // The room each copy takes, so the total matches the grid random turns build.
+  const { width, height } = gridCellSize(
+    bounds,
+    form.randomRotation === 'off'
+      ? undefined
+      : { seed: 0, stepDeg: form.randomRotation === 'quarter' ? 90 : 0 },
+  );
   return (
     <>
-      <Field
+      <TotalField
         label="Total width (mm)"
         title="The width of the whole grid. Typing a width sets the horizontal spacing that makes it."
-        value={total(form.columns, width, form.spacingX)}
-        min={0}
-        set={(value) => apply(value, form.columns, width, 'spacingX')}
+        count={form.columns}
+        countName="columns"
+        size={width}
+        spacing={form.spacingX}
+        spaceBy={form.spaceBy}
+        set={(spacingX) => onChange({ spacingX })}
       />
-      <Field
+      <TotalField
         label="Total height (mm)"
         title="The height of the whole grid. Typing a height sets the vertical spacing that makes it."
-        value={total(form.rows, height, form.spacingY)}
-        min={0}
-        set={(value) => apply(value, form.rows, height, 'spacingY')}
+        count={form.rows}
+        countName="rows"
+        size={height}
+        spacing={form.spacingY}
+        spaceBy={form.spaceBy}
+        set={(spacingY) => onChange({ spacingY })}
       />
+    </>
+  );
+}
+
+// The total is shown from the spacing, but while the field is focused it keeps
+// what is typed, so a half-typed number is not replaced by the recomputed one.
+// Each keystroke that gives a valid total sets the spacing; leaving the field
+// shows the total again.
+function TotalField(props: {
+  readonly label: string;
+  readonly title: string;
+  readonly count: string;
+  readonly countName: string;
+  readonly size: number;
+  readonly spacing: string;
+  readonly spaceBy: ArrayForm['spaceBy'];
+  readonly set: (spacing: string) => void;
+}): JSX.Element {
+  const [draft, setDraft] = useState<string | null>(null);
+  const n = Math.max(1, Math.trunc(Number(props.count)) || 1);
+  const gap = Number(props.spacing) || 0;
+  const shown =
+    props.spaceBy === 'centres' ? props.size + (n - 1) * gap : n * props.size + (n - 1) * gap;
+  const spacingFor = (text: string): number | null =>
+    text.trim() === ''
+      ? null
+      : spacingForTotal(Number(text), Math.trunc(Number(props.count)), props.size, props.spaceBy);
+  const minimum = props.spaceBy === 'centres' ? props.size : n * props.size;
+  const problem =
+    draft === null || draft === shown.toFixed(2) || spacingFor(draft) !== null
+      ? null
+      : n < 2
+        ? `Set at least 2 ${props.countName} to size the grid by its total.`
+        : `Enter a total of at least ${minimum.toFixed(2)} mm.`;
+  return (
+    <>
+      <label style={fieldStyle}>
+        <span>{props.label}</span>
+        <NumberInput
+          value={draft ?? shown.toFixed(2)}
+          title={props.title}
+          min={0}
+          step={0.1}
+          onFocus={(event) => setDraft(event.currentTarget.value)}
+          onBlur={() => setDraft(null)}
+          onChange={(event) => {
+            const text = event.currentTarget.value;
+            setDraft(text);
+            const spacing = spacingFor(text);
+            if (spacing !== null) props.set(spacing.toFixed(3));
+          }}
+        />
+      </label>
+      {problem === null ? null : <p role="alert">{problem}</p>}
     </>
   );
 }
@@ -184,7 +249,7 @@ function GridRandomFields(props: {
     <>
       <Choice
         label="Random orientation"
-        title="Turn every copy but the original about its own centre by a random angle, for a scattered look or to vary grain direction. The seed fixes the pattern."
+        title="Turn every copy but the original about its own centre by a random angle, for a scattered look or to vary grain direction. The seed fixes the pattern. A gap between copies is measured from the box any turn fits (width and height swapped for quarter turns, the diagonal for any angle), so turned copies do not overlap."
         value={form.randomRotation}
         options={RANDOM}
         set={(randomRotation) => onChange({ randomRotation })}

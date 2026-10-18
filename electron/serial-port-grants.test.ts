@@ -120,7 +120,7 @@ describe('SerialPortGrants', () => {
   });
 });
 
-describe('serial port identity on macOS and Linux (ADR-606)', () => {
+describe('serial port identity on macOS and Linux (ADR-607)', () => {
   const mac = serialPortIdentity('darwin');
   const linux = serialPortIdentity('linux');
   const ftdi = {
