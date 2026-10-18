@@ -299,7 +299,9 @@ describe('Centre selection in the jog pad', () => {
           ...state.project,
           scene: {
             ...state.project.scene,
-            groups: state.project.scene.groups?.filter((group) => group.id !== 'deleted-group'),
+            groups: (state.project.scene.groups ?? []).filter(
+              (group) => group.id !== 'deleted-group',
+            ),
           },
         },
       })),
