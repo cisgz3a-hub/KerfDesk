@@ -100,13 +100,15 @@ describe('ArtworkRunOrderPanel', () => {
     expect(useStore.getState().pendingUndo?.project.scene.objects[0]?.id).toBe('Next');
   });
 
-  it('keeps Cancel available when the same numbering document becomes empty', async () => {
+  it('refuses a delete while numbering so Cancel cannot silently undo it', async () => {
     importArtwork('Previous');
     const host = await renderPanel();
     await act(async () => buttonByText(host, 'Number on canvas').click());
     await act(async () => useStore.getState().removeSceneObject('Previous'));
 
-    expect(useStore.getState().project.scene.objects).toHaveLength(0);
+    expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual([
+      'Previous',
+    ]);
     expect(host.querySelector('[aria-label="Canvas numbering controls"]')).not.toBeNull();
     await act(async () => buttonByText(host, 'Cancel').click());
     expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual([
