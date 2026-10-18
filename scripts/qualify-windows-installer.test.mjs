@@ -676,4 +676,6 @@ test('the qualification licence reaches only the historical profile child, which
     release > 0 && release < parent.indexOf("Uninstall-Candidate 'historical-final-uninstall'"),
   );
   assert.match(parent, /'historical-licence-cleanup' 'release'/);
+  // A seat still signing out is retried, and never recorded as released.
+  assert.match(profile, /Retry device deactivation[\s\S]*still signing out/);
 });

@@ -154,8 +154,18 @@ function Exit-UpgradeLicence {
   Invoke-UpgradeControl 'Edition:' 'Button' -Prefix
   Invoke-UpgradeControl 'Deactivate this device' 'Button'
   $null = Get-UpgradeControl 'Edition: Licence needed. Open licence settings' 'Button' -TimeoutSeconds 60
-  Invoke-UpgradeControl 'Close licence settings' 'Button'
-  return 'released'
+  # A transient service failure leaves the seat signing out under the same label.
+  # Only the absence of the retry proves the service freed it.
+  for ($attempt = 0; $attempt -lt 3; $attempt += 1) {
+    if ($null -eq (Get-UpgradeControl 'Retry device deactivation' 'Button' -TimeoutSeconds 3 -Optional)) {
+      Invoke-UpgradeControl 'Close licence settings' 'Button'
+      return 'released'
+    }
+    Start-Sleep -Seconds 5
+    Invoke-UpgradeControl 'Retry device deactivation' 'Button'
+    Start-Sleep -Seconds 5
+  }
+  throw 'The developer qualification seat is still signing out.'
 }
 Write-UpgradeReceipt
 try {

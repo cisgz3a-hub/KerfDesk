@@ -3,6 +3,8 @@ export type WorkspaceAdmission = {
   readonly onChange: (listener: (admitted: boolean) => void) => () => void;
   /** A renderer is opening: until it is sent Pro, no workspace is admitted. */
   readonly rendererOpening: () => void;
+  /** The renderer process died: with no workspace left, nothing is admitted. */
+  readonly rendererGone: () => void;
 };
 
 /**
@@ -26,16 +28,18 @@ export function createStartupSignals(alwaysAdmitted: boolean) {
   const statusRead = new Promise<void>((resolve) => {
     markStatusRead = resolve;
   });
+  const resetRenderer = (): void => {
+    generation += 1;
+    if (!alwaysAdmitted) setAdmitted(false);
+  };
   const admission: WorkspaceAdmission = {
     onChange: (listener) => {
       listeners.add(listener);
       listener(admitted);
       return () => listeners.delete(listener);
     },
-    rendererOpening: () => {
-      generation += 1;
-      if (!alwaysAdmitted) setAdmitted(false);
-    },
+    rendererOpening: () => resetRenderer(),
+    rendererGone: () => resetRenderer(),
   };
   return {
     admission,
