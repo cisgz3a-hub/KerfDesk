@@ -10,6 +10,73 @@ import test from 'node:test';
 const script = fileURLToPath(new URL('./qualify-windows-installer.ps1', import.meta.url));
 
 test(
+  'association qualification uses a visible shell open and retains bounded actual title diagnostics',
+  { skip: process.platform !== 'win32' },
+  () => {
+    const helper = fileURLToPath(new URL('./installer-association-evidence.ps1', import.meta.url));
+    const command = `
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+. '${helper.replaceAll("'", "''")}'
+$startInfo = New-AssociationProjectStartInfo 'C:\\owned fixture\\real saved project.lf2'
+$launch = @{ file = $startInfo.FileName; arguments = $startInfo.Arguments; shell = $startInfo.UseShellExecute; verb = $startInfo.Verb; windowStyle = $startInfo.WindowStyle.ToString() }
+$evidence = [ordered]@{ observations = [Collections.Generic.List[object]]::new(); lastObservation = $null; observationsTruncated = $false }
+$process = [pscustomobject]@{ Id = 123; HasExited = $false; MainWindowTitle = ''; MainWindowHandle = [IntPtr]::Zero }
+$process | Add-Member ScriptMethod Refresh {}
+Add-AssociationProcessObservation $evidence $process
+Add-AssociationProcessObservation $evidence $process
+$initialCount = $evidence.observations.Count
+$process.MainWindowHandle = [IntPtr]456; $process.MainWindowTitle = 'KerfDesk'
+Add-AssociationProcessObservation $evidence $process
+$process.MainWindowTitle = 'KerfDesk ' + [char]0x2014 + ' real saved project.lf2'
+Add-AssociationProcessObservation $evidence $process
+$matchingTitle = $evidence.lastObservation.windowTitle
+for ($i = 0; $i -lt 25; $i++) {
+  $process.MainWindowTitle = "changed title $i"
+  Add-AssociationProcessObservation $evidence $process
+}
+$latestTitle = $evidence.lastObservation.windowTitle
+$process.HasExited = $true
+$process.PSObject.Properties.Remove('MainWindowTitle')
+$process.PSObject.Properties.Remove('MainWindowHandle')
+Add-AssociationProcessObservation $evidence $process
+@{ launch = $launch; evidence = $evidence; initialCount = $initialCount; matchingTitle = $matchingTitle; latestTitle = $latestTitle } | ConvertTo-Json -Depth 6 -Compress
+`;
+    const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', command], {
+      encoding: 'utf8',
+      timeout: 30_000,
+      windowsHide: true,
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    const { launch, evidence, initialCount, matchingTitle, latestTitle } = JSON.parse(
+      result.stdout,
+    );
+    assert.deepEqual(launch, {
+      file: 'C:\\owned fixture\\real saved project.lf2',
+      arguments: '',
+      shell: true,
+      verb: 'open',
+      windowStyle: 'Normal',
+    });
+    assert.equal(initialCount, 1, 'unchanged polls must not expand the receipt');
+    assert.equal(matchingTitle, 'KerfDesk — real saved project.lf2');
+    assert.equal(latestTitle, 'changed title 24', 'last state survives transition truncation');
+    assert.equal(evidence.observations.length, 16);
+    assert.equal(evidence.observationsTruncated, true);
+    assert.equal(evidence.observations[0].windowTitle, '');
+    assert.equal(evidence.observations[0].windowHandle, 0);
+    assert.equal(evidence.observations[1].windowTitle, 'KerfDesk');
+    assert.equal(evidence.observations[2].windowTitle, matchingTitle);
+    assert.equal(evidence.lastObservation.processId, 123);
+    assert.equal(evidence.lastObservation.exited, true);
+    assert.equal(evidence.lastObservation.windowTitle, null);
+    assert.equal(evidence.lastObservation.windowHandle, null);
+  },
+);
+
+test(
   'Windows PowerShell qualification children can hash files without inheriting incompatible pwsh modules',
   { skip: process.platform !== 'win32' },
   () => {

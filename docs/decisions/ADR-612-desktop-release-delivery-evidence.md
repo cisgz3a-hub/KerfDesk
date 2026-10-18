@@ -69,3 +69,8 @@ Project-seal loading starts after native readiness and before project providers
 mount, preserving ADR-592's existing file-operation wait. Absent optional Free
 build entry helpers answer with explicit empty results; genuine renderer errors
 still fail qualification.
+
+Windows association qualification launches the app normally: a hidden shell
+launch has no visible main-window title to verify. The exact-title, normal-close
+and unchanged-project checks remain required, with bounded window observations
+and failure screenshots retained for diagnosis.

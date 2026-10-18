@@ -54,6 +54,7 @@ if ($Scenario -in @('Full', 'HistoricalUpgrade')) { $UpgradeInstaller = Assert-C
 $EvidenceRoot = Assert-ChildPath $EvidenceRoot $env:GITHUB_WORKSPACE
 . (Join-Path $PSScriptRoot 'installer-qualification-root.ps1')
 . (Join-Path $PSScriptRoot 'windows-powershell-process.ps1')
+. (Join-Path $PSScriptRoot 'installer-association-evidence.ps1')
 $ownedRoot = Assert-ChildPath (Get-InstallerQualificationRoot $env:RUNNER_TEMP $env:GITHUB_RUN_ID $env:GITHUB_RUN_ATTEMPT $Scenario) $env:RUNNER_TEMP
 $installRoot = Assert-ChildPath (Join-Path $ownedRoot 'KerfDesk Installed') $ownedRoot
 $executable = Join-Path $installRoot 'KerfDesk.exe'
@@ -270,20 +271,28 @@ function Invoke-AssociatedProject {
   $ownedProject = Assert-ChildPath $project $ownedRoot
   if (-not (Test-Path -LiteralPath $ownedProject -PathType Leaf)) { throw 'Saved association fixture is missing.' }
   $projectBefore = Get-FileEvidence $ownedProject
-  $startInfo = [Diagnostics.ProcessStartInfo]::new($ownedProject)
-  $startInfo.UseShellExecute = $true
-  $startInfo.Verb = 'open'
-  $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
-  $associated = [Diagnostics.Process]::Start($startInfo)
-  if ($null -eq $associated) { throw 'The project open verb returned no owned process.' }
+  $startInfo = New-AssociationProjectStartInfo $ownedProject
+  $expectedTitle = 'KerfDesk — ' + [IO.Path]::GetFileName($ownedProject)
+  $diagnostic = [ordered]@{
+    status = 'opening'; startedAt = [DateTime]::UtcNow.ToString('o')
+    expectedTitle = $expectedTitle; expectedExecutable = $executable
+    observations = [Collections.Generic.List[object]]::new()
+    lastObservation = $null; observationsTruncated = $false
+  }
+  $receipt.associationOpen = $diagnostic
+  $associated = $null
   $owned = $false
   try {
-    if ($associated.MainModule.FileName -ne $executable) { throw 'The project association launched a different executable.' }
+    $associated = [Diagnostics.Process]::Start($startInfo)
+    if ($null -eq $associated) { throw 'The project open verb returned no owned process.' }
+    Add-AssociationProcessObservation $diagnostic $associated
+    $diagnostic.executable = $associated.MainModule.FileName
+    $diagnostic.processStartedAt = $associated.StartTime.ToUniversalTime().ToString('o')
+    if ($diagnostic.executable -ne $executable) { throw 'The project association launched a different executable.' }
     $owned = $true
-    $expectedTitle = 'KerfDesk — ' + [IO.Path]::GetFileName($ownedProject)
     $deadline = [DateTime]::UtcNow.AddSeconds(45)
     do {
-      $associated.Refresh()
+      Add-AssociationProcessObservation $diagnostic $associated
       if ($associated.HasExited) { throw 'The associated app exited before opening the saved project.' }
       if ($associated.MainWindowTitle -eq $expectedTitle) { break }
       Start-Sleep -Milliseconds 150
@@ -298,13 +307,28 @@ function Invoke-AssociatedProject {
       name = 'shell-open-saved-project'; executable = $executable
       project = $projectBefore; windowTitle = $expectedTitle; exitCode = $associated.ExitCode
     })
+    $diagnostic.status = 'passed'
     Write-Receipt
+  } catch {
+    $diagnostic.status = 'failed'
+    $diagnostic.error = $_.ToString()
+    if ($owned) {
+      try {
+        Add-AssociationProcessObservation $diagnostic $associated
+        if (-not $associated.HasExited) {
+          $diagnostic.windowEvidence = Save-AssociationWindowEvidence $associated.Id $executable (Join-Path $EvidenceRoot 'shell-open-saved-project')
+        }
+      } catch { $diagnostic.evidenceError = $_.ToString() }
+    }
+    Write-Receipt
+    throw
   } finally {
-    if ($owned -and -not $associated.HasExited) {
+    $diagnostic.finishedAt = [DateTime]::UtcNow.ToString('o')
+    if ($owned -and $null -ne $associated -and -not $associated.HasExited) {
       $associated.Kill($true)
       if (-not $associated.WaitForExit(10000)) { throw 'Owned association process did not terminate.' }
     }
-    $associated.Dispose()
+    if ($null -ne $associated) { $associated.Dispose() }
   }
 }
 
