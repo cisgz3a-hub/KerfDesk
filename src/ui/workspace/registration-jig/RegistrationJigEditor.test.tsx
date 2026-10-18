@@ -51,12 +51,14 @@ function click(label: string): void {
   if (found === undefined) throw new Error(`Missing ${label}`);
   act(() => found.click());
 }
-function press(key: string): void {
+function press(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
   const editor = container.querySelector('[aria-label="Registration Jig editor"]');
   if (editor === null) throw new Error('Missing editor');
+  const event = new KeyboardEvent('keydown', { ...init, key, bubbles: true, cancelable: true });
   act(() => {
-    editor.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    editor.dispatchEvent(event);
   });
+  return event;
 }
 function confirmDialog(): Element | undefined {
   return [...document.querySelectorAll('[role="dialog"]')].find((dialog) =>
@@ -146,6 +148,29 @@ describe('Registration Jig dedicated editor', () => {
     press('Escape');
     expect(confirmDialog()).toBeDefined();
     expect(close).not.toHaveBeenCalled();
+  });
+  it('Ctrl+A selects all the artwork but no outline, and not from a field', () => {
+    savedJigWithArtwork();
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'more',
+        color: '#0000ff',
+        spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: 40, y: 5 },
+      }),
+    );
+    useStore.getState().selectObject('art');
+    render();
+    const field = container.querySelector<HTMLInputElement>('[aria-label="X (mm)"]');
+    if (field === null) throw new Error('Missing selection field');
+    act(() => field.focus());
+    act(() => {
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
+    });
+    expect(container.textContent).toContain('1 selected');
+    expect(press('a', { ctrlKey: true }).defaultPrevented).toBe(true);
+    // The outline has not been burned, so it is editable, but Ctrl+A leaves it out.
+    expect(container.textContent).toContain('2 selected');
   });
   it('Escape in a field only leaves the field', () => {
     savedJigWithArtwork();
