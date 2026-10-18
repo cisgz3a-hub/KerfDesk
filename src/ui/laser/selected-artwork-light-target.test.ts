@@ -162,6 +162,30 @@ describe('explicit selected artwork centre in the completed Frame placement', ()
     },
   );
 
+  it('uses work-only Verified Origin for automatic and chosen centres then preserves Start', async () => {
+    const { sim } = await connectedFixture('marlin', 'verified-origin');
+    useLaserStore.setState({ wcoCache: null, workOriginSource: 'unknown', workOriginActive: true });
+    const before = await frame();
+    expect(useLaserStore.getState().wcoCache).toBeNull();
+    expect(nativeHead()).toBeNull();
+    const automatic = centreLightAfterCleanFrame(true);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await automatic;
+    expect(useLaserStore.getState().positioningLightEnabled).toBe(true);
+    expect(useLaserStore.getState().statusReport?.wPos).toMatchObject({ x: 18, y: 11 });
+    await centre(['selected']);
+    const laser = useLaserStore.getState();
+    expect(laser.statusReport?.wPos).toMatchObject({ x: 3, y: 21 });
+    expect(laser.wcoCache).toBeNull();
+    expect(laser.framedRun?.candidate).toBe(before.candidate);
+    expect(framedRunStartHandoffIssue(laser.framedRun!, laser)).toBeNull();
+    const review = await prepareFramedStartReview(laser.framedRun!);
+    const first = sim.outbound().length;
+    await startReviewedFrameOnClock();
+    expectProgramSentOnce(sim.outbound().slice(first), review!.prepared.gcode);
+    expect(useLaserStore.getState().lastWriteError).toBeNull();
+  });
+
   it('allows choosing another artwork after Frame without changing whole-job placement', async () => {
     await connectedFixture('grbl-v1.1', 'user-origin');
     const before = await frame();

@@ -59,14 +59,10 @@ export async function centreSelectionLight(objectIds?: ReadonlyArray<string>): P
   // Re-anchoring a chosen subset would move it away from the framed whole job.
   const centre = selectedCentre(prepared.project, ids);
   const machine = toMachineCoords(centre, prepared.project.device);
-  await centreLightOnBedPoint(
-    framedWorkPointToBed(
-      {
-        x: machine.x + prepared.jobOriginOffset.x,
-        y: machine.y + prepared.jobOriginOffset.y,
-      },
-      current,
-    ),
+  await centreLightOnFramedPoint(
+    { x: machine.x + prepared.jobOriginOffset.x, y: machine.y + prepared.jobOriginOffset.y },
+    frame,
+    current,
     assertTargetCurrent,
   );
 }
@@ -117,11 +113,10 @@ export async function centreLightOnFramedArtwork(): Promise<void> {
   const bounds = resolveFrameCandidate(frame.candidate.preparedStart);
   if (!bounds.ok) throw new Error(bounds.messages.join(' '));
   const { jobBounds } = bounds;
-  await centreLightOnBedPoint(
-    framedWorkPointToBed(
-      { x: (jobBounds.minX + jobBounds.maxX) / 2, y: (jobBounds.minY + jobBounds.maxY) / 2 },
-      current,
-    ),
+  await centreLightOnFramedPoint(
+    { x: (jobBounds.minX + jobBounds.maxX) / 2, y: (jobBounds.minY + jobBounds.maxY) / 2 },
+    frame,
+    current,
     assertTargetCurrent,
   );
 }
@@ -148,6 +143,38 @@ function artworkPlacementGuard(
       if (changed !== null) throw new Error(changed);
     }
   };
+}
+
+async function centreLightOnFramedPoint(
+  point: Vec2,
+  frame: FramedRunPermit,
+  laser: LaserState,
+  assertTargetCurrent: () => void,
+): Promise<void> {
+  if (headFrameContext(laser).workOffsetMm !== null) {
+    await centreLightOnBedPoint(framedWorkPointToBed(point, laser), assertTargetCurrent);
+    return;
+  }
+  if (frame.candidate.preparedStart.jobOrigin?.startFrom !== 'verified-origin')
+    throw new Error('Wait for the controller work offset.');
+  const device = frame.candidate.preparedStart.prepared.project.device;
+  const light = device.positioningLight;
+  if (light === undefined) throw new Error('Set up the separate positioning light first.');
+  // Only the offset vector needs the device transform; its translation cancels.
+  // The captured work target remains truthful even when the native origin is unknown.
+  const zero = toMachineCoords({ x: 0, y: 0 }, device);
+  const pointer = toMachineCoords({ x: light.offsetXmm, y: light.offsetYmm }, device);
+  const feed = clampJogFeed(
+    useJogControlPreferences.getState().requestedFeedMmPerMin,
+    device.maxFeed,
+  );
+  await laser.centrePositioningLight(
+    point.x - pointer.x + zero.x,
+    point.y - pointer.y + zero.y,
+    feed,
+    assertTargetCurrent,
+    'work',
+  );
 }
 
 function framedWorkPointToBed(point: Vec2, laser: LaserState): Vec2 {

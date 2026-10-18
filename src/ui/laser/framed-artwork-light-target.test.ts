@@ -87,6 +87,41 @@ describe('placed artwork centre after Frame', () => {
     },
   );
 
+  it.each([
+    ['front-left', 33, 36],
+    ['front-right', 47, 36],
+    ['rear-left', 33, 44],
+    ['rear-right', 47, 44],
+    ['center', 33, 36],
+  ] as const)('centres Verified Origin with an unreported offset at %s', async (origin, x, y) => {
+    useStore.setState((app) => ({
+      project: { ...app.project, device: { ...app.project.device, origin } },
+      jobPlacement: { startFrom: 'verified-origin', anchor: 'front-left' },
+    }));
+    const candidate = useLaserStore.getState().framedRun!.candidate;
+    useLaserStore.setState((laser) => ({
+      wcoCache: null,
+      workOriginActive: true,
+      workOriginSource: 'unknown',
+      statusReport: { ...laser.statusReport!, mPos: null, wPos: { x: 75, y: 45, z: 0 } },
+    }));
+    const frame = createFramedRunPermit(
+      {
+        ...candidate,
+        preparedStart: {
+          ...candidate.preparedStart,
+          prepared: { ...candidate.preparedStart.prepared, project: useStore.getState().project },
+          jobOrigin: { startFrom: 'verified-origin', anchor: 'front-left' },
+        },
+      },
+      useLaserStore.getState(),
+    );
+    useLaserStore.setState({ framedRun: frame, completedFrame: frame });
+    expect(centreLightAfterFrameWanted()).toBe(true);
+    await centreLightOnFramedArtwork();
+    expect(move).toHaveBeenCalledExactlyOnceWith(x, y, 1200, expect.any(Function), 'work');
+  });
+
   it('keeps explicit automatic-centre opt-out', () => {
     useStore.setState((app) => ({
       project: {

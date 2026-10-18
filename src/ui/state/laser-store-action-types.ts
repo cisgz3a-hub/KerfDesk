@@ -82,6 +82,7 @@ export type LaserStoreActions = {
     y: number,
     feed: number,
     assertTargetCurrent?: () => void,
+    coordinateFrame?: 'machine' | 'work',
   ) => Promise<void>;
   readonly switchPositioningLightOn: () => Promise<void>;
   readonly switchPositioningLightOff: () => Promise<void>;

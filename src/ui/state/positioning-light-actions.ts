@@ -1,4 +1,5 @@
 import { rotaryAppliesTo } from '../../core/job';
+import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import {
   POSITIONING_LIGHT_UNSUPPORTED_MESSAGE,
   positioningLightIssue,
@@ -47,8 +48,14 @@ export function positioningLightActions(
   'centrePositioningLight' | 'switchPositioningLightOn' | 'switchPositioningLightOff'
 > {
   return {
-    centrePositioningLight: (x, y, feed, assertTargetCurrent) =>
-      runPositioningLight(set, get, refs, write, true, { x, y, feed, assertTargetCurrent }),
+    centrePositioningLight: (x, y, feed, assertTargetCurrent, coordinateFrame = 'machine') =>
+      runPositioningLight(set, get, refs, write, true, {
+        x,
+        y,
+        feed,
+        assertTargetCurrent,
+        coordinateFrame,
+      }),
     switchPositioningLightOn: () => runPositioningLight(set, get, refs, write, true),
     switchPositioningLightOff: () => runPositioningLight(set, get, refs, write, false),
   };
@@ -90,6 +97,7 @@ type Target = {
   readonly y: number;
   readonly feed: number;
   readonly assertTargetCurrent: (() => void) | undefined;
+  readonly coordinateFrame: 'machine' | 'work';
 };
 
 async function runPositioningLight(
@@ -281,12 +289,9 @@ async function moveToLightTarget(
   target: Target,
   onMotion: () => void,
 ): Promise<void> {
-  const current = inferCurrentMachinePosition(
-    context.get().statusReport,
-    context.get().wcoCache,
-    context.get().controllerSettings?.reportInches === true,
-  );
-  if (current === null) throw new Error('Positioning light needs a live machine position.');
+  const current = lightTargetPosition(context, target);
+  if (current === null)
+    throw new Error('Positioning light needs a live position in its captured coordinate frame.');
   const params = { dx: target.x - current.x, dy: target.y - current.y, feed: target.feed };
   const moving = Math.abs(params.dx) >= 0.001 || Math.abs(params.dy) >= 0.001;
   if (!moving) {
@@ -346,11 +351,7 @@ function restoreFrameProof(
 }
 
 function assertLightTargetReached(context: PositioningLightTransaction, target: Target): void {
-  const final = inferCurrentMachinePosition(
-    context.get().statusReport,
-    context.get().wcoCache,
-    context.get().controllerSettings?.reportInches === true,
-  );
+  const final = lightTargetPosition(context, target);
   const settings = context.get().controllerSettings;
   const reportTick =
     context.refs.driver.kind === 'marlin'
@@ -370,4 +371,16 @@ function assertLightTargetReached(context: PositioningLightTransaction, target: 
     throw new Error(
       'The head did not reach the selected trace centre; the positioning light stays off.',
     );
+}
+
+function lightTargetPosition(context: PositioningLightTransaction, target: Target) {
+  const state = context.get();
+  const inches = state.controllerSettings?.reportInches === true;
+  if (target.coordinateFrame === 'machine')
+    return inferCurrentMachinePosition(state.statusReport, state.wcoCache, inches);
+  // Verified Origin can know only WPos. Never invent MPos or a zero WCO.
+  const work = state.statusReport?.wPos;
+  if (work == null) return null;
+  const [x, y] = normalizeReportedMPosToMm([work.x, work.y, work.z], inches);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
