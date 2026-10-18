@@ -3,7 +3,12 @@
 // complete set. Artwork copies retain their source operations, so Artwork only
 // applies to every copy while disabling every outline.
 
-import { REGISTRATION_LAYER_ID, updateLayer, type Scene } from '../../core/scene';
+import {
+  REGISTRATION_LAYER_ID,
+  registrationRunState,
+  updateLayer,
+  type Scene,
+} from '../../core/scene';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 
@@ -38,7 +43,7 @@ export function applyRegistrationOutput(
     state.registrationArtworkOutputSnapshot ?? state.project.registrationArtworkOutputSnapshot;
   const snapshot =
     scope === 'box'
-      ? (existingSnapshot ?? captureArtworkOutputSnapshot(state.project.scene))
+      ? outlineSnapshot(state.project.scene, existingSnapshot)
       : (existingSnapshot ?? enableAllArtworkSnapshot(state.project.scene));
   const scene = applyRegistrationOutputToScene(state.project.scene, scope, snapshot);
   const persistedSnapshot = scope === 'box' ? snapshot : undefined;
@@ -78,6 +83,26 @@ export function applyRegistrationOutputToScene(
     if (layer.output !== output) scene = updateLayer(scene, layer.id, { output });
   }
   return scene;
+}
+
+// The artwork outputs Artwork only should restore after this Outline only.
+function outlineSnapshot(
+  scene: Scene,
+  existing: Readonly<Record<string, boolean>> | null | undefined,
+): Readonly<Record<string, boolean>> {
+  // An artwork run the operator set up by hand since the last Outline only is
+  // their current intent.
+  if (existing == null || registrationRunState(scene) === 'artwork')
+    return captureArtworkOutputSnapshot(scene);
+  // Repeating Outline only keeps the snapshot it took, plus any artwork turned
+  // on since; artwork that is off may only be off because of Outline only.
+  const turnedOn = scene.layers.filter(
+    (layer) => layer.id !== REGISTRATION_LAYER_ID && layer.output && existing[layer.id] !== true,
+  );
+  if (turnedOn.length === 0) return existing;
+  const merged: Record<string, boolean> = { ...existing };
+  for (const layer of turnedOn) merged[layer.id] = true;
+  return merged;
 }
 
 function captureArtworkOutputSnapshot(scene: Scene): Readonly<Record<string, boolean>> {

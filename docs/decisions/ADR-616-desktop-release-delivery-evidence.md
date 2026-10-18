@@ -1,4 +1,4 @@
-## ADR-612 - Desktop releases retain evidence of customer delivery (2026-10-18)
+## ADR-616 - Desktop releases retain evidence of customer delivery (2026-10-18)
 
 **Status:** Accepted; maintainer approved the fixes, with delivery conditional on passing checks. | **Date:** 2026-10-18
 
@@ -61,6 +61,13 @@ and native smoke are separate checks. Full installer/upgrade qualification
 belongs on a disposable Windows runner because NSIS shares installation and
 registry state with the developer's app. Free runner qualification does not
 prove paid credential retention, standard-user UAC, SmartScreen or hardware.
+
+ADR-613's separate commercial macOS/Linux lanes retain their own switches and
+Windows-failure isolation. This decision's public verification and signed
+success receipt cover manual Windows and Preview, not those commercial platform
+feeds. Their current R2 readback and seven-day native artifacts do not establish
+public CDN/page delivery or a durable success receipt. Keep those lanes disabled
+until their publication and separate qualification are explicitly authorised.
 
 Installed qualification also exposed an ambiguous nested Artwork-tab selector
 and a project-seal request made before desktop startup completed. The harness

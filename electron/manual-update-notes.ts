@@ -2,20 +2,18 @@ import {
   UPDATE_NOTES_LIMIT,
   updateNotesUrl,
   verifyUpdateNotes,
+  type UpdateNotesRelease,
 } from '../public/desktop-update-notes.mjs';
 import { readBoundedManifest } from '../public/desktop-release-manifest.mjs';
-import {
-  manualReleaseKeySet,
-  type ManualCandidate,
-  type UpdateFetch,
-} from './manual-update-manifest.js';
+import { manualReleaseKeySet, type UpdateFetch } from './manual-update-manifest.js';
 import type { PublicKeys } from './licensing-verification.js';
 
 /** Notes are optional presentation metadata, never update authority. */
 export async function fetchManualUpdateNotes(
   fetch: UpdateFetch,
   keys: PublicKeys,
-  candidate: ManualCandidate,
+  // Every system's release of one version shares its notes (ADR-613).
+  candidate: { readonly release: UpdateNotesRelease },
   now: number,
 ): Promise<readonly string[] | null> {
   try {

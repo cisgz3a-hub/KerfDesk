@@ -156,6 +156,21 @@
   }
 }
 
+/* Beside the Job origin picker, the Start from select is too narrow for
+   "Absolute Coordinates" in a default 300px machine panel and clipped it, so
+   narrow panels give the select the full width and put the picker below. */
+@container machine-rail-body (max-width: 340px) {
+  .lf-machine-tool-dropdown .lf-placement-fields {
+    --lf-placement-display: flex;
+    align-items: stretch;
+  }
+
+  .lf-machine-tool-dropdown .lf-placement-anchor {
+    flex-direction: row;
+    gap: 8px !important;
+  }
+}
+
 /* Reclaim spacing before labels or icons in the narrowest machine panels. */
 @container machine-rail-body (max-width: 280px) {
   .lf-btn.lf-machine-tool-tab {

@@ -11,7 +11,7 @@ import { statusPill } from '../lib/components.mjs';
 import { formatPrice } from '../lib/commerce.mjs';
 import { html } from '../lib/html.mjs';
 
-function gettingStarted() {
+function gettingStarted(site) {
   return [
     {
       id: 'account',
@@ -38,7 +38,10 @@ function gettingStarted() {
       question: 'Does KerfDesk run on a Mac or on Linux?',
       answer: html`<p>
           Yes. The web app runs in Chrome or Edge on Windows, Mac and Linux, and you can install it
-          from the browser. There’s no Linux desktop app yet, so on Linux, use the web app.
+          from the browser. KerfDesk for Mac and KerfDesk for Linux (a .deb for Ubuntu and Debian
+          and an AppImage for other distributions) appear on the
+          <a href="${site.downloadPageUrl}">KerfDesk download page</a> as each is released, with
+          their install steps. Until then, on Linux, use the web app.
         </p>
         <p>
           ${statusPill('in-progress')} Desktop Previews are available for Windows 10 and 11 (64-bit)
@@ -336,7 +339,7 @@ function privacyAndData(site) {
 // [{ id, title, items: [{ id, question, answer }] }]
 export function faqSections(site, commerce) {
   return [
-    { id: 'getting-started', title: 'Getting started', items: gettingStarted() },
+    { id: 'getting-started', title: 'Getting started', items: gettingStarted(site) },
     {
       id: 'machines-connection',
       title: 'Machines and connection',

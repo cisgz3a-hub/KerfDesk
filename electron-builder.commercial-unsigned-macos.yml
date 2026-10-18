@@ -1,0 +1,44 @@
+# Customer macOS release with production licensing and manual downloads (ADR-613).
+# Generate an external config with
+# prepare-commercial-desktop --unsigned-installer --platform macos.
+# It adds the Preview's Mac packaging to the unsigned lane until an Apple
+# Developer ID and notarization exist: an ad-hoc signature, no notarization.
+extends: ./electron-builder.commercial-unsigned.yml
+
+# The Preview's fuse set: the release lane checks the Mac package against
+# electron-builder.preview.yml's block, and a test keeps the two equal. Cookie
+# encryption uses the macOS Keychain, which an unsigned app cannot
+# hold reliably across updates; KerfDesk keeps no login cookies. Flipping fuses
+# invalidates the ad-hoc signature, and Apple silicon refuses to launch the app
+# unless it is signed again.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  loadBrowserProcessSpecificV8Snapshot: false
+  grantFileProtocolExtraPrivileges: false
+  resetAdHocDarwinSignature: true
+
+# The Preview's bundle identity, so the commercial app installs over a Preview.
+mac:
+  appId: com.kerfdesk.app
+  icon: public/app-icon.icns
+  target:
+    - dmg
+  artifactName: KerfDesk-${version}-macos-${arch}.${ext}
+  identity: null
+  hardenedRuntime: false
+  notarize: false
+  # Electron 44 needs macOS 13 Ventura or newer (Chromium dropped macOS 12).
+  minimumSystemVersion: '13.0'
+  extendInfo:
+    NSCameraUsageDescription: KerfDesk uses a camera to align work with material and preview the machine workspace.
+    NSLocalNetworkUsageDescription: KerfDesk connects to cameras on the local network for workspace preview.
+
+dmg:
+  title: KerfDesk ${version}
+  sign: false
+  writeUpdateInfo: false

@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useRef } from 'react';
 import { Icon } from '../kit/icons';
 import type { MachineKind } from '../../core/scene';
 import { commandFamilyLabel } from './command-family-label';
@@ -18,6 +18,7 @@ import { CommandSearchHost } from './CommandSearchDialog';
 import { RecentProjectMenuGroup } from '../recent-projects/RecentProjectMenuGroup';
 import { MENU_GROUPS } from './app-menu-groups';
 import { shortcutLabel } from '../common/shortcut-label';
+import { useMenuViewportFit } from './use-menu-viewport-fit';
 
 export function AppMenuBar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -87,6 +88,8 @@ function MenuFamily(props: {
   readonly onOpenChange: (open: boolean) => void;
   readonly onCommandRun: () => void;
 }): JSX.Element | null {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const viewportFit = useMenuViewportFit(menuRef, props.open);
   const commands = props.commands.filter((command) => command.family === props.family);
   if (commands.length === 0) return null;
   const toggle = (): void => props.onOpenChange(!props.open);
@@ -111,7 +114,13 @@ function MenuFamily(props: {
         {commandFamilyLabel(props.family, props.machineKind)}
       </summary>
       {props.open ? (
-        <div role="menu" className="lf-menu" style={menuStyle} data-family-menu={props.family}>
+        <div
+          ref={menuRef}
+          role="menu"
+          className="lf-menu"
+          style={{ ...menuStyle, ...viewportFit }}
+          data-family-menu={props.family}
+        >
           {groupCommands(props.family, commands).map((group, index) => (
             <Fragment key={index}>
               {index > 0 ? <div role="separator" style={menuSeparatorStyle} /> : null}
@@ -191,8 +200,8 @@ function groupCommands(
 const menuBarStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'stretch',
-  gap: 2,
-  padding: '2px 0',
+  gap: 1,
+  padding: '1px 0',
   background: 'var(--lf-bg-0)',
   color: 'var(--lf-text)',
   fontFamily: 'system-ui, sans-serif',
@@ -204,7 +213,7 @@ const familyStyle: React.CSSProperties = { position: 'relative' };
 const summaryStyle: React.CSSProperties = {
   listStyle: 'none',
   cursor: 'pointer',
-  padding: '4px 8px',
+  padding: '2px 7px',
   borderRadius: 4,
   userSelect: 'none',
 };
@@ -214,14 +223,21 @@ const menuStyle: React.CSSProperties = {
   position: 'absolute',
   top: '100%',
   left: 0,
-  minWidth: 210,
+  // Size to the longest label + shortcut: an absolutely positioned box would
+  // otherwise shrink to its narrow menu title and wrap every long command.
+  width: 'max-content',
+  minWidth: 220,
+  maxWidth: 'calc(100vw - 16px)',
   display: 'flex',
   flexDirection: 'column',
   gap: 1,
   // Long menus (Tools is 25 items) must scroll instead of running off the
-  // bottom of short windows; 80px ≈ menu bar + toolbar above the dropdown.
+  // bottom of short windows. useMenuViewportFit replaces this estimate with
+  // the room actually left below the menu title.
   maxHeight: 'calc(100vh - 80px)',
   overflowY: 'auto',
+  // The height cap includes the menu's own padding and border.
+  boxSizing: 'border-box',
 };
 const menuSeparatorStyle: React.CSSProperties = {
   height: 1,
@@ -230,9 +246,9 @@ const menuSeparatorStyle: React.CSSProperties = {
   margin: '3px 6px',
 };
 const menuGroupLabelStyle: React.CSSProperties = {
-  padding: '5px 9px 2px',
+  padding: '4px 8px 1px',
   color: 'var(--lf-text-faint)',
-  fontSize: 11,
+  fontSize: 'var(--lf-text-xs)',
   fontWeight: 700,
   letterSpacing: '0.04em',
   textTransform: 'uppercase',
@@ -250,6 +266,6 @@ const checkmarkStyle: React.CSSProperties = {
 const menuLabelStyle: React.CSSProperties = { flex: 1 };
 const shortcutStyle: React.CSSProperties = {
   color: 'var(--lf-text-faint)',
-  fontSize: 12,
+  fontSize: 'var(--lf-text-xs)',
   whiteSpace: 'nowrap',
 };

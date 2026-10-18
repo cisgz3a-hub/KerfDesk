@@ -37,6 +37,19 @@ describe('update status text (ADR-547)', () => {
     );
   });
 
+  it('points macOS and Linux to the download page instead of a download (ADR-613)', () => {
+    const page = (state: CommercialUpdateStatus['state'], version: string | null = null) => ({
+      ...status(state, version),
+      mode: 'manual' as const,
+      delivery: 'download-page' as const,
+    });
+    const available = updateStatusText(page('available', '1.0.21'), null, at);
+    expect(available).toContain('KerfDesk 1.0.21 is available. Open its download page');
+    expect(available).toContain('install it after you close KerfDesk');
+    expect(available).not.toContain('Download it');
+    expect(updateStatusText(page('failed'), null, at)).toContain('open the download page');
+  });
+
   it('reads the status before it arrives', () => {
     expect(updateStatusText(null, null, at)).toBe('Reading the update status...');
     expect(updateCheckAllowed(null)).toBe(false);

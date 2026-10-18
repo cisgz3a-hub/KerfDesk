@@ -77,14 +77,25 @@ export type CameraSourceGet = () => CameraSourceSlice;
 
 const ADAPTER_MISSING = 'Camera is not available on this platform';
 const BRIDGE_MISSING =
-  'The local camera bridge is not running — LaserForge Desktop starts it automatically; in a browser run pnpm camera:bridge.';
+  'The local camera bridge is not running — KerfDesk Desktop starts it automatically; in a browser run pnpm camera:bridge.';
+// The bridge looks for FFmpeg once per run (ADR-551), so reconnecting alone
+// does not find a copy installed since.
 const FFMPEG_MISSING =
-  'FFmpeg is not installed on this computer — RTSP cameras need it for preview and capture. Install it, then reconnect.';
+  'FFmpeg is not installed on this computer — RTSP cameras need it for preview and capture. Install it, then restart KerfDesk.';
+// NotReadableError (Chromium's older name: TrackStartError) is any failure to
+// reach the camera hardware: on Windows another program holding it ("Device in
+// use") or Windows' camera privacy switch for desktop apps (ADR-551).
+const USB_CAMERA_BUSY =
+  'The camera could not be started. Close other programs that use it (another KerfDesk window, LightBurn, a video call or the Camera app). On Windows, also open Settings, Privacy & security, Camera, and let desktop apps use the camera. Then press Start USB camera.';
+const USB_CAMERA_NOT_FOUND =
+  'No camera was found. Connect the camera, then press Start USB camera.';
 const NO_PREVIEW_URL = 'The camera bridge did not return a preview URL for this RTSP camera.';
 const UNMONITORED_RTSP_ADVISORY =
   'This camera bridge does not report RTSP preview liveness. The preview remains available, but a frozen image may not be detected. Update the desktop app or restart the local bridge to enable monitoring.';
 function cameraErrorMessage(err: unknown): string {
   if (err instanceof DOMException) {
+    if (err.name === 'NotReadableError' || err.name === 'TrackStartError') return USB_CAMERA_BUSY;
+    if (err.name === 'NotFoundError') return USB_CAMERA_NOT_FOUND;
     return err.message === '' ? err.name : `${err.name}: ${err.message}`;
   }
   if (err instanceof Error && err.message !== '') return err.message;

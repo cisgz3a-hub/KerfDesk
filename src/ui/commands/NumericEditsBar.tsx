@@ -201,7 +201,7 @@ function SizeFields({ model }: { readonly model: NumericEditModel }): JSX.Elemen
         disabled={!model.hasSelection}
         onClick={() => model.setPreserveAspect((value) => !value)}
       >
-        <Icon name={model.preserveAspect ? 'lock' : 'unlock'} size={16} />
+        <Icon name={model.preserveAspect ? 'lock' : 'unlock'} size={14} />
       </button>
       <NumberField
         label="Selection height"

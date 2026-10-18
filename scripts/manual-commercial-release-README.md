@@ -91,7 +91,7 @@ Follow the workflow to successful publication, then verify the public download. 
 
 ## Delivery evidence and recovery
 
-ADR-612 adds required public verification after storage publication. To repeat
+ADR-616 adds required public verification after storage publication. To repeat
 the read-only check with the exact published version and source, use a fresh
 absolute evidence directory:
 
@@ -130,3 +130,27 @@ storage configuration. This observes the exact newest beta and starts its
 waiting period now; it does not publish or promote the release, change its
 licence date, or accept `--now`. Keep all release enablement variables off until
 the fixes and the intended publication are approved.
+## macOS and Linux (ADR-613)
+
+The same workflow publishes the commercial Mac and Linux builds of each Windows release, under the same version, once Windows is published. Each system is off until its repository variable is `on`: `KERFDESK_UNSIGNED_MACOS_RELEASES` (Apple silicon and Intel DMGs) and `KERFDESK_UNSIGNED_LINUX_RELEASES` (x64 `.deb` and AppImage). The Windows documents above, and their single writer, are unchanged: installed Windows copies never see a Mac or Linux file.
+
+The ADR-616 public-delivery verifier and signed success receipt above cover Windows and Preview only. The commercial Mac/Linux jobs currently prove package qualification and authenticated R2 readback, retain native artifacts for seven days, and do not yet prove public CDN/page delivery or retain a durable success receipt. Windows success must not depend on an absent platform feed. Keep the separate platform switches disabled until their publication and qualification are explicitly authorised.
+
+The build jobs hold no secret. The Windows job hands them its public signed release identity; `scripts/build-commercial-platform.sh` prepares from it (`prepare-commercial-desktop.mjs --release-identity`), packages, and qualifies the package (contract, fuses, launch, import and save; ASAR tamper refusal on macOS; `.deb` install and AppImage launch on Ubuntu 24.04). The publish jobs, in the `desktop-commercial` environment, accept only the files whose SHA-256 their build jobs reported and run:
+
+```text
+node scripts/publish-platform-commercial-release.mjs --platform <macos|linux> --sha256 <file>=<64-hex> [...] <release-directory> <commercial-release-identity.json>
+```
+
+It writes, under `desktop/commercial-manual/`:
+
+- `releases/X.Y.Z/KerfDesk-X.Y.Z-macos-arm64.dmg`, `…-macos-x64.dmg` and `download-manifest-macos.json`, then `latest-macos.json`
+- `releases/X.Y.Z/KerfDesk-X.Y.Z-linux-amd64.deb`, `…-linux-x86_64.AppImage` and `download-manifest-linux.json`, then `latest-linux.json`
+
+It refuses unless the Windows `download-manifest.json` of the same version is already published with the same identity, and refuses rollback, backdating and conflicting immutable bytes. The release notes are the Windows release's `release-notes.json`. A Mac or Linux failure leaves the Windows release as it is; **Re-run failed jobs** repeats the same version (a fresh run of the workflow skips an already published source).
+
+Before the first Mac or Linux release, the maintainer:
+
+1. Publishes Software and Supplier Terms 1.3 (archiving 1.2 and notifying Paddle) so that Pro rights and the trial cover macOS and Linux installations, not only "Windows installations", and updates the pricing, licence and buy pages that say Pro is Windows only.
+2. Sets `KERFDESK_UNSIGNED_MACOS_RELEASES=on` and/or `KERFDESK_UNSIGNED_LINUX_RELEASES=on`, and checks that the `desktop-commercial` environment admits the `publish-macos` and `publish-linux` jobs (same branch rule as Windows; no new secret).
+3. Runs **Release unsigned Windows desktop** on `main` with **Release now**, or lets the next 10-PR batch run, then checks the Mac and Linux panels on kerfdesk.com/download and installs each file on a real Mac and Linux computer.

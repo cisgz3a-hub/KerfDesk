@@ -6,7 +6,7 @@
     "In the jig editor, add text with your existing fonts, import artwork, or upload an image and trace it directly. Imported and traced artwork fits inside the jig outline, with Line or Fill settings for each piece.",
     "After a complete outline burn, the jig switches to Artwork only and reminds you to place the piece and focus on its top surface. Job Review shows the burn order and the artwork focus reminder.",
     "Collapsed Artwork and Machine panels now pulse in the orange accent, so a closed panel is easy to find and reopen.",
-    "New Centre & LED controls under the laser jog buttons move to the centre of the design and switch a configured pointer light on, with a separate LED off action.",
+    "New Centre & LED controls under the laser jog buttons move to the centre of the selected artwork and switch a configured pointer light on, with a separate LED off action.",
     "Jobs complete more reliably when Pause races the final controller replies, and the canvas no longer shows an unsolicited selection popup."
   ]
 }
