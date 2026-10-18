@@ -84,31 +84,39 @@ describe('ArtworkPulsePainter (ADR-620)', () => {
     expect(canvases).toBe(2 * count);
   });
 
-  it('pulses a path for an operation that is bound to it but does not style it', () => {
-    const line = createLayer({ id: 'line', color: '#2563eb' });
-    const fill = createLayer({ id: 'fill', color: '#dc2626', mode: 'fill' });
-    const piece = square('both', 'line', 10);
-    const object: ImportedSvg = {
-      ...piece,
-      paths: piece.paths.map((path) => ({ ...path, operationIds: ['line', 'fill'] })),
-    };
-    const base = createProject();
-    const project = { ...base, scene: { ...base.scene, objects: [object], layers: [line, fill] } };
-    const { ctx, drawImages } = recordingContext();
+  it.each(['object', 'path'] as const)(
+    'pulses the second operation with %s bindings',
+    (binding) => {
+      const line = createLayer({ id: 'line', color: '#2563eb' });
+      const fill = createLayer({ id: 'fill', color: '#dc2626', mode: 'fill' });
+      const piece = square('both', 'line', 10);
+      const object: ImportedSvg = {
+        ...piece,
+        ...(binding === 'object'
+          ? { operationIds: ['line', 'fill'] }
+          : { paths: piece.paths.map((path) => ({ ...path, operationIds: ['line', 'fill'] })) }),
+      };
+      const base = createProject();
+      const project = {
+        ...base,
+        scene: { ...base.scene, objects: [object], layers: [line, fill] },
+      };
+      const { ctx, drawImages } = recordingContext();
 
-    new ArtworkPulsePainter().draw(ctx, project, view, [
-      {
-        objectId: 'both',
-        // The second operation: the canvas styles the path with the first.
-        colorSources: new Map([['fill', 'fill']]),
-        strength: 1,
-        glow: null,
-        edgeAlpha: 0,
-      },
-    ]);
+      new ArtworkPulsePainter().draw(ctx, project, view, [
+        {
+          objectId: 'both',
+          // The second operation: the canvas styles the path with the first.
+          colorSources: new Map([['fill', 'fill']]),
+          strength: 1,
+          glow: null,
+          edgeAlpha: 0,
+        },
+      ]);
 
-    expect(drawImages()).toBe(1);
-  });
+      expect(drawImages()).toBe(1);
+    },
+  );
 });
 
 // Counts the blits the painter makes onto the overlay itself.

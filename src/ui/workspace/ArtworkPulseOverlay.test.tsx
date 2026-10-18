@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import {
   createLayer,
   createProject,
@@ -53,7 +53,7 @@ function project(): Project {
 
 let host: HTMLDivElement;
 let root: Root;
-let hover: ReturnType<typeof vi.spyOn>;
+let hover: MockInstance<ArtworkPulseClock['hover']>;
 
 async function render(canvasHoverEnabled: boolean): Promise<void> {
   await act(async () =>
@@ -128,5 +128,45 @@ describe('ArtworkPulseOverlay (ADR-620)', () => {
     expect(layer?.style.visibility).not.toBe('hidden');
     await act(async () => useUiStore.getState().setOperationColorPeek(true));
     expect(layer?.style.visibility).toBe('hidden');
+  });
+
+  it('regroups after Paste settings on the hovered row without another pulse', async () => {
+    const base = project();
+    const heart = base.scene.objects[0];
+    const engrave = base.scene.layers[0];
+    if (heart === undefined || engrave === undefined) throw new Error('missing artwork fixture');
+    const sibling = { ...engrave, id: 'sibling', color: '#dc2626' };
+    const source = { ...engrave, id: 'source', color: '#16a34a', power: engrave.power / 2 };
+    useStore.setState({
+      project: {
+        ...base,
+        scene: {
+          ...base.scene,
+          layers: [engrave, sibling, source],
+          objects: [heart, { ...heart, id: 'other-heart', operationIds: ['sibling'] }],
+        },
+      },
+    });
+    useStore.getState().copyLayerSettings('source');
+    useUiStore.getState().setHoveredOperationId('engrave');
+    await render(true);
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    const highlighted = (): ReadonlyArray<string> =>
+      clock.frame(performance.now(), true).pieces.map((piece) => piece.objectId);
+    expect(highlighted()).toEqual(['heart', 'other-heart']);
+
+    // Paste lives inside the row, so its hover identity remains unchanged.
+    await act(async () => useStore.getState().pasteLayerSettings('engrave'));
+    await render(true);
+    expect(useUiStore.getState().hoveredOperationId).toBe('engrave');
+    expect(highlighted()).toEqual(['heart']);
+    expect(pulses()).toEqual([true, false]);
+
+    // Matching the sibling again restores its edge without restarting a pulse.
+    useStore.getState().copyLayerSettings('sibling');
+    await act(async () => useStore.getState().pasteLayerSettings('engrave'));
+    await render(true);
+    expect(highlighted()).toEqual(['heart', 'other-heart']);
+    expect(pulses()).toEqual([true, false, false]);
   });
 });
