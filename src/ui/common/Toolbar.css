@@ -115,9 +115,13 @@
   flex-shrink: 0;
   gap: 8px;
 }
+/* Borderless like Open, Save and Preview; its border shows on hover. */
 .lf-toolbar-shell .lf-toolbar-more {
   min-width: 76px;
   color: var(--lf-text-muted);
+}
+.lf-toolbar-shell .lf-toolbar-more[aria-expanded='true'] {
+  background: var(--lf-bg-1);
   border-color: var(--lf-border);
 }
 .lf-toolbar-shell .lf-toolbar-icon,

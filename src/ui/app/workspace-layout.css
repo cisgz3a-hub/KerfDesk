@@ -149,6 +149,19 @@
   gap: 6px;
 }
 
+/* A shown panel and the selected panel tab use the copper tint, not the solid
+   fill, so solid copper keeps marking the one main action nearby (Connect).
+   The shared aria-pressed fill (tokens.css) is unchanged elsewhere. */
+.lf-workspace-panel-toggles > .lf-btn[aria-pressed='true'],
+.lf-workspace-panel-toggles > .lf-btn[aria-pressed='true']:hover:not(:disabled),
+.lf-workspace-panel-toggles > .lf-btn[aria-pressed='true']:active:not(:disabled),
+.lf-workspace-panel-tabs > .lf-workspace-panel-tab--selected,
+.lf-workspace-panel-tabs > .lf-workspace-panel-tab--selected:active:not(:disabled) {
+  background: var(--lf-tint-accent);
+  border-color: var(--lf-accent);
+  color: var(--lf-accent-fg);
+}
+
 @media (max-width: 700px) {
   .lf-workspace-panels--compact {
     width: 260px;
