@@ -93,10 +93,10 @@ fileAssociations:
   - ext: lf2
     name: KerfDesk.Project
     description: KerfDesk project
-    # Linux only: the shared-mime-info type the desktop entry opens (ADR-606).
+    # Linux only: the shared-mime-info type the desktop entry opens (ADR-607).
     mimeType: application/x-kerfdesk-project
 
-# Linux desktop (ADR-606): an AppImage that runs on most distributions without
+# Linux desktop (ADR-607): an AppImage that runs on most distributions without
 # installing, and a .deb for Debian and Ubuntu, both x64. electron-builder's
 # .deb scripts set up the Chromium sandbox and, on Ubuntu 24.04 and newer, the
 # AppArmor profile it needs. The desktop entry claims the .lf2 MIME type so a
@@ -137,13 +137,13 @@ appImage:
 # The static AppImage runtime (electron-builder 26.16.1 lists it as a beta toolset)
 # carries its own FUSE support, so the AppImage starts on Ubuntu 22.04 and newer
 # without libfuse2, which those systems no longer install. The default legacy
-# runtime needs libfuse2 and fails before KerfDesk starts (ADR-606).
+# runtime needs libfuse2 and fails before KerfDesk starts (ADR-607).
 toolsets:
   appimage: 1.0.3
 
 # This stable config has no macOS target: the Mac builds are the unsigned
 # Preview (electron-builder.preview.yml, ADR-248) until a Developer ID and
-# notarization exist. The Linux block above packages the same app (ADR-606).
+# notarization exist. The Linux block above packages the same app (ADR-607).
 
 # Self-hosted generic update feed on Cloudflare R2 (ADR-024). Configuring a
 # `publish` block makes electron-builder emit `latest.yml` + `.blockmap`;

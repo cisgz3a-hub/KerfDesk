@@ -10,7 +10,7 @@ describe('why a serial port did not open', () => {
     expect(text).not.toContain('dialout');
   });
 
-  it('adds the serial group step on Linux, where a missing group looks the same (ADR-606)', () => {
+  it('adds the serial group step on Linux, where a missing group looks the same (ADR-607)', () => {
     const text = connectionFailureText(OPEN_FAILED, 'laser', true);
     expect(text).toContain('The port is busy or unavailable');
     expect(text).toContain('sudo usermod -aG dialout $USER');

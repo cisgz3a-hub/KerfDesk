@@ -41,7 +41,10 @@ export function withTrialBudget(
   };
 }
 
-/** A trial's process-local time cannot move backwards or outlive elapsed time. */
+/**
+ * A trial's process-local time cannot move backwards or outlive elapsed time.
+ * A paid licence's last-seen mark uses one without a deadline.
+ */
 export class TrialSessionClock {
   private readonly startedAt: number;
   private readonly startedElapsedMs = performance.now();
