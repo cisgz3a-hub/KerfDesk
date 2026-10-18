@@ -24,6 +24,7 @@ import {
   readCanvasStartMarkersVisible,
   writeCanvasStartMarkersVisible,
 } from './canvas-motion-preferences';
+import { artworkColorHintSlice, type ArtworkColorHintState } from './artwork-color-hint';
 import { artworkRunOrderUiSlice, type ArtworkRunOrderUiState } from './artwork-run-order-ui';
 import { uiRailPanelSlice, type UiRailPanelState } from './ui-rail-panel';
 import { uiSnapSlice, type UiSnapState } from './ui-snap-slice';
@@ -133,6 +134,7 @@ export type FloatingPanelPosition = {
 export type PreviewPlaybackSpeed = 'slow' | 'normal' | 'fast';
 
 export type UiState = ArtworkRunOrderUiState &
+  ArtworkColorHintState &
   UiRailPanelState &
   UiSnapState & {
     readonly dragOverlay: boolean;
@@ -333,6 +335,7 @@ const RESET_TOOL_MODE: Partial<UiState> = {
 export const useUiStore = create<UiState>((set) => ({
   ...uiRailPanelSlice(set),
   ...artworkRunOrderUiSlice(set),
+  ...artworkColorHintSlice(set),
   ...uiSnapSlice(set),
   dragOverlay: false,
   setDragOverlay: (next) => set({ dragOverlay: next }),

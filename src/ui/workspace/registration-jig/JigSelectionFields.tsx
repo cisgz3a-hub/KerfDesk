@@ -2,12 +2,11 @@ import { useState } from 'react';
 import {
   buildSelectionTransformEdit,
   selectionMetrics,
-  sceneObjectHasVisibleLayer,
   type Project,
-  type SceneObject,
   type SelectionTransformEdit,
 } from '../../../core/scene';
 import { NumberInput } from '../../kit';
+import { jigEditableSelection, withJigTransforms } from './jig-canvas-selection';
 
 export function JigSelectionFields(props: {
   readonly project: Project;
@@ -16,12 +15,7 @@ export function JigSelectionFields(props: {
 }): JSX.Element {
   const [preserveAspect, setPreserveAspect] = useState(true);
   const [error, setError] = useState('');
-  const objects = props.project.scene.objects.filter(
-    (object) =>
-      props.selectedIds.has(object.id) &&
-      object.locked !== true &&
-      sceneObjectHasVisibleLayer(props.project.scene, object),
-  );
+  const objects = jigEditableSelection(props.project, props.selectedIds);
   const metrics = selectionMetrics(objects);
   const edit = (value: SelectionTransformEdit): void => {
     const result = buildSelectionTransformEdit(objects, value);
@@ -30,8 +24,7 @@ export function JigSelectionFields(props: {
       return;
     }
     setError('');
-    const transforms = new Map(result.transforms.map((item) => [item.id, item.transform]));
-    props.onCommit(withTransforms(props.project, transforms));
+    props.onCommit(withJigTransforms(props.project, result.transforms));
   };
   if (metrics === null)
     return (
@@ -83,22 +76,6 @@ export function JigSelectionFields(props: {
       {error !== '' && <p role="alert">{error}</p>}
     </section>
   );
-}
-
-function withTransforms(
-  project: Project,
-  transforms: ReadonlyMap<string, SceneObject['transform']>,
-): Project {
-  return {
-    ...project,
-    scene: {
-      ...project.scene,
-      objects: project.scene.objects.map((object) => {
-        const transform = transforms.get(object.id);
-        return transform === undefined ? object : { ...object, transform };
-      }),
-    },
-  };
 }
 
 function JigNumber(props: {

@@ -7,6 +7,7 @@ import {
   type Polyline,
   type TracedImage,
 } from '../../core/scene';
+import { canvasTheme } from '../theme/canvas-theme';
 import { resetArtworkSpritesForTests, SPRITE_MIN_DISPLAY_SEGMENTS } from './artwork-sprite-cache';
 import { createDisplayPolylineCache } from './display-polylines';
 import {
@@ -142,6 +143,40 @@ describe('object display resolution', () => {
     ).toEqual([]);
     const orphan = resolveObjectDisplay(traced([square(10)]), new Map(), view, undefined, 'design');
     expect(orphan.paths[0]?.paint).toEqual({ kind: 'stroke', color: '#000000', output: true });
+  });
+
+  it('rests bound artwork in ink but keeps orphan and Preview colours (ADR-620)', () => {
+    const red = sceneLayerVisibility.lookup([
+      createLayer({ id: 'cut', color: '#dc2626', mode: 'fill' }),
+    ]);
+    const object = traced([square(10)], {
+      paths: [{ color: '#dc2626', polylines: [square(10)], operationIds: ['cut'] }],
+    });
+    const coloured = resolveObjectDisplay(object, red, view, undefined, 'design');
+    expect(coloured.paths[0]).toMatchObject({
+      operationId: 'cut',
+      paint: { kind: 'fill', color: '#dc2626' },
+    });
+    const ink = resolveObjectDisplay(object, red, view, undefined, 'design', 'ink');
+    expect(ink.paths[0]).toMatchObject({
+      operationId: 'cut',
+      paint: { kind: 'fill', color: canvasTheme.artworkInk },
+    });
+    // The canvas sprite must repaint when Alt switches between the two.
+    expect(ink.styleKey).not.toBe(coloured.styleKey);
+    const preview = resolveObjectDisplay(object, red, view, undefined, 'faint', 'ink');
+    expect(preview.paths[0]?.paint.color).toBe('#dc2626');
+    const orphan = resolveObjectDisplay(
+      traced([square(10)], {
+        paths: [{ color: '#16a34a', polylines: [square(10)] }],
+      }),
+      red,
+      view,
+      undefined,
+      'design',
+      'ink',
+    );
+    expect(orphan.paths[0]).toMatchObject({ operationId: null, paint: { color: '#16a34a' } });
   });
 
   it('keeps one flattening of a curved trace while wheel notches stay inside a zoom bucket', () => {

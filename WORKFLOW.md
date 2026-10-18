@@ -662,8 +662,8 @@ the linked artwork.
 
 ### F-A6d. Filled or wireframe view (ADR-410)
 
-1. **Window → Wireframe View** (`Alt+W`) draws Fill artwork as outlines in its operation colour,
-   so overlaps and stray paths show. The menu item shows a check while it is on.
+1. **Window → Wireframe View** (`Alt+W`) draws Fill artwork as outlines, so overlaps and stray
+   paths show. The menu item shows a check while it is on.
 2. It changes the canvas only: output, Preview and saved projects are unchanged. It resets to
    Filled when the app restarts.
 
@@ -708,7 +708,9 @@ the linked artwork.
    selected vector artwork. The artwork previews live while the handles are dragged; Enter or Apply
    applies it as one undo step, Esc or Cancel leaves it as it was, and Reset handles starts again.
    Shift keeps the Warp corners a parallelogram. Curves become fine lines within 0.05 mm; images,
-   reliefs and locked artwork are left as they are, and the notice says how many.
+   reliefs and locked artwork are left as they are, and the notice says how many. A bend that needs
+   more geometry than can be prepared accurately is not previewed: the artwork stays as it was and
+   the tool's hint says why, in the words Apply would use, until the handles allow the bend again.
 4. **Arrange → Layout → Copy Along Path…** copies the selected artwork along the top-most selected
    single path (or the path picked under Guide path): by number of copies, spacing between centres
    or gap between copies, from the start offset to the end offset, turned to follow the path unless
@@ -776,6 +778,21 @@ the linked artwork.
 4. **Optimize** applies it as one undo step. Imported and traced artwork keeps its operations and
    tabs; text and drawn shapes that change become paths in the same step, and locked artwork is
    left as it is. The notice says what changed. Settings are remembered for the session.
+
+### F-A6j. Operation colours on the canvas (ADR-620)
+
+1. Artwork rests in plain ink on the workspace, so the canvas shows the design itself. Every
+   operation still has its own colour, shown on its row in the Artwork panel.
+2. With the Select tool, rest the pointer on a piece of artwork: it pulses once in its operation
+   colour, and every other piece whose operation has the same settings pulses in that same
+   colour, rippling out from the piece under the pointer. A soft colour edge stays while the
+   pointer rests there. Resting on an operation row does the same for that operation's artwork.
+3. Hold **Alt** (Option on a Mac) to show every operation colour at once; let go to return to ink.
+   Alt shortcuts such as `Alt+W` do not trigger it.
+4. With reduced motion turned on in the operating system, the colour shows while the pointer
+   rests instead of pulsing.
+5. Display only: Preview, output and saved projects are unchanged. New operations start at blue;
+   black is the last palette colour.
 
 ### F-A7. Artwork Operations panel
 
@@ -949,6 +966,9 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 3. **Undo last** removes only the most recent assignment. **Done** commits the whole numbering
    session as one undoable project action. **Cancel** restores the order from before the session.
 4. Numbering ends automatically after every run unit has been assigned.
+5. While numbering is open, other design edits (Delete, nudge, paste, Undo/Redo, menu, toolbar
+   and command-search commands) are refused with a notice to click **Done** or **Cancel** first,
+   so Cancel can never silently discard them.
 
 #### Success - inspect a job from either surface
 1. Click a run row: its complete run unit is selected on the canvas, highlighted with its operation
@@ -1109,6 +1129,13 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    the left.
 5. Burned labels show each row's and column's value (speeds as the feed the job runs). The toast
    names what rows and columns vary.
+6. Below the fields, a live preview draws the card as Generate will make it: every row and column
+   it holds (a passes axis shows only its whole numbers), labelled with the same values the card
+   burns, speeds capped at the profile's maximum feed. Each cell is shaded from faint to deep by
+   its energy relative to the strongest cell: power × passes ÷ speed, and ÷ hatch spacing for
+   Engrave. Engraved cells fill; cut cells show only their outline. Hovering a cell names its
+   settings. While a field is invalid the last valid card stays, dimmed, until it is fixed. The
+   preview only shows the card; it never changes what Generate makes.
 
 ### F-A7g. Recipes that apply themselves (ADR-496)
 
@@ -2657,6 +2684,13 @@ authorization, Frame proof, controller command, or safety boundary.
    Escape with nothing selected, or **Close without saving**, closes at once when
    nothing changed; otherwise it asks **Save jig changes?** with **Save to canvas**,
    **Discard changes** and **Keep editing**. Discarding leaves the main canvas unchanged.
+   On the jig canvas, drag a selection to move it. Drag a corner handle to resize it
+   proportionally (Shift resizes freely), an edge handle to stretch one side, or the
+   round handle above it to rotate it about its centre (Shift snaps to 15°). Each drag
+   is one undoable draft edit. Drag on empty canvas to box-select: left to right selects
+   what the box encloses, right to left what it touches. Shift-drag or Shift-click adds
+   to the selection, and Ctrl+A selects all the artwork (not the outlines) unless a field
+   has focus. Locked or hidden objects, including locked outlines, are never selected.
 2. In **Jig layout**, choose Rectangle or Circle, enter the outline size, then enter
    rows, columns, and horizontal/vertical spacing. Apply the layout before saving;
    until then the tab reads **Jig layout •**. A 1 x 5 grid creates five independently
@@ -2669,7 +2703,8 @@ authorization, Frame proof, controller command, or safety boundary.
    image** and use the existing tracers directly in the editor. Imported and traced
    artwork fits inside the outline it was dropped on, else the selected outline, else
    the outline holding the selected artwork, else the first outline. Several files at
-   once fill consecutive outlines in grid order from there.
+   once fill consecutive outlines in grid order from there. While files are dragged
+   over the canvas, the outline that would receive them is highlighted.
    **Line / Fill settings** controls the selected artwork's operation, power, speed and
    passes; Fill also exposes line interval, scan angle, fill style and cross-hatch.
    Use Line for open traced paths. These edits remain in the draft until saved.

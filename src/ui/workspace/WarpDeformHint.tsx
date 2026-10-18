@@ -1,8 +1,9 @@
 // What the Warp and Deform tools do, shown while one is on (LBG-T06), with the
-// keys that finish it. Enter applies and Esc cancels from anywhere but a text
-// box or a dialog. The listener runs in the capture phase so Esc only leaves
-// the tool and keeps the selection, instead of also clearing it as the global
-// Esc does.
+// keys that finish it. When the preview cannot make the current bend, it says
+// why in the words Apply would use, so the artwork snapping back unbent is not
+// a mystery. Enter applies and Esc cancels from anywhere but a text box or a
+// dialog. The listener runs in the capture phase so Esc only leaves the tool
+// and keeps the selection, instead of also clearing it as the global Esc does.
 
 import { useEffect } from 'react';
 import { warpDeformHandlesUnmoved } from '../../core/geometry/warp-deform-map';
@@ -22,7 +23,7 @@ export const WARP_HINT =
 export const DEFORM_HINT =
   'Drag the handles to bend the selection. Press Enter to apply or Esc to cancel.';
 
-export function WarpDeformHint(): JSX.Element | null {
+export function WarpDeformHint(props: { readonly failure: string | null }): JSX.Element | null {
   const session = useActiveWarpDeformSession();
   useWarpDeformKeys(session !== null);
   if (session === null) return null;
@@ -31,6 +32,11 @@ export function WarpDeformHint(): JSX.Element | null {
   return (
     <div role="status" style={hintStyle} {...{ [HINT_ATTRIBUTE]: session.grid }}>
       <span>{session.grid === 'warp' ? WARP_HINT : DEFORM_HINT}</span>
+      {props.failure === null ? null : (
+        <span style={failureStyle} data-warp-deform-failure="">
+          {props.failure}
+        </span>
+      )}
       <button
         type="button"
         className="lf-btn"
@@ -100,4 +106,11 @@ const hintStyle: React.CSSProperties = {
   background: 'var(--lf-bg-1)',
   boxShadow: 'var(--lf-shadow)',
   fontSize: 12,
+};
+
+// A line of its own between the hint and the buttons. The hint grows upward
+// from its bottom edge, so the buttons stay put while the reason comes and goes.
+const failureStyle: React.CSSProperties = {
+  flexBasis: '100%',
+  color: 'var(--lf-warning-fg)',
 };
