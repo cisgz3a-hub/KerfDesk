@@ -60,12 +60,15 @@ export function ArtworkPulseOverlay(props: {
         ? { kind: 'object', objectId: hoveredObjectId }
         : null;
   usePulseLoop(ref, props.project, view, seed, hoveredObjectId);
+  // Holding Alt shows every operation in its own colour on the canvas below;
+  // a group pulsing in one shared colour would paint over exactly that.
+  const peek = useUiStore((state) => state.operationColorPeek);
   return (
     <canvas
       ref={ref}
       width={width}
       height={height}
-      style={layerStyle}
+      style={peek ? hiddenLayerStyle : layerStyle}
       aria-hidden="true"
       data-testid="artwork-pulse-layer"
     />
@@ -80,15 +83,23 @@ function useCanvasHoverObject(
   enabled: boolean,
 ): string | null {
   const [hovered, setHovered] = useState<string | null>(null);
+  // Set while a click or drag owns the pointer, until the pointer reports again.
+  const paused = useRef(false);
   const x = cursor?.x ?? null;
   const y = cursor?.y ?? null;
   useEffect(() => {
     // A click or drag owns the pointer: keep what was hovered and wait.
-    if (!enabled) return;
-    if (x === null || y === null) {
-      setHovered(null);
+    if (!enabled) {
+      paused.current = true;
       return;
     }
+    if (x === null || y === null) {
+      // Pointer-up clears the cursor although the pointer has not moved, so
+      // a paused hover holds until the pointer reports where it is.
+      if (!paused.current) setHovered(null);
+      return;
+    }
+    paused.current = false;
     const point = { x, y };
     const tolerance = LEAVE_TOLERANCE_MM + LEAVE_TOLERANCE_PX / scale;
     setHovered((current) =>
@@ -223,3 +234,4 @@ const layerStyle: React.CSSProperties = {
   height: '100%',
   pointerEvents: 'none',
 };
+const hiddenLayerStyle: React.CSSProperties = { ...layerStyle, visibility: 'hidden' };

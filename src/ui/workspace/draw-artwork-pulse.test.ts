@@ -83,4 +83,51 @@ describe('ArtworkPulsePainter (ADR-620)', () => {
     // piece with every same-settings operation would make 2N².
     expect(canvases).toBe(2 * count);
   });
+
+  it('pulses a path for an operation that is bound to it but does not style it', () => {
+    const line = createLayer({ id: 'line', color: '#2563eb' });
+    const fill = createLayer({ id: 'fill', color: '#dc2626', mode: 'fill' });
+    const piece = square('both', 'line', 10);
+    const object: ImportedSvg = {
+      ...piece,
+      paths: piece.paths.map((path) => ({ ...path, operationIds: ['line', 'fill'] })),
+    };
+    const base = createProject();
+    const project = { ...base, scene: { ...base.scene, objects: [object], layers: [line, fill] } };
+    const { ctx, drawImages } = recordingContext();
+
+    new ArtworkPulsePainter().draw(ctx, project, view, [
+      {
+        objectId: 'both',
+        // The second operation: the canvas styles the path with the first.
+        colorSources: new Map([['fill', 'fill']]),
+        strength: 1,
+        glow: null,
+        edgeAlpha: 0,
+      },
+    ]);
+
+    expect(drawImages()).toBe(1);
+  });
 });
+
+// Counts the blits the painter makes onto the overlay itself.
+function recordingContext(): {
+  ctx: CanvasRenderingContext2D;
+  drawImages: () => number;
+} {
+  let count = 0;
+  const state: Record<string, unknown> = { canvas: { width: 800, height: 200 } };
+  const ctx = new Proxy(state, {
+    get(target, property) {
+      if (property === 'drawImage') return () => (count += 1);
+      if (property in target) return target[String(property)];
+      return () => undefined;
+    },
+    set(target, property, value) {
+      target[String(property)] = value;
+      return true;
+    },
+  }) as unknown as CanvasRenderingContext2D;
+  return { ctx, drawImages: () => count };
+}

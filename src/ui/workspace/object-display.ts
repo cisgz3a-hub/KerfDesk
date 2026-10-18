@@ -47,6 +47,8 @@ export type PathDisplay = {
   readonly paint: PathPaint;
   /** The operation that styles this path; null for a colour no operation owns. */
   readonly operationId: string | null;
+  /** The scene path drawn, for callers that need every operation bound to it. */
+  readonly path: ColoredPath;
 };
 
 export type ObjectDisplay = {
@@ -99,7 +101,7 @@ export function resolveObjectDisplay(
     displaySegmentCount += countPolylineSegments(display.polylines);
     isSimplified ||= display.isSimplified;
     styleParts.push(paintKey(paint));
-    paths.push({ display, paint, operationId: resolution.operation?.id ?? null });
+    paths.push({ display, paint, operationId: resolution.operation?.id ?? null, path });
   }
   return {
     paths,

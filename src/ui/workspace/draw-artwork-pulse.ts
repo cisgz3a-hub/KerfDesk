@@ -9,6 +9,7 @@
 import {
   applyTransform,
   operationIdsForObject,
+  pathUsesOperation,
   sceneLayerVisibility,
   sceneObjectUsesOperation,
   transformedBBox,
@@ -237,9 +238,11 @@ function paintVectorPiece(
   flood: CanvasRenderingContext2D,
 ): boolean {
   const resolved = resolveObjectDisplay(object, lookup, view, displayCache, 'design', 'operation');
+  // Every operation bound to a path, not only the one that styles it on the
+  // canvas, so each operation's row can reveal the artwork it processes.
   const paths = resolved.paths
-    .filter((path) => path.operationId === layer.id)
-    .map((path) => ({ ...path, paint: { ...path.paint, color } }));
+    .filter((display) => pathUsesOperation(object, display.path, layer))
+    .map((display) => ({ ...display, paint: { ...display.paint, color } }));
   if (paths.length === 0) return false;
   paintObjectDisplay(flood, object, { ...resolved, paths }, view);
   return true;
