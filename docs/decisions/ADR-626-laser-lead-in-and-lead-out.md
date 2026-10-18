@@ -51,16 +51,20 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    move tangentially.
 3. **The scrap side is found** (`core/job/laser-lead-rings.ts`). Automatic puts a lead outside an outer
    contour and inside a hole, by the containment parity inside-first ordering uses, counted over every
-   closed contour of every Line cut group in the job. A hole cut by its own operation is therefore
-   still a hole. A contour that tabs or perforation broke into pieces still counts: compile keeps its
-   whole outline on the cut group (`CutGroup.topologyRings`, matched to the pieces by their topology
-   identity, ADR-486 Amd 2; translated with the job, dropped from the prepared job once leads are
-   placed, and kept only when some operation or artwork in the scene asks for leads). A job from before that rebuilds the outline from its pieces (`core/job/laser-lead-chain.ts`,
-   an endpoint grid sized to the outline, so thousands of sparse dashes chain quickly); where a gap
-   skips a corner, the corner is put back where the edges on either side meet, so a hole in the
-   corner is still inside. Copies of one outline (the
-   same bounds and length within 0.01 mm, and each outline lying on the other within 0.01 mm, such
-   as an outline cut by two operations) count once, or a hole inside a twice-cut outline would read as an outer contour.
+   closed contour of every Line cut group in the job that burns. A group at zero power, or artwork at
+   0% power, cuts nothing and holds no part, so it is neither an obstacle nor a container, and gets no
+   leads. A hole cut by its own operation is therefore still a hole. A contour that tabs or
+   perforation broke into pieces still counts: compile keeps its whole outline on the cut group
+   (`CutGroup.topologyRings`, matched to the pieces by their topology identity, ADR-486 Amd 2;
+   translated with the job, dropped from the prepared job once leads are placed, and kept only when
+   some operation or artwork in the scene asks for leads). A job from before that rebuilds the outline
+   from its pieces (`core/job/laser-lead-chain.ts`, an endpoint grid sized to the outline, so
+   thousands of sparse dashes chain quickly); where a gap skips a corner, the corner is put back where
+   the edges on either side meet, so a hole in the corner is still inside. Copies of one outline, such
+   as an outline cut by two operations, count once, or a hole inside a twice-cut outline would read as
+   an outer contour. A copy has the same bounds and length within 0.01 mm and is the same loop vertex
+   by vertex within 0.01 mm, however it starts or runs; shapes that only share bounds and length stay
+   apart.
    Containment is judged from the outlines here, not from the depth compile carries, because that
    depth already counts a container on the same path that may also have a copy. **Always outside**
    and **Always inside** override it for the whole operation, for the cases parity cannot know (a
@@ -110,8 +114,9 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    burn on the segment (`finalPassBurn`); `finalPassCutSegments` hands it to every pass walker, and
    bounds, coordinate checks, the Ruida export's range check and the rotary Y mapping read it too.
    The overcut's lead-out takes its heading from the overcut run alone, so a run shorter than the
-   tangent window keeps its own direction. With one pass the final pass is the only one, so its burn is the segment's own and no reader can
-   count a path that never runs.
+   tangent window keeps its own direction. With one pass the final pass is the only one, so its burn
+   is the segment's own and no reader can count a path that never runs; the ordinary lead-out, which
+   that pass never cuts, is not kept as a line other leads must clear either.
 8. **Arcs (ADR-432).** A contour that goes out as G2/G3 keeps its arc moves, and its leads join them
    as moves: a line lead as G1, an arc lead as G2/G3 (quarter turns at most; chords below the arc
    fitter's 0.1 mm radius). A contour that goes out as chords gets its arc leads as chords within
@@ -158,12 +163,15 @@ outline, the bed, open paths, overcut on the final pass with its own lead-out, a
 arc lead whose sweep bulges past its samples at the bed edge, and the final-pass burn through the
 rotary Y mapping and the Ruida export's range check. `core/job/laser-leads-geometry-guards.test.ts`
 covers an arc's sag near another cut, a corner skipped by a tab gap, mirrored shapes with equal bounds
-and length, a 1 km cut line, the rotary bed and a one-pass overcut; `layer-default-settings-leads.test.ts`
-covers saved defaults and recipe steps without leads. `core/job/laser-leads-arcs-and-pieces.test.ts` covers
-the arc tangent at a G2/G3 join, neighbours measured by their arcs and an outline cut as 3,000 dashes. `core/job/laser-leads-review-guards.test.ts` covers a cut
-beside the join, broken outlines read whole from compile, sparse dashes, final-pass coordinates in
-the G-code check and a very short overcut; `laser-lead-override-angle.test.ts` covers a bulk angle
-edit across arc and line leads.
+and length, a 1 km cut line, the rotary bed, a one-pass overcut and the lead-out it never cuts;
+`layer-default-settings-leads.test.ts` covers saved defaults and recipe steps without leads.
+`core/job/laser-leads-arcs-and-pieces.test.ts` covers the arc tangent at a G2/G3 join, neighbours
+measured by their arcs and an outline cut as 3,000 dashes. `core/job/laser-leads-review-guards.test.ts`
+covers a cut beside the join, broken outlines read whole from compile, sparse dashes, final-pass
+coordinates in the G-code check and a very short overcut. `core/job/laser-leads-restart-and-rings.test.ts`
+covers a corner-started hole on finely divided sides, outlines kept only when leads are asked for,
+copies started elsewhere or run the other way, and an outline that burns nothing.
+`laser-lead-override-angle.test.ts` covers a bulk angle edit across arc and line leads.
 End-to-end tests (`io/gcode/laser-leads-output.test.ts`) pin byte-identical G-code, prepared jobs and
 Ruida plans with leads off (set or absent) on GRBL, arc GRBL, Marlin and Smoothieware with 1 and 3
 passes and with and without overcut, and show leads on every pass, in Marlin, Smoothieware and Ruida

@@ -8,6 +8,7 @@ import { createLayer, IDENTITY_TRANSFORM, type Layer, type SceneObject, type Vec
 import { applyLaserLeads } from './apply-laser-leads';
 import { compileJob } from './compile-job';
 import type { CutGroup, CutSegment, Job } from './job';
+import { leadJobLines } from './laser-lead-rings';
 import type { CutGroupLaserLeads } from './laser-lead-settings';
 
 const LEADS: CutGroupLaserLeads = {
@@ -112,5 +113,46 @@ describe('laser lead restarts and kept outlines (ADR-626)', () => {
     expect(applyLaserLeads(job, { bed: null }).groups.some((g) => 'topologyRings' in g)).toBe(
       false,
     );
+  });
+
+  it('takes a ring for a copy only when it is the same loop, however it starts or runs', () => {
+    // A 40 mm square with a 2 mm bump on its bottom edge at x = `at`, in many vertices.
+    const bumped = (at: number): CutSegment => {
+      const points: Vec2[] = [];
+      for (let x = 0; x < 40; x += 0.5) {
+        if (x === at) points.push({ x, y: 0 }, { x, y: -2 }, { x: x + 2, y: -2 });
+        else if (x > at && x < at + 2) continue;
+        else points.push({ x, y: 0 });
+      }
+      points.push({ x: 40, y: 0 }, { x: 40, y: 40 }, { x: 0, y: 40 });
+      return { polyline: [...points, points[0] as Vec2], closed: true };
+    };
+    const a = bumped(10);
+    const turned: CutSegment = {
+      polyline: [...a.polyline.slice(7, -1), ...a.polyline.slice(0, 8)].reverse(),
+      closed: true,
+    };
+    const copies = leadJobLines({
+      groups: [group([a]), group([turned]), group([bumped(28)])],
+    }).copies;
+    expect(copies[0]).toEqual([1]);
+    expect(copies[2]).toEqual([]);
+  });
+
+  it('reads an outline that burns nothing as no part at all', () => {
+    const hole = dividedSquare(10, 10, 20, 1);
+    const done = applyLaserLeads(
+      {
+        groups: [
+          group([hole], { laserLeads: LEADS }),
+          group([dividedSquare(0, 0, 40, 1)], { power: 0 }),
+        ],
+      },
+      { bed: null },
+    );
+    const cut = done.groups[0];
+    const led = cut?.kind === 'cut' ? cut.segments[0] : undefined;
+    // Nothing encloses the square, so its scrap is outside it.
+    expect(pointInPolygon(led?.polyline[0] as Vec2, hole.polyline)).toBe(false);
   });
 });

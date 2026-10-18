@@ -46,6 +46,7 @@ import {
 } from './laser-lead-contour';
 import type { LeadJoin, LeadShape } from './laser-lead-path';
 import { leadJobLines, OBSTACLE_ARC_SAGITTA_MM, type LeadJobLines } from './laser-lead-rings';
+import { isBurningLineGroup } from './line-start-region';
 import { boundsContains } from './segment-bounds';
 
 export type LaserLeadOptions = {
@@ -87,7 +88,9 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   };
   const counts = new Map<string, LeadCounts>();
   const groups = withoutTopologyRings(job).groups.map((group, groupIndex) => {
-    if (group.kind !== 'cut' || group.laserLeads === undefined) return group;
+    // A group that burns nothing gets no leads: they would burn nothing too.
+    if (group.kind !== 'cut' || group.laserLeads === undefined || !isBurningLineGroup(group))
+      return group;
     const tally = countsFor(counts, group.layerId, group.laserLeads.operationName);
     return {
       ...group,
@@ -167,7 +170,7 @@ function leadSegment(
   tallyContour(tally, attempt);
   const { leadIn, leadOut, finalPass } = attempt;
   if (leadIn === null && leadOut === null) return segment;
-  recordLeads(world, attempt);
+  recordLeads(world, attempt, group.passes);
   return leadedSegment(attempt.segment, leadIn, leadOut, finalPass, group.passes);
 }
 
@@ -211,10 +214,13 @@ function leadAttempt(
 // goes out as G2/G3 is indexed as its arcs, sampled as finely as other arc
 // obstacles, so a later lead measures from the arc itself; the final pass goes
 // out as chords.
-function recordLeads(world: LeadWorld, attempt: LeadAttempt): void {
+function recordLeads(world: LeadWorld, attempt: LeadAttempt, passes: number): void {
+  // With one pass and an overcut the final pass is the only one, so the
+  // ordinary lead-out never burns.
+  const ordinaryOut = passes <= 1 && attempt.finalPass !== null ? null : attempt.leadOut;
   const placed = [
     ...asBurned(attempt.leadIn, attempt.arcsEmitted),
-    ...asBurned(attempt.leadOut, attempt.arcsEmitted),
+    ...asBurned(ordinaryOut, attempt.arcsEmitted),
     ...asBurned(attempt.finalPass?.fit ?? null, false),
   ].map((points) => world.obstacles.addLine(points));
   world.leadLines.set(attempt.ringId, [...(world.leadLines.get(attempt.ringId) ?? []), ...placed]);

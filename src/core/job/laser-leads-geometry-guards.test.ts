@@ -220,6 +220,36 @@ describe('laser lead geometry guards (ADR-626)', () => {
     expect(pathLength(led.polyline)).toBeCloseTo(2 + 40 + 3 + 2, 1);
   });
 
+  it('keeps no neighbour clear of a lead-out a one-pass overcut never cuts', () => {
+    // A 3 mm square below the 10 mm one, whose 1 mm corner leads reach across
+    // where the 10 mm square's ordinary lead-out would run.
+    const neighbour = closed([
+      { x: 0.25, y: -1.45 },
+      { x: 0.25, y: -4.45 },
+      { x: 3.25, y: -4.45 },
+      { x: 3.25, y: -1.45 },
+    ]);
+    const led = (passes: number) =>
+      applyLaserLeads(
+        {
+          groups: [
+            group([square(0, 0, 10)], { laserLeads: LEADS, finalPassOvercutMm: 3, passes }),
+            group([neighbour], { laserLeads: { ...LEADS, lengthMm: 1 }, passes }),
+          ],
+        },
+        NO_BED,
+      );
+    const onePass = led(1);
+    const second = onePass.groups[1];
+    const fitted = second?.kind === 'cut' ? second.segments[0] : undefined;
+    expect(pathLength(fitted?.polyline ?? [])).toBeCloseTo(1 + 12 + 1, 1);
+    expect(onePass.diagnostics).toBeUndefined();
+    // With two passes the first pass does cut that lead-out, so it is kept clear.
+    expect(led(2).diagnostics).toEqual([
+      expect.objectContaining({ kind: 'laser-leads-adjusted', shortened: 1, omitted: 0 }),
+    ]);
+  });
+
   it('fits a lead shorter than the clearance, at every length the setting allows', () => {
     for (const leads of [
       { ...LEADS, lengthMm: 0.1 },

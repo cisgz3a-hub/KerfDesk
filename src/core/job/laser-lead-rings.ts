@@ -24,6 +24,7 @@ import { emittedCutArcMoves } from './cut-arc-moves';
 import { containmentDepths } from './containment-depth';
 import type { CutSegment, Job } from './job';
 import { chainPieces } from './laser-lead-chain';
+import { isBurningLineGroup } from './line-start-region';
 import type { LeadRing } from './laser-lead-obstacles';
 import { polylineBounds } from './segment-bounds';
 
@@ -55,7 +56,9 @@ export function leadJobLines(job: Job): LeadJobLines {
   const ringOfLine = new Map<number, number>();
   const pieces = new Map<string, { nesting: NonNullable<CutSegment['nesting']>; ids: number[] }>();
   job.groups.forEach((group, groupIndex) => {
-    if (group.kind !== 'cut') return;
+    // A group that burns nothing (zero power, or an artwork at 0% power) cuts
+    // no line and holds no part: it is neither an obstacle nor a container.
+    if (group.kind !== 'cut' || !isBurningLineGroup(group)) return;
     group.segments.forEach((segment, segmentIndex) => {
       const lineId = lines.length;
       lines.push(burnLine(segment, group.entryRunwayMm));
@@ -146,8 +149,10 @@ function earlierCopy(
   return null;
 }
 
-// Same bounds and length first, cheaply; then the outlines themselves, so two
-// different shapes that happen to share both (mirrored L shapes) stay apart.
+// Same bounds and length first, cheaply; then the outlines themselves, vertex
+// by vertex: a copy is the same loop, perhaps started elsewhere or run the other
+// way, every vertex within COPY_MM. Two different shapes that share bounds and
+// length (mirrored L shapes, or detours between sampled points) stay apart.
 function ringsAreCopies(a: LeadRing, b: LeadRing): boolean {
   return (
     Math.abs(a.bounds.minX - b.bounds.minX) <= COPY_MM &&
@@ -155,40 +160,45 @@ function ringsAreCopies(a: LeadRing, b: LeadRing): boolean {
     Math.abs(a.bounds.maxX - b.bounds.maxX) <= COPY_MM &&
     Math.abs(a.bounds.maxY - b.bounds.maxY) <= COPY_MM &&
     Math.abs(a.lengthMm - b.lengthMm) <= COPY_MM + a.lengthMm * COPY_LENGTH_RELATIVE &&
-    outlineRidesOn(a.points, b.points) &&
-    outlineRidesOn(b.points, a.points)
+    sameLoop(openLoop(a.points), openLoop(b.points))
   );
 }
 
-// Probes spread along an outline; each must lie on the other within COPY_MM.
-const COPY_PROBES = 32;
+/** The loop's vertices without a closing point that repeats the first. */
+function openLoop(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
+  const first = points[0];
+  const last = points[points.length - 1];
+  return points.length > 1 && first !== undefined && last !== undefined && near(first, last)
+    ? points.slice(0, -1)
+    : points;
+}
 
-function outlineRidesOn(probe: ReadonlyArray<Vec2>, outline: ReadonlyArray<Vec2>): boolean {
-  const stride = Math.max(1, Math.floor(probe.length / COPY_PROBES));
-  for (let index = 0; index < probe.length; index += stride) {
-    const point = probe[index] as Vec2;
-    if (distanceToOutline(point, outline) > COPY_MM) return false;
+function sameLoop(a: ReadonlyArray<Vec2>, b: ReadonlyArray<Vec2>): boolean {
+  const start = a[0];
+  if (start === undefined || a.length !== b.length) return false;
+  for (let offset = 0; offset < b.length; offset += 1) {
+    if (!near(start, b[offset] as Vec2)) continue;
+    if (walksAlong(a, b, offset, 1) || walksAlong(a, b, offset, -1)) return true;
+  }
+  return false;
+}
+
+function walksAlong(
+  a: ReadonlyArray<Vec2>,
+  b: ReadonlyArray<Vec2>,
+  offset: number,
+  step: 1 | -1,
+): boolean {
+  const count = b.length;
+  for (let index = 1; index < a.length; index += 1) {
+    const other = b[(((offset + step * index) % count) + count) % count] as Vec2;
+    if (!near(a[index] as Vec2, other)) return false;
   }
   return true;
 }
 
-function distanceToOutline(point: Vec2, outline: ReadonlyArray<Vec2>): number {
-  let bestSq = Number.POSITIVE_INFINITY;
-  for (let index = 0; index < outline.length; index += 1) {
-    const a = outline[index] as Vec2;
-    const b = outline[(index + 1) % outline.length] as Vec2;
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const lengthSq = dx * dx + dy * dy;
-    const t =
-      lengthSq === 0
-        ? 0
-        : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSq));
-    const ox = point.x - (a.x + t * dx);
-    const oy = point.y - (a.y + t * dy);
-    bestSq = Math.min(bestSq, ox * ox + oy * oy);
-  }
-  return Math.sqrt(bestSq);
+function near(a: Vec2, b: Vec2): boolean {
+  return Math.abs(a.x - b.x) <= COPY_MM && Math.abs(a.y - b.y) <= COPY_MM;
 }
 
 function copyLists(representatives: ReadonlyArray<number>): number[][] {
