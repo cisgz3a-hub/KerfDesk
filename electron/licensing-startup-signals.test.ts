@@ -38,6 +38,18 @@ describe('startup signals for the licence window (ADR-623)', () => {
     expect(seen).toEqual([false, true]);
   });
 
+  it('clears admission, and so the camera, when the renderer process dies', () => {
+    const signals = createStartupSignals(false);
+    const seen: boolean[] = [];
+    signals.admission.onChange((admitted) => seen.push(admitted));
+    const inFlight = signals.observeRequest();
+    signals.observeRequest()({ edition: 'pro' });
+    signals.admission.rendererGone();
+    // A reply to the dead renderer cannot restart anything.
+    inFlight({ edition: 'pro' });
+    expect(seen).toEqual([false, true, false]);
+  });
+
   it('always admits a build without licensing, as it has no licence window', () => {
     const signals = createStartupSignals(true);
     const seen: boolean[] = [];

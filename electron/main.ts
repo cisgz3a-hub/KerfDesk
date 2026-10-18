@@ -134,6 +134,8 @@ if (process.platform === 'win32') app.setAppUserModelId(DESKTOP_APP_USER_MODEL_I
 let desktopWindowReady = false;
 let quitRequested = false;
 let prepareLicenceQuit: (() => void) | null = null;
+// A dead renderer leaves no workspace, so the camera bridge stops (ADR-623).
+let rendererGone: (() => void) | null = null;
 const remoteAccess = createDesktopRemoteAccess(DESKTOP_DATA_PATH);
 const manualCloseApproval = createDesktopUpdateClose(app, () => BrowserWindow.getAllWindows());
 const reopenDesktopWindow = createDesktopWindowReopener({
@@ -408,6 +410,7 @@ async function createWindow(): Promise<void> {
   // and the taskbar button shows the job's progress (ADR-553).
   installSessionEndGuard(window);
   installTaskbarJobProgress(window);
+  window.webContents.on('render-process-gone', () => rendererGone?.());
   installRendererCrashRecovery(window, {
     isClosing: () => closeGuard.isClosing(),
     askToReload: async (prompt) => {
@@ -521,6 +524,7 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
         requestManualUpdateClose: manualCloseApproval.request,
       });
       prepareLicenceQuit = licence.prepareQuit;
+      rendererGone = licence.admission.rendererGone;
       const startup = createDesktopBackgroundStartup(licence, autoUpdater, {
         isPackaged: app.isPackaged,
         trustedUpdates: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
