@@ -1,6 +1,6 @@
 ## ADR-612 - Desktop releases retain evidence of customer delivery (2026-10-18)
 
-**Status:** Proposed; release enablement awaits maintainer approval. | **Date:** 2026-10-18
+**Status:** Accepted; maintainer approved the fixes, with delivery conditional on passing checks. | **Date:** 2026-10-18
 
 ### Context
 
@@ -49,7 +49,8 @@ post-publication checks automatically.
 
 The Preview feed must be created by an approved current Preview publication.
 Do not fall back to GitHub downloads, invent a feed, or relax signature checks.
-The release switches stay disabled throughout this repair and review.
+The release switches stay disabled throughout repair and verification. The
+approved delivery must use the final merged source and pass all release gates.
 
 ### Verification and limits
 
@@ -60,3 +61,11 @@ and native smoke are separate checks. Full installer/upgrade qualification
 belongs on a disposable Windows runner because NSIS shares installation and
 registry state with the developer's app. Free runner qualification does not
 prove paid credential retention, standard-user UAC, SmartScreen or hardware.
+
+Installed qualification also exposed an ambiguous nested Artwork-tab selector
+and a project-seal request made before desktop startup completed. The harness
+selects the outer tablist explicitly and retains console source locations.
+Project-seal loading starts after native readiness and before project providers
+mount, preserving ADR-592's existing file-operation wait. Absent optional Free
+build entry helpers answer with explicit empty results; genuine renderer errors
+still fail qualification.
