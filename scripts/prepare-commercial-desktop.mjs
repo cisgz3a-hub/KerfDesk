@@ -1,5 +1,5 @@
 import { createPrivateKey, createPublicKey, sign, verify } from 'node:crypto';
-import { mkdir, open, readFile, realpath, writeFile } from 'node:fs/promises';
+import { mkdir, open, readdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { extractFile } from '@electron/asar';
@@ -10,6 +10,7 @@ import {
 import { hasSandboxMarker } from '../public/desktop-sandbox-contract.mjs';
 import { verifyDesktopRendererAsar } from './verify-desktop-renderer.mjs';
 import { encodeInstallerTerms } from './prepare-installer-terms.mjs';
+import { copyMacRuntimeNotices } from './electron-builder-preview-after-pack.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const API_ORIGIN = 'https://license.kerfdesk.com';
@@ -156,13 +157,48 @@ export function prepareCommercialMetadata(input, now = Date.now()) {
     payload: bytes.toString('base64'),
     signature: sign(null, bytes, key).toString('base64'),
   };
+  return licenceMetadata(input.version, input.unsignedInstaller === true, keys, envelope);
+}
+
+function licenceMetadata(version, unsignedInstaller, keys, envelope) {
   return {
-    version: input.version,
-    kerfdeskUpdateChannelTrusted: input.unsignedInstaller !== true,
-    kerfdeskDesktopReleaseChannel: input.unsignedInstaller ? 'commercial-unsigned' : 'stable',
-    ...(input.unsignedInstaller ? { kerfdeskUnsignedInstaller: true } : {}),
+    version,
+    kerfdeskUpdateChannelTrusted: !unsignedInstaller,
+    kerfdeskDesktopReleaseChannel: unsignedInstaller ? 'commercial-unsigned' : 'stable',
+    ...(unsignedInstaller ? { kerfdeskUnsignedInstaller: true } : {}),
     kerfdeskCommercialLicense: { schema: 1, apiOrigin: API_ORIGIN, ...keys, release: envelope },
   };
+}
+
+/**
+ * The same metadata from a release identity the Windows job already signed
+ * (ADR-610): the macOS and Linux builds of a release hold no signing key. The
+ * public envelope must verify against the pinned stable keys and name the
+ * version and source this build was planned for.
+ */
+export function commercialMetadataFromIdentity(input, now = Date.now()) {
+  requireInput(
+    input.unsignedInstaller === true,
+    'A signed release identity is reused only by the unsigned lane.',
+  );
+  const keys = trustedKeys(input.entitlementKeySet, input.releaseKeySet);
+  const envelope = input.releaseIdentity;
+  requireInput(
+    record(envelope) &&
+      Object.keys(envelope).sort().join(',') === 'algorithm,keyId,payload,schemaVersion,signature',
+    'A signed release identity envelope is required.',
+  );
+  const claims = verifyUnsignedCommercialMetadata(
+    licenceMetadata(input.version, true, keys, envelope),
+    input.entitlementKeySet,
+    input.releaseKeySet,
+  );
+  requireInput(
+    claims.sourceSha === input.sourceSha,
+    'The signed release identity names a different source.',
+  );
+  requirePublishableIdentity(claims, now);
+  return licenceMetadata(claims.version, true, keys, envelope);
 }
 
 export function verifyCommercialMetadata(metadata, entitlementKeySet, releaseKeySet) {
@@ -313,8 +349,22 @@ export async function writeCommercialPreparation(input, root = ROOT) {
     termsText.trim().length > 0 && !termsText.includes('\0'),
     'Commercial terms must contain nonempty UTF-8 text.',
   );
-  const metadata = prepareCommercialMetadata(input);
-  const lane = input.unsignedInstaller ? 'commercial-unsigned' : 'commercial';
+  const platform = input.platform ?? 'windows';
+  requireInput(
+    ['windows', 'macos', 'linux'].includes(platform) &&
+      (platform === 'windows' || input.unsignedInstaller === true),
+    'Only the unsigned lane packages macOS and Linux.',
+  );
+  const metadata =
+    input.releaseIdentity === undefined
+      ? prepareCommercialMetadata(input)
+      : commercialMetadataFromIdentity(input);
+  // Windows and Linux share one configuration; the Mac adds its packaging (ADR-610).
+  const lane = input.unsignedInstaller
+    ? platform === 'macos'
+      ? 'commercial-unsigned-macos'
+      : 'commercial-unsigned'
+    : 'commercial';
   const installerTerms = join(output, 'commercial-installer-terms.txt');
   const config = {
     extends: join(await realpath(root), `electron-builder.${lane}.yml`),
@@ -379,7 +429,11 @@ export default async function verifyCommercialPackage(context) {
   return verifyPreparedPackage(context, false);
 }
 
-export async function verifyUnsignedCommercialPackage(context) {
+// electron-builder passes only the context; tests replace the Mac notice copy.
+export async function verifyUnsignedCommercialPackage(
+  context,
+  { copyNotices = copyMacRuntimeNotices } = {},
+) {
   const config = context.packager.config;
   requireInput(
     config.appId === 'dev.laserforge.app' &&
@@ -391,28 +445,41 @@ export async function verifyUnsignedCommercialPackage(context) {
     'Unsigned commercial configuration must retain production identity and disable signing and updates.',
   );
   await verifyPreparedPackage(context, true);
+  const resources = await packagedResources(context);
   for (const [source, destination] of [
     ['LICENSE', 'LICENSE'],
     ['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md'],
     ['public/third-party-notices.txt', 'third-party-notices.txt'],
   ]) {
     const expected = await readFile(join(context.packager.projectDir, source));
-    const actual = await readFile(join(context.appOutDir, 'resources/legal', destination));
+    const actual = await readFile(join(resources, 'legal', destination));
     requireInput(
       expected.length > 0 && actual.equals(expected),
       `Commercial legal notice differs: ${source}`,
     );
   }
+  // A Mac app also carries Electron's own notices, as the Preview does.
+  await copyNotices(context);
+}
+
+/** Where electron-builder put app.asar and the legal files for this system. */
+async function packagedResources(context) {
+  if (context.electronPlatformName !== 'darwin') return join(context.appOutDir, 'resources');
+  const bundles = (await readdir(context.appOutDir)).filter((entry) => entry.endsWith('.app'));
+  requireInput(bundles.length === 1, 'A packaged Mac build must hold exactly one app bundle.');
+  return join(context.appOutDir, bundles[0], 'Contents', 'Resources');
 }
 
 async function verifyPreparedPackage(context, unsignedInstaller) {
+  // The signed lane needs Windows code signing; the unsigned lane also ships
+  // macOS and Linux (ADR-610).
   requireInput(
-    context.electronPlatformName === 'win32',
-    'Commercial packaging currently supports Windows only.',
+    context.electronPlatformName === 'win32' ||
+      (unsignedInstaller && ['darwin', 'linux'].includes(context.electronPlatformName)),
+    'Signed commercial packaging supports Windows only; the unsigned lane also packages macOS and Linux.',
   );
-  const metadata = JSON.parse(
-    extractFile(join(context.appOutDir, 'resources', 'app.asar'), 'package.json').toString('utf8'),
-  );
+  const archive = join(await packagedResources(context), 'app.asar');
+  const metadata = JSON.parse(extractFile(archive, 'package.json').toString('utf8'));
   const root = context.packager.projectDir;
   const catalogs = await publicCatalogs(root);
   const verifyMetadata = unsignedInstaller
@@ -434,7 +501,7 @@ async function verifyPreparedPackage(context, unsignedInstaller) {
       (await boundedFile(realTerms, 262_144 + 3)).trim().length > 0,
     'Explicit external commercial terms are required.',
   );
-  verifyDesktopRendererAsar(join(context.appOutDir, 'resources', 'app.asar'));
+  verifyDesktopRendererAsar(archive);
 }
 
 export async function runPreparation(args, env = process.env, root = ROOT) {
@@ -446,6 +513,8 @@ export async function runPreparation(args, env = process.env, root = ROOT) {
     '--source-ref': 'sourceRef',
     '--published-at': 'publishedAt',
     '--key-id': 'keyId',
+    '--platform': 'platform',
+    '--release-identity': 'releaseIdentityFile',
   };
   const input = {};
   for (let index = 0; index < args.length; ) {
@@ -461,13 +530,38 @@ export async function runPreparation(args, env = process.env, root = ROOT) {
     const field = names[args[index]];
     requireInput(
       field && args[index + 1] && !Object.hasOwn(input, field),
-      'Usage: prepare-commercial-desktop.mjs [--unsigned-installer] --output-dir <external-dir> --terms-file <external-terms.txt> --version <X.Y.Z> --source-sha <sha> --source-ref <refs/tags/vX.Y.Z|refs/heads/main> --published-at <canonical-UTC> --key-id <stable-key-id>',
+      'Usage: prepare-commercial-desktop.mjs [--unsigned-installer] [--platform <windows|macos|linux>] --output-dir <external-dir> --terms-file <external-terms.txt> --version <X.Y.Z> --source-sha <sha> (--source-ref <refs/tags/vX.Y.Z|refs/heads/main> --published-at <canonical-UTC> --key-id <stable-key-id> | --release-identity <signed-identity.json>)',
     );
     input[field] = args[index + 1];
     index += 2;
   }
+  const required = ['outputDir', 'termsFile', 'version', 'sourceSha'];
+  if (Object.hasOwn(input, 'releaseIdentityFile')) {
+    // A macOS or Linux build reuses the identity the Windows job signed and
+    // never holds the signing key itself (ADR-610).
+    requireInput(
+      required.every((field) => Object.hasOwn(input, field)) &&
+        !['sourceRef', 'publishedAt', 'keyId'].some((field) => Object.hasOwn(input, field)),
+      'Identity preparation takes the output, terms, version, source and identity only.',
+    );
+    requireInput(
+      !env.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY && !env.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY_FILE,
+      'Identity preparation must run without the signing key.',
+    );
+    const { releaseIdentityFile, ...rest } = input;
+    return writeCommercialPreparation(
+      {
+        ...rest,
+        ...(await publicCatalogs(root)),
+        releaseIdentity: JSON.parse(await boundedFile(releaseIdentityFile, 65_536)),
+      },
+      root,
+    );
+  }
   requireInput(
-    Object.values(names).every((field) => Object.hasOwn(input, field)),
+    [...required, 'sourceRef', 'publishedAt', 'keyId'].every((field) =>
+      Object.hasOwn(input, field),
+    ),
     'All commercial preparation arguments are required.',
   );
   const inline = env.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY;

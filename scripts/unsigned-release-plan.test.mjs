@@ -362,3 +362,87 @@ test('workflow applies the same batch policy before Windows and rechecks before 
   assert.ok(steps[securityIndex].run.includes('if ($before -ne $after)'));
   assert.ok(steps[securityIndex].run.includes('if ($integrityExit -ne 0)'));
 });
+
+test('macOS and Linux follow the published Windows release, each behind its own switch (ADR-610)', async () => {
+  const workflow = load(
+    await readFile(
+      new URL('../.github/workflows/release-desktop-unsigned.yml', import.meta.url),
+      'utf8',
+    ),
+  );
+  const { publish } = workflow.jobs;
+  // Windows hands on its values only from a step after its own publication.
+  const steps = publish.steps;
+  const share = steps.findIndex((step) => step.id === 'share');
+  assert.ok(
+    share > steps.findIndex((step) => step.run?.includes('publish-manual-commercial-release.mjs')),
+  );
+  assert.equal(steps[share].if, "steps.plan.outputs.publish == 'true'");
+  assert.equal(publish.outputs.published, '${{ steps.share.outputs.published }}');
+  assert.equal(publish.outputs.identity, '${{ steps.share.outputs.identity }}');
+  assert.equal(publish.outputs.version, '${{ steps.plan.outputs.version }}');
+  for (const [job, runner, variable] of [
+    ['build-macos-arm64', 'macos-15', 'KERFDESK_UNSIGNED_MACOS_RELEASES'],
+    ['build-macos-x64', 'macos-15-intel', 'KERFDESK_UNSIGNED_MACOS_RELEASES'],
+    ['build-linux', 'ubuntu-24.04', 'KERFDESK_UNSIGNED_LINUX_RELEASES'],
+  ]) {
+    const build = workflow.jobs[job];
+    assert.equal(build.needs, 'publish');
+    assert.equal(build['runs-on'], runner);
+    assert.equal(
+      build.if,
+      `needs.publish.outputs.published == 'true' && vars.${variable} == 'on'`,
+    );
+    // Build jobs hold no secret and no protected environment.
+    assert.equal(build.environment, undefined);
+    assert.equal(JSON.stringify(build).includes('secrets.'), false);
+    assert.equal(build.outputs.digests, '${{ steps.build.outputs.digests }}');
+    const checkout = build.steps[0];
+    assert.equal(checkout.with.ref, '${{ needs.publish.outputs.source-sha }}');
+    assert.equal(checkout.with['persist-credentials'], false);
+    const qualify = build.steps.find((step) => step.id === 'build');
+    assert.ok(qualify.run.includes('bash scripts/build-commercial-platform.sh'));
+    assert.equal(qualify.env.IDENTITY, '${{ needs.publish.outputs.identity }}');
+    const upload = build.steps.find((step) => step.with?.['if-no-files-found'] === 'error');
+    assert.equal(upload.with.overwrite, true);
+    assert.equal(upload.with.name.includes('run_attempt'), false);
+  }
+  for (const [job, platform, builds] of [
+    ['publish-macos', 'macos', ['build-macos-arm64', 'build-macos-x64']],
+    ['publish-linux', 'linux', ['build-linux']],
+  ]) {
+    const release = workflow.jobs[job];
+    assert.deepEqual(release.needs, ['publish', ...builds]);
+    assert.equal(release.environment, 'desktop-commercial');
+    assert.equal(release.env.PLATFORM, platform);
+    assert.equal(
+      release.env.DIGESTS,
+      builds.map((build) => `\${{ needs.${build}.outputs.digests }}`).join(' '),
+    );
+    const step = release.steps.find((item) =>
+      item.run?.includes('publish-platform-commercial-release.mjs'),
+    );
+    assert.ok(step.run.includes('--platform "${PLATFORM}"'));
+    assert.ok(step.run.includes('git fetch --no-tags origin main'));
+    // Never the Windows publisher, so the Windows documents keep one writer.
+    assert.equal(JSON.stringify(release).includes('publish-manual-commercial-release'), false);
+  }
+});
+
+test('the Desktop package check rehearses the commercial Mac and Linux builds (ADR-610)', async () => {
+  const workflow = load(
+    await readFile(new URL('../.github/workflows/desktop-package-check.yml', import.meta.url), 'utf8'),
+  );
+  const linux = workflow.jobs['commercial-linux'];
+  const mac = workflow.jobs['commercial-macos'];
+  // Linux on every pull request; macOS with the other native jobs.
+  assert.equal(linux.if, undefined);
+  assert.equal(mac.if, '${{ inputs.native == true }}');
+  for (const job of [linux, mac]) {
+    const run = job.steps.map((step) => step.run ?? '').join('\n');
+    assert.ok(run.includes('node scripts/rehearse-commercial-identity.mjs'));
+    assert.ok(run.includes('bash scripts/build-commercial-platform.sh'));
+    assert.match(job.env.VERSION, /^0\.0\.\$\{\{ github\.run_number \}\}$/u);
+    assert.equal(JSON.stringify(job).includes('secrets.'), false);
+  }
+});

@@ -1,10 +1,25 @@
 #!/usr/bin/env bash
+# The macOS package contract: the Preview's (ADR-248), or with --commercial the
+# unsigned commercial Mac build's (ADR-610), whose app.asar must carry the signed
+# release identity of its Windows installer instead of the Preview metadata.
+#
+# usage: bash scripts/verify-macos-preview-package.sh <version> <arch> [release directory] [--commercial <identity.json>]
 
 set -euo pipefail
 
 version="${1:?Preview version is required}"
 arch="${2:?Mac architecture is required}"
-release_dir="release/${version}"
+release_dir="${3:-release/${version}}"
+identity=''
+if [[ $# -gt 3 ]]; then
+  if [[ $# -ne 5 || "${4}" != '--commercial' || -z "${5}" ]]; then
+    echo 'usage: verify-macos-preview-package.sh <version> <arch> [release directory] [--commercial <identity.json>]' >&2
+    exit 1
+  fi
+  identity="${5}"
+fi
+package_label='Preview'
+if [[ -n "${identity}" ]]; then package_label='Commercial build'; fi
 dmg="${release_dir}/KerfDesk-${version}-macos-${arch}.dmg"
 
 require_file() {
@@ -30,7 +45,7 @@ test -f "${dmg}" || { echo "Missing canonical DMG: ${dmg}" >&2; exit 1; }
 if find "${release_dir}" -type f \
   \( -name 'latest*.yml' -o -name 'latest*.yaml' -o -name 'latest*.json' -o -name '*.blockmap' \) \
   | grep -q .; then
-  echo 'Preview emitted forbidden updater metadata.' >&2
+  echo "${package_label} emitted forbidden updater metadata." >&2
   exit 1
 fi
 
@@ -60,8 +75,13 @@ test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "${plist}")" 
 expected_macho_arch="${arch}"
 if [[ "${arch}" == 'x64' ]]; then expected_macho_arch='x86_64'; fi
 test "$(lipo -archs "${executable}")" = "${expected_macho_arch}"
-node scripts/verify-packaged-preview-metadata.mjs \
-  "${app_dir}/Contents/Resources/app.asar" "${version}"
+if [[ -n "${identity}" ]]; then
+  node scripts/verify-packaged-commercial-metadata.mjs \
+    "${app_dir}/Contents/Resources/app.asar" "${version}" "${identity}"
+else
+  node scripts/verify-packaged-preview-metadata.mjs \
+    "${app_dir}/Contents/Resources/app.asar" "${version}"
+fi
 
 require_file 'KerfDesk LICENSE' "${app_dir}/Contents/Resources/legal/LICENSE"
 require_file \
@@ -78,31 +98,35 @@ require_file \
   "${app_dir}/Contents/Resources/legal/electron/LICENSES.chromium.html"
 
 if xcrun stapler validate "${app_dir}"; then
-  echo "Preview app unexpectedly has a notarization ticket: ${app_dir}" >&2
+  echo "${package_label} app unexpectedly has a notarization ticket: ${app_dir}" >&2
   exit 1
 fi
 if xcrun stapler validate "${dmg}"; then
-  echo "Preview DMG unexpectedly has a notarization ticket: ${dmg}" >&2
+  echo "${package_label} DMG unexpectedly has a notarization ticket: ${dmg}" >&2
   exit 1
 fi
 
 while IFS= read -r -d '' candidate; do
   details="$(codesign --display --verbose=4 "${candidate}" 2>&1 || true)"
   if grep -q '^Authority=' <<<"${details}"; then
-    echo "Preview contains a distribution signing authority: ${candidate}" >&2
+    echo "${package_label} contains a distribution signing authority: ${candidate}" >&2
     exit 1
   fi
   if grep '^TeamIdentifier=' <<<"${details}" | grep -vq 'TeamIdentifier=not set'; then
-    echo "Preview contains a trusted Team ID: ${candidate}" >&2
+    echo "${package_label} contains a trusted Team ID: ${candidate}" >&2
     exit 1
   fi
   if grep -q '^Signature=' <<<"${details}" && ! grep -q '^Signature=adhoc$' <<<"${details}"; then
-    echo "Preview contains a non-ad-hoc signature: ${candidate}" >&2
+    echo "${package_label} contains a non-ad-hoc signature: ${candidate}" >&2
     exit 1
   fi
 done < <(find "${app_dir}" \
   \( -type d \( -name '*.app' -o -name '*.framework' -o -name '*.xpc' \) \
   -o -type f -perm -111 \) -print0)
 
-echo "macOS ${arch} Preview package contract verified for ${version}"
+if [[ -n "${identity}" ]]; then
+  echo "macOS ${arch} commercial package contract verified for ${version}"
+else
+  echo "macOS ${arch} Preview package contract verified for ${version}"
+fi
 exit 0

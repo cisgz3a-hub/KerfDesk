@@ -110,6 +110,11 @@ async function resolveNoticePath(context, sourceName) {
 
 export default async function copyPreviewRuntimeNotices(context) {
   verifyDesktopRenderer(context);
+  await copyMacRuntimeNotices(context);
+}
+
+/** Electron's own notices on a Mac; the unsigned commercial Mac build needs them too (ADR-610). */
+export async function copyMacRuntimeNotices(context) {
   if (context.electronPlatformName !== 'darwin') {
     return;
   }

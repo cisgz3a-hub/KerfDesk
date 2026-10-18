@@ -633,3 +633,188 @@ test('unsigned afterPack validates production ASAR, renderer, notices and actual
   await writeFile(join(appOutDir, 'resources/legal/LICENSE'), 'Wrong notice');
   await assert.rejects(verifyUnsignedCommercialPackage(context), /legal notice/u);
 });
+
+async function publicKeyFiles(root, input) {
+  await mkdir(join(root, 'public'), { recursive: true });
+  await writeFile(
+    join(root, 'public/desktop-licence-keys.json'),
+    JSON.stringify(input.entitlementKeySet),
+  );
+  await writeFile(
+    join(root, 'public/desktop-release-keys.json'),
+    JSON.stringify(input.releaseKeySet),
+  );
+}
+
+test('macOS and Linux builds reuse the identity the Windows job signed, without the signing key (ADR-610)', async () => {
+  const paths = await files();
+  const input = fixture({ unsignedInstaller: true, sourceRef: 'refs/heads/main' });
+  await publicKeyFiles(paths.root, input);
+  const windows = await writeCommercialPreparation(
+    { ...input, ...paths, outputDir: join(paths.workspace, 'windows') },
+    paths.root,
+  );
+  const windowsConfig = JSON.parse(await readFile(windows.configPath, 'utf8'));
+  const args = (platform, outputDir) => [
+    '--unsigned-installer',
+    '--platform',
+    platform,
+    '--output-dir',
+    outputDir,
+    '--terms-file',
+    paths.termsFile,
+    '--version',
+    input.version,
+    '--source-sha',
+    input.sourceSha,
+    '--release-identity',
+    windows.identityPath,
+  ];
+  for (const [platform, lane] of [
+    ['macos', 'electron-builder.commercial-unsigned-macos.yml'],
+    ['linux', 'electron-builder.commercial-unsigned.yml'],
+  ]) {
+    const result = await runPreparation(
+      args(platform, join(paths.workspace, platform)),
+      {},
+      paths.root,
+    );
+    const config = JSON.parse(await readFile(result.configPath, 'utf8'));
+    assert.equal(config.extends, join(paths.root, lane));
+    // The same licensing metadata and identity bytes as the Windows installer.
+    assert.deepEqual(config.extraMetadata, windowsConfig.extraMetadata);
+    assert.deepEqual(await readFile(result.identityPath), await readFile(windows.identityPath));
+  }
+  const swap = (list, from, to) => list.map((value) => (value === from ? to : value));
+  const refused = [
+    [args('macos', join(paths.workspace, 'a')), { DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: 'x' }],
+    [[...args('macos', join(paths.workspace, 'b')), '--key-id', input.keyId], {}],
+    [args('macos', join(paths.workspace, 'c')).slice(1), {}],
+    [args('darwin', join(paths.workspace, 'd')), {}],
+    [swap(args('macos', join(paths.workspace, 'e')), input.version, '1.2.4'), {}],
+    [swap(args('linux', join(paths.workspace, 'f')), input.sourceSha, 'b'.repeat(40)), {}],
+  ];
+  for (const [refusedArgs, env] of refused)
+    await assert.rejects(runPreparation(refusedArgs, env, paths.root), JSON.stringify(refusedArgs));
+  const forged = JSON.parse(await readFile(windows.identityPath, 'utf8'));
+  forged.signature = Buffer.alloc(64).toString('base64');
+  const forgedPath = join(paths.workspace, 'forged-identity.json');
+  await writeFile(forgedPath, JSON.stringify(forged));
+  await assert.rejects(
+    runPreparation(
+      swap(args('linux', join(paths.workspace, 'g')), windows.identityPath, forgedPath),
+      {},
+      paths.root,
+    ),
+    /signature/u,
+  );
+  await assert.rejects(
+    writeCommercialPreparation(
+      { ...input, ...paths, unsignedInstaller: false, platform: 'macos' },
+      paths.root,
+    ),
+    /unsigned lane/u,
+  );
+});
+
+test('the macOS and Linux configs keep the commercial identity, the Preview Mac packaging and no feed', async (t) => {
+  const requireBuilder = createRequire(import.meta.resolve('electron-builder'));
+  const configModule = requireBuilder.resolve('app-builder-lib/out/util/config/config.js');
+  const { getConfig } = await import(pathToFileURL(configModule).href);
+  builderLogToStderr(t, configModule);
+  const { configuredFuses } = await import('./verify-packaged-desktop.mjs');
+  const previewText = await readFile(join(ROOT, 'electron-builder.preview.yml'), 'utf8');
+  const macText = await readFile(
+    join(ROOT, 'electron-builder.commercial-unsigned-macos.yml'),
+    'utf8',
+  );
+  // The Mac package is checked against the Preview's fuse block, so they must agree.
+  assert.deepEqual(configuredFuses(macText), configuredFuses(previewText));
+  const preview = await getConfig(ROOT, join(ROOT, 'electron-builder.preview.yml'), null);
+  const prepared = async (platform) => {
+    const paths = await files();
+    const result = await writeCommercialPreparation(
+      { ...fixture(), ...paths, unsignedInstaller: true, platform },
+      ROOT,
+    );
+    return getConfig(ROOT, result.configPath, null);
+  };
+  const mac = await prepared('macos');
+  assert.equal(mac.appId, 'dev.laserforge.app');
+  assert.deepEqual(mac.mac, preview.mac);
+  assert.deepEqual(mac.dmg, preview.dmg);
+  assert.deepEqual(mac.electronFuses, preview.electronFuses);
+  assert.equal(mac.publish, null);
+  assert.equal(mac.forceCodeSigning, false);
+  assert.equal(mac.afterPack, 'scripts/verify-unsigned-commercial-package.mjs');
+  assert.equal(mac.extraMetadata.kerfdeskUnsignedInstaller, true);
+  assert.equal(mac.extraMetadata.kerfdeskCommercialLicense.schema, 1);
+  assert.equal(mac.directories.output, 'release/commercial-unsigned/${version}');
+  const linux = await prepared('linux');
+  assert.equal(linux.linux.executableName, 'kerfdesk');
+  assert.equal(linux.linux.publish, null);
+  assert.equal(linux.publish, null);
+  assert.equal(linux.electronFuses.enableCookieEncryption, true);
+  assert.equal(linux.afterPack, 'scripts/verify-unsigned-commercial-package.mjs');
+  // Windows and Linux share one configuration, so the Windows build is unchanged.
+  const windows = await prepared(undefined);
+  const withoutRunValues = (config) => ({ ...config, extraMetadata: null, nsis: null });
+  assert.deepEqual(withoutRunValues(windows), withoutRunValues(linux));
+});
+
+for (const [platform, resources] of [
+  ['darwin', 'KerfDesk.app/Contents/Resources'],
+  ['linux', 'resources'],
+])
+  test(`unsigned afterPack checks a ${platform} package where electron-builder puts it`, async () => {
+    const paths = await files();
+    const input = fixture({ unsignedInstaller: true });
+    await publicKeyFiles(paths.root, input);
+    const app = join(paths.workspace, 'app');
+    const appOutDir = join(paths.workspace, 'packed');
+    await mkdir(join(app, 'dist/web'), { recursive: true });
+    await mkdir(join(app, 'dist-electron'), { recursive: true });
+    await writeFile(join(app, 'dist-electron/main.js'), '');
+    await writeFile(
+      join(app, 'dist/web/index.html'),
+      '<meta name="kerfdesk-build-capabilities" content="desktop">',
+    );
+    await writeFile(join(app, 'package.json'), JSON.stringify(prepareCommercialMetadata(input)));
+    await mkdir(join(appOutDir, resources, 'legal'), { recursive: true });
+    for (const [source, destination] of [
+      ['LICENSE', 'LICENSE'],
+      ['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md'],
+      ['public/third-party-notices.txt', 'third-party-notices.txt'],
+    ]) {
+      await writeFile(join(paths.root, source), 'Notice fixture');
+      await writeFile(join(appOutDir, resources, 'legal', destination), 'Notice fixture');
+    }
+    await finished(await createPackage(app, join(appOutDir, resources, 'app.asar')));
+    const config = {
+      appId: 'dev.laserforge.app',
+      productName: 'KerfDesk',
+      forceCodeSigning: false,
+      win: { signExecutable: false },
+      publish: null,
+      nsis: { license: paths.termsFile, differentialPackage: false },
+    };
+    const context = {
+      electronPlatformName: platform,
+      appOutDir,
+      arch: 1,
+      packager: { projectDir: paths.root, appInfo: { version: input.version }, config },
+    };
+    // Electron's own notices come from its macOS release zip (the Preview's
+    // after-pack step), which needs macOS's ditto; record the call instead.
+    const copied = [];
+    const copyNotices = async (packed) => copied.push(packed);
+    await verifyUnsignedCommercialPackage(context, { copyNotices });
+    assert.deepEqual(copied, [context]);
+    // The signed lane stays Windows only.
+    await assert.rejects(verifyCommercialPackage(context), /Windows only/u);
+    await writeFile(join(appOutDir, resources, 'legal/LICENSE'), 'Wrong notice');
+    await assert.rejects(
+      verifyUnsignedCommercialPackage(context, { copyNotices }),
+      /legal notice/u,
+    );
+  });

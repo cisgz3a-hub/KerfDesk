@@ -56,6 +56,13 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     environment: desktop-commercial
+    # Set only after Windows is published: the macOS and Linux jobs follow it
+    # with the same version and signed release identity (ADR-610).
+    outputs:
+      published: ${{ steps.share.outputs.published }}
+      version: ${{ steps.plan.outputs.version }}
+      source-sha: ${{ steps.plan.outputs.sourceSha }}
+      identity: ${{ steps.share.outputs.identity }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -229,6 +236,16 @@ jobs:
             --expected-latest-sha256 $env:EXPECTED_LATEST_SHA256 $release $identity "$release/win-unpacked/resources"
           if ($LASTEXITCODE -ne 0) { throw 'Unsigned publication was not confirmed.' }
           "Published Windows $env:RELEASE_VERSION with verified download history. Installed apps check at startup and every 30 minutes; download and installation require user choices." >> $env:GITHUB_STEP_SUMMARY
+      - name: Hand the published release identity to the macOS and Linux builds
+        id: share
+        if: steps.plan.outputs.publish == 'true'
+        shell: pwsh
+        run: |
+          # Public signed data, embedded in every installer; the key stays here.
+          $identity = Join-Path $env:RUNNER_TEMP 'commercial-preparation/commercial-release-identity.json'
+          $encoded = [Convert]::ToBase64String([IO.File]::ReadAllBytes($identity))
+          "identity=$encoded" >> $env:GITHUB_OUTPUT
+          'published=true' >> $env:GITHUB_OUTPUT
       - name: Preserve a failed release for inspection
         if: failure() && steps.plan.outputs.publish == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -241,3 +258,142 @@ jobs:
             ${{ runner.temp }}/unsigned-dependency-audit/report.*
           retention-days: 1
           if-no-files-found: warn
+
+  # macOS and Linux follow the published Windows release (ADR-610). Each system
+  # is off until its repository variable is `on`. The build jobs hold no
+  # secret: they reuse the identity the Windows job signed. A failure here never
+  # changes the Windows release; re-running the failed jobs repeats this version.
+  build-macos-arm64:
+    needs: publish
+    if: needs.publish.outputs.published == 'true' && vars.KERFDESK_UNSIGNED_MACOS_RELEASES == 'on'
+    runs-on: macos-15
+    timeout-minutes: 60
+    outputs:
+      digests: ${{ steps.build.outputs.digests }}
+    steps: &commercial-build-steps
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.publish.outputs.source-sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - name: Install the locked dependency graph
+        run: pnpm install --frozen-lockfile
+      - name: Build the desktop source the Windows release was built from
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          pnpm guard:repo
+          pnpm generate:notices
+          pnpm build:electron-main
+          pnpm build:bundle:desktop
+      - name: Package and qualify the unsigned commercial build
+        id: build
+        env:
+          IDENTITY: ${{ needs.publish.outputs.identity }}
+          RELEASE_VERSION: ${{ needs.publish.outputs.version }}
+          RELEASE_SHA: ${{ needs.publish.outputs.source-sha }}
+        run: |
+          identity="${RUNNER_TEMP}/published-release-identity.json"
+          node -e 'require("fs").writeFileSync(process.argv[1], Buffer.from(process.env.IDENTITY, "base64"))' "${identity}"
+          platform="${RUNNER_OS,,}"
+          if [[ "${platform}" == macos ]]; then arch="${RUNNER_ARCH,,}"; else arch=x64; fi
+          bash scripts/build-commercial-platform.sh "${platform}" "${arch}" \
+            "${RELEASE_VERSION}" "${RELEASE_SHA}" "${identity}"
+      - name: Keep the qualified files for publication
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          # No attempt number: a re-run build replaces its files, and a re-run
+          # publish job finds those its build qualified.
+          name: commercial-files-${{ runner.os }}-${{ runner.arch }}-${{ needs.publish.outputs.version }}
+          path: |
+            release/commercial-unsigned/${{ needs.publish.outputs.version }}/*.dmg
+            release/commercial-unsigned/${{ needs.publish.outputs.version }}/*.deb
+            release/commercial-unsigned/${{ needs.publish.outputs.version }}/*.AppImage
+          retention-days: 3
+          overwrite: true
+          if-no-files-found: error
+      - name: Keep the launch evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: commercial-qualification-${{ runner.os }}-${{ runner.arch }}-${{ needs.publish.outputs.version }}-${{ github.run_attempt }}
+          path: artifacts/native-smoke/
+          retention-days: 7
+          if-no-files-found: warn
+
+  build-macos-x64:
+    needs: publish
+    if: needs.publish.outputs.published == 'true' && vars.KERFDESK_UNSIGNED_MACOS_RELEASES == 'on'
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+    outputs:
+      digests: ${{ steps.build.outputs.digests }}
+    steps: *commercial-build-steps
+
+  build-linux:
+    needs: publish
+    if: needs.publish.outputs.published == 'true' && vars.KERFDESK_UNSIGNED_LINUX_RELEASES == 'on'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      digests: ${{ steps.build.outputs.digests }}
+    steps: *commercial-build-steps
+
+  publish-macos:
+    needs: [publish, build-macos-arm64, build-macos-x64]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: desktop-commercial
+    env:
+      PLATFORM: macos
+      QUALIFIED_OS: macOS
+      DIGESTS: ${{ needs.build-macos-arm64.outputs.digests }} ${{ needs.build-macos-x64.outputs.digests }}
+    steps: &commercial-publish-steps
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.publish.outputs.source-sha }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - name: Install the locked dependency graph
+        run: pnpm install --frozen-lockfile
+      - name: Collect the qualified files
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: commercial-files-${{ env.QUALIFIED_OS }}-*-${{ needs.publish.outputs.version }}
+          path: ${{ runner.temp }}/qualified
+          merge-multiple: true
+      - name: Publish the files beside the Windows release, then the system's latest document
+        env:
+          DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: ${{ secrets.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY }}
+          DESKTOP_STABLE_MANIFEST_KEY_ID: ${{ vars.DESKTOP_STABLE_MANIFEST_KEY_ID }}
+          COMMERCIAL_R2_API_TOKEN: ${{ secrets.COMMERCIAL_R2_API_TOKEN }}
+          COMMERCIAL_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID }}
+          IDENTITY: ${{ needs.publish.outputs.identity }}
+          RELEASE_VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          git fetch --no-tags origin main
+          identity="${RUNNER_TEMP}/published-release-identity.json"
+          node -e 'require("fs").writeFileSync(process.argv[1], Buffer.from(process.env.IDENTITY, "base64"))' "${identity}"
+          # Only the files whose SHA-256 the qualifying jobs reported.
+          digests=()
+          for pair in ${DIGESTS}; do digests+=(--sha256 "${pair}"); done
+          node scripts/publish-platform-commercial-release.mjs --platform "${PLATFORM}" \
+            "${digests[@]}" "${RUNNER_TEMP}/qualified" "${identity}"
+          echo "Published ${PLATFORM} ${RELEASE_VERSION} beside Windows. Installed copies show it at startup and every 30 minutes and open the download page; nothing installs by itself." >> "${GITHUB_STEP_SUMMARY}"
+
+  publish-linux:
+    needs: [publish, build-linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: desktop-commercial
+    env:
+      PLATFORM: linux
+      QUALIFIED_OS: Linux
+      DIGESTS: ${{ needs.build-linux.outputs.digests }}
+    steps: *commercial-publish-steps

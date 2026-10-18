@@ -2,13 +2,23 @@
 # The Linux package contract (ADR-606): the AppImage and the .deb carry the
 # KerfDesk identity, the legal files, the .lf2 MIME type and a desktop entry
 # that opens it, and no updater metadata. Runs on Linux, where dpkg-deb exists.
+# With --commercial, app.asar must carry the unsigned commercial lane's signed
+# release identity instead of the Preview metadata (ADR-610).
 #
-# usage: bash scripts/verify-linux-package.sh <version> [release directory]
+# usage: bash scripts/verify-linux-package.sh <version> [release directory] [--commercial <identity.json>]
 
 set -euo pipefail
 
 version="${1:?Package version is required}"
 release_dir="${2:-release/${version}}"
+identity=''
+if [[ $# -gt 2 ]]; then
+  if [[ $# -ne 4 || "${3}" != '--commercial' || -z "${4}" ]]; then
+    echo 'usage: verify-linux-package.sh <version> [release directory] [--commercial <identity.json>]' >&2
+    exit 1
+  fi
+  identity="${4}"
+fi
 appimage="${release_dir}/KerfDesk-${version}-linux-x86_64.AppImage"
 deb="${release_dir}/KerfDesk-${version}-linux-amd64.deb"
 mime_type='application/x-kerfdesk-project'
@@ -48,6 +58,17 @@ check_mime_file() {
   if grep -q 'pattern="\*\.lbrn' "${mime}"; then fail "${mime}: claims LightBurn files"; fi
 }
 
+# What the packaged app reads from app.asar: Preview metadata, or the commercial
+# lane's licensing and signed release identity.
+check_metadata() {
+  local archive="${1:?app.asar is required}"
+  if [[ -n "${identity}" ]]; then
+    node scripts/verify-packaged-commercial-metadata.mjs "${archive}" "${version}" "${identity}"
+  else
+    node scripts/verify-packaged-preview-metadata.mjs "${archive}" "${version}"
+  fi
+}
+
 check_legal_files() {
   local resources="${1:?resources folder is required}"
   for file in legal/LICENSE legal/THIRD_PARTY_NOTICES.md legal/third-party-notices.txt app.asar; do
@@ -76,7 +97,7 @@ check_legal_files "${work}/deb/opt/KerfDesk/resources"
 check_desktop_entry "${work}/deb/usr/share/applications/kerfdesk.desktop" '/opt/KerfDesk/kerfdesk %U'
 check_mime_file "${work}/deb/usr/share/mime/packages/kerfdesk.xml"
 test -f "${work}/deb/usr/share/icons/hicolor/512x512/apps/kerfdesk.png" || fail '.deb has no 512px icon'
-node scripts/verify-packaged-preview-metadata.mjs "${work}/deb/opt/KerfDesk/resources/app.asar" "${version}"
+check_metadata "${work}/deb/opt/KerfDesk/resources/app.asar"
 
 # --- AppImage --- (extracted, so the check needs no FUSE)
 appimage_path="$(realpath "${appimage}")"
@@ -90,6 +111,6 @@ grep -q 'NO_SANDBOX=(--no-sandbox)' "${root}/AppRun" || fail 'AppRun has no sand
 test -x "${root}/kerfdesk" || fail 'AppImage has no kerfdesk executable'
 check_legal_files "${root}/resources"
 check_desktop_entry "${root}/kerfdesk.desktop" 'AppRun %U'
-node scripts/verify-packaged-preview-metadata.mjs "${root}/resources/app.asar" "${version}"
+check_metadata "${root}/resources/app.asar"
 
 echo "Linux package contract passed for KerfDesk ${version}."
