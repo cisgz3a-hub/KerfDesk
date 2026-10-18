@@ -151,8 +151,3 @@
     line-height: 1;
   }
 }
-
-.lf-project-sheets-dialog .lf-dialog-actions {
-  bottom: calc(-1 * var(--lf-space-6));
-  z-index: 2;
-}

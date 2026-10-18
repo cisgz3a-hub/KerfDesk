@@ -244,8 +244,3 @@
 .lf-dialog.lf-creation-dialog {
   width: min(560px, calc(100vw - 24px));
 }
-
-.lf-authoring-dialog .lf-dialog-actions {
-  bottom: calc(-1 * var(--lf-space-6));
-  z-index: 2;
-}
