@@ -50,10 +50,10 @@ async function pointerActivate(element: HTMLButtonElement): Promise<void> {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
   });
 }
-function assertRailButton(element: HTMLButtonElement, railWidth = '50px'): void {
+function assertRailButton(element: HTMLButtonElement, railWidth = '40px'): void {
   const rail = host.querySelector('.lf-toolstrip');
   expect(element.parentElement).toBe(rail);
-  expect(getComputedStyle(element).width).toBe('36px');
+  expect(getComputedStyle(element).width).toBe('30px');
   expect(getComputedStyle(rail!).overflowX).toBe('hidden');
   expect(getComputedStyle(rail!).width).toBe(railWidth);
 }
@@ -97,7 +97,7 @@ describe('compound and node controls in the real clipping ToolStrip', () => {
     const project = useStore.getState().project;
     await act(async () => root.render(<ToolStrip />));
     const launcher = button('Node coordinates');
-    assertRailButton(launcher, '58px');
+    assertRailButton(launcher, '52px');
     await pointerActivate(launcher);
     const popover = document.querySelector<HTMLElement>(
       '[role="dialog"][aria-label="Node coordinates"]',

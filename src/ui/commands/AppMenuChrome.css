@@ -1,10 +1,10 @@
 .lf-menu-chrome {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
   flex-shrink: 0;
-  min-height: 36px;
-  padding: 0 12px;
+  min-height: 28px;
+  padding: 0 8px;
   background: var(--lf-bg-0);
   border-bottom: 1px solid var(--lf-border);
   color: var(--lf-text);
@@ -13,7 +13,7 @@
 
 .lf-menu-brand {
   flex-shrink: 0;
-  font-size: 16px;
+  font-size: var(--lf-text-lg);
   font-weight: 600;
   letter-spacing: -0.3px;
 }
@@ -40,8 +40,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 26px;
+  width: 26px;
+  height: 22px;
   padding: 0;
 }
 
@@ -50,8 +50,8 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  height: 26px;
-  padding: 0 8px;
+  height: 22px;
+  padding: 0 6px;
   color: var(--lf-text-muted);
 }
 

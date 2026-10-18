@@ -17,11 +17,11 @@
 .lf-machine-toolbar {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  flex: 1 1 580px;
+  gap: 4px;
+  flex: 1 1 500px;
   min-width: 0;
   max-width: 100%;
-  padding: 5px 12px;
+  padding: 2px 8px;
   font-size: var(--lf-text-sm);
 }
 
@@ -40,9 +40,9 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  min-width: 32px;
-  min-height: 32px;
-  padding: 5px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px;
 }
 
 .lf-machine-toolbar [data-help-id='control:laser.machine-setup.launch'] svg {
@@ -50,9 +50,9 @@
 }
 
 /* The transforms and the machine group (Laser / CNC, machine, Connect) share
-   one row only from about 1240 px; narrower, the machine group takes its own
+   one row only from about 1140 px; narrower, the machine group takes its own
    full-width row below a divider instead of wrapping loose. */
-@media (max-width: 1240px) {
+@media (max-width: 1140px) {
   .lf-workspace-topbar > .lf-numeric-edits {
     flex-basis: 100%;
   }

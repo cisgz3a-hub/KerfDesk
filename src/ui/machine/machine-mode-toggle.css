@@ -6,11 +6,11 @@
  * matches the machine name button beside it. */
 
 .lf-machine-mode {
-  --lf-machine-mode-pad: 3px;
+  --lf-machine-mode-pad: 2px;
   --lf-machine-mode-gap: 2px;
   position: relative;
   display: grid;
-  grid-template-columns: repeat(2, minmax(96px, 1fr));
+  grid-template-columns: repeat(2, minmax(78px, 1fr));
   gap: var(--lf-machine-mode-gap);
   flex-shrink: 0;
   padding: var(--lf-machine-mode-pad);
@@ -46,9 +46,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 28px;
-  padding: 3px 14px;
+  gap: 5px;
+  min-height: 22px;
+  padding: 1px 10px;
   border: 0;
   border-radius: var(--lf-radius-md);
   background: transparent;

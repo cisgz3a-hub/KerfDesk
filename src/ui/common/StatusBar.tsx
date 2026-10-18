@@ -138,7 +138,7 @@ const barStyle: React.CSSProperties = {
   overflowY: 'hidden',
   gap: 8,
   alignItems: 'center',
-  padding: '4px 10px',
+  padding: '2px 8px',
   background: 'var(--lf-bg-0)',
   color: 'var(--lf-text-muted)',
   fontFamily: 'var(--lf-font)',
@@ -153,7 +153,7 @@ const telemetryStyle: React.CSSProperties = {
   minWidth: 0,
   overflowX: 'auto',
   overflowY: 'hidden',
-  gap: 12,
+  gap: 10,
   alignItems: 'center',
 };
 const actionsStyle: React.CSSProperties = {

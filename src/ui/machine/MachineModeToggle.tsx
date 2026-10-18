@@ -100,7 +100,7 @@ function SegButton(props: {
       title={title}
       className="lf-machine-mode__choice"
     >
-      <Icon name={props.icon} size={16} />
+      <Icon name={props.icon} size={14} />
       <span>{props.label}</span>
     </button>
   );

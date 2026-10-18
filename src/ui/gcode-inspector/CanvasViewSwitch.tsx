@@ -65,9 +65,9 @@ const wrapStyle: React.CSSProperties = {
 };
 
 const optionStyle: React.CSSProperties = {
-  padding: '2px 14px',
+  padding: '1px 12px',
   fontSize: 'var(--lf-text-md)',
-  lineHeight: 1.4,
+  lineHeight: 1.35,
   borderRadius: 'var(--lf-radius-md)',
   whiteSpace: 'nowrap',
 };

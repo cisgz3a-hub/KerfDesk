@@ -18,11 +18,17 @@
 
 .lf-status-bar__segment + .lf-status-bar__segment {
   border-left: 1px solid var(--lf-border);
-  padding-left: 12px;
+  padding-left: 10px;
 }
 
 .lf-status-bar__telemetry:focus-visible {
   outline-offset: -2px;
+}
+
+/* The edition and update buttons sit on the bar's text line rather than on a
+   control row, so their line box must not set the bar's height. */
+.lf-status-bar__actions .lf-btn {
+  line-height: 1.25;
 }
 
 /* Links to the pricing and policy pages in the web app (ADR-524 Amendment 3).
