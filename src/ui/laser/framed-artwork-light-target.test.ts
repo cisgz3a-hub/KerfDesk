@@ -83,7 +83,7 @@ describe('placed artwork centre after Frame', () => {
       await centreLightOnFramedArtwork();
       // Native artwork centre = work (40,40) + WCO (100,-20) = (140,20).
       // Both bed axes reverse: subtracting pointer (+7,-4) moves native head (+7,-4).
-      expect(move).toHaveBeenCalledExactlyOnceWith(147, 16, 1200);
+      expect(move).toHaveBeenCalledExactlyOnceWith(147, 16, 1200, expect.any(Function));
     },
   );
 
@@ -135,7 +135,7 @@ describe('placed artwork centre after Frame', () => {
     useLaserStore.setState({ pendingUntrackedAcks: 0 });
     await vi.advanceTimersByTimeAsync(25);
     await pending;
-    expect(move).toHaveBeenCalledExactlyOnceWith(147, 16, 1200);
+    expect(move).toHaveBeenCalledExactlyOnceWith(147, 16, 1200, expect.any(Function));
   });
 
   it('never adopts a replacement Frame while waiting for its final reply', async () => {

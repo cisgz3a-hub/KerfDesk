@@ -16,6 +16,7 @@ import {
 } from './frame-artwork-centre-led.test-support';
 import type * as OutputPreparationWorker from './output-preparation-worker-client';
 import { centreLightAfterCleanFrame, runFrameNow } from './use-frame-action';
+import { centreLightOnFramedArtwork } from './centre-selection-light';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -50,6 +51,55 @@ const families = ['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware'] a
 const modes = ['absolute', 'user-origin', 'verified-origin', 'current-position'] as const;
 
 describe('Frame followed by a separate LED at the placed output artwork centre', () => {
+  it.each(['artwork', 'placement', 'output-scope', 'work-offset'] as const)(
+    'cancels pending automatic centring after %s changes while M5 acknowledgement is held',
+    async (drift) => {
+      const { sim, frameAck } = await connectedFixture('grbl-v1.1', 'current-position');
+      const framing = runFrameNow();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await framing).toBe(true);
+      const from = sim.outbound().length;
+      const before = useLaserStore.getState();
+      const head = inferCurrentMachinePosition(before.statusReport, before.wcoCache);
+      frameAck.arm();
+      const centring = centreLightOnFramedArtwork();
+      const outcome = centring.then(
+        () => null,
+        (error: unknown) => error,
+      );
+      await vi.advanceTimersByTimeAsync(100);
+      expect(frameAck.held()).toBe(true);
+      expect(sim.outbound().slice(from).join('')).toContain('M5\n');
+      if (drift === 'artwork')
+        useStore.setState((app) => ({
+          project: {
+            ...app.project,
+            scene: {
+              ...app.project.scene,
+              objects: app.project.scene.objects.map((object) => ({
+                ...object,
+                transform: { ...object.transform, x: object.transform.x + 1 },
+              })),
+            },
+          },
+        }));
+      if (drift === 'placement')
+        useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'center' } });
+      if (drift === 'output-scope')
+        useStore.setState({
+          outputScopeSettings: { cutSelectedGraphics: true, useSelectionOrigin: false },
+        });
+      if (drift === 'work-offset') useLaserStore.setState({ wcoCache: { x: 101, y: 50, z: 0 } });
+      frameAck.release();
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(await outcome).toBeInstanceOf(Error);
+      expect(sim.outbound().slice(from).join('')).not.toMatch(/M7|\$J|G[01] /);
+      const after = useLaserStore.getState();
+      expect(inferCurrentMachinePosition(after.statusReport, after.wcoCache)).toEqual(head);
+      expect(after.positioningLightEnabled).toBe(false);
+    },
+  );
+
   it.each(families.flatMap((kind) => modes.map((mode) => ({ kind, mode }))))(
     '$kind / $mode keeps the framed placement when moving the LED and preparing Start',
     async ({ kind, mode }) => {

@@ -77,8 +77,13 @@ export type LaserStoreActions = {
   readonly clearIncidentHistory: () => void;
   readonly jog: (params: JogParams, owner?: MachineExecutionOwner) => Promise<void>;
   readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
-  readonly centrePositioningLight: (x: number, y: number, feed: number) => Promise<void>;
-  readonly setPositioningLightEnabled: (enabled: false) => Promise<void>;
+  readonly centrePositioningLight: (
+    x: number,
+    y: number,
+    feed: number,
+    assertTargetCurrent?: () => void,
+  ) => Promise<void>;
+  readonly setPositioningLightEnabled: (enabled: boolean) => Promise<void>;
   readonly setAirAssistEnabled: (enabled: boolean) => Promise<void>;
   readonly setFireActive: (active: boolean, requestedPercent?: number) => Promise<void>;
   readonly markJobStart: (request: JobStartMarkRequest) => Promise<void>;

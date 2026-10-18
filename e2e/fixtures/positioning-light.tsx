@@ -12,6 +12,16 @@ const rectangle = createRectangle({
   color: '#000000',
   spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
 });
+const second = {
+  ...createRectangle({
+    id: 'badge',
+    color: '#000000',
+    spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
+  }),
+  name: 'Badge',
+  transform: { ...rectangle.transform, x: 80, y: 60 },
+};
+let centreCount = 0;
 useStore.setState((state) => ({
   project: {
     ...state.project,
@@ -39,12 +49,14 @@ useLaserStore.setState({
     spindle: 0,
   },
   centrePositioningLight: async (x, y) => {
-    fixtureElement('result').textContent = `Simulated centre ${x}, ${y}`;
+    centreCount += 1;
+    fixtureElement('centre-count').textContent = String(centreCount);
+    fixtureElement('result').textContent = 'Simulated centre ' + x + ', ' + y;
     useLaserStore.setState({ positioningLightEnabled: true });
   },
-  setPositioningLightEnabled: async () => {
-    fixtureElement('result').textContent = 'Simulated LED off';
-    useLaserStore.setState({ positioningLightEnabled: false });
+  setPositioningLightEnabled: async (enabled) => {
+    fixtureElement('result').textContent = enabled ? 'Simulated LED on' : 'Simulated LED off';
+    useLaserStore.setState({ positioningLightEnabled: enabled });
   },
 });
 
@@ -79,7 +91,22 @@ function Fixture(): JSX.Element {
         Load configured fixture
       </button>
       <button onClick={() => useStore.getState().selectObject(null)}>Deselect fixture</button>
+      <button
+        onClick={() =>
+          useStore.setState((state) => ({
+            project: {
+              ...state.project,
+              scene: { ...state.project.scene, objects: [rectangle, second] },
+            },
+            selectedObjectId: 'target',
+            additionalSelectedIds: new Set(['badge']),
+          }))
+        }
+      >
+        Select two artworks
+      </button>
       <output id="result" />
+      <output id="centre-count">0</output>
       <MachineSetupDialogHost />
     </main>
   );
@@ -87,7 +114,7 @@ function Fixture(): JSX.Element {
 
 function fixtureElement(id: string): HTMLElement {
   const element = document.getElementById(id);
-  if (element === null) throw new Error(`Missing fixture element: ${id}`);
+  if (element === null) throw new Error('Missing fixture element: ' + id);
   return element;
 }
 

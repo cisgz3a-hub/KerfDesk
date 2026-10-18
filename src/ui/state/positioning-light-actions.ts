@@ -33,9 +33,9 @@ export function positioningLightActions(
   write: SafeWrite,
 ): Pick<LaserState, 'centrePositioningLight' | 'setPositioningLightEnabled'> {
   return {
-    centrePositioningLight: (x, y, feed) =>
-      runPositioningLight(set, get, refs, write, { x, y, feed }),
-    setPositioningLightEnabled: () => runPositioningLight(set, get, refs, write),
+    centrePositioningLight: (x, y, feed, assertTargetCurrent) =>
+      runPositioningLight(set, get, refs, write, true, { x, y, feed, assertTargetCurrent }),
+    setPositioningLightEnabled: (enabled) => runPositioningLight(set, get, refs, write, enabled),
   };
 }
 
@@ -55,19 +55,25 @@ function assertAdmission(state: LaserState, refs: LiveRefs): void {
     throw new Error('Wait for the current controller command to settle.');
 }
 
-type Target = { readonly x: number; readonly y: number; readonly feed: number };
+type Target = {
+  readonly x: number;
+  readonly y: number;
+  readonly feed: number;
+  readonly assertTargetCurrent: (() => void) | undefined;
+};
 
 async function runPositioningLight(
   set: SetFn,
   get: () => LaserState,
   refs: LiveRefs,
   write: SafeWrite,
+  enabled: boolean,
   target?: Target,
 ): Promise<void> {
   assertAdmission(get(), refs);
   assertTarget(target);
-  const mapping = resolveMapping(get(), refs, target);
-  const { context, owns, session } = createTransaction(set, get, refs, write, target);
+  const mapping = resolveMapping(get(), refs, enabled);
+  const { context, owns, session } = createTransaction(set, get, refs, write, enabled, target);
   const driver = refs.driver;
   let mayHaveMoved = false;
   let settled = false;
@@ -75,18 +81,20 @@ async function runPositioningLight(
     const report = await positioningLightStatus(context);
     if (report.state !== 'Idle')
       throw new Error('Positioning light needs a fresh Idle controller.');
-    if (target !== undefined) {
+    if (enabled) {
       await turnOffPreviousLight(context);
       for (const line of driver.commands.frameToolOffLines)
         await positioningLightCommand(context, line);
       await positioningLightCommand(context, mapping.offCommand);
       set({ positioningLightEnabled: false });
+      lightSnapshots.delete(refs);
       await positioningLightFence(context);
       const ready = await positioningLightStatus(context);
       if (ready.state !== 'Idle') throw new Error('The controller left Idle before positioning.');
-      await moveToLightTarget(context, set, target, () => {
-        mayHaveMoved = true;
-      });
+      if (target !== undefined)
+        await moveToLightTarget(context, set, target, () => {
+          mayHaveMoved = true;
+        });
       settled = true;
       lightSnapshots.set(refs, { mapping: { ...mapping }, session });
       // May have reached hardware even if its acknowledgement is subsequently
@@ -130,6 +138,7 @@ async function turnOffPreviousLight(context: PositioningLightTransaction): Promi
 
 function assertTarget(target: Target | undefined): void {
   if (target === undefined) return;
+  target.assertTargetCurrent?.();
   const project = useStore.getState().project;
   if (project.machine?.kind === 'cnc' || rotaryAppliesTo(project.device, project.machine))
     throw new Error('Centre and light needs a Cartesian laser placement.');
@@ -142,19 +151,15 @@ function assertProfileDriver(refs: LiveRefs): void {
     throw new Error('The selected device profile does not match the connected controller.');
 }
 
-function resolveMapping(
-  state: LaserState,
-  refs: LiveRefs,
-  target: Target | undefined,
-): PositioningLight {
+function resolveMapping(state: LaserState, refs: LiveRefs, enabled: boolean): PositioningLight {
   const previous = lightSnapshots.get(refs);
-  if (target === undefined && previous?.session() === true) return previous.mapping;
+  if (!enabled && previous?.session() === true) return previous.mapping;
   assertProfileDriver(refs);
   const mapping = useStore.getState().project.device.positioningLight;
   const issue = positioningLightIssue(mapping, refs.driver.kind);
   if (mapping === undefined || issue !== null)
     throw new Error(issue ?? 'Configure the separate positioning light in Device Profile first.');
-  if (target === undefined && state.positioningLightEnabled && previous?.session() !== true)
+  if (state.positioningLightEnabled && previous?.session() !== true)
     throw new Error(
       'The positioning light belongs to an earlier connection; check it at the machine.',
     );
@@ -166,6 +171,7 @@ function createTransaction(
   get: () => LaserState,
   refs: LiveRefs,
   write: SafeWrite,
+  enabled: boolean,
   target: Target | undefined,
 ) {
   const initial = get();
@@ -181,7 +187,11 @@ function createTransaction(
     refs.writeEpoch === writeEpoch;
   const operation = {
     ...interactiveControllerOperation(
-      target === undefined ? 'Switching positioning light off' : 'Centring positioning light',
+      target !== undefined
+        ? 'Centring positioning light'
+        : enabled
+          ? 'Switching positioning light on'
+          : 'Switching positioning light off',
       'terminal-exchange',
     ),
     ...(target === undefined ? {} : { mayMove: true as const }),
@@ -197,7 +207,8 @@ function createTransaction(
       get().mpgActive
     )
       throw new Error('Positioning light was cancelled or its controller session changed.');
-    if (target !== undefined && useStore.getState().project.device !== device)
+    target?.assertTargetCurrent?.();
+    if (enabled && useStore.getState().project.device !== device)
       throw new Error('Device settings changed during positioning.');
   };
   const context: PositioningLightTransaction = {

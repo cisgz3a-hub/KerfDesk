@@ -18,8 +18,12 @@ const originalLaser = useLaserStore.getState();
 const originalPreferences = useJogControlPreferences.getState();
 let host: HTMLDivElement;
 let root: Root;
-const jog = vi.fn(async () => undefined);
-const off = vi.fn(async () => undefined);
+const jog = vi.fn(async (..._args: unknown[]) =>
+  useLaserStore.setState({ positioningLightEnabled: true }),
+);
+const off = vi.fn(async (enabled: boolean) =>
+  useLaserStore.setState({ positioningLightEnabled: enabled }),
+);
 
 beforeEach(() => {
   resetStore();
@@ -84,7 +88,7 @@ afterEach(async () => {
 });
 
 function centreButton(): HTMLButtonElement {
-  const button = host.querySelector<HTMLButtonElement>('button[aria-label="Centre & LED"]');
+  const button = host.querySelector<HTMLButtonElement>('button[aria-label="Artwork centre & LED"]');
   if (button === null) throw new Error('Centre selection button missing');
   return button;
 }
@@ -94,16 +98,16 @@ describe('Centre selection in the jog pad', () => {
     await act(async () => root.render(<JogPad disabled={false} />));
     expect(centreButton().title).toContain('beam off');
     await act(async () => centreButton().click());
-    expect(jog).toHaveBeenCalledExactlyOnceWith(40, 45, 1200);
+    expect(jog).toHaveBeenCalledExactlyOnceWith(40, 45, 1200, expect.any(Function));
     await act(async () => useStore.getState().setMachineKind('cnc'));
-    expect(host.querySelector('button[aria-label="Centre & LED"]')).toBeNull();
+    expect(host.querySelector('button[aria-label="Artwork centre & LED"]')).toBeNull();
   });
 
   it('explains unavailable selection, placement and machine states without sending movement', async () => {
     await act(async () => root.render(<JogPad disabled={false} />));
     await act(async () => useStore.getState().selectObject(null));
     expect(centreButton().disabled).toBe(true);
-    expect(centreButton().title).toContain('Select a trace');
+    expect(centreButton().title).toContain('Select artwork');
     await act(async () => centreButton().click());
 
     await act(async () => {
@@ -113,7 +117,7 @@ describe('Centre selection in the jog pad', () => {
       }));
     });
     expect(centreButton().disabled).toBe(true);
-    expect(centreButton().title).toContain('Absolute Coords');
+    expect(centreButton().title).toContain('Frame the job once');
     await act(async () => centreButton().click());
 
     await act(async () => {
@@ -158,7 +162,7 @@ describe('Centre selection in the jog pad', () => {
     await act(async () => root.render(<JogPad disabled={false} />));
     await act(async () => centreButton().click());
     // Centre (40,45), head (30,50) in canvas bed axes, native Y=300-50.
-    expect(jog).toHaveBeenCalledExactlyOnceWith(30, 250, 1200);
+    expect(jog).toHaveBeenCalledExactlyOnceWith(30, 250, 1200, expect.any(Function));
   });
 
   it('keeps light off available after deselection and switching to CNC', async () => {
@@ -209,4 +213,112 @@ describe('Centre selection in the jog pad', () => {
     expect(host.textContent).not.toContain('Set up LED');
     expect(jog).not.toHaveBeenCalled();
   });
+
+  it('requires choosing one of several selected artworks and keeps the canvas selection', async () => {
+    addSecondArtwork();
+    await act(async () => root.render(<JogPad disabled={false} />));
+    expect(centreButton().disabled).toBe(true);
+    expect(centreButton().title).toContain('Choose which');
+    const chooser = host.querySelector<HTMLSelectElement>(
+      'select[aria-label="Artwork to centre"]',
+    )!;
+    expect(chooser.options).toHaveLength(3);
+    expect(chooser.options[2]?.textContent).toContain('Second artwork');
+    await act(async () => {
+      chooser.value = chooser.options[2]!.value;
+      chooser.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(jog).not.toHaveBeenCalled();
+    expect(centreButton().disabled).toBe(false);
+    await act(async () => centreButton().click());
+    expect(jog).toHaveBeenCalledExactlyOnceWith(110, 85, 1200, expect.any(Function));
+    expect(useStore.getState().selectedObjectId).toBe('shape');
+    expect([...useStore.getState().additionalSelectedIds]).toEqual(['second']);
+    const on = host.querySelector<HTMLButtonElement>('button[aria-label="LED on"]')!;
+    expect(on.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('treats a selected group as one artwork and targets its combined centre', async () => {
+    addSecondArtwork();
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          groups: [{ id: 'logo', name: 'Complete logo', objectIds: ['shape', 'second'] }],
+        },
+      },
+    }));
+    await act(async () => root.render(<JogPad disabled={false} />));
+    expect(host.querySelector('select[aria-label="Artwork to centre"]')).toBeNull();
+    await act(async () => centreButton().click());
+    expect(jog).toHaveBeenCalledExactlyOnceWith(75, 65, 1200, expect.any(Function));
+  });
+
+  it('clears a multiple-artwork choice when the canvas selection changes', async () => {
+    addSecondArtwork();
+    await act(async () => root.render(<JogPad disabled={false} />));
+    const chooser = host.querySelector<HTMLSelectElement>(
+      'select[aria-label="Artwork to centre"]',
+    )!;
+    await act(async () => {
+      chooser.value = chooser.options[2]!.value;
+      chooser.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => useStore.getState().selectObject(null));
+    await act(async () =>
+      useStore.setState({
+        selectedObjectId: 'shape',
+        additionalSelectedIds: new Set(['second']),
+      }),
+    );
+    expect(centreButton().disabled).toBe(true);
+    expect(
+      host.querySelector<HTMLSelectElement>('select[aria-label="Artwork to centre"]')?.value,
+    ).toBe('');
+    expect(jog).not.toHaveBeenCalled();
+  });
+
+  it('switches the LED on and off without a selection or a centre move', async () => {
+    useStore.getState().selectObject(null);
+    await act(async () => root.render(<JogPad disabled={false} />));
+    const on = host.querySelector<HTMLButtonElement>('button[aria-label="LED on"]')!;
+    const turnOff = host.querySelector<HTMLButtonElement>('button[aria-label="LED off"]')!;
+    expect(on.disabled).toBe(false);
+    await act(async () => on.click());
+    expect(off).toHaveBeenLastCalledWith(true);
+    expect(on.getAttribute('aria-pressed')).toBe('true');
+    await act(async () => turnOff.click());
+    expect(off).toHaveBeenLastCalledWith(false);
+    expect(on.getAttribute('aria-pressed')).toBe('false');
+    expect(jog).not.toHaveBeenCalled();
+    expect(centreButton().disabled).toBe(true);
+    // Off remains callable even when reset/no feedback makes the tracked state false.
+    expect(turnOff.disabled).toBe(false);
+  });
 });
+
+function addSecondArtwork(): void {
+  const second = createRectangle({
+    id: 'second',
+    color: '#000000',
+    spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
+  });
+  useStore.setState((state) => ({
+    project: {
+      ...state.project,
+      scene: {
+        ...state.project.scene,
+        objects: [
+          ...state.project.scene.objects,
+          {
+            ...second,
+            name: 'Second artwork',
+            transform: { ...IDENTITY_TRANSFORM, x: 100, y: 80 },
+          },
+        ],
+      },
+    },
+    additionalSelectedIds: new Set(['second']),
+  }));
+}

@@ -2,6 +2,8 @@
 
 **Status:** Accepted. Physical controller and accessory qualification remains separate from software verification.
 
+The manual button and its Absolute-only restriction are extended by [Amendment 1](ADR-603-amendment-1-artwork-centre-and-led-switch.md), approved on 2026-10-18.
+
 ## Changes
 
 Selecting traced artwork no longer opens the canvas panel offering Edit trace parts and Edit nodes. The existing menu and tool strip still enter these modes. Once explicitly editing, the panel retains Done, preparation progress, Retry and the part-node action.
