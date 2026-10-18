@@ -1,5 +1,5 @@
-// The Warp and Deform hint (LBG-T06): what it says, its buttons, and the
-// Enter and Esc keys that finish the tool.
+// The Warp and Deform hint (LBG-T06): what it says, why a bend is refused, its
+// buttons, and the Enter and Esc keys that finish the tool.
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -71,8 +71,8 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-async function render(): Promise<void> {
-  await act(async () => root.render(<WarpDeformHint />));
+async function render(failure: string | null = null): Promise<void> {
+  await act(async () => root.render(<WarpDeformHint failure={failure} />));
 }
 
 async function press(key: string): Promise<void> {
@@ -106,6 +106,23 @@ describe('WarpDeformHint', () => {
     for (const button of host.querySelectorAll('button')) expect(button.title).not.toBe('');
     // Nothing has moved yet, so there is nothing to reset.
     expect(host.querySelector<HTMLButtonElement>('button')?.disabled).toBe(true);
+  });
+
+  it('says why the bend cannot be made, above the buttons, until it can', async () => {
+    const reason = 'The bend needs more geometry than can be prepared accurately.';
+    await act(async () => startWarpDeformTool('deform'));
+    await act(async () => bendOneHandle());
+    await render(reason);
+
+    const failure = host.querySelector('[data-warp-deform-failure]');
+    expect(failure?.textContent).toBe(reason);
+    expect(failure?.nextElementSibling?.textContent).toBe('Reset handles');
+    // Apply stays available; it gives the same reason as a toast.
+    expect(host.querySelector<HTMLButtonElement>('.lf-btn--primary')?.disabled).toBe(false);
+
+    await render(null);
+    expect(host.querySelector('[data-warp-deform-failure]')).toBeNull();
+    expect(host.textContent).toContain(DEFORM_HINT);
   });
 
   it('applies on Enter as one undo step', async () => {
