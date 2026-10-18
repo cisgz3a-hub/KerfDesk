@@ -3357,9 +3357,10 @@ again) or **Discard changes**.
    corner or the centre, or move with the arrow keys. The origin shows a dot and the +X/+Y
    directions it produces, with the same words under the diagram; it sets the canvas-to-machine
    orientation and jog directions, not work zero or homing. The homing corner shows a home marker
-   and stays a record, since firmware decides where Home moves. Laser `$31` records the minimum S input in the
-   controller's PWM mapping, not a minimum S emitted by jobs. The laser-mode checkbox describes
-   the expected firmware state; saving these profile fields does not write controller settings.
+   and stays a record, since firmware decides where Home moves. Laser `$31` records the minimum S
+   input in the controller's PWM mapping, not a minimum S emitted by jobs. The laser-mode checkbox
+   describes the expected firmware state; saving these profile fields does not write controller
+   settings.
    CNC **Machine limits** retains safe Z, spindle maximum, spin-up delay, coolant, and park, including
    when a hybrid machine's active mode is Laser. The optional **CNC job setup** section appears only
    while CNC is active. It contains **Current job** material, default/active bit, stock
