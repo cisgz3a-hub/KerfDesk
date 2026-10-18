@@ -118,6 +118,23 @@ describe('desktop update status (ADR-547)', () => {
       expect(() => parseCommercialUpdateStatus(value)).toThrow('Invalid update status');
   });
 
+  it('keeps the macOS and Linux download-page delivery and refuses it with a download (ADR-613)', () => {
+    const page = { ...ready, mode: 'manual', installOnQuit: false, delivery: 'download-page' };
+    for (const state of ['idle', 'checking', 'available', 'up-to-date', 'not-covered', 'failed'])
+      expect(parseCommercialUpdateStatus({ ...page, state })).toMatchObject({
+        state,
+        delivery: 'download-page',
+      });
+    for (const value of [
+      { ...page, state: 'downloading' },
+      { ...page, state: 'ready' },
+      { ...page, state: 'available', installOnQuit: true },
+      { ...page, state: 'available', delivery: 'installer' },
+      { ...ready, state: 'up-to-date', delivery: 'download-page' },
+    ])
+      expect(() => parseCommercialUpdateStatus(value)).toThrow('Invalid update status');
+  });
+
   it('copies bounded notes and refuses inconsistent or malformed presentation metadata', () => {
     const notes = {
       ...ready,

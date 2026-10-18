@@ -120,6 +120,22 @@ describe('canvas update prompt (ADR-561 Amendment 5)', () => {
     expect(button('Install now')?.disabled).toBe(false);
   });
 
+  it('opens the download page on macOS and Linux and then steps aside (ADR-613)', async () => {
+    const page = { delivery: 'download-page' as const };
+    const adapter = client(manual('available', '2026.41.0', page));
+    adapter.downloadUpdate.mockResolvedValue(manual('available', '2026.41.0', page));
+    await mount(adapter);
+    expect(button('Update')).toBeUndefined();
+    const open = button('Download page')!;
+    expect(open.title).toContain('Open the download page for KerfDesk 2026.41.0');
+    await act(async () => open.click());
+    expect(adapter.downloadUpdate).toHaveBeenCalledOnce();
+    expect(prompt()).toBeNull();
+    // The status bar keeps the notice until the new version is installed.
+    expect(button('Update available')).toBeDefined();
+    expect(adapter.installUpdateOnQuit).not.toHaveBeenCalled();
+  });
+
   it('arms install-on-close from the prompt and then gets out of the way', async () => {
     const adapter = client(manual('ready'));
     await mount(adapter);

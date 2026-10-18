@@ -88,3 +88,26 @@ When an authenticated previous release exists, the same job also installs that i
 For a published pair, run **Qualify published Windows upgrade** on `main`, selecting the previous and target versions. This read-only workflow authenticates both immutable installers and performs the same native retention scenario. It publishes nothing and needs no provider secrets. These NSIS exercises refuse developer machines and persistent or self-hosted runners because same-app installers share registry keys. The current scenario proves Free licence state only; paid credential retention, consumer Windows, standard-user UAC, SmartScreen and hardware require separate evidence. See [historical qualification scope](../docs/audits/2026-10-01-historical-windows-upgrade-qualification.md).
 
 Follow the workflow to successful publication, then verify the public download. Users can use **Help > Check for Updates** immediately or wait for the startup/30-minute check; they choose the download and installation themselves.
+
+## macOS and Linux (ADR-613)
+
+The same workflow publishes the commercial Mac and Linux builds of each Windows release, under the same version, once Windows is published. Each system is off until its repository variable is `on`: `KERFDESK_UNSIGNED_MACOS_RELEASES` (Apple silicon and Intel DMGs) and `KERFDESK_UNSIGNED_LINUX_RELEASES` (x64 `.deb` and AppImage). The Windows documents above, and their single writer, are unchanged: installed Windows copies never see a Mac or Linux file.
+
+The build jobs hold no secret. The Windows job hands them its public signed release identity; `scripts/build-commercial-platform.sh` prepares from it (`prepare-commercial-desktop.mjs --release-identity`), packages, and qualifies the package (contract, fuses, launch, import and save; ASAR tamper refusal on macOS; `.deb` install and AppImage launch on Ubuntu 24.04). The publish jobs, in the `desktop-commercial` environment, accept only the files whose SHA-256 their build jobs reported and run:
+
+```text
+node scripts/publish-platform-commercial-release.mjs --platform <macos|linux> --sha256 <file>=<64-hex> [...] <release-directory> <commercial-release-identity.json>
+```
+
+It writes, under `desktop/commercial-manual/`:
+
+- `releases/X.Y.Z/KerfDesk-X.Y.Z-macos-arm64.dmg`, `…-macos-x64.dmg` and `download-manifest-macos.json`, then `latest-macos.json`
+- `releases/X.Y.Z/KerfDesk-X.Y.Z-linux-amd64.deb`, `…-linux-x86_64.AppImage` and `download-manifest-linux.json`, then `latest-linux.json`
+
+It refuses unless the Windows `download-manifest.json` of the same version is already published with the same identity, and refuses rollback, backdating and conflicting immutable bytes. The release notes are the Windows release's `release-notes.json`. A Mac or Linux failure leaves the Windows release as it is; **Re-run failed jobs** repeats the same version (a fresh run of the workflow skips an already published source).
+
+Before the first Mac or Linux release, the maintainer:
+
+1. Publishes Software and Supplier Terms 1.3 (archiving 1.2 and notifying Paddle) so that Pro rights and the trial cover macOS and Linux installations, not only "Windows installations", and updates the pricing, licence and buy pages that say Pro is Windows only.
+2. Sets `KERFDESK_UNSIGNED_MACOS_RELEASES=on` and/or `KERFDESK_UNSIGNED_LINUX_RELEASES=on`, and checks that the `desktop-commercial` environment admits the `publish-macos` and `publish-linux` jobs (same branch rule as Windows; no new secret).
+3. Runs **Release unsigned Windows desktop** on `main` with **Release now**, or lets the next 10-PR batch run, then checks the Mac and Linux panels on kerfdesk.com/download and installs each file on a real Mac and Linux computer.

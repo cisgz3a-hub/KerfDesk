@@ -108,7 +108,7 @@ export async function runStopJob(context: JobStopContext, reason?: JobStopReason
     }
     const softReset = driver().realtime.softReset;
     if (softReset === null) {
-      await runNoResetStop(context, reason, ownsSession);
+      await runNoResetStopUnlessDisconnecting(context, reason, ownsSession);
       return;
     }
     if (!ownsSession()) return;
@@ -128,6 +128,18 @@ export async function runStopJob(context: JobStopContext, reason?: JobStopReason
       throw error;
     }
   }
+}
+
+// Disconnect has frozen the stream and is writing these same stop lines before
+// it closes the port. It owns the controller until the close; taking its
+// operation over would reopen polling and command gates meanwhile.
+async function runNoResetStopUnlessDisconnecting(
+  context: JobStopContext,
+  reason: JobStopReason | undefined,
+  ownsSession: () => boolean,
+): Promise<void> {
+  if (context.get().controllerOperation?.kind === 'disconnect') return;
+  await runNoResetStop(context, reason, ownsSession);
 }
 
 // A no-reset Abort must retire host refill before even the handback await.

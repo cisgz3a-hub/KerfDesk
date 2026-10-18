@@ -1,4 +1,5 @@
 import type { DeviceProfile } from './device-profile';
+import { positioningLightSupported } from './positioning-light';
 import { isScanOffsetTableForProfile } from './scan-offset-profile';
 
 // Interactive profile edits must never leave the optional controlled seek
@@ -8,7 +9,7 @@ export function deviceProfileWithInteractivePatch(
   current: DeviceProfile,
   patch: Partial<DeviceProfile>,
 ): DeviceProfile {
-  const patched: DeviceProfile = { ...current, ...patch };
+  const patched = withoutUnsupportedLight({ ...current, ...patch });
   // A measured travel confirmation belongs to that value. Controller-detected
   // travel may replace it without going through the manual Z editor, so never
   // inherit the old confirmation for different travel. An explicit confirmation
@@ -35,6 +36,15 @@ export function deviceProfileWithInteractivePatch(
   }
   if (controlledFeed <= scanSafe.maxFeed) return scanSafe;
   return { ...scanSafe, controlledLaserOffTravelFeedMmPerMin: scanSafe.maxFeed };
+}
+
+// Switching to a Marlin fan-mosfet dialect removes the positioning light: its
+// laser is on the fan output, so no LED command may ever be sent there.
+function withoutUnsupportedLight(profile: DeviceProfile): DeviceProfile {
+  if (profile.positioningLight === undefined) return profile;
+  if (positioningLightSupported(profile.gcodeDialect.dialectId)) return profile;
+  const { positioningLight: _removed, ...rest } = profile;
+  return rest;
 }
 
 function scanCalibrationIdentity(profile: DeviceProfile): string {

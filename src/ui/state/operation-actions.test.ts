@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { DEFAULT_CNC_LAYER_SETTINGS, operationIdsForObject } from '../../core/scene';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  nextOperationColor,
+  operationIdsForObject,
+} from '../../core/scene';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
@@ -10,9 +14,10 @@ describe('artwork operation actions', () => {
     useStore.getState().importSvgObject(svgObj('Johann', ['#000000']));
     useStore.getState().importSvgObject(svgObj('Box', ['#000000']));
     const { objects, layers } = useStore.getState().project.scene;
+    const first = nextOperationColor([]);
     expect(layers.map((layer) => [layer.name, layer.color])).toEqual([
-      ['Johann', '#000000'],
-      ['Box', '#2563eb'],
+      ['Johann', first],
+      ['Box', nextOperationColor([{ color: first }])],
     ]);
     expect(operationIdsForObject(objects[0]!, layers)).not.toEqual(
       operationIdsForObject(objects[1]!, layers),

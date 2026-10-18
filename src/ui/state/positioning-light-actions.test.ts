@@ -1,136 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { selectControllerDriver } from '../../core/controllers';
-import type { ControllerCommandSet, ControllerKind } from '../../core/devices/device-profile';
-import { parseStatusReport } from '../../core/controllers/grbl';
-import { initialLaserState, disconnectStopCommands } from './laser-store-helpers';
+import type { ControllerKind } from '../../core/devices/device-profile';
+import { disconnectStopCommands } from './laser-store-helpers';
 import {
-  consumeControllerCommandResponse,
   cancelControllerLifecycleRefs,
+  consumeControllerCommandResponse,
 } from './laser-interactive-command';
-import { observeFreshControllerStatus } from './laser-controller-status-wait';
-import { positioningLightActions } from './positioning-light-actions';
+import { positioningLightDisconnectOff } from './positioning-light-actions';
 import {
   framedRunControllerSnapshot,
   framedRunStartHandoffIssue,
   type FramedRunPermit,
 } from './framed-run';
-import { useLaserStore, type LaserState, type LiveRefs } from './laser-store';
+import { type LiveRefs } from './laser-store';
 import { useStore } from './store';
-import type { SafeWrite } from './laser-safe-write';
+import { harness, originalProject } from '../../__fixtures__/positioning-light-harness';
 
-const originalProject = useStore.getState().project;
 afterEach(() => {
   useStore.setState({ project: originalProject });
   vi.useRealTimers();
 });
-
-function harness(kind: ControllerKind = 'grbl-v1.1', commandSet?: ControllerCommandSet) {
-  const driver = selectControllerDriver(kind, commandSet);
-  const mapping =
-    kind === 'marlin'
-      ? { onCommand: 'M355 S1 P255', offCommand: 'M355 S0', offsetXmm: 0, offsetYmm: 0 }
-      : { onCommand: 'M64 P0', offCommand: 'M65 P0', offsetXmm: 0, offsetYmm: 0 };
-  useStore.setState({
-    project: {
-      ...originalProject,
-      machine: { kind: 'laser' },
-      device: { ...originalProject.device, controllerKind: kind, positioningLight: mapping },
-    },
-  });
-  let state: LaserState = {
-    ...useLaserStore.getState(),
-    ...initialLaserState(),
-    connection: { kind: 'connected' },
-    activeControllerKind: kind,
-    capabilities: driver.capabilities,
-    statusReport: parseStatusReport('<Idle|MPos:0,0,0|WCO:0,0,0>'),
-    controllerSessionEpoch: 3,
-  };
-  const refs = {
-    driver,
-    connection: {},
-    writeEpoch: 1,
-    controllerCommand: null,
-    controllerIdleWait: null,
-    controllerStatusWait: null,
-  } as unknown as LiveRefs;
-  const writes: string[] = [];
-  let head = { x: 0, y: 0 };
-  let movingPolls = 0;
-  let moved = false;
-  let holdLine: string | undefined;
-  let failLine: string | undefined;
-  let afterWrite: ((line: string) => void) | undefined;
-  const set = (patch: Partial<LaserState> | ((state: LaserState) => Partial<LaserState>)): void => {
-    state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) };
-  };
-  const emitStatus = (): void => {
-    const motionState = movingPolls-- > 0 ? 'Jog' : 'Idle';
-    const report = parseStatusReport(
-      `<${motionState}|MPos:${kind === 'marlin' ? head.x.toFixed(2) : head.x},${kind === 'marlin' ? head.y.toFixed(2) : head.y},0|WCO:0,0,0>`,
-    )!;
-    state = { ...state, statusReport: report, statusSequence: state.statusSequence + 1 };
-    consumeControllerCommandResponse(refs, { kind: 'status', report }, 'status');
-    observeFreshControllerStatus(
-      refs,
-      { sessionEpoch: state.controllerSessionEpoch, sequence: state.statusSequence },
-      report,
-    );
-  };
-  const ack = (line: string): void => {
-    const response = line === 'fire off' ? 'turning laser off and returning to auto mode' : 'ok';
-    consumeControllerCommandResponse(refs, driver.classifyLine(response), response);
-  };
-  const acceptMotion = (line: string): void => {
-    if (line.startsWith('$J=') || line.startsWith('G0 ') || line.startsWith('G1 ')) {
-      head = {
-        x: head.x + Number(/X(-?[\d.]+)/.exec(line)?.[1] ?? 0),
-        y: head.y + Number(/Y(-?[\d.]+)/.exec(line)?.[1] ?? 0),
-      };
-      moved = true;
-    }
-  };
-  const write: SafeWrite = async (wire, _action, _source, assertCurrent) => {
-    assertCurrent?.();
-    writes.push(wire);
-    const line = wire.trim();
-    afterWrite?.(line);
-    if (line === failLine) throw new Error('wire handoff failed');
-    if (line === holdLine) return;
-    if (line === '?' || line === 'M114') emitStatus();
-    acceptMotion(line);
-    if (line !== '?') ack(line);
-  };
-  const stop = vi.fn(async () => {
-    cancelControllerLifecycleRefs(refs);
-    set({ controllerOperation: null });
-  });
-  set({ stopJob: stop });
-  const actions = positioningLightActions(set, () => state, refs, write);
-  return {
-    actions,
-    writes,
-    refs,
-    mapping,
-    stop,
-    get: () => state,
-    set,
-    ack,
-    hold: (line?: string) => {
-      holdLine = line;
-    },
-    fail: (line: string) => {
-      failLine = line;
-    },
-    after: (fn: (line: string) => void) => {
-      afterWrite = fn;
-    },
-    moving: (count: number) => {
-      movingPolls = count;
-    },
-    hasMoved: () => moved,
-  };
-}
 
 const families: ControllerKind[] = ['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware'];
 describe('separate positioning light transaction', () => {
@@ -139,7 +27,9 @@ describe('separate positioning light transaction', () => {
     async (kind) => {
       const h = harness(kind);
       await h.actions.centrePositioningLight(40.004, 45.006, 1200);
-      const lines = h.writes.map((line) => line.trim());
+      const lines = h.writes
+        .flatMap((wire) => wire.split('\n').map((line) => line.trim()))
+        .filter((line) => line !== '');
       const move = lines.findIndex(
         (line) => line.startsWith('$J=') || line.startsWith('G0 ') || line.startsWith('G1 '),
       );
@@ -150,16 +40,57 @@ describe('separate positioning light transaction', () => {
       expect(lines[on - 1]).toBe(kind === 'marlin' ? 'M114' : '?');
       expect(h.get().controllerOperation).toBeNull();
       expect(h.get().positioningLightEnabled).toBe(true);
-      await h.actions.setPositioningLightEnabled(false);
+      await h.actions.switchPositioningLightOff();
       expect(h.get().positioningLightEnabled).toBe(false);
       expect(h.writes.at(-1)?.trim()).toBe(h.mapping.offCommand);
     },
   );
 
+  it('sends nothing on a Marlin fan-mosfet laser, not even a captured off command', async () => {
+    const h = harness('marlin');
+    await h.actions.centrePositioningLight(20, 10, 1200);
+    expect(h.get().positioningLightEnabled).toBe(true);
+    const device = useStore.getState().project.device;
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: { ...device, gcodeDialect: { dialectId: 'marlin-fan' } },
+      },
+    }));
+    const written = h.writes.length;
+    await expect(h.actions.switchPositioningLightOff()).rejects.toThrow(/fan-mosfet/);
+    await expect(h.actions.centrePositioningLight(30, 10, 1200)).rejects.toThrow(/fan-mosfet/);
+    expect(h.writes).toHaveLength(written);
+    expect(positioningLightDisconnectOff(h.get(), h.refs)).toBeNull();
+  });
+
+  it('queues a Marlin G91/G0/G90 light move as one owned write', async () => {
+    const h = harness('marlin');
+    await h.actions.centrePositioningLight(20, 10, 1200);
+    const jog = h.writes.find((wire) => wire.includes('G91'));
+    // The whole relative move, including the return to G90, is one wire write,
+    // so an Abort can never land between G91 and G90 and leave G91 modal.
+    expect(jog).toBeDefined();
+    expect(jog).toMatch(/G91[^\n]*\n[^\n]*G0 [^\n]*\n[^\n]*G90\n$/);
+    expect(h.writes.filter((wire) => /\bG9[01]\b/.test(wire))).toEqual([jog]);
+  });
+
+  it('contains an Abort during a Marlin light move without a lone G91 on the wire', async () => {
+    const h = harness('marlin');
+    h.hold('G90');
+    const centring = h.actions.centrePositioningLight(20, 10, 1200);
+    await vi.waitFor(() => expect(h.writes.some((wire) => wire.includes('G91'))).toBe(true));
+    cancelControllerLifecycleRefs(h.refs, 'Abort');
+    await expect(centring).rejects.toThrow();
+    const jog = h.writes.find((wire) => wire.includes('G91'));
+    expect(jog).toContain('G90');
+    expect(h.stop).toHaveBeenCalled();
+  });
+
   it('uses the Falcon beam-off G1 command contract without native jog bytes', async () => {
     const h = harness('grbl-v1.1', 'creality-falcon-a1-pro');
     await h.actions.centrePositioningLight(40, 45, 1200);
-    expect(h.writes).toContain('G1 X40.000 Y45.000 F1200 S0\n');
+    expect(h.writes.join('')).toContain('G1 X40.000 Y45.000 F1200 S0\n');
     expect(h.writes.some((line) => line.startsWith('$J='))).toBe(false);
     expect(h.get().positioningLightEnabled).toBe(true);
   });
@@ -202,7 +133,7 @@ describe('separate positioning light transaction', () => {
     useStore.setState({
       project: { ...useStore.getState().project, device: { ...originalProject.device } },
     });
-    await h.actions.setPositioningLightEnabled(false);
+    await h.actions.switchPositioningLightOff();
     expect(h.writes.at(-1)?.trim()).toBe(h.mapping.offCommand);
     expect(h.get().positioningLightEnabled).toBe(false);
   });
@@ -219,6 +150,60 @@ describe('separate positioning light transaction', () => {
     await failure;
     expect(h.stop).toHaveBeenCalledOnce();
     expect(h.writes).not.toContain(`${h.mapping.onCommand}\n`);
+  });
+
+  it('releases a refused jog without the reset-based Abort', async () => {
+    const h = harness();
+    h.after((line) => {
+      if (line.startsWith('$J=')) h.hold(line);
+    });
+    const pending = h.actions.centrePositioningLight(40, 45, 1200);
+    const failure = expect(pending).rejects.toThrow('error:15');
+    await vi.waitFor(() => expect(h.writes.some((line) => line.startsWith('$J='))).toBe(true));
+    consumeControllerCommandResponse(h.refs, h.refs.driver.classifyLine('error:15'), 'error:15');
+    await failure;
+    expect(h.stop).not.toHaveBeenCalled();
+    expect(h.get().controllerOperation).toBeNull();
+    expect(h.writes).not.toContain(`${h.mapping.onCommand}\n`);
+  });
+
+  it('hands a reported Jog to the unowned jog-cancel Abort after a status timeout', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    let jogged = false;
+    let polls = 0;
+    h.after((line) => {
+      if (line.startsWith('$J=')) {
+        jogged = true;
+        h.moving(100);
+      } else if (line === '?' && jogged && ++polls === 2) h.hold('?');
+    });
+    let ownerAtAbort: unknown = 'not called';
+    h.set({
+      stopJob: async () => {
+        ownerAtAbort = h.get().controllerOperation;
+      },
+    });
+    const pending = h.actions.centrePositioningLight(40, 45, 1200);
+    const failure = expect(pending).rejects.toThrow(/timed out|position/);
+    await vi.advanceTimersByTimeAsync(9000);
+    await failure;
+    expect(h.get().statusReport?.state).toBe('Jog');
+    expect(ownerAtAbort).toBeNull();
+    expect(h.writes).not.toContain(`${h.mapping.onCommand}\n`);
+  });
+
+  it('exposes the captured off command to Disconnect only while lit on this connection', async () => {
+    const h = harness();
+    expect(positioningLightDisconnectOff(h.get(), h.refs)).toBeNull();
+    await h.actions.centrePositioningLight(40, 45, 1200);
+    expect(positioningLightDisconnectOff(h.get(), h.refs)).toBe(h.mapping.offCommand);
+    const original = h.refs.connection;
+    h.refs.connection = {} as LiveRefs['connection'];
+    expect(positioningLightDisconnectOff(h.get(), h.refs)).toBeNull();
+    h.refs.connection = original;
+    await h.actions.switchPositioningLightOff();
+    expect(positioningLightDisconnectOff(h.get(), h.refs)).toBeNull();
   });
 
   it('never continues into a replacement session after a pending acknowledgement', async () => {
@@ -281,7 +266,7 @@ describe('separate positioning light transaction', () => {
       controllerKind: 'marlin',
       positioningLight: { ...h.mapping, offCommand: 'M355 S0' },
     });
-    await expect(h.actions.setPositioningLightEnabled(false)).rejects.toThrow('does not match');
+    await expect(h.actions.switchPositioningLightOff()).rejects.toThrow('does not match');
     expect(h.writes).toEqual([]);
   });
 
@@ -289,9 +274,35 @@ describe('separate positioning light transaction', () => {
     const h = harness();
     await h.actions.centrePositioningLight(40, 45, 1200);
     useStore.getState().updateDeviceProfile({ controllerKind: 'marlin' });
-    await h.actions.setPositioningLightEnabled(false);
+    await h.actions.switchPositioningLightOff();
     expect(h.writes.at(-1)?.trim()).toBe(h.mapping.offCommand);
   });
+
+  it.each([
+    ['marlin', 'M355 S1', 'M0355 S1'],
+    ['fluidnc', 'M64 P0', 'M65 P1'],
+    ['marlin', 'M125', 'M355 S0'],
+  ] as const)(
+    'rejects invalid %s light mapping before any controller write',
+    async (kind, onCommand, offCommand) => {
+      const h = harness(kind);
+      useStore.setState((state) => ({
+        project: {
+          ...state.project,
+          device: {
+            ...state.project.device,
+            positioningLight: { ...h.mapping, onCommand, offCommand },
+          },
+        },
+      }));
+      await expect(h.actions.centrePositioningLight(40, 45, 1200)).rejects.toThrow(
+        /Positioning light/,
+      );
+      expect(h.writes).toEqual([]);
+      expect(h.hasMoved()).toBe(false);
+      expect(h.get().controllerOperation).toBeNull();
+    },
+  );
 
   it('rejects file-only controllers and invalid maps without any command', async () => {
     const h = harness('ruida');

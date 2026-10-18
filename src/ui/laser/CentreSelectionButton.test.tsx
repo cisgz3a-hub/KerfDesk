@@ -66,7 +66,7 @@ beforeEach(() => {
     motionOperation: null,
     controllerOperation: null,
     centrePositioningLight: jog,
-    setPositioningLightEnabled: off,
+    switchPositioningLightOff: off,
     positioningLightEnabled: false,
   });
   useJogControlPreferences.setState({ requestedFeedMmPerMin: 1200 });
@@ -170,7 +170,7 @@ describe('Centre selection in the jog pad', () => {
     expect(button).not.toBeNull();
     expect(button?.disabled).toBe(false);
     await act(async () => button?.click());
-    expect(off).toHaveBeenCalledExactlyOnceWith(false);
+    expect(off).toHaveBeenCalledExactlyOnceWith();
     expect(jog).not.toHaveBeenCalled();
   });
 
@@ -208,5 +208,34 @@ describe('Centre selection in the jog pad', () => {
     expect(centreButton().title).toContain('file export only');
     expect(host.textContent).not.toContain('Set up LED');
     expect(jog).not.toHaveBeenCalled();
+  });
+
+  it('shows no LED controls at all on a Marlin fan-mosfet laser, even while lit', async () => {
+    useLaserStore.setState({ positioningLightEnabled: true });
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: {
+          ...state.project.device,
+          controllerKind: 'marlin',
+          gcodeDialect: { dialectId: 'marlin-fan' },
+        },
+      },
+    }));
+    await act(async () => root.render(<JogPad disabled={false} />));
+    expect(host.querySelector('button[aria-label="Centre & LED"]')).toBeNull();
+    expect(host.querySelector('button[aria-label="LED off"]')).toBeNull();
+    expect(host.textContent).not.toContain('Set up LED');
+    await act(async () =>
+      useStore.setState((state) => ({
+        project: {
+          ...state.project,
+          device: { ...state.project.device, gcodeDialect: { dialectId: 'marlin-inline' } },
+        },
+      })),
+    );
+    expect(host.querySelector('button[aria-label="Centre & LED"]')).not.toBeNull();
+    expect(jog).not.toHaveBeenCalled();
+    expect(off).not.toHaveBeenCalled();
   });
 });

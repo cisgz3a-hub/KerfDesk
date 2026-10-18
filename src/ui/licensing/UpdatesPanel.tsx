@@ -102,9 +102,11 @@ function UpdateDetails({
       <EarlyUpdatesOption client={client} />
       {updating ? (
         <p style={licenceMuted}>
-          {status?.mode === 'manual'
-            ? 'Download while you work, then choose Install and close KerfDesk or install when you close later. The app asks about unsaved changes and waits while machine work is active.'
-            : 'New versions download in the background and install when you close KerfDesk.'}
+          {status?.delivery === 'download-page'
+            ? 'KerfDesk tells you when a new version is out and opens its download page in your browser. Install it after you close KerfDesk; KerfDesk never downloads or installs it by itself.'
+            : status?.mode === 'manual'
+              ? 'Download while you work, then choose Install and close KerfDesk or install when you close later. The app asks about unsaved changes and waits while machine work is active.'
+              : 'New versions download in the background and install when you close KerfDesk.'}
         </p>
       ) : null}
     </>
@@ -181,9 +183,13 @@ function UpdateActions({
           className="lf-btn lf-btn--primary"
           disabled={busy || client.downloadUpdate === undefined}
           onClick={() => void onDownload()}
-          title="Download and verify this update while KerfDesk stays open. Installation is a separate choice."
+          title={
+            status.delivery === 'download-page'
+              ? 'Open the verified download page for this version in your browser. KerfDesk does not download or install it itself.'
+              : 'Download and verify this update while KerfDesk stays open. Installation is a separate choice.'
+          }
         >
-          Download update
+          {status.delivery === 'download-page' ? 'Open download page' : 'Download update'}
         </button>
       ) : null}
       <ManualUpdateInstallActions

@@ -2,7 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
-import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
+import { IDENTITY_TRANSFORM, nextOperationColor, type RasterImage } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
@@ -78,9 +78,11 @@ describe('Artwork Operations panel', () => {
     try {
       expect(host.querySelector('[aria-label="Operation Johann"]')).not.toBeNull();
       expect(host.querySelector('[aria-label="Operation Box"]')).not.toBeNull();
+      // The palette's first two colours (blue, then red since ADR-620).
+      const first = nextOperationColor([]);
       expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
-        '#000000',
-        '#2563eb',
+        first,
+        nextOperationColor([{ color: first }]),
       ]);
     } finally {
       await unmount();

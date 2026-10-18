@@ -282,6 +282,8 @@ describe('hitTest', () => {
     );
 
     expect(hitTest(scene, { x: 10, y: 10 })).toBe('A');
+    // Display-only hover (ADR-620) answers with the locked piece on top.
+    expect(hitTest(scene, { x: 10, y: 10 }, { includeLocked: true })).toBe('B');
   });
 
   it('skips objects whose assigned layer is hidden', () => {

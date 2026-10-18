@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { StreamerState } from '../../core/controllers/grbl';
+import { nextOperationColor } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
@@ -39,7 +40,7 @@ describe('compact operation row and selected operation settings', () => {
       const row = operationRow(mounted.host);
       await click(operationActivation(row));
 
-      expect(useUiStore.getState().activeLayerColor).toBe('#000000');
+      expect(useUiStore.getState().activeLayerColor).toBe(nextOperationColor([]));
       expect(row.getAttribute('aria-current')).toBe('true');
       expect(row.querySelector('select')).toBeNull();
       expect(row.textContent).not.toContain('More cut settings');

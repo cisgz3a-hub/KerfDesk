@@ -27,14 +27,19 @@ export function useCommercialUpdateStatus(client: LicenceAdapter) {
       pending.current = true;
       revision.current += 1;
       setBusy(true);
-      setFeedback(ACTION_FEEDBACK[kind]);
+      const page = useCommercialUpdateStore.getState().status?.delivery === 'download-page';
+      setFeedback(
+        kind === 'download' && page ? 'Opening the download page...' : ACTION_FEEDBACK[kind],
+      );
       try {
         const next = await action();
         setStatus(next);
         setUnconfirmed(false);
         setFeedback(
           kind === 'download' && next.state === 'available'
-            ? 'The download has not started. Try Download update again.'
+            ? next.delivery === 'download-page'
+              ? 'The download page opens in your browser. Install the new version after you close KerfDesk.'
+              : 'The download has not started. Try Download update again.'
             : null,
         );
       } catch {
@@ -122,5 +127,6 @@ function unreadable(status: CommercialUpdateStatus | null): CommercialUpdateStat
     version: null,
     checkedAt: null,
     ...(status?.mode === 'manual' ? { mode: 'manual', installOnQuit: false } : {}),
+    ...(status?.delivery === undefined ? {} : { delivery: status.delivery }),
   };
 }
