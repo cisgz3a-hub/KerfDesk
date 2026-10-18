@@ -1,27 +1,45 @@
 // A job whose last replies were lost on the serial link finishes on the
-// controller's own evidence instead of a watchdog soft reset (ADR-610).
+// controller's own ordered `$G` answer instead of a watchdog soft reset
+// (ADR-610 Amendment 1).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGrblSimulator, type GrblSimulator } from '../../__fixtures__/controllers';
-import { grblDriver } from '../../core/controllers';
+import { grblDriver, selectControllerDriver } from '../../core/controllers';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import {
-  LOST_ACK_BUFFER_PROOF_MS,
-  LOST_ACK_IDLE_PROOF_MS,
-  reportProof,
+  hasOrderedProbe,
+  LOST_REPLY_PROBE_AFTER_MS,
+  reportShowsIdle,
 } from './laser-lost-ack-reconcile';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
 import { startTestLaserJobOnClock } from './laser-test-command-control';
+import { shouldReleaseStreamerAtIdle } from './laser-terminal-stream-release';
 import { resetStore } from './test-helpers';
 
 type Link = {
-  /** Drop the n-th `ok` (1-based) after arming. */
-  dropOk: number | null;
+  /** Drop these `ok`s (1-based, counted after arming). */
+  dropOks: ReadonlyArray<number>;
   okCount: number;
-  /** Rewrite each status line's buffer field; null leaves it as the simulator sent it. */
-  buffer: ((state: string) => string | null) | null;
+  /** Drop the `ok` that follows the next `[GC:` report: the probe's own reply. */
+  dropOkAfterGc: boolean;
+  sawGc: boolean;
+  /** Once the whole job is on the wire, hold every reply that is not a status
+   * report, as a controller holding the tail of its program would. */
+  holding: boolean;
+  held: string[];
+  deliverHeld: (() => void) | null;
 };
+
+const link = (dropOks: ReadonlyArray<number> = []): Link => ({
+  dropOks,
+  okCount: -1,
+  dropOkAfterGc: false,
+  sawGc: false,
+  holding: false,
+  held: [],
+  deliverHeld: null,
+});
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -38,17 +56,32 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
+function wholeJobSent(): boolean {
+  const streamer = useLaserStore.getState().streamer;
+  return streamer !== null && streamer.queueIndex >= streamer.queued.length;
+}
+
 // The firmware sent the reply; the host never read it, as after a UART line
 // error on a noisy link.
-function lossyAdapter(sim: GrblSimulator, link: Link): PlatformAdapter {
+function lossyAdapter(sim: GrblSimulator, wire: Link): PlatformAdapter {
   const deliver = (line: string, handler: (line: string) => void): void => {
-    if (line.trim() === 'ok' && link.dropOk !== null) {
-      link.okCount += 1;
-      if (link.okCount === link.dropOk) return;
+    const isStatus = line.trim().startsWith('<');
+    if (wire.holding && !isStatus && wholeJobSent()) {
+      wire.held.push(line);
+      wire.deliverHeld = () => wire.held.splice(0).forEach((held) => handler(held));
+      return;
     }
-    const status = /^<([A-Za-z]+)[^>]*>$/.exec(line.trim());
-    const bf = status !== null && link.buffer !== null ? link.buffer(status[1] ?? '') : null;
-    handler(bf === null ? line : line.replace(/>\s*$/, `|Bf:${bf}>`));
+    if (wire.dropOkAfterGc && line.trim().startsWith('[GC:')) wire.sawGc = true;
+    if (line.trim() === 'ok' && wire.sawGc) {
+      wire.sawGc = false;
+      wire.dropOkAfterGc = false;
+      return;
+    }
+    if (line.trim() === 'ok' && wire.okCount >= 0) {
+      wire.okCount += 1;
+      if (wire.dropOks.includes(wire.okCount)) return;
+    }
+    handler(line);
   };
   return {
     ...sim.adapter,
@@ -73,9 +106,9 @@ function lossyAdapter(sim: GrblSimulator, link: Link): PlatformAdapter {
   };
 }
 
-async function connectIdle(link: Link): Promise<GrblSimulator> {
+async function connectIdle(wire: Link): Promise<GrblSimulator> {
   const sim = createGrblSimulator();
-  await useLaserStore.getState().connect(lossyAdapter(sim, link));
+  await useLaserStore.getState().connect(lossyAdapter(sim, wire));
   await vi.advanceTimersByTimeAsync(1_200);
   expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
   expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
@@ -98,119 +131,140 @@ function sentSoftReset(sim: GrblSimulator): boolean {
   return sim.outbound().some((payload) => payload.includes('\x18'));
 }
 
+function probesSent(sim: GrblSimulator): number {
+  const outbound = sim.outbound();
+  const jobStart = outbound.findIndex((payload) => payload.includes('G1 X10 Y0'));
+  return outbound.slice(jobStart).filter((payload) => payload === '$G\n').length;
+}
+
+function expectCleanFinish(sim: GrblSimulator): void {
+  const state = useLaserStore.getState();
+  expect(state.safetyNotice).toBeNull();
+  expect(state.pendingUntrackedAcks).toBe(0);
+  expect(state.controllerQualification.kind).toBe('qualified');
+  expect(state.getControllerReconnectRecommended()).toBe(false);
+  expect(sentSoftReset(sim)).toBe(false);
+  expect(sim.outbound()).toContain('G4 P0.01\n');
+  expect(state.log.join('\n')).toMatch(/Controller settled after job/);
+}
+
 describe('lost job-line replies at the end of a job', () => {
-  it('finishes the job after a sustained Idle when the controller reports no buffer state', async () => {
-    const link: Link = { dropOk: null, okCount: 0, buffer: null };
-    const sim = await connectIdle(link);
-    link.dropOk = 5;
+  it('asks the controller for $G and finishes on its ordered answer', async () => {
+    const wire = link([5]);
+    const sim = await connectIdle(wire);
+    wire.okCount = 0;
     await startTestLaserJobOnClock(JOB);
 
-    const releasedAfter = await msUntilReleased(40_000);
+    const releasedAfter = await msUntilReleased(20_000);
 
     expect(releasedAfter).not.toBeNull();
-    expect(releasedAfter).toBeGreaterThanOrEqual(LOST_ACK_IDLE_PROOF_MS);
-    expect(releasedAfter).toBeLessThan(25_000);
-    const state = useLaserStore.getState();
-    expect(state.safetyNotice).toBeNull();
-    expect(state.controllerQualification.kind).toBe('qualified');
-    expect(state.getControllerReconnectRecommended()).toBe(false);
-    expect(sentSoftReset(sim)).toBe(false);
-    expect(sim.outbound()).toContain('G4 P0.01\n');
-    expect(state.log.join('\n')).toMatch(/1 job line reply was lost on the serial link/);
-    expect(state.log.join('\n')).toMatch(/Controller settled after job/);
+    expect(releasedAfter).toBeGreaterThanOrEqual(LOST_REPLY_PROBE_AFTER_MS);
+    expect(releasedAfter).toBeLessThan(5_000);
+    expect(probesSent(sim)).toBe(1);
+    expectCleanFinish(sim);
+    expect(useLaserStore.getState().log.join('\n')).toMatch(
+      /1 job line reply was lost on the serial link: the controller answered \$G only after reading every line/,
+    );
   });
 
-  it('finishes sooner when the controller reports an empty buffer and planner', async () => {
-    const link: Link = {
-      dropOk: null,
-      okCount: 0,
-      buffer: (state) => (state === 'Idle' ? '15,128' : '10,64'),
-    };
-    const sim = await connectIdle(link);
-    link.dropOk = 5;
+  it('never finishes early while the controller holds its program, then completes through the replies', async () => {
+    const wire = link();
+    const sim = await connectIdle(wire);
+    wire.okCount = 0;
+    wire.holding = true;
     await startTestLaserJobOnClock(JOB);
 
-    const releasedAfter = await msUntilReleased(40_000);
-
-    expect(releasedAfter).not.toBeNull();
-    expect(releasedAfter).toBeGreaterThanOrEqual(LOST_ACK_BUFFER_PROOF_MS);
-    expect(releasedAfter).toBeLessThan(12_000);
-    expect(useLaserStore.getState().safetyNotice).toBeNull();
-    expect(sentSoftReset(sim)).toBe(false);
-    expect(useLaserStore.getState().log.join('\n')).toMatch(/empty receive buffer and planner/);
-  });
-
-  it('keeps waiting while the buffer report shows unread input (a controller holding its program)', async () => {
-    const link: Link = { dropOk: null, okCount: 0, buffer: () => '15,128' };
-    await connectIdle(link);
-    link.dropOk = 5;
-    // From here on the controller says its receive ring still holds bytes.
-    link.buffer = (state) => (state === 'Idle' ? '15,100' : '10,64');
-    await startTestLaserJobOnClock(JOB);
-
+    // Idle reports keep arriving while every reply waits in the controller.
     await vi.advanceTimersByTimeAsync(30_000);
-
-    const state = useLaserStore.getState();
+    let state = useLaserStore.getState();
     expect(state.streamer?.status).toBe('streaming');
-    expect(state.streamer?.inFlight.length).toBeGreaterThan(0);
+    expect(probesSent(sim)).toBe(1);
+    expect(state.log.join('\n')).not.toMatch(/lost on the serial link/);
+
+    wire.holding = false;
+    wire.deliverHeld?.();
+    expect(await msUntilReleased(10_000)).not.toBeNull();
+    expectCleanFinish(sim);
+    state = useLaserStore.getState();
     expect(state.log.join('\n')).not.toMatch(/lost on the serial link/);
   });
 
-  it('completes an undisturbed job exactly as before', async () => {
-    const link: Link = { dropOk: null, okCount: 0, buffer: null };
-    const sim = await connectIdle(link);
+  it('finishes when the probe’s own reply is lost after its [GC:] report', async () => {
+    const wire = link([5]);
+    const sim = await connectIdle(wire);
+    wire.okCount = 0;
+    wire.dropOkAfterGc = true;
+    await startTestLaserJobOnClock(JOB);
+
+    expect(await msUntilReleased(20_000)).not.toBeNull();
+    expectCleanFinish(sim);
+    expect(useLaserStore.getState().log.join('\n')).toMatch(/\$G confirmation was lost/);
+  });
+
+  it('completes an undisturbed job exactly as before, without a probe', async () => {
+    const wire = link();
+    const sim = await connectIdle(wire);
+    wire.okCount = 0;
     await startTestLaserJobOnClock(JOB);
 
     const releasedAfter = await msUntilReleased(10_000);
 
     expect(releasedAfter).not.toBeNull();
     expect(releasedAfter).toBeLessThan(3_000);
-    expect(sentSoftReset(sim)).toBe(false);
+    expect(probesSent(sim)).toBe(0);
+    expectCleanFinish(sim);
     expect(useLaserStore.getState().log.join('\n')).not.toMatch(/lost on the serial link/);
   });
 });
 
-describe('reportProof', () => {
-  const stamp = (sessionEpoch: number) => ({
-    sessionEpoch,
-    positionEpoch: 0,
-    sequence: 1,
-    observedAt: 1,
-  });
-  const base = {
-    controllerSessionEpoch: 3,
-    statusObservation: stamp(3),
-    rxCapacityEvidence: { rxBytesFree: 128, plannerBlocksFree: 15, sessionEpoch: 3, observedAt: 1 },
-    plannerCapacityEvidence: { plannerBlocksFree: 15, sessionEpoch: 3, observedAt: 1 },
-  };
-  const report = (
-    state: string,
-    buffer: { plannerBlocksFree: number; rxBytesFree: number } | null,
-  ) => ({ state, buffer }) as never;
-
-  it('accepts only a current-session Idle', () => {
-    expect(reportProof({ ...base, statusReport: report('Run', null) })).toBeNull();
-    expect(reportProof({ ...base, statusReport: report('Idle', null) })).toBe('idle');
-    expect(
-      reportProof({
-        ...base,
-        statusObservation: stamp(2),
-        statusReport: report('Idle', null),
-      }),
-    ).toBeNull();
+describe('lost-reply proof rules', () => {
+  it('probes only controllers that answer $G in order behind job lines', () => {
+    for (const kind of ['grbl-v1.1', 'grblhal', 'fluidnc'] as const) {
+      expect(hasOrderedProbe(selectControllerDriver(kind))).toBe(true);
+    }
+    expect(hasOrderedProbe(selectControllerDriver('grblhal', 'creality-falcon-a1-pro'))).toBe(true);
+    expect(hasOrderedProbe(selectControllerDriver('smoothieware'))).toBe(false);
+    expect(hasOrderedProbe(selectControllerDriver('marlin'))).toBe(false);
   });
 
-  it('requires a buffer report to be as empty as the quiescent baseline', () => {
-    const empty = { plannerBlocksFree: 15, rxBytesFree: 128 };
-    expect(reportProof({ ...base, statusReport: report('Idle', empty) })).toBe('buffer');
+  it('accepts only a current-session Idle report', () => {
+    const stamp = (sessionEpoch: number) => ({
+      sessionEpoch,
+      positionEpoch: 0,
+      sequence: 1,
+      observedAt: 1,
+    });
+    const report = (state: string) => ({ state }) as never;
+    const base = { controllerSessionEpoch: 3, statusObservation: stamp(3) };
+    expect(reportShowsIdle({ ...base, statusReport: report('Idle') })).toBe(true);
+    expect(reportShowsIdle({ ...base, statusReport: report('Run') })).toBe(false);
     expect(
-      reportProof({ ...base, statusReport: report('Idle', { ...empty, rxBytesFree: 100 }) }),
-    ).toBeNull();
+      reportShowsIdle({ ...base, statusObservation: stamp(2), statusReport: report('Idle') }),
+    ).toBe(false);
+  });
+
+  it('keeps a finished stream mounted while its probe still owes a reply', () => {
+    const idle = { state: 'Idle' } as never;
+    const probe = {
+      writeEpoch: 2,
+      sessionEpoch: 1,
+      streamerEpoch: 1,
+      linesBefore: 7,
+      sentAt: 0,
+      provenAt: null,
+    };
+    const done = { streamer: { status: 'done' } as never, controllerOperation: null };
+    const errored = { streamer: { status: 'errored' } as never, controllerOperation: null };
+    expect(shouldReleaseStreamerAtIdle(done, idle)).toBe(true);
+    expect(shouldReleaseStreamerAtIdle(done, idle, { writeEpoch: 2, lostReplyProbe: probe })).toBe(
+      false,
+    );
+    // A reset moved the session on: the probe is no longer owed anything.
+    expect(shouldReleaseStreamerAtIdle(done, idle, { writeEpoch: 3, lostReplyProbe: probe })).toBe(
+      true,
+    );
     expect(
-      reportProof({ ...base, statusReport: report('Idle', { ...empty, plannerBlocksFree: 14 }) }),
-    ).toBeNull();
-    expect(
-      reportProof({ ...base, rxCapacityEvidence: null, statusReport: report('Idle', empty) }),
-    ).toBeNull();
+      shouldReleaseStreamerAtIdle(errored, idle, { writeEpoch: 2, lostReplyProbe: probe }),
+    ).toBe(true);
   });
 });

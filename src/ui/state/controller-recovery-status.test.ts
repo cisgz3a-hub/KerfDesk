@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { controllerReconnectRecommended } from './controller-recovery-status';
+import { controllerReconnectRecommended, controllerWentSilent } from './controller-recovery-status';
 
-type RecoveryStatus = Parameters<typeof controllerReconnectRecommended>[0];
+type RecoveryStatus = Parameters<typeof controllerWentSilent>[0];
 
 const now = 20_000;
 
 function state(overrides: Partial<RecoveryStatus> = {}): RecoveryStatus {
   return {
     connection: { kind: 'connected' },
+    capabilities: { statusQuery: 'realtime-report' } as RecoveryStatus['capabilities'],
     controllerSessionEpoch: 4,
     controllerQualification: { kind: 'failed', epoch: 4, message: 'Empty settings response.' },
     controllerOperation: null,
@@ -161,5 +162,63 @@ describe('current controller reconnect recommendation', () => {
         now,
       ),
     ).toBe(false);
+  });
+});
+
+describe('a controller that went silent (ADR-611 Amendment 1)', () => {
+  const silent = (overrides: Partial<RecoveryStatus> = {}) =>
+    state({
+      controllerQualification: { kind: 'qualified', epoch: 4, settings: 'verified' },
+      statusObservation: {
+        sessionEpoch: 4,
+        positionEpoch: 1,
+        sequence: 7,
+        observedAt: now - 9_000,
+      },
+      ...overrides,
+    });
+
+  it('reads silent once a controller that answered this session stops answering', () => {
+    expect(controllerWentSilent(silent(), now)).toBe(true);
+    expect(
+      controllerWentSilent(
+        silent({
+          statusObservation: {
+            sessionEpoch: 4,
+            positionEpoch: 1,
+            sequence: 7,
+            observedAt: now - 500,
+          },
+        }),
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it('counts Alarm and Sleep replies as answers', () => {
+    expect(
+      controllerWentSilent(
+        silent({ statusResponseObservation: { sessionEpoch: 4, observedAt: now - 500 } }),
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it('says nothing before the first reply of a session, while homing, or for a queued-poll controller', () => {
+    expect(controllerWentSilent(silent({ statusObservation: null }), now)).toBe(false);
+    expect(controllerWentSilent(silent({ controllerSessionEpoch: 5 }), now)).toBe(false);
+    expect(
+      controllerWentSilent(
+        silent({ controllerOperation: { kind: 'home', phase: 'homing' } as never }),
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      controllerWentSilent(
+        silent({ capabilities: { statusQuery: 'queued-poll' } as RecoveryStatus['capabilities'] }),
+        now,
+      ),
+    ).toBe(false);
+    expect(controllerWentSilent(silent({ connection: { kind: 'disconnected' } }), now)).toBe(false);
   });
 });

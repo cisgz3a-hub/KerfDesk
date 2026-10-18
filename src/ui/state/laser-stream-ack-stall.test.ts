@@ -37,13 +37,20 @@ function makeConnection(writes: string[], options: ConnectionOptions = {}): Fake
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
   let closes = 0;
+  // GRBL answers lines in order: `$G` behind job lines that are still owed a
+  // reply is answered after them, and a soft reset discards it (ADR-610 A1).
+  const queuedBehindJob: string[] = [];
+  const jobRepliesOwed = (): boolean =>
+    (useLaserStore.getState().streamer?.inFlight.length ?? 0) > 0;
   const emitLine = (line: string): void => {
     for (const handler of lineHandlers) handler(line);
+    if (line === 'ok' && !jobRepliesOwed()) queuedBehindJob.splice(0).forEach(emitLine);
   };
   const connection: FakeConnection = {
     write: async (data) => {
       const acknowledgeStartFence = captureTestLaserStartFenceAck(data, emitLine);
       writes.push(data);
+      if (data === '\x18') queuedBehindJob.length = 0;
       await simulateResetWrite(data, options, emitLine);
       if (data === '?') emitLine('<Idle|MPos:0,0,0|FS:0,0>');
       if (data === 'M114\n') {
@@ -56,8 +63,9 @@ function makeConnection(writes: string[], options: ConnectionOptions = {}): Fake
         emitLine('ok');
       }
       if (data === '$G\n') {
-        emitLine('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
-        emitLine('ok');
+        const reply = ['[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]', 'ok'];
+        if (jobRepliesOwed()) queuedBehindJob.push(...reply);
+        else reply.forEach(emitLine);
       }
       if (data === '$$\n') {
         emitLine('$30=1000');

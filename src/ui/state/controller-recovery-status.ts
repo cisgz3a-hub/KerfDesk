@@ -50,6 +50,29 @@ export function controllerStoppedResponding(state: RecoveryStatus, now = Date.no
   return state.connection.kind === 'connected' && controllerResponseMissing(state, now);
 }
 
+/**
+ * A controller that answered status queries in this session and then stopped,
+ * while nothing it owns may hold its replies: the connection bar reads "Not
+ * responding" instead of "Connected" (ADR-611 Amendment 1), as other senders
+ * show a stalled link. GRBL may leave `?` unanswered while it homes, and a
+ * queued-poll controller is not asked while a job streams, so neither counts.
+ */
+export function controllerWentSilent(
+  state: RecoveryStatus & Pick<LaserState, 'capabilities'>,
+  now = Date.now(),
+): boolean {
+  if (state.connection.kind !== 'connected') return false;
+  if (state.capabilities.statusQuery !== 'realtime-report' || state.controllerOperation !== null) {
+    return false;
+  }
+  const observed = state.statusResponseObservation ?? state.statusObservation;
+  return (
+    observed !== null &&
+    observed.sessionEpoch === state.controllerSessionEpoch &&
+    now - observed.observedAt >= CONTROLLER_RESPONSE_WINDOW_MS
+  );
+}
+
 function currentQualificationFailed(state: RecoveryStatus): boolean {
   return (
     state.controllerQualification.kind === 'failed' &&
