@@ -94,7 +94,7 @@ test('the required aggregate always observes every packaging job and uses the ac
   assert.equal(verdict.env.NATIVE_PACKAGING, '${{ inputs.native == true }}');
   assert.equal(
     gate.steps.find((step) => step.uses?.startsWith('actions/checkout@')).with.ref,
-    '${{ inputs.ref }}',
+    undefined,
   );
 });
 

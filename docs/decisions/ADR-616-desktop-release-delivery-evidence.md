@@ -95,6 +95,9 @@ aggregate after every packaging job, including failures and cancellations. All
 ordinary Linux packaging and commercial-rehearsal jobs must pass; native jobs
 may be skipped only when the existing native input is false. A selected native
 run must pass all its Windows and macOS jobs. Missing or unknown results fail.
+The aggregate runs from its workflow revision, which contains its verification
+script. Packaging jobs still check out the requested source, including historical
+release candidates that predate that script.
 
 ### Amendment 1: protected retry of an original failed success receipt
 
