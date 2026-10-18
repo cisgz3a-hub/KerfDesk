@@ -28,7 +28,9 @@ A UI audit of the Artwork panel found:
    a run) and cards with a chevron (All operations).
 8. Run order cards named the operation twice and printed "#1" beside "Laser output step: 1".
    Number on canvas, a niche mode, was the loudest control in the panel.
-9. At 1280 × 720 three stacked tab rows and a boxed header left Speed below the fold.
+9. At 1280 × 720 three stacked tab rows and a boxed header left Speed below the fold. ADR-608's
+   denser chrome, which landed while this work was open, already lifts Speed into view there;
+   the boxed header still spent about 40 px above the settings.
 
 ### Decision
 
@@ -59,14 +61,15 @@ A UI audit of the Artwork panel found:
    CNC cards always show their actual steps (ADR-211). Number on canvas is an ordinary button.
 9. **The header is one line plus a light tab row** (amends ADR-430 rule 1): a short word
    (Selected or Editing) and the artwork's name, or "N artworks selected", then the Operation |
-   Artwork switch as underline tabs instead of a boxed card. On windows 820 px tall or less the
-   panel tightens its spacing only; every control stays.
+   Artwork switch as underline tabs instead of a boxed card. Sizes follow ADR-608's scale; no
+   control is removed or hidden on short windows.
 
 ### Consequences
 
-- Power and Speed are visible without scrolling at 1280 × 720 and 1366 × 768 with one artwork
-  selected and the project-machine notice dismissed. A longer scope line or mixed-settings note
-  can still push Speed down; the panel scrolls as before.
+- With one artwork selected, the operation settings start 37 px higher at every window size
+  (first field at 320 px instead of 357 px at 1280 × 720). Power, Speed and Passes are visible
+  without scrolling at 1280 × 720 and 1366 × 768. A longer scope line or mixed-settings note can
+  still push them down; the panel scrolls as before.
 - An operation's output is switched from its editor (select its artwork, or pick it in the
   Artwork picker) or from the bulk tools, no longer from its row menu.
 - Run order cards for unnamed shapes read "Rectangle"; the #N badge and the operation line tell
@@ -78,7 +81,9 @@ A UI audit of the Artwork panel found:
 - Unit tests cover the picker labels, the warning under the switch, the trimmed row menu, the
   labelled bulk-tool groups, the Run order card's step and operation lines, and the renamed
   labels.
-- Browser screenshots before and after at 1600 × 960 and 1280 × 720 in the desktop-mode dev
-  server; at 1280 × 720 the Speed field ends above the scroller's bottom edge, and choosing Image
-  on vector artwork leaves the switch where it was (0 px shift, before 29 px).
+- Browser screenshots before (current main) and after at 1600 × 960, 1280 × 720 and 1366 × 768
+  in the desktop-mode dev server, kept in `docs/audits/2026-10-18-artwork-panel/`. Choosing Image
+  on vector artwork leaves the switch where it was (0 px shift, before 46 px); move arrows and
+  the collapse chevron measure 28 × 28 px (before 22 × 24 and 22 × 22); the Properties tab and
+  the editor tabs keep whole words at 240, 300 and 480 px rail widths.
 - **NOT verified:** on hardware, or perceptually at every breakpoint.
