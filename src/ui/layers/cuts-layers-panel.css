@@ -70,6 +70,15 @@
   }
 }
 
+/* At the narrowest rail the tabs share space by word length, so the longest
+   word, Properties, still fits whole. */
+@container (max-width: 260px) {
+  .lf-artwork-view-tab.lf-btn {
+    flex: 1 1 auto;
+    padding-inline: 2px;
+  }
+}
+
 .lf-artwork-view-content {
   min-height: 0;
   min-width: 0;
