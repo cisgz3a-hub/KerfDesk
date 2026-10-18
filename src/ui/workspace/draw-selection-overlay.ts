@@ -43,6 +43,8 @@ export function drawSelectionSetOverlay(
   ctx: CanvasRenderingContext2D,
   objects: ReadonlyArray<SceneObject>,
   view: ViewTransform,
+  // The registration jig canvas has no centre move handle: it drags artwork directly.
+  options: { readonly moveHandle?: boolean } = {},
 ): void {
   const bbox = combinedBBox(objects);
   if (bbox === null) return;
@@ -59,7 +61,7 @@ export function drawSelectionSetOverlay(
   ctx.lineWidth = 1.5;
   const half = HANDLE_SCREEN_PX / 2;
   for (const handle of aabbHandlePoints(bbox)) drawSingleHandle(ctx, handle, view, half);
-  drawMoveHandleFor(ctx, objects, view);
+  if (options.moveHandle !== false) drawMoveHandleFor(ctx, objects, view);
 }
 
 function drawSelectionBox(
