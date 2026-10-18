@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The Linux package contract (ADR-606): the AppImage and the .deb carry the
+# The Linux package contract (ADR-607): the AppImage and the .deb carry the
 # KerfDesk identity, the legal files, the .lf2 MIME type and a desktop entry
 # that opens it, and no updater metadata. Runs on Linux, where dpkg-deb exists.
 # With --commercial, app.asar must carry the unsigned commercial lane's signed
@@ -104,7 +104,7 @@ appimage_path="$(realpath "${appimage}")"
 (cd "${work}" && "${appimage_path}" --appimage-extract >/dev/null)
 root="${work}/squashfs-root"
 test -x "${root}/AppRun" || fail 'AppImage has no AppRun'
-# The desktop entry adds no --no-sandbox (ADR-606), so the launcher itself must
+# The desktop entry adds no --no-sandbox (ADR-607), so the launcher itself must
 # drop Chromium's sandbox where the system blocks user namespaces.
 grep -q 'unshare -Ur true' "${root}/AppRun" || fail 'AppRun has no user namespace check'
 grep -q 'NO_SANDBOX=(--no-sandbox)' "${root}/AppRun" || fail 'AppRun has no sandbox fallback'

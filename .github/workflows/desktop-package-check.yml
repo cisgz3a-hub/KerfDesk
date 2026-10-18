@@ -9,7 +9,7 @@ name: Desktop package check
 #   and push to main. A second Linux job builds the AppImage and .deb from the
 #   Preview config, checks their package contract, installs the .deb and
 #   launches the installed app with Ubuntu's default sandbox restriction in
-#   place, then removes it (ADR-606). A third rehearses the commercial Linux
+#   place, then removes it (ADR-607). A third rehearses the commercial Linux
 #   build of the unsigned lane, and macOS rehearses its commercial build with
 #   the native jobs (ADR-613).
 # - Windows and macOS build the unsigned Preview exactly as the Preview release
@@ -217,7 +217,7 @@ jobs:
 
       # No modified-app.asar check here: Electron 44 enforces ASAR integrity on
       # macOS and Windows only (docs/tutorial/asar-integrity.md), so a Linux
-      # build starts with a modified app.asar whatever the fuse says (ADR-606).
+      # build starts with a modified app.asar whatever the fuse says (ADR-607).
 
       - name: Upload native smoke evidence
         if: always()

@@ -1,4 +1,4 @@
-import { checkGrantTime } from './licensing-clock.js';
+import { checkGrantTime, LicenceClockError, paidClockOffset } from './licensing-clock.js';
 import type { LicencePayment } from './licensing-commerce.js';
 import type { LicensingConfig } from './licensing-config.js';
 import { displayDeviceName, RELEASED, REVOKED } from './licensing-messages.js';
@@ -12,6 +12,8 @@ export type GrantAction = 'activate' | 'trial' | 'refresh';
 export type VerifiedGrant = {
   readonly credential: LicenceCredential;
   readonly claims: LicenceClaims;
+  /** Set when a paid refresh was accepted despite this computer's clock (ADR-592). */
+  readonly clockOffset?: number;
 };
 type ActivationBody = {
   readonly licenseId: string;
@@ -96,14 +98,32 @@ export function grantRequest(
 
 /**
  * Checks a service grant for this device. A grant issued more than five
- * minutes from this computer's clock throws LicenceClockError, for every tier.
+ * minutes from this computer's clock throws LicenceClockError, for every tier,
+ * except a paid refresh within one check-in period: the service did confirm
+ * that licence, so it is kept with the measured offset (ADR-592).
  */
 export function verifyGrant(
   config: LicensingConfig,
   value: unknown,
   device: string,
   now: number,
+  action: GrantAction,
 ): VerifiedGrant {
+  const grant = verifySignedGrant(config, value, device);
+  try {
+    checkGrantTime(grant.claims.issuedAt, now);
+  } catch (error) {
+    const clockOffset =
+      error instanceof LicenceClockError && action === 'refresh'
+        ? paidClockOffset(grant.claims, error.offset)
+        : null;
+    if (clockOffset === null) throw error;
+    return { ...grant, clockOffset };
+  }
+  return grant;
+}
+
+function verifySignedGrant(config: LicensingConfig, value: unknown, device: string): VerifiedGrant {
   if (
     config.channel !== 'commercial' ||
     !record(value) ||
@@ -113,7 +133,6 @@ export function verifyGrant(
     throw new Error('Invalid activation');
   const claims = verifyEntitlement(value.entitlement, config.entitlementKeys, device);
   if (claims === null) throw new Error('Invalid entitlement');
-  checkGrantTime(claims.issuedAt, now);
   return {
     credential: {
       entitlement: value.entitlement as LicenceCredential['entitlement'],
@@ -126,7 +145,8 @@ export function verifyGrant(
 /**
  * The record a verified grant leaves. A fresh grant ends any stuck
  * deactivation, and a key that unlocks paid Pro drops an unfinished purchase,
- * which would otherwise hide Renew (ADR-523 Amendment 2).
+ * which would otherwise hide Renew (ADR-523 Amendment 2). A clock offset is
+ * kept only with the grant it was measured for.
  */
 export function grantedRecord(
   action: GrantAction,
@@ -135,7 +155,7 @@ export function grantedRecord(
   now: number,
   licenseKey?: string,
 ): { readonly next: LicenceRecord; readonly droppedOrder: LicencePayment | null } {
-  const { pendingDeactivation: _pending, payment, ...rest } = saved;
+  const { pendingDeactivation: _pending, payment, clockOffset: _offset, ...rest } = saved;
   const stale =
     action === 'activate' && grant.claims.tier !== 'trial' && payment?.operation === 'purchase';
   const next: LicenceRecord = {
@@ -145,6 +165,7 @@ export function grantedRecord(
     lastSeenAt: now,
     refreshedAt: now,
     credential: grant.credential,
+    ...(grant.clockOffset === undefined ? {} : { clockOffset: grant.clockOffset }),
     ...(payment === undefined || stale ? {} : { payment }),
     ...(action === 'activate' && validLicenceKey(licenseKey) ? { licenseKey } : {}),
   };
@@ -159,7 +180,7 @@ export function revokedRecord(
 ): LicenceRecord | null {
   const revoked = REVOKED.has(code);
   if (!revoked && !RELEASED.has(code)) return null;
-  const { credential: _credential, licenseKey, ...rest } = saved;
+  const { credential: _credential, licenseKey, clockOffset: _offset, ...rest } = saved;
   // A released seat keeps its activation key; a revoked licence's key is useless.
   return {
     ...rest,
