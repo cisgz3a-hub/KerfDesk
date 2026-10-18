@@ -51,7 +51,7 @@ export const OVERVIEW = [
     icon: 'circle-play',
     title: 'Preview and G-code Inspector',
     href: '#preview',
-    body: 'Toolpath preview and a job-time estimate. In Pro, the G-code Inspector plays back .nc, .gcode and .tap files in 3D.',
+    body: 'Toolpath preview and a job-time estimate. The G-code Inspector plays back .nc, .gcode and .tap files in 3D, in every edition.',
   },
   {
     icon: 'camera',
@@ -257,7 +257,7 @@ export const FILE_ROWS = [
   [
     html`G-code <code>.nc</code>, <code>.gcode</code>, <code>.tap</code>`,
     'View',
-    'Opens in the G-code Inspector, part of Pro, for viewing only.',
+    'Opens in the G-code Inspector, in every edition, for viewing only.',
   ],
   [
     html`G-code <code>.gcode</code>, <code>.nc</code>`,
