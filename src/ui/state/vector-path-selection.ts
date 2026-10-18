@@ -66,18 +66,35 @@ export function expectedSelection(state: VectorPathState, options: VectorCombine
   );
 }
 
+export const WELD_ID_BASE = 'welded';
+
 export function uniqueWeldId(scene: Scene): string {
-  return uniqueObjectId(scene, 'welded');
+  return uniqueObjectId(scene, WELD_ID_BASE);
 }
 
 export function uniqueObjectId(scene: Scene, base: string): string {
+  return numberedObjectId(scene, base) ?? `${base}-paths-${crypto.randomUUID()}`;
+}
+
+/**
+ * Whether `id` is the id uniqueObjectId would give in this scene: the numbered
+ * one, or, once those run out, any unused random one. A background result
+ * computed with that id can then be committed as it is (ADR-609).
+ */
+export function objectIdStillFree(scene: Scene, base: string, id: string): boolean {
+  const numbered = numberedObjectId(scene, base);
+  if (numbered !== null) return id === numbered;
+  return id.startsWith(`${base}-paths-`) && !scene.objects.some((object) => object.id === id);
+}
+
+function numberedObjectId(scene: Scene, base: string): string | null {
   const used = new Set(scene.objects.map((object) => object.id));
   if (!used.has(`${base}-paths`)) return `${base}-paths`;
   for (let index = 2; index <= MAX_ID_SUFFIX; index += 1) {
     const id = `${base}-paths-${index}`;
     if (!used.has(id)) return id;
   }
-  return `${base}-paths-${crypto.randomUUID()}`;
+  return null;
 }
 
 const MAX_ID_SUFFIX = 1000;

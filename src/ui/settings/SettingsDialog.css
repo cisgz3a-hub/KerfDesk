@@ -1,0 +1,11 @@
+/* Settings keeps one footprint whichever section is open: a content-sized
+   panel resized with every section, so the section list jumped under the
+   pointer. The panel itself does not scroll; the section body is the only
+   scroll region, so nothing scrolls inside something else that scrolls. */
+.lf-dialog.lf-settings-dialog {
+  width: min(720px, calc(100vw - 20px));
+  height: min(760px, 90vh);
+  max-width: none;
+  box-sizing: border-box;
+  overflow: hidden;
+}

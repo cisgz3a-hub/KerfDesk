@@ -105,7 +105,7 @@ function MachineSummary(
           {props.status}
         </span>
       </span>
-      <Icon name="chevron-down" size={13} />
+      <Icon name="chevron-down" size={12} />
     </>
   );
 }

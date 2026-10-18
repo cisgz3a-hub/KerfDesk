@@ -7,21 +7,21 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--lf-text-sm);
   font-weight: 500;
 }
 
 .lf-operation-slider__unit {
   color: var(--lf-text-muted);
-  font-size: 11px;
+  font-size: var(--lf-text-xs);
   font-weight: 400;
 }
 
 .lf-operation-slider__heading input {
-  flex: 0 0 100px;
-  width: 100px;
+  flex: 0 0 84px;
+  width: 84px;
   min-width: 0;
-  min-height: 32px;
+  min-height: 24px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -29,9 +29,9 @@ input.lf-operation-slider__range {
   display: block;
   appearance: none;
   width: 100%;
-  height: 28px;
-  min-height: 28px;
-  margin: 3px 0 0;
+  height: 20px;
+  min-height: 20px;
+  margin: 1px 0 0;
   padding: 0;
   border: 0;
   border-radius: 4px;
@@ -111,11 +111,47 @@ input.lf-operation-slider__range {
   background: transparent;
 }
 
+.lf-operation-slider__reading {
+  margin-left: 2px;
+  color: var(--lf-text-faint);
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The minimum rail would stack the reading on a third heading line; the
+   slider's spoken value still gives it. */
+@container (max-width: 260px) {
+  .lf-operation-slider__reading {
+    display: none;
+  }
+}
+
 .lf-operation-slider__scale {
+  position: relative;
   display: flex;
   justify-content: space-between;
   color: var(--lf-text-muted);
   font-size: 10px;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
+}
+
+/* A decade on a log-scale track; 8px is half the thumb, which never leaves the track. */
+.lf-operation-slider__tick {
+  position: absolute;
+  top: 0;
+  left: calc(8px + (100% - 16px) * var(--tick));
+  transform: translateX(-50%);
+}
+
+.lf-operation-slider__tick::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 1px;
+  height: 4px;
+  background: var(--lf-border-strong);
 }

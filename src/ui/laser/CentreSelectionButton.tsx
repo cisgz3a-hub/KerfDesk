@@ -28,7 +28,7 @@ export function CentreSelectionButton({
   const blocked = useCentreBlockMessage(fileOnly, needsSetup, disabled, machineBlocked);
   if (!laserMode && !lightEnabled) return null;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+    <div className="lf-jog-light-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
       {laserMode ? (
         <button
           type="button"

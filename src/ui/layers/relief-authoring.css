@@ -129,9 +129,3 @@
     grid-template-columns: minmax(0, 1fr) 100px;
   }
 }
-
-.lf-relief-authoring-dialog .lf-dialog-actions,
-.lf-relief-create-dialog .lf-dialog-actions {
-  bottom: calc(-1 * var(--lf-space-6));
-  z-index: 2;
-}
