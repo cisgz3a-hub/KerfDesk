@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setActiveEdition, UNRESTRICTED_EDITION } from '../licensing/edition';
 import { useToastStore } from '../state/toast-store';
 import { resetStore } from '../state/test-helpers';
 import {
@@ -49,6 +50,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cancelBackgroundVectorCommand();
+  setActiveEdition(null);
   vi.useRealTimers();
 });
 
@@ -92,6 +94,18 @@ describe('one-click background vector commands (ADR-609)', () => {
     await expect(running).resolves.toBe(false);
     expect(sessions[0]!.released).toBe(true);
     expect(offset.commit).not.toHaveBeenCalled();
+  });
+
+  it('does not commit over an open Pro prompt', async () => {
+    const offset = command('Offset outlines');
+    const running = runVectorCommandInBackground(offset);
+    setActiveEdition({ ...UNRESTRICTED_EDITION, proPromptOpen: true });
+    sessions[0]!.resolve({ kind: 'done', result: { kind: 'ok', value: null } });
+    await expect(running).resolves.toBe(false);
+    expect(offset.commit).not.toHaveBeenCalled();
+    expect(messages()).toContain(
+      'Offset outlines was not applied: a Pro prompt is open. Close it, then run Offset outlines again.',
+    );
   });
 
   it('keeps its working notice up until the work settles', async () => {

@@ -76,7 +76,7 @@ function LicensedEdition({
   const link = useLicenceLink(client);
   // A desktop build without commercial metadata cannot take a licence.
   const freeBuild = unlicensedRunsFree && session.status?.channel === 'free';
-  const { load, isPro } = session;
+  const { load, isPro, hasPendingPro } = session;
   const { showAll } = desktop;
   const { managing, closeManager } = useLicenceManager(freeBuild, load, showAll);
   const value = useMemo<EditionValue>(
@@ -88,10 +88,13 @@ function LicensedEdition({
         return isPro();
       },
       proInDesktop: freeBuild,
+      get proPromptOpen() {
+        return hasPendingPro();
+      },
       requestPro: freeBuild ? desktop.request : session.requestPro,
       openLicence: freeBuild ? showAll : openLicence,
     }),
-    [desktop.request, freeBuild, isPro, session.requestPro, session.status, showAll],
+    [desktop.request, freeBuild, hasPendingPro, isPro, session.requestPro, session.status, showAll],
   );
   useEffect(() => {
     setActiveEdition(value);
@@ -247,5 +250,6 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
     },
     [accept, settle, trialClock],
   );
-  return { status, failure, pending, settle, accept, load, requestPro, isPro };
+  const hasPendingPro = useCallback(() => pendingRef.current !== null, []);
+  return { status, failure, pending, settle, accept, load, requestPro, isPro, hasPendingPro };
 }
