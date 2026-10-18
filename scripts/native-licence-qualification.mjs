@@ -190,8 +190,11 @@ export function publicNativePhase(result, processResult, profile, phase, label) 
       offline?.mode === 'offline-enforced' &&
       offline.chromiumProbeBlocked === true &&
       offline.nodeProbeBlocked === true,
-    filePickers: 'stubbed',
-    projectSaveTarget: 'memory',
+    // Cleanup behind the licence window opens no workspace, so no pickers run (ADR-623).
+    filePickers:
+      result?.renderer?.fileAccess?.openPicker === 'stubbed' ? 'stubbed' : 'not-exercised',
+    projectSaveTarget:
+      result?.renderer?.fileAccess?.writeTarget === 'memory' ? 'memory' : 'not-exercised',
   };
 }
 
