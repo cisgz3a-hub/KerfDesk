@@ -1,11 +1,11 @@
-/* Curved crests and a feathered copper wake travel along a collapsed hint.
+/* A curved crest and feathered copper wake flow left to right on every hint.
    Full-size layers make percentage transforms follow the control's length;
    only a small band inside them is painted. Both layers share the document
    timeline (sync-panel-pulses.ts), including hints collapsed later. */
 .lf-btn.lf-panel-expand-hint {
   --lf-panel-wave-from: translate3d(-100%, 0, 0);
   --lf-panel-wave-to: translate3d(100%, 0, 0);
-  --lf-panel-wave-size: 140px 100%;
+  --lf-panel-wave-size: 180% 100%;
   --lf-panel-wave-origin: 40% 50%;
   --lf-panel-wave-radius: 40% 50%;
   --lf-panel-wave-mask: url('./panel-hint-wave-horizontal.svg');
@@ -17,15 +17,6 @@
   color: var(--lf-accent-fg);
 }
 
-.lf-btn.lf-panel-expand-hint--vertical {
-  --lf-panel-wave-from: translate3d(0, -70%, 0);
-  --lf-panel-wave-to: translate3d(0, 70%, 0);
-  --lf-panel-wave-size: 100% 160px;
-  --lf-panel-wave-origin: 50% 40%;
-  --lf-panel-wave-radius: 50% 40%;
-  --lf-panel-wave-mask: url('./panel-hint-wave-vertical.svg');
-}
-
 .lf-btn.lf-panel-expand-hint::before,
 .lf-btn.lf-panel-expand-hint::after {
   content: '';
@@ -33,7 +24,7 @@
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  animation: lf-panel-expand-pulse 5.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation: lf-panel-expand-pulse 6.4s cubic-bezier(0.37, 0, 0.63, 1) infinite;
 }
 
 /* A wide, low glow sits beneath the finer curved crests. The static gradients
@@ -41,8 +32,8 @@
 .lf-btn.lf-panel-expand-hint::before {
   background: radial-gradient(
       ellipse var(--lf-panel-wave-radius) at var(--lf-panel-wave-origin),
-      color-mix(in srgb, var(--lf-accent) 20%, transparent),
-      color-mix(in srgb, var(--lf-accent) 8%, transparent) 30%,
+      color-mix(in srgb, var(--lf-accent) 18%, transparent),
+      color-mix(in srgb, var(--lf-accent) 7%, transparent) 30%,
       transparent 100%
     )
     center / var(--lf-panel-wave-size) no-repeat;
