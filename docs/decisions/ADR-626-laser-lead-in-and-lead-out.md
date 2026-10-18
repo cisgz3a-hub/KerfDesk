@@ -66,8 +66,12 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    the bed's place in program coordinates is known, measured with each arc's full G2/G3 sweep as
    job bounds measure it, not only its sampled points; walking out from the join it may never come
    nearer its own contour than it already was (within 0.03 mm, up to the clearance), and its free
-   end, where the mark lands, must be on the scrap side and at least the clearance from the contour;
-   away from the join it must keep the clearance from every other cut line, except copies of its own
+   end, where the mark lands, must be on the scrap side and at least the clearance from the contour
+   (or, for a lead too short to reach that far, 90% of the way its own shape takes it into the
+   scrap, so every length the setting allows can fit);
+   away from the join it must keep the clearance from every other cut line, including the bridged
+   gaps of a tabbed or perforated outline (a lead slipping through two tab gaps would burn across
+   that part), except copies of its own
    outline on another operation (same bounds and length within 0.01 mm); and its free end must lie
    inside exactly the closed contours that hold its own contour, so it can never end inside another
    part or past the hole or sheet its contour sits in. The clearance is 0.2 mm or one kerf width

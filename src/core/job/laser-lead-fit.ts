@@ -5,10 +5,11 @@
 //     from the join, it never comes nearer the contour than it already was
 //     (within TOLERANCE_MM, and up to the clearance), and its free end, where
 //     the start or stop mark lands, is on the scrap side and at least the
-//     clearance away;
+//     clearance away, or, for a lead too short to reach that far, 90% of the
+//     way its own shape takes it into the scrap;
 //   - away from the join it keeps the clearance from every other cut line,
-//     except copies of its own contour (the same outline on another
-//     operation);
+//     including the uncut gaps of a tabbed or perforated outline, except
+//     copies of its own contour (the same outline on another operation);
 //   - its free end is inside exactly the closed contours that hold its own
 //     contour, so it cannot end inside another part or past the hole or
 //     sheet opening its contour sits in.
@@ -53,6 +54,9 @@ const SAMPLE_MM = 0.05;
 // a lead may simply be riding the contour's chords near the join.
 const TOLERANCE_MM = 0.03;
 const BED_SLACK_MM = 1e-6;
+// Share of a short lead's own reach into the scrap its free end must keep
+// from its contour; the rest allows for the contour curving under it.
+const FREE_END_REACH_SHARE = 0.9;
 
 export function fitLead(
   kind: LeadKind,
@@ -62,7 +66,7 @@ export function fitLead(
 ): LeadFit | null {
   for (const factor of LENGTH_LADDER) {
     const path = leadPath(kind, join, { ...shape, lengthMm: shape.lengthMm * factor });
-    if (leadFits(path, kind, join.at, context)) return { path, shortened: factor < 1 };
+    if (leadFits(path, kind, join, context)) return { path, shortened: factor < 1 };
   }
   return null;
 }
@@ -70,15 +74,20 @@ export function fitLead(
 export function leadFits(
   path: LeadPath,
   kind: LeadKind,
-  at: Vec2,
+  join: LeadJoin,
   context: LeadFitContext,
 ): boolean {
+  const { at } = join;
   if (!onBed(path, context.bed)) return false;
   const outward = kind === 'in' ? [...path.points].reverse() : path.points;
   // An arc written as G2/G3 bulges up to the sampling sag past the chords
   // checked here, so it keeps that much more clearance from other cut lines.
   const reserveMm = path.moves.some((move) => move.kind === 'arc') ? ARC_SAMPLE_SAGITTA_MM : 0;
-  if (!clearOfCutLines(walkSamples(outward), at, context, reserveMm)) return false;
+  // The free end keeps the clearance from its own contour, or, for a lead too
+  // short to reach that far, nearly as far as its own shape takes it.
+  const reachMm = (path.freeEnd.x - at.x) * join.scrap.x + (path.freeEnd.y - at.y) * join.scrap.y;
+  const freeEndNeedMm = Math.min(context.clearanceMm, FREE_END_REACH_SHARE * reachMm);
+  if (!clearOfCutLines(walkSamples(outward), at, context, reserveMm, freeEndNeedMm)) return false;
   return freeEndInScrap(path.freeEnd, at, context);
 }
 
@@ -87,6 +96,7 @@ function clearOfCutLines(
   at: Vec2,
   context: LeadFitContext,
   reserveMm: number,
+  freeEndNeedMm: number,
 ): boolean {
   const { obstacles, ownLine, ignoredLines, clearanceMm } = context;
   const keepOutMm = clearanceMm + reserveMm;
@@ -101,7 +111,7 @@ function clearOfCutLines(
     if (fromJoin >= clearanceMm && otherMm < keepOutMm) return false;
   }
   // The last sample is the free end, where the start or stop mark lands.
-  return freeEndMm >= clearanceMm;
+  return freeEndMm >= freeEndNeedMm;
 }
 
 function freeEndInScrap(freeEnd: Vec2, at: Vec2, context: LeadFitContext): boolean {

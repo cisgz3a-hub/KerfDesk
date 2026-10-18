@@ -210,4 +210,57 @@ describe('laser lead geometry guards (ADR-626)', () => {
     // chords run a few micrometres short of the arcs.
     expect(pathLength(led.polyline)).toBeCloseTo(2 + 40 + 3 + 2, 1);
   });
+
+  it('fits a lead shorter than the clearance, at every length the setting allows', () => {
+    for (const leads of [
+      { ...LEADS, lengthMm: 0.1 },
+      { ...LEADS, style: 'line' as const, angleDeg: 45, lengthMm: 0.1 },
+    ]) {
+      const led = first(
+        applyLaserLeads({ groups: [group([square(0, 0, 10)], { laserLeads: leads })] }, NO_BED),
+      );
+      expect(led.closed).toBe(false);
+    }
+  });
+
+  it('keeps a lead from slipping through two tab gaps across a tabbed neighbour', () => {
+    // A 0.8 mm strip right of the square, tabbed where the square's start
+    // would lead straight out across it.
+    const nesting = { forest: 'strip-run', depth: 0, topologyContour: '0' };
+    const strip: CutSegment[] = [
+      {
+        polyline: [
+          { x: 10.6, y: 5.5 },
+          { x: 10.6, y: 10 },
+          { x: 11.4, y: 10 },
+          { x: 11.4, y: 5.5 },
+        ],
+        closed: false,
+        nesting,
+      },
+      {
+        polyline: [
+          { x: 11.4, y: 4.5 },
+          { x: 11.4, y: 0 },
+          { x: 10.6, y: 0 },
+          { x: 10.6, y: 4.5 },
+        ],
+        closed: false,
+        nesting,
+      },
+    ];
+    const start: Vec2 = { x: 10, y: 5 };
+    const part: CutSegment = {
+      polyline: [start, { x: 10, y: 10 }, { x: 0, y: 10 }, { x: 0, y: 0 }, { x: 10, y: 0 }, start],
+      closed: true,
+    };
+    const leads = { ...LEADS, style: 'line' as const, angleDeg: 90, lengthMm: 3, leadOut: false };
+    const done = applyLaserLeads(
+      { groups: [group([part], { laserLeads: leads }), group(strip)] },
+      NO_BED,
+    );
+    const led = first(done);
+    expect(led.closed).toBe(false);
+    for (const point of led.polyline) expect(point.x).toBeLessThanOrEqual(10.4);
+  });
 });

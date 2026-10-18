@@ -75,7 +75,12 @@ export function leadJobLines(job: Job): LeadJobLines {
   });
   for (const { nesting, ids } of pieces.values()) {
     const outline = chainPieces(ids.map((id) => lines[id] ?? []));
-    if (outline.length >= 3) rings.push(ring(outline, ids, nesting));
+    if (outline.length < 3) continue;
+    // The whole outline, its uncut gaps bridged, is a line a lead keeps clear
+    // of too: a lead slipping through two tab gaps would burn across the part.
+    const bridged = lines.length;
+    lines.push([...outline, outline[0] as Vec2]);
+    rings.push(ring(outline, [...ids, bridged], nesting));
   }
   const representatives = copyRepresentatives(rings);
   return {
