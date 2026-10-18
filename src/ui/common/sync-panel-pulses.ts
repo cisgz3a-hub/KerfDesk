@@ -1,4 +1,4 @@
-// Collapsed-panel hints beat in step. A CSS animation starts when its element
+// Collapsed-panel waves travel in step. A CSS animation starts when its element
 // gets the class, so a rail collapsed a second after another would pulse a
 // second behind it forever. Pinning each hint animation's start to the
 // document timeline's origin gives every hint the same phase, whenever it
