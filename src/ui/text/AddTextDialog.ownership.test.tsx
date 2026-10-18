@@ -9,7 +9,10 @@ import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 
 const mocks = vi.hoisted(() => ({ render: vi.fn() }));
-vi.mock('./render-text-geometry', () => ({ renderTextGeometry: mocks.render }));
+vi.mock('./text-worker-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./text-worker-session')>()),
+  renderTextGeometryOffThread: mocks.render,
+}));
 vi.mock('./font-loader', () => ({
   cssFamilyForFont: (key: string) => `lf2-${key}`,
   ensureFontCss: vi.fn(async () => undefined),
@@ -98,6 +101,7 @@ it.each(['escape', 'new-project', 'unmount'] as const)(
         else h.root.render(null);
       });
       const project = useStore.getState().project;
+      expect(mocks.render.mock.calls[0]?.[1]?.aborted).toBe(true);
       await act(async () => h.resolve(rendered));
       expect(useStore.getState().project).toBe(project);
       expect(useStore.getState().project.scene.objects).toHaveLength(0);
@@ -106,6 +110,18 @@ it.each(['escape', 'new-project', 'unmount'] as const)(
     }
   },
 );
+
+it('locks every editable field while a modal submission is rendering', async () => {
+  const h = await startRender();
+  try {
+    const fields = h.host.querySelectorAll('textarea, input, select');
+    expect(fields.length).toBeGreaterThan(8);
+    expect([...fields].every((field) => field.matches(':disabled'))).toBe(true);
+    await act(async () => h.resolve(rendered));
+  } finally {
+    await h.dispose();
+  }
+});
 
 it('keeps unrelated same-document edits and inserts one current text after StrictMode replay', async () => {
   const h = await startRender();

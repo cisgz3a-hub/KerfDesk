@@ -107,9 +107,13 @@ function compositesAreAcyclic(
     const start = offsets[glyph] ?? 0;
     const end = offsets[glyph + 1] ?? start;
     if (start === end) continue;
-    if (end < start || end > glyf.length) return false;
+    if (end - start < GLYPH_HEADER_BYTES || end > glyf.length) return false;
     if (data.getInt16(glyf.offset + start) >= 0) continue;
-    const indexes = componentIndexes(data, glyf.offset + start + GLYPH_HEADER_BYTES);
+    const indexes = componentIndexes(
+      data,
+      glyf.offset + start + GLYPH_HEADER_BYTES,
+      glyf.offset + end,
+    );
     // opentype.js cannot resolve a component that does not exist.
     if (indexes.some((index) => index >= glyphCount)) return false;
     components.set(glyph, indexes);
@@ -117,17 +121,19 @@ function compositesAreAcyclic(
   return !hasCycle(components);
 }
 
-function componentIndexes(data: DataView, start: number): ReadonlyArray<number> {
+function componentIndexes(data: DataView, start: number, end: number): ReadonlyArray<number> {
   const indexes: number[] = [];
   let cursor = start;
   let flags = MORE_COMPONENTS;
   while ((flags & MORE_COMPONENTS) !== 0) {
+    if (cursor + 4 > end) throw new RangeError('Composite record exceeds its glyph.');
     flags = data.getUint16(cursor);
     indexes.push(data.getUint16(cursor + 2));
     cursor += 4 + ((flags & ARG_1_AND_2_ARE_WORDS) !== 0 ? 4 : 2);
     if ((flags & WE_HAVE_A_SCALE) !== 0) cursor += 2;
     else if ((flags & WE_HAVE_AN_X_AND_Y_SCALE) !== 0) cursor += 4;
     else if ((flags & WE_HAVE_A_TWO_BY_TWO) !== 0) cursor += 8;
+    if (cursor > end) throw new RangeError('Composite arguments or transform exceed its glyph.');
   }
   return indexes;
 }

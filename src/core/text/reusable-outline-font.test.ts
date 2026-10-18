@@ -122,6 +122,18 @@ describe('reusableOutlineFont (ADR-624)', () => {
     expect(reusableOutlineFont(syntheticFont([null, [0], [1, 0], [2, 1]]))).toBe(true);
   });
 
+  it.each([0x0020, 0x0001, 0x0008, 0x0040, 0x0080])(
+    'refuses a component record crossing its glyph end (flag %s)',
+    (flag) => {
+      const font = syntheticFont([null, [0], null]);
+      // glyf is the first table; glyph 1 follows the 10-byte simple glyph.
+      const view = new DataView(font);
+      const glyf = view.getUint32(20);
+      view.setUint16(glyf + 10 + 10, 0x0002 | flag);
+      expect(reusableOutlineFont(font)).toBe(false);
+    },
+  );
+
   it.each([
     ['two glyphs that include each other', [null, [2], [1]]],
     ['a longer cycle', [null, [2], [3], [0, 1]]],
