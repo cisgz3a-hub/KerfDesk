@@ -375,16 +375,10 @@ try {
       @(Get-Process -Name KerfDesk, LaserForge -ErrorAction SilentlyContinue).Count -ne 0) {
     throw 'Runner already contains KerfDesk installation, profile, shortcuts or processes; refusing.'
   }
-  $candidateSources = @(@{ file = $Installer; source = $SourceCommit })
-  if ($UpgradeInstaller) {
-    $upgradeSource = if ($UpgradeSourceCommit) { $UpgradeSourceCommit } else { $SourceCommit }
-    $candidateSources += @{ file = $UpgradeInstaller; source = $upgradeSource }
-  }
-  $candidates = foreach ($entry in $candidateSources) {
-    $candidate = $entry.file
+  $candidates = foreach ($candidate in @($Installer, $UpgradeInstaller | Where-Object { $_ })) {
     $signature = (Get-AuthenticodeSignature -LiteralPath $candidate).Status.ToString()
     if ($signature -ne 'NotSigned') { throw "Expected unsigned test candidate, found $signature" }
-    & (Join-Path $PSScriptRoot 'verify-windows-package-identity.ps1') -Executable $candidate -Kind Installer -SourceCommit $entry.source | Out-Null
+    & (Join-Path $PSScriptRoot 'verify-windows-package-identity.ps1') -Executable $candidate -Kind Installer | Out-Null
     [pscustomobject]@{ file = (Get-FileEvidence $candidate); signature = $signature }
   }
   $receipt.candidates = @($candidates)
