@@ -116,7 +116,7 @@ test('Adjust Image and Photo engraving apply settings through their dialogs and 
   await photo
     .getByRole('radiogroup', { name: 'Photo processing' })
     .getByRole('radio', { name: 'Stucki', exact: true })
-    .check({ force: true });
+    .check();
   await photo.getByRole('spinbutton', { name: 'Photo midtones (gamma)' }).fill('1.2');
   await photo.getByRole('spinbutton', { name: 'Photo midtones (gamma)' }).blur();
   await photo.getByRole('button', { name: 'Apply photo settings' }).click();
@@ -128,7 +128,7 @@ test('Adjust Image and Photo engraving apply settings through their dialogs and 
   const stucki = dither.getByRole('radio', { name: 'Stucki', exact: true });
   const jarvis = dither.getByRole('radio', { name: 'Jarvis', exact: true });
   await expect(stucki).toBeChecked();
-  await jarvis.check({ force: true });
+  await jarvis.check();
   await adjust.getByRole('button', { name: 'OK', exact: true }).click();
   expect((await project(page)).scene.layers).toEqual(before.scene.layers);
   await command(page, 'adjust-image');
