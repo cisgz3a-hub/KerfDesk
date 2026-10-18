@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../state';
-import { useDesignHierarchyStore } from '../state/design-hierarchy-store';
+import { currentHierarchyFocus, useDesignHierarchyStore } from '../state/design-hierarchy-store';
 import { selectedObjectIds } from '../state/scene-group-actions';
 import { selectedArtworkLightTargets } from './selected-artwork-light-targets';
 
@@ -9,8 +9,7 @@ export function useArtworkLightChoice() {
   const primary = useStore((state) => state.selectedObjectId);
   const additional = useStore((state) => state.additionalSelectedIds);
   const documentEpoch = useStore((state) => state.projectDocumentEpoch);
-  const hierarchy = useDesignHierarchyStore();
-  const focus = hierarchy.documentEpoch === documentEpoch ? hierarchy.focusId : null;
+  const focus = useDesignHierarchyStore(() => currentHierarchyFocus(scene, documentEpoch));
   const targets = useMemo(
     () =>
       selectedArtworkLightTargets(

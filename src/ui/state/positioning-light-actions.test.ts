@@ -390,7 +390,7 @@ describe('Frame evidence across a positioning-light move (ADR-605)', () => {
     expect(framedRunStartHandoffIssue(permit, h.get())).not.toBeNull();
   });
 
-  it('voids the Frame when the canvas changes during the move, even if changed back', async () => {
+  it('keeps Frame when only the project reference changes during the move', async () => {
     const h = harness();
     completeFrame(h, 'absolute');
     const project = useStore.getState().project;
@@ -399,8 +399,9 @@ describe('Frame evidence across a positioning-light move (ADR-605)', () => {
       useStore.setState({ project: { ...project } });
     });
     await h.actions.centrePositioningLight(40, 45, 1200);
-    expect(h.get().completedFrame).toBeNull();
-    expect(h.get().framedRun).toBeNull();
+    expect(h.get().completedFrame).not.toBeNull();
+    expect(h.get().framedRun).toBe(h.get().completedFrame);
+    expect(h.get().positioningLightEnabled).toBe(true);
   });
 
   it('voids the Frame when the light travel fails', async () => {

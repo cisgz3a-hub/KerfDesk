@@ -6,6 +6,8 @@ import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
+import { focusDesignHierarchy, useDesignHierarchyStore } from '../state/design-hierarchy-store';
+import { createFramedRunPermit, type FramedRunCandidate } from '../state/framed-run';
 import { JogPad } from './JogPad';
 import { useJogControlPreferences } from './jog-control-preferences';
 import { useMachineSetupDialogStore } from './device-setup/machine-setup-dialog-store';
@@ -16,6 +18,7 @@ import { useMachineSetupDialogStore } from './device-setup/machine-setup-dialog-
 
 const originalLaser = useLaserStore.getState();
 const originalPreferences = useJogControlPreferences.getState();
+const originalHierarchy = useDesignHierarchyStore.getState();
 let host: HTMLDivElement;
 let root: Root;
 const jog = vi.fn(async (..._args: unknown[]) =>
@@ -27,6 +30,7 @@ const off = vi.fn(async (enabled: boolean) =>
 
 beforeEach(() => {
   resetStore();
+  focusDesignHierarchy(null, useStore.getState().projectDocumentEpoch);
   jog.mockClear();
   off.mockClear();
   const shape = createRectangle({
@@ -73,6 +77,8 @@ beforeEach(() => {
     switchPositioningLightOn: () => off(true),
     switchPositioningLightOff: () => off(false),
     positioningLightEnabled: false,
+    framedRun: null,
+    completedFrame: null,
   });
   useJogControlPreferences.setState({ requestedFeedMmPerMin: 1200 });
   host = document.createElement('div');
@@ -85,6 +91,7 @@ afterEach(async () => {
   host.remove();
   useLaserStore.setState(originalLaser, true);
   useJogControlPreferences.setState(originalPreferences, true);
+  useDesignHierarchyStore.setState(originalHierarchy, true);
   useMachineSetupDialogStore.getState().close();
 });
 
@@ -142,6 +149,31 @@ describe('Centre selection in the jog pad', () => {
     await act(async () => centreButton().click());
     expect(jog).not.toHaveBeenCalled();
   });
+
+  it.each(['absolute', 'user-origin', 'verified-origin', 'current-position'] as const)(
+    'requires an ordinary Frame instead of transient evidence in %s',
+    async (startFrom) => {
+      useStore.setState({ jobPlacement: { startFrom, anchor: 'front-left' } });
+      await act(async () => root.render(<JogPad disabled={false} />));
+      for (const authorizationContext of ['transient-camera', 'laser-second-pass'] as const) {
+        const candidate = { authorizationContext } as FramedRunCandidate;
+        const frame = createFramedRunPermit(candidate, useLaserStore.getState());
+        for (const evidence of [
+          { framedRun: frame, completedFrame: null },
+          { framedRun: null, completedFrame: frame },
+        ]) {
+          await act(async () => useLaserStore.setState(evidence));
+          expect(centreButton().disabled).toBe(true);
+          expect(centreButton().title).toContain('ordinary artwork job');
+          await act(async () => centreButton().click());
+        }
+      }
+      const frame = createFramedRunPermit({} as FramedRunCandidate, useLaserStore.getState());
+      await act(async () => useLaserStore.setState({ framedRun: null, completedFrame: frame }));
+      expect(centreButton().disabled).toBe(false);
+      expect(jog).not.toHaveBeenCalled();
+    },
+  );
 
   it('subtracts the pointer offset before converting bed axes to native coordinates', async () => {
     useStore.setState((state) => ({
@@ -239,19 +271,41 @@ describe('Centre selection in the jog pad', () => {
     expect(on.getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('treats a selected group as one artwork and targets its combined centre', async () => {
+  it('keeps intact groups combined after deleting the focused group', async () => {
     addSecondArtwork();
     useStore.setState((state) => ({
       project: {
         ...state.project,
         scene: {
           ...state.project.scene,
-          groups: [{ id: 'logo', name: 'Complete logo', objectIds: ['shape', 'second'] }],
+          groups: [
+            { id: 'logo', name: 'Complete logo', objectIds: ['shape', 'second'] },
+            { id: 'deleted-group', name: 'Previous focus', objectIds: [] },
+          ],
         },
       },
     }));
     await act(async () => root.render(<JogPad disabled={false} />));
     expect(host.querySelector('select[aria-label="Artwork to centre"]')).toBeNull();
+    await act(async () => focusDesignHierarchy('logo', useStore.getState().projectDocumentEpoch));
+    expect(centreButton().disabled).toBe(true);
+    expect(host.querySelector('select[aria-label="Artwork to centre"]')).not.toBeNull();
+    await act(async () =>
+      focusDesignHierarchy('deleted-group', useStore.getState().projectDocumentEpoch),
+    );
+    await act(async () =>
+      useStore.setState((state) => ({
+        project: {
+          ...state.project,
+          scene: {
+            ...state.project.scene,
+            groups: state.project.scene.groups?.filter((group) => group.id !== 'deleted-group'),
+          },
+        },
+      })),
+    );
+    expect(host.querySelector('select[aria-label="Artwork to centre"]')).toBeNull();
+    expect(centreButton().disabled).toBe(false);
     await act(async () => centreButton().click());
     expect(jog).toHaveBeenCalledExactlyOnceWith(75, 65, 1200, expect.any(Function));
   });

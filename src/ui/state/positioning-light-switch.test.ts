@@ -45,6 +45,15 @@ describe('independent positioning LED switch', () => {
       expect(lines.indexOf(h.mapping.onCommand)).toBeGreaterThan(
         lines.indexOf(h.refs.driver.commands.frameToolOffLines[0]!),
       );
+      expect(lines).not.toContain('M9');
+      expect(lines).not.toContain('M107');
+      expect(lines).toEqual(
+        expect.arrayContaining(
+          h.refs.driver.commands.frameToolOffLines.filter(
+            (line) => line !== 'M9' && line !== 'M107',
+          ),
+        ),
+      );
       expect(lines.at(-1)).toBe(h.mapping.onCommand);
       expect(lines).toContain(h.refs.driver.commands.settleDwell);
       expect(lines.some(changesPosition)).toBe(false);
@@ -64,6 +73,20 @@ describe('independent positioning LED switch', () => {
       expect(h.writes.some(changesPosition)).toBe(false);
     },
   );
+
+  it('still sends M9 when it is the explicitly configured LED output Off', async () => {
+    const h = harness();
+    useStore.getState().updateDeviceProfile({
+      positioningLight: { ...h.mapping, onCommand: 'M7', offCommand: 'M9' },
+    });
+    await h.actions.switchPositioningLightOn();
+    expect(h.writes.filter((line) => line.trim() === 'M9')).toHaveLength(1);
+    expect(h.writes.at(-1)?.trim()).toBe('M7');
+    expect(h.writes.some(changesPosition)).toBe(false);
+    await h.actions.switchPositioningLightOff();
+    expect(h.writes.filter((line) => line.trim() === 'M9')).toHaveLength(2);
+    expect(h.get().positioningLightEnabled).toBe(false);
+  });
 
   it('leaves an incumbent readiness wait untouched when switching On', async () => {
     const h = harness();

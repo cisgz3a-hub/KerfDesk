@@ -8,6 +8,8 @@ import {
 import type { PositioningLight } from '../../core/devices/positioning-light';
 import type { DeviceProfile } from '../../core/devices/device-profile';
 import { inferCurrentMachinePosition } from './infer-machine-position';
+import { positioningLightEditGuard } from './positioning-light-edit-guard';
+import { currentFrameSpatialSignature } from '../laser/frame-spatial-identity';
 import {
   controllerOperationOwner,
   interactiveControllerOperation,
@@ -111,7 +113,14 @@ async function runPositioningLight(
   assertAdmission(get(), refs);
   assertTarget(target);
   const mapping = resolveMapping(get(), refs, enabled);
-  const { context, owns, session } = createTransaction(set, get, refs, write, enabled, target);
+  const { context, owns, session, dispose } = createTransaction(
+    set,
+    get,
+    refs,
+    write,
+    enabled,
+    target,
+  );
   const driver = refs.driver;
   let mayHaveMoved = false;
   let settled = false;
@@ -121,7 +130,7 @@ async function runPositioningLight(
       throw new Error('Positioning light needs a fresh Idle controller.');
     if (enabled) {
       await turnOffPreviousLight(context);
-      for (const line of driver.commands.frameToolOffLines)
+      for (const line of lightToolOffLines(driver.commands.frameToolOffLines, target !== undefined))
         await positioningLightCommand(context, line);
       await positioningLightCommand(context, mapping.offCommand);
       set({ positioningLightEnabled: false });
@@ -156,6 +165,8 @@ async function runPositioningLight(
       else set({ controllerOperation: null });
     }
     throw error;
+  } finally {
+    dispose();
   }
 }
 
@@ -185,6 +196,11 @@ async function turnOffPreviousLight(context: PositioningLightTransaction): Promi
   const previous = lightSnapshots.get(context.refs);
   if (previous?.session() === true && context.get().positioningLightEnabled)
     await positioningLightCommand(context, previous.mapping.offCommand);
+}
+
+// Standalone LED switching keeps unrelated coolant/fan accessories unchanged.
+function lightToolOffLines(lines: ReadonlyArray<string>, moves: boolean): ReadonlyArray<string> {
+  return moves ? lines : lines.filter((line) => line !== 'M9' && line !== 'M107');
 }
 
 function assertTarget(target: Target | undefined): void {
@@ -236,6 +252,7 @@ function createTransaction(
   target: Target | undefined,
 ) {
   const initial = get();
+  const editGuard = positioningLightEditGuard(target !== undefined);
   const device = useStore.getState().project.device;
   const connection = refs.connection;
   const driver = refs.driver;
@@ -272,6 +289,7 @@ function createTransaction(
     target?.assertTargetCurrent?.();
     if (enabled && useStore.getState().project.device !== device)
       throw new Error('Device settings changed during positioning.');
+    editGuard.assertUnchanged();
   };
   const context: PositioningLightTransaction = {
     get,
@@ -280,7 +298,7 @@ function createTransaction(
     write: (line, action, source) => write(line, action, source, assertCurrent),
   };
   set({ controllerOperation: operation, lastWriteError: null });
-  return { context, owns, session };
+  return { context, owns, session, dispose: editGuard.dispose };
 }
 
 async function moveToLightTarget(
@@ -322,8 +340,8 @@ async function moveToLightTarget(
 }
 
 type LightMoveFrameProof = StashedFrameProof & {
-  readonly project: unknown;
-  readonly jobPlacement: unknown;
+  readonly spatialSignature: string;
+  readonly projectDocumentEpoch: number;
 };
 
 function stashFrameProof(state: LaserState): LightMoveFrameProof {
@@ -332,20 +350,24 @@ function stashFrameProof(state: LaserState): LightMoveFrameProof {
     framedRun: state.framedRun,
     completedFrame: state.completedFrame ?? null,
     frameVerification: state.frameVerification,
-    project: app.project,
-    jobPlacement: app.jobPlacement,
+    spatialSignature: currentFrameSpatialSignature(app),
+    projectDocumentEpoch: app.projectDocumentEpoch,
   };
 }
 
-// The proof was voided for the move itself, so the drift subscription could
-// not watch the canvas meanwhile; any edit, even one undone, keeps it void.
+// The ordinary drift subscription cannot watch a temporarily absent proof.
+// assertCurrent checks the one-way transaction observer, including undone edits.
 function restoreFrameProof(
   context: PositioningLightTransaction,
   set: SetFn,
   proof: LightMoveFrameProof,
 ): void {
   const app = useStore.getState();
-  if (app.project !== proof.project || app.jobPlacement !== proof.jobPlacement) return;
+  if (
+    currentFrameSpatialSignature(app) !== proof.spatialSignature ||
+    app.projectDocumentEpoch !== proof.projectDocumentEpoch
+  )
+    return;
   context.assertCurrent();
   set((state) => rebasedLightMoveFramePatch(proof, state));
 }

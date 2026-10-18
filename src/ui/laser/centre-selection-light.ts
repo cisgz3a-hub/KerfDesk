@@ -4,6 +4,7 @@ import {
 } from '../../core/devices/head-position-frames';
 import { positioningLightIssue } from '../../core/devices/positioning-light';
 import { toMachineCoords } from '../../core/devices/origin-transform';
+import { computeFrameBounds } from '../../core/job';
 import { rotaryAppliesTo } from '../../core/job/rotary-job';
 import { machineKindOf, type Vec2 } from '../../core/scene';
 import { useStore } from '../state';
@@ -57,7 +58,7 @@ export async function centreSelectionLight(objectIds?: ReadonlyArray<string>): P
   const prepared = frame.candidate.preparedStart.prepared;
   // This snapshot also contains evaluated text and Print-and-Cut registration.
   // Re-anchoring a chosen subset would move it away from the framed whole job.
-  const centre = selectedCentre(prepared.project, ids);
+  const centre = selectedCentre(prepared.project, ids, true);
   const machine = toMachineCoords(centre, prepared.project.device);
   await centreLightOnFramedPoint(
     { x: machine.x + prepared.jobOriginOffset.x, y: machine.y + prepared.jobOriginOffset.y },
@@ -70,9 +71,21 @@ export async function centreSelectionLight(objectIds?: ReadonlyArray<string>): P
 function selectedCentre(
   project: ReturnType<typeof useStore.getState>['project'],
   ids: string[],
+  framedOutput = false,
 ): Vec2 {
-  const existing = new Set(project.scene.objects.map((object) => object.id));
-  if (ids.some((id) => !existing.has(id)))
+  const objects = new Map(project.scene.objects.map((object) => [object.id, object]));
+  if (
+    ids.some((id) => {
+      const object = objects.get(id);
+      // Prepared scenes also retain disabled artwork and placement dependencies.
+      // Use Frame's own inclusion rules, including per-path/sub-operation binding.
+      return (
+        object === undefined ||
+        (framedOutput &&
+          computeFrameBounds({ ...project.scene, objects: [object] }, project.device) === null)
+      );
+    })
+  )
     throw new Error('The chosen artwork was not included in this Frame. Frame that artwork first.');
   const centre = selectionAnchorScenePoint(project, ids, 'c');
   if (centre === null || !Number.isFinite(centre.x) || !Number.isFinite(centre.y))
@@ -129,8 +142,9 @@ function artworkPlacementGuard(
   return () => {
     const current = useStore.getState();
     if (
-      current.project !== app.project ||
-      current.jobPlacement !== app.jobPlacement ||
+      current.projectDocumentEpoch !== app.projectDocumentEpoch ||
+      (frame === null &&
+        (current.project !== app.project || current.jobPlacement !== app.jobPlacement)) ||
       currentFrameSpatialSignature(current) !== spatialSignature
     )
       throw new Error('The artwork or placement changed before the LED move.');
@@ -200,8 +214,8 @@ function assertFramedLightCurrent(
   if (
     (current.framedRun ?? current.completedFrame) !== frame ||
     current.manualMotionCancelEpoch !== laser.manualMotionCancelEpoch ||
-    currentApp.project !== app.project ||
-    currentApp.jobPlacement !== app.jobPlacement
+    currentApp.projectDocumentEpoch !== app.projectDocumentEpoch ||
+    currentFrameSpatialSignature(currentApp) !== currentFrameSpatialSignature(app)
   )
     throw new Error('The framed artwork or positioning request changed before the LED move.');
   const changed = framedRunStartHandoffIssue(frame, current);

@@ -165,8 +165,10 @@ function PositioningLightControls({
 
 function usePlacementBlockMessage(): string | null {
   const absolute = useStore((state) => state.jobPlacement.startFrom === 'absolute');
-  const hasFrame = useLaserStore((state) => (state.framedRun ?? state.completedFrame) != null);
-  return !absolute && !hasFrame
+  const frame = useLaserStore((state) => state.framedRun ?? state.completedFrame);
+  if (frame?.candidate.authorizationContext !== undefined)
+    return 'Frame the ordinary artwork job before centring this artwork.';
+  return !absolute && frame == null
     ? 'Frame the job once to locate this artwork on the board, then choose Artwork centre & LED.'
     : null;
 }

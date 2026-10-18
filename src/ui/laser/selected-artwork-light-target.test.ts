@@ -268,6 +268,33 @@ describe('explicit selected artwork centre in the completed Frame placement', ()
     },
   );
 
+  it('allows process-only edits while the final Frame acknowledgement is pending', async () => {
+    const { project } = await connectedFixture('grbl-v1.1', 'current-position');
+    const before = await frame();
+    useLaserStore.setState({ pendingUntrackedAcks: 1 });
+    const pending = centreSelectionLight(['selected']);
+    useStore.setState({
+      project: {
+        ...project,
+        scene: {
+          ...project.scene,
+          layers: project.scene.layers.map((layer) => ({
+            ...layer,
+            name: 'Updated process',
+            power: 25,
+            speed: 1500,
+          })),
+        },
+      },
+    });
+    useLaserStore.setState({ pendingUntrackedAcks: 0 });
+    await vi.advanceTimersByTimeAsync(5_000);
+    await pending;
+    expect(nativeHead()).toMatchObject({ x: 178, y: 116 });
+    expect(useLaserStore.getState().positioningLightEnabled).toBe(true);
+    expect(useLaserStore.getState().framedRun?.candidate).toBe(before.candidate);
+  });
+
   it.each(['user-origin', 'verified-origin', 'current-position'] as const)(
     '%s retains the jig anchor while targeting artwork inside its board outline',
     async (mode) => {
@@ -295,7 +322,7 @@ describe('explicit selected artwork centre in the completed Frame placement', ()
     },
   );
 
-  it.each(['selection', 'deleted', 'placement', 'session', 'cancel'] as const)(
+  it.each(['selection', 'deleted', 'placement', 'session', 'cancel', 'document'] as const)(
     'does not dispatch a chosen target after %s changes during the final Frame fence',
     async (drift) => {
       const { sim } = await connectedFixture('grbl-v1.1', 'current-position');
@@ -305,6 +332,8 @@ describe('explicit selected artwork centre in the completed Frame placement', ()
       const pending = centreSelectionLight(['selected']);
       const rejected = expect(pending).rejects.toThrow();
       if (drift === 'selection') useStore.setState({ selectedObjectId: 'also-output' });
+      if (drift === 'document')
+        useStore.setState((app) => ({ projectDocumentEpoch: app.projectDocumentEpoch + 1 }));
       if (drift === 'deleted')
         useStore.setState((app) => ({
           project: {
