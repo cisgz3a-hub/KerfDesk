@@ -25,7 +25,7 @@
 // The floor, 1 mm/s, is below every cut in those guides (the slowest is a
 // 5 W diode at 2 mm/s). Slower speeds remain available by typing them.
 
-import type { DeviceProfile, LaserTechnology } from './device-profile';
+import type { LaserSubProfile, LaserTechnology } from './device-profile';
 
 export const SPEED_SLIDER_FLOOR_MM_PER_MIN = 60;
 
@@ -40,15 +40,20 @@ const WORKING_SPEED_MAX_BY_TECHNOLOGY: Readonly<Record<LaserTechnology, number>>
   unknown: 30_000,
 };
 
+/** What the range reads from a machine profile. */
+export type SpeedRangeMachine = {
+  readonly profileId?: string | undefined;
+  readonly laserSubProfile?: Pick<LaserSubProfile, 'technology'> | undefined;
+  readonly maxFeed: number;
+};
+
 export type SpeedSliderRange = {
   readonly min: number;
   readonly max: number;
 };
 
 /** The fastest speed this machine is normally run at, before its ceiling. */
-export function workingSpeedMaxMmPerMin(
-  device: Pick<DeviceProfile, 'profileId' | 'laserSubProfile'>,
-): number {
+export function workingSpeedMaxMmPerMin(device: Omit<SpeedRangeMachine, 'maxFeed'>): number {
   const byProfile =
     device.profileId === undefined ? undefined : WORKING_SPEED_MAX_BY_PROFILE_ID[device.profileId];
   if (byProfile !== undefined) return byProfile;
@@ -56,9 +61,7 @@ export function workingSpeedMaxMmPerMin(
 }
 
 /** The Speed slider's span: working speeds, never above Output max feed. */
-export function speedSliderRange(
-  device: Pick<DeviceProfile, 'profileId' | 'laserSubProfile' | 'maxFeed'>,
-): SpeedSliderRange {
+export function speedSliderRange(device: SpeedRangeMachine): SpeedSliderRange {
   const ceiling = Number.isFinite(device.maxFeed) && device.maxFeed >= 1 ? device.maxFeed : 1;
   const max = Math.min(ceiling, workingSpeedMaxMmPerMin(device));
   return { min: Math.min(SPEED_SLIDER_FLOOR_MM_PER_MIN, max), max };
@@ -82,7 +85,7 @@ export function speedSliderStops(range: SpeedSliderRange): ReadonlyArray<number>
     value = nextStop(value);
   }
   // An odd ceiling (7321) replaces a round stop it nearly repeats (7250).
-  const last = stops[stops.length - 1]!;
+  const last = stops.at(-1) ?? min;
   if (stops.length > 1 && max - last < stopStep(last) / 2) stops.pop();
   stops.push(max);
   return stops;
@@ -115,20 +118,18 @@ function nextStop(value: number): number {
   return coarser === step ? next : Math.ceil(next / coarser) * coarser;
 }
 
-/** Index of the stop nearest value on the slider's log scale. */
+/** Index of the stop nearest value on the slider's log scale; ends take values beyond them. */
 export function nearestSpeedStopIndex(stops: ReadonlyArray<number>, value: number): number {
-  if (stops.length === 0 || !Number.isFinite(value) || value <= stops[0]!) return 0;
-  const last = stops.length - 1;
-  if (value >= stops[last]!) return last;
-  const target = Math.log(value);
+  if (!Number.isFinite(value)) return 0;
+  const target = Math.log(Math.max(value, Number.MIN_VALUE));
   let best = 0;
   let bestDistance = Number.POSITIVE_INFINITY;
-  for (let index = 0; index <= last; index += 1) {
-    const distance = Math.abs(Math.log(stops[index]!) - target);
+  stops.forEach((stop, index) => {
+    const distance = Math.abs(Math.log(stop) - target);
     if (distance < bestDistance) {
       best = index;
       bestDistance = distance;
     }
-  }
+  });
   return best;
 }

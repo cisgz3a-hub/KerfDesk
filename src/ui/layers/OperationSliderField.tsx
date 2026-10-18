@@ -126,10 +126,32 @@ function sliderTrack(props: OperationSliderFieldProps, value: number): SliderTra
     max: last,
     position,
     fraction: last === 0 ? 1 : position / last,
-    low: stops[0]!,
-    high: stops[last]!,
+    low: stops[0] ?? props.min,
+    high: stops[last] ?? props.max,
     ticks,
   };
+}
+
+function SliderScale(props: { readonly track: SliderTrack; readonly mixed: boolean }): JSX.Element {
+  const { track, mixed } = props;
+  return (
+    <div className="lf-operation-slider__scale" aria-hidden="true">
+      <span>{scaleFormat.format(track.low)}</span>
+      <span>{mixed ? 'Mixed' : null}</span>
+      {mixed
+        ? null
+        : track.ticks.map((tick) => (
+            <span
+              key={tick.value}
+              className="lf-operation-slider__tick"
+              style={{ '--tick': tick.fraction } as React.CSSProperties}
+            >
+              {scaleFormat.format(tick.value)}
+            </span>
+          ))}
+      <span>{scaleFormat.format(track.high)}</span>
+    </div>
+  );
 }
 
 /** A quick adjustment plus exact entry, sharing one document-owned draft. */
@@ -149,10 +171,14 @@ export function OperationSliderField(props: OperationSliderFieldProps): JSX.Elem
       <div className="lf-operation-slider__heading">
         <label id={`${id}-label`} htmlFor={`${id}-number`}>
           {props.label} <span className="lf-operation-slider__unit">{props.unit}</span>
+          {/* The space lets a narrow panel wrap the reading onto its own line. */}
           {reading === undefined ? null : (
-            <span className="lf-operation-slider__reading" aria-hidden="true">
-              {reading}
-            </span>
+            <>
+              {' '}
+              <span className="lf-operation-slider__reading" aria-hidden="true">
+                {reading}
+              </span>
+            </>
           )}
         </label>
         <input
@@ -192,22 +218,7 @@ export function OperationSliderField(props: OperationSliderFieldProps): JSX.Elem
         onLostPointerCapture={draft.finishDrag}
         onBlur={draft.finishDrag}
       />
-      <div className="lf-operation-slider__scale" aria-hidden="true">
-        <span>{scaleFormat.format(track.low)}</span>
-        <span>{mixed ? 'Mixed' : null}</span>
-        {mixed
-          ? null
-          : track.ticks.map((tick) => (
-              <span
-                key={tick.value}
-                className="lf-operation-slider__tick"
-                style={{ '--tick': tick.fraction } as React.CSSProperties}
-              >
-                {scaleFormat.format(tick.value)}
-              </span>
-            ))}
-        <span>{scaleFormat.format(track.high)}</span>
-      </div>
+      <SliderScale track={track} mixed={mixed} />
     </div>
   );
 }

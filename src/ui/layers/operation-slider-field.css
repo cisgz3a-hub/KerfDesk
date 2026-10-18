@@ -112,12 +112,20 @@ input.lf-operation-slider__range {
 }
 
 .lf-operation-slider__reading {
-  margin-left: 6px;
+  margin-left: 2px;
   color: var(--lf-text-faint);
   font-size: 11px;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* The minimum rail would stack the reading on a third heading line; the
+   slider's spoken value still gives it. */
+@container (max-width: 260px) {
+  .lf-operation-slider__reading {
+    display: none;
+  }
 }
 
 .lf-operation-slider__scale {
@@ -136,13 +144,12 @@ input.lf-operation-slider__range {
   top: 0;
   left: calc(8px + (100% - 16px) * var(--tick));
   transform: translateX(-50%);
-  padding-top: 3px;
 }
 
 .lf-operation-slider__tick::before {
   content: '';
   position: absolute;
-  top: -2px;
+  top: -5px;
   left: 50%;
   width: 1px;
   height: 4px;

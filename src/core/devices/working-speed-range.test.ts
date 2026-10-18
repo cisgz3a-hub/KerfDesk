@@ -32,15 +32,7 @@ describe('speedSliderRange', () => {
 
   it('caps a raised ceiling at the laser type’s working speed', () => {
     const diode = { ...XTOOL_D1_PRO_PROFILES[0]!, maxFeed: 100_000 };
-    const co2 = {
-      ...DEFAULT_DEVICE_PROFILE,
-      maxFeed: 100_000,
-      laserSubProfile: {
-        technology: 'co2' as const,
-        focusMode: 'manual' as const,
-        airAssist: 'unknown' as const,
-      },
-    };
+    const co2 = { maxFeed: 100_000, laserSubProfile: { technology: 'co2' as const } };
     expect(speedSliderRange(diode).max).toBe(10_000);
     expect(speedSliderRange(co2).max).toBe(30_000);
     expect(speedSliderRange({ ...DEFAULT_DEVICE_PROFILE, maxFeed: 100_000 }).max).toBe(30_000);
