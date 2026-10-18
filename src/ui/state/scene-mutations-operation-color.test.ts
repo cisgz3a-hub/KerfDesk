@@ -10,6 +10,7 @@ import {
   createProject,
   DEFAULT_RASTER_LAYER_COLOR,
   IDENTITY_TRANSFORM,
+  nextOperationColor,
   operationIdsForObject,
   type Project,
   type RasterImage,
@@ -20,8 +21,8 @@ import { applyFreshImport, applyTraceToExisting } from './scene-mutations';
 
 const SOURCE_ID = 'src1';
 const TRACE_ID = 'trace1';
-// OPERATION_PALETTE[0] — "New artwork starts in black" (core/scene/artwork-operation.ts).
-const FIRST_PALETTE_COLOR = '#000000';
+// OPERATION_PALETTE[0], what the allocator hands out first (blue since ADR-620).
+const FIRST_PALETTE_COLOR = nextOperationColor([]);
 
 function operationColorFor(project: Project, objectId: string): string | undefined {
   const object = project.scene.objects.find((candidate) => candidate.id === objectId);
@@ -65,7 +66,7 @@ function importedSource(): Project {
 
 // A schema-v2 style scene: the source raster carries no operationIds and is
 // resolved to its operation by COLOR match alone. Its color equals its
-// operation's color (both black), which is how legacy scenes bound geometry.
+// operation's color (both the first palette color), which is how legacy scenes bound geometry.
 function legacyColorBoundProject(): Project {
   const base = createProject();
   return {
@@ -80,18 +81,18 @@ function legacyColorBoundProject(): Project {
 
 describe('operation color assignment', () => {
   it('gives the first artwork in an empty scene the first palette color', () => {
-    // Guard: proves the palette itself is black-first, so a failure in the
+    // Guard: proves the import takes the first palette color, so a failure in the
     // trace case below localizes to the trace flow rather than the allocator.
     expect(operationColorFor(importedSource(), SOURCE_ID)).toBe(FIRST_PALETTE_COLOR);
   });
 
-  it('gives the traced artwork black rather than the runner-up palette color', () => {
+  it('gives the traced artwork the first palette color rather than the runner-up', () => {
     // The real ADR-026 flow: the operator imports the bitmap, then runs Trace
     // on it. The source is retained as a tinted 'trace-source' backing — a
     // reference object the operator is expected to delete, not output — but its
     // operation already holds OPERATION_PALETTE[0]. The first-unused-wins
     // allocator therefore pushes the trace (the artwork actually being cut)
-    // onto the second color, so a fresh trace lands on the canvas blue.
+    // onto the second color.
     const result = applyTraceToExisting(
       { project: importedSource(), undoStack: [] },
       SOURCE_ID,
@@ -100,7 +101,7 @@ describe('operation color assignment', () => {
     expect(operationColorFor(result.project, TRACE_ID)).toBe(FIRST_PALETTE_COLOR);
   });
 
-  it('gives the traced artwork black when the source is deleted after tracing', () => {
+  it('gives the traced artwork the first palette color when the source is deleted', () => {
     // Delete Image After Trace drops the source object up front, but its now
     // orphaned operation is only pruned at the end — after the trace has
     // already allocated against it.
@@ -126,8 +127,8 @@ describe('operation color assignment', () => {
 
   it('still gives a second imported artwork its own distinct color', () => {
     // The maintainer's "multiple colors with layers and different images": once
-    // the trace holds black, the next fresh artwork must get its own color, not
-    // collide onto black. Guards against over-correcting into a mono allocator.
+    // the trace holds the first color, the next fresh artwork must get its own
+    // color, not collide onto it. Guards against over-correcting into a mono allocator.
     const traced = applyTraceToExisting(
       { project: importedSource(), undoStack: [] },
       SOURCE_ID,
@@ -162,17 +163,17 @@ describe('operation color assignment', () => {
     const sourceOps = operationIdsForObject(source, result.project.scene.layers);
     const traceOps = operationIdsForObject(trace, result.project.scene.layers);
     // The source still resolves to an operation, and it is a DIFFERENT one than
-    // the trace. The color assertion alone would pass vacuously (both black in
+    // the trace. The color assertion alone would pass vacuously (both one color in
     // the corrupted case); asserting distinct operations is what catches the
     // silent merge — without the guard the color-bound source re-points onto the
-    // trace's freshly-blackened operation.
+    // trace's freshly recolored operation.
     expect(sourceOps.length).toBeGreaterThan(0);
     expect(sourceOps).not.toEqual(traceOps);
   });
 });
 
 describe('rasterized (raster-output) trace color assignment', () => {
-  it('gives a rasterized trace black by reusing the source image operation', () => {
+  it('gives a rasterized trace the first palette color by reusing the source image operation', () => {
     const result = applyRasterizedTraceToExisting(
       { project: importedSource(), undoStack: [] },
       SOURCE_ID,
@@ -181,10 +182,10 @@ describe('rasterized (raster-output) trace color assignment', () => {
     expect(operationColorFor(result.project, 'rtrace1')).toBe(FIRST_PALETTE_COLOR);
   });
 
-  it('gives a rasterized trace black even with no reusable image operation (audit F2)', () => {
+  it('gives a rasterized trace the first palette color with no reusable image operation (audit F2)', () => {
     // Force the fresh-operation branch: bind the source to a LINE operation so
     // no Image operation is reusable. The freshly allocated operation must still
-    // take black, not the runner-up.
+    // take the first palette color, not the runner-up.
     const base = createProject();
     const project: Project = {
       ...base,

@@ -662,8 +662,8 @@ the linked artwork.
 
 ### F-A6d. Filled or wireframe view (ADR-410)
 
-1. **Window → Wireframe View** (`Alt+W`) draws Fill artwork as outlines in its operation colour,
-   so overlaps and stray paths show. The menu item shows a check while it is on.
+1. **Window → Wireframe View** (`Alt+W`) draws Fill artwork as outlines, so overlaps and stray
+   paths show. The menu item shows a check while it is on.
 2. It changes the canvas only: output, Preview and saved projects are unchanged. It resets to
    Filled when the app restarts.
 
@@ -778,6 +778,21 @@ the linked artwork.
 4. **Optimize** applies it as one undo step. Imported and traced artwork keeps its operations and
    tabs; text and drawn shapes that change become paths in the same step, and locked artwork is
    left as it is. The notice says what changed. Settings are remembered for the session.
+
+### F-A6j. Operation colours on the canvas (ADR-620)
+
+1. Artwork rests in plain ink on the workspace, so the canvas shows the design itself. Every
+   operation still has its own colour, shown on its row in the Artwork panel.
+2. With the Select tool, rest the pointer on a piece of artwork: it pulses once in its operation
+   colour, and every other piece whose operation has the same settings pulses in that same
+   colour, rippling out from the piece under the pointer. A soft colour edge stays while the
+   pointer rests there. Resting on an operation row does the same for that operation's artwork.
+3. Hold **Alt** (Option on a Mac) to show every operation colour at once; let go to return to ink.
+   Alt shortcuts such as `Alt+W` do not trigger it.
+4. With reduced motion turned on in the operating system, the colour shows while the pointer
+   rests instead of pulsing.
+5. Display only: Preview, output and saved projects are unchanged. New operations start at blue;
+   black is the last palette colour.
 
 ### F-A7. Artwork Operations panel
 
@@ -1114,6 +1129,13 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    the left.
 5. Burned labels show each row's and column's value (speeds as the feed the job runs). The toast
    names what rows and columns vary.
+6. Below the fields, a live preview draws the card as Generate will make it: every row and column
+   it holds (a passes axis shows only its whole numbers), labelled with the same values the card
+   burns, speeds capped at the profile's maximum feed. Each cell is shaded from faint to deep by
+   its energy relative to the strongest cell: power × passes ÷ speed, and ÷ hatch spacing for
+   Engrave. Engraved cells fill; cut cells show only their outline. Hovering a cell names its
+   settings. While a field is invalid the last valid card stays, dimmed, until it is fixed. The
+   preview only shows the card; it never changes what Generate makes.
 
 ### F-A7g. Recipes that apply themselves (ADR-496)
 

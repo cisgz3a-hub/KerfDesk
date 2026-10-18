@@ -84,11 +84,15 @@ export type MaterialTestGrid = {
 
 type CellSettings = Readonly<Record<MaterialTestParameter, number>>;
 
-type GridPlan = {
+/** The grid's two axes and the values it holds still, as Generate builds them. */
+export type MaterialTestGridAxes = {
   readonly mode: 'fill' | 'line';
   readonly rowAxis: MaterialTestAxis;
   readonly columnAxis: MaterialTestAxis;
   readonly fixed: CellSettings;
+};
+
+type GridPlan = MaterialTestGridAxes & {
   readonly layers: ReadonlyArray<Layer>;
   readonly layout: MaterialTestLayout;
   readonly cellWidth: number;
@@ -121,7 +125,8 @@ export function generateMaterialTestGrid(options: MaterialTestGridOptions): Mate
   };
 }
 
-function planMaterialTestGrid(options: MaterialTestGridOptions): GridPlan {
+/** ADR-497: the rows and columns a grid will hold, shared with the dialog's preview. */
+export function materialTestGridAxes(options: MaterialTestGridOptions): MaterialTestGridAxes {
   const mode = options.mode === 'line' ? 'line' : 'fill';
   const [rowParameter, columnParameter] = resolveParameters(options, mode);
   const rowAxis = materialTestAxis(
@@ -140,6 +145,11 @@ function planMaterialTestGrid(options: MaterialTestGridOptions): GridPlan {
       fixedMaterialTestValue(parameter, options),
     ]),
   ) as CellSettings;
+  return { mode, rowAxis, columnAxis, fixed };
+}
+
+function planMaterialTestGrid(options: MaterialTestGridOptions): GridPlan {
+  const { mode, rowAxis, columnAxis, fixed } = materialTestGridAxes(options);
   const cellWidth = Math.max(MIN_CELL_SIZE_MM, finiteOr(options.cellWidthMm, MIN_CELL_SIZE_MM));
   const cellHeight = Math.max(MIN_CELL_SIZE_MM, finiteOr(options.cellHeightMm, MIN_CELL_SIZE_MM));
   const layers = materialTestLayers({ mode, rowAxis, columnAxis, fixed, options });
