@@ -20,6 +20,10 @@ export const SYSTEM_FONTS_UNSUPPORTED =
   'This browser cannot list installed fonts. Use Chrome or Edge, or the KerfDesk desktop app, or Import a TTF or OTF file.';
 export const SYSTEM_FONTS_DENIED =
   'KerfDesk was not allowed to read your installed fonts. Allow font access for this site in your browser settings and try again, or Import a TTF or OTF file.';
+// Some browsers answer a blocked or dismissed permission with an empty list
+// rather than an error, so an empty answer is not "no fonts installed".
+export const SYSTEM_FONTS_EMPTY =
+  'The browser listed no installed fonts. It may be blocking font access for this site: allow it in your browser settings and try again, or Import a TTF or OTF file.';
 export const SYSTEM_FONT_RESTRICTED =
   "This font's licence restricts embedding. Keep projects that use it to yourself unless the licence allows sharing.";
 
@@ -126,6 +130,7 @@ function SystemFontsBody(props: {
   if (result.kind === 'failed') {
     return <p role="alert">Could not list installed fonts: {result.message}</p>;
   }
+  if (result.families.length === 0) return <p role="note">{SYSTEM_FONTS_EMPTY}</p>;
   return <SystemFontList {...props} families={result.families} />;
 }
 

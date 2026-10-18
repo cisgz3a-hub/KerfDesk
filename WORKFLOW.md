@@ -3577,7 +3577,9 @@ settings and Job Review keep their existing read-only setup references.
   the project opens on computers without the font. A face inside a `.ttc` collection is copied
   out on its own. A font whose licence restricts embedding says so first; choose **Embed font**
   to use it anyway or **Back** to pick another. Firefox and Safari cannot list installed fonts:
-  the dialog says so and **Import** still works. The list is never saved or sent anywhere.
+  the dialog says so and **Import** still works. A browser that blocks font access may answer
+  with an empty list instead; the dialog says the browser listed no fonts and how to allow it.
+  The list is never saved or sent anywhere.
 - F-D4. Adjust character spacing / line height
 - **Weld overlaps** joins overlapping outline letters without converting text to a separate shape.
   It is enabled for new text. For existing text, double-click it, enable **Weld overlaps**, then
@@ -9017,8 +9019,8 @@ The G-code Inspector is free in every edition (ADR-627).
    program (Inspect G-code) does not offer it: it already has Frame and Start.
 2. **Run on machine...** opens **Run *file name***. It lists what is sent (lines and bytes; the
    file's comments, `%` markers and blank lines are left out and nothing else changes), the
-   Inspector's estimated time, the Frame outline (its size and its lowest X and Y in work
-   coordinates), the units the program declares and whether it runs as a laser or a CNC job
+   Inspector's estimated time, the Frame outline (its size and lowest corner in work
+   coordinates, travel moves included), the units the program declares and whether it runs as a laser or a CNC job
    (the current machine mode).
 3. **Frame** is enabled while connected, Idle and with no other motion running; its tooltip
    says why otherwise. It runs the ordinary Frame preparation (G54 selection, report units)

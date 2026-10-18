@@ -7,6 +7,7 @@ import { groupSystemFonts, type SystemFontFace, type SystemFontQuery } from './s
 import {
   SYSTEM_FONT_RESTRICTED,
   SYSTEM_FONTS_DENIED,
+  SYSTEM_FONTS_EMPTY,
   SYSTEM_FONTS_UNSUPPORTED,
   SystemFontsDialog,
 } from './SystemFontsDialog';
@@ -69,6 +70,12 @@ it('explains a browser without the API and a refused permission', async () => {
   expect((await show({ kind: 'unsupported' })).textContent).toContain(SYSTEM_FONTS_UNSUPPORTED);
   act(() => root?.unmount());
   expect((await show({ kind: 'denied' })).textContent).toContain(SYSTEM_FONTS_DENIED);
+});
+
+it('does not read an empty answer as no fonts installed', async () => {
+  const body = await show({ kind: 'ok', families: [] });
+  expect(body.textContent).toContain(SYSTEM_FONTS_EMPTY);
+  expect(body.querySelector('input[type="search"]')).toBeNull();
 });
 
 it('lists families, narrows them by search and embeds the chosen face', async () => {

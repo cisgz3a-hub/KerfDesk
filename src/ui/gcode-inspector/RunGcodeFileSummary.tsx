@@ -44,9 +44,9 @@ export function RunGcodeFileSummary(props: {
         <dt>Frame outline</dt>
         <dd>
           {props.formatLength(envelope.maxX - envelope.minX)} ×{' '}
-          {props.formatLength(envelope.maxY - envelope.minY)}, from X{' '}
-          {props.formatLength(envelope.minX)} Y {props.formatLength(envelope.minY)} in work
-          coordinates
+          {props.formatLength(envelope.maxY - envelope.minY)}; lowest corner X{' '}
+          {props.formatLength(envelope.minX)}, Y {props.formatLength(envelope.minY)} (work
+          coordinates, travel moves included)
         </dd>
         <dt>Units</dt>
         <dd>{UNITS_TEXT[review.units]}</dd>
