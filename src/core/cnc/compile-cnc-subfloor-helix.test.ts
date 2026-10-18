@@ -44,33 +44,37 @@ function passes(scene: Scene) {
   return group.passes;
 }
 
-it('keeps the ordinary pocket depth ladder when a sub-floor helix is disclosed', () => {
-  const layer = {
-    ...createLayer({ id: 'pocket-op', color }),
-    cnc: {
-      ...DEFAULT_CNC_LAYER_SETTINGS,
-      cutType: 'pocket' as const,
-      tabsEnabled: false,
-      depthMm: 2,
-      depthPerPassMm: 1,
-    },
-  };
-  const ordinary = passes({ objects: [square], layers: [layer] });
-  const scene: Scene = {
-    objects: [square],
-    layers: [
-      {
-        ...layer,
-        cnc: { ...layer.cnc, helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 0.2 } },
+it.each([0, 3])(
+  'keeps the ordinary pocket depth ladder (ramp %s) for a sub-floor helix',
+  (rampEntryDeg) => {
+    const layer = {
+      ...createLayer({ id: 'pocket-op', color }),
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'pocket' as const,
+        tabsEnabled: false,
+        depthMm: 2,
+        depthPerPassMm: 1,
+        rampEntryDeg,
       },
-    ],
-  };
+    };
+    const ordinary = passes({ objects: [square], layers: [layer] });
+    const scene: Scene = {
+      objects: [square],
+      layers: [
+        {
+          ...layer,
+          cnc: { ...layer.cnc, helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 0.2 } },
+        },
+      ],
+    };
 
-  expect(passes(scene)).toEqual(ordinary);
-  expect(ordinary.length).toBeGreaterThan(0);
-  expect(
-    findCncHelicalEntryIssues(scene, DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG),
-  ).toEqual([
-    { layerId: 'pocket-op', reason: expect.stringMatching(/0\.5 degrees.*plunge entry/) },
-  ]);
-});
+    expect(passes(scene)).toEqual(ordinary);
+    expect(ordinary.length).toBeGreaterThan(0);
+    expect(
+      findCncHelicalEntryIssues(scene, DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG),
+    ).toEqual([
+      { layerId: 'pocket-op', reason: expect.stringMatching(/0\.5 degrees.*ordinary entry/) },
+    ]);
+  },
+);

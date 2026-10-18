@@ -14,7 +14,7 @@ export type HelicalEntryPlan =
 
 type HelicalEntryIssue = {
   readonly reason: string;
-  readonly fallback?: 'plunge';
+  readonly fallback?: 'ordinary-pocket';
 };
 
 const MIN_ANGLE_DEG = 0.5;
@@ -81,8 +81,8 @@ function helicalRequestIssue(
   // disclosed rather than silently steepened to it (audit 2026-10-18).
   if (settings.angleDeg < MIN_ANGLE_DEG) {
     return {
-      reason: `Helix entry angle must be at least ${String(MIN_ANGLE_DEG)} degrees. This pocket uses plunge entry.`,
-      fallback: 'plunge',
+      reason: `Helix entry angle must be at least ${String(MIN_ANGLE_DEG)} degrees. This pocket keeps its ordinary entry.`,
+      fallback: 'ordinary-pocket',
     };
   }
   if (settings.minDiameterMm > settings.maxDiameterMm) {
