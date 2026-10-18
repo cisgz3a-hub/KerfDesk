@@ -335,10 +335,13 @@ function Uninstall-Candidate([string]$Label) {
 
 function Invoke-InstalledSmoke([string]$Label) {
   # The installed app launches, imports an SVG and saves a project on a throwaway
-  # profile; the smoke's own deadline bounds it.
+  # profile; the smoke's own deadline bounds it. A commercial package has no
+  # licence on that profile, so it must open behind its licence window instead,
+  # in a state a trial or key can open (ADR-623).
   $output = Join-Path $EvidenceRoot $Label
-  & node (Join-Path $PSScriptRoot 'verify-windows-packaged-native-smoke.mjs') $executable "--output=$output"
-  if ($LASTEXITCODE -ne 0) { throw "Installed app launch/import/save failed: $Label" }
+  $expectation = @(if ($PackageKind -eq 'CommercialUnsigned') { '--expect-licence-window' })
+  & node (Join-Path $PSScriptRoot 'verify-windows-packaged-native-smoke.mjs') $executable "--output=$output" @expectation
+  if ($LASTEXITCODE -ne 0) { throw "Installed app launch failed: $Label" }
   $steps.Add([pscustomobject]@{ name = $Label; evidence = $output })
   Write-Receipt
 }

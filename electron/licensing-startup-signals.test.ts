@@ -17,13 +17,25 @@ describe('startup signals for the licence window (ADR-623)', () => {
     const signals = createStartupSignals(false);
     const seen: boolean[] = [];
     signals.admission.onChange((admitted) => seen.push(admitted));
-    signals.observe({ edition: 'free' });
-    signals.observe({ edition: 'pro' });
-    signals.observe({ edition: 'pro' });
+    signals.observeRequest()({ edition: 'free' });
+    signals.observeRequest()({ edition: 'pro' });
+    signals.observeRequest()({ edition: 'pro' });
     // A reopened macOS window, or a reload, opens behind the window again.
     signals.admission.rendererOpening();
-    signals.observe({ edition: 'free' });
+    signals.observeRequest()({ edition: 'free' });
     expect(seen).toEqual([false, true, false]);
+  });
+
+  it('ignores a Pro reply to a renderer that reloaded before it arrived', () => {
+    const signals = createStartupSignals(false);
+    const seen: boolean[] = [];
+    signals.admission.onChange((admitted) => seen.push(admitted));
+    const staleRequest = signals.observeRequest();
+    signals.admission.rendererOpening();
+    staleRequest({ edition: 'pro' });
+    expect(seen).toEqual([false]);
+    signals.observeRequest()({ edition: 'pro' });
+    expect(seen).toEqual([false, true]);
   });
 
   it('always admits a build without licensing, as it has no licence window', () => {
@@ -31,7 +43,7 @@ describe('startup signals for the licence window (ADR-623)', () => {
     const seen: boolean[] = [];
     signals.admission.onChange((admitted) => seen.push(admitted));
     signals.admission.rendererOpening();
-    signals.observe({ edition: 'free' });
+    signals.observeRequest()({ edition: 'free' });
     expect(seen).toEqual([true]);
   });
 
@@ -40,7 +52,7 @@ describe('startup signals for the licence window (ADR-623)', () => {
     const read = createStartupSignals(false);
     const afterRead = read.afterFirstStatusRead(10_000);
     expect(await settled(afterRead)).toBe(false);
-    read.observe({ edition: 'free' });
+    read.observeRequest()({ edition: 'free' });
     expect(await settled(afterRead)).toBe(true);
     const unread = createStartupSignals(false).afterFirstStatusRead(10_000);
     await vi.advanceTimersByTimeAsync(9_999);

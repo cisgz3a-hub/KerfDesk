@@ -149,6 +149,24 @@ it('opens the workspace as soon as a quiet confirmation restores the licence', a
   expect(licenceWindow()).toBeNull();
   expect(host.querySelector('[data-workspace]')).not.toBeNull();
 });
+it('hands the modal role to the updates panel it opens, and takes it back', async () => {
+  await act(async () =>
+    root.render(
+      <EditionProvider client={client()}>
+        <div data-workspace>workspace</div>
+      </EditionProvider>,
+    ),
+  );
+  expect(licenceWindow()?.getAttribute('aria-modal')).toBe('true');
+  await act(async () => button('Check for updates').click());
+  expect(document.querySelector('[role="dialog"][aria-label="KerfDesk updates"]')).not.toBeNull();
+  expect(licenceWindow()?.getAttribute('aria-modal')).toBe('false');
+  expect(licenceWindow()?.getAttribute('aria-hidden')).toBe('true');
+  await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(document.querySelector('[role="dialog"][aria-label="KerfDesk updates"]')).toBeNull();
+  expect(licenceWindow()?.getAttribute('aria-modal')).toBe('true');
+  expect(licenceWindow()?.hasAttribute('aria-hidden')).toBe(false);
+});
 it('opens a build that cannot take a licence without the licence window', async () => {
   const api = client({ ...free, channel: 'free', state: 'ready' });
   await act(async () =>

@@ -20,8 +20,11 @@ export type LicenceEntry = {
   readonly licenceLink?: LicenceLink | null | undefined;
   /** This computer's project seal key (ADR-592), for a commercial build's own renderer. */
   readonly projectSealKey?: (() => Promise<string | null>) | undefined;
-  /** Sees each status the renderer is sent: the licence window's reads (ADR-623). */
-  readonly observeStatus?: ((status: LicenceStatus) => void) | undefined;
+  /**
+   * Watches one renderer request from its start: the status it is sent tells
+   * the licence window's reads and admission apart from a reloaded renderer's (ADR-623).
+   */
+  readonly observeRequest?: (() => (status: LicenceStatus) => void) | undefined;
 };
 
 export function withLicensingRoutes(
@@ -48,8 +51,9 @@ export function withLicensingRoutes(
       ].includes(action)
     )
       return updateRoute(action, request, updates, requestUpdateClose);
+    const observe = entry.observeRequest?.();
     const sent = (status: LicenceStatus): Response => {
-      entry.observeStatus?.(status);
+      observe?.(status);
       return response(status);
     };
     if (action === 'status' && request.method === 'GET') return sent(await runtime.status());

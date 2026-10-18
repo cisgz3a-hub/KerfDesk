@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
 import { usePlatformOptional } from '../app/platform-context';
+import { useCommercialUpdateStore } from '../state/commercial-update-store';
 import { installDesktopCloseReceiver } from '../app/desktop-close-runtime';
 import { LicenceDevicesPanel } from './LicenceDevicesPanel';
 import {
@@ -51,6 +52,9 @@ export function DesktopLicenceGate({
     initialKey,
   );
   const dialog = useRef<HTMLElement>(null);
+  // Check for updates opens its panel over this window: it then holds the
+  // modal role, so assistive technology can reach it.
+  const updatesOpen = useCommercialUpdateStore((state) => state.controls?.panelOpen === true);
   useEffect(() => dialog.current?.focus(), []);
   // The workspace has not mounted its close receiver yet (ADR-623). Keep the
   // ordinary guarded handoff available for Quit and the native window close.
@@ -60,7 +64,8 @@ export function DesktopLicenceGate({
       <section
         ref={dialog}
         role="dialog"
-        aria-modal="true"
+        aria-modal={!updatesOpen}
+        aria-hidden={updatesOpen || undefined}
         aria-label={LICENCE_GATE_LABEL}
         aria-busy={busy}
         // The splash and native qualification wait for a settled state: a

@@ -126,7 +126,7 @@ export function createDesktopLicensing(options: Options) {
   const signals = createStartupSignals(config.channel === 'free');
   const entry = {
     ...licenceEntry(config, desktopLicenceLink(config, options.packaged), options),
-    observeStatus: signals.observe,
+    observeRequest: signals.observeRequest,
   };
   const rings = createUpdateRingStore(options.userDataPath);
   const { manual, installer } = manualUpdateChecks(config, options, runtime);

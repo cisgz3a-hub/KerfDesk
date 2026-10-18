@@ -14,6 +14,8 @@ export type WorkspaceAdmission = {
  */
 export function createStartupSignals(alwaysAdmitted: boolean) {
   let admitted = alwaysAdmitted;
+  // Each opening renderer is a new generation; replies to an older one admit nothing.
+  let generation = 0;
   const listeners = new Set<(admitted: boolean) => void>();
   const setAdmitted = (next: boolean): void => {
     if (admitted === next) return;
@@ -31,15 +33,23 @@ export function createStartupSignals(alwaysAdmitted: boolean) {
       return () => listeners.delete(listener);
     },
     rendererOpening: () => {
+      generation += 1;
       if (!alwaysAdmitted) setAdmitted(false);
     },
   };
   return {
     admission,
-    /** Notes a status sent to the renderer, and whether it admits the workspace. */
-    observe: (status: { readonly edition: string }): void => {
-      markStatusRead();
-      if (status.edition === 'pro') setAdmitted(true);
+    /**
+     * Starts watching one renderer request: the status it is sent counts only
+     * if no renderer has opened since, as a reload or a reopened window would.
+     */
+    observeRequest: (): ((status: { readonly edition: string }) => void) => {
+      const requested = generation;
+      return (status) => {
+        if (requested !== generation) return;
+        markStatusRead();
+        if (status.edition === 'pro') setAdmitted(true);
+      };
     },
     /** Resolves once a status has been read, or after `ms` if none is. */
     afterFirstStatusRead: (ms: number): Promise<void> => {
