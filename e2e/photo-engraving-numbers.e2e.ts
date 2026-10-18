@@ -90,7 +90,7 @@ test('stored fractional tones and low density allow unrelated photo edits', asyn
   await dialog
     .getByRole('radiogroup', { name: 'Photo processing' })
     .getByRole('radio', { name: 'Stucki', exact: true })
-    .check({ force: true });
+    .check();
   expect(
     await dialog.locator('form').evaluate((form: HTMLFormElement) => form.checkValidity()),
   ).toBe(true);
