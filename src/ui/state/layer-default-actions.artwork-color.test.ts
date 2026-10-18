@@ -79,12 +79,14 @@ describe('per-color defaults follow the artwork color', () => {
     expect(operationFor('second')).toMatchObject({ power: 37, speed: 2345 });
   });
 
-  it('keeps a black-artwork default away from red artwork whose operation got palette black', () => {
-    useStore.getState().importSvgObject(svgObj('black', ['#000000']));
-    const black = operationFor('black');
-    useStore.getState().setLayerParam(black.id, { power: 66, speed: 4321 });
-    useStore.getState().makeLayerDefault(black.id);
-    // Saved defaults outlive the project, and a new project's palette starts at black again.
+  it('keeps one artwork colour default away from red artwork whose operation got that colour', () => {
+    // Artwork drawn in the palette's first colour (ADR-620: blue).
+    const paletteFirst = nextOperationColor([]);
+    useStore.getState().importSvgObject(svgObj('first-colour', [paletteFirst]));
+    const first = operationFor('first-colour');
+    useStore.getState().setLayerParam(first.id, { power: 66, speed: 4321 });
+    useStore.getState().makeLayerDefault(first.id);
+    // Saved defaults outlive the project, and a new project's palette starts over.
     useStore.getState().newProject();
 
     useStore.getState().importSvgObject(svgObj('red', [RED]));

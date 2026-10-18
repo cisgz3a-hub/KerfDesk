@@ -1,5 +1,6 @@
 // The Warp and Deform canvas tools (LBG-T06): starting, dragging handles,
-// Shift's parallelogram, the live preview, Apply and Cancel.
+// Shift's parallelogram, the live preview and a bend it refuses, Apply and
+// Cancel.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { initialWarpDeformHandles } from '../../core/geometry/warp-deform-map';
 import { createLayer } from '../../core/scene/layer';
@@ -10,7 +11,7 @@ import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { useWarpDeformSession } from '../state/warp-deform-session';
-import { warpDeformDisplayProject } from './use-warp-deform-preview';
+import { warpDeformPreview } from './use-warp-deform-preview';
 import {
   activeWarpDeformSession,
   applyWarpDeformTool,
@@ -148,15 +149,43 @@ describe('Warp and Deform tools', () => {
     const session = activeWarpDeformSession();
     if (session === null) throw new Error('no session');
     const project = useStore.getState().project;
-    expect(warpDeformDisplayProject(project, session)).toBe(project);
+    expect(warpDeformPreview(project, session)).toEqual({ project, failure: null });
 
     resetWarpDeformHandles();
     moveWarpHandleDrag(drag(5, { x: 43, y: 37 }), { x: 43, y: 57 }, false);
     const moved = activeWarpDeformSession();
-    const preview = warpDeformDisplayProject(project, moved);
-    expect(preview).not.toBe(project);
-    expect(preview.scene.objects[0]).not.toBe(PART);
+    const preview = warpDeformPreview(project, moved);
+    expect(preview.failure).toBeNull();
+    expect(preview.project).not.toBe(project);
+    expect(preview.project.scene.objects[0]).not.toBe(PART);
     expect(useStore.getState().project).toBe(project);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it('say why the preview cannot make a bend, in the words Apply uses', () => {
+    // A dense trace: more points than a bend may produce.
+    const points = Array.from({ length: 200_002 }, (_, i) => ({
+      x: (i % 1000) / 10,
+      y: Math.floor(i / 1000) / 4,
+    }));
+    const dense: ImportedSvg = {
+      ...PART,
+      paths: [{ color: '#000000', polylines: [{ closed: false, points }] }],
+    };
+    const project = useStore.getState().project;
+    useStore.setState({ project: { ...project, scene: { ...project.scene, objects: [dense] } } });
+    startWarpDeformTool('deform');
+    moveWarpHandleDrag(drag(5, { x: 43, y: 37 }), { x: 43, y: 57 }, false);
+    const refused = useStore.getState().project;
+
+    const preview = warpDeformPreview(refused, activeWarpDeformSession());
+
+    // The canvas keeps the artwork unbent and says why while the tool is on.
+    expect(preview.project).toBe(refused);
+    expect(preview.failure).toContain('nothing changed');
+    applyWarpDeformTool();
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(preview.failure);
+    expect(useStore.getState().project).toBe(refused);
     expect(useStore.getState().undoStack).toHaveLength(0);
   });
 

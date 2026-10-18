@@ -27,16 +27,25 @@ export type HitTestObjectResult =
 
 const NO_HIT: HitTestObjectResult = { kind: 'none' };
 
-export function hitTest(scene: Scene, point: Vec2): string | null {
+/**
+ * Selection skips locked artwork. `includeLocked` is for display-only uses
+ * (the hover colour pulse, ADR-620) where the piece under the pointer is the
+ * answer even if it cannot be picked.
+ */
+export function hitTest(
+  scene: Scene,
+  point: Vec2,
+  options: { readonly includeLocked?: boolean } = {},
+): string | null {
   const layerByColor = sceneLayerVisibilityLookup(scene.layers);
   let bestLineInterior: { readonly id: string; readonly area: number } | null = null;
 
   // Topmost first: later-added objects render on top so direct hits win first.
   for (let i = scene.objects.length - 1; i >= 0; i -= 1) {
     const obj = scene.objects[i];
-    if (obj === undefined) continue;
-    if (obj.locked === true) continue;
-    if (!sceneObjectHasVisibleLayerFromMap(obj, layerByColor)) continue;
+    if (obj === undefined || !isHitCandidate(obj, layerByColor, options.includeLocked === true)) {
+      continue;
+    }
 
     const hit = hitTestObject(layerByColor, obj, point);
     if (hit.kind === 'primary') return obj.id;
@@ -48,6 +57,15 @@ export function hitTest(scene: Scene, point: Vec2): string | null {
     }
   }
   return bestLineInterior?.id ?? null;
+}
+
+function isHitCandidate(
+  obj: SceneObject,
+  layerByColor: ReadonlyMap<string, Layer>,
+  includeLocked: boolean,
+): boolean {
+  if (obj.locked === true && !includeLocked) return false;
+  return sceneObjectHasVisibleLayerFromMap(obj, layerByColor);
 }
 
 export function hitTestObject(

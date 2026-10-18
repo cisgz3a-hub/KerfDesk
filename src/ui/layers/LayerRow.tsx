@@ -14,6 +14,7 @@ import { LayerOrderControls } from './LayerOrderControls';
 import { LayerSettingsClipboardButtons } from './LayerSettingsClipboardButtons';
 import { SelectLayerObjectsButton } from './SelectLayerObjectsButton';
 import { ShowOnlyLayerButton } from './ShowOnlyLayerButton';
+import { useOperationRowHover } from './use-operation-row-hover';
 
 export function LayerRow(props: {
   readonly layer: Layer;
@@ -28,12 +29,15 @@ export function LayerRow(props: {
   const active = activeLayerColor === props.layer.color;
   const artworkCount = operationArtworkCount(objects, props.layer);
   const activate = (): void => setActiveLayerColor(props.layer.color);
+  const hover = useOperationRowHover(props.layer.id);
   return (
     <section
       aria-label={`Operation ${props.layer.name}`}
       aria-current={active ? 'true' : undefined}
       className="lf-operation-card"
       style={rowStyle(props.layer.output, active)}
+      onPointerEnter={hover.onPointerEnter}
+      onPointerLeave={hover.onPointerLeave}
     >
       <OperationActivation
         layer={props.layer}

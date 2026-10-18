@@ -662,8 +662,8 @@ the linked artwork.
 
 ### F-A6d. Filled or wireframe view (ADR-410)
 
-1. **Window → Wireframe View** (`Alt+W`) draws Fill artwork as outlines in its operation colour,
-   so overlaps and stray paths show. The menu item shows a check while it is on.
+1. **Window → Wireframe View** (`Alt+W`) draws Fill artwork as outlines, so overlaps and stray
+   paths show. The menu item shows a check while it is on.
 2. It changes the canvas only: output, Preview and saved projects are unchanged. It resets to
    Filled when the app restarts.
 
@@ -708,7 +708,9 @@ the linked artwork.
    selected vector artwork. The artwork previews live while the handles are dragged; Enter or Apply
    applies it as one undo step, Esc or Cancel leaves it as it was, and Reset handles starts again.
    Shift keeps the Warp corners a parallelogram. Curves become fine lines within 0.05 mm; images,
-   reliefs and locked artwork are left as they are, and the notice says how many.
+   reliefs and locked artwork are left as they are, and the notice says how many. A bend that needs
+   more geometry than can be prepared accurately is not previewed: the artwork stays as it was and
+   the tool's hint says why, in the words Apply would use, until the handles allow the bend again.
 4. **Arrange → Layout → Copy Along Path…** copies the selected artwork along the top-most selected
    single path (or the path picked under Guide path): by number of copies, spacing between centres
    or gap between copies, from the start offset to the end offset, turned to follow the path unless
@@ -776,6 +778,21 @@ the linked artwork.
 4. **Optimize** applies it as one undo step. Imported and traced artwork keeps its operations and
    tabs; text and drawn shapes that change become paths in the same step, and locked artwork is
    left as it is. The notice says what changed. Settings are remembered for the session.
+
+### F-A6j. Operation colours on the canvas (ADR-620)
+
+1. Artwork rests in plain ink on the workspace, so the canvas shows the design itself. Every
+   operation still has its own colour, shown on its row in the Artwork panel.
+2. With the Select tool, rest the pointer on a piece of artwork: it pulses once in its operation
+   colour, and every other piece whose operation has the same settings pulses in that same
+   colour, rippling out from the piece under the pointer. A soft colour edge stays while the
+   pointer rests there. Resting on an operation row does the same for that operation's artwork.
+3. Hold **Alt** (Option on a Mac) to show every operation colour at once; let go to return to ink.
+   Alt shortcuts such as `Alt+W` do not trigger it.
+4. With reduced motion turned on in the operating system, the colour shows while the pointer
+   rests instead of pulsing.
+5. Display only: Preview, output and saved projects are unchanged. New operations start at blue;
+   black is the last palette colour.
 
 ### F-A7. Artwork Operations panel
 
@@ -949,6 +966,9 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 3. **Undo last** removes only the most recent assignment. **Done** commits the whole numbering
    session as one undoable project action. **Cancel** restores the order from before the session.
 4. Numbering ends automatically after every run unit has been assigned.
+5. While numbering is open, other design edits (Delete, nudge, paste, Undo/Redo, menu, toolbar
+   and command-search commands) are refused with a notice to click **Done** or **Cancel** first,
+   so Cancel can never silently discard them.
 
 #### Success - inspect a job from either surface
 1. Click a run row: its complete run unit is selected on the canvas, highlighted with its operation
@@ -1109,6 +1129,13 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    the left.
 5. Burned labels show each row's and column's value (speeds as the feed the job runs). The toast
    names what rows and columns vary.
+6. Below the fields, a live preview draws the card as Generate will make it: every row and column
+   it holds (a passes axis shows only its whole numbers), labelled with the same values the card
+   burns, speeds capped at the profile's maximum feed. Each cell is shaded from faint to deep by
+   its energy relative to the strongest cell: power × passes ÷ speed, and ÷ hatch spacing for
+   Engrave. Engraved cells fill; cut cells show only their outline. Hovering a cell names its
+   settings. While a field is invalid the last valid card stays, dimmed, until it is fixed. The
+   preview only shows the card; it never changes what Generate makes.
 
 ### F-A7g. Recipes that apply themselves (ADR-496)
 
@@ -3365,9 +3392,15 @@ again) or **Discard changes**.
    **Use S maximum as spindle RPM** and a reported CNC mode; otherwise the spindle ceiling stays
    unchanged. Configured travel is not measured usable travel.
 2. **Essentials** — review the name, usable work area, max/frame feed, origin, homing policy, and
-   applicable laser output or CNC machine limits. Laser `$31` records the minimum S input in the
-   controller's PWM mapping, not a minimum S emitted by jobs. The laser-mode checkbox describes
-   the expected firmware state; saving these profile fields does not write controller settings.
+   applicable laser output or CNC machine limits. The origin and the recorded homing corner are
+   each picked on a small bed diagram whose bottom edge is the front, toward the operator: click a
+   corner or the centre, or move with the arrow keys. The origin shows a dot and the +X/+Y
+   directions it produces, with the same words under the diagram; it sets the canvas-to-machine
+   orientation and jog directions, not work zero or homing. The homing corner shows a home marker
+   and stays a record, since firmware decides where Home moves. Laser `$31` records the minimum S
+   input in the controller's PWM mapping, not a minimum S emitted by jobs. The laser-mode checkbox
+   describes the expected firmware state; saving these profile fields does not write controller
+   settings.
    CNC **Machine limits** retains safe Z, spindle maximum, spin-up delay, coolant, and park, including
    when a hybrid machine's active mode is Laser. The optional **CNC job setup** section appears only
    while CNC is active. It contains **Current job** material, default/active bit, stock
