@@ -67,7 +67,10 @@ describe('theme-aware workspace drawing', () => {
       const light = recordingContext();
       setDark(false);
       drawScene(light.ctx, 800, 600, project, { selectedId: null, preview: false });
-      expect(kind === 'fill' ? light.fills : light.strokes).toContain('#000000');
+      // ADR-620: owned artwork rests in themed ink; orphan artwork keeps its source colour.
+      expect(kind === 'fill' ? light.fills : light.strokes).toContain(
+        kind === 'orphan' ? '#000000' : canvasTheme.artworkInk,
+      );
       expect(JSON.stringify(project)).toBe(stored);
     },
   );

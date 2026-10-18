@@ -33,6 +33,7 @@ import {
   drawObjectDisplay,
   isVectorSceneObject,
   resolveObjectDisplay,
+  type ArtworkPalette,
   type ObjectDisplayMode,
 } from './object-display';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
@@ -113,6 +114,9 @@ export type DrawOpts = {
   readonly artworkRunFocus?: ArtworkRunFocus;
   // ADR-410 Wireframe view: outline Fill artwork instead of filling it.
   readonly wireframe?: boolean;
+  // ADR-620: artwork rests in plain ink; true (Alt held) paints every path in
+  // its operation colour instead.
+  readonly operationColors?: boolean;
 };
 
 export function drawScene(
@@ -155,6 +159,7 @@ export function drawScene(
           ? []
           : [opts.selectedPathNode]),
       opts.wireframe === true ? 'wireframe' : 'design',
+      opts.operationColors === true ? 'operation' : 'ink',
       opts.additionalSelectedIds,
       opts.onRasterBitmapReady,
       opts.displayPolylineCache,
@@ -303,6 +308,7 @@ function drawObjects(
   selectedPathNode: PathNodeRef | null,
   selectedPathNodes: ReadonlyArray<PathNodeRef>,
   displayMode: ObjectDisplayMode,
+  palette: ArtworkPalette,
   additionalSelectedIds: ReadonlySet<string> = EMPTY_SELECTION,
   onRasterBitmapReady?: () => void,
   displayPolylineCache?: DisplayPolylineCache,
@@ -333,6 +339,7 @@ function drawObjects(
         displayPolylineCache,
         onRasterBitmapReady,
         displayMode,
+        palette,
       )
     ) {
       simplified = true;
@@ -404,9 +411,17 @@ function drawObjectPolylines(
   displayPolylineCache: DisplayPolylineCache | undefined,
   requestRedraw: (() => void) | undefined,
   displayMode: ObjectDisplayMode,
+  palette: ArtworkPalette,
 ): boolean {
   if (!isVectorSceneObject(obj)) return false;
-  const resolved = resolveObjectDisplay(obj, layerByColor, view, displayPolylineCache, displayMode);
+  const resolved = resolveObjectDisplay(
+    obj,
+    layerByColor,
+    view,
+    displayPolylineCache,
+    displayMode,
+    palette,
+  );
   drawObjectDisplay(ctx, obj, resolved, view, requestRedraw);
   return resolved.isSimplified;
 }
