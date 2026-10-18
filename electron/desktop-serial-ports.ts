@@ -1,7 +1,7 @@
 // Serial access for the desktop session. Every platform gets the Select dialog
 // (desktop-serial-chooser.ts), and only the picked port is granted (ADR-366).
 // On Windows, macOS and Linux main also remembers the picks across restarts
-// (ADR-552, ADR-606), as Chrome does: a device permission handler grants the
+// (ADR-552, ADR-607), as Chrome does: a device permission handler grants the
 // trusted page exactly the ports picked there and not forgotten, and nothing
 // else. Electron keeps a pick it cannot remember (on macOS and Linux, an
 // adapter with no serial number) for the run, and any other system has no

@@ -18,6 +18,7 @@ import { ProInDesktopDialog } from './ProInDesktopDialog';
 import type { ProFeature } from './pro-features';
 import { createTrialExpiryClock, expireTrialStatus } from './trial-expiry';
 import { useTrialExpiry } from './use-trial-expiry';
+import { useCheckInReminder } from './use-checkin-reminder';
 import { useLicenceLink } from './use-licence-link';
 
 export { LICENCE_SETTINGS_EVENT };
@@ -227,6 +228,7 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
     };
   }, [load]);
   useTrialExpiry(status, accept, trialClock);
+  useCheckInReminder(status);
   const isPro = useCallback(
     () => statusRef.current?.edition === 'pro' && trialClock.remainingMs(statusRef.current) > 0,
     [trialClock],

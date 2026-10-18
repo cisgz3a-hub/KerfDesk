@@ -1,4 +1,4 @@
-// Shortcut labels as the operator's keyboard shows them (ADR-606). KerfDesk
+// Shortcut labels as the operator's keyboard shows them (ADR-607). KerfDesk
 // writes every chord the Windows way ("Ctrl+Shift+V"), and its key handlers
 // take Cmd for Ctrl on a Mac. On a Mac the labels therefore use the macOS
 // symbols in Apple's order, Option before Shift before Command ("⇧⌘V"), as

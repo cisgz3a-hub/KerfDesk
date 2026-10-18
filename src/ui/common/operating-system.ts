@@ -1,5 +1,5 @@
 // Which desktop system the window runs on, from what Chromium reports, for
-// wording that differs by system (ADR-606). The web app and the desktop app
+// wording that differs by system (ADR-607). The web app and the desktop app
 // both run Chromium, so the same answer holds in either.
 
 export type PlatformSignals = { readonly platform: string; readonly userAgent: string };
