@@ -4,6 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { CommercialUpdateStatus, LicenceAdapter, LicenceStatus } from '../../platform/types';
 import { EditionProvider, LICENCE_SETTINGS_EVENT } from './EditionProvider';
 import { proFeaturesUnlocked } from './edition';
+import { rendererCloseRequestScript } from '../../../electron/renderer-close-request';
+import { desktopCloseController } from '../app/desktop-close-runtime';
 
 // The window a commercial desktop build opens behind until a trial or licence is active (ADR-623).
 
@@ -41,6 +43,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  desktopCloseController.keepOpen();
   vi.unstubAllGlobals();
 });
 function client(status: LicenceStatus = free): LicenceAdapter {
@@ -184,4 +187,45 @@ it('fills the licence window with a purchase-link key and opens no panel after i
   expect(api.activate).toHaveBeenCalledWith(LINKED_KEY);
   expect(licenceWindow()).toBeNull();
   expect(host.textContent).toBe('workspace');
+});
+
+function requestClose(operation: 'prepare' | 'approve', requestId: number): Promise<unknown> {
+  const reply: unknown = window.eval(rendererCloseRequestScript(operation, requestId));
+  return Promise.resolve(reply);
+}
+
+it.each(['activation-required', 'unreachable'])(
+  'prepares and approves normal desktop close from the %s licence window',
+  async (state) => {
+    const api = client();
+    if (state === 'unreachable') vi.mocked(api.status).mockRejectedValue(new Error('offline'));
+    await act(async () =>
+      root.render(
+        <EditionProvider client={api}>
+          <div data-workspace>workspace</div>
+        </EditionProvider>,
+      ),
+    );
+    expect(licenceWindow()?.dataset.licenceState).toBe(state);
+    expect(host.querySelector('[data-workspace]')).toBeNull();
+    expect(await requestClose('prepare', 41)).toEqual({ status: 'ready', dirty: false });
+    expect(await requestClose('approve', 41)).toEqual({ status: 'approved' });
+  },
+);
+
+it('releases the licence close receiver and its approval when the workspace is admitted', async () => {
+  await act(async () =>
+    root.render(
+      <EditionProvider client={client()}>
+        <div data-workspace>workspace</div>
+      </EditionProvider>,
+    ),
+  );
+  expect(await requestClose('prepare', 51)).toEqual({ status: 'ready', dirty: false });
+  await act(async () => button('Start free 30-day trial').click());
+  expect(host.querySelector('[data-workspace]')).not.toBeNull();
+  expect(desktopCloseController.ownsUnload).toBe(false);
+  expect(desktopCloseController.approve(51)).toEqual({ status: 'retry' });
+  // This fixture has no workspace receiver: the licence receiver must be gone.
+  expect(await requestClose('prepare', 52)).toEqual({ status: 'unavailable' });
 });

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
 import { usePlatformOptional } from '../app/platform-context';
+import { installDesktopCloseReceiver } from '../app/desktop-close-runtime';
 import { LicenceDevicesPanel } from './LicenceDevicesPanel';
 import {
   LicenceActivationForm,
@@ -51,6 +52,9 @@ export function DesktopLicenceGate({
   );
   const dialog = useRef<HTMLElement>(null);
   useEffect(() => dialog.current?.focus(), []);
+  // The workspace has not mounted its close receiver yet (ADR-623). Keep the
+  // ordinary guarded handoff available for Quit and the native window close.
+  useEffect(() => installDesktopCloseReceiver(window), []);
   return (
     <div style={backdrop}>
       <section

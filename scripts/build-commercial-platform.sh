@@ -51,8 +51,8 @@ if [[ "${platform}" == macos ]]; then
   bash scripts/verify-macos-preview-package.sh "${version}" "${arch}" "${release}" \
     --commercial "${identity}"
 
-  # Fuses and app.asar, then launch, import and save from inside the DMG, as an
-  # operator opening it would.
+  # Fuses and app.asar, then launch the licence window from inside the DMG,
+  # as a new operator opening this commercial build would (ADR-623).
   mount_dir="$(mktemp -d)"
   hdiutil attach -readonly -nobrowse -mountpoint "${mount_dir}" "${dmg}" >/dev/null
   trap 'bash scripts/detach-macos-dmg.sh "${mount_dir}"' EXIT
@@ -61,7 +61,7 @@ if [[ "${platform}" == macos ]]; then
   node scripts/verify-packaged-desktop.mjs \
     "${app}/Contents/Frameworks/Electron Framework.framework/Electron Framework" \
     "${app}/Contents/Resources/app.asar" electron-builder.preview.yml
-  pnpm smoke:desktop:native -- "${app}/Contents/MacOS/KerfDesk"
+  pnpm smoke:desktop:native -- "${app}/Contents/MacOS/KerfDesk" --expect-licence-window
   bash scripts/detach-macos-dmg.sh "${mount_dir}"
   trap - EXIT
 
@@ -87,7 +87,7 @@ else
   grep -q '^application/x-kerfdesk-project=.*kerfdesk\.desktop' /usr/share/applications/mimeinfo.cache
   sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=1
   test "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = 1
-  xvfb-run -a pnpm smoke:desktop:native -- /opt/KerfDesk/kerfdesk
+  xvfb-run -a pnpm smoke:desktop:native -- /opt/KerfDesk/kerfdesk --expect-licence-window
 
   # The AppImage as double-clicked: no libfuse2, and its launcher must drop the
   # sandbox by itself where user namespaces are blocked.
@@ -97,7 +97,7 @@ else
     exit 1
   fi
   command -v fusermount3 || sudo apt-get install -y fuse3
-  xvfb-run -a pnpm smoke:desktop:native -- "${appimage}"
+  xvfb-run -a pnpm smoke:desktop:native -- "${appimage}" --expect-licence-window
 
   sudo apt-get remove -y kerfdesk
   test ! -e /opt/KerfDesk/kerfdesk
