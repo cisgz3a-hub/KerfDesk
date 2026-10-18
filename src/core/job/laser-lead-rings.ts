@@ -207,7 +207,7 @@ function copyLists(representatives: ReadonlyArray<number>): number[][] {
 // bows past its chords, so its moves are sampled finely enough that a lead's
 // clearance from it is measured from the arc itself (ADR-432 decides by the
 // same predicate). Otherwise the chords are the burn.
-const OBSTACLE_ARC_SAGITTA_MM = 0.002;
+export const OBSTACLE_ARC_SAGITTA_MM = 0.002;
 
 function burnLine(segment: CutSegment, entryRunwayMm: number | undefined): ReadonlyArray<Vec2> {
   const moves = emittedCutArcMoves(segment, { arcMovesEnabled: true, entryRunwayMm });

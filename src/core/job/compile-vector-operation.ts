@@ -27,11 +27,12 @@ export function compileVectorGroupsForLayer(
   device: DeviceProfile,
   priorityObjectId: string,
   scope: string,
+  keepLeadRings = false,
 ): VectorCompilation {
   const buckets = vectorProcessBuckets(objects, layer);
   const fillBuckets = buckets.filter((bucket) => bucket.layer.mode === 'fill');
   const lineBuckets = buckets.filter((bucket) => bucket.layer.mode === 'line');
-  const lines = lineTopologyCollections(lineBuckets, device, scope);
+  const lines = lineTopologyCollections(lineBuckets, device, scope, keepLeadRings);
   const fill = resolveFillContext(objects, fillBuckets, device);
   const output = vectorCompilation(
     buckets.map((bucket) =>

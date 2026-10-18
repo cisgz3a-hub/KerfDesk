@@ -10,6 +10,7 @@ import type { Group, Job, JobDiagnostic } from './job';
 import { compileVectorGroupsForLayer } from './compile-vector-operation';
 import { focusTestProfileIssue } from './focus-test';
 import { FocusTestCompilationError } from './focus-test-compilation-error';
+import { sceneAsksForLaserLeads } from './laser-lead-settings';
 
 export function compileJob(
   scene: Scene,
@@ -18,7 +19,14 @@ export function compileJob(
 ): Job {
   const groups: Group[] = [];
   const diagnostics: JobDiagnostic[] = [];
-  const output = { groups, diagnostics, vectorRun: 0 };
+  // ADR-626: broken-contour outlines are kept for laser leads only when some
+  // operation asks for leads.
+  const output = {
+    groups,
+    diagnostics,
+    vectorRun: 0,
+    keepLeadRings: sceneAsksForLaserLeads(scene),
+  };
   const completeSceneObjects = [...scene.objects, ...(scene.outputDependencies ?? [])];
   const jigRuns = registrationJigCompilationRuns(scene);
   if (jigRuns !== null) {
@@ -59,7 +67,12 @@ export function compileJob(
 }
 
 function appendOperationCompilation(
-  output: { readonly groups: Group[]; readonly diagnostics: JobDiagnostic[]; vectorRun: number },
+  output: {
+    readonly groups: Group[];
+    readonly diagnostics: JobDiagnostic[];
+    vectorRun: number;
+    readonly keepLeadRings: boolean;
+  },
   vectorObjects: ReadonlyArray<SceneObject>,
   rasterObjects: ReadonlyArray<SceneObject>,
   layer: Layer,
@@ -76,6 +89,7 @@ function appendOperationCompilation(
         device,
         priorityObjectId,
         `vector:${output.vectorRun++}:${operationLayer.id}`,
+        output.keepLeadRings,
       );
       for (const group of vector.groups) {
         if (!hasFocusOutputIntent(group, operationLayer)) continue;

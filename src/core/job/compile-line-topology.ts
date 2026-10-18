@@ -18,6 +18,7 @@ export function lineTopologyCollections(
   buckets: ReadonlyArray<VectorProcessBucket>,
   device: DeviceProfile,
   scope: string,
+  keepLeadRings = false,
 ): ReadonlyMap<VectorProcessBucket, LineSegmentCollection> {
   const collected = buckets.map((bucket) => ({
     bucket,
@@ -63,7 +64,8 @@ export function lineTopologyCollections(
     });
     const tabbed = applyLineTabs(segments, line.placedTabs, bucket.layer);
     const output = perforateLineSegments(tabbed.segments, bucket.layer);
-    const topologyRings = brokenContourRings(segments, output, scope);
+    // Only a job with leads somewhere reads them (ADR-626); others never carry them.
+    const topologyRings = keepLeadRings ? brokenContourRings(segments, output, scope) : [];
     result.set(bucket, {
       segments: output,
       tabSpans: tabbed.tabSpans,

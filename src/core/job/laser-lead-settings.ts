@@ -8,7 +8,7 @@
 // meets the cut (90 degrees is a quarter circle); for a line, the angle it
 // meets the cut at (90 degrees comes straight in from the side).
 
-import type { LayerOperationSettings } from '../scene';
+import type { LayerOperationSettings, Scene } from '../scene';
 // Deep import: core/scene's barrel is ratcheted and may only shrink.
 import type { LaserLeadSide, LaserLeadStyle } from '../scene/layer';
 
@@ -50,6 +50,29 @@ export type LaserLeadSpec = {
 
 /** A cut group's leads, with the operation name Job Review reports them under. */
 export type CutGroupLaserLeads = LaserLeadSpec & { readonly operationName: string };
+
+type LeadSwitches = Pick<LayerOperationSettings, 'leadInEnabled' | 'leadOutEnabled'>;
+
+function asksForLeads(settings: Partial<LeadSwitches> | null | undefined): boolean {
+  return settings?.leadInEnabled === true || settings?.leadOutEnabled === true;
+}
+
+/** Whether any operation, sub-operation or artwork override in the scene asks
+ * for a lead; compile keeps what leads need (CutGroup.topologyRings) only then. */
+export function sceneAsksForLaserLeads(scene: Pick<Scene, 'layers' | 'objects'>): boolean {
+  return (
+    scene.layers.some(
+      (layer) => asksForLeads(layer) || layer.subLayers.some((sub) => asksForLeads(sub.settings)),
+    ) ||
+    scene.objects.some((object) => {
+      const override = object.operationOverride;
+      return (
+        asksForLeads(override) ||
+        Object.values(override?.byOperation ?? {}).some((entry) => asksForLeads(entry))
+      );
+    })
+  );
+}
 
 /** The operation's leads, or null when it asks for neither. */
 export function laserLeadSpecFor(settings: LeadSettings): LaserLeadSpec | null {

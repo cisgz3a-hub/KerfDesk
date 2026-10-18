@@ -54,8 +54,8 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    closed contour of every Line cut group in the job. A hole cut by its own operation is therefore
    still a hole. A contour that tabs or perforation broke into pieces still counts: compile keeps its
    whole outline on the cut group (`CutGroup.topologyRings`, matched to the pieces by their topology
-   identity, ADR-486 Amd 2; translated with the job, and dropped from the prepared job once leads are
-   placed). A job from before that rebuilds the outline from its pieces (`core/job/laser-lead-chain.ts`,
+   identity, ADR-486 Amd 2; translated with the job, dropped from the prepared job once leads are
+   placed, and kept only when some operation or artwork in the scene asks for leads). A job from before that rebuilds the outline from its pieces (`core/job/laser-lead-chain.ts`,
    an endpoint grid sized to the outline, so thousands of sparse dashes chain quickly); where a gap
    skips a corner, the corner is put back where the edges on either side meet, so a hole in the
    corner is still inside. Copies of one outline (the
@@ -75,7 +75,8 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    its very first step it must keep the clearance from every other cut line, including the bridged
    gaps of a tabbed or perforated outline (a lead slipping through two tab gaps would burn across that
    part) and the leads already placed for earlier contours, so two leads aimed into the same scrap
-   cannot burn over each other; copies of its own outline on another operation, and their leads, are
+   cannot burn over each other (a placed lead that goes out as G2/G3 is indexed as its arcs); copies
+   of its own outline on another operation, and their leads, are
    exempt. Its free end must lie inside exactly
    the closed contours that hold its own contour, so it can never end inside another part or past the
    hole or sheet its contour sits in. The clearance is 0.2 mm or one kerf width (twice the kerf
@@ -90,8 +91,10 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    the job start point has been applied, so each lead joins where the beam really starts. With
    **Nearest corner**, an outer contour's leads therefore start at a corner, where a line lead can run
    straight on from the edge. Where an asked-for lead does not fit at the planned start, the contour
-   is tried starting in the middle of each of its four nearest edges of at least 1 mm, alternating
-   forward and back, and the first start where every lead fits wins. This matters for holes: inside a
+   is tried starting in the middle of each of its four nearest straight runs of at least 1 mm
+   (consecutive chords heading within 1° of each other, so a side split into short chords is one
+   run; every run is considered), alternating forward and back, and the first start where every lead
+   fits wins. This matters for holes: inside a
    hole, a corner leaves no room for a lead that joins along the edge, and rectangles are drawn from a
    corner. The new start is half an edge from the planned one.
 6. **One open burn.** A led contour becomes one open segment: lead-in, the whole contour, lead-out.

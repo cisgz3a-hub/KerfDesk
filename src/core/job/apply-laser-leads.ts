@@ -23,6 +23,7 @@
 // - Open paths, tab pieces and perforation dashes get no leads; compile says
 //   so for tabs and perforation (compile-vector-operation.ts).
 
+import { sampleArcMoves } from '../geometry/arc-fit';
 import { overcutClosedPolyline } from '../geometry/overcut';
 import type { Vec2 } from '../scene';
 import { outlineInsideContainer } from './containment-depth';
@@ -44,7 +45,7 @@ import {
   scrapNormal,
 } from './laser-lead-contour';
 import type { LeadJoin, LeadShape } from './laser-lead-path';
-import { leadJobLines, type LeadJobLines } from './laser-lead-rings';
+import { leadJobLines, OBSTACLE_ARC_SAGITTA_MM, type LeadJobLines } from './laser-lead-rings';
 import { boundsContains } from './segment-bounds';
 
 export type LaserLeadOptions = {
@@ -173,6 +174,8 @@ function leadSegment(
 type LeadAttempt = {
   readonly segment: CutSegment;
   readonly ringId: number;
+  /** The contour, and so its arc leads, go out as G2/G3. */
+  readonly arcsEmitted: boolean;
   readonly spec: CutGroupLaserLeads;
   readonly leadIn: LeadFit | null;
   readonly leadOut: LeadFit | null;
@@ -191,17 +194,38 @@ function leadAttempt(
   const leadIn = spec.leadIn ? fitLead('in', plan.startJoin, shape, context) : null;
   const leadOut = spec.leadOut ? fitLead('out', plan.endJoin, shape, context) : null;
   const finalPass = finalPassLeadOut(segment, group, leadOut, plan);
-  return { segment, ringId: plan.ringId, spec, leadIn, leadOut, finalPass };
+  return {
+    segment,
+    ringId: plan.ringId,
+    arcsEmitted: context.arcsEmitted,
+    spec,
+    leadIn,
+    leadOut,
+    finalPass,
+  };
 }
 
 // Placed leads are cut lines too: a later contour's leads keep clear of them,
 // so two leads aimed into the same scrap cannot burn over each other. Copies
-// of this contour ignore them, as they ignore the contour itself.
+// of this contour ignore them, as they ignore the contour itself. A lead that
+// goes out as G2/G3 is indexed as its arcs, sampled as finely as other arc
+// obstacles, so a later lead measures from the arc itself; the final pass goes
+// out as chords.
 function recordLeads(world: LeadWorld, attempt: LeadAttempt): void {
-  const placed = [attempt.leadIn, attempt.leadOut, attempt.finalPass?.fit ?? null].flatMap((fit) =>
-    fit === null ? [] : [world.obstacles.addLine(fit.path.points)],
-  );
+  const placed = [
+    ...asBurned(attempt.leadIn, attempt.arcsEmitted),
+    ...asBurned(attempt.leadOut, attempt.arcsEmitted),
+    ...asBurned(attempt.finalPass?.fit ?? null, false),
+  ].map((points) => world.obstacles.addLine(points));
   world.leadLines.set(attempt.ringId, [...(world.leadLines.get(attempt.ringId) ?? []), ...placed]);
+}
+
+function asBurned(fit: LeadFit | null, arcs: boolean): ReadonlyArray<ReadonlyArray<Vec2>> {
+  if (fit === null) return [];
+  const start = fit.path.points[0];
+  return arcs && start !== undefined && fit.path.moves.some((move) => move.kind === 'arc')
+    ? [sampleArcMoves(start, fit.path.moves, OBSTACLE_ARC_SAGITTA_MM)]
+    : [fit.path.points];
 }
 
 /** Every lead asked for is there, on every pass. */
