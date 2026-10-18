@@ -10,14 +10,21 @@ import { CutSettingsDialog } from './CutSettingsDialog';
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-async function renderDialog(patch: Partial<Layer>) {
+async function renderDialog(patch: Partial<Layer>, selectionCount?: number) {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
   const onApply = vi.fn();
   const layer = { ...createLayer({ id: 'test', color: '#000000' }), ...patch };
   await act(async () =>
-    root.render(<CutSettingsDialog layer={layer} onApply={onApply} onCancel={vi.fn()} />),
+    root.render(
+      <CutSettingsDialog
+        layer={layer}
+        onApply={onApply}
+        onCancel={vi.fn()}
+        {...(selectionCount === undefined ? {} : { selectionCount })}
+      />,
+    ),
   );
   const form = host.querySelector('form');
   if (!form) throw new Error('form missing');
@@ -180,6 +187,30 @@ describe('native cut-settings submission', () => {
       await view.close();
     }
   });
+
+  it.each(['ArrowRight', 'End'])(
+    'applies a dither chosen with %s to several selected artworks',
+    async (key) => {
+      const view = await renderDialog({ mode: 'image', ditherAlgorithm: 'jarvis' }, 2);
+      try {
+        const jarvis = swatch(view.host, 'jarvis');
+        jarvis.focus();
+        await act(async () => {
+          jarvis.dispatchEvent(
+            new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+          );
+        });
+        const chosen = key === 'End' ? 'grayscale' : 'stucki';
+        expect(swatch(view.host, chosen).checked).toBe(true);
+        expect(document.activeElement).toBe(swatch(view.host, chosen));
+        await submit(view.form, 'click');
+        expect(view.onApply).toHaveBeenCalledOnce();
+        expect(view.onApply.mock.calls[0]?.[0]).toEqual({ ditherAlgorithm: chosen });
+      } finally {
+        await view.close();
+      }
+    },
+  );
 
   it('keeps the chosen dither when its row name is clicked', async () => {
     const view = await renderDialog({ mode: 'image', ditherAlgorithm: 'ordered' });

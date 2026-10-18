@@ -81,8 +81,11 @@ export function DitherSwatchPicker(props: {
     const next = keyboardTarget(algorithms, event.key, event.target);
     if (next === null) return;
     event.preventDefault();
-    groupRef.current?.querySelector<HTMLInputElement>(`input[value="${next}"]`)?.focus();
-    if (next !== props.value) props.onChange(next);
+    const radio = groupRef.current?.querySelector<HTMLInputElement>(`input[value="${next}"]`);
+    radio?.focus();
+    // Click rather than call onChange: the radio's own change event then
+    // reaches forms that track edited fields, as a mouse choice does.
+    if (next !== props.value) radio?.click();
   };
   return (
     <div className="lf-dither-picker">
