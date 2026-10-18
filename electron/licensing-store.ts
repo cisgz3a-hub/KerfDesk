@@ -48,11 +48,17 @@ export class LicenceStoreUnreadableError extends Error {
 }
 
 /**
- * Linux keeps a licence only in a Secret Service keyring, never Electron's
- * basic_text fallback, whose key is the same on every computer. Without one, a
- * trial or key cannot be saved here until a keyring runs and KerfDesk restarts.
+ * Linux keeps a licence only under a keyring's key, never the fallback key that
+ * is the same on every computer. Electron's async safeStorage picks its key once
+ * per process (Chromium os_crypt_async) and prefixes each ciphertext with that
+ * provider's tag: v11 is a Secret Service or KWallet, v12 the desktop portal, v10
+ * the fallback. Neither the selected backend name, which reflects only the
+ * desktop or --password-store, nor async availability, which the fallback always
+ * satisfies, says which key is in use, so a probe's tag decides. Without a
+ * keyring, a trial or key cannot be saved until one runs and KerfDesk restarts.
  */
-const LINUX_KEYRINGS = ['gnome_libsecret', 'kwallet', 'kwallet5', 'kwallet6'];
+const LINUX_KEYRING_TAGS = new Set(['v11', 'v12']);
+const LINUX_KEYRING_PROBE = 'kerfdesk-keyring-probe';
 export class LinuxKeyringUnavailableError extends Error {
   constructor() {
     super('No Secret Service keyring is available to keep the licence.');
@@ -70,7 +76,6 @@ export function validLicenceKey(value: unknown): value is string {
 }
 type SecureStorage = {
   readonly isAsyncEncryptionAvailable: () => Promise<boolean>;
-  readonly getSelectedStorageBackend: () => string;
   readonly encryptStringAsync: (value: string) => Promise<Buffer>;
   readonly decryptStringAsync: (
     value: Buffer,
@@ -124,12 +129,20 @@ export function createLicensingStore(options: {
 }): LicensingStore {
   const file = join(options.userDataPath, FILE_NAME);
   const secure = options.secureStorage;
+  // The key is fixed for the process, so one answer holds until a restart; a
+  // probe that fails outright is asked again next time.
+  let keyring: Promise<boolean> | null = null;
+  const linuxKeyring = (): Promise<boolean> =>
+    (keyring ??= secure.encryptStringAsync(LINUX_KEYRING_PROBE).then(
+      (sealed) => LINUX_KEYRING_TAGS.has(sealed.subarray(0, 3).toString('latin1')),
+      () => {
+        keyring = null;
+        return false;
+      },
+    ));
   const check = async (): Promise<void> => {
     const available = await secure.isAsyncEncryptionAvailable();
-    if (
-      options.platform === 'linux' &&
-      (!available || !LINUX_KEYRINGS.includes(secure.getSelectedStorageBackend()))
-    )
+    if (options.platform === 'linux' && !(available && (await linuxKeyring())))
       throw new LinuxKeyringUnavailableError();
     if (!available) {
       throw new Error(

@@ -119,7 +119,7 @@ export const MESSAGES = {
     'The licence service or this computer’s secure storage is unavailable. Check your connection and that you are signed in to your operating-system account, then try again.',
   // Not a network fault: the app cannot use the keyring until it restarts.
   linuxKeyring:
-    'KerfDesk keeps its licence in your desktop’s keyring, and no keyring is running here, so a trial or licence key cannot be saved. Your internet connection is not the problem. Install GNOME Keyring or KWallet, make sure it starts and unlocks when you sign in, then restart KerfDesk. Without a GNOME or KDE desktop, also start KerfDesk with --password-store=gnome-libsecret.',
+    'KerfDesk keeps its licence in your desktop’s keyring, and no keyring is running here, so a trial or licence key cannot be saved. Your internet connection is not the problem. Install GNOME Keyring or KWallet (or another Secret Service, such as KeePassXC), make sure it starts and unlocks when you sign in, then restart KerfDesk.',
   unconfirmed:
     'The licence service could not confirm this licence. Your saved licence keeps working.',
   deactivated: 'This device has been deactivated and its licence seat is free for another device.',

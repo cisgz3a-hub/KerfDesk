@@ -95,7 +95,6 @@ async function harness(tier: 'paid' | 'trial', confirmedAt = ISSUED) {
     platform: 'win32',
     secureStorage: {
       isAsyncEncryptionAvailable: async () => true,
-      getSelectedStorageBackend: () => 'audit-mock-only',
       encryptStringAsync: async (value) => encode(JSON.parse(value)),
       decryptStringAsync: async (value) => ({
         result: value.map((byte) => byte ^ 0x5a).toString(),

@@ -74,7 +74,6 @@ describe('isolated sandbox licensing', () => {
     const directory = await mkdtemp(join(tmpdir(), 'kerfdesk-sandbox-store-'));
     const secureStorage = {
       isAsyncEncryptionAvailable: async () => true,
-      getSelectedStorageBackend: () => 'gnome_libsecret',
       encryptStringAsync: async (value: string) => Buffer.from(value),
       decryptStringAsync: async (value: Buffer) => ({
         result: value.toString(),

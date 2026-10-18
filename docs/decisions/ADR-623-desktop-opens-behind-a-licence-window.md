@@ -76,12 +76,16 @@ link, and LightBurn has no free tier.
   fresh sandbox smoke now proves the window stands alone instead of importing and
   saving, and the commercial release packaging smoke
   (`build-commercial-platform.sh`, `--expect-licence-window`) does the same for
-  each unlicensed Mac and Linux package. Linux keeps a licence only in a Secret
-  Service keyring, so that smoke launches each Linux package with an unlocked
-  GNOME Keyring on its own D-Bus session and must reach `activation-required`.
-  A Linux computer without a keyring sees its own message naming GNOME Keyring
-  and KWallet (`MESSAGES.linuxKeyring`), not the outage message; it still cannot
-  start a trial until a keyring runs. The window answers the main process's
+  each unlicensed Mac and Linux package. Linux keeps a licence only under a
+  Secret Service or KWallet key, never Electron's fallback key, and the store
+  checks which key Electron actually encrypts with, not the desktop's backend
+  name. So that smoke launches each Linux package with an unlocked GNOME Keyring
+  on its own D-Bus session and no desktop name, and it must reach
+  `activation-required`. A Linux computer without a keyring sees its own message
+  naming GNOME Keyring and KWallet (`MESSAGES.linuxKeyring`), not the outage
+  message. It still cannot start a trial until a keyring runs: the maintainer
+  chose on 2026-10-18 to keep refusing the fallback and to state the requirement
+  on the download page instead. The window answers the main process's
   close requests, so Quit and the window's X close the app before the workspace
   exists. The historical Free upgrade qualification (`installed-upgrade-profile.ps1`)
   still expects a Free workspace: once its target carries this decision, it needs

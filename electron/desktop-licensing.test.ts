@@ -19,10 +19,10 @@ vi.mock('electron', () => ({
   // Deliberately fake the OS boundary; this is not a claim about native crypto.
   safeStorage: {
     isAsyncEncryptionAvailable: async () => true,
-    getSelectedStorageBackend: () => 'gnome_libsecret',
-    encryptStringAsync: async (value: string) => Buffer.from(value),
+    // v11: a Secret Service key, which Linux requires (licensing-store.ts).
+    encryptStringAsync: async (value: string) => Buffer.from(`v11${value}`),
     decryptStringAsync: async (value: Buffer) => ({
-      result: value.toString(),
+      result: value.subarray(3).toString(),
       shouldReEncrypt: false,
     }),
   },
