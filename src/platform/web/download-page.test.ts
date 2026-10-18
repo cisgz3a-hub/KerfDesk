@@ -72,6 +72,35 @@ describe('desktop Preview download page', () => {
     expect(page.indexOf('commercial-heading')).toBeLessThan(page.indexOf('preview-heading'));
   });
 
+  it('offers Mac and Linux editions only through verified links, with honest install steps (ADR-613)', () => {
+    const page = downloadPage();
+    const platforms = page.slice(
+      page.indexOf('aria-labelledby="platforms-heading"'),
+      page.indexOf('aria-labelledby="preview-heading"'),
+    );
+    expect(page.indexOf('commercial-heading')).toBeLessThan(page.indexOf('platforms-heading'));
+    expect(
+      [...platforms.matchAll(/data-platform-file="([^"]+)"/g)].map((match) => match[1]),
+    ).toEqual(['macos-arm64.dmg', 'macos-x64.dmg', 'linux-amd64.deb', 'linux-x86_64.AppImage']);
+    // Every download and manifest link starts hidden with no address until the script verifies it.
+    expect(platforms).not.toMatch(/<a class="download[^"]*"[^>]*\shref=/);
+    expect(platforms).not.toMatch(/data-platform-manifest[^>]*\shref=/);
+    expect(platforms.match(/data-platform-file="[^"]+"\s+hidden/g)).toHaveLength(4);
+    // Pro is mentioned only once a release is verified.
+    expect(platforms.match(/data-platform-edition hidden/g)).toHaveLength(2);
+    expect(platforms.match(/data-platform-pro hidden/g)).toHaveLength(2);
+    expect(platforms.match(/role="status" data-platform-status/g)).toHaveLength(2);
+    expect(platforms).toContain('id="macos"');
+    expect(platforms).toContain('id="linux"');
+    expect(platforms).toContain('<strong>Open Anyway</strong>');
+    expect(platforms).toContain('<strong>Always Allow</strong>');
+    expect(platforms).toContain('sudo apt install ./KerfDesk-&lt;version&gt;-linux-amd64.deb');
+    expect(platforms).toContain('recommended on Ubuntu 24.04 and newer');
+    expect(platforms).toContain('sudo usermod -aG dialout $USER');
+    expect(platforms).toContain('<code>uucp</code>');
+    expect(platforms).toMatch(/never downloads or installs a Mac or Linux update by\s+itself/);
+  });
+
   it('keeps Linux users on the web app', () => {
     const page = downloadPage();
 

@@ -1,5 +1,5 @@
 // Operator and workflow entry point for one system's commercial macOS or Linux
-// release (ADR-610). The release must already be public on Windows.
+// release (ADR-613). The release must already be public on Windows.
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { setTimeout } from 'node:timers/promises';
@@ -15,10 +15,7 @@ import {
   printableStorageFailure,
   ReleaseRateLimitError,
 } from './stable-release-store.mjs';
-import {
-  DOWNLOAD_PLATFORMS,
-  platformArtifactNames,
-} from '../public/desktop-platform-download.mjs';
+import { DOWNLOAD_PLATFORMS, platformArtifactNames } from '../public/desktop-platform-download.mjs';
 import { publishPlatformCommercialRelease } from './platform-commercial-publisher.mjs';
 
 const USAGE =
@@ -79,8 +76,9 @@ export function requirePlatformPublicationContext(env) {
 }
 
 async function main() {
-  const { platform, expected, releaseDirectory, identityPath } =
-    parsePlatformPublicationArguments(process.argv.slice(2));
+  const { platform, expected, releaseDirectory, identityPath } = parsePlatformPublicationArguments(
+    process.argv.slice(2),
+  );
   requirePlatformPublicationContext(process.env);
   const json = (bytes) => JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   const keySet = json(

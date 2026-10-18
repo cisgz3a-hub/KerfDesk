@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The macOS package contract: the Preview's (ADR-248), or with --commercial the
-# unsigned commercial Mac build's (ADR-610), whose app.asar must carry the signed
+# unsigned commercial Mac build's (ADR-613), whose app.asar must carry the signed
 # release identity of its Windows installer instead of the Preview metadata.
 #
 # usage: bash scripts/verify-macos-preview-package.sh <version> <arch> [release directory] [--commercial <identity.json>]

@@ -117,6 +117,11 @@ export type CommercialUpdateStatus = {
   readonly checkedAt: number | null;
   /** Manual packages require separate download and installation consent. */
   readonly mode?: 'manual';
+  /**
+   * macOS and Linux (ADR-613): the update action opens the verified download
+   * page in the browser; the app never downloads or installs it itself.
+   */
+  readonly delivery?: 'download-page';
   /** True only after the owner arms a manual installer for normal app close. */
   readonly installOnQuit?: boolean;
   readonly releaseNotes?: readonly string[];

@@ -1,4 +1,4 @@
-// CI rehearsal of the commercial macOS and Linux builds (ADR-610). The real
+// CI rehearsal of the commercial macOS and Linux builds (ADR-613). The real
 // release identity is signed only in the protected Windows job, so a pull
 // request cannot build a real commercial package. This replaces the pinned
 // stable key in this runner's checkout with a throwaway one and signs a release

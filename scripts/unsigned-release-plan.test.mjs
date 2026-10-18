@@ -363,7 +363,7 @@ test('workflow applies the same batch policy before Windows and rechecks before 
   assert.ok(steps[securityIndex].run.includes('if ($integrityExit -ne 0)'));
 });
 
-test('macOS and Linux follow the published Windows release, each behind its own switch (ADR-610)', async () => {
+test('macOS and Linux follow the published Windows release, each behind its own switch (ADR-613)', async () => {
   const workflow = load(
     await readFile(
       new URL('../.github/workflows/release-desktop-unsigned.yml', import.meta.url),
@@ -389,10 +389,7 @@ test('macOS and Linux follow the published Windows release, each behind its own 
     const build = workflow.jobs[job];
     assert.equal(build.needs, 'publish');
     assert.equal(build['runs-on'], runner);
-    assert.equal(
-      build.if,
-      `needs.publish.outputs.published == 'true' && vars.${variable} == 'on'`,
-    );
+    assert.equal(build.if, `needs.publish.outputs.published == 'true' && vars.${variable} == 'on'`);
     // Build jobs hold no secret and no protected environment.
     assert.equal(build.environment, undefined);
     assert.equal(JSON.stringify(build).includes('secrets.'), false);
@@ -429,9 +426,12 @@ test('macOS and Linux follow the published Windows release, each behind its own 
   }
 });
 
-test('the Desktop package check rehearses the commercial Mac and Linux builds (ADR-610)', async () => {
+test('the Desktop package check rehearses the commercial Mac and Linux builds (ADR-613)', async () => {
   const workflow = load(
-    await readFile(new URL('../.github/workflows/desktop-package-check.yml', import.meta.url), 'utf8'),
+    await readFile(
+      new URL('../.github/workflows/desktop-package-check.yml', import.meta.url),
+      'utf8',
+    ),
   );
   const linux = workflow.jobs['commercial-linux'];
   const mac = workflow.jobs['commercial-macos'];

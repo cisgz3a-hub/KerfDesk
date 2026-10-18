@@ -26,6 +26,14 @@ import {
   MANUAL_CATALOG_URL,
   verifyManualCatalog,
 } from './desktop-manual-catalog.mjs';
+import {
+  DOWNLOAD_PLATFORMS,
+  PLATFORM_DOWNLOAD_LIMIT,
+  platformDownloadUrl,
+  platformLatestUrl,
+  platformManifestName,
+  verifyPlatformDownload,
+} from './desktop-platform-download.mjs';
 
 function requestOptions(signal) {
   return {
@@ -325,7 +333,100 @@ function showEarlierReleases(document, releases, unavailable = false) {
   history.hidden = releases.length === 0 && !unavailable;
 }
 
+const PLATFORM_NAMES = { macos: 'Mac', linux: 'Linux' };
+
+/**
+ * The Mac and Linux editions (ADR-613), each from its own signed document.
+ * Nothing about one system can show or hide the other's download, and no
+ * downloaded URL or text is inserted into the page.
+ */
+export async function populatePlatformDownloads(document, fetchRequest = fetch, search = '') {
+  await Promise.all(
+    DOWNLOAD_PLATFORMS.map((platform) =>
+      populatePlatformDownload(document, platform, fetchRequest, search),
+    ),
+  );
+}
+
+async function populatePlatformDownload(document, platform, fetchRequest, search) {
+  const card = document.getElementById(platform);
+  if (!card) return;
+  const name = PLATFORM_NAMES[platform];
+  const status = card.querySelector('[data-platform-status]');
+  const reset = () => {
+    for (const link of card.querySelectorAll('[data-platform-file], [data-platform-manifest]')) {
+      link.hidden = true;
+      link.removeAttribute('href');
+    }
+    for (const hash of card.querySelectorAll('[data-platform-hash]')) hash.textContent = '';
+    for (const item of card.querySelectorAll('[data-platform-edition], [data-platform-pro]'))
+      item.hidden = true;
+  };
+  reset();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  let requested = null;
+  try {
+    const params = new URLSearchParams(search);
+    const value = params.get('version');
+    requested = value === null || isPreviewVersion(value) ? null : value;
+    if (
+      requested !== null &&
+      (params.getAll('version').length !== 1 || !isStableVersion(requested))
+    )
+      throw new Error('Invalid requested desktop version');
+    const options = requestOptions(controller.signal);
+    const url =
+      requested === null
+        ? platformLatestUrl(platform)
+        : platformDownloadUrl(platform, requested, platformManifestName(platform));
+    const [response, keys] = await Promise.all([
+      fetchRequest(url, options),
+      trustAnchors(fetchRequest, options),
+    ]);
+    // Nothing published yet is the honest "not released" state, not an error.
+    if (response.status === 404 && requested === null) {
+      status.textContent = `KerfDesk for ${name} has not been released yet. Its verified download will appear here when it is; until then, use the web app in Chrome or Edge.`;
+      return;
+    }
+    const release = await verifyPlatformDownload(
+      await readBoundedManifest(response, PLATFORM_DOWNLOAD_LIMIT),
+      keys,
+      platform,
+    );
+    if (requested !== null && release.version !== requested)
+      throw new Error('Requested desktop version mismatch');
+    for (const link of card.querySelectorAll('[data-platform-file]')) {
+      const file = `KerfDesk-${release.version}-${link.dataset.platformFile}`;
+      const artifact = release.artifacts.find((item) => item.name === file);
+      if (!artifact) throw new Error('Missing platform artifact');
+      link.href = platformDownloadUrl(platform, release.version, artifact.name);
+      link.hidden = false;
+      const hash = card.querySelector(`[data-platform-hash="${link.dataset.platformFile}"]`);
+      if (hash)
+        hash.textContent = `${artifact.name} · ${megabytes(artifact.bytes)} · SHA-256: ${artifact.sha256}`;
+    }
+    const manifest = card.querySelector('[data-platform-manifest]');
+    manifest.href = platformDownloadUrl(platform, release.version, platformManifestName(platform));
+    manifest.hidden = false;
+    for (const item of card.querySelectorAll('[data-platform-edition], [data-platform-pro]'))
+      item.hidden = false;
+    const signing =
+      release.codeSigning === 'developer-id' ? 'Signed and notarized' : 'Not yet code-signed';
+    status.textContent = `KerfDesk ${release.version} · Released ${release.publishedAt.slice(0, 10)} · ${signing} · Download details signature verified.`;
+  } catch {
+    reset();
+    status.textContent =
+      requested !== null
+        ? `That ${name} version could not be verified. Check the version number or contact support for a download your licence covers.`
+        : `No verified ${name} download is available right now. Please try again later, or use the web app.`;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 if (typeof document !== 'undefined') {
   void populateCommercialDownload(document, fetch, location.search);
+  void populatePlatformDownloads(document, fetch, location.search);
   void populatePreviewDownloads(document, location.search);
 }

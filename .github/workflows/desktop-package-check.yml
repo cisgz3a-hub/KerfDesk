@@ -11,7 +11,7 @@ name: Desktop package check
 #   launches the installed app with Ubuntu's default sandbox restriction in
 #   place, then removes it (ADR-606). A third rehearses the commercial Linux
 #   build of the unsigned lane, and macOS rehearses its commercial build with
-#   the native jobs (ADR-610).
+#   the native jobs (ADR-613).
 # - Windows and macOS build the unsigned Preview exactly as the Preview release
 #   lane does, and run that lane's package contract. Windows then installs it,
 #   launches the installed app and uninstalls it; macOS launches the app from
@@ -228,7 +228,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  # The commercial Mac and Linux builds of the unsigned lane (ADR-610) run only
+  # The commercial Mac and Linux builds of the unsigned lane (ADR-613) run only
   # after a Windows release, with the identity its protected job signed. These
   # rehearsals run the same script with a throwaway identity, signed by a key
   # this runner makes and pins in its own checkout, so a pull request proves the

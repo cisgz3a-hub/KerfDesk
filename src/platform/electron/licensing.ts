@@ -129,17 +129,20 @@ export function parseCommercialUpdateStatus(value: unknown): CommercialUpdateSta
   if (
     !validUpdateFields(status) ||
     !validManualUpdateStatus(status) ||
+    !validDelivery(status) ||
     !validUpdateNotes(status) ||
     !validUpdateProgress(status)
   )
     throw new Error('Invalid update status.');
   const { state, currentVersion, version, checkedAt } = status;
+  return { state, currentVersion, version, checkedAt, ...optionalUpdateFields(status) };
+}
+
+/** Copies only the known optional fields of a status already validated. */
+function optionalUpdateFields(status: CommercialUpdateStatus): Partial<CommercialUpdateStatus> {
   return {
-    state,
-    currentVersion,
-    version,
-    checkedAt,
     ...(status.mode === undefined ? {} : { mode: status.mode }),
+    ...(status.delivery === undefined ? {} : { delivery: status.delivery }),
     ...(status.installOnQuit === undefined ? {} : { installOnQuit: status.installOnQuit }),
     ...(status.releaseNotesState === undefined
       ? {}
@@ -192,6 +195,17 @@ function validUpdateFields(status: CommercialUpdateStatus): boolean {
       (typeof status.version === 'string' && RELEASE_VERSION.test(status.version))
     ) ||
     !(status.checkedAt === null || Number.isSafeInteger(status.checkedAt))
+  );
+}
+
+/** A macOS or Linux build never downloads, holds or installs an update itself (ADR-613). */
+function validDelivery(status: CommercialUpdateStatus): boolean {
+  return (
+    status.delivery === undefined ||
+    (status.mode === 'manual' &&
+      status.delivery === 'download-page' &&
+      status.installOnQuit !== true &&
+      !['downloading', 'ready'].includes(status.state))
   );
 }
 

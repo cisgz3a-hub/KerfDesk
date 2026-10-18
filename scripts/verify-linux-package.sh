@@ -3,7 +3,7 @@
 # KerfDesk identity, the legal files, the .lf2 MIME type and a desktop entry
 # that opens it, and no updater metadata. Runs on Linux, where dpkg-deb exists.
 # With --commercial, app.asar must carry the unsigned commercial lane's signed
-# release identity instead of the Preview metadata (ADR-610).
+# release identity instead of the Preview metadata (ADR-613).
 #
 # usage: bash scripts/verify-linux-package.sh <version> [release directory] [--commercial <identity.json>]
 

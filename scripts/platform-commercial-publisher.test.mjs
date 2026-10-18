@@ -134,7 +134,10 @@ test('each system has its own exact files and storage keys beside the Windows on
 test('the platform document accepts only its exact identity, system, files and signing values', () => {
   assert.equal(validatePlatformDownload(payload()).platform, 'macos');
   assert.equal(validatePlatformDownload(payload('linux')).platform, 'linux');
-  assert.equal(validatePlatformDownload(payload('macos', { codeSigning: 'developer-id' })).platform, 'macos');
+  assert.equal(
+    validatePlatformDownload(payload('macos', { codeSigning: 'developer-id' })).platform,
+    'macos',
+  );
   const artifacts = payload().artifacts;
   for (const change of [
     { kind: 'manual-download' },
@@ -158,7 +161,8 @@ test('the platform document accepts only its exact identity, system, files and s
     assert.throws(() => validatePlatformDownload(payload('macos', change)), JSON.stringify(change));
   assert.throws(() => validatePlatformDownload(payload('linux', { codeSigning: 'developer-id' })));
   assert.throws(() => validatePlatformDownload({ ...payload(), extra: true }));
-  const { platform: _platform, ...withoutPlatform } = payload();
+  const withoutPlatform = payload();
+  delete withoutPlatform.platform;
   assert.throws(() => validatePlatformDownload(withoutPlatform));
 });
 
@@ -179,7 +183,10 @@ test('installed Windows copies refuse a platform document, and a platform docume
   await assert.rejects(
     verifyPlatformDownload(`${text}${' '.repeat(70_000)}`, stable.keySet, 'linux'),
   );
-  const tampered = { ...envelope, payload: Buffer.from(JSON.stringify(payload('macos'))).toString('base64') };
+  const tampered = {
+    ...envelope,
+    payload: Buffer.from(JSON.stringify(payload('macos'))).toString('base64'),
+  };
   await assert.rejects(verifyPlatformDownload(JSON.stringify(tampered), stable.keySet, 'macos'));
 });
 

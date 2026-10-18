@@ -26,6 +26,7 @@ import { createDesktopUpdates, type DesktopUpdates } from './update-status.js';
 import { desktopManualUpdates } from './desktop-manual-updates.js';
 import { installManualUpdateQuit } from './manual-update-quit.js';
 import { createProjectSealKey } from './project-seal-key.js';
+import { officialPlatformDownloadUrl } from './official-download-page.js';
 
 // A plain label for the device list; the computer's own name is never sent.
 const DEVICE_NAMES: Readonly<Record<string, string>> = {
@@ -89,14 +90,19 @@ export function createDesktopLicensing(options: Options) {
   });
   const entry = licenceEntry(config, desktopLicenceLink(config, options.packaged), options);
   const rings = createUpdateRingStore(options.userDataPath);
-  const manual = desktopManualUpdates(config, {
+  const checks = desktopManualUpdates(config, {
     ...options,
     fetch: (url, init) => net.fetch(url, init),
     eligible: runtime.isManualReleaseEligible,
     announce: announceManualUpdate,
+    announceDownloadPage: announceDownloadPageUpdate,
+    openDownloadPage: openPlatformDownloadPage,
   });
-  if (manual !== null)
-    installManualUpdateQuit(app, manual, {
+  const manual = checks?.updates ?? null;
+  // Only the Windows installer runs after a close; macOS and Linux open the page.
+  const installer = checks?.kind === 'installer' ? checks.updates : null;
+  if (installer !== null)
+    installManualUpdateQuit(app, installer, {
       canInstall: options.canInstallManualUpdate ?? (() => false),
       reportFailure: (error) => console.warn('Manual update installation deferred:', error),
     });
@@ -122,7 +128,7 @@ export function createDesktopLicensing(options: Options) {
         runtime,
         earlyUpdates,
         updates,
-        manual === null ? undefined : options.requestManualUpdateClose,
+        installer === null ? undefined : options.requestManualUpdateClose,
         entry,
       ),
     /**
@@ -191,6 +197,27 @@ function desktopLicenceLink(config: LicensingConfig, packaged: boolean) {
       }
     },
   });
+}
+
+/** The only pages a macOS or Linux update opens: one verified version's section (ADR-613). */
+async function openPlatformDownloadPage(url: string): Promise<void> {
+  const page = new URL(url);
+  const version = page.searchParams.get('version') ?? '';
+  const platform = page.hash.slice(1);
+  if (
+    (platform !== 'macos' && platform !== 'linux') ||
+    url !== officialPlatformDownloadUrl(version, platform)
+  )
+    throw new Error('Invalid download page');
+  await shell.openExternal(url);
+}
+
+function announceDownloadPageUpdate(version: string): void {
+  if (Notification.isSupported())
+    new Notification({
+      title: 'KerfDesk update available',
+      body: `KerfDesk ${version} is available. Open Help > Check for Updates to get it from the download page, then install it after you close KerfDesk.`,
+    }).show();
 }
 
 function announceManualUpdate(version: string): void {

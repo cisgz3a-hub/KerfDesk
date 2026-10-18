@@ -646,7 +646,7 @@ async function publicKeyFiles(root, input) {
   );
 }
 
-test('macOS and Linux builds reuse the identity the Windows job signed, without the signing key (ADR-610)', async () => {
+test('macOS and Linux builds reuse the identity the Windows job signed, without the signing key (ADR-613)', async () => {
   const paths = await files();
   const input = fixture({ unsignedInstaller: true, sourceRef: 'refs/heads/main' });
   await publicKeyFiles(paths.root, input);

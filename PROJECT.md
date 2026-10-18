@@ -55,7 +55,7 @@ User profile:
   - *Brave note:* WebSerial is shipped but Brave may gate it behind a Shields/flags toggle in some versions (upstream issue brave-browser#24404, status last re-verified 2026-05-28 — still open). Surface a one-line "Enable WebSerial in Brave settings" hint in the F-B1 connect error path.
 - **Windows desktop preview packaging:** the checked-in Preview workflow builds an unsigned KerfDesk NSIS package for Windows 10/11 x64. Publication still requires an authorized exact-version tag and recorded real-OS qualification.
 - **macOS desktop preview packaging:** the checked-in Preview workflow builds separate unsigned and unnotarized KerfDesk DMGs for macOS 13+ x64 and arm64. Publication still requires an authorized exact-version tag and recorded real-OS qualification.
-- **Linux desktop packaging:** the same app builds as an x64 AppImage and `.deb` (ADR-606). Every pull request checks both packages, installs the `.deb` on Ubuntu and launches it. No Linux file is published yet, so Linux operators use the web/PWA until a Linux download exists.
+- **Linux desktop packaging:** the same app builds as an x64 AppImage and `.deb` (ADR-606). Every pull request checks both packages, installs the `.deb` on Ubuntu and launches it. The unsigned commercial lane can publish the Linux `.deb` and AppImage and the Mac DMGs beside each Windows release, behind one repository switch per system (ADR-613); until the maintainer turns them on, Linux operators use the web/PWA.
 - **Product website:** a separate static site in `website/` (ADR-524) that describes, downloads and prices KerfDesk. It ships no JavaScript, analytics or cookies, is never bundled into the app, and shows no price or checkout while sales are closed under ADR-247.
 
 Every current and planned target uses one codebase, sharing every line of pipeline and UI code, separated only by a thin **platform adapter** for file I/O, serial port, and drag-and-drop. See ADR-011 and ADR-248.
@@ -413,7 +413,7 @@ Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, no
   A1 Pro and Neotronics 4040, firmware builds unconfirmed; community Marlin/Smoothie/FluidNC verification), Ruida
   real-controller validation then the Electron UDP transport, wizard
   controller-family step polish. Trocen/TopWisdom/galvo stay out of scope.
-- Phase J: Linux desktop build. Packaging, the `.lf2` file type, remembered serial ports and CI install checks shipped under ADR-606; publishing Linux downloads remains; macOS Preview moved into the current ADR-247/248 Desktop Preview track. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)
+- Phase J: Linux desktop build. Packaging, the `.lf2` file type, remembered serial ports and CI install checks shipped under ADR-606; publishing Linux and commercial Mac downloads is designed in ADR-613 and waits for the maintainer's switch; macOS Preview moved into the current ADR-247/248 Desktop Preview track. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)
 
 **Public source availability does not collapse the phase plan.** ADR-005, ADR-006, ADR-007 are discipline choices, not technical-impossibility choices. See ADR-017 for the dependency policy, ADR-247/248 for the preview-distribution posture and ADR-543 for the source licence.
 
@@ -687,7 +687,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - ~~Raster engrave (Fill, Image modes).~~ **Shipped in Phase F** (F.1 Fill, F.2 Image) — no longer out of scope.
 - ~~Marlin, Smoothieware, and Ruida export.~~ **Shipped under Phase I** with
   simulator/evidence labels; Trocen and TopWisdom remain out of scope.
-- ~~Linux desktop build.~~ **Packaged under ADR-606** (AppImage and `.deb`, x64); publishing Linux downloads needs its own design. Windows and macOS Preview packaging is in scope under ADR-247/248.
+- ~~Linux desktop build.~~ **Packaged under ADR-606** (AppImage and `.deb`, x64); publishing Linux downloads is ADR-613. Windows and macOS Preview packaging is in scope under ADR-247/248.
 - ~~Node editing of imported paths.~~ **Shipped as bounded node/Bezier editing** with schema-v2 canonical-curve invalidation rules (ADR-159, ADR-164); a general geometry kernel remains out of scope.
 - Boolean ops.
 - ~~Camera alignment, overhead camera.~~ **Scoped by ADR-107** (Camera Mode —

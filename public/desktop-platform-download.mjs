@@ -1,5 +1,5 @@
 /* global TextEncoder */
-// The macOS and Linux downloads of the unsigned commercial lane (ADR-610). Each
+// The macOS and Linux downloads of the unsigned commercial lane (ADR-613). Each
 // system has its own signed document beside the Windows one: installed Windows
 // copies check commercial-manual/latest.json against exactly one Windows
 // installer (desktop-manual-download.mjs), so that document never names these

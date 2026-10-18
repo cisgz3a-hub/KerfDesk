@@ -26,7 +26,12 @@ const keySets = {
   releaseKeySet: {
     schemaVersion: 1,
     keys: [
-      { keyId: 'stable-test', algorithm: 'Ed25519', channel: 'stable', publicKeySpki: spki(stable) },
+      {
+        keyId: 'stable-test',
+        algorithm: 'Ed25519',
+        channel: 'stable',
+        publicKeySpki: spki(stable),
+      },
     ],
   },
 };
@@ -97,5 +102,8 @@ test('the packaged commercial app carries exactly this release identity and lice
   const stale = await archiveWith(packaged, '1.2.2');
   assert.throws(() => verifyPackagedCommercialAsar(stale, VERSION, identity, keySets), /renderer/u);
   const stranger = await archiveWith({ ...packaged, author: { name: 'Someone else' } });
-  assert.throws(() => verifyPackagedCommercialAsar(stranger, VERSION, identity, keySets), /author/u);
+  assert.throws(
+    () => verifyPackagedCommercialAsar(stranger, VERSION, identity, keySets),
+    /author/u,
+  );
 });

@@ -1,4 +1,4 @@
-## ADR-610 - Commercial macOS and Linux downloads beside the unsigned Windows lane
+## ADR-613 - Commercial macOS and Linux downloads beside the unsigned Windows lane
 
 **Status:** Accepted by the maintainer's request on 2026-10-18 ("I need full apple and Linux
 integration": a normal download for every system). Implemented in source and CI; nothing is
@@ -49,15 +49,15 @@ and `.deb` with CI install checks, but published nothing, because:
    | System | Latest (`no-store`) | Per version, immutable | Files |
    | ------ | ------------------- | ---------------------- | ----- |
    | macOS | `desktop/commercial-manual/latest-macos.json` | `releases/X.Y.Z/download-manifest-macos.json` | `KerfDesk-X.Y.Z-macos-arm64.dmg`, `KerfDesk-X.Y.Z-macos-x64.dmg` |
-   | Linux | `desktop/commercial-manual/latest-linux.json` | `releases/X.Y.Z/download-manifest-linux.json` | `KerfDesk-X.Y.Z-linux-x86_64.AppImage`, `KerfDesk-X.Y.Z-linux-amd64.deb` |
+   | Linux | `desktop/commercial-manual/latest-linux.json` | `releases/X.Y.Z/download-manifest-linux.json` | `KerfDesk-X.Y.Z-linux-amd64.deb`, `KerfDesk-X.Y.Z-linux-x86_64.AppImage` |
 
    Each is an Ed25519 envelope signed by the stable key, whose payload
    (`public/desktop-platform-download.mjs`) has the Windows identity fields plus
-   `kind: "platform-download"` and `platform`, and lists exactly that system's files with size
-   and SHA-256. `codeSigning` is `unsigned`; macOS also accepts `developer-id`, so the first
-   notarized Mac build can reach unsigned Mac copies once, as `authenticode` does on Windows
-   (ADR-579). The signature covers the system, so a Linux document cannot pass as a Mac one, and
-   the Windows validator refuses both (different fields). The publisher
+   `kind: "platform-download"` and `platform`, and lists exactly that system's files, in the
+   order above, with size and SHA-256. `codeSigning` is `unsigned`; macOS also accepts
+   `developer-id`, so the first notarized Mac build can reach unsigned Mac copies once, as
+   `authenticode` does on Windows (ADR-579). The signature covers the system, so a Linux document
+   cannot pass as a Mac one, and the Windows validator refuses both (different fields). The publisher
    (`scripts/publish-platform-commercial-release.mjs`) refuses unless the Windows
    `download-manifest.json` of the same version is already published with the same identity,
    which keeps one version line and guarantees the shared `release-notes.json` exists. It refuses
@@ -66,23 +66,32 @@ and `.deb` with CI install checks, but published nothing, because:
    writer. Earlier Mac and Linux versions stay downloadable by exact version
    (`download.html?version=X.Y.Z`); a listed history like Windows' `catalog.json` is not built
    yet.
-4. **Packaging and qualification before anything is published.**
+4. **Packaging and qualification before anything is published.** One script,
+   `scripts/build-commercial-platform.sh`, prepares, packages and qualifies each system, so a
+   release and its CI rehearsal run the same commands.
    - **macOS:** `electron-builder.commercial-unsigned-macos.yml` adds the Preview's Mac packaging
      to the commercial lane: bundle ID `com.kerfdesk.app` (an installed Preview is replaced in
      place), macOS 13 or newer, an ad-hoc signature re-applied after the fuses are set, no
      notarization, and the Preview's fuse set (cookie encryption off, because an unsigned build
      cannot hold its keychain item reliably and KerfDesk keeps no login cookies). Each
      architecture builds on its own runner (Apple silicon `macos-15`, Intel `macos-15-intel`),
-     then must pass the package contract (`scripts/verify-macos-commercial-package.sh`: identity,
-     legal and Electron notices, the signed commercial metadata in `app.asar` bound to the
-     release identity, no updater metadata, no notarization ticket, no Developer ID), the fuse and
-     `app.asar` check, a launch, import and save from inside the DMG, and the ASAR tamper refusal.
+     then must pass the Mac package contract with `--commercial`
+     (`scripts/verify-macos-preview-package.sh`: identity, legal and Electron notices, the signed
+     commercial metadata in `app.asar` bound to the release identity
+     (`scripts/verify-packaged-commercial-metadata.mjs`), no updater metadata, no notarization
+     ticket, no Developer ID), the fuse and `app.asar` check against the Preview's fuse block, a
+     launch, import and save from inside the DMG, and the ASAR tamper refusal.
    - **Linux:** the ADR-607 packages from the commercial config, then the same contract
      (`scripts/verify-linux-package.sh --commercial`), the fuse check, a `.deb` install and launch
      with Ubuntu 24.04's user-namespace restriction on, an AppImage launch without `libfuse2`,
      and removal. No tamper test runs, because Linux has none to prove (ADR-607 decision 9).
    - The publish jobs accept only files whose SHA-256 the qualifying job reported for exactly
      that file, so nothing changed in between can be published.
+   - **Rehearsal.** The Desktop package check runs the same script for Linux on every pull
+     request, and for macOS with the other native jobs, from a release identity signed by a
+     throwaway key that `scripts/rehearse-commercial-identity.mjs` pins in that runner's checkout
+     only. The publishers read the pinned keys of a clean checkout, so nothing a rehearsal signs
+     can be published.
 5. **In-app update notices on macOS and Linux.** A packaged commercial unsigned build on macOS
    (x64 or arm64) or Linux (x64) reads its system's `latest-<system>.json` at start and every 30
    minutes, and verifies it as Windows does: pinned stable keys, the exact system and file names,

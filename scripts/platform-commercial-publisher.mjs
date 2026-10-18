@@ -1,5 +1,5 @@
 // Publishes one system's macOS or Linux files beside the unsigned Windows
-// release of the same version (ADR-610). It never writes a Windows object, the
+// release of the same version (ADR-613). It never writes a Windows object, the
 // Windows latest.json, its catalogue or the release notes: installed Windows
 // copies keep reading exactly what the Windows publisher wrote.
 import { createPrivateKey, sign } from 'node:crypto';
@@ -161,8 +161,15 @@ export async function publishPlatformCommercialRelease({
   if (!same(initial, await store.get(latestKey)))
     refuse(`The ${platform} latest document changed during publication.`);
   if (same(initial, manifest))
-    return { status: 'already-published', version: payload.version, latestSha256: digest(manifest) };
-  await store.put(latestKey, manifest, { contentType: 'application/json', cacheControl: 'no-store' });
+    return {
+      status: 'already-published',
+      version: payload.version,
+      latestSha256: digest(manifest),
+    };
+  await store.put(latestKey, manifest, {
+    contentType: 'application/json',
+    cacheControl: 'no-store',
+  });
   if (!same(manifest, await store.get(latestKey)))
     refuse(`The ${platform} latest document readback failed.`);
   return { status: 'published', version: payload.version, latestSha256: digest(manifest) };

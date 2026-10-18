@@ -172,7 +172,7 @@ function licenceMetadata(version, unsignedInstaller, keys, envelope) {
 
 /**
  * The same metadata from a release identity the Windows job already signed
- * (ADR-610): the macOS and Linux builds of a release hold no signing key. The
+ * (ADR-613): the macOS and Linux builds of a release hold no signing key. The
  * public envelope must verify against the pinned stable keys and name the
  * version and source this build was planned for.
  */
@@ -359,7 +359,7 @@ export async function writeCommercialPreparation(input, root = ROOT) {
     input.releaseIdentity === undefined
       ? prepareCommercialMetadata(input)
       : commercialMetadataFromIdentity(input);
-  // Windows and Linux share one configuration; the Mac adds its packaging (ADR-610).
+  // Windows and Linux share one configuration; the Mac adds its packaging (ADR-613).
   const lane = input.unsignedInstaller
     ? platform === 'macos'
       ? 'commercial-unsigned-macos'
@@ -472,7 +472,7 @@ async function packagedResources(context) {
 
 async function verifyPreparedPackage(context, unsignedInstaller) {
   // The signed lane needs Windows code signing; the unsigned lane also ships
-  // macOS and Linux (ADR-610).
+  // macOS and Linux (ADR-613).
   requireInput(
     context.electronPlatformName === 'win32' ||
       (unsignedInstaller && ['darwin', 'linux'].includes(context.electronPlatformName)),
@@ -538,7 +538,7 @@ export async function runPreparation(args, env = process.env, root = ROOT) {
   const required = ['outputDir', 'termsFile', 'version', 'sourceSha'];
   if (Object.hasOwn(input, 'releaseIdentityFile')) {
     // A macOS or Linux build reuses the identity the Windows job signed and
-    // never holds the signing key itself (ADR-610).
+    // never holds the signing key itself (ADR-613).
     requireInput(
       required.every((field) => Object.hasOwn(input, field)) &&
         !['sourceRef', 'publishedAt', 'keyId'].some((field) => Object.hasOwn(input, field)),

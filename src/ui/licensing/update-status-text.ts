@@ -29,7 +29,9 @@ const DESCRIBE: Record<CommercialUpdateStatus['state'], Describe> = {
   idle: () => "KerfDesk hasn't checked for updates since it opened.",
   checking: () => 'Checking for updates...',
   available: (status) =>
-    `KerfDesk ${version(status)} is available. Download it when you are ready.`,
+    status.delivery === 'download-page'
+      ? `KerfDesk ${version(status)} is available. Open its download page to get it, then install it after you close KerfDesk.`
+      : `KerfDesk ${version(status)} is available. Download it when you are ready.`,
   downloading: downloadText,
   'up-to-date': (status, _until, formatTime) =>
     `KerfDesk is up to date.${checked(status, formatTime)}`,
@@ -37,11 +39,13 @@ const DESCRIBE: Record<CommercialUpdateStatus['state'], Describe> = {
   'not-covered': (status, updatesUntil) =>
     `KerfDesk ${version(status)} is out, but ${coverage(updatesUntil)} The version you have keeps working.`,
   failed: (status) =>
-    status.mode === 'manual'
-      ? 'The update could not be prepared. Check your connection and try Check now again. Your current version keeps working.'
-      : status.version === null
-        ? "KerfDesk couldn't check for updates. Check the internet connection, then try again."
-        : `KerfDesk ${status.version} couldn't be prepared. KerfDesk tries again next time it opens.`,
+    status.delivery === 'download-page'
+      ? "KerfDesk couldn't check for updates or open the download page. Check your connection and try Check now again. Your current version keeps working."
+      : status.mode === 'manual'
+        ? 'The update could not be prepared. Check your connection and try Check now again. Your current version keeps working.'
+        : status.version === null
+          ? "KerfDesk couldn't check for updates. Check the internet connection, then try again."
+          : `KerfDesk ${status.version} couldn't be prepared. KerfDesk tries again next time it opens.`,
 };
 
 function downloadText(status: CommercialUpdateStatus): string {

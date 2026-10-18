@@ -57,7 +57,7 @@ jobs:
     timeout-minutes: 60
     environment: desktop-commercial
     # Set only after Windows is published: the macOS and Linux jobs follow it
-    # with the same version and signed release identity (ADR-610).
+    # with the same version and signed release identity (ADR-613).
     outputs:
       published: ${{ steps.share.outputs.published }}
       version: ${{ steps.plan.outputs.version }}
@@ -259,7 +259,7 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
-  # macOS and Linux follow the published Windows release (ADR-610). Each system
+  # macOS and Linux follow the published Windows release (ADR-613). Each system
   # is off until its repository variable is `on`. The build jobs hold no
   # secret: they reuse the identity the Windows job signed. A failure here never
   # changes the Windows release; re-running the failed jobs repeats this version.

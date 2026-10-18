@@ -1,4 +1,4 @@
-# Customer macOS release with production licensing and manual downloads (ADR-610).
+# Customer macOS release with production licensing and manual downloads (ADR-613).
 # Generate an external config with
 # prepare-commercial-desktop --unsigned-installer --platform macos.
 # It adds the Preview's Mac packaging to the unsigned lane until an Apple

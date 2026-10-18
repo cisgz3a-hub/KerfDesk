@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and qualify one system's unsigned commercial package (ADR-610) from the
+# Build and qualify one system's unsigned commercial package (ADR-613) from the
 # release identity the Windows job already signed. It never holds a signing key.
 # The release workflow runs it before publication, and the Desktop package
 # check rehearses it with a throwaway identity. A qualified file's SHA-256 is

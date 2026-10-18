@@ -106,9 +106,13 @@ function OfferBody(
           variant="primary"
           disabled={busy}
           onClick={() => run(controls.download)}
-          title={`Download and verify KerfDesk ${view.version} while you keep working. You choose when to install it.`}
+          title={
+            status.delivery === 'download-page'
+              ? `Open the download page for KerfDesk ${view.version} in your browser. Install it after you close KerfDesk.`
+              : `Download and verify KerfDesk ${view.version} while you keep working. You choose when to install it.`
+          }
         >
-          Update
+          {status.delivery === 'download-page' ? 'Download page' : 'Update'}
         </Button>
         <NotNow onClick={dismiss} />
       </span>

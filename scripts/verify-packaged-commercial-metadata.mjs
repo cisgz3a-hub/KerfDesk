@@ -1,5 +1,5 @@
 // Verify the package.json a packaged unsigned commercial app reads from app.asar
-// (ADR-610): production licensing, the unsigned lane's markers and exactly the
+// (ADR-613): production licensing, the unsigned lane's markers and exactly the
 // release identity the Windows installer of this version carries. The macOS
 // and Linux package contracts run it on the bytes inside each DMG, .deb and
 // AppImage, not on the build inputs.
