@@ -98,10 +98,6 @@ function useCanvasHoverObject(
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null) return;
-    let releasedNormally = false;
-    const begin = (): void => {
-      releasedNormally = false;
-    };
     // Cursor null also means an ordinary click finished. Physical leave and
     // cancellation must independently end a paused hover, even if cursor null
     // has already been reported by pointer-up.
@@ -111,36 +107,7 @@ function useCanvasHoverObject(
       paused.current = false;
       setHovered(null);
     };
-    const release = (event: PointerEvent): void => {
-      releasedNormally = true;
-      const bounds = canvas.getBoundingClientRect();
-      if (
-        event.clientX < bounds.left ||
-        event.clientX >= bounds.right ||
-        event.clientY < bounds.top ||
-        event.clientY >= bounds.bottom
-      ) {
-        leave();
-      }
-    };
-    const lostCapture = (): void => {
-      // A normal pointer-up also releases capture; preserve its paused hover.
-      // Capture loss without pointer-up is the owner's cancellation path.
-      if (!releasedNormally) leave();
-      releasedNormally = false;
-    };
-    canvas.addEventListener('pointerdown', begin);
-    canvas.addEventListener('pointerleave', leave);
-    canvas.addEventListener('pointercancel', leave);
-    canvas.addEventListener('pointerup', release);
-    canvas.addEventListener('lostpointercapture', lostCapture);
-    return () => {
-      canvas.removeEventListener('pointerdown', begin);
-      canvas.removeEventListener('pointerleave', leave);
-      canvas.removeEventListener('pointercancel', leave);
-      canvas.removeEventListener('pointerup', release);
-      canvas.removeEventListener('lostpointercapture', lostCapture);
-    };
+    return listenForHoverBoundary(canvas, leave);
   }, [canvasRef]);
   const x = cursor?.x ?? null;
   const y = cursor?.y ?? null;
@@ -177,6 +144,41 @@ function useCanvasHoverObject(
     };
   }, [x, y, scene, scale, enabled, pauseHover]);
   return hovered;
+}
+
+/** Capture release follows ordinary pointer-up as well as cancellation. */
+function listenForHoverBoundary(canvas: HTMLCanvasElement, leave: () => void): () => void {
+  let releasedNormally = false;
+  const begin = (): void => {
+    releasedNormally = false;
+  };
+  const release = (event: PointerEvent): void => {
+    releasedNormally = true;
+    const bounds = canvas.getBoundingClientRect();
+    if (
+      event.clientX < bounds.left ||
+      event.clientX >= bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY >= bounds.bottom
+    )
+      leave();
+  };
+  const lostCapture = (): void => {
+    // Only an unexpected loss ends the hover; a normal click resumes it.
+    if (!releasedNormally) leave();
+    releasedNormally = false;
+  };
+  const listeners = [
+    ['pointerdown', begin],
+    ['pointerleave', leave],
+    ['pointercancel', leave],
+    ['pointerup', release],
+    ['lostpointercapture', lostCapture],
+  ] as const;
+  for (const [type, handler] of listeners) canvas.addEventListener(type, handler);
+  return () => {
+    for (const [type, handler] of listeners) canvas.removeEventListener(type, handler);
+  };
 }
 
 function pointNearObject(scene: Scene, id: string, point: Vec2, toleranceMm: number): boolean {
