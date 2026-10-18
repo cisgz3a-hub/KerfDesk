@@ -25,7 +25,6 @@
   border: 1px solid var(--lf-border);
   border-radius: 6px;
   background: var(--lf-bg-input);
-  color: var(--lf-text);
   cursor: pointer;
   transition:
     border-color 80ms,
@@ -58,11 +57,36 @@
   cursor: pointer;
 }
 
+/* A small piece of material with the marks burned into it: dark on light in
+   every theme, and kept as drawn in forced-colors mode, so a swatch never
+   swaps what burns for what stays. */
 .lf-dither-swatch__thumbnail {
   display: block;
   max-width: 100%;
+  border-radius: 2px;
+  background: var(--lf-burn-preview-material);
+  color: var(--lf-burn-preview-mark);
   fill: currentColor;
   shape-rendering: crispEdges;
+  forced-color-adjust: none;
+}
+
+.lf-dither-picker__notice {
+  margin: 0;
+}
+
+/* Forced colours drop the accent border, wash and inset ring, so the chosen
+   swatch takes the system highlight instead. */
+@media (forced-colors: active) {
+  .lf-dither-swatch[data-checked='true'] {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight;
+  }
+
+  .lf-dither-swatch:has(input:focus-visible) {
+    outline-color: CanvasText;
+  }
 }
 
 .lf-dither-picker__caption {

@@ -6,6 +6,7 @@ import {
   MAX_RASTER_LINES_PER_MM,
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster';
+import { imageDitherAlgorithm } from '../../core/raster/image-processing';
 import type { Layer, LayerOperationSettings } from '../../core/scene';
 import { DitherSwatchPicker } from './DitherSwatchPicker';
 import { mixedCheckboxProps, useMixedOperationNumber } from './mixed-operation-input';
@@ -152,14 +153,32 @@ function DitherSelect(props: {
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
   const { labelContext, settings, commit } = props;
+  const notice = passThroughNotice(settings, props.mixedFields);
   return (
     <DitherSwatchPicker
       value={props.mixedFields?.ditherAlgorithm ? null : settings.ditherAlgorithm}
       onChange={(ditherAlgorithm) => commit({ ditherAlgorithm })}
       title="Binary modes emit off/max dots. Grayscale maps luma between Min Power and Power."
       ariaLabel={`Dither for ${labelContext}`}
+      {...(notice === undefined ? {} : { notice })}
     />
   );
+}
+
+// Use original pixels burns the image's own pixels as Grayscale whatever the
+// stored dither (imageDitherAlgorithm), so say so rather than let a swatch
+// promise dots that will not burn.
+function passThroughNotice(
+  settings: LayerOperationSettings,
+  mixed: MixedOperationFields | undefined,
+): string | undefined {
+  if (mixed?.passThrough) {
+    return 'Some selected artwork uses original pixels, which always burns as Grayscale.';
+  }
+  if (!settings.passThrough) return undefined;
+  const chosen = mixed?.ditherAlgorithm ? null : settings.ditherAlgorithm;
+  if (chosen !== null && imageDitherAlgorithm(settings) === chosen) return undefined;
+  return 'Use original pixels is on, so this burns as Grayscale. The dither chosen here applies once it is off.';
 }
 
 function LineIntervalInput(props: {

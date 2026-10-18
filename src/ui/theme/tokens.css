@@ -44,6 +44,10 @@
   --lf-bg-overlay: rgba(250, 249, 247, 0.96);
   /* Fixed light artwork/material previews keep their text legible in either theme. */
   --lf-material-surface-text: #6b655c;
+  /* Burn previews (the Dither swatches): dark marks on light material in
+   * either theme, so a theme can never swap what burns for what stays. */
+  --lf-burn-preview-material: #f3f0e9;
+  --lf-burn-preview-mark: #2b2823;
   --lf-border: #ddd9d3;
   --lf-border-strong: #aaa59d;
 
@@ -160,6 +164,9 @@
   --lf-tint-success-hover: #2c4b3c;
   --lf-tint-success-active: #345b48;
   --lf-accent-wash: rgba(227, 154, 99, 0.12);
+  /* Same polarity as light, toned down so the material does not glare. */
+  --lf-burn-preview-material: #d6cfc3;
+  --lf-burn-preview-mark: #1c1a18;
   --lf-focus: #90bfff;
   --lf-backdrop: rgba(12, 11, 9, 0.6);
   --lf-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);

@@ -178,7 +178,26 @@ test('Image dither swatches fit and stay keyboard-operable at every panel width'
   await expect(panel.getByRole('spinbutton', { name: /^Minimum power for/ })).toHaveCount(0);
   await page.keyboard.press('ArrowRight');
   await expect(dither.getByRole('radio', { name: 'Floyd-Steinberg', exact: true })).toBeChecked();
+
+  // Burn marks stay darker than the material in either theme, so dark mode
+  // never shows what burns as light.
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((name) => document.documentElement.setAttribute('data-theme', name), theme);
+    const colors = await dither
+      .locator('svg')
+      .first()
+      .evaluate((svg) => {
+        const style = getComputedStyle(svg);
+        return { mark: style.color, material: style.backgroundColor };
+      });
+    expect(lightness(colors.mark)).toBeLessThan(lightness(colors.material) - 100);
+  }
 });
+
+function lightness(rgb: string): number {
+  const [red = 0, green = 0, blue = 0] = (rgb.match(/\d+(\.\d+)?/g) ?? []).map(Number);
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
 
 // ADR-431: Cut depth and Depth per pass share one row, Feed, Plunge and
 // Spindle speed the next. Each row's boxes stay level and even at every width;

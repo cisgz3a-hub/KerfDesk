@@ -240,4 +240,36 @@ describe('Dither in the selected-operation inspector', () => {
       await view.unmount();
     }
   });
+
+  // Use original pixels burns as Grayscale whatever the stored dither.
+  it.each([
+    ['a binary dither under Use original pixels', 'jarvis', true, true, /burns as Grayscale/],
+    ['Grayscale under Use original pixels', 'grayscale', true, true, null],
+    ['a binary dither without it', 'jarvis', false, false, null],
+    ['artwork that disagrees on it', 'jarvis', true, false, /Some selected artwork/],
+  ] as const)(
+    'says when the choice does not burn: %s',
+    async (_case, ditherAlgorithm, firstPassThrough, secondPassThrough, notice) => {
+      load(
+        { ...FIRST, ...image, ditherAlgorithm, passThrough: firstPassThrough },
+        { ...SECOND, ...image, ditherAlgorithm, passThrough: secondPassThrough },
+      );
+      const view = await mountInspector();
+      try {
+        const group = view.host.querySelector(DITHER_GROUP);
+        const text = view.host.querySelector('.lf-dither-picker__notice')?.textContent ?? null;
+        if (notice === null) {
+          expect(text).toBeNull();
+          expect(group?.hasAttribute('aria-describedby')).toBe(false);
+        } else {
+          expect(text).toMatch(notice);
+          const describedBy = group?.getAttribute('aria-describedby') ?? '';
+          expect(document.getElementById(describedBy)?.textContent).toBe(text);
+        }
+        expect(checkedValue(view.host)).toBe(ditherAlgorithm);
+      } finally {
+        await view.unmount();
+      }
+    },
+  );
 });

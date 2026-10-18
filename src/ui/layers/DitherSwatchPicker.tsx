@@ -42,15 +42,18 @@ const THUMBNAIL_SCALE = 2;
 /**
  * The Dither choice as a radio group of swatches, each the same ramp burned
  * with that mode. `value` is null when the selected artwork disagrees (Mixed):
- * no swatch is checked until one is chosen.
+ * no swatch is checked until one is chosen. `notice` says when something else
+ * overrides the choice, such as Use original pixels forcing Grayscale.
  */
 export function DitherSwatchPicker(props: {
   readonly value: DitherAlgorithm | null;
   readonly ariaLabel: string;
   readonly title: string;
+  readonly notice?: string;
   readonly onChange: (algorithm: DitherAlgorithm) => void;
 }): JSX.Element {
   const name = useId();
+  const noticeId = useId();
   const groupRef = useRef<HTMLDivElement>(null);
   const tabStop = props.value ?? DITHER_ALGORITHMS[0];
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
@@ -67,6 +70,7 @@ export function DitherSwatchPicker(props: {
         ref={groupRef}
         role="radiogroup"
         aria-label={props.ariaLabel}
+        aria-describedby={props.notice === undefined ? undefined : noticeId}
         title={props.title}
         className="lf-dither-swatches"
         onKeyDown={onKeyDown}
@@ -86,6 +90,11 @@ export function DitherSwatchPicker(props: {
         <strong>{props.value === null ? 'Mixed' : DITHER_COPY[props.value].label}</strong>{' '}
         {props.value === null ? MIXED_HINT : DITHER_COPY[props.value].description}
       </p>
+      {props.notice === undefined ? null : (
+        <p id={noticeId} className="lf-laser-help lf-laser-notice lf-dither-picker__notice">
+          {props.notice}
+        </p>
+      )}
     </div>
   );
 }
