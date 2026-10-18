@@ -727,9 +727,14 @@ body {
   margin-top: var(--lf-space-2);
   /* Pin the actions row to the panel's visible bottom edge while long content
      scrolls beneath it. Full-bleed negative margins cover the panel padding so
-     scrolled content cannot peek around the opaque footer band. */
+     scrolled content cannot peek around the opaque footer band. Sticky insets
+     are measured from inside the panel's padding, so bottom: 0 would park the
+     band 16px above the edge with rows showing through below the buttons; the
+     negative inset cancels that padding. z-index keeps positioned controls in
+     the scrolled content beneath the band. */
   position: sticky;
-  bottom: 0;
+  bottom: calc(-1 * var(--lf-space-6));
+  z-index: 2;
   margin-bottom: calc(-1 * var(--lf-space-6));
   margin-left: calc(-1 * var(--lf-space-6));
   margin-right: calc(-1 * var(--lf-space-6));
