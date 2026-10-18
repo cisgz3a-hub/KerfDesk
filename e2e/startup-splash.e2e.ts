@@ -50,26 +50,83 @@ test('waits for a successful workspace paint after a canvas mounts', async ({ pa
   await canvas.evaluate((element) => {
     element.setAttribute('data-workspace-painted', 'true');
   });
-  await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 2000 });
+  await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 7000 });
 });
 
-test('reveals the workspace while the decorative artwork is still pending', async ({ page }) => {
-  const waitForDesktopModule = await observeDesktopModule(page);
-  const artwork = await holdRequest(page, /\/startup-craft\.webp(?:\?|$)/);
+test('paints the wood with the splash without a separate artwork request', async ({ page }) => {
+  let artworkRequests = 0;
+  await page.route(/\/startup-craft\.webp(?:\?|$)/, async (route) => {
+    artworkRequests += 1;
+    await route.abort();
+  });
+  const main = await holdRequest(page, /\/src\/ui\/app\/main\.tsx(?:\?|$)/);
   try {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await expect.poll(artwork.requested).toBe(true);
-    await waitForDesktopModule();
-    await expect(page.locator('canvas[aria-label="KerfDesk workspace"]')).toBeVisible();
+    await page.goto('/', { waitUntil: 'commit' });
+    await expect.poll(main.requested).toBe(true);
+    const artwork = page.locator('.app-splash__art');
+    await expect(artwork).toHaveAttribute('src', /^data:image\/webp;base64,/);
+    await expect
+      .poll(() =>
+        artwork.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0),
+      )
+      .toBe(true);
+    await expect(artwork).toHaveAttribute('decoding', 'sync');
+    expect(artworkRequests).toBe(0);
+    await expect(page.locator('#app-root')).toBeEmpty();
+    await expect(page.locator('#app-splash')).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('splash-before-workspace.png') });
+    await main.release();
     await expect(page.locator('canvas[aria-label="KerfDesk workspace"]')).toHaveAttribute(
       'data-workspace-painted',
       'true',
     );
-    await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 2000 });
+    await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 7000 });
   } finally {
-    await artwork.release();
+    await main.release();
   }
 });
+
+for (const edition of ['browser', 'desktop']) {
+  test.describe(`${edition} splash timing`, () => {
+    test.use({
+      userAgent: `Mozilla/5.0 Chrome/142.0.0.0${edition === 'desktop' ? ' Electron/44.8.0' : ''}`,
+    });
+
+    test('retains a full hold after a slow entry and uses the longer fade', async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      const main = await holdRequest(page, /\/src\/ui\/app\/main\.tsx(?:\?|$)/);
+      try {
+        await page.goto('/', { waitUntil: 'commit' });
+        await expect.poll(main.requested).toBe(true);
+        // Reproduce navigation consuming the old two-second minimum before
+        // the workspace module can even install the splash dismissal.
+        await page.waitForFunction(() => performance.now() >= 2500);
+        const releasedAt = await page.evaluate(() => performance.now());
+        await page.evaluate(() => {
+          const splash = document.getElementById('app-splash');
+          if (splash === null) throw new Error('Missing startup splash');
+          new MutationObserver(() => {
+            if (splash.classList.contains('app-splash--hidden')) {
+              document.documentElement.dataset.splashFadeAt = String(performance.now());
+              document.documentElement.dataset.splashFadeDuration = splash.style.transitionDuration;
+            }
+          }).observe(splash, { attributes: true, attributeFilter: ['class'] });
+        });
+        await main.release();
+        await expect(page.locator('canvas[data-workspace-painted="true"]')).toBeVisible();
+        await expect(page.locator('html')).toHaveAttribute('data-splash-fade-at', /\d/, {
+          timeout: 7000,
+        });
+        const fadedAt = Number(await page.locator('html').getAttribute('data-splash-fade-at'));
+        expect(fadedAt - releasedAt).toBeGreaterThanOrEqual(4000);
+        await expect(page.locator('html')).toHaveAttribute('data-splash-fade-duration', '750ms');
+        await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 2000 });
+      } finally {
+        await main.release();
+      }
+    });
+  });
+}
 
 test('reveals the actual root error boundary without waiting for a canvas', async ({ page }) => {
   // Replace only App: the real entry point and ErrorBoundary still run.
@@ -105,9 +162,8 @@ test('eventually dismisses when the mounted app has neither canvas nor error scr
 });
 
 async function observeDesktopModule(page: Page) {
-  // DOMContentLoaded precedes the dynamically attached desktop module. A held
-  // image prevents waiting for the page's load event, so observe the module's
-  // own load separately from workspace paint and splash dismissal.
+  // DOMContentLoaded precedes the dynamically attached workspace module.
+  // Observe its load separately from canvas paint and splash dismissal.
   await page.addInitScript(() => {
     document.addEventListener(
       'load',

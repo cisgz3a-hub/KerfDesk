@@ -8,13 +8,6 @@
     <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link
-      rel="preload"
-      as="image"
-      type="image/webp"
-      href="/startup-craft.webp"
-      fetchpriority="high"
-    />
     <title>KerfDesk — Laser and CNC Software</title>
     <!-- Search and link-preview metadata mirrors the public pages (public/pricing/).
          The runtime window title still comes from use-window-title.ts. -->
@@ -38,9 +31,10 @@
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <!-- The wordmark, credit and activity indicator paint before JS or artwork.
+    <!-- Vite embeds the artwork so timber, wordmark and credit paint together
+         before workspace JS. Synchronous image decoding avoids a black frame.
          main.tsx dismisses the screen when the workspace is ready (F-A1); the
-         desktop app holds it briefly first (ADR-049 Amendment 1).
+         screen holds for four visible seconds in both editions (ADR-049 Amendment 2).
          Activity is indeterminate: no simulated percentage. Soft light flows
          along the artwork's wood grooves: the grooves were traced from
          startup-craft.webp into the SVG below, in that image's pixels, so
@@ -63,7 +57,7 @@
         color-scheme: dark;
         font-family: 'Segoe UI', system-ui, sans-serif;
         pointer-events: none;
-        transition: opacity 180ms ease-out;
+        transition: opacity 750ms ease-out;
       }
       #app-splash .app-splash__art {
         position: absolute;
@@ -435,13 +429,7 @@
   <body>
     <div id="app-root"></div>
     <div id="app-splash" role="status" aria-label="Loading KerfDesk workspace">
-      <img
-        class="app-splash__art"
-        src="/startup-craft.webp"
-        alt=""
-        fetchpriority="high"
-        decoding="async"
-      />
+      <img class="app-splash__art" src="/startup-craft.webp" alt="" decoding="sync" />
       <div class="app-splash__flow" aria-hidden="true">
         <div class="app-splash__grain">
           <i></i><i></i><i></i><i></i><i></i>
