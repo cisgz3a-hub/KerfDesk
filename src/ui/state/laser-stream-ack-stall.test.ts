@@ -73,14 +73,7 @@ function makeConnection(writes: string[], options: ConnectionOptions = {}): Fake
         emitLine('$32=1');
         emitLine('ok');
       }
-      if (
-        data === 'M5\n' ||
-        data === 'M9\n' ||
-        data === 'M107\n' ||
-        data === 'M410\n' ||
-        data === 'M5 I\n'
-      )
-        emitLine('ok');
+      if (['M5\n', 'M9\n', 'M107\n', 'M410\n', 'M5 I\n'].includes(data)) emitLine('ok');
       acknowledgeStartFence();
     },
     onLine: (handler) => {
