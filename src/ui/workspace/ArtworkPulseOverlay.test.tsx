@@ -11,8 +11,10 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { setAppThemePreference } from '../theme/app-theme';
 import { ArtworkPulseClock, PULSE_HOVER_DWELL_MS } from './artwork-pulse';
 import { ArtworkPulseOverlay } from './ArtworkPulseOverlay';
+import { ArtworkPulsePainter } from './draw-artwork-pulse';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -58,8 +60,10 @@ let canvasRef: { current: HTMLCanvasElement };
 let root: Root;
 let hover: MockInstance<ArtworkPulseClock['hover']>;
 
-// Hover off means a click or drag owns the pointer unless a test says otherwise.
-async function render(canvasHoverEnabled: boolean, dragging = !canvasHoverEnabled): Promise<void> {
+async function render(
+  canvasHoverEnabled: boolean,
+  canvasHoverPaused = !canvasHoverEnabled,
+): Promise<void> {
   await act(async () =>
     root.render(
       <ArtworkPulseOverlay
@@ -68,16 +72,10 @@ async function render(canvasHoverEnabled: boolean, dragging = !canvasHoverEnable
         canvasSize={SIZE}
         viewState={VIEW}
         canvasHoverEnabled={canvasHoverEnabled}
-        dragging={dragging}
+        canvasHoverPaused={canvasHoverPaused}
       />,
     ),
   );
-}
-
-// jsdom has no PointerEvent; the overlay only reads pointerId and coordinates.
-function withPointerId(event: MouseEvent, pointerId = 1): MouseEvent {
-  Object.defineProperty(event, 'pointerId', { value: pointerId });
-  return event;
 }
 
 async function pointAt(point: { x: number; y: number } | null): Promise<void> {
@@ -89,6 +87,7 @@ const pulses = (): ReadonlyArray<unknown> =>
   hover.mock.calls.map((call) => (call[2] as { pulse?: boolean } | undefined)?.pulse ?? true);
 
 beforeEach(() => {
+  setAppThemePreference('light');
   vi.useFakeTimers();
   vi.stubGlobal('requestAnimationFrame', () => 1);
   vi.stubGlobal('cancelAnimationFrame', () => undefined);
@@ -120,10 +119,157 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  useUiStore.setState({ operationColorPeek: false, hoveredOperationId: null });
+  useUiStore.setState({
+    operationColorPeek: false,
+    hoveredOperationId: null,
+    wireframeView: false,
+  });
+  setAppThemePreference('light');
 });
 
 describe('ArtworkPulseOverlay (ADR-620)', () => {
+  it('keeps normal capture-release markers independent for two pointers', async () => {
+    canvas.hasPointerCapture = () => true;
+    const pointer = (type: string, pointerId: number): void => {
+      const event = new MouseEvent(type, { clientX: 50, clientY: 50 });
+      Object.defineProperty(event, 'pointerId', { value: pointerId });
+      canvas.dispatchEvent(event);
+    };
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    await act(async () => {
+      pointer('pointerdown', 1);
+      pointer('pointerdown', 2);
+    });
+    await render(false);
+    await act(async () => {
+      useStore.getState().setCursorMm(null);
+      pointer('pointerup', 1);
+      pointer('pointerup', 2);
+      pointer('lostpointercapture', 1);
+      pointer('lostpointercapture', 2);
+    });
+    await render(true);
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    expect(clock.frame(performance.now(), true).pieces.map((piece) => piece.objectId)).toEqual([
+      'heart',
+    ]);
+  });
+
+  it('does not let a second pointer release hide cancellation of the captured pointer', async () => {
+    const pointer = (type: string, pointerId: number): void => {
+      const event = new MouseEvent(type, { clientX: 50, clientY: 50 });
+      Object.defineProperty(event, 'pointerId', { value: pointerId });
+      canvas.dispatchEvent(event);
+    };
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    await act(async () => pointer('pointerdown', 1));
+    await render(false);
+    await act(async () => {
+      useStore.getState().setCursorMm(null);
+      pointer('pointerdown', 2);
+      pointer('pointerup', 2);
+      pointer('lostpointercapture', 1);
+    });
+    await render(true);
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    expect(clock.frame(performance.now(), true).pieces).toEqual([]);
+  });
+
+  it('forgets an uncaptured click release before the next drag loses capture', async () => {
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    await act(async () => {
+      // Alt/Shift selection can finish without acquiring pointer capture.
+      canvas.dispatchEvent(new MouseEvent('pointerup', { clientX: 50, clientY: 50 }));
+      canvas.dispatchEvent(new MouseEvent('pointerdown'));
+    });
+    await render(false);
+    await act(async () => {
+      useStore.getState().setCursorMm(null);
+      canvas.dispatchEvent(new MouseEvent('lostpointercapture'));
+    });
+    await render(true);
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    expect(clock.frame(performance.now(), true).pieces).toEqual([]);
+  });
+
+  it('ends a paused hover when capture is lost before pointer-up', async () => {
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    await render(false);
+    await act(async () => useStore.getState().setCursorMm(null));
+    await act(async () => canvas.dispatchEvent(new MouseEvent('lostpointercapture')));
+    await render(true);
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    expect(clock.frame(performance.now(), true).pieces).toEqual([]);
+    await pointAt({ x: 5, y: 5 });
+    expect(pulses()).toEqual([true, true]);
+  });
+
+  it('preserves an ordinary click hover through automatic capture release', async () => {
+    canvas.hasPointerCapture = () => true;
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    await act(async () => canvas.dispatchEvent(new MouseEvent('pointerdown')));
+    await render(false);
+    await act(async () => useStore.getState().setCursorMm(null));
+    await act(async () => {
+      canvas.dispatchEvent(new MouseEvent('pointerup', { clientX: 50, clientY: 50 }));
+      canvas.dispatchEvent(new MouseEvent('lostpointercapture'));
+    });
+    await render(true);
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    expect(clock.frame(performance.now(), true).pieces.map((piece) => piece.objectId)).toEqual([
+      'heart',
+    ]);
+    await pointAt({ x: 5, y: 5 });
+    expect(pulses()).toEqual([true, false]);
+  });
+
+  it('clears a canvas hover when another tool takes over and waits for a fresh dwell', async () => {
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    expect(pulses()).toEqual([true]);
+    await render(false, false);
+    await pointAt({ x: 6, y: 5 });
+    await render(true);
+    // A pointer within the old object's box must not restore the stale hover.
+    expect(pulses()).toEqual([true]);
+    await act(async () => vi.advanceTimersByTime(PULSE_HOVER_DWELL_MS + 10));
+    expect(pulses()).toEqual([true, true]);
+  });
+
+  it.each(['theme', 'wireframe'] as const)(
+    'repaints a settled hover after a %s change without another pulse',
+    async (change) => {
+      const frames: FrameRequestCallback[] = [];
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+        frames.push(callback);
+        return frames.length;
+      });
+      const painted = vi.spyOn(ArtworkPulsePainter.prototype, 'draw');
+      await render(true);
+      await pointAt({ x: 5, y: 5 });
+      // Finish the pulse; the clock then has no scheduled animation frames.
+      frames.shift()?.(performance.now() + 5000);
+      frames.shift()?.(performance.now() + 6000);
+      expect(frames).toHaveLength(0);
+      painted.mockClear();
+      await act(async () => {
+        if (change === 'theme') setAppThemePreference('dark');
+        else useUiStore.setState({ wireframeView: true });
+      });
+      expect(frames).toHaveLength(1);
+      frames.shift()?.(performance.now() + 7000);
+      expect(painted).toHaveBeenCalledOnce();
+      expect(painted.mock.calls[0]?.[3].map((piece) => piece.objectId)).toEqual(['heart']);
+      expect(painted.mock.calls[0]?.[4]).toBe(change === 'wireframe' ? 'wireframe' : 'design');
+      expect(pulses()).toEqual([true]);
+    },
+  );
+
   it('pulses once on hover and resumes without a second pulse after a click', async () => {
     await render(true);
     await pointAt({ x: 5, y: 5 });
@@ -133,67 +279,15 @@ describe('ArtworkPulseOverlay (ADR-620)', () => {
     // although the pointer has not moved.
     await render(false);
     await act(async () => useStore.getState().setCursorMm(null));
-    await act(async () => {
-      canvas.dispatchEvent(
-        withPointerId(new MouseEvent('pointerup', { clientX: 50, clientY: 50 })),
-      );
-      // The browser drops capture after every release; that is still just a click.
-      canvas.dispatchEvent(withPointerId(new MouseEvent('lostpointercapture')));
-    });
+    await act(async () =>
+      canvas.dispatchEvent(new MouseEvent('pointerup', { clientX: 50, clientY: 50 })),
+    );
     await render(true);
     expect(pulses()).toEqual([true, false]);
 
     // The next small move on the same piece is still the same hover.
     await pointAt({ x: 5.5, y: 5 });
     expect(pulses()).toEqual([true, false]);
-  });
-
-  it('ends a paused hover when capture is lost without a release (a cancelled drag)', async () => {
-    await render(true);
-    await pointAt({ x: 5, y: 5 });
-    await render(false);
-    await act(async () => useStore.getState().setCursorMm(null));
-    await act(async () =>
-      canvas.dispatchEvent(withPointerId(new MouseEvent('lostpointercapture'))),
-    );
-    await render(true);
-    expect(pulses()).toEqual([true]);
-    await pointAt({ x: 5, y: 5 });
-    expect(pulses()).toEqual([true, true]);
-  });
-
-  it('does not let an uncaptured click mask a later cancelled drag', async () => {
-    await render(true);
-    await pointAt({ x: 5, y: 5 });
-    // A Shift-click selection releases without ever holding capture.
-    await act(async () =>
-      canvas.dispatchEvent(
-        withPointerId(new MouseEvent('pointerup', { clientX: 50, clientY: 50 })),
-      ),
-    );
-    // The next drag with the same mouse is then cancelled.
-    await act(async () => canvas.dispatchEvent(withPointerId(new MouseEvent('pointerdown'))));
-    await render(false);
-    await act(async () => useStore.getState().setCursorMm(null));
-    await act(async () =>
-      canvas.dispatchEvent(withPointerId(new MouseEvent('lostpointercapture'))),
-    );
-    await render(true);
-    await pointAt({ x: 5, y: 5 });
-    expect(pulses()).toEqual([true, true]);
-  });
-
-  it('ends the hover when the Select tool is left, rather than pausing it', async () => {
-    await render(true);
-    await pointAt({ x: 5, y: 5 });
-    // Another tool: not a drag, so the hover is over.
-    await render(false, false);
-    expect(hover.mock.calls).toHaveLength(1);
-    await render(true);
-    // Nothing returns until the pointer settles on artwork again, which pulses afresh.
-    expect(hover.mock.calls).toHaveLength(1);
-    await pointAt({ x: 5.5, y: 5 });
-    expect(pulses()).toEqual([true, true]);
   });
 
   it('pulses again after the pointer really leaves and comes back', async () => {

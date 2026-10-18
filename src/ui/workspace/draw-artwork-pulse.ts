@@ -67,6 +67,7 @@ type CacheEntry = {
   /** Other bound operations can change the path's visible fill/stroke style. */
   readonly lookup: ReadonlyMap<string, Layer>;
   readonly viewKey: string;
+  readonly displayMode: ObjectDisplayMode;
   readonly bitmap: PieceBitmap | null;
 };
 
@@ -95,22 +96,14 @@ export class ArtworkPulsePainter {
     project: Project,
     view: ViewTransform,
     pieces: ReadonlyArray<PulsePieceFrame>,
-    // Wireframe View outlines Fill artwork; the pulse follows what is on screen.
-    mode: Extract<ObjectDisplayMode, 'design' | 'wireframe'> = 'design',
+    displayMode: ObjectDisplayMode = 'design',
   ): void {
     const { width, height } = ctx.canvas;
     ctx.clearRect(0, 0, width, height);
     const layers = project.scene.layers;
     this.indexScene(project);
     const { layerById, objectById, lookup } = this;
-    const viewKey = `${view.scale}|${view.offsetX}|${view.offsetY}|${width}x${height}|${getCanvasColorScheme()}|${mode}`;
-    const env: RenderEnv = {
-      lookup,
-      view,
-      canvas: ctx.canvas,
-      displayCache: this.displayCache,
-      mode,
-    };
+    const viewKey = `${view.scale}|${view.offsetX}|${view.offsetY}|${width}x${height}|${getCanvasColorScheme()}`;
     const live = new Set<string>();
     for (const piece of pieces) {
       const object = objectById.get(piece.objectId);
@@ -125,8 +118,8 @@ export class ArtworkPulsePainter {
         const colorLayer = layerById.get(sourceId) ?? layer;
         const key = `${object.id}\u0000${operationId}`;
         live.add(key);
-        const identity = { object, layer, colorLayer, lookup, viewKey };
-        const bitmap = this.bitmapFor(key, identity, env);
+        const identity = { object, layer, colorLayer, lookup, viewKey, displayMode };
+        const bitmap = this.bitmapFor(key, identity, lookup, view, ctx.canvas);
         if (bitmap !== null) drawPiece(ctx, bitmap, piece);
       }
     }
@@ -182,7 +175,9 @@ export class ArtworkPulsePainter {
   private bitmapFor(
     key: string,
     identity: Omit<CacheEntry, 'bitmap'>,
-    env: RenderEnv,
+    lookup: ReadonlyMap<string, Layer>,
+    view: ViewTransform,
+    canvas: HTMLCanvasElement,
   ): PieceBitmap | null {
     const cached = this.entries.get(key);
     // Re-inserting marks the entry most recently used for `retain`.
@@ -193,13 +188,23 @@ export class ArtworkPulsePainter {
       cached.layer === identity.layer &&
       cached.colorLayer === identity.colorLayer &&
       cached.lookup === identity.lookup &&
-      cached.viewKey === identity.viewKey
+      cached.viewKey === identity.viewKey &&
+      cached.displayMode === identity.displayMode
     ) {
       this.entries.set(key, cached);
       return cached.bitmap;
     }
     const color = canvasVectorDisplayColor(identity.colorLayer.color);
-    const bitmap = renderPiece(identity.object, identity.layer, color, env);
+    const bitmap = renderPiece(
+      identity.object,
+      identity.layer,
+      color,
+      lookup,
+      view,
+      canvas,
+      this.displayCache,
+      identity.displayMode,
+    );
     this.entries.set(key, { ...identity, bitmap });
     return bitmap;
   }
@@ -240,23 +245,17 @@ function drawPiece(
   ctx.restore();
 }
 
-/** What every piece of one frame is rendered against. */
-type RenderEnv = {
-  readonly lookup: ReadonlyMap<string, Layer>;
-  readonly view: ViewTransform;
-  readonly canvas: HTMLCanvasElement;
-  readonly displayCache: DisplayPolylineCache;
-  readonly mode: ObjectDisplayMode;
-};
-
 function renderPiece(
   object: SceneObject,
   layer: Layer,
   color: string,
-  env: RenderEnv,
+  lookup: ReadonlyMap<string, Layer>,
+  view: ViewTransform,
+  canvas: HTMLCanvasElement,
+  displayCache: DisplayPolylineCache,
+  displayMode: ObjectDisplayMode,
 ): PieceBitmap | null {
-  const { view } = env;
-  const region = screenRegion(object, view, env.canvas);
+  const region = screenRegion(object, view, canvas);
   if (region === null) return null;
   const local: ViewTransform = {
     scale: view.scale,
@@ -267,7 +266,9 @@ function renderPiece(
   const glow = createBitmap(region);
   if (flood === null || glow === null) return null;
   if (isVectorSceneObject(object)) {
-    if (!paintVectorPiece(object, layer, color, { ...env, view: local }, flood.ctx)) {
+    if (
+      !paintVectorPiece(object, layer, color, lookup, local, displayCache, displayMode, flood.ctx)
+    ) {
       return null;
     }
     growOutline(glow.ctx, flood.canvas);
@@ -281,16 +282,18 @@ function paintVectorPiece(
   object: VectorSceneObject,
   layer: Layer,
   color: string,
-  env: RenderEnv,
+  lookup: ReadonlyMap<string, Layer>,
+  view: ViewTransform,
+  displayCache: DisplayPolylineCache,
+  displayMode: ObjectDisplayMode,
   flood: CanvasRenderingContext2D,
 ): boolean {
-  const { view } = env;
   const resolved = resolveObjectDisplay(
     object,
-    env.lookup,
+    lookup,
     view,
-    env.displayCache,
-    env.mode,
+    displayCache,
+    displayMode,
     'operation',
   );
   // Every operation bound to a path, not only the one that styles it on the
