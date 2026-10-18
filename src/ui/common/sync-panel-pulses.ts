@@ -12,7 +12,8 @@ export function syncPanelPulse(event: AnimationEvent): void {
   if (event.animationName !== PANEL_PULSE_ANIMATION) return;
   const target = event.target;
   if (!(target instanceof Element) || typeof target.getAnimations !== 'function') return;
-  for (const animation of target.getAnimations()) {
+  // Pseudo-element crest and glow animations are included only with subtree.
+  for (const animation of target.getAnimations({ subtree: true })) {
     if ('animationName' in animation && animation.animationName === PANEL_PULSE_ANIMATION) {
       animation.startTime = 0;
     }

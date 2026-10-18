@@ -1,48 +1,96 @@
-/* A soft copper wave crosses each collapsed-panel hint from left to right.
-   The faint base tint, border and label stay steady; only the feathered band
-   moves, then rests briefly beyond the edge before the next pass. Every hint
-   shares the document timeline (sync-panel-pulses.ts), even when collapsed
-   at different times. The background clips the wave to the button itself. */
+/* Curved crests and a feathered copper wake travel along a collapsed hint.
+   Full-size layers make percentage transforms follow the control's length;
+   only a small band inside them is painted. Both layers share the document
+   timeline (sync-panel-pulses.ts), including hints collapsed later. */
 .lf-btn.lf-panel-expand-hint {
-  border-color: color-mix(in srgb, var(--lf-accent) 45%, var(--lf-border));
-  background-color: var(--lf-accent-wash);
-  background-image: linear-gradient(
-    90deg,
-    transparent 36%,
-    color-mix(in srgb, var(--lf-accent) 8%, transparent) 44%,
-    color-mix(in srgb, var(--lf-accent) 22%, transparent) 50%,
-    color-mix(in srgb, var(--lf-accent) 8%, transparent) 56%,
-    transparent 64%
-  );
-  background-size: 300% 100%;
-  background-position: 100% 0;
-  background-repeat: no-repeat;
+  --lf-panel-wave-from: translate3d(-100%, 0, 0);
+  --lf-panel-wave-to: translate3d(100%, 0, 0);
+  --lf-panel-wave-size: 140px 100%;
+  --lf-panel-wave-origin: 40% 50%;
+  --lf-panel-wave-radius: 40% 50%;
+  --lf-panel-wave-mask: url('./panel-hint-wave-horizontal.svg');
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--lf-accent) 28%, var(--lf-border));
+  background: color-mix(in srgb, var(--lf-accent) 4%, var(--lf-bg-1));
   color: var(--lf-accent-fg);
-  animation: lf-panel-expand-pulse 4.8s linear infinite;
+}
+
+.lf-btn.lf-panel-expand-hint--vertical {
+  --lf-panel-wave-from: translate3d(0, -70%, 0);
+  --lf-panel-wave-to: translate3d(0, 70%, 0);
+  --lf-panel-wave-size: 100% 160px;
+  --lf-panel-wave-origin: 50% 40%;
+  --lf-panel-wave-radius: 50% 40%;
+  --lf-panel-wave-mask: url('./panel-hint-wave-vertical.svg');
+}
+
+.lf-btn.lf-panel-expand-hint::before,
+.lf-btn.lf-panel-expand-hint::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  animation: lf-panel-expand-pulse 5.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+/* A wide, low glow sits beneath the finer curved crests. The static gradients
+   and SVG masks stay fixed; animation changes only transform and opacity. */
+.lf-btn.lf-panel-expand-hint::before {
+  background: radial-gradient(
+      ellipse var(--lf-panel-wave-radius) at var(--lf-panel-wave-origin),
+      color-mix(in srgb, var(--lf-accent) 20%, transparent),
+      color-mix(in srgb, var(--lf-accent) 8%, transparent) 30%,
+      transparent 100%
+    )
+    center / var(--lf-panel-wave-size) no-repeat;
+}
+
+.lf-btn.lf-panel-expand-hint::after {
+  background: var(--lf-accent);
+  mask: var(--lf-panel-wave-mask) center / var(--lf-panel-wave-size) no-repeat;
 }
 
 .lf-btn.lf-panel-expand-hint:hover:not(:disabled),
 .lf-btn.lf-panel-expand-hint:focus-visible:not(:disabled) {
-  animation: none;
   border-color: var(--lf-accent);
   background: var(--lf-tint-accent);
   color: var(--lf-accent-fg);
 }
 
+.lf-btn.lf-panel-expand-hint:focus-visible {
+  outline-offset: -3px;
+}
+
+.lf-btn.lf-panel-expand-hint:is(:hover, :focus-visible)::before,
+.lf-btn.lf-panel-expand-hint:is(:hover, :focus-visible)::after {
+  animation: none;
+  opacity: 0;
+}
+
 @keyframes lf-panel-expand-pulse {
   0% {
-    background-position: 100% 0;
+    transform: var(--lf-panel-wave-from);
+    opacity: 0;
   }
 
-  84%,
+  15%,
+  85% {
+    opacity: 1;
+  }
+
   100% {
-    background-position: 0% 0;
+    transform: var(--lf-panel-wave-to);
+    opacity: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce), (forced-colors: active) {
-  .lf-btn.lf-panel-expand-hint {
+  .lf-btn.lf-panel-expand-hint::before,
+  .lf-btn.lf-panel-expand-hint::after {
+    display: none;
     animation: none;
-    background-image: none;
   }
 }

@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { PANEL_PULSE_ANIMATION, syncPanelPulse } from './sync-panel-pulses';
 
 type FakeAnimation = { animationName?: string; startTime: number | null };
 
 function hintWith(animations: FakeAnimation[]): HTMLButtonElement {
   const button = document.createElement('button');
-  Object.defineProperty(button, 'getAnimations', { value: () => animations });
+  Object.defineProperty(button, 'getAnimations', { value: vi.fn(() => animations) });
   return button;
 }
 
@@ -19,11 +19,15 @@ function animationStart(target: Element, animationName: string): AnimationEvent 
 }
 
 describe('syncPanelPulse', () => {
-  it('pins every panel hint pulse to the document timeline origin', () => {
+  it('includes pseudo-element crest and glow and pins both to the document timeline origin', () => {
     const pulse: FakeAnimation = { animationName: PANEL_PULSE_ANIMATION, startTime: 1734.5 };
+    const glow: FakeAnimation = { animationName: PANEL_PULSE_ANIMATION, startTime: 1834.5 };
     const other: FakeAnimation = { animationName: 'lf-attention-pulse', startTime: 900 };
     const transition: FakeAnimation = { startTime: 50 };
-    syncPanelPulse(animationStart(hintWith([pulse, other, transition]), PANEL_PULSE_ANIMATION));
+    const hint = hintWith([pulse, glow, other, transition]);
+    syncPanelPulse(animationStart(hint, PANEL_PULSE_ANIMATION));
+    expect(hint.getAnimations).toHaveBeenCalledWith({ subtree: true });
+    expect(glow.startTime).toBe(0);
     expect(pulse.startTime).toBe(0);
     expect(other.startTime).toBe(900);
     expect(transition.startTime).toBe(50);
@@ -50,6 +54,8 @@ describe('collapsed-panel hint style', () => {
   });
 
   it('stays a faint tint and never fills the rail with the solid accent', () => {
-    expect(css).not.toMatch(/background:\s*var\(--lf-accent\)\s*;/);
+    const controlRule = css.match(/\.lf-btn\.lf-panel-expand-hint\s*\{([^}]*)\}/)?.[1];
+    expect(controlRule).toBeDefined();
+    expect(controlRule).not.toMatch(/background(?:-color)?:\s*var\(--lf-accent\)\s*;/);
   });
 });

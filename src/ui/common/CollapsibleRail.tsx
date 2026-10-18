@@ -39,7 +39,7 @@ export function CollapsedRail(props: {
     <aside aria-label={props.ariaLabel} className="lf-rail" style={collapsedRailStyle}>
       <button
         type="button"
-        className="lf-btn lf-panel-expand-hint"
+        className="lf-btn lf-panel-expand-hint lf-panel-expand-hint--vertical"
         style={expandButtonStyle}
         aria-label={label}
         aria-expanded={false}
