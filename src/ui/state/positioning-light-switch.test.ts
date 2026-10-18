@@ -156,22 +156,51 @@ describe('independent positioning LED switch', () => {
     expect(h.writes.at(-1)?.trim()).toBe(h.mapping.offCommand);
   });
 
-  it('clears On tracking when the controller refuses the on command', async () => {
-    const h = harness();
-    h.refuse(h.mapping.onCommand);
+  it.each(['grbl-v1.1', 'grblhal', 'fluidnc'] as const)(
+    'clears On tracking for unsupported On on %s',
+    async (kind) => {
+      const h = harness(kind);
+      h.refuse(h.mapping.onCommand);
+      await expect(h.actions.switchPositioningLightOn()).rejects.toBeInstanceOf(
+        ControllerCommandRefusedError,
+      );
+      const lines = h.writes.map((line) => line.trim());
+      expect(lines.indexOf(h.mapping.offCommand)).toBeLessThan(lines.indexOf(h.mapping.onCommand));
+      expect(h.get().positioningLightEnabled).toBe(false);
+      expect(positioningLightDisconnectOff(h.get(), h.refs)).toBeNull();
+      expect(h.get().controllerOperation).toBeNull();
+      h.refuse();
+      await h.actions.switchPositioningLightOn();
+      expect(h.get().positioningLightEnabled).toBe(true);
+    },
+  );
+
+  it.each([
+    ['grbl-v1.1', 'error:20ok'],
+    ['grbl-v1.1', 'error:7002009'],
+    ['grbl-v1.1', 'error:7'],
+    ['marlin', 'Error:handler failed'],
+    ['marlin', 'Error:Printer halted. kill() called!'],
+    ['marlin', 'unknown-command'],
+    ['smoothieware', 'error:unsupported pin'],
+    ['smoothieware', '!!'],
+  ] as const)('keeps conservative On and its captured Off for %s %s', async (kind, response) => {
+    const h = harness(kind);
+    h.refuse(
+      h.mapping.onCommand,
+      response === 'unknown-command' ? `echo:Unknown command: "${h.mapping.onCommand}"` : response,
+    );
     await expect(h.actions.switchPositioningLightOn()).rejects.toBeInstanceOf(
       ControllerCommandRefusedError,
     );
-    const lines = h.writes.map((line) => line.trim());
-    expect(lines.indexOf(h.mapping.offCommand)).toBeLessThan(lines.indexOf(h.mapping.onCommand));
-    expect(h.get().positioningLightEnabled).toBe(false);
-    expect(positioningLightDisconnectOff(h.get(), h.refs)).toBeNull();
+    expect(h.get().positioningLightEnabled).toBe(true);
+    expect(positioningLightDisconnectOff(h.get(), h.refs)?.trim()).toBe(h.mapping.offCommand);
     expect(h.get().controllerOperation).toBeNull();
     h.refuse();
-    await h.actions.switchPositioningLightOn();
-    expect(h.get().positioningLightEnabled).toBe(true);
+    await h.actions.switchPositioningLightOff();
+    expect(h.get().positioningLightEnabled).toBe(false);
+    expect(positioningLightDisconnectOff(h.get(), h.refs)).toBeNull();
   });
-
   it('keeps Off available when the on acknowledgement is lost', async () => {
     vi.useFakeTimers();
     const h = harness();

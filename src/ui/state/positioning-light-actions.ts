@@ -190,8 +190,9 @@ async function containUnsettledMove(
 }
 
 // On may have reached hardware even if its acknowledgement is subsequently
-// lost. Keep Off available until a positively acknowledged off or reset. An
-// error:N refuses the line before it runs, so the acknowledged Off still holds.
+// lost or a generic fault rejects the exchange. Keep the captured Off mapping.
+// GRBL-family error:20 rejects an unsupported command before execution, so only
+// that qualified response proves the preceding acknowledged Off still holds.
 async function sendLightOn(
   context: PositioningLightTransaction,
   set: SetFn,
@@ -202,7 +203,13 @@ async function sendLightOn(
   try {
     await positioningLightCommand(context, mapping.onCommand);
   } catch (error) {
-    if (error instanceof ControllerCommandRefusedError && owns()) {
+    const kind = context.refs.driver.kind;
+    if (
+      error instanceof ControllerCommandRefusedError &&
+      error.controllerErrorCode === 20 &&
+      (kind === 'grbl-v1.1' || kind === 'grblhal' || kind === 'fluidnc') &&
+      owns()
+    ) {
       set({ positioningLightEnabled: false });
       lightSnapshots.delete(context.refs);
     }

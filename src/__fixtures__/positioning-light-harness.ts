@@ -66,6 +66,7 @@ export function harness(
   let holdLine: string | undefined;
   let failLine: string | undefined;
   let refuseLine: string | undefined;
+  let refusalResponse = 'error:20';
   let afterWrite: ((line: string) => void) | undefined;
   const set = (patch: Partial<LaserState> | ((state: LaserState) => Partial<LaserState>)): void => {
     state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) };
@@ -98,6 +99,15 @@ export function harness(
     const response = line === 'fire off' ? 'turning laser off and returning to auto mode' : 'ok';
     consumeControllerCommandResponse(refs, driver.classifyLine(response), response);
   };
+  const emitRefusal = (line: string): void => {
+    const response = driver.classifyLine(refusalResponse);
+    consumeControllerCommandResponse(refs, response, refusalResponse);
+    if (
+      response.kind === 'unknown-command' ||
+      (response.kind === 'error' && response.acknowledgesLine === false)
+    )
+      ack(line);
+  };
   const acceptMotion = (line: string): void => {
     if (line.startsWith('$J=') || line.startsWith('G0 ') || line.startsWith('G1 ')) {
       head = {
@@ -117,7 +127,7 @@ export function harness(
       if (line === failLine) throw new Error('wire handoff failed');
       if (line === holdLine) return;
       if (line === refuseLine) {
-        consumeControllerCommandResponse(refs, driver.classifyLine('error:20'), 'error:20');
+        emitRefusal(line);
         continue;
       }
       if (line === '?' || line === 'M114') emitStatus();
@@ -146,9 +156,10 @@ export function harness(
     fail: (line: string) => {
       failLine = line;
     },
-    /** Answer this line with a GRBL-style error:N refusal instead of ok. */
-    refuse: (line?: string) => {
+    /** Reply with an error or matching unknown-command, including a required trailing ACK. */
+    refuse: (line?: string, response = 'error:20') => {
       refuseLine = line;
+      refusalResponse = response;
     },
     after: (fn: (line: string) => void) => {
       afterWrite = fn;
