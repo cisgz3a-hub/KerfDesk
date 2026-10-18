@@ -15,6 +15,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import { usePrefersReducedMotion } from '../common/use-prefers-reduced-motion';
+import { useCanvasColorScheme } from '../theme/use-canvas-color-scheme';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import {
@@ -178,8 +179,11 @@ function usePulseLoop(
 ): void {
   const reducedMotion = usePrefersReducedMotion();
   const pulsedObjectId = useRef<string | null>(null);
-  const latest = useRef<PulseLoopState>({ project, view, reducedMotion });
-  latest.current = { project, view, reducedMotion };
+  const mode = useUiStore((state) => (state.wireframeView ? 'wireframe' : 'design'));
+  // Bitmaps are keyed on the scheme, but an idle loop never looks: repaint on a switch.
+  const colorScheme = useCanvasColorScheme();
+  const latest = useRef<PulseLoopState>({ project, view, reducedMotion, mode });
+  latest.current = { project, view, reducedMotion, mode };
   const [loop] = useState(() =>
     createPulseLoop(() => ({
       ctx: ref.current?.getContext('2d') ?? null,
@@ -217,7 +221,7 @@ function usePulseLoop(
   }, [seedKey, scene, machineKind, canvasObjectId]);
   useEffect(() => {
     loop.kick();
-  }, [project, view, reducedMotion, loop]);
+  }, [project, view, reducedMotion, mode, colorScheme, loop]);
   useEffect(() => () => loop.dispose(), [loop]);
 }
 
@@ -225,6 +229,7 @@ type PulseLoopState = {
   readonly project: Project;
   readonly view: ViewTransform;
   readonly reducedMotion: boolean;
+  readonly mode: 'design' | 'wireframe';
 };
 
 /** Runs animation frames only while a pulse or an edge fade is in flight. */
@@ -239,7 +244,7 @@ function createPulseLoop(
     const { ctx, state } = read();
     if (ctx === null) return;
     const frame = clock.frame(now, state.reducedMotion);
-    painter.draw(ctx, state.project, state.view, frame.pieces);
+    painter.draw(ctx, state.project, state.view, frame.pieces, state.mode);
     if (frame.busy) kick();
   }
   function kick(): void {

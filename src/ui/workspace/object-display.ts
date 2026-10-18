@@ -93,14 +93,16 @@ export function resolveObjectDisplay(
   let displaySegmentCount = 0;
   let isSimplified = false;
   const styleParts: string[] = [];
-  for (const path of obj.paths) {
+  for (const [index, path] of obj.paths.entries()) {
     const resolution = sceneLayerVisibility.resolvePath(obj, path, layerByColor);
     if (!resolution.visible) continue;
     const paint = resolvePaint(obj, path, resolution.operation, mode, palette);
     const display = displayPathFor(path, obj, view, cache, paint.kind === 'fill');
     displaySegmentCount += countPolylineSegments(display.polylines);
     isSimplified ||= display.isSimplified;
-    styleParts.push(paintKey(paint));
+    // Which paths survived visibility, too: in ink every path paints alike,
+    // so hiding one operation and showing another must still change the key.
+    styleParts.push(`${index}=${paintKey(paint)}`);
     paths.push({ display, paint, operationId: resolution.operation?.id ?? null, path });
   }
   return {

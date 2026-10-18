@@ -26,6 +26,7 @@ import {
   isVectorSceneObject,
   paintObjectDisplay,
   resolveObjectDisplay,
+  type ObjectDisplayMode,
   type VectorSceneObject,
 } from './object-display';
 import type { ViewTransform } from './view-transform';
@@ -94,13 +95,22 @@ export class ArtworkPulsePainter {
     project: Project,
     view: ViewTransform,
     pieces: ReadonlyArray<PulsePieceFrame>,
+    // Wireframe View outlines Fill artwork; the pulse follows what is on screen.
+    mode: Extract<ObjectDisplayMode, 'design' | 'wireframe'> = 'design',
   ): void {
     const { width, height } = ctx.canvas;
     ctx.clearRect(0, 0, width, height);
     const layers = project.scene.layers;
     this.indexScene(project);
     const { layerById, objectById, lookup } = this;
-    const viewKey = `${view.scale}|${view.offsetX}|${view.offsetY}|${width}x${height}|${getCanvasColorScheme()}`;
+    const viewKey = `${view.scale}|${view.offsetX}|${view.offsetY}|${width}x${height}|${getCanvasColorScheme()}|${mode}`;
+    const env: RenderEnv = {
+      lookup,
+      view,
+      canvas: ctx.canvas,
+      displayCache: this.displayCache,
+      mode,
+    };
     const live = new Set<string>();
     for (const piece of pieces) {
       const object = objectById.get(piece.objectId);
@@ -116,7 +126,7 @@ export class ArtworkPulsePainter {
         const key = `${object.id}\u0000${operationId}`;
         live.add(key);
         const identity = { object, layer, colorLayer, lookup, viewKey };
-        const bitmap = this.bitmapFor(key, identity, lookup, view, ctx.canvas);
+        const bitmap = this.bitmapFor(key, identity, env);
         if (bitmap !== null) drawPiece(ctx, bitmap, piece);
       }
     }
@@ -172,9 +182,7 @@ export class ArtworkPulsePainter {
   private bitmapFor(
     key: string,
     identity: Omit<CacheEntry, 'bitmap'>,
-    lookup: ReadonlyMap<string, Layer>,
-    view: ViewTransform,
-    canvas: HTMLCanvasElement,
+    env: RenderEnv,
   ): PieceBitmap | null {
     const cached = this.entries.get(key);
     // Re-inserting marks the entry most recently used for `retain`.
@@ -191,15 +199,7 @@ export class ArtworkPulsePainter {
       return cached.bitmap;
     }
     const color = canvasVectorDisplayColor(identity.colorLayer.color);
-    const bitmap = renderPiece(
-      identity.object,
-      identity.layer,
-      color,
-      lookup,
-      view,
-      canvas,
-      this.displayCache,
-    );
+    const bitmap = renderPiece(identity.object, identity.layer, color, env);
     this.entries.set(key, { ...identity, bitmap });
     return bitmap;
   }
@@ -240,16 +240,23 @@ function drawPiece(
   ctx.restore();
 }
 
+/** What every piece of one frame is rendered against. */
+type RenderEnv = {
+  readonly lookup: ReadonlyMap<string, Layer>;
+  readonly view: ViewTransform;
+  readonly canvas: HTMLCanvasElement;
+  readonly displayCache: DisplayPolylineCache;
+  readonly mode: ObjectDisplayMode;
+};
+
 function renderPiece(
   object: SceneObject,
   layer: Layer,
   color: string,
-  lookup: ReadonlyMap<string, Layer>,
-  view: ViewTransform,
-  canvas: HTMLCanvasElement,
-  displayCache: DisplayPolylineCache,
+  env: RenderEnv,
 ): PieceBitmap | null {
-  const region = screenRegion(object, view, canvas);
+  const { view } = env;
+  const region = screenRegion(object, view, env.canvas);
   if (region === null) return null;
   const local: ViewTransform = {
     scale: view.scale,
@@ -260,7 +267,7 @@ function renderPiece(
   const glow = createBitmap(region);
   if (flood === null || glow === null) return null;
   if (isVectorSceneObject(object)) {
-    if (!paintVectorPiece(object, layer, color, lookup, local, displayCache, flood.ctx)) {
+    if (!paintVectorPiece(object, layer, color, { ...env, view: local }, flood.ctx)) {
       return null;
     }
     growOutline(glow.ctx, flood.canvas);
@@ -274,12 +281,18 @@ function paintVectorPiece(
   object: VectorSceneObject,
   layer: Layer,
   color: string,
-  lookup: ReadonlyMap<string, Layer>,
-  view: ViewTransform,
-  displayCache: DisplayPolylineCache,
+  env: RenderEnv,
   flood: CanvasRenderingContext2D,
 ): boolean {
-  const resolved = resolveObjectDisplay(object, lookup, view, displayCache, 'design', 'operation');
+  const { view } = env;
+  const resolved = resolveObjectDisplay(
+    object,
+    env.lookup,
+    view,
+    env.displayCache,
+    env.mode,
+    'operation',
+  );
   // Every operation bound to a path, not only the one that styles it on the
   // canvas, so each operation's row can reveal the artwork it processes.
   const paths = resolved.paths
