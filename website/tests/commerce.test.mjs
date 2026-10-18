@@ -163,6 +163,7 @@ describe('commerce configuration', () => {
     );
     assert.match(text, /A license never stops a job from running/);
     assert.match(text, /Sales and paid checkout remain closed/);
+    assert.doesNotMatch(text, /The desktop app opens with a free 30-day Pro trial or a license/);
     assert.match(html, /href="\/terms\/"/);
     assert.match(html, /href="\/refunds\/"/);
     assert.doesNotMatch(html, /<form\b/i);

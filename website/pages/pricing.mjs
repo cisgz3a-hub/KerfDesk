@@ -256,7 +256,8 @@ export const page = {
       'KerfDesk Free runs in the browser, with no time limit.',
       plan &&
         `${plan.name} adds advanced tools${plan.where ? ` to ${plan.where}` : ''} for ${formatPrice(plan.price, commerce.currency)}, paid once.`,
-      plan?.trialDays &&
+      commerce.trialOpen &&
+        plan?.trialDays &&
         `The desktop app opens with a free ${plan.trialDays}-day ${plan.name} trial or a license; it has no Free edition.`,
       !commerce.salesOpen && 'Paid checkout is closed.',
     ]
