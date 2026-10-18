@@ -459,7 +459,7 @@ phase; tracked here so they don't get lost.
 3. **Laser-off on travel** — every `G0` move either carries `S0` on the same line, immediately **follows** an `M5`/`M107`, or runs while the last commanded `S` is already `0`. Property-tested (`src/core/invariants/predicates.ts`).
 4. **No partial output** — pipeline failure writes no file and sends no stream.
 5. **Deterministic G-code** — same input + same parameters → byte-identical output. Snapshot-tested.
-6. **Units honest** — internal model is mm. Inches accepted only at import boundary via explicit conversion.
+6. **Units honest** — internal model is mm. Inches are converted explicitly at the import boundary or at the display boundary (the Inches preference, ADR-629), never inside the pipeline.
 7. **Power scale honest** — Fresh GRBL-family laser output uses the current connected controller's verified `$30` range; without current evidence it uses the saved profile and discloses that assumption (ADR-567). The execution copy leaves saved machine settings unchanged. 100% requests the maximum `S` command, not measured optical watts. Frozen recovery output retains its reviewed bytes.
 8. **No telemetry; pinned release and commercial licensing services only (ADR-523)** — local-first. No app-usage analytics, error-reporting service, cloud sync, project data, machine data or job data leaves the machine. Desktop release discovery uses pinned first-party endpoints; Preview remains metadata-only. Only the explicit commercial channel may send its documented product-hashed installation identity, device label, licensing credentials and order fields to the licensing service. Checkout sends payment details directly to its approved provider. Servers necessarily receive connection metadata such as IP address and time. The owner may inspect aggregate installer request statistics from the download host, without client tracking or personal identifiers in saved reports (ADR-563). Web/PWA and every CAM/preview/streaming path stay fully offline.
 9. **Abort reachable always** — the software Abort / Controller Reset control is reachable from any window state during a job. No modal can block it. This command is not a safety-rated E-stop; dangerous conditions require the machine's physical E-stop or power isolation.
@@ -729,11 +729,14 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   operation pipelines remain out of scope.
 - Multi-command macros, scripting, command palette, plugins, extensions, macro import/export,
   automatic macro triggers, and controller-program streaming outside the ordinary Start flow.
+  An external G-code file runs only through its own Frame and Start review (ADR-630).
 - ~~Variable text (CSV / counter / date).~~ **Bounded offline fields shipped**; bounded offline sheet
   imposition is adopted for staged implementation (ADR-279). Live databases remain deferred
   (ADR-164); offline barcode/QR generation shipped (ADR-386).
-- Host system-font enumeration. Explicitly imported user fonts are embedded in
-  the project under fixed budgets and no longer depend on the host after save (ADR-164).
+- ~~Host system-font enumeration.~~ **System fonts...** lists installed fonts only when the
+  operator asks and embeds the chosen face like an imported font (ADR-628). Imported and system
+  fonts are embedded in the project under fixed budgets and no longer depend on the host after
+  save (ADR-164).
 
 ---
 
