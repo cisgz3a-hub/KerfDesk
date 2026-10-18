@@ -7,6 +7,7 @@ import {
   moreWorkspaceContextCommands,
   primaryWorkspaceContextCommands,
 } from './workspace-context-commands';
+import { shortcutLabel } from '../common/shortcut-label';
 
 export function WorkspaceContextBar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -108,7 +109,9 @@ function ContextCommandButton(props: {
 
 function commandButtonTitle(command: AppCommand, helpId: ReturnType<typeof commandHelpId>): string {
   if (command.disabledReason !== undefined) return controlHelp(helpId, command.disabledReason);
-  return command.shortcut === undefined ? command.title : `${command.title} (${command.shortcut})`;
+  return command.shortcut === undefined
+    ? command.title
+    : `${command.title} (${shortcutLabel(command.shortcut)})`;
 }
 
 function commandsForIds(

@@ -6,7 +6,10 @@ name: Desktop package check
 # package checks otherwise ran only when a release was tagged.
 #
 # - Linux packages the stable config as an unpacked app, on every pull request
-#   and push to main.
+#   and push to main. A second Linux job builds the AppImage and .deb from the
+#   Preview config, checks their package contract, installs the .deb and
+#   launches the installed app with Ubuntu's default sandbox restriction in
+#   place, then removes it (ADR-606).
 # - Windows and macOS build the unsigned Preview exactly as the Preview release
 #   lane does, and run that lane's package contract. Windows then installs it,
 #   launches the installed app and uninstalls it; macOS launches the app from
@@ -85,7 +88,7 @@ jobs:
         run: |
           app_dir="$(ls -d release/*/linux-unpacked)"
           node scripts/verify-packaged-desktop.mjs \
-            "${app_dir}/laserforge" "${app_dir}/resources/app.asar" electron-builder.yml
+            "${app_dir}/kerfdesk" "${app_dir}/resources/app.asar" electron-builder.yml
 
       - name: Let Chromium's sandbox start on the runner
         # Ubuntu 24.04 blocks unprivileged user namespaces through AppArmor,
@@ -100,13 +103,125 @@ jobs:
       - name: Launch, import and save in the packaged app
         run: |
           app_dir="$(pwd)/$(ls -d release/*/linux-unpacked)"
-          xvfb-run -a pnpm smoke:desktop:native -- "${app_dir}/laserforge"
+          xvfb-run -a pnpm smoke:desktop:native -- "${app_dir}/kerfdesk"
 
       - name: Upload native smoke evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: desktop-package-check-${{ inputs.ref || github.sha }}
+          path: artifacts/native-smoke/
+          if-no-files-found: warn
+          retention-days: 14
+
+  linux-installers:
+    name: Package, install and launch the Linux AppImage and .deb
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      # Same shape as the dry run's 0.0.0-dispatch.N: never a real release number.
+      VERSION: 0.0.0-check.${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Empty except when the release train calls: then the release commit.
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build renderer and Electron main at the check version
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ env.VERSION }}
+        run: pnpm build:renderer:desktop && pnpm build:electron-main
+
+      - name: Build the Linux AppImage and .deb from the Preview config
+        run: |
+          pnpm exec electron-builder --linux --x64 \
+            --config electron-builder.preview.yml \
+            --config.extraMetadata.version="${VERSION}" \
+            --config.extraMetadata.kerfdeskUpdateChannelTrusted=false \
+            --config.extraMetadata.kerfdeskDesktopReleaseChannel=preview \
+            --config.forceCodeSigning=false \
+            --publish never
+
+      - name: Check the Linux package contract
+        run: bash scripts/verify-linux-package.sh "${VERSION}"
+
+      - name: Check fuses and app.asar contents
+        run: |
+          app_dir="release/${VERSION}/linux-unpacked"
+          node scripts/verify-packaged-desktop.mjs \
+            "${app_dir}/kerfdesk" "${app_dir}/resources/app.asar" electron-builder.preview.yml
+
+      - name: Install the .deb as an operator would
+        # Ubuntu 24.04 keeps its unprivileged user namespace restriction here:
+        # the AppArmor profile the .deb installs is what lets Chromium's
+        # sandbox start, as on an operator's computer.
+        run: |
+          sudo apt-get update
+          # A desktop system has the MIME and desktop databases the .deb updates.
+          sudo apt-get install -y xvfb shared-mime-info desktop-file-utils
+          sudo apt-get install -y "./release/${VERSION}/KerfDesk-${VERSION}-linux-amd64.deb"
+          test "$(readlink -f /usr/bin/kerfdesk)" = /opt/KerfDesk/kerfdesk
+          grep -q '^application/x-kerfdesk-project=.*kerfdesk\.desktop' \
+            /usr/share/applications/mimeinfo.cache
+          grep -q 'application/x-kerfdesk-project' /usr/share/mime/globs2
+
+      - name: Keep Ubuntu's user-namespace restriction on for both launches
+        # Both launches below must prove the sandbox setup under Ubuntu's
+        # default, so the restriction is set and checked rather than assumed.
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=1
+          test "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = 1
+
+      - name: Launch, import and save in the installed app
+        run: xvfb-run -a pnpm smoke:desktop:native -- /opt/KerfDesk/kerfdesk
+
+      - name: Launch, import and save in the AppImage, as double-clicked
+        # Still with Ubuntu's restriction on: the AppImage's launcher must drop
+        # Chromium's sandbox by itself here, where user namespaces are blocked.
+        # And without libfuse2, which Ubuntu 22.04 and newer no longer install:
+        # the static runtime must mount the AppImage with its own FUSE support.
+        run: |
+          if ldconfig -p | grep -q 'libfuse\.so\.2'; then
+            sudo apt-get remove -y 'libfuse2*'
+          fi
+          if ldconfig -p | grep -q 'libfuse\.so\.2'; then
+            echo 'libfuse2 is still installed, so this would not prove the AppImage needs none.' >&2
+            exit 1
+          fi
+          ls -l /dev/fuse
+          command -v fusermount3 || sudo apt-get install -y fuse3
+          appimage="$(pwd)/release/${VERSION}/KerfDesk-${VERSION}-linux-x86_64.AppImage"
+          xvfb-run -a pnpm smoke:desktop:native -- "${appimage}"
+
+      - name: Remove the .deb
+        run: |
+          sudo apt-get remove -y kerfdesk
+          test ! -e /opt/KerfDesk/kerfdesk
+          test ! -e /usr/share/applications/kerfdesk.desktop
+
+      # No modified-app.asar check here: Electron 44 enforces ASAR integrity on
+      # macOS and Windows only (docs/tutorial/asar-integrity.md), so a Linux
+      # build starts with a modified app.asar whatever the fuse says (ADR-606).
+
+      - name: Upload native smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: desktop-package-check-linux-installers-${{ inputs.ref || github.sha }}
           path: artifacts/native-smoke/
           if-no-files-found: warn
           retention-days: 14

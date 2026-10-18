@@ -1,4 +1,5 @@
 import { Icon, IconButton } from '../kit';
+import { useSyncedPanelPulses } from './sync-panel-pulses';
 import './collapsible-rail.css';
 
 export const COLLAPSED_RAIL_WIDTH_PX = 48;
@@ -32,6 +33,7 @@ export function CollapsedRail(props: {
   readonly ariaLabel: string;
   readonly onExpand: () => void;
 }): JSX.Element {
+  useSyncedPanelPulses();
   const label = `Expand ${props.title} panel`;
   return (
     <aside aria-label={props.ariaLabel} className="lf-rail" style={collapsedRailStyle}>

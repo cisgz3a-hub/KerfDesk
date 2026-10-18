@@ -161,7 +161,7 @@ test('real workerd: fixed origin, small metadata, no bearer URLs, no machine rou
     assert.equal(notices.status, 200);
     const noticeText = await notices.text();
     assert.match(noticeText, /Copyright \(c\) 2025 Cloudflare, Inc\./);
-    assert.match(noticeText, /@modelcontextprotocol\/server@2\.2\.0/);
+    assert.match(noticeText, /@modelcontextprotocol\/server@2\.3\.1/);
     assert.match(noticeText, /Apache License/);
     assert.match(noticeText, /MIT License/);
     const oversized = await poster(worker)('/api/desktop/register', { filler: 'x'.repeat(4097) });

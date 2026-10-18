@@ -83,12 +83,12 @@ describe('desktop serial ports', () => {
     vi.restoreAllMocks();
   });
 
-  it('installs no device permission handler outside Windows (ADR-366)', async () => {
+  it('installs no device permission handler where Electron remembers no port (ADR-366)', async () => {
     const { session, events, setDevicePermissionHandler } = fakeSession();
     installDesktopSerialPorts(session, {
       trustedOrigins: trusted,
       userDataPath,
-      platform: 'darwin',
+      platform: 'freebsd',
     });
 
     await expect(pick(events, [laser, twin], 1)).resolves.toBe('twin-token');
@@ -179,5 +179,94 @@ describe('desktop serial ports', () => {
     expect(showMessageBox).toHaveBeenLastCalledWith(
       expect.objectContaining({ defaultId: 1, cancelId: 2 }),
     );
+  });
+
+  // Electron's stored form on macOS and Linux (serial_chooser_context.cc
+  // PortInfoToValue): USB IDs as numbers, the serial number, and on macOS the
+  // USB driver name (ADR-606).
+  const ftdi = {
+    portId: 'ftdi-token',
+    portName: 'cu.usbserial-A10KJ3QZ',
+    displayName: 'FT232R USB UART',
+    vendorId: '1027',
+    productId: '24577',
+    serialNumber: 'A10KJ3QZ',
+    usbDriverName: 'AppleUSBFTDI',
+  };
+  const ftdiTwin = { ...ftdi, portId: 'twin-token', serialNumber: 'A10KJ3R0' };
+  const posixCheck = (serial: string, driver?: string): DevicePermissionHandlerHandlerDetails =>
+    ({
+      deviceType: 'serial',
+      origin: PACKAGED_RENDERER_ORIGIN,
+      device: {
+        name: 'FT232R USB UART',
+        vendor_id: 1027,
+        product_id: 24577,
+        serial_number: serial,
+        ...(driver === undefined ? {} : { usb_driver: driver }),
+      },
+    }) as unknown as DevicePermissionHandlerHandlerDetails;
+
+  it('on macOS remembers a pick across restarts by its USB IDs, serial number and driver', async () => {
+    const file = join(userDataPath, SERIAL_PORT_GRANTS_FILE);
+    const first = fakeSession();
+    installDesktopSerialPorts(first.session, {
+      trustedOrigins: trusted,
+      userDataPath,
+      platform: 'darwin',
+    });
+    expect(first.allows(posixCheck('A10KJ3QZ', 'AppleUSBFTDI'))).toBe(false);
+
+    await expect(pick(first.events, [ftdi, ftdiTwin] as never, 0)).resolves.toBe('ftdi-token');
+    expect(first.allows(posixCheck('A10KJ3QZ', 'AppleUSBFTDI'))).toBe(true);
+    expect(first.allows(posixCheck('A10KJ3R0', 'AppleUSBFTDI'))).toBe(false);
+    // The vendor's own driver lists the same adapter as a second port.
+    expect(first.allows(posixCheck('A10KJ3QZ', 'FTDIUSBSerialDriver'))).toBe(false);
+    await vi.waitFor(() => expect(readSerialPortGrants(file)).toHaveLength(1));
+
+    const restarted = fakeSession();
+    installDesktopSerialPorts(restarted.session, {
+      trustedOrigins: trusted,
+      userDataPath,
+      platform: 'darwin',
+    });
+    expect(restarted.allows(posixCheck('A10KJ3QZ', 'AppleUSBFTDI'))).toBe(true);
+    expect(
+      restarted.allows({
+        ...posixCheck('A10KJ3QZ', 'AppleUSBFTDI'),
+        origin: 'https://example.com',
+      }),
+    ).toBe(false);
+
+    restarted.events.emit(
+      'serial-port-revoked',
+      {},
+      { port: ftdi, origin: PACKAGED_RENDERER_ORIGIN },
+    );
+    expect(restarted.allows(posixCheck('A10KJ3QZ', 'AppleUSBFTDI'))).toBe(false);
+    await vi.waitFor(() => expect(readSerialPortGrants(file)).toEqual([]));
+  });
+
+  it('on Linux remembers a pick by its USB IDs and serial number, and makes it the default', async () => {
+    const linuxPort = { ...ftdi, portName: 'ttyUSB0', usbDriverName: undefined };
+    const linuxTwin = {
+      ...linuxPort,
+      portId: 'twin-token',
+      portName: 'ttyUSB1',
+      serialNumber: 'A10KJ3R0',
+    };
+    const { session, events, allows } = fakeSession();
+    installDesktopSerialPorts(session, {
+      trustedOrigins: trusted,
+      userDataPath,
+      platform: 'linux',
+    });
+
+    await expect(pick(events, [linuxPort, linuxTwin] as never, 1)).resolves.toBe('twin-token');
+    expect(allows(posixCheck('A10KJ3R0'))).toBe(true);
+    expect(allows(posixCheck('A10KJ3QZ'))).toBe(false);
+
+    await pick(events, [linuxPort, linuxTwin] as never, 1);
+    expect(showMessageBox).toHaveBeenLastCalledWith(expect.objectContaining({ defaultId: 1 }));
   });
 });

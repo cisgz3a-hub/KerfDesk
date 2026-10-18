@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findFfmpeg } from './ffmpeg-path';
+import { ffmpegMissingReason, findFfmpeg } from './ffmpeg-path';
 
 function search(platform: NodeJS.Platform, pathVariable: string, files: ReadonlyArray<string>) {
   return { platform, pathVariable, isFile: (file: string) => files.includes(file) };
@@ -36,5 +36,28 @@ describe('finding FFmpeg for network cameras (ADR-551)', () => {
     expect(
       findFfmpeg({ platform: 'linux', pathVariable: undefined, isFile: () => true }),
     ).toBeNull();
+  });
+
+  it('finds Homebrew or MacPorts FFmpeg on a Mac opened from the Finder (ADR-606)', () => {
+    const finderPath = '/usr/bin:/bin:/usr/sbin:/sbin';
+    expect(findFfmpeg(search('darwin', finderPath, ['/opt/homebrew/bin/ffmpeg']))).toBe(
+      '/opt/homebrew/bin/ffmpeg',
+    );
+    expect(findFfmpeg(search('darwin', finderPath, ['/opt/local/bin/ffmpeg']))).toBe(
+      '/opt/local/bin/ffmpeg',
+    );
+    // PATH still comes first, and other systems keep PATH alone.
+    expect(
+      findFfmpeg(
+        search('darwin', '/Users/me/bin', ['/Users/me/bin/ffmpeg', '/opt/homebrew/bin/ffmpeg']),
+      ),
+    ).toBe('/Users/me/bin/ffmpeg');
+    expect(findFfmpeg(search('linux', '/usr/bin', ['/opt/homebrew/bin/ffmpeg']))).toBeNull();
+  });
+
+  it('tells each system how to install FFmpeg', () => {
+    expect(ffmpegMissingReason('darwin')).toContain('brew install ffmpeg');
+    expect(ffmpegMissingReason('linux')).toContain('sudo apt install ffmpeg');
+    expect(ffmpegMissingReason('win32')).toContain('add its bin folder to PATH');
   });
 });

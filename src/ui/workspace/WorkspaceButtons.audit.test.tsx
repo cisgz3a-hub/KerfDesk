@@ -341,6 +341,8 @@ describe('registration jig remaining actions', () => {
     await click('Remove outline');
     expect(useStore.getState().project).toBe(project);
     await click('Close without saving');
+    expect(onClose).not.toHaveBeenCalled();
+    await click('Discard changes');
     expect(onClose).toHaveBeenCalledOnce();
     expect(useStore.getState().project).toBe(project);
 
