@@ -2738,6 +2738,16 @@ authorization, Frame proof, controller command, or safety boundary.
    artwork stays in place and can still output; removed artwork and group/order edits
    are restored together by Undo. A retained relief's linked source cannot be silently
    removed. Exact artwork-size controls also appear for a single fitted jig (ADR-599).
+9. The draft survives changes the main project makes while the editor is open, such as
+   variable text advancing after a job (ADR-606 Amendment 1). **Save to canvas** carries
+   over main-project changes to artwork, operations and project settings the draft did
+   not touch, and the draft's own edits win for what it changed. A finished outline run
+   that selects **Artwork only** meanwhile is still adopted. Saving is refused, with a
+   message naming the cause, only when another project was opened, the main project
+   gained a captured board, the jig outlines changed there, artwork the draft changed
+   was also changed or removed there, or the same operation setting was changed
+   differently on both sides. Then choose **Close without saving**, **Discard changes**,
+   and reopen the editor.
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 
