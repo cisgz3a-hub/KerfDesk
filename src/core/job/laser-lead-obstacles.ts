@@ -110,6 +110,43 @@ export class LeadObstacles {
     return { ownMm: Math.sqrt(nearest.ownSq), otherMm: Math.sqrt(nearest.otherSq) };
   }
 
+  /** Tests the complete walking chord, including its interior. Point samples
+   * alone can miss a short neighbouring cut's closest approach between them. */
+  otherLinesClear(
+    a: Vec2,
+    b: Vec2,
+    clearanceMm: number,
+    own: number,
+    ignored: ReadonlySet<number>,
+  ): boolean {
+    const { ax, ay, bx, by, line } = this.chords;
+    const tooClose = (chord: number): boolean => {
+      const owner = line[chord] as number;
+      if (owner === own || ignored.has(owner)) return false;
+      return (
+        chordDistanceSq(
+          a,
+          b,
+          ax[chord] as number,
+          ay[chord] as number,
+          bx[chord] as number,
+          by[chord] as number,
+        ) <
+        clearanceMm * clearanceMm
+      );
+    };
+    const loX = cellOf(Math.min(a.x, b.x) - clearanceMm);
+    const hiX = cellOf(Math.max(a.x, b.x) + clearanceMm);
+    const loY = cellOf(Math.min(a.y, b.y) - clearanceMm);
+    const hiY = cellOf(Math.max(a.y, b.y) + clearanceMm);
+    for (let cx = loX; cx <= hiX; cx += 1) {
+      for (let cy = loY; cy <= hiY; cy += 1) {
+        if ((this.grid.cells.get(cellKey(cx, cy)) ?? []).some(tooClose)) return false;
+      }
+    }
+    return !this.grid.wide.some(tooClose);
+  }
+
   private visitChord(
     chord: number,
     point: Vec2,
@@ -211,6 +248,30 @@ function segmentDistanceSq(point: Vec2, ax: number, ay: number, bx: number, by: 
   const ox = point.x - (ax + t * dx);
   const oy = point.y - (ay + t * dy);
   return ox * ox + oy * oy;
+}
+
+// In 2D, intersecting segments have distance zero; otherwise their closest
+// pair includes at least one endpoint. Parallel and zero-length segments are
+// therefore handled by the endpoint distances too.
+function chordDistanceSq(a: Vec2, b: Vec2, cx: number, cy: number, dx: number, dy: number): number {
+  const ux = b.x - a.x;
+  const uy = b.y - a.y;
+  const vx = dx - cx;
+  const vy = dy - cy;
+  const determinant = ux * vy - uy * vx;
+  if (determinant !== 0) {
+    const wx = cx - a.x;
+    const wy = cy - a.y;
+    const t = (wx * vy - wy * vx) / determinant;
+    const u = (wx * uy - wy * ux) / determinant;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return 0;
+  }
+  return Math.min(
+    segmentDistanceSq(a, cx, cy, dx, dy),
+    segmentDistanceSq(b, cx, cy, dx, dy),
+    segmentDistanceSq({ x: cx, y: cy }, a.x, a.y, b.x, b.y),
+    segmentDistanceSq({ x: dx, y: dy }, a.x, a.y, b.x, b.y),
+  );
 }
 
 function finiteBounds(bounds: SegmentBounds): boolean {

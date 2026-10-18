@@ -93,12 +93,13 @@ export function leadFits(
   // short to reach that far, nearly as far as its own shape takes it.
   const reachMm = (path.freeEnd.x - at.x) * join.scrap.x + (path.freeEnd.y - at.y) * join.scrap.y;
   const freeEndNeedMm = Math.min(context.clearanceMm, FREE_END_REACH_SHARE * reachMm);
-  if (!clearOfCutLines(walkSamples(outward), context, reserveMm, freeEndNeedMm)) return false;
+  if (!clearOfCutLines(walkSamples(outward), at, context, reserveMm, freeEndNeedMm)) return false;
   return freeEndInScrap(path.freeEnd, at, context);
 }
 
 function clearOfCutLines(
   samples: ReadonlyArray<Vec2>,
+  start: Vec2,
   context: LeadFitContext,
   reserveMm: number,
   freeEndNeedMm: number,
@@ -107,14 +108,17 @@ function clearOfCutLines(
   const keepOutMm = clearanceMm + reserveMm;
   let reached = 0;
   let freeEndMm = 0;
+  let previous = start;
   for (const sample of samples) {
-    const { ownMm, otherMm } = obstacles.distancesMm(sample, keepOutMm, ownLine, ignoredLines);
+    const { ownMm } = obstacles.distancesMm(sample, keepOutMm, ownLine, ignoredLines);
     if (ownMm < Math.min(reached, clearanceMm) - TOLERANCE_MM) return false;
     reached = Math.max(reached, ownMm);
     freeEndMm = ownMm;
     // From the very first step: a lead shorter than the clearance, or one that
     // starts beside another cut, must not cross it on its way out.
-    if (otherMm < keepOutMm) return false;
+    if (!obstacles.otherLinesClear(previous, sample, keepOutMm, ownLine, ignoredLines))
+      return false;
+    previous = sample;
   }
   // The last sample is the free end, where the start or stop mark lands.
   return freeEndMm >= freeEndNeedMm;
