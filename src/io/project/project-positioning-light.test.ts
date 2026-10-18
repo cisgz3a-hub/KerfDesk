@@ -71,16 +71,27 @@ describe('positioning light persistence', () => {
     },
   );
 
-  it('drops an M106/M107 light mapping from a Marlin fan-mosfet project', () => {
+  // A Marlin fan-mosfet laser has no positioning light, so any saved one is dropped.
+  it.each([
+    ['M106 P1 S255', 'M107 P1'],
+    ['M355 S1 P255', 'M355 S0'],
+  ])('drops a %s light from a Marlin fan-mosfet project and profile', (onCommand, offCommand) => {
     const device = {
       ...DEFAULT_DEVICE_PROFILE,
       controllerKind: 'marlin' as const,
       gcodeDialect: { dialectId: 'marlin-fan' as const },
-      positioningLight: { ...positioningLight, onCommand: 'M106 P1 S255', offCommand: 'M107 P1' },
+      positioningLight: { ...positioningLight, onCommand, offCommand },
     };
     const loaded = deserializeProject(serializeProject(createProject(device)));
     expect(loaded.kind).toBe('ok');
     if (loaded.kind === 'ok') expect(loaded.project.device.positioningLight).toBeUndefined();
+    const profile = deserializeMachineProfileDocument(profileDocument(device));
+    expect(profile.kind).toBe('ok');
+    if (profile.kind !== 'ok') return;
+    expect(profile.document.profile.positioningLight).toBeUndefined();
+    expect(profile.document.reviewNotes).toContainEqual(
+      expect.stringContaining('Positioning light removed'),
+    );
   });
 
   // Dropped (never sent), not refused: the file still opens (supersedes #1222's refusal).

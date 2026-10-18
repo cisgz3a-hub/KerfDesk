@@ -29,13 +29,16 @@ function marlinLight(
 }
 
 describe('Centre & LED after Frame on Marlin fan-mosfet lasers', () => {
-  it('never switches an M106/M107 "light" on after Frame when fan commands fire the laser', () => {
-    marlinLight('marlin-fan', 'M106 P1 S255', 'M107 P1');
+  it.each([
+    ['M106 P1 S255', 'M107 P1'],
+    ['M355 S1', 'M355 S0'],
+  ])('never switches a light %s on after Frame on a fan-mosfet laser', (onCommand, offCommand) => {
+    marlinLight('marlin-fan', onCommand, offCommand);
     expect(centreLightAfterFrameWanted()).toBe(false);
   });
 
-  it('still finishes Frame with a documented accessory light on the same profile', () => {
-    marlinLight('marlin-fan', 'M355 S1', 'M355 S0');
+  it('still finishes Frame with an accessory light on an inline Marlin profile', () => {
+    marlinLight('marlin-inline', 'M355 S1', 'M355 S0');
     expect(centreLightAfterFrameWanted()).toBe(true);
   });
 });

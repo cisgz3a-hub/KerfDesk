@@ -20,18 +20,31 @@ const RESERVED_M_CODES = new Set([
   401, 402, 410, 500, 501, 502, 600, 605, 701, 702, 915, 997, 999,
 ]);
 
+export const POSITIONING_LIGHT_UNSUPPORTED_MESSAGE =
+  'Marlin fan-mosfet profiles have no positioning light: the laser is wired to the fan output, so KerfDesk never sends LED commands there.';
+
+/**
+ * Whether a profile may have a separate positioning light at all. A Marlin
+ * fan-mosfet laser is switched by the fan commands, so the LED feature is
+ * removed there entirely and the laser can never be fired through it.
+ */
+export function positioningLightSupported(gcodeDialectId: string | undefined): boolean {
+  return gcodeDialectId !== 'marlin-fan';
+}
+
 export function positioningLightIssue(
   value: unknown,
   controllerKind?: ControllerKind,
   gcodeDialectId?: string,
 ): string | null {
   if (value === undefined) return null;
+  if (!positioningLightSupported(gcodeDialectId)) return POSITIONING_LIGHT_UNSUPPORTED_MESSAGE;
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return 'Positioning light must contain its on/off commands and X/Y offsets.';
   }
   const light = value as Record<string, unknown>;
   for (const field of ['onCommand', 'offCommand'] as const) {
-    const issue = commandIssue(light[field], field, controllerKind, gcodeDialectId);
+    const issue = commandIssue(light[field], field, controllerKind);
     if (issue !== null) return issue;
   }
   const onCommand = light['onCommand'] as string;
@@ -49,14 +62,11 @@ function commandIssue(
   command: unknown,
   field: 'onCommand' | 'offCommand',
   kind: ControllerKind | undefined,
-  gcodeDialectId: string | undefined,
 ): string | null {
   if (!isPositioningLightCommand(command)) {
     return `Positioning light ${field === 'onCommand' ? 'on' : 'off'} command must be one documented accessory M-code, without motion or cutting-beam commands.`;
   }
-  return (
-    machineStateCommandIssue(command, kind, gcodeDialectId) ?? digitalOutputIssue(command, kind)
-  );
+  return machineStateCommandIssue(command, kind) ?? digitalOutputIssue(command, kind);
 }
 
 function offsetIssue(light: Record<string, unknown>): string | null {
@@ -162,19 +172,16 @@ const STATE_CHANGING_M_CODES = new Set([
 function machineStateCommandIssue(
   command: string,
   kind: ControllerKind | undefined,
-  gcodeDialectId: string | undefined,
 ): string | null {
   const [head = '', ...words] = command.trim().toUpperCase().split(/ +/);
   const code = Number(/^M(\d+)/.exec(head)?.[1]);
   if (STATE_CHANGING_M_CODES.has(code))
     return 'Positioning light commands cannot change pins, limits, overrides or motion settings.';
   // Smoothieware's M106/M107 are configurable switch commands; elsewhere they
-  // address Marlin fans. KerfDesk's 'marlin-fan' dialect fires the laser with
-  // a bare M106 S<n> (fan 0), so only an explicit non-zero fan index is a
-  // separate output, and a fan-mosfet profile refuses them outright.
+  // address Marlin fans, and fan 0 can be a fan-wired laser, so only an explicit
+  // non-zero fan index is a separate output. (A Marlin fan-mosfet profile has
+  // no positioning light at all: positioningLightSupported.)
   if ((code !== 106 && code !== 107) || kind === 'smoothieware') return null;
-  if (gcodeDialectId === 'marlin-fan')
-    return 'Positioning light cannot use M106/M107 on a Marlin fan-mosfet profile: they fire the laser.';
   const fan = Number(words.find((word) => word.startsWith('P'))?.slice(1));
   return Number.isInteger(fan) && fan > 0
     ? null

@@ -46,6 +46,24 @@ describe('separate positioning light transaction', () => {
     },
   );
 
+  it('sends nothing on a Marlin fan-mosfet laser, not even a captured off command', async () => {
+    const h = harness('marlin');
+    await h.actions.centrePositioningLight(20, 10, 1200);
+    expect(h.get().positioningLightEnabled).toBe(true);
+    const device = useStore.getState().project.device;
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: { ...device, gcodeDialect: { dialectId: 'marlin-fan' } },
+      },
+    }));
+    const written = h.writes.length;
+    await expect(h.actions.switchPositioningLightOff()).rejects.toThrow(/fan-mosfet/);
+    await expect(h.actions.centrePositioningLight(30, 10, 1200)).rejects.toThrow(/fan-mosfet/);
+    expect(h.writes).toHaveLength(written);
+    expect(positioningLightDisconnectOff(h.get(), h.refs)).toBeNull();
+  });
+
   it('queues a Marlin G91/G0/G90 light move as one owned write', async () => {
     const h = harness('marlin');
     await h.actions.centrePositioningLight(20, 10, 1200);

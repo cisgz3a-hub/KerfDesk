@@ -1,6 +1,9 @@
 import { rotaryAppliesTo } from '../../core/job/rotary-job';
 import { machineKindOf } from '../../core/scene';
-import { positioningLightIssue } from '../../core/devices/positioning-light';
+import {
+  positioningLightIssue,
+  positioningLightSupported,
+} from '../../core/devices/positioning-light';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { selectedObjectIds } from '../state/scene-group-actions';
@@ -15,6 +18,10 @@ export function CentreSelectionButton({
   readonly disabled: boolean;
 }): JSX.Element | null {
   const laserMode = useStore((state) => machineKindOf(state.project.machine) === 'laser');
+  // A Marlin fan-mosfet laser has no positioning light: nothing to show or send.
+  const supported = useStore((state) =>
+    positioningLightSupported(state.project.device.gcodeDialect?.dialectId),
+  );
   const needsSetup = useStore((state) => {
     const light = state.project.device.positioningLight;
     return (
@@ -30,7 +37,7 @@ export function CentreSelectionButton({
   const lightEnabled = useLaserStore((state) => state.positioningLightEnabled);
   const machineBlocked = useLaserStore((state) => headMoveBlockMessage(state));
   const blocked = useCentreBlockMessage(fileOnly, needsSetup, disabled, machineBlocked);
-  if (!laserMode && !lightEnabled) return null;
+  if (!supported || (!laserMode && !lightEnabled)) return null;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
       {laserMode ? (

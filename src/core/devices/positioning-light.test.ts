@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type ControllerKind } from './device-profile';
 import { controllerCompatibleProfile } from './controller-profile-compatibility';
-import { normalizePositioningLight, positioningLightIssue } from './positioning-light';
+import {
+  normalizePositioningLight,
+  POSITIONING_LIGHT_UNSUPPORTED_MESSAGE,
+  positioningLightIssue,
+  positioningLightSupported,
+} from './positioning-light';
 
 const light = { onCommand: 'M64 P0', offCommand: 'M65 P0', offsetXmm: 10, offsetYmm: -5 };
 
@@ -99,14 +104,34 @@ describe('Centre & LED after Frame setting (ADR-605)', () => {
 });
 
 describe('laser-firing fan commands', () => {
+  // The LED feature does not exist on a Marlin fan-mosfet laser: every mapping is refused.
   it.each([
     ['M106 S255', 'M107'],
     ['M106 P1 S255', 'M107 P1'],
     ['M106 P2', 'M107 P2'],
-  ])('refuses %s / %s on a Marlin fan-mosfet laser profile', (onCommand, offCommand) => {
+    ['M355 S1 P255', 'M355 S0'],
+    ['M64 P0', 'M65 P0'],
+    ['M7', 'M9'],
+  ])('refuses any light %s / %s on a Marlin fan-mosfet laser profile', (onCommand, offCommand) => {
+    expect(positioningLightIssue({ ...light, onCommand, offCommand }, 'marlin', 'marlin-fan')).toBe(
+      POSITIONING_LIGHT_UNSUPPORTED_MESSAGE,
+    );
     expect(
-      positioningLightIssue({ ...light, onCommand, offCommand }, 'marlin', 'marlin-fan'),
-    ).toMatch(/fire the laser/);
+      normalizePositioningLight({ ...light, onCommand, offCommand }, 'marlin', 'marlin-fan'),
+    ).toBeUndefined();
+  });
+
+  it('marks only the Marlin fan-mosfet dialect as having no positioning light', () => {
+    expect(positioningLightSupported('marlin-fan')).toBe(false);
+    for (const dialect of [undefined, 'marlin-inline', 'grbl-compatible', 'grbl-dynamic'])
+      expect(positioningLightSupported(dialect)).toBe(true);
+    expect(
+      positioningLightIssue(
+        { ...light, onCommand: 'M355 S1', offCommand: 'M355 S0' },
+        'marlin',
+        'marlin-inline',
+      ),
+    ).toBeNull();
   });
 
   it('refuses fan 0 everywhere, where it can be the laser', () => {

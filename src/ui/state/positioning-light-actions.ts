@@ -1,6 +1,11 @@
 import { rotaryAppliesTo } from '../../core/job';
-import { positioningLightIssue } from '../../core/devices/positioning-light';
+import {
+  POSITIONING_LIGHT_UNSUPPORTED_MESSAGE,
+  positioningLightIssue,
+  positioningLightSupported,
+} from '../../core/devices/positioning-light';
 import type { PositioningLight } from '../../core/devices/positioning-light';
+import type { DeviceProfile } from '../../core/devices/device-profile';
 import { inferCurrentMachinePosition } from './infer-machine-position';
 import {
   controllerOperationOwner,
@@ -49,7 +54,9 @@ export function positioningLightActions(
  * connection, for Disconnect's best-effort cleanup; null otherwise. */
 export function positioningLightDisconnectOff(state: LaserState, refs: LiveRefs): string | null {
   const snapshot = lightSnapshots.get(refs);
-  return state.positioningLightEnabled &&
+  const dialect = useStore.getState().project.device.gcodeDialect?.dialectId;
+  return positioningLightSupported(dialect) &&
+    state.positioningLightEnabled &&
     snapshot !== undefined &&
     refs.connection !== null &&
     snapshot.connection === refs.connection
@@ -174,15 +181,24 @@ function assertProfileDriver(refs: LiveRefs): void {
     throw new Error('The selected device profile does not match the connected controller.');
 }
 
+// Nothing at all is sent on a Marlin fan-mosfet profile, not even an off
+// command captured before the profile changed: its laser is the fan output.
+function assertLightSupported(): DeviceProfile {
+  const device = useStore.getState().project.device;
+  if (!positioningLightSupported(device.gcodeDialect?.dialectId))
+    throw new Error(POSITIONING_LIGHT_UNSUPPORTED_MESSAGE);
+  return device;
+}
+
 function resolveMapping(
   state: LaserState,
   refs: LiveRefs,
   target: Target | undefined,
 ): PositioningLight {
+  const device = assertLightSupported();
   const previous = lightSnapshots.get(refs);
   if (target === undefined && previous?.session() === true) return previous.mapping;
   assertProfileDriver(refs);
-  const device = useStore.getState().project.device;
   const mapping = device.positioningLight;
   const issue = positioningLightIssue(mapping, refs.driver.kind, device.gcodeDialect?.dialectId);
   if (mapping === undefined || issue !== null)

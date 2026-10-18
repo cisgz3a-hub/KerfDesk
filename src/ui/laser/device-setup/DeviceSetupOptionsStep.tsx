@@ -3,6 +3,7 @@
 // live project state or hardware command changes when a field is edited.
 
 import { DEFAULT_ROTARY_SETUP, type DeviceProfile } from '../../../core/devices';
+import { positioningLightSupported } from '../../../core/devices/positioning-light';
 import { scanOffsetMagnitudeLimitMm } from '../../../core/devices/scan-offset-profile';
 import { AutofocusEditor } from '../AutofocusEditor';
 import { ZRows } from '../DeviceProfileRows';
@@ -85,16 +86,19 @@ function LaserCalibrationSections(props: {
   const { draft, update } = props;
   return (
     <>
-      <OptionSection
-        title="Positioning LED / crosshair"
-        status={draft.positioningLight === undefined ? 'Not configured' : 'Configured'}
-        open={props.openPositioningLight}
-      >
-        <PositioningLightEditor
-          device={draft}
-          onChange={(positioningLight) => update({ positioningLight })}
-        />
-      </OptionSection>
+      {/* A Marlin fan-mosfet laser is on the fan output: no positioning light there. */}
+      {positioningLightSupported(draft.gcodeDialect.dialectId) ? (
+        <OptionSection
+          title="Positioning LED / crosshair"
+          status={draft.positioningLight === undefined ? 'Not configured' : 'Configured'}
+          open={props.openPositioningLight}
+        >
+          <PositioningLightEditor
+            device={draft}
+            onChange={(positioningLight) => update({ positioningLight })}
+          />
+        </OptionSection>
+      ) : null}
       <OptionSection title="Raster scan-offset calibration" status={scanOffsetStatus(draft)}>
         <ScanOffsetEditor
           value={draft.scanningOffsets}
