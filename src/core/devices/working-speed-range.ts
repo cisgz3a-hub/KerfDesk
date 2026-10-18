@@ -32,6 +32,9 @@ export const SPEED_SLIDER_FLOOR_MM_PER_MIN = 60;
 
 const WORKING_SPEED_MAX_BY_PROFILE_ID: Readonly<Record<string, number>> = {
   'creality-falcon-a1-pro-grblhal': 10_000,
+  // "Creality Falcon-compatible GRBL diode" names its laser but carries no
+  // laserSubProfile, so the type table would read it as unknown.
+  'creality-falcon-a1-pro-compatible': 10_000,
 };
 
 const WORKING_SPEED_MAX_BY_TECHNOLOGY: Readonly<Record<LaserTechnology, number>> = {

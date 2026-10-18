@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from './device-profile';
-import { FALCON_A1_PRO_GRBLHAL_PROFILE } from './falcon-profiles';
+import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falcon-profiles';
 import { FALCON_A1_PRO_INFRARED_2W_MODULE } from './laser-modules';
 import { XTOOL_D1_PRO_PROFILES } from './brand-laser-profiles';
 import {
@@ -22,6 +22,12 @@ describe('speedSliderRange', () => {
       laserSubProfile: FALCON_A1_PRO_INFRARED_2W_MODULE,
     };
     expect(speedSliderRange(infrared).max).toBe(10_000);
+  });
+
+  it('keeps the Falcon-compatible diode at the diode maximum when its ceiling is raised', () => {
+    expect(FALCON_COMPATIBLE_PROFILE.laserSubProfile).toBeUndefined();
+    const raised = { ...FALCON_COMPATIBLE_PROFILE, maxFeed: 36_000 };
+    expect(speedSliderRange(raised).max).toBe(10_000);
   });
 
   it('never runs past Output max feed', () => {
