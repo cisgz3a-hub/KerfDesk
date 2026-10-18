@@ -5,6 +5,8 @@
 
 import type { Layer } from '../../core/scene';
 import { useDebouncedCommit } from './use-debounced-commit';
+import { useLengthUnit } from '../state/display-units';
+import { MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
 
 export function Row(props: {
   readonly label: string;
@@ -43,26 +45,62 @@ type NumberFieldProps = {
   readonly stacked?: boolean;
   /** Spoken name when the visible label is a short form of it ("Spindle" for Spindle speed). */
   readonly ariaName?: string;
+  /** A millimetre length or mm/min feed that follows the display unit (ADR-629). */
+  readonly dimension?: 'length' | 'feed';
 } & NumberFieldRange;
 
+// How a mm or mm/min value shows in the operator's unit. The saved value stays
+// in millimetres, and the debounced draft commits only an edited value, so
+// rounding the inch display never writes back.
+type FieldDisplay = {
+  readonly scale: number;
+  readonly unit: string;
+  readonly step: number;
+  readonly show: (value: number) => number;
+};
+
+function fieldDisplay(props: NumberFieldProps, unit: DisplayLengthUnit): FieldDisplay {
+  if (props.dimension === undefined || unit === 'mm') {
+    return { scale: 1, unit: props.unit, step: props.step, show: (value) => value };
+  }
+  const feed = props.dimension === 'feed';
+  const decimals = feed ? 1 : 4;
+  return {
+    scale: MM_PER_INCH,
+    unit: feed ? 'in/min' : 'in',
+    step: feed ? 1 : 0.01,
+    show: (value) => Number((value / MM_PER_INCH).toFixed(decimals)),
+  };
+}
+
+function clampToRange(props: NumberFieldProps, value: number): number {
+  if (props.positiveOnly === true) return value;
+  return Math.max(props.min, Math.min(props.max, value));
+}
+
 export function NumberField(props: NumberFieldProps): JSX.Element {
+  const display = fieldDisplay(props, useLengthUnit());
+  const shown = display.show(props.value);
   const debounced = useDebouncedCommit<number>({
-    value: props.value,
-    commit: props.onCommit,
+    value: shown,
+    commit: (value) =>
+      props.onCommit(display.scale === 1 ? value : clampToRange(props, value * display.scale)),
     parse: (s) => {
       const n = Number.parseFloat(s);
-      if (!Number.isFinite(n)) return props.value;
-      if (props.positiveOnly === true) return n > 0 ? n : props.value;
-      return Math.max(props.min, Math.min(props.max, n));
+      if (!Number.isFinite(n)) return shown;
+      if (props.positiveOnly === true) return n > 0 ? n : shown;
+      return Math.max(props.min / display.scale, Math.min(props.max / display.scale, n));
     },
   });
-  const unitBesideBox = props.stacked !== true && props.unit.length > 0;
+  const unitBesideBox = props.stacked !== true && display.unit.length > 0;
   return (
-    <Row label={props.label} {...(props.stacked ? { stacked: true, unit: props.unit } : {})}>
+    <Row label={props.label} {...(props.stacked ? { stacked: true, unit: display.unit } : {})}>
       <input
         type="number"
-        {...(props.positiveOnly === true ? {} : { min: props.min, max: props.max })}
-        step={props.step}
+        {...(props.positiveOnly === true
+          ? {}
+          : { min: props.min / display.scale, max: props.max / display.scale })}
+        step={display.step}
         value={debounced.displayValue}
         onChange={debounced.onChange}
         onBlur={debounced.onBlur}
@@ -70,7 +108,7 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
         aria-label={`${props.ariaName ?? props.label} for ${props.layer.color}`}
         title={props.title}
       />
-      {unitBesideBox ? <span style={unitStyle}>{props.unit}</span> : null}
+      {unitBesideBox ? <span style={unitStyle}>{display.unit}</span> : null}
     </Row>
   );
 }

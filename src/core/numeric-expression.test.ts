@@ -149,3 +149,35 @@ describe('evaluateNumericEntry', () => {
     expect(messageFor('('.repeat(300))).toBe('it is too long to read');
   });
 });
+
+describe('evaluateNumericEntry in an inch box (ADR-629)', () => {
+  const INCH: NumericEntryOptions = { kind: 'length', lengthUnit: 'in' };
+  const INCH_SIZE: NumericEntryOptions = { kind: 'length', lengthUnit: 'in', percentOf: 80 };
+
+  it('reads a bare number, a fraction and a sum in inches', () => {
+    expect(valueOf('1', INCH)).toBe(25.4);
+    expect(valueOf('1/2', INCH)).toBe(12.7);
+    expect(valueOf('-0.25', INCH)).toBeCloseTo(-6.35, 12);
+    expect(valueOf('1+1', INCH)).toBeCloseTo(50.8, 12);
+    expect(valueOf('(1+2)', INCH)).toBeCloseTo(76.2, 12);
+    expect(valueOf('sqrt(16)', INCH)).toBeCloseTo(101.6, 12);
+    expect(valueOf('2^3', INCH)).toBeCloseTo(203.2, 12);
+  });
+
+  it('lets a typed unit win over the box unit', () => {
+    expect(valueOf('10mm', INCH)).toBe(10);
+    expect(valueOf('2.5cm', INCH)).toBe(25);
+    expect(valueOf('3/4"', INCH)).toBeCloseTo(19.05, 12);
+    expect(valueOf('10mm/2', INCH)).toBe(5);
+    expect(valueOf('10mm + 1', INCH)).toBeCloseTo(35.4, 12);
+  });
+
+  it('keeps a percentage a share of the current size', () => {
+    expect(valueOf('50%', INCH_SIZE)).toBe(40);
+  });
+
+  it('leaves millimetre boxes and angle boxes as they were', () => {
+    expect(valueOf('1', { kind: 'length', lengthUnit: 'mm' })).toBe(1);
+    expect(valueOf('90', { kind: 'angle', lengthUnit: 'in' })).toBe(90);
+  });
+});

@@ -765,6 +765,21 @@ the linked artwork.
    centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** distribute spacing. Aligning needs two
    or more objects and distributing three or more; a group counts as one. Each is one undo step.
 
+### F-A6j. Show lengths in inches (ADR-629)
+
+1. **Settings → General → Units** offers **Millimetres (mm, mm/min)**, the default, and **Inches
+   (in, in/min)**. The choice belongs to this computer, not the project, and applies at once.
+2. With Inches, these show and take inches: the selection X / Y / Width / Height boxes, the
+   rulers (1-2-5 steps in inches), the status bar's cursor, selection and bed size, the hover size
+   readout, the Measure tool, the Machine panel's position and origin readout and its jog step and
+   speed lists, the laser operation **Speed** (in/min, with an in/s reading), and the CNC
+   operation **Cut depth**, **Depth per pass**, **Feed** and **Plunge**.
+3. In an inch box a bare number is inches (`1/2` is half an inch) and a typed unit still wins
+   (`10mm` is ten millimetres). Every other box keeps its own `mm` label in this first increment.
+4. Showing a value in inches never changes it: leaving a box without typing commits nothing, and
+   switching units adds no undo step. Projects, machine settings, libraries and G-code stay in
+   millimetres (`G21`).
+
 ### F-A6i. Optimize Shapes: smooth and fit outlines (ADR-499)
 
 1. Select vector artwork and choose **Tools → Vector → Optimize Shapes...**.

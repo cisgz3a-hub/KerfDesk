@@ -45,6 +45,8 @@ import { usePreviewBitmapRenderer } from './use-preview-bitmap-renderer';
 import type { LaserTabEditor } from './laser-tab-editor';
 import type { WarpDeformRequest } from '../state/warp-deform-session';
 import { useCanvasDisplay } from './use-warp-deform-preview';
+import { useLengthUnit } from '../state/display-units';
+import type { DisplayLengthUnit } from '../display-length';
 
 export function Workspace(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -254,6 +256,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
   const penDraft = useUiStore((s) => s.penDraft);
   const wireframe = useUiStore((s) => s.wireframeView);
   const operationColors = useUiStore((s) => s.operationColorPeek);
+  const lengthUnit = useLengthUnit();
   const [rasterRedrawTick, setRasterRedrawTick] = useState(0);
   const colorScheme = useCanvasColorScheme();
   const previewBackgroundKey = useMemo(
@@ -282,6 +285,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
       gridMm,
       wireframe,
       operationColors,
+      lengthUnit,
     });
     // `args` is recreated by Workspace; its consumed fields are listed below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -319,6 +323,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
     gridMm,
     wireframe,
     operationColors,
+    lengthUnit,
   ]);
 }
 
@@ -339,6 +344,7 @@ function drawWorkspaceScene(
     readonly gridMm: number;
     readonly wireframe: boolean;
     readonly operationColors: boolean;
+    readonly lengthUnit: DisplayLengthUnit;
   },
 ): void {
   drawScene(ctx, canvas.width, canvas.height, args.project, {
@@ -370,6 +376,7 @@ function drawWorkspaceScene(
     ...(args.artworkRunFocus === null ? {} : { artworkRunFocus: args.artworkRunFocus }),
     wireframe: state.wireframe,
     operationColors: state.operationColors,
+    lengthUnit: state.lengthUnit,
   });
   // Startup reveals the editor after a successful artwork/chrome paint, not
   // merely after React has inserted an empty canvas element.

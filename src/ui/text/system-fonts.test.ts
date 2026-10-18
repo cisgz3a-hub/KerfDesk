@@ -85,7 +85,8 @@ describe('system font file (ADR-628)', () => {
     const chosen = await systemFontFile(face('Roboto', 'Regular'));
     expect(chosen.file.name).toBe('Roboto.ttf');
     expect(chosen.restricted).toBe(false);
-    expect(new Uint8Array(await chosen.file.arrayBuffer())).toEqual(roboto);
+    const bytes = Buffer.from(await chosen.file.arrayBuffer());
+    expect(bytes.equals(Buffer.from(roboto))).toBe(true);
   });
 
   it('names a CFF-outline face .otf and keeps file-system characters out of the name', async () => {

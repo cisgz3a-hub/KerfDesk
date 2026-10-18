@@ -17,6 +17,8 @@ import {
   type Vec2,
 } from '../../core/scene';
 import { useStore } from '../state';
+import { useLengthUnit } from '../state/display-units';
+import { formatDisplayLengthFixed, type DisplayLengthUnit } from '../display-length';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { computeView, type ViewState } from './view-transform';
 
@@ -30,6 +32,7 @@ export function HoverSizeReadout(props: {
   readonly enabled: boolean;
 }): JSX.Element | null {
   const cursor = useStore((state) => state.cursorMm);
+  const unit = useLengthUnit();
   const hovered = useDwellHit(props.enabled ? cursor : null, props.project);
   if (hovered === null) return null;
   const object = props.project.scene.objects.find((candidate) => candidate.id === hovered.id);
@@ -51,10 +54,10 @@ export function HoverSizeReadout(props: {
     <div className="lf-chip" style={{ ...readoutStyle, left, top }} aria-hidden="true">
       <strong style={nameStyle}>{artworkOperationName(object)}</strong>
       <span style={sizeStyle}>
-        {formatMm(bbox.maxX - bbox.minX)} × {formatMm(bbox.maxY - bbox.minY)} mm
+        {formatMm(bbox.maxX - bbox.minX, unit)} × {formatMm(bbox.maxY - bbox.minY, unit)} {unit}
       </span>
       <span style={positionStyle}>
-        X {formatMm(bbox.minX)}, Y {formatMm(bbox.minY)}
+        X {formatMm(bbox.minX, unit)}, Y {formatMm(bbox.minY, unit)}
       </span>
     </div>
   );
@@ -81,9 +84,9 @@ function useDwellHit(cursor: Vec2 | null, project: Project): Hover | null {
 }
 
 // Whole millimetres read as clutter-free at a glance; one decimal keeps a
-// 0.5 mm kerf test from rounding to nothing.
-function formatMm(value: number): string {
-  return Number.isFinite(value) ? value.toFixed(1) : '—';
+// 0.5 mm kerf test from rounding to nothing. Inches show three (ADR-629).
+function formatMm(value: number, unit: DisplayLengthUnit): string {
+  return Number.isFinite(value) ? formatDisplayLengthFixed(value, unit, 1) : '—';
 }
 
 const readoutStyle: React.CSSProperties = {
