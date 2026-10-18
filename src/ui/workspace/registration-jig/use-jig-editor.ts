@@ -18,6 +18,7 @@ import {
   selectedJigIds,
   selectJigObjects,
   undoJigDraft,
+  type JigCommitRefusal,
   type JigEditorSession,
 } from './jig-editor-session';
 import {
@@ -133,15 +134,13 @@ function useJigEditorClose(args: {
       onClose();
       return true;
     }
-    const change = commitJigEditorSession(useStore.getState(), session);
-    if (change === null) {
+    const result = commitJigEditorSession(useStore.getState(), session);
+    if (result.kind === 'refused') {
       setConfirmingClose(false);
-      setError(
-        'The main project changed while this editor was open. Choose Close without saving, then Discard changes, and reopen to use the current project.',
-      );
+      setError(refusalMessage(result.reason));
       return false;
     }
-    useStore.setState(change);
+    useStore.setState(result.change);
     onClose();
     return true;
   };
@@ -167,6 +166,27 @@ function useJigEditorClose(args: {
     keepEditing: () => setConfirmingClose(false),
     discard: onClose,
   };
+}
+
+const REOPEN = 'Choose Close without saving, then Discard changes, and reopen the editor';
+
+// Changes the draft did not overlap are merged on save, so each refusal names
+// what actually collided.
+function refusalMessage(reason: JigCommitRefusal): string {
+  switch (reason) {
+    case 'new-document':
+      return `A different project was opened while this editor was open, so these jig edits belong to the previous one. ${REOPEN} to edit the jig in this project.`;
+    case 'captured-board':
+      return `The main project now holds a captured board outline, which this editor cannot replace. ${REOPEN}; Place Board owns that outline.`;
+    case 'outlines':
+      return `The jig outlines changed on the main canvas while this editor was open, and this draft holds the whole layout. ${REOPEN} to start from the current outlines.`;
+    case 'artwork':
+      return `Artwork you changed here was also changed in the main project while this editor was open. ${REOPEN} to start from the current artwork.`;
+    case 'operations':
+      return `An operation setting you changed here was also changed in the main project, or artwork here uses an operation the main project removed. ${REOPEN} to start from the current operations.`;
+    case 'project':
+      return `A project setting changed in the main project overlaps this editor's changes. ${REOPEN} to start from the current project.`;
+  }
 }
 
 export type JigEditorController = ReturnType<typeof useJigEditor>;

@@ -211,15 +211,24 @@ describe('Registration Jig dedicated editor', () => {
     click('Undo');
     expect(container.querySelector('.lf-jig-lock')).not.toBeNull();
   });
-  it('does not overwrite a project changed behind the editor', () => {
+  it('does not overwrite a different project opened behind the editor', () => {
     render();
     act(() => useStore.getState().newProject());
     const project = useStore.getState().project;
     click('Save to canvas');
     expect(useStore.getState().project).toBe(project);
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(
-      'main project changed',
+      'A different project was opened',
     );
     expect(close).not.toHaveBeenCalled();
+  });
+  it('saves the draft over an unrelated change made behind the editor', () => {
+    render();
+    act(() => useStore.getState().setVariableSettings({ serialValue: 5 }));
+    click('Save to canvas');
+    const { project } = useStore.getState();
+    expect(close).toHaveBeenCalledOnce();
+    expect(findRegistrationBoxes(project.scene)).toHaveLength(1);
+    expect(project.variables?.serialValue).toBe(5);
   });
 });

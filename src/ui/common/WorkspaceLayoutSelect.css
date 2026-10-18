@@ -3,8 +3,8 @@
   align-items: center;
   flex-shrink: 0;
   gap: 6px;
-  min-height: 40px;
-  font-size: 15px;
+  min-height: 28px;
+  font-size: var(--lf-text-sm);
   white-space: nowrap;
 }
 .lf-workspace-layout-menu {
@@ -16,8 +16,8 @@
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  min-height: 34px;
-  padding: 7px 9px;
+  min-height: 26px;
+  padding: 4px 8px;
   color: var(--lf-text);
   background: transparent;
   border: 0;

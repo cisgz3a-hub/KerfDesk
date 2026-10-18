@@ -18,8 +18,8 @@ export function OffsetShapesDialogHost(props: { readonly onClose: () => void }):
       selectedIds={selectedObjectIds(primary, additional)}
       initial={lastApplied}
       onCancel={props.onClose}
-      onApply={(request) => {
-        if (!offset(request)) return;
+      onApply={(request, prepared) => {
+        if (!offset(request, prepared)) return;
         lastApplied = request;
         props.onClose();
       }}

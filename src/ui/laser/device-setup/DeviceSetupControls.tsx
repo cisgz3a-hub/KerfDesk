@@ -38,7 +38,7 @@ export function DeviceSetupControls(): JSX.Element {
         {...helpProps('control:laser.machine-setup.launch')}
         aria-label="Machine Setup"
       >
-        <Icon name="sliders" size={16} />
+        <Icon name="sliders" size={15} />
       </Button>
       {needsSetup && (
         <p style={mutedNoteStyle} role="note">

@@ -28,7 +28,27 @@ These are editor and scene-layout changes only. Output modes, the outline-then-a
 
 Component tests cover the close prompt (Keep editing, Discard changes, Save from the prompt), Escape clearing the selection before asking, initial focus, closing without an undo step when nothing changed, and locked outlines in Artwork only with Unlock and Undo. Canvas tests cover refitting once per layout rebuild without chasing ordinary edits, and dropped files reaching the editor with the outline under the drop. State tests cover the on-bed shift, centring an unsaved grid, batch placement across outlines, and anchoring on the outline that holds the selected artwork.
 
-### Amendment: Direct manipulation on the jig canvas (2026-10-18)
+### Amendment 1 - Keep the draft when the main project changes behind the editor (2026-10-18)
+
+#### Context
+
+**Save to canvas** refused the draft whenever the main project had changed since the editor opened, apart from the switch to **Artwork only** that a finished outline run makes. The editor is a full-screen modal, so such changes come from automation, such as variable text advancing after a job. The operator then had to discard every jig edit and reopen the editor, even when the change had nothing to do with the jig.
+
+#### Decision
+
+- **Saving rebases the draft.** It merges three ways: the project the editor opened, the current main project and the draft. Main-project changes to artwork, operations and project fields the draft did not touch are carried over; the draft's own edits win for what it changed. Artwork the main project added is kept, after the draft's artwork, and run and presentation order lists merge the same way. Operations merge setting by setting.
+- **A finished outline run still selects Artwork only.** When the main project's output mode changed while the editor was open, the saved draft adopts that mode, as before. Output flags alone never cause a refusal.
+- **Only overlapping changes are refused.** The editor keeps the existing refusals for another opened document and for a captured-board outline. It also refuses when the jig outlines changed in the main project (they may be burned, and the draft holds the whole layout), when artwork, a group or an order list the draft changed was changed or removed there, when the same operation setting was changed differently on both sides, when artwork in the merge uses an operation one side removed, and when a project field the editor does not own was changed differently on both sides. Each refusal shows its own message. The operator still recovers with **Close without saving**, **Discard changes**, and reopening the editor.
+
+#### Consequences
+
+A save after a rebase is still one undoable edit; Undo restores the main project as it was just before the save, including the changes that arrived while the editor was open. Selected items the main project removed are dropped from the saved selection. Stacking follows the draft: a main-project change that only restacks existing artwork is not carried over. Outlines, output modes, Job Review, Frame (ADR-565) and Start are unchanged.
+
+#### Verification
+
+Session tests cover an unrelated object added in the main project, a variable-text advance after a job, an outline moved in the main project (refused), the same artwork edited on both sides (refused) beside different artwork edited on each side (merged), operation settings merged by field and refused on the same field, the existing switch to Artwork only, and the new-document and captured-board refusals. Editor component tests save a draft over a variable setting changed behind the editor and show the new-document message.
+
+### Amendment 2 - Direct manipulation on the jig canvas (2026-10-18)
 
 The jig canvas could only select by click and Shift-click and move by dragging. Resizing and rotating needed the numeric fields, there was no box selection or Select all, and a file drag gave no sign of which outline would receive the files.
 

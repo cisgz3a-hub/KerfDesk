@@ -36,6 +36,8 @@ export type UseDebouncedCommitArgs<T> = {
 export type DebouncedCommit = {
   readonly displayValue: string;
   readonly onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /** An edit whose text is not the input's own value (a slider position). */
+  readonly changeText: (text: string, input: HTMLInputElement) => void;
   readonly onBlur: (event?: React.FocusEvent<HTMLInputElement>) => void;
   readonly errorMessage: string | null;
 };
@@ -147,10 +149,12 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     setDraft,
     setErrorMessage,
   };
+  const changeText = createTextChangeHandler(handlerContext);
   return {
     displayValue: draft,
     errorMessage,
-    onChange: createChangeHandler(handlerContext),
+    onChange: (event) => changeText(event.target.value, event.target),
+    changeText,
     onBlur: createBlurHandler(handlerContext),
   };
 }
@@ -172,24 +176,25 @@ type DebouncedHandlerContext<T> = {
   readonly setErrorMessage: (value: string | null) => void;
 };
 
-function createChangeHandler<T>(context: DebouncedHandlerContext<T>): DebouncedCommit['onChange'] {
-  return (event): void => {
+function createTextChangeHandler<T>(
+  context: DebouncedHandlerContext<T>,
+): DebouncedCommit['changeText'] {
+  return (nextText, input): void => {
     if (context.documentEpoch !== useStore.getState().projectDocumentEpoch) return;
     context.documentOwner.current.pending = context.documentEpoch;
-    context.inputRef.current = event.target;
-    const nextText = event.target.value;
+    context.inputRef.current = input;
     context.editedRef.current = true;
     context.setDraft(nextText);
     // Blank is a valid transient edit, but never a value to commit.
     if (nextText.trim() === '') {
       context.debouncer?.cancel();
       context.setErrorMessage(null);
-      setInputValidity(event.target, '');
+      setInputValidity(input, '');
       return;
     }
     const error = context.validationError(nextText);
     context.setErrorMessage(error);
-    setInputValidity(event.target, error ?? '');
+    setInputValidity(input, error ?? '');
     if (error !== null) {
       context.debouncer?.cancel();
       return;
