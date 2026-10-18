@@ -128,6 +128,24 @@ afterEach(async () => {
 });
 
 describe('ArtworkPulseOverlay (ADR-620)', () => {
+  it('forgets an uncaptured click release before the next drag loses capture', async () => {
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    await act(async () => {
+      // Alt/Shift selection can finish without acquiring pointer capture.
+      canvas.dispatchEvent(new MouseEvent('pointerup', { clientX: 50, clientY: 50 }));
+      canvas.dispatchEvent(new MouseEvent('pointerdown'));
+    });
+    await render(false);
+    await act(async () => {
+      useStore.getState().setCursorMm(null);
+      canvas.dispatchEvent(new MouseEvent('lostpointercapture'));
+    });
+    await render(true);
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    expect(clock.frame(performance.now(), true).pieces).toEqual([]);
+  });
+
   it('ends a paused hover when capture is lost before pointer-up', async () => {
     await render(true);
     await pointAt({ x: 5, y: 5 });
