@@ -103,12 +103,12 @@ function polylineToSubs(el: Element, closed: boolean, scale: number): ReadonlyAr
   if (points.length < 2) return [];
   const first = points[0];
   if (first === undefined) return [];
-  if (closed) return [{ points: [...points, first], closed: true }];
+  const meets = endsMeet(points, closureToleranceUserUnits(scale));
+  // A <polygon> that already repeats its first point closes on it exactly once.
+  if (closed) return [{ points: [...(meets ? points.slice(0, -1) : points), first], closed: true }];
   // A <polyline> that returns to its start is stored as the <polygon> of its
   // other points (E-2): closed, ending on the first point exactly once.
-  if (endsMeet(points, closureToleranceUserUnits(scale))) {
-    return [{ points: [...points.slice(0, -1), first], closed: true }];
-  }
+  if (meets) return [{ points: [...points.slice(0, -1), first], closed: true }];
   return [{ points, closed: false }];
 }
 

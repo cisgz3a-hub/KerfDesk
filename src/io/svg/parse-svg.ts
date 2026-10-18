@@ -155,6 +155,9 @@ function walkElement(
   if (tag === 'text') context.counts.text += 1;
   if (tag === 'text' || NEVER_RENDERED.has(tag)) return;
   appendElement(el, state, context, depth);
+  // A <use> renders only its referenced instance; its own child elements never
+  // paint (SVG 2 struct.html#UseElement), so they are not geometry.
+  if (tag === 'use') return;
   const content = tag === 'svg' ? nestedSvgViewportState(el, state, AUTO_SIZE) : state;
   if (content !== null) walkChildren(el, content, context, depth);
 }
