@@ -61,7 +61,9 @@ cookie and refuses framing. Neither guide creates a pairing or replaces approval
 
 The owner has settled the offer (ADR-524 Amendment 1), and `commerce.config.mjs` holds it: a Free
 edition with no time limit and a Pro license at US$49.50, one time, with a year of updates, an
-optional US$20 update year, three devices and a 30-day trial. The site shows these prices, but
+optional US$20 update year, three devices and a 30-day trial. Free is the browser app only: the
+desktop app opens behind a trial or licence window and has no Free edition (ADR-623), so never
+write that Free runs on the desktop. The site shows these prices, but
 checkout is closed (`salesOpen: false`): no plan has a checkout URL, and the pricing page says
 purchase opens soon. `tests/commerce.test.mjs` pins the offer and the closed checkout, so any
 change to either is deliberate. Don't write refund or other sale terms on the site; the terms of

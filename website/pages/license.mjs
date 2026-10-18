@@ -25,7 +25,7 @@ function todaySection() {
     id: 'today',
     eyebrow: 'Using KerfDesk',
     title: 'The notice that comes with the app',
-    lead: 'KerfDesk Free runs in the browser and on the desktop, and Pro comes with the Windows desktop app. The app comes with a short License & Safety Notice about its license, machine safety and liability. The Windows installer shows it during setup, and Help > About KerfDesk in the app points to it.',
+    lead: 'KerfDesk Free runs in the browser. The Windows desktop app runs Pro and opens with a free 30-day trial or a license. The app comes with a short License & Safety Notice about its license, machine safety and liability. The Windows installer shows it during setup, and Help > About KerfDesk in the app points to it.',
     content: html`${table({
       caption: 'What the five parts of the notice say',
       head: ['Part', 'In plain words'],
@@ -77,7 +77,7 @@ function proLicenseSection(commerce) {
     id: 'pro-license',
     eyebrow: 'Free and Pro',
     title: 'The Free edition and the Pro license',
-    lead: `Free has no time limit. Pro adds the Pro tools with a one-time license.${commerce.salesOpen ? ' You can buy Pro through the KerfDesk purchase page.' : ' Purchase opens soon; nothing can be bought yet.'}`,
+    lead: `Free has no time limit, in the browser. Pro adds the Pro tools with a one-time license, in the desktop app.${commerce.salesOpen ? ' You can buy Pro through the KerfDesk purchase page.' : ' Purchase opens soon; nothing can be bought yet.'}`,
     content: html`${featureGrid(proLicenseFacts(commerce))}
     ${actions(button('/pricing/', 'See pricing', { iconName: 'tag', variant: 'secondary' }))}`,
   });
@@ -176,7 +176,7 @@ export const page = {
     })}
     ${ctaBand({
       title: 'Start with KerfDesk Free',
-      body: 'Open KerfDesk in your browser or download the desktop app. Free needs no account and has no time limit.',
+      body: 'Open KerfDesk in your browser: Free needs no account and has no time limit. The desktop app opens with a free 30-day Pro trial.',
       buttons: [
         button(site.appUrl, 'Open the app'),
         button('/download/', 'Download', { variant: 'ghost-dark' }),

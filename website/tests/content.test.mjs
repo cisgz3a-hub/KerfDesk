@@ -189,6 +189,19 @@ describe('website copy', () => {
     );
   });
 
+  // ADR-623: the desktop app opens behind a trial or licence window, and Free
+  // is the browser app. The Supplier Terms and refund policy are legal text
+  // the owner changes, so they are left out here.
+  it('never offers a Free edition of the desktop app', () => {
+    const desktopFree =
+      /in the browser (?:and|or) on the desktop|\bopens (?:in )?Free\b|Free · Try Pro|only the Pro tools lock|everything in Free keeps working/i;
+    for (const { file, text } of pages) {
+      if (/^(?:terms|refunds)\//.test(file.replaceAll('\\', '/'))) continue;
+      assert.doesNotMatch(text, desktopFree, file);
+    }
+    assert.match(pageText('pricing/index.html'), /it has no Free edition/);
+  });
+
   // Published Supplier Terms and the refund policy are accessible before any
   // purchase, without opening checkout or replacing a supplied app notice.
   // ADR-578: case-by-case refunds that keep statutory rights and the v1.1 promise.

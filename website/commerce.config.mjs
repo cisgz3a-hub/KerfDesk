@@ -12,7 +12,8 @@ export const commerce = {
   currency: 'USD',
   termsUrl: '/terms/',
   refundPolicyUrl: '/refunds/',
-  // The Free edition: no time limit, in the browser and on the desktop.
+  // The Free edition: no time limit, in the browser only. The desktop app has no
+  // Free edition; it opens behind a trial or licence window (ADR-623).
   free: {
     name: 'Free',
     includes: [

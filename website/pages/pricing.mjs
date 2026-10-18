@@ -18,7 +18,7 @@ function freePlan(commerce, site) {
   return html`<article class="plan plan--free" id="plan-free">
     <h2 class="h3">KerfDesk ${commerce.free.name}</h2>
     <p class="plan__price">Free <small>no time limit</small></p>
-    <p>In the browser and on the desktop. No account, no card.</p>
+    <p>In the browser. No account, no card.</p>
     ${ticks(commerce.free.includes)} ${button(site.appUrl, 'Open the app')}
   </article>`;
 }
@@ -130,7 +130,7 @@ function licenseTerms(plan, commerce) {
     {
       icon: 'shield-check',
       title: 'Your jobs keep running',
-      body: `A license never stops a job from running. When a trial ends, only the ${plan.name} tools lock, and everything in Free keeps working.`,
+      body: `A license never stops a job from running or closes an open project. When a trial ends, the desktop app asks for a license the next time it opens, and KerfDesk Free keeps working in the browser.`,
     },
   ].filter(Boolean);
   return section({
@@ -178,14 +178,19 @@ function faq(commerce, plan, site) {
     {
       id: 'free-expire',
       question: 'Does the Free edition expire?',
-      answer:
-        'No. Free has no time limit, in the browser and on the desktop, and it needs no account or card.',
+      answer: 'No. Free has no time limit and needs no account or card. It runs in the browser.',
     },
+    commerce.trialOpen &&
+      plan?.trialDays && {
+        id: 'desktop-free',
+        question: 'Can I use the desktop app without a license?',
+        answer: `Only during its free ${plan.trialDays}-day ${plan.name} trial. The desktop app has no Free edition: it opens with a trial or a license, and after the trial it needs a license. KerfDesk Free stays in the browser, with no time limit.`,
+      },
     {
       id: 'trial-ends',
       question: 'What happens when my trial ends?',
       answer:
-        'Only the Pro tools lock. Everything in Free keeps working, and a license never stops a job from running.',
+        'If KerfDesk is open when it ends, your project stays open and only new Pro tool choices pause; a license never stops a job from running. The next time you open the desktop app, it asks for a license key. KerfDesk Free keeps working in the browser.',
     },
     {
       id: 'after-updates',
@@ -244,13 +249,15 @@ export const page = {
   nav: 'pricing',
   title: 'Pricing',
   description:
-    'KerfDesk Free has no time limit. Pro adds advanced tools to the Windows desktop app for US$49.50, paid once, with a year of updates and a 30-day trial.',
+    'KerfDesk Free runs in the browser with no time limit. The Windows desktop app is KerfDesk Pro: a free 30-day trial, then US$49.50, paid once, with a year of updates.',
   render: ({ site, commerce }) => {
     const [plan] = commerce.plans;
     const lead = [
-      'KerfDesk Free runs in the browser and on the desktop, with no time limit.',
+      'KerfDesk Free runs in the browser, with no time limit.',
       plan &&
         `${plan.name} adds advanced tools${plan.where ? ` to ${plan.where}` : ''} for ${formatPrice(plan.price, commerce.currency)}, paid once.`,
+      plan?.trialDays &&
+        `The desktop app opens with a free ${plan.trialDays}-day ${plan.name} trial or a license; it has no Free edition.`,
       !commerce.salesOpen && 'Paid checkout is closed.',
     ]
       .filter(Boolean)

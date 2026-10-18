@@ -53,13 +53,14 @@ function platforms(site) {
       ${button(site.appUrl, 'Open the web app', { iconName: 'arrow-right' })}
     </article>
     <article class="platform">
-      <span class="eyebrow">Windows Free and Pro</span>
+      <span class="eyebrow">Windows Pro, with a free trial</span>
       <h3>${icon('monitor')}Windows</h3>
       <p>
         Windows 10 or 11, 64-bit (x64). The commercial Windows edition is available as an unsigned
         installer. Windows may show an unknown publisher warning. Use the KerfDesk download page to
-        get the verified release. It opens Free; start a Pro trial or enter a purchased licence in
-        Help &gt; Licence.
+        get the verified release. It opens to Activate KerfDesk: start the free 30-day Pro trial,
+        enter a purchased licence key or buy Pro. The desktop app has no Free edition; KerfDesk Free
+        is the web app.
       </p>
       <p>Look for ${asset(WINDOWS.file)}</p>
       ${button(site.downloadPageUrl, 'Windows downloads', {
@@ -125,8 +126,8 @@ function chooseSection(site) {
       body: html`<p>
           KerfDesk for Linux comes as a .deb for Ubuntu and Debian and an AppImage for other
           distributions, on the KerfDesk download page once it is released. Until then, use the
-          <a href="${site.appUrl}">web app</a> in Chrome or Edge. It has the same Free design and
-          toolpath features as the desktop app, and you can install it from the browser.
+          <a href="${site.appUrl}">web app</a> in Chrome or Edge. It runs KerfDesk Free, with no
+          time limit, and you can install it from the browser.
         </p>
         <p>
           To run a USB machine from Linux, add your account to the serial group once (<code
@@ -142,7 +143,7 @@ function sameAppSection(ctx) {
     tone: 'alt',
     content: split({
       title: 'One app, wherever you run it',
-      body: 'The desktop app is built from the same code as the web app. Packaging doesn’t change any design, toolpath, G-code or machine-control behavior. A few extras exist only on the desktop, such as the network-camera helper and the update link, and Pro is sold only for the Windows desktop app.',
+      body: 'The desktop app is built from the same code as the web app. Packaging doesn’t change any design, toolpath, G-code or machine-control behavior. A few extras exist only on the desktop, such as the network-camera helper and the update link. KerfDesk Free is the web app; the desktop app runs Pro and opens with a free 30-day trial or a license.',
       points: SAME_APP_POINTS,
       media: shot(ctx, 'workspace'),
     }),
@@ -267,13 +268,13 @@ export const page = {
   nav: null,
   title: 'Download',
   description:
-    'Use KerfDesk in your browser, or get the desktop app from the KerfDesk download page: Windows and macOS, and Linux as it is released. Free needs no account.',
+    'Use KerfDesk Free in your browser, or get the desktop app with a free 30-day Pro trial: Windows and macOS, and Linux as it is released. No account needed.',
   render: (ctx) => {
     const { site, commerce } = ctx;
     return html`${pageHero({
       eyebrow: 'Download',
       title: 'Get KerfDesk',
-      lead: 'Use KerfDesk in your browser, or install the desktop app on Windows or macOS, with Linux packages on the download page as they are released. KerfDesk Free runs in both, Pro comes with the Windows desktop app, and neither needs an account.',
+      lead: 'Use KerfDesk in your browser, or install the desktop app on Windows or macOS, with Linux packages on the download page as they are released. KerfDesk Free runs in the browser. The desktop app runs Pro, with a free 30-day trial, then a license. Neither needs an account.',
       extra: actions(
         button(site.appUrl, 'Open KerfDesk in your browser', { iconName: 'arrow-right' }),
         button(site.downloadPageUrl, 'Desktop downloads', {

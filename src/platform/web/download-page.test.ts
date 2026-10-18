@@ -54,9 +54,14 @@ describe('desktop Preview download page', () => {
       page.indexOf('aria-labelledby="preview-heading"'),
     );
 
-    expect(commercial).toContain('Free, with a 30-day Pro trial');
-    // ADR-540: the app always runs Free; only the Pro tools need the trial or a licence.
-    expect(commercial).toContain('KerfDesk Free has no time limit.');
+    expect(commercial).toContain('Pro, with a free 30-day trial');
+    // ADR-623: the desktop app opens behind a trial or licence window; Free is the web app.
+    expect(commercial).toContain('<strong>Activate KerfDesk</strong>');
+    expect(commercial).toContain('<strong>Start free 30-day trial</strong>');
+    expect(commercial).toMatch(/It has no Free\s+edition: KerfDesk Free runs in the web app/);
+    expect(page).not.toMatch(
+      /Free, with a 30-day Pro trial|Free · Try Pro|KerfDesk Free has no time limit/,
+    );
     expect(commercial).not.toContain('Every feature is included for 30 days');
     expect(commercial).toContain('id="commercial-status" role="status"');
     expect(commercial).toMatch(/<a class="download" id="commercial-download" hidden>/);

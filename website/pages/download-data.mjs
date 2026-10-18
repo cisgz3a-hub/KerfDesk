@@ -65,7 +65,7 @@ export const WEB_APP_POINTS = [
 ];
 
 export const SAME_APP_POINTS = [
-  'KerfDesk Free, with no time limit',
+  'Free in the browser; a free 30-day Pro trial on the desktop',
   'No account or sign-in',
   'Your projects are saved as files on your own computer',
   'No analytics, error reporting or cloud sync',
@@ -131,10 +131,10 @@ export function downloadFaq(site, commerce) {
       id: 'account',
       question: 'Do I need an account?',
       answer: html`<p>
-        No. There’s no sign-up or sign-in, and KerfDesk Free needs nothing else.
+        No. There’s no sign-up or sign-in, and KerfDesk Free in the browser needs nothing else.
         ${plan &&
-        html`${plan.name} is unlocked with a license, and each device can try ${plan.name} free for
-        ${plan.trialDays} days first, with no card
+        html`The desktop app runs ${plan.name}, which is unlocked with a license, and each device
+        can try ${plan.name} free for ${plan.trialDays} days first, with no card
         needed${commerce.trialOpen ? '' : ', once the desktop app is released'}.`}
       </p>`,
     },
@@ -142,10 +142,11 @@ export function downloadFaq(site, commerce) {
       id: 'cost',
       question: 'Does it cost anything?',
       answer: html`<p>
-        KerfDesk Free costs nothing and has no time limit.
+        KerfDesk Free in the browser costs nothing and has no time limit.
         ${plan &&
-        html`${plan.name} costs ${formatPrice(plan.price, commerce.currency)}, paid once, with a
-        year of updates.`}
+        html`The desktop app runs ${plan.name}: after its free ${plan.trialDays}-day trial, a
+        license costs ${formatPrice(plan.price, commerce.currency)}, paid once, with a year of
+        updates.`}
         ${commerce.salesOpen
           ? 'Buy through the KerfDesk purchase page or Help > Licence in the Windows app.'
           : 'Purchase isn’t open yet.'}

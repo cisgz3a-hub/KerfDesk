@@ -111,7 +111,7 @@ class BrowserPurchasePage {
         );
       } else if (this.config === null)
         this.status(
-          'Pro purchases are not open yet. No payment will be taken. You can still download and use KerfDesk Free.',
+          'Pro purchases are not open yet. No payment will be taken. You can still use KerfDesk Free in the browser, or the free 30-day trial in the desktop app.',
         );
       else if (!supportsBrowserPurchase(this.window))
         this.status(

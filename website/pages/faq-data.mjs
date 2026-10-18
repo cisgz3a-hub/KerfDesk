@@ -17,7 +17,7 @@ function gettingStarted(site) {
       id: 'account',
       question: 'Do I need an account?',
       answer:
-        'No. There’s no sign-up or sign-in. KerfDesk Free opens straight to the workspace, so you can start working right away, and the Pro trial needs no card.',
+        'No. There’s no sign-up or sign-in. KerfDesk Free in the browser opens straight to the workspace, so you can start working right away, and the desktop app’s Pro trial needs no card.',
     },
     {
       id: 'browsers',
@@ -249,9 +249,10 @@ function pricingAndLicense(site, commerce) {
       id: 'free',
       question: 'Is KerfDesk free?',
       answer: html`<p>
-        KerfDesk Free is, with no time limit, in the browser and on the desktop. It covers drawing,
-        text, file import, basic tracing, laser cutting and engraving, 2D CNC cuts and all machine
-        control. See <a href="#pro">What does Pro add?</a>
+        KerfDesk Free is, with no time limit, in the browser. It covers drawing, text, file import,
+        basic tracing, laser cutting and engraving, 2D CNC cuts and all machine control. The desktop
+        app has no Free edition: it opens with a free Pro trial or a license. See
+        <a href="#pro">What does Pro add?</a>
       </p>`,
     },
     plan && {
@@ -269,7 +270,8 @@ function pricingAndLicense(site, commerce) {
           One license is active on up to ${plan.deviceLimit} devices at a time, and each device can
           try ${plan.name} free for ${plan.trialDays} days with no
           card${commerce.trialOpen ? '' : ', once the desktop app is released'}. When a trial ends,
-          only the ${plan.name} tools lock, and a license never stops a job from running.
+          the desktop app asks for a license the next time it opens, KerfDesk Free keeps working in
+          the browser, and a license never stops a job from running.
           ${commerce.salesOpen
             ? html`Buy through the <a href="${site.appUrl}/buy.html">KerfDesk purchase page</a>.`
             : 'Purchase opens soon.'}

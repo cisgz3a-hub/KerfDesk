@@ -157,7 +157,10 @@ describe('commerce configuration', () => {
       text,
       /The desktop app with Pro isn’t released yet; the download page will have it/,
     );
-    assert.match(text, /only the Pro tools lock, and everything in Free keeps working/);
+    assert.match(
+      text,
+      /When a trial ends, the desktop app asks for a license the next time it opens, and KerfDesk Free keeps working in the browser/,
+    );
     assert.match(text, /A license never stops a job from running/);
     assert.match(text, /Sales and paid checkout remain closed/);
     assert.match(html, /href="\/terms\/"/);
@@ -205,6 +208,23 @@ describe('commerce configuration', () => {
     assert.match(html, /href="\/terms\/"/);
     assert.match(html, /href="\/refunds\/"/);
     assert.doesNotMatch(text, /Purchase opens soon/);
+  });
+
+  // ADR-623: the desktop app opens behind a trial or licence window; Free is browser only.
+  it('never offers a Free edition of the desktop app', () => {
+    const text = textContent(renderPricing(commerce));
+    assert.match(
+      text,
+      /The desktop app opens with a free 30-day Pro trial or a license; it has no Free edition\./,
+    );
+    assert.match(
+      text,
+      /Can I use the desktop app without a license\? Only during its free 30-day Pro trial/,
+    );
+    assert.doesNotMatch(
+      text,
+      /in the browser and on the desktop|everything in Free keeps working/i,
+    );
   });
 
   it('formats whole and fractional prices as unambiguous US dollars', () => {
