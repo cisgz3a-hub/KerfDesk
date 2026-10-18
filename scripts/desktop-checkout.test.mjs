@@ -212,6 +212,7 @@ test('mobile landing keeps disabled sales closed and never loads Paddle or creat
   assert.equal(window.document.querySelector('canvas'), null);
   assert.equal(window.document.getElementById('purchase-open').disabled, true);
   assert.match(window.document.getElementById('checkout-status').textContent, /not open yet/u);
+  assert.doesNotMatch(window.document.getElementById('checkout-status').textContent, /trial/u);
   assert.equal(window.document.querySelector('script[src^="https:"]'), null);
   assert.equal(window.localStorage.getItem(PURCHASE_STORAGE_KEY), null);
   assert.equal(requests.length, 1);
