@@ -9,7 +9,7 @@ const WINDOWS_CHROME =
 const LINUX_CHROME =
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 
-describe('shortcut labels on each keyboard (ADR-606)', () => {
+describe('shortcut labels on each keyboard (ADR-607)', () => {
   it('recognises a Mac by its platform or user agent, and nothing else', () => {
     expect(isApplePlatform({ platform: 'MacIntel', userAgent: MAC_CHROME })).toBe(true);
     expect(isApplePlatform({ platform: '', userAgent: MAC_CHROME })).toBe(true);

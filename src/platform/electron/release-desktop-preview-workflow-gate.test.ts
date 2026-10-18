@@ -61,7 +61,7 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(builder).toMatch(/win:\s*\n\s*icon: public\/app-icon\.ico/);
     expect(builder).toMatch(/mac:\s[\s\S]*icon: public\/app-icon\.icns/);
     expect(builder).not.toMatch(/mac:\s[\s\S]*arch:\s*\n\s*- x64[\s\S]*- arm64/);
-    // Linux packages are built and checked on every pull request, not yet published (ADR-606).
+    // Linux packages are built and checked on every pull request, not yet published (ADR-607).
     expect(workflow).not.toContain('--linux');
     expect(builder).toMatch(/^linux:\s[\s\S]*target: AppImage[\s\S]*target: deb/m);
   });
@@ -154,7 +154,7 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(workflow).toContain('Release verification and legal-closure gate');
   });
 
-  it('builds and checks the Windows and macOS Preview in the release train, Linux on every pull request (ADR-522 Amendment 1, ADR-606)', () => {
+  it('builds and checks the Windows and macOS Preview in the release train, Linux on every pull request (ADR-522 Amendment 1, ADR-607)', () => {
     expect(packageCheck).toMatch(/^ {2}pull_request:$/m);
     expect(packageCheck).toMatch(/^ {2}workflow_call:$/m);
     expect(packageCheck).toMatch(/^ {2}workflow_dispatch:$/m);
