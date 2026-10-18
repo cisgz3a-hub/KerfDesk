@@ -90,22 +90,7 @@ export function createDesktopLicensing(options: Options) {
   });
   const entry = licenceEntry(config, desktopLicenceLink(config, options.packaged), options);
   const rings = createUpdateRingStore(options.userDataPath);
-  const checks = desktopManualUpdates(config, {
-    ...options,
-    fetch: (url, init) => net.fetch(url, init),
-    eligible: runtime.isManualReleaseEligible,
-    announce: announceManualUpdate,
-    announceDownloadPage: announceDownloadPageUpdate,
-    openDownloadPage: openPlatformDownloadPage,
-  });
-  const manual = checks?.updates ?? null;
-  // Only the Windows installer runs after a close; macOS and Linux open the page.
-  const installer = checks?.kind === 'installer' ? checks.updates : null;
-  if (installer !== null)
-    installManualUpdateQuit(app, installer, {
-      canInstall: options.canInstallManualUpdate ?? (() => false),
-      reportFailure: (error) => console.warn('Manual update installation deferred:', error),
-    });
+  const { manual, installer } = manualUpdateChecks(config, options, runtime);
   /** Beta remains exclusive to the trusted signed updater (ADR-541). */
   const earlyUpdates = earlyUpdateSetting(
     config.channel === 'commercial' && options.trustedUpdates,
@@ -197,6 +182,28 @@ function desktopLicenceLink(config: LicensingConfig, packaged: boolean) {
       }
     },
   });
+}
+
+/**
+ * The unsigned build's own update checks (ADR-561, ADR-613). Only the Windows
+ * installer runs after a close; macOS and Linux open the download page.
+ */
+function manualUpdateChecks(config: LicensingConfig, options: Options, runtime: LicensingRuntime) {
+  const checks = desktopManualUpdates(config, {
+    ...options,
+    fetch: (url, init) => net.fetch(url, init),
+    eligible: runtime.isManualReleaseEligible,
+    announce: announceManualUpdate,
+    announceDownloadPage: announceDownloadPageUpdate,
+    openDownloadPage: openPlatformDownloadPage,
+  });
+  const installer = checks?.kind === 'installer' ? checks.updates : null;
+  if (installer !== null)
+    installManualUpdateQuit(app, installer, {
+      canInstall: options.canInstallManualUpdate ?? (() => false),
+      reportFailure: (error) => console.warn('Manual update installation deferred:', error),
+    });
+  return { manual: checks?.updates ?? null, installer };
 }
 
 /** The only pages a macOS or Linux update opens: one verified version's section (ADR-613). */

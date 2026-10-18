@@ -298,8 +298,8 @@ jobs:
         run: |
           identity="${RUNNER_TEMP}/published-release-identity.json"
           node -e 'require("fs").writeFileSync(process.argv[1], Buffer.from(process.env.IDENTITY, "base64"))' "${identity}"
-          platform="${RUNNER_OS,,}"
-          if [[ "${platform}" == macos ]]; then arch="${RUNNER_ARCH,,}"; else arch=x64; fi
+          platform="$(echo "${RUNNER_OS}" | tr "[:upper:]" "[:lower:]")"
+          if [[ "${platform}" == macos ]]; then arch="$(echo "${RUNNER_ARCH}" | tr "[:upper:]" "[:lower:]")"; else arch=x64; fi
           bash scripts/build-commercial-platform.sh "${platform}" "${arch}" \
             "${RELEASE_VERSION}" "${RELEASE_SHA}" "${identity}"
       - name: Keep the qualified files for publication

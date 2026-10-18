@@ -275,7 +275,7 @@ jobs:
 
       - name: Package and qualify exactly as the release does
         run: |
-          platform="${RUNNER_OS,,}"
+          platform="$(echo "${RUNNER_OS}" | tr "[:upper:]" "[:lower:]")"
           bash scripts/build-commercial-platform.sh "${platform}" "${{ matrix.arch }}" \
             "${VERSION}" "$(git rev-parse HEAD)" "${RUNNER_TEMP}/rehearsal-identity.json"
 
