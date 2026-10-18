@@ -26,7 +26,12 @@
 import { overcutClosedPolyline } from '../geometry/overcut';
 import type { Vec2 } from '../scene';
 import { outlineInsideContainer } from './containment-depth';
-import { validCutArcMoves, withCutArcMoves, withoutArcMoves } from './cut-arc-moves';
+import {
+  emittedCutArcMoves,
+  validCutArcMoves,
+  withCutArcMoves,
+  withoutArcMoves,
+} from './cut-arc-moves';
 import type { CutGroup, CutSegment, Job, JobDiagnostic } from './job';
 import type { CutGroupLaserLeads } from './laser-lead-settings';
 import type { JobBounds } from './job-bounds';
@@ -199,7 +204,10 @@ function leadPlan(
   const spec = group.laserLeads;
   const lineId = world.lineOf.get(key);
   const ringId = lineId === undefined ? undefined : world.ringOfLine.get(lineId);
-  const joins = contourJoins(segment.polyline);
+  const joins = contourJoins(
+    segment.polyline,
+    emittedCutArcMoves(segment, { arcMovesEnabled: true, entryRunwayMm: group.entryRunwayMm }),
+  );
   if (spec === undefined || lineId === undefined || ringId === undefined || joins === null)
     return null;
   const inside =

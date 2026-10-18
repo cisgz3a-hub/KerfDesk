@@ -18,7 +18,9 @@
 // carries already counts a container on the same path, which may also have a
 // copy on another operation.
 
+import { sampleArcMoves } from '../geometry/arc-fit';
 import type { Vec2 } from '../scene';
+import { emittedCutArcMoves } from './cut-arc-moves';
 import { containmentDepths } from './containment-depth';
 import type { CutSegment, Job } from './job';
 import { chainPieces } from './laser-lead-chain';
@@ -46,10 +48,6 @@ const COPY_LENGTH_RELATIVE = 1e-4;
 // Copies are looked up by their lower-left corner on a grid this fine.
 const COPY_CELL_MM = 0.1;
 
-// A ring chained from more pieces than this is left out of containment: one
-// contour cut as thousands of dashes is too costly to chain and rare.
-const MAX_CHAINED_PIECES = 2000;
-
 export function leadJobLines(job: Job): LeadJobLines {
   const lines: Array<ReadonlyArray<Vec2>> = [];
   const lineOf = new Map<string, number>();
@@ -60,7 +58,7 @@ export function leadJobLines(job: Job): LeadJobLines {
     if (group.kind !== 'cut') return;
     group.segments.forEach((segment, segmentIndex) => {
       const lineId = lines.length;
-      lines.push(segment.polyline);
+      lines.push(burnLine(segment, group.entryRunwayMm));
       lineOf.set(`${groupIndex}:${segmentIndex}`, lineId);
       if (segment.closed) {
         ringOfLine.set(lineId, rings.length);
@@ -76,7 +74,6 @@ export function leadJobLines(job: Job): LeadJobLines {
     });
   });
   for (const { nesting, ids } of pieces.values()) {
-    if (ids.length > MAX_CHAINED_PIECES) continue;
     const outline = chainPieces(ids.map((id) => lines[id] ?? []));
     if (outline.length >= 3) rings.push(ring(outline, ids, nesting));
   }
@@ -196,6 +193,19 @@ function copyLists(representatives: ReadonlyArray<number>): number[][] {
   return representatives.map((representative, index) =>
     (members.get(representative) ?? []).filter((other) => other !== index),
   );
+}
+
+// The line as it burns: on an arc machine a contour that goes out as G2/G3
+// bows past its chords, so its moves are sampled finely enough that a lead's
+// clearance from it is measured from the arc itself (ADR-432 decides by the
+// same predicate). Otherwise the chords are the burn.
+const OBSTACLE_ARC_SAGITTA_MM = 0.002;
+
+function burnLine(segment: CutSegment, entryRunwayMm: number | undefined): ReadonlyArray<Vec2> {
+  const moves = emittedCutArcMoves(segment, { arcMovesEnabled: true, entryRunwayMm });
+  const first = segment.polyline[0];
+  if (moves === null || first === undefined) return segment.polyline;
+  return sampleArcMoves(first, moves, OBSTACLE_ARC_SAGITTA_MM);
 }
 
 function ring(

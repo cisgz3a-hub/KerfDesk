@@ -45,13 +45,16 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    also the extra burn per lead. An arc is tangent to the cut where it joins, turns through the arc
    angle, and has radius length ÷ angle; it joins without a corner, so the head need not slow down
    where it meets the part. A line meets the cut at its angle. A lead-in ends on the start heading
-   along the cut; a lead-out leaves the end heading along it. Directions are read over 0.05 mm of path.
+   along the cut; a lead-out leaves the end heading along it. Directions are read over 0.05 mm of path,
+   or, for a contour that goes out as G2/G3, from its first and last moves, so an arc lead meets an arc
+   move tangentially.
 3. **The scrap side is found** (`core/job/laser-lead-rings.ts`). Automatic puts a lead outside an outer
    contour and inside a hole, by the containment parity inside-first ordering uses, counted over every
    closed contour of every Line cut group in the job. A hole cut by its own operation is therefore
    still a hole. A contour that tabs or perforation broke into pieces still counts: its pieces carry
    the contour's topology identity (ADR-486 Amd 2) and are chained back into the outline they cut
-   (`core/job/laser-lead-chain.ts`); where a gap skips a corner, the corner is put back where the
+   (`core/job/laser-lead-chain.ts`, with an endpoint grid so thousands of dashes chain in about
+   linear time and no outline is left out); where a gap skips a corner, the corner is put back where the
    edges on either side meet, so a hole in the corner is still inside. Copies of one outline (the
    same bounds and length within 0.01 mm, and each outline lying on the other within 0.01 mm, such
    as an outline cut by two operations) count once, or a hole inside a twice-cut outline would read as an outer contour.
@@ -69,7 +72,8 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    inside exactly the closed contours that hold its own contour, so it can never end inside another
    part or past the hole or sheet its contour sits in. The clearance is 0.2 mm or one kerf width
    (twice the kerf offset), whichever is wider, at most 1 mm; an arc that goes out as G2/G3 keeps
-   0.005 mm more, its sampling sag. On an active rotary only the bed's X limits apply: the rotary
+   0.005 mm more, its sampling sag, and a neighbour that goes out as G2/G3 is measured by its arcs
+   sampled to 0.002 mm, not by its chords. On an active rotary only the bed's X limits apply: the rotary
    rebases Y, so where the artwork sits on the flat canvas does not change its leads. Cut lines longer
    than 1 m are checked by every query rather than gridded, so one long line cannot fill the index.
    A lead that does not fit is tried at ¾, ½ and ¼ of its length, then left out.
@@ -143,7 +147,8 @@ arc lead whose sweep bulges past its samples at the bed edge, and the final-pass
 rotary Y mapping and the Ruida export's range check. `core/job/laser-leads-geometry-guards.test.ts`
 covers an arc's sag near another cut, a corner skipped by a tab gap, mirrored shapes with equal bounds
 and length, a 1 km cut line, the rotary bed and a one-pass overcut; `layer-default-settings-leads.test.ts`
-covers saved defaults and recipe steps without leads.
+covers saved defaults and recipe steps without leads. `core/job/laser-leads-arcs-and-pieces.test.ts` covers
+the arc tangent at a G2/G3 join, neighbours measured by their arcs and an outline cut as 3,000 dashes.
 End-to-end tests (`io/gcode/laser-leads-output.test.ts`) pin byte-identical G-code, prepared jobs and
 Ruida plans with leads off (set or absent) on GRBL, arc GRBL, Marlin and Smoothieware with 1 and 3
 passes and with and without overcut, and show leads on every pass, in Marlin, Smoothieware and Ruida

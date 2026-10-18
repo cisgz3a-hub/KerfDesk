@@ -11,6 +11,7 @@
 // barely changes: the new start is half an edge away.
 
 import { signedAreaMm2 } from '../geometry/polyline-orientation';
+import type { ArcMove } from '../geometry/arc-fit';
 import type { Vec2 } from '../scene';
 import {
   arcRotatableVertices,
@@ -39,17 +40,51 @@ const MAX_RESTARTS = 4;
 const MIN_RESTART_EDGE_MM = 1;
 const MAX_RESTART_EDGES_SCANNED = 64;
 
-/** Null for a contour too small or degenerate to give a lead a direction. */
-export function contourJoins(ring: ReadonlyArray<Vec2>): ContourJoins | null {
+/** Null for a contour too small or degenerate to give a lead a direction.
+ * `moves` are the line/arc moves the contour goes out as, when it does (ADR-432):
+ * then the directions are the moves' own, so an arc lead meets a G2/G3 move
+ * tangentially instead of at the angle its first chord makes. */
+export function contourJoins(
+  ring: ReadonlyArray<Vec2>,
+  moves: ReadonlyArray<ArcMove> | null = null,
+): ContourJoins | null {
   const start = ring[0];
   const end = ring[ring.length - 1];
   if (start === undefined || end === undefined || ring.length < 4) return null;
   const area = signedAreaMm2(ring);
   if (!(Math.abs(area) > MIN_AREA_MM2)) return null;
-  const startTangent = forwardTangent(ring);
-  const endTangent = backwardTangent(ring);
+  const startTangent =
+    (moves === null ? null : leavingMoveTangent(start, moves)) ?? forwardTangent(ring);
+  const endTangent =
+    (moves === null ? null : arrivingMoveTangent(start, moves)) ?? backwardTangent(ring);
   if (startTangent === null || endTangent === null) return null;
   return { start, end, startTangent, endTangent, counterClockwise: area > 0 };
+}
+
+// The direction of travel where the first move leaves `start`.
+function leavingMoveTangent(start: Vec2, moves: ReadonlyArray<ArcMove>): Vec2 | null {
+  const move = moves[0];
+  if (move === undefined) return null;
+  return move.kind === 'line' ? unitBetween(start, move.to) : arcTangent(move, start);
+}
+
+// The direction of travel where the last move arrives at its end.
+function arrivingMoveTangent(start: Vec2, moves: ReadonlyArray<ArcMove>): Vec2 | null {
+  const move = moves[moves.length - 1];
+  if (move === undefined) return null;
+  if (move.kind === 'arc') return arcTangent(move, move.to);
+  const from = moves.length > 1 ? (moves[moves.length - 2] as ArcMove).to : start;
+  return unitBetween(from, move.to);
+}
+
+// Along the circle at `point`: the radius turned a quarter turn the way the
+// arc runs.
+function arcTangent(move: Extract<ArcMove, { kind: 'arc' }>, point: Vec2): Vec2 | null {
+  const rx = point.x - move.center.x;
+  const ry = point.y - move.center.y;
+  const radius = Math.hypot(rx, ry);
+  if (!(radius > 0)) return null;
+  return move.clockwise ? { x: ry / radius, y: -rx / radius } : { x: -ry / radius, y: rx / radius };
 }
 
 /** The direction the path arrives at its last point in. */
