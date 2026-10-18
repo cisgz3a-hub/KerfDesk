@@ -10,7 +10,7 @@ const NO_UPDATES: CommercialUpdateStatus = {
   checkedAt: null,
 };
 import { EditionProvider, LICENCE_SETTINGS_EVENT } from './EditionProvider';
-import { proFeaturesUnlocked, requestProFeature, useEdition } from './edition';
+import { proFeaturesUnlocked, proPromptOpen, requestProFeature, useEdition } from './edition';
 import { editionLabel } from './EditionStatusButton';
 
 const free: LicenceStatus = {
@@ -141,7 +141,10 @@ it('lets the operator decline without opening the tool', async () => {
   await act(async () => button('Open V-carve').click());
   expect(document.body.textContent).toContain('Pro trial on this device has ended');
   expect(document.body.textContent).not.toContain('Start free 30-day trial');
+  // Background work reads this so it never commits over the waiting edit (ADR-609).
+  expect(proPromptOpen()).toBe(true);
   await act(async () => button('Not now').click());
+  expect(proPromptOpen()).toBe(false);
   expect(open).not.toHaveBeenCalled();
   expect(document.body.textContent).not.toContain('is a Pro tool');
 });

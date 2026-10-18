@@ -37,7 +37,8 @@ menus and typing were frozen, and an open dialog froze again on every edit and o
    task carries the result ids the action will use, so a result can be committed unchanged.
 2. **Dialogs preview in the background and Apply commits the settled result.** Offset Shapes
    and Combine Shapes keep the last settled preview on screen, marked "Updating preview…", until
-   the current request settles. Apply is enabled only for the current request's result and
+   the current request settles. If it settles with a problem, the older preview is cleared, so
+   the dialog never shows geometry its status no longer describes. Apply is enabled only for the current request's result and
    passes it to the action. The action commits it only when its inputs are still exactly the
    action's own: the same source objects by identity and in order, the same options, and
    result ids the scene would still give. That last test is `objectIdStillFree`: the numbered
@@ -57,7 +58,10 @@ menus and typing were frozen, and an open dialog froze again on every edit and o
    commands share one slot. A newer click of either, refused or not, terminates the running one
    and says so when it was the other command. So at most one background result is ever
    committing, and two commits cannot both ask for Pro admission, which holds a single pending
-   request.
+   request. If any Pro prompt is open when a result arrives (another tool's edit is waiting on
+   it), the result is not committed and a notice asks for the command to be run again; committing
+   would replace or invalidate that waiting edit. The edition provider exposes the open prompt as
+   a read-only `proPromptOpen`, which gates nothing.
 5. **Newer work cancels older work.** Clipper cannot be interrupted, and these runs last
    seconds to minutes. A newer request therefore terminates a busy worker and starts at once in
    a fresh one, instead of queuing behind work whose answer is no longer wanted. This differs
