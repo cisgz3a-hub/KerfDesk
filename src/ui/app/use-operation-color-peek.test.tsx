@@ -90,6 +90,15 @@ describe('useOperationColorPeek', () => {
     expect(peek()).toBe(false);
   });
 
+  it('peeks again after a press the system cancelled', () => {
+    window.dispatchEvent(new MouseEvent('pointerdown', { buttons: 1, bubbles: true }));
+    // A system gesture ends the press with pointercancel and no pointerup.
+    window.dispatchEvent(new MouseEvent('pointercancel', { buttons: 1, bubbles: true }));
+    key('keydown', { key: 'Alt', altKey: true });
+    vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS);
+    expect(peek()).toBe(true);
+  });
+
   it('never peeks when Alt joins a drag already under way', () => {
     // A plain press starts a snapping drag; Alt pressed later turns snapping off.
     window.dispatchEvent(new MouseEvent('pointerdown', { buttons: 1, bubbles: true }));
