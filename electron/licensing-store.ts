@@ -3,6 +3,7 @@ import { mkdir, open, readdir, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { record, type SignedEntitlement } from './licensing-verification.js';
 import { validLicencePayment, type LicencePayment } from './licensing-commerce.js';
+import { createSecureStorageCheck } from './secure-storage-check.js';
 
 export type LicenceCredential = {
   readonly entitlement: SignedEntitlement;
@@ -48,17 +49,9 @@ export class LicenceStoreUnreadableError extends Error {
 }
 
 /**
- * Linux keeps a licence only under a keyring's key, never the fallback key that
- * is the same on every computer. Electron's async safeStorage picks its key once
- * per process (Chromium os_crypt_async) and prefixes each ciphertext with that
- * provider's tag: v11 is a Secret Service or KWallet, v12 the desktop portal, v10
- * the fallback. Neither the selected backend name, which reflects only the
- * desktop or --password-store, nor async availability, which the fallback always
- * satisfies, says which key is in use, so a probe's tag decides. Without a
- * keyring, a trial or key cannot be saved until one runs and KerfDesk restarts.
+ * Linux keeps a licence only under a keyring's key (createSecureStorageCheck).
+ * Without one, a trial or key cannot be saved until one runs and KerfDesk restarts.
  */
-const LINUX_KEYRING_TAGS = new Set(['v11', 'v12']);
-const LINUX_KEYRING_PROBE = 'kerfdesk-keyring-probe';
 export class LinuxKeyringUnavailableError extends Error {
   constructor() {
     super('No Secret Service keyring is available to keep the licence.');
@@ -129,26 +122,13 @@ export function createLicensingStore(options: {
 }): LicensingStore {
   const file = join(options.userDataPath, FILE_NAME);
   const secure = options.secureStorage;
-  // The key is fixed for the process, so one answer holds until a restart; a
-  // probe that fails outright is asked again next time.
-  let keyring: Promise<boolean> | null = null;
-  const linuxKeyring = (): Promise<boolean> =>
-    (keyring ??= secure.encryptStringAsync(LINUX_KEYRING_PROBE).then(
-      (sealed) => LINUX_KEYRING_TAGS.has(sealed.subarray(0, 3).toString('latin1')),
-      () => {
-        keyring = null;
-        return false;
-      },
-    ));
+  const usable = createSecureStorageCheck(secure, options.platform);
   const check = async (): Promise<void> => {
-    const available = await secure.isAsyncEncryptionAvailable();
-    if (options.platform === 'linux' && !(available && (await linuxKeyring())))
-      throw new LinuxKeyringUnavailableError();
-    if (!available) {
-      throw new Error(
-        'Secure operating-system credential storage is unavailable. Unlock your keychain or password manager and try again.',
-      );
-    }
+    if (await usable()) return;
+    if (options.platform === 'linux') throw new LinuxKeyringUnavailableError();
+    throw new Error(
+      'Secure operating-system credential storage is unavailable. Unlock your keychain or password manager and try again.',
+    );
   };
   const write = async (value: LicenceRecord): Promise<void> => {
     await check();

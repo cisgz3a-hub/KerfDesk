@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, open, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createSecureStorageCheck } from '../secure-storage-check.js';
 
 export type RemoteIdentity = {
   readonly schemaVersion: 1;
@@ -12,7 +13,6 @@ export type RemoteIdentity = {
 };
 type SecureStorage = {
   isAsyncEncryptionAvailable(): Promise<boolean>;
-  getSelectedStorageBackend(): string;
   encryptStringAsync(value: string): Promise<Buffer>;
   decryptStringAsync(value: Buffer): Promise<{ result: string; shouldReEncrypt: boolean }>;
 };
@@ -52,15 +52,10 @@ export function createRemoteCredentialStore(options: {
 }) {
   const file = join(options.userDataPath, 'remote-control.v1');
   const secure = options.secureStorage;
+  // On Linux, only a keyring's key counts, never the shared fallback key.
+  const usable = createSecureStorageCheck(secure, options.platform);
   const check = async (): Promise<void> => {
-    if (
-      !(await secure.isAsyncEncryptionAvailable()) ||
-      (options.platform === 'linux' &&
-        !['gnome_libsecret', 'kwallet', 'kwallet5', 'kwallet6'].includes(
-          secure.getSelectedStorageBackend(),
-        ))
-    )
-      throw new Error('Secure remote credential storage is unavailable.');
+    if (!(await usable())) throw new Error('Secure remote credential storage is unavailable.');
   };
   const write = async (value: RemoteIdentity): Promise<void> => {
     if (!validRemoteIdentity(value)) throw new Error('Invalid remote settings.');

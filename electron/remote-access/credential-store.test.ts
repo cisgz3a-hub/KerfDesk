@@ -21,27 +21,27 @@ afterEach(async () => {
 });
 
 // Ephemeral authenticated encryption exercises the file contract, not Windows DPAPI qualification.
-function storage() {
+// `tag` is the key provider's ciphertext prefix: v11 a Secret Service, v10 the fallback key.
+function storage(tag: string) {
   const key = randomBytes(32);
   return {
     isAsyncEncryptionAvailable: vi.fn(async () => true),
-    getSelectedStorageBackend: () => 'gnome_libsecret',
     encryptStringAsync: vi.fn(async (value: string) => {
       const nonce = randomBytes(12);
       const cipher = createCipheriv('aes-256-gcm', key, nonce);
       const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
-      return Buffer.concat([nonce, cipher.getAuthTag(), ciphertext]);
+      return Buffer.concat([Buffer.from(tag), nonce, cipher.getAuthTag(), ciphertext]);
     }),
     decryptStringAsync: vi.fn(async (value: Buffer) => {
-      const decipher = createDecipheriv('aes-256-gcm', key, value.subarray(0, 12));
-      decipher.setAuthTag(value.subarray(12, 28));
-      const plaintext = Buffer.concat([decipher.update(value.subarray(28)), decipher.final()]);
+      const decipher = createDecipheriv('aes-256-gcm', key, value.subarray(3, 15));
+      decipher.setAuthTag(value.subarray(15, 31));
+      const plaintext = Buffer.concat([decipher.update(value.subarray(31)), decipher.final()]);
       return { result: plaintext.toString('utf8'), shouldReEncrypt: false };
     }),
   };
 }
-function fixture(platform = 'win32') {
-  const secureStorage = storage();
+function fixture(platform = 'win32', tag = 'v11') {
+  const secureStorage = storage(tag);
   const store = createRemoteCredentialStore({ userDataPath: directory, platform, secureStorage });
   return { store, secureStorage, file: join(directory, 'remote-control.v1') };
 }
@@ -78,17 +78,41 @@ describe('separate encrypted remote credentials', () => {
     expect(await readdir(directory)).toEqual(['remote-control.v1']);
   });
 
-  it.each(['basic_text', 'unknown'])(
-    'refuses Linux %s and never writes plaintext',
-    async (backend) => {
-      const { store, secureStorage } = fixture('linux');
-      secureStorage.getSelectedStorageBackend = () => backend;
-      await expect(store.write(store.create())).rejects.toThrow('Secure remote');
-      await expect(store.read()).rejects.toThrow('Secure remote');
-      expect(secureStorage.encryptStringAsync).not.toHaveBeenCalled();
-      expect(await readdir(directory)).toEqual([]);
+  it('refuses the Linux fallback key, whatever backend Electron names, and never writes', async () => {
+    // A GNOME desktop with no keyring running still encrypts, under the shared v10 key.
+    const { store, secureStorage } = fixture('linux', 'v10');
+    const identity = store.create();
+    await expect(store.write(identity)).rejects.toThrow('Secure remote');
+    await expect(store.read()).rejects.toThrow('Secure remote');
+    // Only the one probe was encrypted, never the identity.
+    expect(secureStorage.encryptStringAsync).toHaveBeenCalledOnce();
+    expect(secureStorage.encryptStringAsync).not.toHaveBeenCalledWith(
+      expect.stringContaining(identity.ownerSecret),
+    );
+    expect(await readdir(directory)).toEqual([]);
+  });
+
+  it.each(['v11', 'v12'])(
+    'keeps Linux credentials under a %s keyring key on any desktop, probing once',
+    async (tag) => {
+      // A tiling window manager reports basic_text yet reaches a running Secret Service.
+      const { store, secureStorage, file } = fixture('linux', tag);
+      const identity = store.create();
+      expect(await store.read()).toBeNull();
+      await store.write(identity);
+      expect(await store.read()).toEqual(identity);
+      expect((await readFile(file)).subarray(0, 3).toString()).toBe(tag);
+      // The probe and the identity: the provider cannot change within a process.
+      expect(secureStorage.encryptStringAsync).toHaveBeenCalledTimes(2);
     },
   );
+
+  it('asks the Linux keyring again after a probe that failed outright', async () => {
+    const { store, secureStorage } = fixture('linux');
+    secureStorage.encryptStringAsync.mockRejectedValueOnce(new Error('bus closed'));
+    await expect(store.read()).rejects.toThrow('Secure remote');
+    expect(await store.read()).toBeNull();
+  });
 
   it('fails closed for unavailable storage, oversized files and modified ciphertext', async () => {
     const { store, secureStorage, file } = fixture();

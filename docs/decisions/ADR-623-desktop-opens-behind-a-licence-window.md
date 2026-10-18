@@ -79,7 +79,8 @@ link, and LightBurn has no free tier.
   each unlicensed Mac and Linux package. Linux keeps a licence only under a
   Secret Service or KWallet key, never Electron's fallback key, and the store
   checks which key Electron actually encrypts with, not the desktop's backend
-  name. So that smoke launches each Linux package with an unlocked GNOME Keyring
+  name (`secure-storage-check.ts`; the OpenAI key and remote-access stores use
+  the same check). So that smoke launches each Linux package with an unlocked GNOME Keyring
   on its own D-Bus session and no desktop name, and it must reach
   `activation-required`. A Linux computer without a keyring sees its own message
   naming GNOME Keyring and KWallet (`MESSAGES.linuxKeyring`), not the outage
