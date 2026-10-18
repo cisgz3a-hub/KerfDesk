@@ -80,7 +80,7 @@ export function isCanonicalPath(candidate: string, pathApi: PathApi = path): boo
 }
 
 // A Linux desktop entry's %U hands a double-clicked file over as a file:// URL
-// (ADR-606). Only a local one becomes a path: no host but localhost, and no
+// (ADR-607). Only a local one becomes a path: no host but localhost, and no
 // encoded slash or NUL that would change which file the path names.
 function localFileArgument(arg: string, pathApi: PathApi): string {
   if (pathApi.sep !== '/' || !/^file:\/\//i.test(arg)) return arg;

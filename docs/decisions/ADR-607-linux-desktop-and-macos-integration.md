@@ -1,4 +1,4 @@
-## ADR-606 - Linux desktop packages and macOS and Linux integration
+## ADR-607 - Linux desktop packages and macOS and Linux integration
 
 **Status:** Accepted by the maintainer's request on 2026-10-18 ("I need full apple and Linux
 integration"). Amends ADR-248 decision 1 and 3 (Linux out of scope, no Linux artifact), ADR-552

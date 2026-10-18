@@ -11,6 +11,7 @@ import { localPathArtwork } from '../../core/geometry/local-path-artwork';
 import { isUnlockedVectorArtwork } from '../../core/geometry/trim-contours';
 import { remapTrimmedAnchors, trimEdit, type TrimEdit } from '../../core/geometry/trim-shape-edit';
 import { findTrimTarget } from '../../core/geometry/trim-shapes';
+import { pathBoundOperationIds } from '../../core/geometry/vector-path-join';
 import { boundsForPaths, type VectorSceneObject } from '../../core/geometry/vector-path-tools';
 import {
   removeObject,
@@ -97,8 +98,11 @@ function trimmedScenePatch(
   const trimmed = trimmedObject(object, edit);
   if (trimmed.converted !== null) notify(conversionMessage(trimmed.converted));
   const replaced = replaceObject(scene, object.id, trimmed.object).objects;
-  const kept = keptStretch(state, trimmed.object, edit, options);
-  const joined = options.autoJoin === true ? autoJoinTrimmed(replaced, trimmed.object, edit) : null;
+  const kept = keptStretch(state, object, edit, options);
+  const joined =
+    options.autoJoin === true
+      ? autoJoinTrimmed(replaced, trimmed.object, edit, scene.layers)
+      : null;
   const objects = [...(joined?.objects ?? replaced), ...(kept === null ? [] : [kept])];
   const nextScene =
     joined === null ? { ...scene, objects } : repairedScene({ ...scene, objects }, replaced);
@@ -133,20 +137,31 @@ function trimmedObject(object: VectorSceneObject, edit: TrimEdit): Trimmed {
 
 function keptStretch(
   state: AppState,
-  trimmed: SceneObject,
+  // The object before the trim, so the trimmed path is still at `edit.pathIndex`.
+  trimmed: VectorSceneObject,
   edit: TrimEdit,
   options: TrimOptions,
 ): SceneObject | null {
   if (options.keepRemoved === undefined) return null;
   const copy = preservedStretch(state.project, trimmed, edit, options.keepRemoved.color);
   if (copy === null) return null;
+  const placed =
+    copy.operationIds === undefined && trimmed.operationIds !== undefined
+      ? { ...copy, operationIds: trimmed.operationIds }
+      : copy;
+  // Compare what each actually cuts by: a path binding wins over the artwork's.
+  const operations = state.project.scene.layers;
+  const source = trimmed.paths[edit.pathIndex];
+  const copyPath = placed.paths[0];
+  const trimmedIds = new Set(
+    source === undefined ? [] : pathBoundOperationIds(trimmed, source, operations),
+  );
   const sameLayer =
-    JSON.stringify(copy.operationIds ?? null) === JSON.stringify(trimmed.operationIds ?? null);
+    copyPath !== undefined &&
+    pathBoundOperationIds(placed, copyPath, operations).some((id) => trimmedIds.has(id));
   if (sameLayer)
     notify('The kept segment is on the same layer as the trimmed shape, so it will be cut too.');
-  return copy.operationIds === undefined && trimmed.operationIds !== undefined
-    ? { ...copy, operationIds: trimmed.operationIds }
-    : copy;
+  return placed;
 }
 
 // Objects a join emptied are gone: drop them from groups and repair what depended on them.
