@@ -152,6 +152,7 @@ function SystemFontList(props: {
         type="search"
         className="lf-input"
         aria-label="Search installed fonts"
+        title="Type part of a font family or style name, like arial bold."
         placeholder="Search installed fonts"
         value={props.search}
         onChange={(event) => props.onSearch(event.target.value)}
