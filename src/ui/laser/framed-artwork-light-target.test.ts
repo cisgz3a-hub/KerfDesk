@@ -122,6 +122,63 @@ describe('placed artwork centre after Frame', () => {
     expect(move).toHaveBeenCalledExactlyOnceWith(x, y, 1200, expect.any(Function), 'work');
   });
 
+  it.each(
+    (['absolute', 'current-position'] as const).flatMap((mode) =>
+      (['machine', 'work'] as const).flatMap((report) =>
+        (
+          [
+            ['front-left', 33, 36],
+            ['front-right', 47, 36],
+            ['rear-left', 33, 44],
+            ['rear-right', 47, 44],
+            ['center', 33, 36],
+          ] as const
+        ).map(([origin, x, y]) => ({ mode, report, origin, x, y })),
+      ),
+    ),
+  )(
+    'retains captured assumed-zero $mode with $report reports at $origin',
+    async ({ mode, report, origin, x, y }) => {
+      useStore.setState((app) => ({
+        project: { ...app.project, device: { ...app.project.device, origin } },
+        jobPlacement: { startFrom: mode, anchor: 'front-left' },
+      }));
+      const candidate = useLaserStore.getState().framedRun!.candidate;
+      useLaserStore.setState((laser) => ({
+        wcoCache: null,
+        workOriginActive: false,
+        workOriginSource: 'none',
+        statusReport: {
+          ...laser.statusReport!,
+          mPos: report === 'machine' ? { x: 75, y: 45, z: 0 } : null,
+          wPos: report === 'work' ? { x: 75, y: 45, z: 0 } : null,
+        },
+      }));
+      const frame = createFramedRunPermit(
+        {
+          ...candidate,
+          preparedStart: {
+            ...candidate.preparedStart,
+            prepared: { ...candidate.preparedStart.prepared, project: useStore.getState().project },
+            ...(mode === 'current-position'
+              ? {
+                  jobOrigin: {
+                    startFrom: mode,
+                    anchor: 'front-left',
+                    currentPosition: { x: 75, y: 45 },
+                  },
+                }
+              : {}),
+          },
+        },
+        useLaserStore.getState(),
+      );
+      useLaserStore.setState({ framedRun: frame, completedFrame: frame });
+      await centreLightOnFramedArtwork();
+      expect(move).toHaveBeenCalledExactlyOnceWith(x, y, 1200, expect.any(Function), report);
+      expect(useLaserStore.getState().wcoCache).toBeNull();
+    },
+  );
   it('keeps explicit automatic-centre opt-out', () => {
     useStore.setState((app) => ({
       project: {

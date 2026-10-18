@@ -8,6 +8,7 @@ import { computeFrameBounds, type JobBounds } from '../../core/job';
 import { rotaryAppliesTo } from '../../core/job/rotary-job';
 import { machineKindOf, type Vec2 } from '../../core/scene';
 import { useStore } from '../state';
+import { placementAssumesZeroWorkOffset } from '../job-placement';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { framedRunStartHandoffIssue, type FramedRunPermit } from '../state/framed-run';
 import { selectedObjectIds } from '../state/scene-group-actions';
@@ -190,8 +191,14 @@ async function centreLightOnFramedPoint(
     await centreLightOnBedPoint(framedWorkPointToBed(point, laser), assertTargetCurrent);
     return;
   }
-  if (frame.candidate.preparedStart.jobOrigin?.startFrom !== 'verified-origin')
+  const startFrom = frame.candidate.preparedStart.jobOrigin?.startFrom ?? 'absolute';
+  const assumedZero = placementAssumesZeroWorkOffset(startFrom, frame.controller);
+  if (startFrom !== 'verified-origin' && !assumedZero)
     throw new Error('Wait for the controller work offset.');
+  // Reuse only the assumption already captured by a completed Frame. Work-only
+  // reports retain the real trace even when its unknown native offset is nonzero.
+  const coordinateFrame = assumedZero && laser.statusReport?.wPos == null ? 'machine' : 'work';
+  if (assumedZero) useToastStore.getState().pushToast(HEAD_MOVE_UNVERIFIED_BED, 'warning');
   const device = frame.candidate.preparedStart.prepared.project.device;
   const light = device.positioningLight;
   if (light === undefined) throw new Error('Set up the separate positioning light first.');
@@ -208,7 +215,7 @@ async function centreLightOnFramedPoint(
     point.y - pointer.y + zero.y,
     feed,
     assertTargetCurrent,
-    'work',
+    coordinateFrame,
   );
 }
 
