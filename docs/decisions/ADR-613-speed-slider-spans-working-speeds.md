@@ -13,4 +13,4 @@
 
 **Consequences.** A machine with a published working maximum adds one entry to the profile table with its source. The range is a convenience for dragging, so a value outside it is never refused or rewritten.
 
-**Verification.** Unit tests cover the per-machine and per-type maximums, the Output max feed cap, degenerate ceilings, the stop series and its spacing, an odd controller-reported ceiling, and nearest-stop lookup. Component tests cover dragging to a stop and committing it, a typed speed above the range pinning the thumb, and the decade and mm/s labels.
+**Verification.** Unit tests cover the per-machine and per-type maximums, the Output max feed cap, degenerate ceilings, the stop series and its spacing, an odd controller-reported ceiling, and nearest-stop lookup. Component tests cover dragging to a stop and committing it, a typed speed above the range pinning the thumb, and the decade and mm/s labels. A local Playwright run in Chrome rendered the range, labels and reading without overflow on 240-400 px rails, and the existing artwork field-rows e2e suite passes.
