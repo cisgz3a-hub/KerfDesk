@@ -73,13 +73,16 @@ export function leadJobLines(job: Job): LeadJobLines {
       else entry.ids.push(lineId);
     });
   });
-  for (const { nesting, ids } of pieces.values()) {
-    const outline = chainPieces(ids.map((id) => lines[id] ?? []));
+  const whole = topologyOutlines(job);
+  for (const [key, { nesting, ids }] of pieces) {
+    // Compile kept the whole outline (ADR-626); a job from before that is
+    // rebuilt from its pieces.
+    const outline = whole.get(key) ?? chainPieces(ids.map((id) => lines[id] ?? []));
     if (outline.length < 3) continue;
-    // The whole outline, its uncut gaps bridged, is a line a lead keeps clear
+    // The whole outline, its uncut gaps included, is a line a lead keeps clear
     // of too: a lead slipping through two tab gaps would burn across the part.
     const bridged = lines.length;
-    lines.push([...outline, outline[0] as Vec2]);
+    lines.push(closedOutline(outline));
     rings.push(ring(outline, [...ids, bridged], nesting));
   }
   const representatives = copyRepresentatives(rings);
@@ -211,6 +214,23 @@ function burnLine(segment: CutSegment, entryRunwayMm: number | undefined): Reado
   const first = segment.polyline[0];
   if (moves === null || first === undefined) return segment.polyline;
   return sampleArcMoves(first, moves, OBSTACLE_ARC_SAGITTA_MM);
+}
+
+function topologyOutlines(job: Job): ReadonlyMap<string, ReadonlyArray<Vec2>> {
+  const outlines = new Map<string, ReadonlyArray<Vec2>>();
+  for (const group of job.groups) {
+    if (group.kind !== 'cut') continue;
+    for (const topology of group.topologyRings ?? []) {
+      outlines.set(`${topology.forest}\u0000${topology.contour}`, topology.polyline);
+    }
+  }
+  return outlines;
+}
+
+function closedOutline(outline: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
+  const first = outline[0] as Vec2;
+  const last = outline[outline.length - 1] as Vec2;
+  return first.x === last.x && first.y === last.y ? outline : [...outline, first];
 }
 
 function ring(

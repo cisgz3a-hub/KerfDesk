@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { pointInPolygon } from '../geometry';
 import type { Vec2 } from '../scene';
 import { applyLaserLeads, laserLeadBed } from './apply-laser-leads';
+import { withCutArcMoves } from './cut-arc-moves';
 import type { CutGroup, CutSegment, Job } from './job';
 import { leadPath } from './laser-lead-path';
 import type { CutGroupLaserLeads } from './laser-lead-settings';
@@ -52,6 +53,14 @@ function group(segments: ReadonlyArray<CutSegment>, extra: Partial<CutGroup> = {
   };
 }
 
+/** The contour as line moves: it goes out as G1/G2/G3 moves on an arc machine. */
+function asMoves(segment: CutSegment): CutSegment {
+  return withCutArcMoves(
+    segment,
+    segment.polyline.slice(1).map((to) => ({ kind: 'line' as const, to })),
+  );
+}
+
 function first(job: Job): CutSegment {
   const cut = job.groups[0];
   const segment = cut?.kind === 'cut' ? cut.segments[0] : undefined;
@@ -88,7 +97,7 @@ describe('laser lead geometry guards (ADR-626)', () => {
     };
     const leads = { ...LEADS, angleDeg: 180, leadOut: false };
     const done = applyLaserLeads(
-      { groups: [group([square(0, 0, 10), cut], { laserLeads: leads })] },
+      { groups: [group([asMoves(square(0, 0, 10)), cut], { laserLeads: leads })] },
       NO_BED,
     );
     // The samples alone would pass at 0.202 mm; the arc as written would not.

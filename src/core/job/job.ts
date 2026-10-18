@@ -128,12 +128,29 @@ export type CutGroup = {
   // leads once the planner has chosen where each closed contour starts
   // (apply-laser-leads.ts). Absent everywhere else, so output is unchanged.
   readonly laserLeads?: CutGroupLaserLeads;
+  // ADR-626: the whole outline of each of this group's contours that tabs or
+  // perforation cut into pieces, for laser leads to read. Preparation drops it
+  // once leads are placed, so a prepared job never carries it.
+  readonly topologyRings?: ReadonlyArray<CutTopologyRing>;
   readonly segments: ReadonlyArray<CutSegment>;
+};
+
+/** A contour cut in pieces, whole (ADR-626): `forest` and `contour` match the
+ * pieces' nesting. */
+export type CutTopologyRing = {
+  readonly forest: string;
+  readonly contour: string;
+  readonly polyline: ReadonlyArray<Vec2>;
 };
 
 export type FillGroup = Omit<
   CutGroup,
-  'kind' | 'segments' | 'finalPassOvercutMm' | 'tabSpanPowerPercent' | 'laserLeads'
+  | 'kind'
+  | 'segments'
+  | 'finalPassOvercutMm'
+  | 'tabSpanPowerPercent'
+  | 'laserLeads'
+  | 'topologyRings'
 > & {
   readonly kind: 'fill';
   readonly fillStyle?: LayerFillStyle;

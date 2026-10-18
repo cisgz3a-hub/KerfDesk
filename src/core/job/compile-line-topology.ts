@@ -2,7 +2,7 @@
 import type { DeviceProfile } from '../devices';
 import type { Polyline } from '../scene';
 import { collectLineSourcesForLayer, type LineSegmentCollection } from './collect-line-segments';
-import type { CutSegment } from './job';
+import type { CutSegment, CutTopologyRing } from './job';
 import {
   layerKerfDiagnostics,
   withLayerKerf,
@@ -62,14 +62,40 @@ export function lineTopologyCollections(
       };
     });
     const tabbed = applyLineTabs(segments, line.placedTabs, bucket.layer);
+    const output = perforateLineSegments(tabbed.segments, bucket.layer);
+    const topologyRings = brokenContourRings(segments, output, scope);
     result.set(bucket, {
-      segments: perforateLineSegments(tabbed.segments, bucket.layer),
+      segments: output,
       tabSpans: tabbed.tabSpans,
       kerfDiagnostics: layerKerfDiagnostics(line, bucket.layer),
       ...(tabbed.tabbedContours === undefined ? {} : { tabbedContours: tabbed.tabbedContours }),
+      ...(topologyRings.length === 0 ? {} : { topologyRings }),
     });
   }
   return result;
+}
+
+// ADR-626: the whole outline of each contour tabs or perforation cut into
+// pieces, so laser leads can tell which side of it is scrap and keep out of
+// its uncut gaps without guessing it back from the pieces.
+function brokenContourRings(
+  before: ReadonlyArray<CutSegment>,
+  after: ReadonlyArray<CutSegment>,
+  forest: string,
+): CutTopologyRing[] {
+  const whole = new Set(
+    after.flatMap((segment) =>
+      segment.closed && segment.nesting?.topologyContour !== undefined
+        ? [segment.nesting.topologyContour]
+        : [],
+    ),
+  );
+  return before.flatMap((segment) => {
+    const contour = segment.nesting?.topologyContour;
+    return segment.closed && contour !== undefined && !whole.has(contour)
+      ? [{ forest, contour, polyline: segment.polyline }]
+      : [];
+  });
 }
 
 function asContour(source: KerfSource): CutSegment {

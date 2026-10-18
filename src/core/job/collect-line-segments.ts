@@ -13,7 +13,7 @@ import {
 import { segmentNesting } from './cut-segment-nesting';
 import { compilationPolylines } from './compilation-polylines';
 import { laserArcFitFor } from './cut-arc-moves';
-import type { CutSegment, JobDiagnostic } from './job';
+import type { CutSegment, CutTopologyRing, JobDiagnostic } from './job';
 import { placedTabPointsForContour } from './laser-tab-anchors';
 import {
   kerfArcSourceRings,
@@ -31,6 +31,8 @@ export type LineSegmentCollection = {
   readonly kerfDiagnostics: ReadonlyArray<JobDiagnostic>;
   /** Closed contours split at tabs (ADR-494); laser leads skip them. */
   readonly tabbedContours?: number;
+  /** Whole outlines of the contours tabs or perforation split (ADR-626). */
+  readonly topologyRings?: ReadonlyArray<CutTopologyRing>;
 };
 
 // Line segments as collected, with the machine-space centres of any tabs

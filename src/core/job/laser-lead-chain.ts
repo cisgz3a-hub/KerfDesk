@@ -26,6 +26,8 @@ const MAX_CORNER_REACH = 2;
 const LINEAR_PIECES = 64;
 
 type NextPiece = { readonly index: number; readonly reversed: boolean };
+// Rings of cells searched before a query falls back to scanning every piece.
+const MAX_GRID_RINGS = 16;
 
 export function chainPieces(pieces: ReadonlyArray<ReadonlyArray<Vec2>>): ReadonlyArray<Vec2> {
   const used = new Array<boolean>(pieces.length).fill(false);
@@ -99,9 +101,15 @@ class EndpointGrid {
   ) {}
 
   static create(pieces: ReadonlyArray<ReadonlyArray<Vec2>>): EndpointGrid {
+    // About one piece-and-gap per cell: the outline's extent shared out over
+    // its pieces, so short dashes with long skips do not make cells tiny.
     let length = 0;
     for (const piece of pieces) length += polylineLength(piece);
-    const cellMm = Math.max(1e-3, length / pieces.length);
+    const cellMm = Math.max(
+      1e-3,
+      length / pieces.length,
+      endpointPerimeter(pieces) / pieces.length,
+    );
     const cells = new Map<string, number[]>();
     let minCell = Number.POSITIVE_INFINITY;
     let maxCell = Number.NEGATIVE_INFINITY;
@@ -129,12 +137,14 @@ class EndpointGrid {
     const best = new BestPiece(pieces, tail);
     const cx = Math.floor(tail.x / this.cellMm);
     const cy = Math.floor(tail.y / this.cellMm);
-    for (let ring = 0; ring <= this.span; ring += 1) {
+    const rings = Math.min(this.span, MAX_GRID_RINGS);
+    for (let ring = 0; ring <= rings; ring += 1) {
       this.searchRing(cx, cy, ring, used, best);
       const reach = ring * this.cellMm;
-      if (best.piece !== null && best.distanceSq < reach * reach) break;
+      if (best.piece !== null && best.distanceSq < reach * reach) return best.piece;
     }
-    return best.piece;
+    // Nothing near enough to be sure of: the full scan settles it.
+    return rings === this.span ? best.piece : nearestPiece(pieces, used, tail);
   }
 
   private searchRing(
@@ -154,6 +164,25 @@ class EndpointGrid {
       }
     }
   }
+}
+
+// Twice the width plus height of the box round the piece ends: about the
+// length of an outline those ends lie along.
+function endpointPerimeter(pieces: ReadonlyArray<ReadonlyArray<Vec2>>): number {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const piece of pieces) {
+    for (const end of [piece[0], piece[piece.length - 1]]) {
+      if (end === undefined || !Number.isFinite(end.x) || !Number.isFinite(end.y)) continue;
+      minX = Math.min(minX, end.x);
+      minY = Math.min(minY, end.y);
+      maxX = Math.max(maxX, end.x);
+      maxY = Math.max(maxY, end.y);
+    }
+  }
+  return Number.isFinite(minX) ? 2 * (maxX - minX + (maxY - minY)) : 0;
 }
 
 function polylineLength(points: ReadonlyArray<Vec2>): number {

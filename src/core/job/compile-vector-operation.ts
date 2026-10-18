@@ -206,6 +206,7 @@ function lineGroups(
             ...runway,
             ...lineOvercutFields(layer, line.segments),
             ...lineLeadFields(layer, line.segments),
+            ...(line.topologyRings === undefined ? {} : { topologyRings: line.topologyRings }),
             segments: line.segments,
           },
         ];

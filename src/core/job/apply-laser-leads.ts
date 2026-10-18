@@ -74,7 +74,7 @@ export function laserLeadBed(bed: JobBounds | null, rotary: boolean): JobBounds 
 
 export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   if (!job.groups.some((group) => group.kind === 'cut' && group.laserLeads !== undefined))
-    return job;
+    return withoutTopologyRings(job);
   const lines = leadJobLines(job);
   const world: LeadWorld = {
     ...lines,
@@ -82,7 +82,7 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
     bed: options.bed,
   };
   const counts = new Map<string, LeadCounts>();
-  const groups = job.groups.map((group, groupIndex) => {
+  const groups = withoutTopologyRings(job).groups.map((group, groupIndex) => {
     if (group.kind !== 'cut' || group.laserLeads === undefined) return group;
     const tally = countsFor(counts, group.layerId, group.laserLeads.operationName);
     return {
@@ -101,6 +101,22 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
     ...(diagnostics.length === 0
       ? {}
       : { diagnostics: [...(job.diagnostics ?? []), ...diagnostics] }),
+  };
+}
+
+// The broken-contour outlines compile kept for leads (CutGroup.topologyRings)
+// are spent once leads are placed: dropped, so no later transform of the job
+// can leave them stale. A job without them is the same object.
+function withoutTopologyRings(job: Job): Job {
+  if (!job.groups.some((group) => group.kind === 'cut' && group.topologyRings !== undefined))
+    return job;
+  return {
+    ...job,
+    groups: job.groups.map((group) => {
+      if (group.kind !== 'cut' || group.topologyRings === undefined) return group;
+      const { topologyRings: _spent, ...rest } = group;
+      return rest;
+    }),
   };
 }
 
@@ -204,10 +220,11 @@ function leadPlan(
   const spec = group.laserLeads;
   const lineId = world.lineOf.get(key);
   const ringId = lineId === undefined ? undefined : world.ringOfLine.get(lineId);
-  const joins = contourJoins(
-    segment.polyline,
-    emittedCutArcMoves(segment, { arcMovesEnabled: true, entryRunwayMm: group.entryRunwayMm }),
-  );
+  const moves = emittedCutArcMoves(segment, {
+    arcMovesEnabled: true,
+    entryRunwayMm: group.entryRunwayMm,
+  });
+  const joins = contourJoins(segment.polyline, moves);
   if (spec === undefined || lineId === undefined || ringId === undefined || joins === null)
     return null;
   const inside =
@@ -220,7 +237,10 @@ function leadPlan(
   return {
     spec,
     shape: { style: spec.style, lengthMm: spec.lengthMm, angleDeg: spec.angleDeg },
-    context: fitContext(segment.polyline, lineId, ringId, inside, spec.clearanceMm, world),
+    context: {
+      ...fitContext(segment.polyline, lineId, ringId, inside, spec.clearanceMm, world),
+      arcsEmitted: moves !== null,
+    },
     startJoin: join(joins.start, joins.startTangent),
     endJoin: join(joins.end, joins.endTangent),
     join,
@@ -259,7 +279,10 @@ function finalPassLeadOut(
   if (points === segment.polyline) return null;
   if (leadOut === null) return { points, fit: null };
   const end = points[points.length - 1] as Vec2;
-  const tangent = backwardTangent(points);
+  // Read from the overcut run alone (it starts at the closing point), so a
+  // run shorter than the tangent window keeps its own heading rather than
+  // taking the closing edge's.
+  const tangent = backwardTangent(points.slice(segment.polyline.length - 1));
   return {
     points,
     fit:
@@ -312,7 +335,7 @@ function fitContext(
   inside: boolean,
   clearanceMm: number,
   world: LeadWorld,
-): LeadFitContext {
+): Omit<LeadFitContext, 'arcsEmitted'> {
   const own = world.rings[ringId];
   // The same outline cut again, by another operation or another group: its
   // lines run along the contour, so a lead cannot keep clear of them, and

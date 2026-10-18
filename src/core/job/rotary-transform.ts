@@ -84,8 +84,12 @@ function jobYRange(job: Job): { readonly min: number; readonly max: number } | n
     }
     if (group.kind !== 'cut' && group.kind !== 'fill') continue;
     for (const segment of group.segments) {
+      for (const p of segment.polyline) {
+        min = Math.min(min, p.y);
+        max = Math.max(max, p.y);
+      }
       // ADR-626: a final pass with an overcut leaves by its own lead-out.
-      for (const p of [...segment.polyline, ...(segment.finalPassBurn?.polyline ?? [])]) {
+      for (const p of segment.finalPassBurn?.polyline ?? []) {
         min = Math.min(min, p.y);
         max = Math.max(max, p.y);
       }

@@ -40,6 +40,9 @@ export type LeadFitContext = {
   readonly inside: boolean;
   readonly clearanceMm: number;
   readonly bed: JobBounds | null;
+  /** True when the contour, and so its arc leads, go out as G2/G3 moves; else
+   * every lead goes out as the chords it is checked by. */
+  readonly arcsEmitted: boolean;
   /** Whether ring `index` holds the lead's own contour. */
   readonly ringHoldsContour: (index: number) => boolean;
 };
@@ -78,22 +81,24 @@ export function leadFits(
   context: LeadFitContext,
 ): boolean {
   const { at } = join;
-  if (!onBed(path, context.bed)) return false;
+  if (!onBed(path, context.bed, context.arcsEmitted)) return false;
   const outward = kind === 'in' ? [...path.points].reverse() : path.points;
   // An arc written as G2/G3 bulges up to the sampling sag past the chords
   // checked here, so it keeps that much more clearance from other cut lines.
-  const reserveMm = path.moves.some((move) => move.kind === 'arc') ? ARC_SAMPLE_SAGITTA_MM : 0;
+  const reserveMm =
+    context.arcsEmitted && path.moves.some((move) => move.kind === 'arc')
+      ? ARC_SAMPLE_SAGITTA_MM
+      : 0;
   // The free end keeps the clearance from its own contour, or, for a lead too
   // short to reach that far, nearly as far as its own shape takes it.
   const reachMm = (path.freeEnd.x - at.x) * join.scrap.x + (path.freeEnd.y - at.y) * join.scrap.y;
   const freeEndNeedMm = Math.min(context.clearanceMm, FREE_END_REACH_SHARE * reachMm);
-  if (!clearOfCutLines(walkSamples(outward), at, context, reserveMm, freeEndNeedMm)) return false;
+  if (!clearOfCutLines(walkSamples(outward), context, reserveMm, freeEndNeedMm)) return false;
   return freeEndInScrap(path.freeEnd, at, context);
 }
 
 function clearOfCutLines(
   samples: ReadonlyArray<Vec2>,
-  at: Vec2,
   context: LeadFitContext,
   reserveMm: number,
   freeEndNeedMm: number,
@@ -107,8 +112,9 @@ function clearOfCutLines(
     if (ownMm < Math.min(reached, clearanceMm) - TOLERANCE_MM) return false;
     reached = Math.max(reached, ownMm);
     freeEndMm = ownMm;
-    const fromJoin = Math.hypot(sample.x - at.x, sample.y - at.y);
-    if (fromJoin >= clearanceMm && otherMm < keepOutMm) return false;
+    // From the very first step: a lead shorter than the clearance, or one that
+    // starts beside another cut, must not cross it on its way out.
+    if (otherMm < keepOutMm) return false;
   }
   // The last sample is the free end, where the start or stop mark lands.
   return freeEndMm >= freeEndNeedMm;
@@ -145,7 +151,7 @@ function walkSamples(points: ReadonlyArray<Vec2>): Vec2[] {
 // The lead's extent as written: its points, and on a machine that takes arcs
 // the full sweep of each G2/G3, which bulges past the sampled points and is
 // measured exactly as job bounds measure it.
-function onBed(path: LeadPath, bed: JobBounds | null): boolean {
+function onBed(path: LeadPath, bed: JobBounds | null, arcsEmitted: boolean): boolean {
   if (bed === null) return true;
   const start = path.points[0];
   if (start === undefined) return false;
@@ -156,7 +162,7 @@ function onBed(path: LeadPath, bed: JobBounds | null): boolean {
     extent.maxX = Math.max(extent.maxX, point.x);
     extent.maxY = Math.max(extent.maxY, point.y);
   }
-  extendBoundsByEmittedArcMoves(extent, start, path.moves);
+  if (arcsEmitted) extendBoundsByEmittedArcMoves(extent, start, path.moves);
   return (
     extent.minX >= bed.minX - BED_SLACK_MM &&
     extent.maxX <= bed.maxX + BED_SLACK_MM &&

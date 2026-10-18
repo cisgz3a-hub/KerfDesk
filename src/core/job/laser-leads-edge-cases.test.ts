@@ -8,6 +8,7 @@ import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { pointInPolygon } from '../geometry';
 import type { Vec2 } from '../scene';
 import { applyLaserLeads } from './apply-laser-leads';
+import { withCutArcMoves } from './cut-arc-moves';
 import { finalPassCutSegments } from './cut-pass-segments';
 import type { CutGroup, CutSegment, Job } from './job';
 import { leadPath } from './laser-lead-path';
@@ -49,6 +50,14 @@ function group(segments: ReadonlyArray<CutSegment>, extra: Partial<CutGroup> = {
   };
 }
 
+/** The contour as line moves: it goes out as G1/G2/G3 moves on an arc machine. */
+function asMoves(segment: CutSegment): CutSegment {
+  return withCutArcMoves(
+    segment,
+    segment.polyline.slice(1).map((to) => ({ kind: 'line' as const, to })),
+  );
+}
+
 function firstSegment(job: Job): CutSegment {
   const cut = job.groups[0];
   const segment = cut?.kind === 'cut' ? cut.segments[0] : undefined;
@@ -72,7 +81,7 @@ describe('laser lead edge cases (ADR-626)', () => {
     expect(pointInPolygon(firstSegment(done).polyline[0] as Vec2, hole.polyline)).toBe(true);
   });
 
-  it('keeps an arc lead on the bed by its full sweep, not just its sampled points', () => {
+  it('keeps an arc lead that goes out as G2/G3 on the bed by its full sweep', () => {
     // A half-turn lead-in reaches its leftmost point mid-sweep, between samples.
     const join = { at: { x: 0, y: 0 }, tangent: { x: 1, y: 0 }, scrap: { x: 0, y: -1 } };
     const shape = { style: 'arc' as const, lengthMm: 2, angleDeg: 180 };
@@ -83,18 +92,21 @@ describe('laser lead edge cases (ADR-626)', () => {
     expect(sweptMinX).toBeLessThan(edge);
     expect(sampledMinX).toBeGreaterThan(edge);
     const bed = { minX: edge, minY: -50, maxX: 300, maxY: 300 };
+    const leads = { ...LEADS, angleDeg: 180, leadOut: false };
     const done = applyLaserLeads(
-      {
-        groups: [
-          group([square(0, 0, 10)], { laserLeads: { ...LEADS, angleDeg: 180, leadOut: false } }),
-        ],
-      },
+      { groups: [group([asMoves(square(0, 0, 10))], { laserLeads: leads })] },
       { bed },
     );
     for (const point of firstSegment(done).polyline) expect(point.x).toBeGreaterThan(edge);
     expect(done.diagnostics).toEqual([
       { kind: 'laser-leads-adjusted', layerId: 'L', layerName: 'Cut', shortened: 1, omitted: 0 },
     ]);
+    // A contour that goes out as chords burns its arc lead as chords too, which fit.
+    const chords = applyLaserLeads(
+      { groups: [group([square(0, 0, 10)], { laserLeads: leads })] },
+      { bed },
+    );
+    expect(chords.diagnostics).toBeUndefined();
   });
 
   it('maps the final-pass burn through the rotary, and counts it in the Y range', () => {
