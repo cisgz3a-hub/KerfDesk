@@ -128,6 +128,55 @@ afterEach(async () => {
 });
 
 describe('ArtworkPulseOverlay (ADR-620)', () => {
+  it('keeps normal capture-release markers independent for two pointers', async () => {
+    canvas.hasPointerCapture = () => true;
+    const pointer = (type: string, pointerId: number): void => {
+      const event = new MouseEvent(type, { clientX: 50, clientY: 50 });
+      Object.defineProperty(event, 'pointerId', { value: pointerId });
+      canvas.dispatchEvent(event);
+    };
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    await act(async () => {
+      pointer('pointerdown', 1);
+      pointer('pointerdown', 2);
+    });
+    await render(false);
+    await act(async () => {
+      useStore.getState().setCursorMm(null);
+      pointer('pointerup', 1);
+      pointer('pointerup', 2);
+      pointer('lostpointercapture', 1);
+      pointer('lostpointercapture', 2);
+    });
+    await render(true);
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    expect(clock.frame(performance.now(), true).pieces.map((piece) => piece.objectId)).toEqual([
+      'heart',
+    ]);
+  });
+
+  it('does not let a second pointer release hide cancellation of the captured pointer', async () => {
+    const pointer = (type: string, pointerId: number): void => {
+      const event = new MouseEvent(type, { clientX: 50, clientY: 50 });
+      Object.defineProperty(event, 'pointerId', { value: pointerId });
+      canvas.dispatchEvent(event);
+    };
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    await act(async () => pointer('pointerdown', 1));
+    await render(false);
+    await act(async () => {
+      useStore.getState().setCursorMm(null);
+      pointer('pointerdown', 2);
+      pointer('pointerup', 2);
+      pointer('lostpointercapture', 1);
+    });
+    await render(true);
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    expect(clock.frame(performance.now(), true).pieces).toEqual([]);
+  });
+
   it('forgets an uncaptured click release before the next drag loses capture', async () => {
     await render(true);
     await pointAt({ x: 5, y: 5 });
@@ -160,6 +209,7 @@ describe('ArtworkPulseOverlay (ADR-620)', () => {
   });
 
   it('preserves an ordinary click hover through automatic capture release', async () => {
+    canvas.hasPointerCapture = () => true;
     await render(true);
     await pointAt({ x: 5, y: 5 });
     await act(async () => canvas.dispatchEvent(new MouseEvent('pointerdown')));

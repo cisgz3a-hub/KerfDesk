@@ -148,12 +148,14 @@ function useCanvasHoverObject(
 
 /** Capture release follows ordinary pointer-up as well as cancellation. */
 function listenForHoverBoundary(canvas: HTMLCanvasElement, leave: () => void): () => void {
-  let releasedNormally = false;
-  const begin = (): void => {
-    releasedNormally = false;
+  const releasedPointers = new Set<number>();
+  const begin = (event: PointerEvent): void => {
+    releasedPointers.delete(event.pointerId);
   };
   const release = (event: PointerEvent): void => {
-    releasedNormally = true;
+    // Capture is implicitly released after pointer-up dispatch. Uncaptured
+    // clicks have no subsequent capture-loss event and need no marker.
+    if (canvas.hasPointerCapture?.(event.pointerId)) releasedPointers.add(event.pointerId);
     const bounds = canvas.getBoundingClientRect();
     if (
       event.clientX < bounds.left ||
@@ -163,15 +165,18 @@ function listenForHoverBoundary(canvas: HTMLCanvasElement, leave: () => void): (
     )
       leave();
   };
-  const lostCapture = (): void => {
+  const lostCapture = (event: PointerEvent): void => {
     // Only an unexpected loss ends the hover; a normal click resumes it.
-    if (!releasedNormally) leave();
-    releasedNormally = false;
+    if (!releasedPointers.delete(event.pointerId)) leave();
+  };
+  const cancel = (event: PointerEvent): void => {
+    releasedPointers.delete(event.pointerId);
+    leave();
   };
   const listeners = [
     ['pointerdown', begin],
     ['pointerleave', leave],
-    ['pointercancel', leave],
+    ['pointercancel', cancel],
     ['pointerup', release],
     ['lostpointercapture', lostCapture],
   ] as const;
