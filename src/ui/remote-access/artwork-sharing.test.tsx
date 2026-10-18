@@ -125,6 +125,10 @@ describe('desktop artwork-sharing consent', () => {
     expect(box.checked).toBe(false);
     expect(box.disabled).toBe(true);
     expect(host.textContent).toContain('its AI provider');
+    // The opt-in also gates camera stills for control-approved connections (ADR-585).
+    expect(box.title).toContain('camera stills');
+    expect(host.textContent).toContain('still photos from this computer’s camera');
+    expect(host.textContent).toContain('save over the open project’s file');
   });
   it('lets the desktop explicitly opt in and immediately opt out', async () => {
     useRemoteAccessStore.setState({

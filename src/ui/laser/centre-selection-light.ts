@@ -62,9 +62,11 @@ export async function centreLightOnFramedArtwork(): Promise<void> {
 
 function assertCentreLightAvailable(): void {
   const { project, jobPlacement } = useStore.getState();
+  // The dialect matters: on a Marlin fan-mosfet profile M106/M107 fire the laser.
   const issue = positioningLightIssue(
     project.device.positioningLight,
     project.device.controllerKind,
+    project.device.gcodeDialect?.dialectId,
   );
   if (project.device.positioningLight === undefined || issue !== null)
     throw new Error(issue ?? 'Set up the separate positioning light in Machine Setup first.');

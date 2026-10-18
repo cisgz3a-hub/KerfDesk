@@ -248,6 +248,22 @@ describe('Setup control audit', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  it('hides the positioning LED settings only on a Marlin fan-mosfet laser', () => {
+    const marlin = {
+      ...DEFAULT_DEVICE_PROFILE,
+      controllerKind: 'marlin' as const,
+      gcodeDialect: { dialectId: 'marlin-inline' as const },
+    };
+    const options = (profile: typeof marlin | typeof DEFAULT_DEVICE_PROFILE) =>
+      render(<DeviceSetupOptionsStep state={initDeviceSetup(profile, null)} dispatch={vi.fn()} />);
+    options(marlin);
+    expect(host.textContent).toContain('Positioning LED / crosshair');
+    options({ ...marlin, gcodeDialect: { dialectId: 'marlin-fan' } });
+    expect(host.textContent).not.toContain('Positioning LED / crosshair');
+    options(DEFAULT_DEVICE_PROFILE);
+    expect(host.textContent).toContain('Positioning LED / crosshair');
+  });
+
   it('review Edit buttons navigate to their exact setup owner without committing', () => {
     const dispatch = vi.fn();
     const state = initDeviceSetup(DEFAULT_DEVICE_PROFILE, null, {

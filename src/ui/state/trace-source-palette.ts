@@ -4,12 +4,12 @@
 // and preflight all skip `role: 'trace-source'`, so it emits no G-code. It must
 // therefore not go on holding a palette color that the artwork actually being
 // cut should have. Without this, tracing a freshly imported photo leaves the
-// invisible backing on OPERATION_PALETTE[0] (black) and pushes the visible
-// trace onto the runner-up (blue) — the artwork the operator cuts ends up
-// outranked by a reference object they are expected to delete.
+// invisible backing on OPERATION_PALETTE[0] and pushes the visible trace onto
+// the runner-up — the artwork the operator cuts ends up outranked by a
+// reference object they are expected to delete.
 //
-// Moving the backing to the reserved image grey hands black back to the
-// first-unused-wins allocator, so the operation created for the trace takes it.
+// Moving the backing to the reserved image grey hands the first colour back to
+// the first-unused-wins allocator, so the operation created for the trace takes it.
 
 import {
   DEFAULT_RASTER_LAYER_COLOR,
@@ -74,6 +74,6 @@ function backingColor(scene: Scene, operationId: string): string {
     return DEFAULT_RASTER_LAYER_COLOR;
   }
   // Grey is taken. Reserve the first palette color for the artwork so the
-  // allocator hands the backing the next free one instead of returning black.
+  // allocator hands the backing the next free one instead of the first.
   return nextOperationColor([...others, { color: ARTWORK_FIRST_COLOR }]);
 }

@@ -6,7 +6,7 @@ import {
   type Transform,
 } from '../../core/scene';
 import { findFontEntry } from '../../core/text';
-import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
+import { canvasTheme } from '../theme/canvas-theme';
 import type { ViewTransform } from '../workspace/view-transform';
 import type { CanvasTextSession } from './canvas-text-store';
 import { cssFamilyForFont } from './font-loader';
@@ -58,7 +58,8 @@ function straightInputStyle(
     letterSpacing: `${values.letterSpacing * values.sizeMm}px`,
     textAlign: values.alignment,
     fontFamily: `"${family}", sans-serif`,
-    color: object === null ? canvasVectorDisplayColor(values.color) : 'transparent',
+    // New text types in the same ink the canvas rests artwork in (ADR-620).
+    color: object === null ? canvasTheme.artworkInk : 'transparent',
   };
 }
 

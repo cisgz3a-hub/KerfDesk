@@ -31,7 +31,7 @@ import {
   WEB_APP_POINTS,
 } from './download-data.mjs';
 
-const [WINDOWS, MAC_INTEL, MAC_ARM] = DESKTOP_FILES;
+const [WINDOWS, MAC_INTEL, MAC_ARM, LINUX_DEB, LINUX_APPIMAGE] = DESKTOP_FILES;
 
 function asset(name) {
   return html`<code class="asset">${name}</code>`;
@@ -72,11 +72,28 @@ function platforms(site) {
       <h3>${icon('laptop')}macOS</h3>
       <p>
         macOS 13 or newer, on Intel or Apple Silicon Macs. There is a separate disk image for each
-        chip type. Testing on real Macs isn’t finished yet.
+        chip type. The KerfDesk download page offers KerfDesk for Mac when it is released, and the
+        free Mac Preview. Testing on real Macs isn’t finished yet.
       </p>
       <p>Intel (x64): ${asset(MAC_INTEL.file)}</p>
       <p>Apple Silicon (arm64): ${asset(MAC_ARM.file)}</p>
       ${button(site.downloadPageUrl, 'Mac downloads', {
+        variant: 'secondary',
+        iconName: 'download',
+      })}
+    </article>
+    <article class="platform">
+      <span class="eyebrow">Unsigned .deb and AppImage</span>
+      <h3>${icon('terminal')}Linux</h3>
+      <p>
+        64-bit (x64) Linux. The .deb is for Ubuntu and Debian and is recommended on Ubuntu 24.04 and
+        newer; the AppImage runs on other distributions without installing. The KerfDesk download
+        page offers both when KerfDesk for Linux is released. Testing on real Linux computers isn’t
+        finished yet.
+      </p>
+      <p>Ubuntu and Debian: ${asset(LINUX_DEB.file)}</p>
+      <p>Other distributions: ${asset(LINUX_APPIMAGE.file)}</p>
+      ${button(site.downloadPageUrl, 'Linux downloads', {
         variant: 'secondary',
         iconName: 'download',
       })}
@@ -89,7 +106,7 @@ function chooseSection(site) {
     id: 'choose',
     eyebrow: 'Web or desktop',
     title: 'Choose how to run KerfDesk',
-    lead: 'The web app is the quickest way to start. The desktop app packages the same app for Windows and macOS.',
+    lead: 'The web app is the quickest way to start. The desktop app packages the same app for Windows, macOS and Linux.',
     content: html`${platforms(site)}
     ${callout({
       iconName: 'package',
@@ -106,10 +123,16 @@ function chooseSection(site) {
       iconName: 'globe',
       title: 'Using Linux?',
       body: html`<p>
-        There is no Linux desktop app yet, and no date for one. Use the
-        <a href="${site.appUrl}">web app</a> in Chrome or Edge. It has the same Free design and
-        toolpath features as the desktop app, and you can install it from the browser.
-      </p>`,
+          KerfDesk for Linux comes as a .deb for Ubuntu and Debian and an AppImage for other
+          distributions, on the KerfDesk download page once it is released. Until then, use the
+          <a href="${site.appUrl}">web app</a> in Chrome or Edge. It has the same Free design and
+          toolpath features as the desktop app, and you can install it from the browser.
+        </p>
+        <p>
+          To run a USB machine from Linux, add your account to the serial group once (<code
+            >sudo usermod -aG dialout $USER</code
+          >, or <code>uucp</code> on Arch Linux), then log out and back in.
+        </p>`,
     })}`,
   });
 }
@@ -135,9 +158,9 @@ function filesSection() {
     lead: 'The download page names each file. Download the one that matches your computer.',
     content: html`<div class="prose">
         <p>
-          In each name below, <code>&lt;version&gt;</code> is the release tag without its leading
-          <code>v</code>. For example, tag <code>v0.2.0-preview.1</code> becomes
-          <code>0.2.0-preview.1</code>.
+          In each name below, <code>&lt;version&gt;</code> is the version number without a leading
+          <code>v</code>, such as <code>1.0.20</code>, or <code>0.2.0-preview.1</code> for a
+          Preview.
         </p>
       </div>
       ${table({
@@ -244,13 +267,13 @@ export const page = {
   nav: null,
   title: 'Download',
   description:
-    'Use KerfDesk in your browser, or get the desktop app for Windows 10/11 or macOS 13+ from the KerfDesk download page. KerfDesk Free needs no account.',
+    'Use KerfDesk in your browser, or get the desktop app from the KerfDesk download page: Windows and macOS, and Linux as it is released. Free needs no account.',
   render: (ctx) => {
     const { site, commerce } = ctx;
     return html`${pageHero({
       eyebrow: 'Download',
       title: 'Get KerfDesk',
-      lead: 'Use KerfDesk in your browser, or install the desktop app on Windows or macOS. KerfDesk Free runs in both, Pro comes with the Windows desktop app, and neither needs an account.',
+      lead: 'Use KerfDesk in your browser, or install the desktop app on Windows or macOS, with Linux packages on the download page as they are released. KerfDesk Free runs in both, Pro comes with the Windows desktop app, and neither needs an account.',
       extra: actions(
         button(site.appUrl, 'Open KerfDesk in your browser', { iconName: 'arrow-right' }),
         button(site.downloadPageUrl, 'Desktop downloads', {

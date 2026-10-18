@@ -119,8 +119,8 @@ export function layerDefaultActions(set: LayerDefaultActionSet): LayerDefaultsAc
 // Every path that creates or resets an operation looks its defaults up here,
 // under the one key Make Default saves to. There is deliberately no fallback
 // to the operation's palette color: a saved key cannot tell an artwork color
-// from a palette color, so a default saved for black artwork would reach any
-// new operation that happened to get palette black.
+// from a palette color, so a default saved for blue artwork would reach any
+// new operation that happened to get palette blue.
 export function defaultSettingsForOperation(
   layerDefaults: LayerDefaultsState,
   objects: ReadonlyArray<SceneObject>,

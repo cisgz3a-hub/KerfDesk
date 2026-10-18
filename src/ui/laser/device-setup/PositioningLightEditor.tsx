@@ -22,7 +22,7 @@ export function PositioningLightEditor({
     );
   }
   const value = device.positioningLight;
-  const issue = positioningLightIssue(value, device.controllerKind);
+  const issue = positioningLightIssue(value, device.controllerKind, device.gcodeDialect?.dialectId);
   return (
     <div style={{ display: 'grid', gap: 8, fontSize: 12 }}>
       <label>

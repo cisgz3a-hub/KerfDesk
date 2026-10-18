@@ -4,6 +4,7 @@ import type { MaterialTestParameter } from '../../core/job/material-test-axes';
 import { materialTestRunwayMm } from '../../core/job/material-test-grid';
 import { CalibrationNumberField } from './CalibrationNumberField';
 import { CalibrationPresetButtons } from './CalibrationPresetButtons';
+import { MaterialTestPreview } from './MaterialTestPreview';
 import { Button, Dialog, DialogActions } from '../kit';
 import { persistCalibrationDraft, restoreCalibrationDraft } from './calibration-draft-storage';
 import { calibrationFieldStyle, calibrationGridStyle } from './calibration-dialog-styles';
@@ -43,6 +44,7 @@ export function MaterialTestDialog(props: {
   );
   const fields = materialTestFields(draft);
   const issues = calibrationDraftIssues(draft, fields);
+  const previewOptions = issues.length > 0 ? null : parseMaterialTestDraft(draft);
   const setField =
     (field: MaterialTestNumberKey) =>
     (event: ChangeEvent<HTMLInputElement>): void => {
@@ -84,6 +86,7 @@ export function MaterialTestDialog(props: {
         ))}
       </div>
       {issues.length > 0 ? <p role="alert">{issues.join(' ')}</p> : null}
+      <MaterialTestPreview options={previewOptions} maxFeedMmPerMin={props.maxFeedMmPerMin} />
       <CalibrationFeedDisclosure draft={draft} maxFeedMmPerMin={props.maxFeedMmPerMin} />
       <RunwayNote
         draft={draft}

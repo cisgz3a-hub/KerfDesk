@@ -1,7 +1,7 @@
 import { applicationHeader } from './fixtures/workspace-ui';
 import { expect, test } from '@playwright/test';
 
-test('routes mobile browsers to purchase and phone setup without downloading workspace algorithms', async ({
+test('keeps licence purchase and Phone & MCP setup on separate pages without downloading workspace algorithms', async ({
   browser,
   baseURL,
 }, testInfo) => {
@@ -34,27 +34,32 @@ test('routes mobile browsers to purchase and phone setup without downloading wor
         page.getByRole('status').filter({ hasText: 'Pro purchases are not open yet' }),
       ).toBeVisible();
       await expect(page.locator('canvas')).toHaveCount(0);
+      await expect(page.locator('main')).toContainText('KerfDesk Pro');
+      await expect(page.locator('main a[href="/phone.html"], .phone-entry')).toHaveCount(0);
+      await expect(page.locator('link[href="/phone.css"]')).toHaveCount(0);
+      await expect(page.locator('main')).not.toContainText('Connect to your open desktop app');
       const mobileNav = page.getByRole('navigation', { name: 'Product', exact: true });
       await expect(mobileNav.getByRole('link', { name: 'Windows app' })).toHaveAttribute(
         'href',
         '/download.html',
       );
-      await expect(
-        mobileNav.getByRole('link', { name: 'Phone access', exact: true }),
-      ).toBeVisible();
-      await expect(page.getByRole('link', { name: 'Set up phone access' })).toBeVisible();
+      await expect(mobileNav.getByRole('link', { name: 'Phone & MCP', exact: true })).toBeVisible();
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true);
       if (width === 390) {
-        await testInfo.attach('mobile-home-phone-entry', {
+        await testInfo.attach('mobile-licence-page', {
           body: await page.screenshot({ fullPage: true }),
           contentType: 'image/png',
         });
       }
 
-      await mobileNav.getByRole('link', { name: 'Phone access', exact: true }).click();
+      await mobileNav.getByRole('link', { name: 'Phone & MCP', exact: true }).click();
       await expect(page).toHaveURL(/\/phone(?:\.html)?$/);
+      await expect(
+        page.getByRole('link', { name: 'KerfDesk Phone and MCP setup' }),
+      ).toHaveAttribute('href', '/phone.html');
+      await expect(page.locator('main a[href="/buy.html"], .licence-card')).toHaveCount(0);
       await expect(page.getByRole('heading', { name: 'Three steps to connect.' })).toBeVisible();
       await expect(page.locator('.phone-steps')).toContainText('Edit → Settings… → Phone & MCP');
       await expect(page.locator('.phone-steps')).toContainText('Connected to the remote service');
@@ -72,7 +77,7 @@ test('routes mobile browsers to purchase and phone setup without downloading wor
       await expect(
         page.getByRole('status').filter({ hasText: 'Pro purchases are not open yet' }),
       ).toBeVisible();
-      await page.getByRole('link', { name: 'Set up phone access' }).click();
+      await mobileNav.getByRole('link', { name: 'Phone & MCP', exact: true }).click();
       await page.getByText('How do I connect ChatGPT or another MCP app?', { exact: true }).click();
       await expect(page.locator('.phone-mcp-url')).toHaveText(
         'https://kerfdesk-phone-control.cisgz3a.workers.dev/mcp',

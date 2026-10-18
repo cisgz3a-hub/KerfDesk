@@ -275,6 +275,21 @@ describe('registration jig completion', () => {
     },
   );
 
+  it('keeps Outline only and says so when no artwork is set to burn', () => {
+    useStore.getState().setRegistrationOutput('artwork');
+    for (const layer of useStore.getState().project.scene.layers)
+      if (layer.id !== 'registration')
+        useStore.getState().setLayerParam(layer.id, { output: false });
+    useStore.getState().setRegistrationOutput('box');
+    const observer = armRegistrationJigCompletion(args())!;
+    observer.accept();
+    settle();
+    expect(outlineEnabled()).toBe(true);
+    expect(registrationRunState(useStore.getState().project.scene)).toBe('box');
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+    expect(useToastStore.getState().toasts[0]!.message).toContain('Outline only stays selected');
+  });
+
   it('does not arm for CNC output', () => {
     useStore.setState({
       project: { ...useStore.getState().project, machine: DEFAULT_CNC_MACHINE_CONFIG },

@@ -11,6 +11,7 @@ import {
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { settledCleanly } from '../state/post-job-clean-settle';
+import { applyRegistrationOutput } from '../state/registration-output-actions';
 import type { RunId } from '../state/recovery';
 import { useToastStore } from '../state/toast-store';
 import { variableStreamOutcome } from './variable-stream-advancement';
@@ -166,6 +167,19 @@ function publishArtworkSelection(
     laser.streamer !== null
   )
     return;
+  // No artwork operation would output (none exists, or every one is off in the
+  // snapshot): switching would leave neither run selected.
+  if (
+    registrationRunState(applyRegistrationOutput(current, 'artwork').project.scene) !== 'artwork'
+  ) {
+    useToastStore
+      .getState()
+      .pushToast(
+        'Outline finished. No artwork is set to burn, so Outline only stays selected.',
+        'success',
+      );
+    return;
+  }
   current.setRegistrationOutput('artwork');
   useToastStore
     .getState()
