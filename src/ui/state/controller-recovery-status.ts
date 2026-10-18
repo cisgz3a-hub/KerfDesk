@@ -42,6 +42,14 @@ export function controllerReconnectRecommended(state: RecoveryStatus, now = Date
   return controllerResponseMissing(state, now);
 }
 
+/** A connected controller that has stopped answering status queries: the one
+ * controller-information condition that interrupts the operator unasked
+ * (ADR-607). A settings read that failed while replies still arrive stays in
+ * Controller info, out of the way, as other senders keep it. */
+export function controllerStoppedResponding(state: RecoveryStatus, now = Date.now()): boolean {
+  return state.connection.kind === 'connected' && controllerResponseMissing(state, now);
+}
+
 function currentQualificationFailed(state: RecoveryStatus): boolean {
   return (
     state.controllerQualification.kind === 'failed' &&
