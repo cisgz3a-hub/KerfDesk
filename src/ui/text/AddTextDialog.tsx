@@ -94,7 +94,7 @@ function DialogForm(props: {
       >
         <h2 className="lf-dialog-title">{state.mode === 'add' ? 'Add Text' : 'Edit Text'}</h2>
       </div>
-      <fieldset disabled={submitting} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
+      <fieldset disabled={submitting} style={textFieldsStyle}>
         <ContentField value={fields.values.content} onChange={fields.setContent} />
         <TextFormattingFields fields={fields} disabled={submitting} />
       </fieldset>
@@ -239,6 +239,16 @@ function Field(props: { readonly label: string; readonly children: React.ReactNo
 // Multi-line rows (textarea, wrapped radios) top-align, unlike .lf-field's
 // default center alignment - layout-only overrides per ADR-047.
 const fieldAlignStyle: React.CSSProperties = { alignItems: 'flex-start' };
+// Keep the dialog's existing row spacing inside the disabled group.
+const textFieldsStyle: React.CSSProperties = {
+  border: 0,
+  margin: 0,
+  padding: 0,
+  minWidth: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'inherit',
+};
 const fieldLabelPadStyle: React.CSSProperties = { paddingTop: 4 };
 const fieldControlStyle: React.CSSProperties = {
   flex: 1,
