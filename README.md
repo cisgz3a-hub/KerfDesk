@@ -73,7 +73,8 @@ LongMill), design in Inkscape / Illustrator / Affinity, and expect a LightBurn-s
   editing and boolean operations (weld, subtract, intersect, exclude) via `clipper2`. A separate
   **Offset outlines** panel keeps the original and adds a larger or smaller outline of closed shapes.
 - **Text** — 21 bundled outline fonts and 4 single-line/stroke faces for engraving, plus imported
-  `.ttf`/`.otf` embedded into the project. Variable text from CSV, serial numbers and dates.
+  `.ttf`/`.otf` files and fonts installed on the computer (**System fonts...**, Chromium only),
+  embedded into the project. Variable text from CSV, serial numbers and dates.
 - **Parametric box generator** — finger-jointed closed, open-top and slide-lid boxes with
   dividers, panel cutouts, baked joint clearance and CNC corner-overcut relief. (Kerf itself is
   handled by the normal per-operation cut settings, not by the generator.)

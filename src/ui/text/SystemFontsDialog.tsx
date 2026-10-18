@@ -1,0 +1,195 @@
+// SystemFontsDialog — lists the fonts installed on this computer and embeds
+// the chosen face through the ordinary font import (ADR-628).
+
+import { useEffect, useMemo, useState } from 'react';
+import { Button, Dialog, DialogActions } from '../kit';
+import {
+  filterSystemFonts,
+  systemFontFile,
+  type SystemFontFace,
+  type SystemFontFamily,
+  type SystemFontFile,
+  type SystemFontQuery,
+} from './system-fonts';
+import './system-fonts.css';
+
+/** Rendering every family of a large font folder at once would stall typing. */
+export const SYSTEM_FONT_ROW_LIMIT = 150;
+
+export const SYSTEM_FONTS_UNSUPPORTED =
+  'This browser cannot list installed fonts. Use Chrome or Edge, or the KerfDesk desktop app, or Import a TTF or OTF file.';
+export const SYSTEM_FONTS_DENIED =
+  'KerfDesk was not allowed to read your installed fonts. Allow font access for this site in your browser settings and try again, or Import a TTF or OTF file.';
+export const SYSTEM_FONT_RESTRICTED =
+  "This font's licence restricts embedding. Keep projects that use it to yourself unless the licence allows sharing.";
+
+export function SystemFontsDialog(props: {
+  readonly query: Promise<SystemFontQuery>;
+  readonly importFont: (file: File) => Promise<void>;
+  readonly onClose: () => void;
+}): JSX.Element {
+  const { importFont, onClose } = props;
+  const result = useQueryResult(props.query);
+  const [search, setSearch] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [restricted, setRestricted] = useState<SystemFontFile | null>(null);
+  const embed = async (file: File): Promise<void> => {
+    await importFont(file);
+    onClose();
+  };
+  const choose = async (face: SystemFontFace): Promise<void> => {
+    setBusy(face.postscriptName);
+    setError(null);
+    try {
+      const chosen = await systemFontFile(face);
+      if (chosen.restricted) setRestricted(chosen);
+      else await embed(chosen.file);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <Dialog title="System fonts" size="md" onClose={onClose}>
+      {restricted === null ? (
+        <SystemFontsBody
+          result={result}
+          search={search}
+          onSearch={setSearch}
+          busy={busy}
+          onChoose={(face) => void choose(face)}
+        />
+      ) : (
+        <p className="lf-system-fonts-notice" role="note">
+          {SYSTEM_FONT_RESTRICTED}
+        </p>
+      )}
+      {error === null ? null : (
+        <p className="lf-system-fonts-error" role="alert">
+          {error}
+        </p>
+      )}
+      <DialogActions>
+        {restricted === null ? null : (
+          <>
+            <Button type="button" onClick={() => setRestricted(null)}>
+              Back
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() =>
+                void embed(restricted.file).catch((caught: unknown) =>
+                  setError(caught instanceof Error ? caught.message : String(caught)),
+                )
+              }
+            >
+              Embed font
+            </Button>
+          </>
+        )}
+        <Button type="button" onClick={onClose}>
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function useQueryResult(query: Promise<SystemFontQuery>): SystemFontQuery | null {
+  const [result, setResult] = useState<SystemFontQuery | null>(null);
+  useEffect(() => {
+    let live = true;
+    void query.then((value) => {
+      if (live) setResult(value);
+    });
+    return () => {
+      live = false;
+    };
+  }, [query]);
+  return result;
+}
+
+function SystemFontsBody(props: {
+  readonly result: SystemFontQuery | null;
+  readonly search: string;
+  readonly onSearch: (value: string) => void;
+  readonly busy: string | null;
+  readonly onChoose: (face: SystemFontFace) => void;
+}): JSX.Element {
+  const { result } = props;
+  if (result === null) return <p className="lf-muted">Reading the fonts on this computer…</p>;
+  if (result.kind === 'unsupported') return <p role="note">{SYSTEM_FONTS_UNSUPPORTED}</p>;
+  if (result.kind === 'denied') return <p role="note">{SYSTEM_FONTS_DENIED}</p>;
+  if (result.kind === 'failed') {
+    return <p role="alert">Could not list installed fonts: {result.message}</p>;
+  }
+  return <SystemFontList {...props} families={result.families} />;
+}
+
+function SystemFontList(props: {
+  readonly families: ReadonlyArray<SystemFontFamily>;
+  readonly search: string;
+  readonly onSearch: (value: string) => void;
+  readonly busy: string | null;
+  readonly onChoose: (face: SystemFontFace) => void;
+}): JSX.Element {
+  const matches = useMemo(
+    () => filterSystemFonts(props.families, props.search),
+    [props.families, props.search],
+  );
+  const shown = matches.slice(0, SYSTEM_FONT_ROW_LIMIT);
+  return (
+    <div className="lf-system-fonts">
+      <input
+        type="search"
+        className="lf-input"
+        aria-label="Search installed fonts"
+        placeholder="Search installed fonts"
+        value={props.search}
+        onChange={(event) => props.onSearch(event.target.value)}
+      />
+      <p className="lf-muted lf-system-fonts-count" aria-live="polite">
+        {countText(matches.length, shown.length)}
+      </p>
+      <ul className="lf-system-fonts-list" aria-label="Installed fonts">
+        {shown.map((family) => (
+          <li key={family.family} className="lf-system-fonts-family">
+            <span
+              className="lf-system-fonts-specimen"
+              style={{ fontFamily: quoted(family.family) }}
+            >
+              {family.family}
+            </span>
+            <span className="lf-system-fonts-styles">
+              {family.faces.map((face) => (
+                <Button
+                  key={face.postscriptName}
+                  type="button"
+                  disabled={props.busy !== null}
+                  title={`Embed ${face.fullName} in this project.`}
+                  aria-label={`Use ${face.fullName}`}
+                  onClick={() => props.onChoose(face)}
+                >
+                  {props.busy === face.postscriptName ? 'Embedding…' : face.style}
+                </Button>
+              ))}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function countText(total: number, shown: number): string {
+  if (total === 0) return 'No installed font matches.';
+  const families = `${total} font ${total === 1 ? 'family' : 'families'}`;
+  return shown < total ? `${families}. Showing ${shown}; type to narrow the list.` : families;
+}
+
+function quoted(family: string): string {
+  return `"${family.replace(/["\\]/g, '')}", system-ui`;
+}

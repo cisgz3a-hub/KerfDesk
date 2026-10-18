@@ -3555,6 +3555,14 @@ settings and Job Review keep their existing read-only setup references.
   open center strokes, so use **Engrave** or **Profile on path**; V-carve,
   Pocket, and Fill require an outline font with closed regions. Fresh CNC
   stroke-text operations default to Engrave even when a V-bit is mounted.
+- **System fonts...** (ADR-628), beside **Import** under the font picker, lists the fonts installed
+  on this computer. Nothing is read until you press it; the browser asks for permission the
+  first time. Search by family or style, then choose a style: KerfDesk copies that face into the
+  project, exactly like an imported `.ttf` / `.otf` (10 MB per font, 32 fonts per project), so
+  the project opens on computers without the font. A face inside a `.ttc` collection is copied
+  out on its own. A font whose licence restricts embedding says so first; choose **Embed font**
+  to use it anyway or **Back** to pick another. Firefox and Safari cannot list installed fonts:
+  the dialog says so and **Import** still works. The list is never saved or sent anywhere.
 - F-D4. Adjust character spacing / line height
 - **Weld overlaps** joins overlapping outline letters without converting text to a separate shape.
   It is enabled for new text. For existing text, double-click it, enable **Weld overlaps**, then
