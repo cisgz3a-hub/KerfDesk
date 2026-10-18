@@ -14,6 +14,7 @@ import { applyCenterArtworkInRegistrationJigSet } from '../../state/registration
 import { applyRemoveRegistrationBox } from '../../state/registration-box-actions';
 import { applyRegistrationOutput } from '../../state/registration-output-actions';
 import { pushUndo } from '../../state/scene-mutations';
+import { rebaseJigDraft, type JigRebaseConflict } from './jig-editor-rebase';
 
 export type JigDraft = Pick<
   AppState,
@@ -197,29 +198,31 @@ export function undoJigDraft(session: JigEditorSession, redo = false): JigEditor
   };
 }
 
+/** Why a draft cannot be saved: another document was opened, the main project
+ *  gained a captured board, or the main project changed what the draft changed. */
+export type JigCommitRefusal = 'new-document' | 'captured-board' | JigRebaseConflict;
+
+export type JigCommitResult =
+  | { readonly kind: 'saved'; readonly change: Partial<AppState> }
+  | { readonly kind: 'refused'; readonly reason: JigCommitRefusal };
+
 export function commitJigEditorSession(
   state: AppState,
   session: JigEditorSession,
-): Partial<AppState> | null {
-  if (state.projectDocumentEpoch !== session.documentEpoch) return null;
-  const rebase = state.project !== session.baseProject;
-  if (rebase && !onlyOutputModeChanged(session.baseProject, state.project)) return null;
+): JigCommitResult {
+  if (state.projectDocumentEpoch !== session.documentEpoch)
+    return { kind: 'refused', reason: 'new-document' };
   if (findRegistrationBoxes(state.project.scene).some((box) => box.provenance === 'captured-board'))
-    return null;
-  let draft = session.draft;
-  if (rebase) {
-    // A completed outline run may select Artwork only while the editor is open.
-    // Keep the draft and adopt that output mode instead of discarding the edits.
-    const mode = registrationRunState(state.project.scene);
-    if (mode === 'box' || mode === 'artwork')
-      draft = { ...draft, ...applyRegistrationOutput({ ...draft, undoStack: [] }, mode) };
-  }
+    return { kind: 'refused', reason: 'captured-board' };
+  const rebased = rebaseJigDraftOnto(state.project, session);
+  if (rebased.kind === 'refused') return rebased;
+  let draft = rebased.draft;
   if (session.firstSave && findRegistrationBoxes(draft.project.scene).length > 0) {
     draft = { ...draft, ...applyRegistrationOutput({ ...draft, undoStack: [] }, 'box') };
   }
   const project = lockOutlines(draft.project);
   // Publish one edit, never the editor's intermediate history or machine state.
-  return {
+  const change: Partial<AppState> = {
     project,
     selectedObjectId: draft.selectedObjectId,
     additionalSelectedIds: draft.additionalSelectedIds,
@@ -232,6 +235,36 @@ export function commitJigEditorSession(
     redoStack: [],
     dirty: true,
   };
+  return { kind: 'saved', change };
+}
+
+// The main project may have changed while the editor was open. Carry those
+// changes into the draft, or refuse when they overlap the draft's own edits.
+function rebaseJigDraftOnto(
+  current: Project,
+  session: JigEditorSession,
+):
+  | { readonly kind: 'rebased'; readonly draft: JigDraft }
+  | { readonly kind: 'refused'; readonly reason: JigRebaseConflict } {
+  const base = session.baseProject;
+  if (current === base) return { kind: 'rebased', draft: session.draft };
+  const rebased = rebaseJigDraft(base, current, session.draft.project);
+  if (rebased.kind === 'conflict') return { kind: 'refused', reason: rebased.conflict };
+  const project = rebased.project;
+  const live = new Set(project.scene.objects.map((object) => object.id));
+  const selected = [...selectedJigIds(session.draft)].filter((id) => live.has(id));
+  let draft: JigDraft = {
+    ...session.draft,
+    project,
+    selectedObjectId: selected[0] ?? null,
+    additionalSelectedIds: new Set(selected.slice(1)),
+  };
+  // A completed outline run may select Artwork only while the editor is open.
+  // Keep the draft and adopt that output mode instead of discarding the edits.
+  const mode = registrationRunState(current.scene);
+  if (mode !== registrationRunState(base.scene) && (mode === 'box' || mode === 'artwork'))
+    draft = { ...draft, ...applyRegistrationOutput({ ...draft, undoStack: [] }, mode) };
+  return { kind: 'rebased', draft };
 }
 
 function lockOutlines(project: Project): Project {
@@ -244,40 +277,4 @@ function lockOutlines(project: Project): Project {
       ),
     },
   };
-}
-
-// True only when the main project differs from the editor's base by the
-// registration output mode: same objects, same operations apart from their
-// output flags, and every other project field unchanged.
-function onlyOutputModeChanged(base: Project, current: Project): boolean {
-  if (registrationRunState(base.scene) === registrationRunState(current.scene)) return false;
-  const { scene: baseScene, registrationArtworkOutputSnapshot: _b, ...baseFields } = base;
-  const { scene: currentScene, registrationArtworkOutputSnapshot: _c, ...currentFields } = current;
-  const keys = Object.keys(currentFields) as Array<keyof typeof currentFields>;
-  if (
-    keys.length !== Object.keys(baseFields).length ||
-    keys.some((key) => currentFields[key] !== baseFields[key])
-  )
-    return false;
-  const { layers: baseLayers, ...baseRest } = baseScene;
-  const { layers: currentLayers, ...currentRest } = currentScene;
-  const sceneKeys = Object.keys(currentRest) as Array<keyof typeof currentRest>;
-  return (
-    sceneKeys.length === Object.keys(baseRest).length &&
-    sceneKeys.every((key) => currentRest[key] === baseRest[key]) &&
-    currentLayers.length === baseLayers.length &&
-    currentLayers.every((layer, index) => sameExceptOutput(layer, baseLayers[index]))
-  );
-}
-
-function sameExceptOutput(layer: object, other: object | undefined): boolean {
-  if (other === undefined) return false;
-  if (layer === other) return true;
-  const { output: _a, ...rest } = layer as Record<string, unknown>;
-  const { output: _b, ...otherRest } = other as Record<string, unknown>;
-  const keys = Object.keys(rest);
-  return (
-    keys.length === Object.keys(otherRest).length &&
-    keys.every((key) => rest[key] === otherRest[key])
-  );
 }
