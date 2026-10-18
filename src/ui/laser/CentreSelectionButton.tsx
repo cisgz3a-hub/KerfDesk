@@ -71,6 +71,7 @@ function ArtworkTargetChooser(props: {
       Artwork to centre
       <select
         aria-label="Artwork to centre"
+        title="Choose which selected artwork the LED centres on. Choosing alone does not move the head."
         value={props.target?.id ?? ''}
         onChange={(event) => props.choose(event.target.value)}
         style={{ width: '100%', minWidth: 0 }}
