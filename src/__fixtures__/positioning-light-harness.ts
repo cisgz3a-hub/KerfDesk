@@ -1,4 +1,4 @@
-﻿import { vi } from 'vitest';
+import { vi } from 'vitest';
 import { selectControllerDriver } from '../core/controllers';
 import type { ControllerCommandSet, ControllerKind } from '../core/devices/device-profile';
 import { parseStatusReport } from '../core/controllers/grbl';

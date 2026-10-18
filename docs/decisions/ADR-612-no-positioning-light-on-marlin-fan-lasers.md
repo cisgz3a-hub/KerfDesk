@@ -1,4 +1,4 @@
-﻿## ADR-608 - No positioning light on Marlin fan-mosfet lasers
+## ADR-612 - No positioning light on Marlin fan-mosfet lasers
 
 **Status:** Accepted by the maintainer's explicit instruction on 2026-10-18. Amends ADR-603 and ADR-605. Software verification only; no controller or accessory was operated.
 

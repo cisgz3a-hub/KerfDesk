@@ -1,4 +1,4 @@
-﻿import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ControllerKind } from '../../core/devices/device-profile';
 import { disconnectStopCommands } from './laser-store-helpers';
 import {
