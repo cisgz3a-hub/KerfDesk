@@ -95,6 +95,24 @@
   }
 }
 
+/* A 720 px laptop screen leaves the strip about 550 px; at full size the tools
+   need about 600, which hid Move laser here and the design library. Mouse
+   screens take 32 px tools there; touch screens keep 36 and scroll. */
+@media (max-height: 760px) and (pointer: fine) {
+  .lf-toolstrip {
+    gap: 2px;
+  }
+
+  .lf-toolstrip > button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .lf-toolstrip__caption {
+    margin-top: 2px;
+  }
+}
+
 .lf-node-coordinate-panel {
   width: 236px;
   padding: 10px;

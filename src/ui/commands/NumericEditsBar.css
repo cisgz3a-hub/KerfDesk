@@ -98,7 +98,9 @@
   width: 14px;
   height: 14px;
 }
-@media (max-width: 900px) {
+/* Up to laptop widths the transforms stay narrow enough (about 660 px) to share
+   one row with the machine group (MachineConnectionToolbar.css) at 1280 px. */
+@media (max-width: 1366px) {
   .lf-numeric-edits-fields {
     gap: 4px 6px;
   }
