@@ -95,3 +95,43 @@ aggregate after every packaging job, including failures and cancellations. All
 ordinary Linux packaging and commercial-rehearsal jobs must pass; native jobs
 may be skipped only when the existing native input is false. A selected native
 run must pass all its Windows and macOS jobs. Missing or unknown results fail.
+
+### Amendment 1: protected retry of an original failed success receipt
+
+An explicit **Recover original desktop release receipt** dispatch on current
+trusted main may retry only the receipt write/readback for an exact original
+unsigned Windows run and attempt. The canonical repository, unsigned-release
+switch, protected desktop-commercial environment and shared commercial-manual
+publication lock remain required. This does not enable any release switch.
+
+The current helper authenticates the current main ref through the GitHub API
+before provenance reads and again before receipt storage; checkout credentials
+remain unpersisted. It authenticates original GitHub run/attempt metadata and jobs,
+including their repository, main branch, workflow path and control SHA. It
+requires the original exact-source gate, build, dependency audit, native launch,
+ASAR restoration, applicable historical upgrade, publication and public delivery
+to have passed before the failed receipt step. All retained evidence uploads must
+have succeeded. Artifact names include the original version and attempt; IDs,
+repository/run/control provenance, upload time, expiry, archive sizes and SHA-256
+are authenticated before bounded data-only ZIP reads. No recovered file is
+executed or extracted into the checkout. Missing, ambiguous, expired or incomplete
+provenance refuses recovery.
+
+The signed candidate identity remains separate from the original workflow's
+control SHA, which can differ for workflow_run. Both must be ancestors of current
+main. Original native/dependency evidence retains its exact run, attempt, source
+and installer identities; the lockfile is read inertly from that source with git
+show. The original stable key identity is required. The ordinary receipt
+validator and storage key remain unchanged: retries preserve the original
+payload, evidence hashes and byte-identical immutable object, with conflicting
+receipts refused. A separate recovery-run artifact records the control/source
+identities and authenticated artifact IDs/digests.
+
+This is historical evidence retention, not a fresh public-delivery check, build,
+installer publication, latest/catalogue update or repair of earlier checks. It
+may recover an upgrade-backed release after newer latest has appeared. It refuses
+original failed/missing public delivery, cancellation, absent required checks or
+uploads, and attempts whose reused jobs are absent from the exact attempt's
+GitHub response. Those cases still require separately reviewed recovery. The
+existing first-release guard still requires an authenticated catalogue containing
+only that release; later history cannot be bypassed by an operator flag.

@@ -26,23 +26,31 @@ const positive = (value) => Number.isSafeInteger(value) && value > 0;
 const sameArtifact = (a, b) => a?.sha256 === b?.sha256 && a?.bytes === b?.bytes;
 const summaryHash = (value) => digest(Buffer.from(JSON.stringify(value)));
 
-export function releaseReceiptContext(env, sourceSha) {
+function validateReceiptContext(context, sourceSha) {
   requireValue(
-    env.GITHUB_ACTIONS === 'true' &&
-      env.GITHUB_REPOSITORY === REPOSITORY &&
-      env.GITHUB_WORKFLOW_REF === WORKFLOW &&
-      env.RELEASE_SOURCE_SHA === sourceSha &&
-      /^[1-9]\d{0,19}$/u.test(env.GITHUB_RUN_ID ?? '') &&
-      /^[1-9]\d{0,5}$/u.test(env.GITHUB_RUN_ATTEMPT ?? ''),
-    'the exact candidate and canonical release workflow are required',
+    context?.repository === REPOSITORY &&
+      context.workflow === WORKFLOW &&
+      context.sourceSha === sourceSha &&
+      /^[a-f0-9]{40}$/u.test(sourceSha) &&
+      /^[1-9]\d{0,19}$/u.test(context.runId ?? '') &&
+      /^[1-9]\d{0,5}$/u.test(context.runAttempt ?? ''),
+    'the exact candidate and canonical original release context are required',
   );
-  return {
-    repository: REPOSITORY,
-    workflow: WORKFLOW,
+  return context;
+}
+
+export function releaseReceiptContext(env, sourceSha) {
+  requireValue(env.GITHUB_ACTIONS === 'true', 'GitHub Actions release context required');
+  return validateReceiptContext(
+    {
+      repository: env.GITHUB_REPOSITORY,
+      workflow: env.GITHUB_WORKFLOW_REF,
+      sourceSha: env.RELEASE_SOURCE_SHA,
+      runId: env.GITHUB_RUN_ID,
+      runAttempt: env.GITHUB_RUN_ATTEMPT,
+    },
     sourceSha,
-    runId: env.GITHUB_RUN_ID,
-    runAttempt: env.GITHUB_RUN_ATTEMPT,
-  };
+  );
 }
 
 function qualification(receipt, context, scenario, versions, sources, artifacts) {
@@ -197,17 +205,7 @@ export async function createReleaseReceiptPayload(input) {
     delivery,
   } = input;
   const signedIdentity = verifyCommercialEnvelope(identity, keySet, 'release-identity');
-  releaseReceiptContext(
-    {
-      GITHUB_ACTIONS: 'true',
-      GITHUB_REPOSITORY: context?.repository,
-      GITHUB_WORKFLOW_REF: context?.workflow,
-      RELEASE_SOURCE_SHA: context?.sourceSha,
-      GITHUB_RUN_ID: context?.runId,
-      GITHUB_RUN_ATTEMPT: context?.runAttempt,
-    },
-    signedIdentity.sourceSha,
-  );
+  validateReceiptContext(context, signedIdentity.sourceSha);
   requireValue(
     Buffer.isBuffer(manifest) && manifest.length <= 65_536,
     'bounded signed manifest required',

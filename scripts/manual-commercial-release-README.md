@@ -122,6 +122,36 @@ run/attempt evidence and signing identity. The receipt helper refuses evidence
 from a different run, source or installer. Do not fabricate a success receipt
 for evidence that has expired or checks that did not run.
 
+For a transient receipt write/readback failure **after the original public
+delivery passed**, an authorised operator can dispatch **Recover original desktop
+release receipt** on current main. Review the original canonical unsigned run,
+exact failed receipt attempt, signed version/source and retained evidence first:
+
+~~~text
+gh workflow run recover-desktop-release-receipt.yml --ref main -f original_run_id=<run-id> -f original_attempt=<attempt> -f source_sha=<40-hex-original-source> -f version=<X.Y.Z>
+~~~
+
+The manual-only job needs the existing unsigned-release enablement switch,
+protected desktop-commercial environment and shared publication lock. It uses
+current trusted main code, authenticates exact original GitHub run/attempt/job and
+artifact provenance, verifies archive sizes and digests, and reads only bounded
+retained data. It never executes a recovered installer/script, rebuilds or
+republishes the release, or changes latest/catalogue. Original source and lockfile
+are read without checking out or executing that source. The signed identity,
+installer, native launch/upgrade, restored ASAR, dependency report and historical
+public-delivery evidence must match; the original stable signing key is required.
+The same original receipt payload/key is retried idempotently; a separate 90-day
+recovery artifact records the recovery run and original artifact IDs/digests.
+
+A newer latest does not invalidate an upgrade-backed release's retained historic
+proof, and the recovery makes no claim to freshly check that release's website.
+Expired/missing/ambiguous artifacts, originally failed/missing public delivery,
+cancelled runs, or missing exact-attempt jobs/checks refuse. In particular, some
+reused-job reruns may lack a complete exact-attempt job list. First-release
+recovery retains the existing one-entry authenticated catalogue requirement and
+refuses once later history exists. This narrow retry does not cover those cases;
+do not fabricate checks or rebuild the same version to get around a refusal.
+
 For the separate signed-beta train, a missing authenticated observation holds
 automatic promotion. An authorised operator can run **Release train** on `main`
 with `action=observe`, the exact `version` and the reviewed
