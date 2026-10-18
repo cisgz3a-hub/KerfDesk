@@ -89,6 +89,17 @@
   height: 19px;
 }
 
+/* Short windows give the side panel's settings the height (ADR-616). */
+@media (max-height: 820px) {
+  .lf-workspace-panel-tabs:not(.lf-workspace-panel-tabs--collapsed) {
+    padding: 4px;
+  }
+
+  .lf-workspace-panel-tabs:not(.lf-workspace-panel-tabs--collapsed) > button {
+    min-height: 32px;
+  }
+}
+
 .lf-workspace-panel-tabs--collapsed {
   grid-template-columns: minmax(0, 1fr);
   padding: 4px;

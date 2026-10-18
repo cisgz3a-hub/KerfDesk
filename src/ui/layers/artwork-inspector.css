@@ -5,26 +5,38 @@
   min-width: 0;
 }
 
-/* The artwork's name gets the full width; the Operation | Artwork switch
-   sits under it instead of squeezing it (ADR-430). */
+/* One line names the artwork; the Operation | Artwork switch is a light tab
+   row under it, not a second boxed control, so the settings start higher
+   (ADR-430 rule 1, amended by ADR-616). */
 .lf-artwork-context {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
-  padding: 10px;
-  background: var(--lf-bg-0);
-  border: 1px solid var(--lf-border);
-  border-radius: 10px;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lf-artwork-context__title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+
+.lf-artwork-context__title > .lf-artwork-eyebrow {
+  flex-shrink: 0;
+}
+
+.lf-artwork-context__title > strong {
+  flex: 1;
+  min-width: 0;
 }
 
 .lf-artwork-editor-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px;
-  padding: 2px;
-  border-radius: 8px;
-  border: 1px solid var(--lf-border);
+  border-bottom: 1px solid var(--lf-border);
 }
 
 .lf-artwork-editor-tabs .lf-btn {
@@ -33,15 +45,16 @@
   justify-content: center;
   gap: 5px;
   min-height: 30px;
-  padding: 5px;
+  padding: 4px 5px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 6px 6px 0 0;
+  color: var(--lf-text-muted);
   font-size: 13px;
 }
 
 .lf-artwork-editor-tabs [aria-selected='true'] {
   color: var(--lf-accent-fg);
-  background: var(--lf-accent-wash);
+  box-shadow: inset 0 -2px var(--lf-accent);
   font-weight: 600;
 }
 
@@ -108,10 +121,6 @@
 /* Artwork tools use the panel's text size, so a button reads as one line. */
 .lf-artwork-adjustments .lf-btn {
   font-size: 13px;
-}
-
-.lf-artwork-context > div {
-  min-width: 0;
 }
 
 .lf-artwork-context strong {
@@ -233,6 +242,39 @@
   border: 1px solid var(--lf-border);
   border-radius: 10px;
   background: var(--lf-bg-1);
+}
+
+/* A 720 to 820 px tall window still shows Power and Speed without scrolling
+   (ADR-616). Only spacing changes; every control stays. */
+@media (max-height: 820px) {
+  .lf-operation-inspector,
+  .lf-operation-inspector .lf-laser-operation-fields {
+    gap: 8px;
+  }
+
+  .lf-operation-inspector {
+    padding: 8px;
+  }
+
+  .lf-operation-inspector .lf-process-segment {
+    min-height: 30px;
+  }
+
+  .lf-artwork-inspector {
+    gap: 6px;
+  }
+
+  .lf-artwork-editor-tabs .lf-btn {
+    min-height: 28px;
+  }
+
+  /* Outranks the rail-wide 32 px input rule further down this file. */
+  .lf-artwork-panel
+    .lf-operation-inspector
+    .lf-operation-identity
+    input:not([type='checkbox']):not([type='range']) {
+    min-height: 28px;
+  }
 }
 
 [data-artwork-organise].lf-btn {

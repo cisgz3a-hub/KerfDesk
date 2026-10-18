@@ -59,18 +59,14 @@ describe('Artwork Operations panel', () => {
   it('collapses and expands with the artwork-operation identity', async () => {
     const { host, unmount } = await renderPanel();
     try {
-      const collapse = host.querySelector(
-        'button[aria-label="Collapse Artwork / Operations panel"]',
-      );
+      const collapse = host.querySelector('button[aria-label="Collapse Artwork panel"]');
       if (!(collapse instanceof HTMLButtonElement)) throw new Error('collapse button missing');
       await act(async () => collapse.click());
-      expect(
-        host.querySelector('aside[aria-label="Artwork / Operations panel collapsed"]'),
-      ).not.toBeNull();
-      const expand = host.querySelector('button[aria-label="Expand Artwork / Operations panel"]');
+      expect(host.querySelector('aside[aria-label="Artwork panel collapsed"]')).not.toBeNull();
+      const expand = host.querySelector('button[aria-label="Expand Artwork panel"]');
       if (!(expand instanceof HTMLButtonElement)) throw new Error('expand button missing');
       await act(async () => expand.click());
-      expect(host.querySelector('aside[aria-label="Artwork / Operations panel"]')).not.toBeNull();
+      expect(host.querySelector('aside[aria-label="Artwork panel"]')).not.toBeNull();
     } finally {
       await unmount();
     }

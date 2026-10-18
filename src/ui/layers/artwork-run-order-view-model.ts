@@ -41,8 +41,10 @@ export function artworkRunOrderRows(project: Project): ReadonlyArray<ArtworkRunO
       const layer = layerById.get(id);
       return layer === undefined ? [] : [layer];
     });
+    // A run is artwork, so it carries the artwork's name, the same name the
+    // Settings header and artwork picker show; operationSummary names the operation.
     const first = objects[0];
-    const name = layers[0]?.name ?? (first === undefined ? 'Artwork' : artworkOperationName(first));
+    const name = first === undefined ? (layers[0]?.name ?? 'Artwork') : artworkOperationName(first);
     return {
       key: unit.key,
       objectIds: unit.objectIds,

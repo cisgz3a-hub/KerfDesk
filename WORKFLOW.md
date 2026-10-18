@@ -126,7 +126,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Top command toolbar**: Open, Import, Import Image, Save and Preview lead with readable labels when space permits. Selecting an image brings Trace image into the row; Image Studio remains in **More**. Other commands remain in **More** and the application menus, with their existing shortcuts, disabled reasons, tooltips and actions. The row measures available width and moves commands into More instead of scrolling horizontally. Utility controls share the row down to 520 px. The project name includes an unsaved-change indicator.
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Machine connection toolbar**: the machine name and connection status sit beside the numeric transforms, with Connect/Disconnect, the Machine Setup icon and the connection-options menu. The machine-name dropdown shows the full profile, bed size, controller, connected port, fitted Laser module selector and supported FluidNC or grblHAL network connection form. Tab moves between its fields; Escape closes it and returns focus to the machine name. Field input stays inside the dropdown while the existing Abort shortcut remains available. Connection failures and qualification/recovery notices remain visible outside the dropdown. On narrow windows the machine controls wrap onto a second top row, and remain available when either sidebar is collapsed. Detected-settings notifications also remain active with the sidebar closed.
-- **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
+- **Artwork panel**: docked right with **Properties**, **Run order**, and **Materials** views in Laser mode (**Recipes** in CNC). Properties is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
 - **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power and Speed each pair a full-width slider with exact numeric entry; Passes remains a numeric field; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
 - **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). An adaptive pocket's Entry & travel names its own helix ("Climb · Adaptive helix"), and names the Ramp entry angle only as the entry of reliefs on the same operation ("Relief ramp 5°", ADR-481 Amendment 1). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only. Closed-only operations also show the exact count of omitted open contours, including mixed closed/open artwork; all-open vector operations without assigned relief retain the no-toolpath explanation (ADR-481 Amendment 2).
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
@@ -922,14 +922,15 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 4. Undo restores the previous layer order.
 
 #### Success - choose which artwork runs first
-1. Open **Run order** in the docked Artwork / Operations rail.
+1. Open **Run order** in the docked Artwork panel.
 2. Enter a one-based **Run** number on any row. The complete run unit moves to that position and all
    other rows renumber automatically.
 3. For large jobs, search by artwork/operation/settings or enter **Jump to run**; the windowed list
    scrolls directly to that row without rendering the whole project at once.
 4. The displayed position updates without changing canvas stacking, geometry, operation settings,
    visibility, output flags, or automatic colours.
-5. Laser output follows the numbered run-unit order exactly. Each row reports its output step(s).
+5. Laser output follows the numbered run-unit order exactly. Each row reports its output step(s)
+   whenever they differ from its run number (ADR-616).
 6. CNC preserves global clearing-before-profile order and contiguous tool sections within each
    clearing/profile phase. Each row shows both
    its requested run number and the exact effective CNC step(s), so any necessary difference is
@@ -1672,7 +1673,7 @@ Left to right:
 - **Cursor position** — `X 124.3, Y 87.0 mm`
 - **Selection summary** — `1 selected · 50.0 × 30.0 mm` (or `Nothing selected`)
 - **Object count** — `Objects: 3`
-- **Layer count** — `Layers: 2 (1 output)`
+- **Operation count** — `Operations: 2 (1 output)`
 - **Device** — `Default 400×400`
 - **Zoom** — `100%`
 - **Job estimate** — Phase C feature; not in Phase A.

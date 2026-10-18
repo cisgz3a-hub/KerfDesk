@@ -1,6 +1,6 @@
 ## ADR-430 - The laser Artwork settings show what the process needs, and Cut Settings holds the rest (2026-09-26)
 
-**Status:** Accepted. | **Date:** 2026-09-26
+**Status:** Accepted; rule 1 (the inspector header) amended by ADR-616. | **Date:** 2026-09-26
 
 Maintainer direction, 2026-09-26, with a screenshot of the Artwork panel's Settings tab in Laser
 mode: "this whole section becomes weird and cluttered and non understandable. We should be at easy

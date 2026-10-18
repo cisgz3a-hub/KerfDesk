@@ -19,8 +19,17 @@ describe('artwork run order view model', () => {
     expect(
       artworkRunOrderRows(project).map((row) => [row.name, row.position, row.effectiveSteps]),
     ).toEqual([
-      ['Profile', 1, [1]],
-      ['Pocket', 2, [2]],
+      ['Lid', 1, [1]],
+      ['Tray', 2, [2]],
+    ]);
+  });
+
+  it('names each run by its artwork and keeps the operation as its summary', () => {
+    const project = projectWithJobs('laser');
+
+    expect(artworkRunOrderRows(project).map((row) => [row.name, row.operationSummary])).toEqual([
+      ['Lid', 'Profile'],
+      ['Tray', 'Pocket'],
     ]);
   });
 
@@ -30,8 +39,8 @@ describe('artwork run order view model', () => {
     expect(
       artworkRunOrderRows(project).map((row) => [row.name, row.position, row.effectiveSteps]),
     ).toEqual([
-      ['Profile', 1, [2]],
-      ['Pocket', 2, [1]],
+      ['Lid', 1, [2]],
+      ['Tray', 2, [1]],
     ]);
   });
 
@@ -71,7 +80,10 @@ function projectWithJobs(machine: 'laser' | 'cnc'): Project {
     ...base,
     ...(machine === 'cnc' ? { machine: DEFAULT_CNC_MACHINE_CONFIG } : {}),
     scene: {
-      objects: [object('profile-object', 'profile', 10), object('pocket-object', 'pocket', 40)],
+      objects: [
+        object('profile-object', 'profile', 10, 'Lid'),
+        object('pocket-object', 'pocket', 40, 'Tray'),
+      ],
       layers: [profile, pocket],
       artworkOrder: ['profile-object', 'pocket-object'],
     },
@@ -90,13 +102,14 @@ function operation(
   };
 }
 
-function object(id: string, operationId: string, x: number): SceneObject {
+function object(id: string, operationId: string, x: number, name: string): SceneObject {
   return {
     ...createRectangle({
       id,
       color: '#000000',
       spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
     }),
+    name,
     operationIds: [operationId],
     transform: { ...IDENTITY_TRANSFORM, x, y: 10 },
   };

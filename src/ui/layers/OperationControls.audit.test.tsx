@@ -31,9 +31,8 @@ async function openDisclosure(host: HTMLElement, label: string): Promise<void> {
 }
 
 describe('artwork control audit: operations', () => {
-  it('changes card visibility and output independently and opens More disclosure', async () => {
+  it('toggles card visibility without output and keeps Show / Output out of More', async () => {
     arrangeTwo();
-    const id = layer().id;
     const name = layer().name;
     const host = await mount(<CutsLayersPanel />);
     await openDisclosure(host, 'All operations');
@@ -41,16 +40,19 @@ describe('artwork control audit: operations', () => {
     await click(button(card, `Hide operation ${name}`));
     expect(layer().visible).toBe(false);
     expect(layer().output).toBe(true);
+    await click(button(card, `Show operation ${name}`));
+    expect(layer().visible).toBe(true);
     const summary = card.querySelector('summary')!;
     await click(summary);
     expect(card.querySelector('details')?.open).toBe(true);
-    await click(input(card, `input[aria-label="Show ${name}"]`));
-    expect(layer().visible).toBe(true);
-    await click(input(card, `input[aria-label="Output ${name}"]`));
-    expect(useStore.getState().project.scene.layers.find((item) => item.id === id)?.output).toBe(
-      false,
-    );
-    expect(layer().visible).toBe(true);
+    // The eye and the editor own visibility and output (ADR-616).
+    expect(card.querySelector('details input[type="checkbox"]')).toBeNull();
+    const remove = button(card, `Delete operation ${name}`);
+    expect(remove.classList.contains('lf-btn--danger')).toBe(true);
+    expect(remove.closest('.lf-operation-menu__danger')).not.toBeNull();
+    expect(
+      button(card, `Copy settings from ${layer().color}`).closest('.lf-operation-menu__danger'),
+    ).toBeNull();
     await click(summary);
     expect(card.querySelector('details')?.open).toBe(false);
   });

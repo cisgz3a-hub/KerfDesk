@@ -6,7 +6,7 @@ const VIEWS: ReadonlyArray<{
   readonly label: string;
   readonly icon: IconName;
 }> = [
-  { id: 'layers', label: 'Settings', icon: 'sliders' },
+  { id: 'layers', label: 'Properties', icon: 'sliders' },
   { id: 'run-order', label: 'Run order', icon: 'layers' },
   { id: 'materials', label: 'Materials', icon: 'square' },
 ];
