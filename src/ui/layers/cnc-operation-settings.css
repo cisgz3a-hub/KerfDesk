@@ -144,7 +144,7 @@
 .lf-cnc-tool-field > select {
   width: 100%;
   min-width: 0;
-  min-height: 34px;
+  min-height: 26px;
 }
 
 .lf-cnc-settings .lf-section {
@@ -156,7 +156,7 @@
 }
 
 .lf-cnc-settings .lf-section > summary {
-  min-height: 38px;
+  min-height: 28px;
   padding: 8px 10px;
   gap: 8px;
   font-size: 12px;
@@ -206,7 +206,7 @@
 
 .lf-cnc-settings .lf-cnc-setting-value > input:not([type='checkbox']),
 .lf-cnc-settings .lf-cnc-setting-value > select {
-  min-height: 32px;
+  min-height: 26px;
   max-width: 100%;
   min-width: 0;
 }

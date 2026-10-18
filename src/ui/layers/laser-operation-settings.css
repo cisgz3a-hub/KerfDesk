@@ -2,15 +2,15 @@
 .lf-cut-settings-content {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 
 .lf-laser-process,
 .lf-laser-essentials {
-  padding: 12px;
+  padding: 8px;
   border: 1px solid var(--lf-border);
-  border-radius: 10px;
+  border-radius: var(--lf-radius-lg);
   background: var(--lf-bg-2);
 }
 
@@ -40,8 +40,8 @@
   flex: 1;
   width: 100%;
   min-width: 0;
-  min-height: 36px;
-  font-size: 13px;
+  min-height: 26px;
+  font-size: var(--lf-text-sm);
 }
 
 .lf-laser-process__illustration {
@@ -72,7 +72,7 @@
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--lf-border);
-  border-radius: 8px;
+  border-radius: var(--lf-radius-lg);
   background: var(--lf-bg-1);
 }
 
@@ -83,11 +83,11 @@
   justify-content: center;
   gap: 6px;
   min-width: 0;
-  min-height: 34px;
-  padding: 4px 6px;
-  border-radius: 6px;
+  min-height: 26px;
+  padding: 2px 6px;
+  border-radius: var(--lf-radius-md);
   color: var(--lf-text-muted);
-  font-size: 13px;
+  font-size: var(--lf-text-sm);
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -118,8 +118,8 @@
 
 .lf-process-segment .lf-laser-process__illustration {
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   color: currentColor;
 }
 
@@ -225,11 +225,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--lf-text-sm);
 }
 
+/* Same width as the Power and Speed entries above it (operation-slider-field.css). */
 .lf-laser-essentials__passes .lf-laser-field__value {
-  flex: 0 0 100px;
+  flex: 0 0 84px;
 }
 
 /* The one or two settings that matter for Fill or Image, laid out like the
@@ -276,7 +277,7 @@
 .lf-laser-field__value input[type='number'],
 .lf-laser-field__value select {
   max-width: 100%;
-  min-height: 32px;
+  min-height: 26px;
 }
 
 /* Each field spans two rows of its grid: every label in a row shares the first
