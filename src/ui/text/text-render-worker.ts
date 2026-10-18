@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-// Lays out canvas text off the UI thread (ADR-624): opentype.js parsing,
+// Lays out canvas text off the UI thread (ADR-631): opentype.js parsing,
 // HarfBuzz shaping for complex scripts, and the outline conversion.
 
 import type {

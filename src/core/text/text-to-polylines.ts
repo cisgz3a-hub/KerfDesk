@@ -125,7 +125,7 @@ export async function parseOutlineFont(fontBuffer: ArrayBuffer): Promise<opentyp
  * textToPolylines' outline route on a font already parsed from
  * `input.fontBuffer`. opentype.js fills parts of a Font in lazily while it
  * draws, and some of that changes later layouts, so a parsed font may serve
- * more than one render only where reusableOutlineFont allows it (ADR-624).
+ * more than one render only where reusableOutlineFont allows it (ADR-631).
  */
 export function outlineTextToPolylines(
   input: OutlineTextRenderInput,

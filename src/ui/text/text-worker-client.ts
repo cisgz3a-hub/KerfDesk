@@ -1,4 +1,4 @@
-// Main-thread side of src/ui/text/text-render-worker.ts (ADR-624), after
+// Main-thread side of src/ui/text/text-render-worker.ts (ADR-631), after
 // ADR-609's vector geometry sessions.
 //
 // One client owns at most one worker. The worker holds the last font file it

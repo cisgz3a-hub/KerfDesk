@@ -1,4 +1,4 @@
-// Canvas text editing lays text out through the text worker (ADR-624).
+// Canvas text editing lays text out through the text worker (ADR-631).
 //
 // A session belongs to one owner (the canvas draft, the text-frame preview,
 // the variable-row preview, the missing-glyph check) and keeps one worker for

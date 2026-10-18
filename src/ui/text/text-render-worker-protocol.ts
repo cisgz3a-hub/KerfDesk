@@ -1,7 +1,7 @@
 import type { TextGeometryRequest } from './text-geometry-compute';
 import type { TextRenderResultMessage } from './text-render-result-transfer';
 
-/** Work the text worker does for canvas text editing (ADR-624). */
+/** Work the text worker does for canvas text editing (ADR-631). */
 export type TextWorkerTask =
   /** renderTextGeometry; `fontToken` names the outline font file, absent for stroke fonts. */
   | { readonly kind: 'render'; readonly input: TextGeometryRequest; readonly fontToken?: number }

@@ -1,4 +1,4 @@
-// renderTextGeometry as the text worker runs it (ADR-624): the same routing and
+// renderTextGeometry as the text worker runs it (ADR-631): the same routing and
 // the same core calls, with the font file already in hand and the parse
 // supplied by the caller, so the worker can reuse a parsed font where that is
 // safe. The UI thread keeps renderTextGeometry itself for output; the worker

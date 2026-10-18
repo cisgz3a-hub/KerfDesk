@@ -3,7 +3,7 @@ import type { encodeEmbeddedFont } from '../src/core/text/embedded-font';
 import type { renderTextGeometry } from '../src/ui/text/render-text-geometry';
 import type { createTextWorkerSession } from '../src/ui/text/text-worker-session';
 
-// ADR-624: canvas text lays out in a module worker, HarfBuzz WASM included,
+// ADR-631: canvas text lays out in a module worker, HarfBuzz WASM included,
 // and returns exactly what the UI thread would have drawn.
 test('lays canvas text out in the text worker, identical to the UI thread', async ({ page }) => {
   await page.goto('/');
