@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import {
   createLayer,
   createProject,
@@ -53,7 +53,7 @@ function project(): Project {
 
 let host: HTMLDivElement;
 let root: Root;
-let hover: ReturnType<typeof vi.spyOn>;
+let hover: MockInstance<ArtworkPulseClock['hover']>;
 
 async function render(canvasHoverEnabled: boolean): Promise<void> {
   await act(async () =>
