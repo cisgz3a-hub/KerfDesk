@@ -54,6 +54,8 @@ function validRights(status: LicenceStatus): boolean {
     [status.accessExpiresAt, status.updatesUntil].every(
       (time) => time === null || Number.isSafeInteger(time),
     ) &&
+    (status.checkInDueAt === undefined ||
+      (status.tier !== null && Number.isSafeInteger(status.checkInDueAt))) &&
     (status.trialExpiresInMs === undefined ||
       (status.tier === 'trial' &&
         status.accessExpiresAt !== null &&

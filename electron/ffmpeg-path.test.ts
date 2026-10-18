@@ -38,7 +38,7 @@ describe('finding FFmpeg for network cameras (ADR-551)', () => {
     ).toBeNull();
   });
 
-  it('finds Homebrew or MacPorts FFmpeg on a Mac opened from the Finder (ADR-606)', () => {
+  it('finds Homebrew or MacPorts FFmpeg on a Mac opened from the Finder (ADR-607)', () => {
     const finderPath = '/usr/bin:/bin:/usr/sbin:/sbin';
     expect(findFfmpeg(search('darwin', finderPath, ['/opt/homebrew/bin/ffmpeg']))).toBe(
       '/opt/homebrew/bin/ffmpeg',

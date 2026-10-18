@@ -211,17 +211,22 @@ describe('saved commercial rights through a fresh 1.0.8 runtime', () => {
     { offset: -1000 * DAY, state: 'checkin-required' },
     { offset: 1000 * DAY, state: 'checkin-required' },
   ])(
-    'keeps a covered paid version at clock offset $offset as $state, without changing it',
+    'keeps a covered paid version at clock offset $offset as $state, moving only its mark on',
     async ({ offset, state }) => {
       const h = await harness('paid');
-      const before = await readFile(h.file);
+      const before = await h.store.read();
+      if (before === null) throw new Error('Expected the old saved record.');
       h.time(ISSUED + offset);
       expect(await h.runtime().status()).toMatchObject({
         state,
         edition: state === 'ready' ? 'pro' : 'free',
         licenseKey: key,
       });
-      expect(await readFile(h.file)).toEqual(before);
+      // ADR-592: a paid licence's last-seen mark only ever moves forward.
+      expect(await h.store.read()).toEqual({
+        ...before,
+        lastSeenAt: Math.max(before.lastSeenAt, ISSUED + offset),
+      });
     },
   );
 });

@@ -183,7 +183,7 @@ describe('desktop serial ports', () => {
 
   // Electron's stored form on macOS and Linux (serial_chooser_context.cc
   // PortInfoToValue): USB IDs as numbers, the serial number, and on macOS the
-  // USB driver name (ADR-606).
+  // USB driver name (ADR-607).
   const ftdi = {
     portId: 'ftdi-token',
     portName: 'cu.usbserial-A10KJ3QZ',
