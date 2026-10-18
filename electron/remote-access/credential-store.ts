@@ -44,6 +44,13 @@ function validPendingRevocations(value: unknown): value is string[] {
   );
 }
 
+/** The OS storage, or on Linux its keyring, refused; the saved record itself was not opened. */
+export class RemoteStorageUnavailableError extends Error {
+  constructor() {
+    super('Secure remote credential storage is unavailable.');
+  }
+}
+
 /** Separate from licensing: no credential ever falls back to a plaintext file. */
 export function createRemoteCredentialStore(options: {
   readonly userDataPath: string;
@@ -55,7 +62,7 @@ export function createRemoteCredentialStore(options: {
   // On Linux, only a keyring's key counts, never the shared fallback key.
   const usable = createSecureStorageCheck(secure, options.platform);
   const check = async (): Promise<void> => {
-    if (!(await usable())) throw new Error('Secure remote credential storage is unavailable.');
+    if (!(await usable())) throw new RemoteStorageUnavailableError();
   };
   const write = async (value: RemoteIdentity): Promise<void> => {
     if (!validRemoteIdentity(value)) throw new Error('Invalid remote settings.');

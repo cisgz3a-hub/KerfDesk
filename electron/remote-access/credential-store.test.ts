@@ -4,7 +4,11 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRemoteCredentialStore, validRemoteIdentity } from './credential-store.js';
+import {
+  createRemoteCredentialStore,
+  RemoteStorageUnavailableError,
+  validRemoteIdentity,
+} from './credential-store.js';
 
 let directory: string;
 beforeEach(async () => {
@@ -110,7 +114,8 @@ describe('separate encrypted remote credentials', () => {
   it('asks the Linux keyring again after a probe that failed outright', async () => {
     const { store, secureStorage } = fixture('linux');
     secureStorage.encryptStringAsync.mockRejectedValueOnce(new Error('bus closed'));
-    await expect(store.read()).rejects.toThrow('Secure remote');
+    // The runtime reads again at the next attach only for this refusal.
+    await expect(store.read()).rejects.toBeInstanceOf(RemoteStorageUnavailableError);
     expect(await store.read()).toBeNull();
   });
 
