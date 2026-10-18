@@ -11,7 +11,7 @@ const DEFAULT_BRIDGE_ORIGIN = 'http://127.0.0.1:51731';
 const STREAM_STATUS_TIMEOUT_MS = 3_000;
 
 const BRIDGE_NOT_RUNNING_REASON =
-  'The network-camera bridge is available only in LaserForge Desktop or local development. For local development, run pnpm camera:bridge in a separate terminal; hosted web builds support USB cameras only.';
+  'The network-camera bridge is available only in KerfDesk Desktop or local development. For local development, run pnpm camera:bridge in a separate terminal; hosted web builds support USB cameras only.';
 
 export function createHttpCameraBridge(bridgeOrigin = DEFAULT_BRIDGE_ORIGIN): CameraBridgeAdapter {
   const origin = bridgeOrigin.replace(/\/+$/, '');

@@ -15,7 +15,7 @@ describe('web RTSP camera bridge client', () => {
     expect(result.kind).toBe('unavailable');
     if (result.kind === 'ok') throw new Error('expected unavailable bridge result');
     expect(result.reason).toContain('pnpm camera:bridge');
-    expect(result.reason).toContain('LaserForge Desktop');
+    expect(result.reason).toContain('KerfDesk Desktop');
     expect(result.reason).toContain('browser camera picker');
   });
 

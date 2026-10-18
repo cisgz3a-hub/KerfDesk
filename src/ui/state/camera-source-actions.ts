@@ -77,14 +77,24 @@ export type CameraSourceGet = () => CameraSourceSlice;
 
 const ADAPTER_MISSING = 'Camera is not available on this platform';
 const BRIDGE_MISSING =
-  'The local camera bridge is not running — LaserForge Desktop starts it automatically; in a browser run pnpm camera:bridge.';
+  'The local camera bridge is not running — KerfDesk Desktop starts it automatically; in a browser run pnpm camera:bridge.';
+// The bridge looks for FFmpeg once per run (ADR-551), so reconnecting alone
+// does not find a copy installed since.
 const FFMPEG_MISSING =
-  'FFmpeg is not installed on this computer — RTSP cameras need it for preview and capture. Install it, then reconnect.';
+  'FFmpeg is not installed on this computer — RTSP cameras need it for preview and capture. Install it, then restart KerfDesk.';
+// Windows refuses a camera another program holds with NotReadableError
+// ("Device in use"); Chromium's older name for it was TrackStartError.
+const USB_CAMERA_BUSY =
+  'The camera is in use by another program, or it could not be started. Close other programs that use the camera (another KerfDesk window, LightBurn, a video call or the Camera app), then press Start USB camera.';
+const USB_CAMERA_NOT_FOUND =
+  'No camera was found. Connect the camera, then press Start USB camera.';
 const NO_PREVIEW_URL = 'The camera bridge did not return a preview URL for this RTSP camera.';
 const UNMONITORED_RTSP_ADVISORY =
   'This camera bridge does not report RTSP preview liveness. The preview remains available, but a frozen image may not be detected. Update the desktop app or restart the local bridge to enable monitoring.';
 function cameraErrorMessage(err: unknown): string {
   if (err instanceof DOMException) {
+    if (err.name === 'NotReadableError' || err.name === 'TrackStartError') return USB_CAMERA_BUSY;
+    if (err.name === 'NotFoundError') return USB_CAMERA_NOT_FOUND;
     return err.message === '' ? err.name : `${err.name}: ${err.message}`;
   }
   if (err instanceof Error && err.message !== '') return err.message;

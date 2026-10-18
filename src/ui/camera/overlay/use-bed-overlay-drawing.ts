@@ -179,18 +179,31 @@ function frameSize(
   return size.width > 0 && size.height > 0 ? size : null;
 }
 
-// Changes whenever the element shows a new picture: a video advances its
-// clock, a polled image swaps or finishes its source. An MJPEG stream keeps
+// Changes whenever the element shows a new picture: a video counts a new
+// frame, a polled image swaps or finishes its source. An MJPEG stream keeps
 // one src and repaints in place, so it is sampled about 30 times a second.
-function liveFrameKey(element: LiveCaptureElement, streaming: boolean): string {
+export function liveFrameKey(element: LiveCaptureElement, streaming: boolean): string {
   if (element instanceof HTMLVideoElement) {
-    return `video:${element.currentTime}:${element.videoWidth}x${element.videoHeight}`;
+    return `video:${videoFrameCount(element)}:${element.videoWidth}x${element.videoHeight}`;
   }
   const tick = streaming ? Math.floor(performance.now() / STREAM_FRAME_MS) : 0;
   return `image:${element.currentSrc}:${element.complete}:${element.naturalWidth}:${tick}`;
 }
 
 const STREAM_FRAME_MS = 33;
+
+// A camera stream's currentTime is a clock that advances on every animation
+// frame (W3C Media Capture and Streams, section 6), so it would redraw at the
+// display's rate, not the camera's. The frames the element has received only
+// change when the camera sends one. The clock remains for a browser that
+// counts none.
+function videoFrameCount(video: HTMLVideoElement): string {
+  const frames =
+    typeof video.getVideoPlaybackQuality === 'function'
+      ? video.getVideoPlaybackQuality().totalVideoFrames
+      : 0;
+  return frames > 0 ? `frames ${frames}` : `time ${video.currentTime}`;
+}
 
 const stillTextures = new WeakMap<RgbaImage, ImageData>();
 
