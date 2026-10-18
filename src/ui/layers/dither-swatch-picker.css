@@ -1,0 +1,103 @@
+/* The Dither picker: a wrapping grid of swatches, each the same ramp burned
+   with one mode. Tiles keep their thumbnail at a whole number of pixels per
+   dot and wrap onto more rows rather than scroll the rail sideways. */
+.lf-dither-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.lf-dither-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 3px;
+  min-width: 0;
+}
+
+.lf-dither-swatch {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+  background: var(--lf-bg-input);
+  cursor: pointer;
+  transition:
+    border-color 80ms,
+    background-color 80ms;
+}
+
+.lf-dither-swatch:hover {
+  border-color: var(--lf-border-strong);
+}
+
+.lf-dither-swatch[data-checked='true'] {
+  border-color: var(--lf-accent);
+  background: var(--lf-accent-wash);
+  box-shadow: inset 0 0 0 1px var(--lf-accent);
+}
+
+.lf-dither-swatch:has(input:focus-visible) {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+/* The radio covers the tile so its title is the tile's tooltip. */
+.lf-dither-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* A small piece of material with the marks burned into it: dark on light in
+   every theme, and kept as drawn in forced-colors mode, so a swatch never
+   swaps what burns for what stays. */
+.lf-dither-swatch__thumbnail {
+  display: block;
+  max-width: 100%;
+  border-radius: 2px;
+  background: var(--lf-burn-preview-material);
+  color: var(--lf-burn-preview-mark);
+  fill: currentColor;
+  shape-rendering: crispEdges;
+  forced-color-adjust: none;
+}
+
+.lf-dither-picker__notice {
+  margin: 0;
+}
+
+/* Forced colours drop the accent border, wash and inset ring, so the chosen
+   swatch takes the system highlight instead. */
+@media (forced-colors: active) {
+  .lf-dither-swatch[data-checked='true'] {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight;
+  }
+
+  .lf-dither-swatch:has(input:focus-visible) {
+    outline-color: CanvasText;
+  }
+}
+
+.lf-dither-picker__caption {
+  min-height: calc(2 * 1.4em);
+  margin: 0;
+  color: var(--lf-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.lf-dither-picker__caption strong {
+  color: var(--lf-text);
+  font-weight: 600;
+}

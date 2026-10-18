@@ -9,7 +9,9 @@ name: Desktop package check
 #   and push to main. A second Linux job builds the AppImage and .deb from the
 #   Preview config, checks their package contract, installs the .deb and
 #   launches the installed app with Ubuntu's default sandbox restriction in
-#   place, then removes it (ADR-607).
+#   place, then removes it (ADR-607). A third rehearses the commercial Linux
+#   build of the unsigned lane, and macOS rehearses its commercial build with
+#   the native jobs (ADR-613).
 # - Windows and macOS build the unsigned Preview exactly as the Preview release
 #   lane does, and run that lane's package contract. Windows then installs it,
 #   launches the installed app and uninstalls it; macOS launches the app from
@@ -225,6 +227,84 @@ jobs:
           path: artifacts/native-smoke/
           if-no-files-found: warn
           retention-days: 14
+
+  # The commercial Mac and Linux builds of the unsigned lane (ADR-613) run only
+  # after a Windows release, with the identity its protected job signed. These
+  # rehearsals run the same script with a throwaway identity, signed by a key
+  # this runner makes and pins in its own checkout, so a pull request proves the
+  # build, package contract and launches long before a release depends on them.
+  commercial-linux:
+    name: Rehearse the commercial Linux build (${{ matrix.arch }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      matrix:
+        arch: [x64]
+    env:
+      # A strict X.Y.Z, as a commercial build requires; never a real release.
+      VERSION: 0.0.${{ github.run_number }}
+    steps: &commercial-rehearsal-steps
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Empty except when the release train calls: then the release commit.
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build renderer and Electron main at the rehearsal version
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ env.VERSION }}
+        run: pnpm build:renderer:desktop && pnpm build:electron-main
+
+      - name: Sign a throwaway release identity in place of the Windows job
+        run: |
+          node scripts/rehearse-commercial-identity.mjs \
+            "${RUNNER_TEMP}/rehearsal-identity.json" "${VERSION}" "$(git rev-parse HEAD)"
+
+      - name: Package and qualify exactly as the release does
+        run: |
+          platform="$(echo "${RUNNER_OS}" | tr "[:upper:]" "[:lower:]")"
+          bash scripts/build-commercial-platform.sh "${platform}" "${{ matrix.arch }}" \
+            "${VERSION}" "$(git rev-parse HEAD)" "${RUNNER_TEMP}/rehearsal-identity.json"
+
+      - name: Upload native smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: desktop-package-check-commercial-${{ runner.os }}-${{ matrix.arch }}-${{ inputs.ref || github.sha }}
+          path: artifacts/native-smoke/
+          if-no-files-found: warn
+          retention-days: 14
+
+  commercial-macos:
+    name: Rehearse the commercial macOS build (${{ matrix.arch }})
+    # macOS runs with the other native jobs (ADR-522 Amendment 1).
+    if: ${{ inputs.native == true }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    env:
+      VERSION: 0.0.${{ github.run_number }}
+    steps: *commercial-rehearsal-steps
 
   windows-package:
     name: Package, install and launch the Windows desktop app

@@ -245,7 +245,11 @@ export function duplicateProfileAsCustom(
 
 export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<string> {
   const errors: string[] = [];
-  const lightIssue = positioningLightIssue(profile.positioningLight, profile.controllerKind);
+  const lightIssue = positioningLightIssue(
+    profile.positioningLight,
+    profile.controllerKind,
+    profile.gcodeDialect?.dialectId,
+  );
   if (lightIssue !== null) errors.push(lightIssue);
   requireNonEmpty(profile.name, 'name', errors);
   if (profile.profileId !== undefined) requireNonEmpty(profile.profileId, 'profileId', errors);

@@ -24,6 +24,7 @@ import { useSettingsDialogStore, type SettingsSectionId } from './settings-dialo
 import { settingsNoteStyle } from './settings-styles';
 import { RemoteAccessSection } from '../remote-access/RemoteAccessSection';
 import { isRemoteAccessRenderer } from '../remote-access/desktop-only';
+import './SettingsDialog.css';
 
 type SectionSpec = {
   readonly id: SettingsSectionId;
@@ -80,7 +81,7 @@ export function SettingsDialog(props: { readonly onClose: () => void }): JSX.Ele
   const active = sections.some((entry) => entry.id === requested) ? requested : 'general';
   const baseId = useId();
   return (
-    <Dialog title="Settings" size="lg" onClose={props.onClose}>
+    <Dialog title="Settings" size="lg" panelClassName="lf-settings-dialog" onClose={props.onClose}>
       <div style={layoutStyle}>
         <SectionTabs baseId={baseId} sections={sections} active={active} onSelect={setSection} />
         <div
@@ -189,11 +190,15 @@ function SectionBody(props: {
   }
 }
 
+// Fills the fixed-size panel between the title and the footer. The section
+// list is as wide as its longest label, so no label wraps.
 const layoutStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(120px, 160px) 1fr',
+  gridTemplateColumns: 'max-content minmax(0, 1fr)',
+  gridTemplateRows: 'minmax(0, 1fr)',
   gap: 'var(--lf-space-4)',
-  minHeight: 320,
+  flex: '1 1 auto',
+  minHeight: 0,
 };
 const navStyle: React.CSSProperties = {
   display: 'flex',
@@ -202,7 +207,11 @@ const navStyle: React.CSSProperties = {
   borderRight: '1px solid var(--lf-border)',
   paddingRight: 'var(--lf-space-3)',
 };
-const tabStyle: React.CSSProperties = { justifyContent: 'flex-start', textAlign: 'left' };
+const tabStyle: React.CSSProperties = {
+  justifyContent: 'flex-start',
+  textAlign: 'left',
+  whiteSpace: 'nowrap',
+};
 const activeTabStyle: React.CSSProperties = {
   ...tabStyle,
   background: 'var(--lf-accent-wash)',
@@ -212,7 +221,7 @@ const panelStyle: React.CSSProperties = {
   display: 'grid',
   alignContent: 'start',
   gap: 'var(--lf-space-4)',
-  maxHeight: 'min(60vh, 520px)',
+  minHeight: 0,
   overflowY: 'auto',
   paddingRight: 4,
 };

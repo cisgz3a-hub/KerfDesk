@@ -1,8 +1,7 @@
 import { clockRolledBack } from './licensing-clock.js';
 import type { LicensingConfig } from './licensing-config.js';
 import type { LicenceRecord } from './licensing-store.js';
-import { verifyManualDownload } from '../public/desktop-manual-download.mjs';
-import { manualReleaseKeySet } from './manual-update-manifest.js';
+import { manualReleaseKeySet, verifyAnyManualDownload } from './manual-update-manifest.js';
 import {
   licenceCoversRelease,
   verifyEntitlement,
@@ -57,7 +56,8 @@ export class LicensingUpdateCache {
     )
       return false;
     try {
-      const release = await verifyManualDownload(
+      // The Windows document, or this release's macOS or Linux one (ADR-613).
+      const release = await verifyAnyManualDownload(
         envelope,
         manualReleaseKeySet(this.config.releaseKeys),
         this.now() * 1000,

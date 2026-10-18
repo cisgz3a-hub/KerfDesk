@@ -7,6 +7,7 @@ import {
   prepareJobEstimateOffThread,
   prepareLargeJobOffThread,
   resetPreparationWorkerForTests,
+  SUPERSEDE_QUIET_WINDOW_MS,
 } from './preparation-worker-client';
 import type {
   PreparationPreviewUpgrade,
@@ -280,5 +281,35 @@ describe('shared preparation consumer ownership', () => {
     expect(worker().terminated).toBe(false);
     worker().send('estimate-ready');
     await expect(stable).resolves.toEqual({ estimate: result.estimate });
+  });
+
+  it('debounces a hook-shaped burst of cancel-then-new-project edits into one restart', async () => {
+    vi.useFakeTimers();
+    try {
+      let owner = new AbortController();
+      const settled: Array<Promise<unknown>> = [];
+      const request = (): void => {
+        const pending = prepareJobEstimateOffThread(createProject(), {}, owner.signal);
+        if (pending === null) throw new Error('expected a worker request');
+        settled.push(pending.catch(() => undefined));
+      };
+      request();
+      expect(FakeWorker.instances).toHaveLength(1);
+      for (let edit = 0; edit < 4; edit += 1) {
+        vi.advanceTimersByTime(300);
+        // The effect cleanup cancels the previous edit before the next request.
+        owner.abort();
+        owner = new AbortController();
+        request();
+      }
+      expect(FakeWorker.instances).toHaveLength(1);
+      vi.advanceTimersByTime(SUPERSEDE_QUIET_WINDOW_MS);
+      expect(FakeWorker.instances).toHaveLength(2);
+      expect(worker().requests).toHaveLength(1);
+      owner.abort();
+      await Promise.all(settled);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

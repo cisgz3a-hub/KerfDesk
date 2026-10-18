@@ -1,18 +1,26 @@
 // Offset Shapes dialog (LightBurn gap batch 3, ADR-410). Distance, direction,
 // corner style, Outer Shapes Only and Delete Originals, with a live preview and
-// size readout computed by the same core call the action uses.
+// size readout computed by the same core call the action uses. That call runs
+// in the vector worker (ADR-609), and Apply commits its settled result.
 
-import { useDeferredValue, useMemo, useState } from 'react';
-import {
-  offsetShapes,
-  type OffsetCornerStyle,
-  type OffsetDirection,
-} from '../../core/geometry/offset-shapes';
+import { useMemo, useState } from 'react';
+import type { VectorSceneObject } from '../../core/geometry';
+import type { OffsetCornerStyle, OffsetDirection } from '../../core/geometry/offset-shapes';
 import type { ImportedSvg, Scene } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
 import { evaluateNumericEntry } from '../../core/numeric-expression';
-import { offsetShapesTargets, type OffsetShapesRequest } from '../state/offset-shapes-actions';
+import {
+  offsetShapesResultIds,
+  offsetShapesTargets,
+  type OffsetShapesRequest,
+} from '../state/offset-shapes-actions';
+import type { PreparedOffsetShapes } from '../state/vector-op-prepared';
 import { OffsetShapesPreview } from './OffsetShapesPreview';
+import {
+  useStableObjects,
+  useVectorOpPreview,
+  type VectorOpPreview,
+} from './use-vector-op-preview';
 
 export const DEFAULT_OFFSET_SHAPES_REQUEST: OffsetShapesRequest = {
   distanceMm: 1,
@@ -21,8 +29,6 @@ export const DEFAULT_OFFSET_SHAPES_REQUEST: OffsetShapesRequest = {
   outerShapesOnly: false,
   deleteOriginals: false,
 };
-
-const PREVIEW_IDS = { outward: 'preview-out', inward: 'preview-in' };
 
 const DIRECTIONS: ReadonlyArray<readonly [OffsetDirection, string, string]> = [
   ['outward', 'Outward', 'Grow the shapes; open lines get a closed outline around them.'],
@@ -45,7 +51,7 @@ export function OffsetShapesDialog(props: {
   readonly selectedIds: ReadonlyArray<string>;
   readonly initial: OffsetShapesRequest;
   readonly onCancel: () => void;
-  readonly onApply: (request: OffsetShapesRequest) => void;
+  readonly onApply: (request: OffsetShapesRequest, prepared?: PreparedOffsetShapes) => void;
 }): JSX.Element {
   const [form, setForm] = useState<OffsetShapesForm>(() => {
     const { distanceMm, ...rest } = props.initial;
@@ -56,16 +62,15 @@ export function OffsetShapesDialog(props: {
     const entry = evaluateNumericEntry(distanceText, { kind: 'length' });
     return { ...rest, distanceMm: entry.kind === 'ok' ? entry.value : Number.NaN };
   }, [form]);
-  const previewRequest = useDeferredValue(request);
-  const sources = useMemo(
-    () => offsetShapesTargets(props.scene, props.selectedIds),
-    [props.scene, props.selectedIds],
+  const sources = useStableObjects(
+    useMemo(
+      () => offsetShapesTargets(props.scene, props.selectedIds),
+      [props.scene, props.selectedIds],
+    ),
   );
-  const preview = useMemo(
-    () => offsetShapes(sources, previewRequest, PREVIEW_IDS),
-    [sources, previewRequest],
-  );
-  const result = preview.kind === 'ok' ? preview.value : null;
+  const { preview, prepared } = useOffsetShapesPreview(props.scene, sources, request);
+  const shown = preview.settled?.sources === sources ? preview.settled.result : null;
+  const canApply = prepared !== undefined || preview.unavailable !== null;
   return (
     <Dialog
       title="Offset Shapes"
@@ -74,20 +79,20 @@ export function OffsetShapesDialog(props: {
       onClose={props.onCancel}
       onSubmit={(event) => {
         event.preventDefault();
-        if (result !== null) props.onApply(request);
+        if (canApply) props.onApply(request, prepared);
       }}
     >
       <OffsetShapesFields
         form={form}
         onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
       />
-      <OffsetShapesPreview sources={sources} result={result} />
+      <OffsetShapesPreview sources={sources} result={shown?.kind === 'ok' ? shown.value : null} />
       <p role="status" aria-live="polite">
-        {preview.kind === 'ok' ? summary(preview.value) : preview.error.message}
+        {offsetStatus(preview)}
       </p>
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
-        <Button variant="primary" type="submit" disabled={result === null}>
+        <Button variant="primary" type="submit" disabled={!canApply}>
           Offset
         </Button>
       </DialogActions>
@@ -141,6 +146,48 @@ function OffsetShapesFields(props: {
       />
     </div>
   );
+}
+
+type OffsetShapesTask = {
+  readonly kind: 'offset-shapes';
+  readonly options: PreparedOffsetShapes['options'];
+  readonly ids: PreparedOffsetShapes['ids'];
+};
+
+function useOffsetShapesPreview(
+  scene: Scene,
+  sources: ReadonlyArray<VectorSceneObject>,
+  request: OffsetShapesRequest,
+): {
+  readonly preview: VectorOpPreview<OffsetShapesTask>;
+  readonly prepared: PreparedOffsetShapes | undefined;
+} {
+  const { outward, inward } = useMemo(() => offsetShapesResultIds(scene), [scene]);
+  const { distanceMm, direction, cornerStyle, outerShapesOnly } = request;
+  const task = useMemo<OffsetShapesTask>(
+    () => ({
+      kind: 'offset-shapes',
+      options: { distanceMm, direction, cornerStyle, outerShapesOnly },
+      ids: { outward, inward },
+    }),
+    [distanceMm, direction, cornerStyle, outerShapesOnly, outward, inward],
+  );
+  const preview = useVectorOpPreview(sources, task);
+  const result = preview.current?.result;
+  const prepared =
+    result?.kind === 'ok'
+      ? { sources, options: task.options, ids: task.ids, result: result.value }
+      : undefined;
+  return { preview, prepared };
+}
+
+function offsetStatus(preview: VectorOpPreview<OffsetShapesTask>): string {
+  const result = preview.current?.result;
+  if (result !== undefined)
+    return result.kind === 'ok' ? summary(result.value) : result.error.message;
+  if (preview.failed !== null) return `${preview.failed} Change the settings to try again.`;
+  if (preview.unavailable !== null) return `${preview.unavailable} Offset still works.`;
+  return 'Updating preview…';
 }
 
 function summary(result: { outward: ImportedSvg | null; inward: ImportedSvg | null }): string {

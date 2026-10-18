@@ -72,8 +72,38 @@ describe('positioning light through real store serial and ACK ownership', () => 
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
     expect(sim.outbound().join('')).toContain('M7\n');
-    await finish(useLaserStore.getState().setPositioningLightEnabled(false));
+    await finish(useLaserStore.getState().switchPositioningLightOff());
     expect(useLaserStore.getState().positioningLightEnabled).toBe(false);
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+  });
+
+  it.each(families)('switches a lit light off as part of Disconnect on %s', async (kind) => {
+    const offLinesAtDisconnect = async (lightOn: boolean): Promise<number> => {
+      resetStore();
+      const sim =
+        kind === 'marlin'
+          ? createMarlinSimulator()
+          : kind === 'smoothieware'
+            ? createSmoothieSimulator()
+            : createGrblSimulator();
+      useStore.getState().updateDeviceProfile({
+        controllerKind: kind,
+        positioningLight: { onCommand: 'M7', offCommand: 'M9', offsetXmm: 0, offsetYmm: 0 },
+      });
+      await useLaserStore.getState().connect(sim.adapter, { controllerKind: kind });
+      await vi.advanceTimersByTimeAsync(1500);
+      if (lightOn) await finish(useLaserStore.getState().centrePositioningLight(10, 15, 1000));
+      const before = sim.outbound().length;
+      await disconnectOnTestClock();
+      await vi.advanceTimersByTimeAsync(5000);
+      return sim
+        .outbound()
+        .slice(before)
+        .join('')
+        .split('\n')
+        .filter((line) => line.trim() === 'M9').length;
+    };
+    const unlit = await offLinesAtDisconnect(false);
+    expect(await offLinesAtDisconnect(true)).toBe(unlit + 1);
   });
 });

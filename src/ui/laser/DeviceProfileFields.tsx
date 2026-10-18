@@ -2,27 +2,21 @@
 // identity and geometry (name, bed, origin, feed) plus the recorded homing
 // corner. Granular so Machine Setup's coordinates step can place each field
 // where it belongs. Pure presentational components: each takes a value plus a
-// change callback and owns no store wiring.
+// change callback and owns no store wiring. The origin and the recorded homing
+// corner are picked on a bed diagram (BedCornerPicker).
 // Power/air-assist fields live in DeviceProfilePowerFields.tsx.
 
 import type { DeviceProfile, Origin } from '../../core/devices';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
+import { BedCornerPicker, bedPositionLabel } from './BedCornerPicker';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
 
 const MAX_BED_MM = 1500;
 const MAX_FEED_MM_PER_MIN = 100000;
 
-const ORIGIN_OPTIONS: ReadonlyArray<{ readonly value: Origin; readonly label: string }> = [
-  { value: 'front-left', label: 'Front left' },
-  { value: 'front-right', label: 'Front right' },
-  { value: 'rear-left', label: 'Rear left' },
-  { value: 'rear-right', label: 'Rear right' },
-  { value: 'center', label: 'Center' },
-];
-
-/** The origin corner as the Origin select names it ("Front left"). */
+/** The origin corner as the bed diagram names it ("Front left"). */
 export function originLabel(origin: Origin): string {
-  return ORIGIN_OPTIONS.find((option) => option.value === origin)?.label ?? origin;
+  return bedPositionLabel(origin);
 }
 
 type DeviceRowsProps = {
@@ -30,45 +24,38 @@ type DeviceRowsProps = {
   readonly update: (patch: Partial<DeviceProfile>) => void;
 };
 
-export function OriginSelect(props: {
+export function OriginCornerPicker(props: {
   readonly value: Origin;
   readonly onChange: (next: Origin) => void;
-  readonly ariaLabel?: string;
-  readonly title?: string;
 }): JSX.Element {
   return (
-    <select
+    <BedCornerPicker
       value={props.value}
-      onChange={(e) => props.onChange(e.target.value as Origin)}
-      aria-label={props.ariaLabel ?? 'Machine origin corner'}
-      title={
-        props.title ??
-        "Sets the canvas-to-machine coordinate orientation and jog directions. Match the controller's coordinate layout. This does not set work zero or change homing settings."
-      }
-    >
-      {ORIGIN_OPTIONS.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+      onChange={props.onChange}
+      marker="origin"
+      ariaLabel="Machine origin corner"
+      title="Sets the canvas-to-machine coordinate orientation and jog directions. Match the controller's coordinate layout. This does not set work zero or change homing settings."
+    />
   );
 }
 
-export function HomingCornerSelect(props: {
+export function HomingCornerPicker(props: {
   readonly value: Origin;
   readonly onChange: (next: Origin) => void;
 }): JSX.Element {
+  // A span, not the <label> the old select sat in: a label forwards a click on
+  // its text to the first corner button, which would change the record.
   return (
-    <label style={inlineLabelStyle}>
+    <span style={homingStyle}>
       <span>Recorded home</span>
-      <OriginSelect
+      <BedCornerPicker
         value={props.value}
         onChange={props.onChange}
+        marker="home"
         ariaLabel="Recorded homing corner"
         title="Record where this machine homes. The controller's firmware determines the actual homing direction; changing this record does not change firmware."
       />
-    </label>
+    </span>
   );
 }
 
@@ -122,7 +109,7 @@ export function OriginCornerRow(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   return (
     <Row label="Origin">
-      <OriginSelect value={device.origin} onChange={(origin) => update({ origin })} />
+      <OriginCornerPicker value={device.origin} onChange={(origin) => update({ origin })} />
     </Row>
   );
 }
@@ -166,10 +153,13 @@ export function FeedRows(props: DeviceRowsProps): JSX.Element {
 
 const textInputStyle: React.CSSProperties = { width: 140 };
 const timesStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-faint)' };
-const inlineLabelStyle: React.CSSProperties = {
+// Wraps so a narrow dialog puts the 156 px diagram under its label rather than
+// overflowing the field.
+const homingStyle: React.CSSProperties = {
   display: 'inline-flex',
+  flexWrap: 'wrap',
   alignItems: 'center',
-  gap: 4,
+  gap: 6,
+  minWidth: 0,
   fontSize: 12,
-  cursor: 'pointer',
 };

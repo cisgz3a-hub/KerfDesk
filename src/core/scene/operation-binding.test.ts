@@ -88,14 +88,16 @@ describe('explicit operation binding', () => {
 
 describe('automatic artwork operations', () => {
   it('uses deterministic distinct palette colors and an artwork name', () => {
-    expect(nextOperationColor([])).toBe('#000000');
-    expect(nextOperationColor([{ color: '#000000' }])).toBe('#2563eb');
-    expect(nextOperationColor([{ color: '#000000' }, { color: '#2563eb' }])).toBe('#dc2626');
+    // ADR-620: the first operation takes a real colour, never black — artwork
+    // rests in ink, so a black hover pulse would be invisible.
+    expect(nextOperationColor([])).toBe('#2563eb');
+    expect(nextOperationColor([{ color: '#2563eb' }])).toBe('#dc2626');
+    expect(nextOperationColor([{ color: '#2563eb' }, { color: '#dc2626' }])).toBe('#16a34a');
     const result = createArtworkOperation(EMPTY_SCENE, artwork('Johann'));
     expect(result.operation).toMatchObject({
       id: 'operation-Johann',
       name: 'Johann',
-      color: '#000000',
+      color: '#2563eb',
     });
     expect(result.object.operationIds).toEqual(['operation-Johann']);
   });

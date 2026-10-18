@@ -104,7 +104,7 @@ describe('Speed above Output max feed', () => {
       expect(note?.textContent).toContain('15,000 mm/min is above this machine');
       expect(note?.textContent).toContain('runs at 10,000 mm/min');
       expect(note?.getAttribute('role')).toBe('status');
-      expect(input(host, SPEED_SELECTOR).title).toContain('Output max feed, 10000 mm/min');
+      expect(input(host, SPEED_SELECTOR).title).toContain('Output max feed, 10,000 mm/min');
     } finally {
       await unmount();
     }
