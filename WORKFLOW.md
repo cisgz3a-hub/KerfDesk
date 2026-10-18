@@ -1106,6 +1106,13 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    the left.
 5. Burned labels show each row's and column's value (speeds as the feed the job runs). The toast
    names what rows and columns vary.
+6. Below the fields, a live preview draws the card as Generate will make it: every row and column
+   it holds (a passes axis shows only its whole numbers), labelled with the same values the card
+   burns, speeds capped at the profile's maximum feed. Each cell is shaded from faint to deep by
+   its energy relative to the strongest cell: power × passes ÷ speed, and ÷ hatch spacing for
+   Engrave. Engraved cells fill; cut cells show only their outline. Hovering a cell names its
+   settings. While a field is invalid the last valid card stays, dimmed, until it is fixed. The
+   preview only shows the card; it never changes what Generate makes.
 
 ### F-A7g. Recipes that apply themselves (ADR-496)
 
