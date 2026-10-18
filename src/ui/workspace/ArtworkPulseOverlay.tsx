@@ -98,6 +98,10 @@ function useCanvasHoverObject(
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null) return;
+    let releasedNormally = false;
+    const begin = (): void => {
+      releasedNormally = false;
+    };
     // Cursor null also means an ordinary click finished. Physical leave and
     // cancellation must independently end a paused hover, even if cursor null
     // has already been reported by pointer-up.
@@ -108,6 +112,7 @@ function useCanvasHoverObject(
       setHovered(null);
     };
     const release = (event: PointerEvent): void => {
+      releasedNormally = true;
       const bounds = canvas.getBoundingClientRect();
       if (
         event.clientX < bounds.left ||
@@ -118,13 +123,23 @@ function useCanvasHoverObject(
         leave();
       }
     };
+    const lostCapture = (): void => {
+      // A normal pointer-up also releases capture; preserve its paused hover.
+      // Capture loss without pointer-up is the owner's cancellation path.
+      if (!releasedNormally) leave();
+      releasedNormally = false;
+    };
+    canvas.addEventListener('pointerdown', begin);
     canvas.addEventListener('pointerleave', leave);
     canvas.addEventListener('pointercancel', leave);
     canvas.addEventListener('pointerup', release);
+    canvas.addEventListener('lostpointercapture', lostCapture);
     return () => {
+      canvas.removeEventListener('pointerdown', begin);
       canvas.removeEventListener('pointerleave', leave);
       canvas.removeEventListener('pointercancel', leave);
       canvas.removeEventListener('pointerup', release);
+      canvas.removeEventListener('lostpointercapture', lostCapture);
     };
   }, [canvasRef]);
   const x = cursor?.x ?? null;

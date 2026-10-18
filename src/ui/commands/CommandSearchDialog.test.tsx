@@ -168,6 +168,25 @@ describe('CommandSearchHost and Ctrl+K', () => {
     expect(open).toHaveBeenCalledTimes(2);
   });
 
+  it('leaves Control-K to macOS text fields while Cmd+K still opens the search', () => {
+    const open = vi.fn();
+    const field = document.createElement('input');
+    document.body.append(field);
+    try {
+      const press = (init: KeyboardEventInit): KeyboardEvent => {
+        const event = new KeyboardEvent('keydown', { key: 'k', bubbles: true, ...init });
+        Object.defineProperty(event, 'target', { value: field });
+        return event;
+      };
+      expect(handleCommandSearchShortcut(press({ ctrlKey: true }), open, true)).toBe(false);
+      expect(handleCommandSearchShortcut(press({ metaKey: true }), open, true)).toBe(true);
+      expect(handleCommandSearchShortcut(press({ ctrlKey: true }), open, false)).toBe(true);
+      expect(open).toHaveBeenCalledTimes(2);
+    } finally {
+      field.remove();
+    }
+  });
+
   it('renders only while the store says open and closes on Escape', async () => {
     const commands = commandsWith({ save: vi.fn(), group: vi.fn(), box: vi.fn() });
     await act(async () =>

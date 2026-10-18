@@ -24,6 +24,12 @@ function key(type: 'keydown' | 'keyup', init: KeyboardEventInit): KeyboardEvent 
 
 const peek = (): boolean => useUiStore.getState().operationColorPeek;
 
+function pointer(type: string, init: MouseEventInit = {}, pointerId = 1): void {
+  const event = new MouseEvent(type, { bubbles: true, ...init });
+  Object.defineProperty(event, 'pointerId', { value: pointerId });
+  window.dispatchEvent(event);
+}
+
 beforeEach(async () => {
   vi.useFakeTimers();
   host = document.createElement('div');
@@ -68,6 +74,22 @@ describe('useOperationColorPeek', () => {
     expect(peek()).toBe(false);
   });
 
+  it('never peeks during an Alt click or drag, where Alt serves the gesture', () => {
+    key('keydown', { key: 'Alt', altKey: true });
+    pointer('pointerdown', { altKey: true, buttons: 1 });
+    vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS * 2);
+    expect(peek()).toBe(false);
+    key('keyup', { key: 'Alt' });
+    pointer('pointerup');
+
+    // An Alt-drag begun after the peek showed ends it.
+    key('keydown', { key: 'Alt', altKey: true });
+    vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS);
+    expect(peek()).toBe(true);
+    pointer('pointerdown', { altKey: true, buttons: 1 });
+    expect(peek()).toBe(false);
+  });
+
   it('ends the peek when the window loses focus mid-hold', () => {
     key('keydown', { key: 'Alt', altKey: true });
     vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS);
@@ -81,13 +103,66 @@ describe('useOperationColorPeek', () => {
     (delay) => {
       key('keydown', { key: 'Alt', altKey: true });
       vi.advanceTimersByTime(delay);
-      window.dispatchEvent(new MouseEvent('pointerdown', { altKey: true, buttons: 1 }));
+      pointer('pointerdown', { altKey: true, buttons: 1 });
       expect(peek()).toBe(false);
       vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS * 2);
       expect(peek()).toBe(false);
       key('keydown', { key: 'Alt', altKey: true, repeat: true });
       expect(peek()).toBe(false);
       key('keyup', { key: 'Alt' });
+      pointer('pointerup');
+      key('keydown', { key: 'Alt', altKey: true });
+      vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS);
+      expect(peek()).toBe(true);
+    },
+  );
+
+  it('does not start a peek when Alt joins an existing pointer drag', () => {
+    pointer('pointerdown', { buttons: 1 });
+    key('keydown', { key: 'Alt', altKey: true });
+    vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS * 2);
+    expect(peek()).toBe(false);
+    pointer('pointerup', { altKey: true });
+    vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS * 2);
+    expect(peek()).toBe(false);
+    key('keyup', { key: 'Alt' });
+    key('keydown', { key: 'Alt', altKey: true });
+    vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS);
+    expect(peek()).toBe(true);
+  });
+
+  it.each([0, OPERATION_COLOR_PEEK_DELAY_MS])(
+    'cancels an outside Alt drag entering after %i ms',
+    (delay) => {
+      key('keydown', { key: 'Alt', altKey: true });
+      vi.advanceTimersByTime(delay);
+      pointer('pointermove', { altKey: true, buttons: 1 });
+      expect(peek()).toBe(false);
+      vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS * 2);
+      expect(peek()).toBe(false);
+    },
+  );
+
+  it('keeps tracking a second pointer when the first pointer ends', () => {
+    pointer('pointerdown', { buttons: 1 }, 1);
+    pointer('pointerdown', { buttons: 1 }, 2);
+    pointer('pointerup', {}, 1);
+    key('keydown', { key: 'Alt', altKey: true });
+    vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS * 2);
+    expect(peek()).toBe(false);
+    pointer('pointercancel', {}, 2);
+    key('keyup', { key: 'Alt' });
+    key('keydown', { key: 'Alt', altKey: true });
+    vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS);
+    expect(peek()).toBe(true);
+  });
+
+  it.each(['pointerup', 'pointercancel', 'blur'])(
+    'allows a fresh standalone Alt press after %s clears the active pointer',
+    (end) => {
+      pointer('pointerdown', { buttons: 1 });
+      if (end === 'blur') window.dispatchEvent(new Event('blur'));
+      else pointer(end);
       key('keydown', { key: 'Alt', altKey: true });
       vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS);
       expect(peek()).toBe(true);

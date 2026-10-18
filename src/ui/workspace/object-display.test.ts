@@ -179,6 +179,25 @@ describe('object display resolution', () => {
     expect(orphan.paths[0]).toMatchObject({ operationId: null, paint: { color: '#16a34a' } });
   });
 
+  it('changes the ink style key when a different operation is the visible one', () => {
+    // Two paths on two operations paint alike in ink; the key must still say
+    // which survived visibility, or a cached sprite would show the hidden one.
+    const object = traced([square(10)], {
+      paths: [
+        { color: '#000000', polylines: [square(10)], operationIds: ['a'] },
+        { color: '#000000', polylines: [square(4)], operationIds: ['b'] },
+      ],
+    });
+    const showing = (visible: 'a' | 'b') =>
+      sceneLayerVisibility.lookup([
+        { ...createLayer({ id: 'a', color: '#2563eb' }), visible: visible === 'a' },
+        { ...createLayer({ id: 'b', color: '#dc2626' }), visible: visible === 'b' },
+      ]);
+    const onlyA = resolveObjectDisplay(object, showing('a'), view, undefined, 'design', 'ink');
+    const onlyB = resolveObjectDisplay(object, showing('b'), view, undefined, 'design', 'ink');
+    expect(onlyA.styleKey).not.toBe(onlyB.styleKey);
+  });
+
   it('keeps one flattening of a curved trace while wheel notches stay inside a zoom bucket', () => {
     const object = traced([square(10)], {
       transform: { ...IDENTITY_TRANSFORM, scaleX: 2, scaleY: -2 },

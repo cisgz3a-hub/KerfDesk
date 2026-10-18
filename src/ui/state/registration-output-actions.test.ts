@@ -230,6 +230,57 @@ describe('setRegistrationOutput', () => {
     ).toBe(true);
   });
 
+  it('keeps an artwork run set up by hand when Outline only is chosen again', () => {
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'second-art',
+        color: DISABLED_ART_COLOR,
+        spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: 40, y: 10 },
+      }),
+    );
+    const first = operationIdFor('art');
+    const second = operationIdFor('second-art');
+    useStore.getState().setRegistrationOutput('box');
+    // By hand in the Layers panel: outline off, only the first artwork on.
+    useStore.getState().setLayerParam(REGISTRATION_LAYER_ID, { output: false });
+    useStore.getState().setLayerParam(first, { output: true });
+
+    useStore.getState().setRegistrationOutput('box');
+    useStore.getState().setRegistrationOutput('artwork');
+
+    expect(outputById()).toMatchObject({
+      [first]: true,
+      [second]: false,
+      [REGISTRATION_LAYER_ID]: false,
+    });
+  });
+
+  it('adds artwork turned on during Outline only to the artwork it restores', () => {
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'second-art',
+        color: DISABLED_ART_COLOR,
+        spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: 40, y: 10 },
+      }),
+    );
+    const first = operationIdFor('art');
+    const second = operationIdFor('second-art');
+    useStore.getState().setLayerParam(second, { output: false });
+    useStore.getState().setRegistrationOutput('box');
+    useStore.getState().setLayerParam(second, { output: true });
+
+    useStore.getState().setRegistrationOutput('box');
+    useStore.getState().setRegistrationOutput('artwork');
+
+    expect(outputById()).toMatchObject({
+      [first]: true,
+      [second]: true,
+      [REGISTRATION_LAYER_ID]: false,
+    });
+  });
+
   it('is a no-op when there is no registration jig', () => {
     resetStore();
     const before = useStore.getState().project;

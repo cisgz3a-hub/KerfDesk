@@ -308,11 +308,12 @@ function useJigCanvasPaint(
       drawScene(ctx, size.width, size.height, displayed, {
         selectedId: null,
         preview: false,
-        // This dedicated editor has no hover pulse or Alt-peek overlay.
-        operationColors: true,
         view,
         displayPolylineCache: cache.current,
         onRasterBitmapReady: () => setPaintRevision((revision) => revision + 1),
+        // The jig editor has no hover pulse or Alt peek, so it keeps showing
+        // operation colours rather than resting in ink (ADR-620).
+        operationColors: true,
       });
       drawSelection(ctx, displayed, selectedIds, size, view);
     });

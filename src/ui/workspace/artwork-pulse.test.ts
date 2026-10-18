@@ -16,9 +16,9 @@ import {
   pulseStartOffsets,
   pulseStrength,
   pulseTargetFor,
-  sameOperationSettings,
   type PulseTarget,
 } from './artwork-pulse';
+import { sameOperationSettings } from './pulse-settings-match';
 
 function layer(id: string, color: string, overrides: Partial<Layer> = {}): Layer {
   return { ...createLayer({ id, color }), ...overrides };

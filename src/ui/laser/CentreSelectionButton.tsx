@@ -1,6 +1,9 @@
 import { rotaryAppliesTo } from '../../core/job/rotary-job';
 import { machineKindOf } from '../../core/scene';
-import { positioningLightIssue } from '../../core/devices/positioning-light';
+import {
+  positioningLightIssue,
+  positioningLightSupported,
+} from '../../core/devices/positioning-light';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { selectedObjectIds } from '../state/scene-group-actions';
@@ -15,18 +18,26 @@ export function CentreSelectionButton({
   readonly disabled: boolean;
 }): JSX.Element | null {
   const laserMode = useStore((state) => machineKindOf(state.project.machine) === 'laser');
+  // A Marlin fan-mosfet laser has no positioning light: nothing to show or send.
+  const supported = useStore((state) =>
+    positioningLightSupported(state.project.device.gcodeDialect?.dialectId),
+  );
   const needsSetup = useStore((state) => {
     const light = state.project.device.positioningLight;
     return (
       light === undefined ||
-      positioningLightIssue(light, state.project.device.controllerKind) !== null
+      positioningLightIssue(
+        light,
+        state.project.device.controllerKind,
+        state.project.device.gcodeDialect?.dialectId,
+      ) !== null
     );
   });
   const fileOnly = useStore((state) => state.project.device.controllerKind === 'ruida');
   const lightEnabled = useLaserStore((state) => state.positioningLightEnabled);
   const machineBlocked = useLaserStore((state) => headMoveBlockMessage(state));
   const blocked = useCentreBlockMessage(fileOnly, needsSetup, disabled, machineBlocked);
-  if (!laserMode && !lightEnabled) return null;
+  if (!supported || (!laserMode && !lightEnabled)) return null;
   return (
     <div className="lf-jog-light-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
       {laserMode ? (
@@ -69,7 +80,7 @@ function PositioningLightOffButton({
   readonly configured: boolean;
 }): JSX.Element | null {
   const lightEnabled = useLaserStore((state) => state.positioningLightEnabled);
-  const off = useLaserStore((state) => state.setPositioningLightEnabled);
+  const off = useLaserStore((state) => state.switchPositioningLightOff);
   const blocked = useLaserStore((state) => headMoveBlockMessage(state));
   if (!lightEnabled && !configured) return null;
   return (
@@ -83,7 +94,7 @@ function PositioningLightOffButton({
       }
       disabled={blocked !== null}
       onClick={() => {
-        void off(false).catch(controllerActionFailureHandler('LED off'));
+        void off().catch(controllerActionFailureHandler('LED off'));
       }}
     >
       LED off

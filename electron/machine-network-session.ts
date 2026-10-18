@@ -45,6 +45,7 @@ export class MachineNetworkSession {
       if (this.queuedBytes > RX_LIMIT) {
         this.close(
           'Network receive queue exceeded its limit; the session was closed without dropping acknowledgements into a live stream.',
+          { discardReceived: true },
         );
         return;
       }
@@ -93,13 +94,17 @@ export class MachineNetworkSession {
     this.close('Network write queue exceeded its local limit.');
     return false;
   }
-  close(error?: string): void {
+  // Bytes the controller sent before closing (a final ALARM or error line) stay
+  // queued for the last read; only an oversized receive queue is discarded.
+  close(error?: string, options: { readonly discardReceived?: boolean } = {}): void {
     if (this.closed) return;
     this.closed = true;
     this.failure = error;
     this.socket.destroy();
-    this.chunks.length = 0;
-    this.queuedBytes = 0;
+    if (options.discardReceived === true) {
+      this.chunks.length = 0;
+      this.queuedBytes = 0;
+    }
     this.deliver();
   }
   private take(): ReadResult {

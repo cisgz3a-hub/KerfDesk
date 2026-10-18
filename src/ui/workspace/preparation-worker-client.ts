@@ -49,6 +49,7 @@ import {
 } from './canvas-compilation-main-bridge';
 import { PreparationResultCache } from './preparation-result-cache';
 import { PreparationConsumers } from './preparation-consumers';
+import { PreparationQuietWindow } from './preparation-quiet-window';
 import {
   PreparationSupersededError,
   mergePreparationRequest,
@@ -98,8 +99,10 @@ let nextRequestId = 0;
 let activeRequest: ActiveRequest | null = null;
 let activeTransfer: PreparationTransferAssembler | null = null;
 let queuedRequests: ReadonlyArray<QueuedRequest> = [];
-let quietWindowTimer: ReturnType<typeof setTimeout> | null = null;
 let memoryReservation: MemoryReservation | null = null;
+const quietWindow = new PreparationQuietWindow<Project>(SUPERSEDE_QUIET_WINDOW_MS, () =>
+  dispatchNextRequest(),
+);
 const preparationCache = new PreparationResultCache(MAX_SETTLED_PREPARATIONS);
 const preparationConsumers = new PreparationConsumers(
   cancelUnownedPreparation,
@@ -170,6 +173,7 @@ function requestPreparation(
     // Keep the same exact options: a queued estimate can be promoted to a
     // full Preview, satisfying both consumers with the same compile.
     rejectQueuedRequests(new PreparationSupersededError('newer-request'), key);
+    quietWindow.armForBurst(project);
   }
   if (typeof Worker === 'undefined') return null;
   const promise = new Promise<LargeJobPreparation | LargeJobEstimate>((resolve, reject) => {
@@ -213,16 +217,15 @@ function cancelUnownedPreparation(project: Project, key: string): void {
   );
   queuedRequests = queuedRequests.filter((request) => !held.includes(request));
   for (const request of held) request.reject(cancelled);
-  if (activeRequest?.project === project && activeRequest.key === key) {
+  const activeCancelled = activeRequest?.project === project && activeRequest.key === key;
+  if (activeCancelled || held.length > 0) quietWindow.rememberCancelled(project);
+  if (activeCancelled && activeRequest !== null) {
     const active = activeRequest;
     activeRequest = null;
     retireWorker();
     active.reject(cancelled);
   } else if (queuedRequests.length === 0 && activeRequest === null) retireWorker();
-  if (queuedRequests.length === 0 && quietWindowTimer !== null) {
-    clearTimeout(quietWindowTimer);
-    quietWindowTimer = null;
-  }
+  if (queuedRequests.length === 0) quietWindow.clear();
   dispatchNextRequest();
 }
 
@@ -252,15 +255,7 @@ function supersedeForNewProject(): void {
   // must not jump ahead of an autosave already waiting for this worker.
   retireWorker();
   stale?.reject(new PreparationSupersededError('newer-project'));
-  armQuietWindow();
-}
-
-function armQuietWindow(): void {
-  if (quietWindowTimer !== null) clearTimeout(quietWindowTimer);
-  quietWindowTimer = setTimeout(() => {
-    quietWindowTimer = null;
-    dispatchNextRequest();
-  }, SUPERSEDE_QUIET_WINDOW_MS);
+  quietWindow.arm();
 }
 
 function ensureWorker(): Worker | null {
@@ -382,7 +377,7 @@ function handleTransferMessage(packet: PreparationTransferResponse): void {
 function dispatchNextRequest(): void {
   if (
     activeRequest !== null ||
-    quietWindowTimer !== null ||
+    quietWindow.armed ||
     memoryReservation !== null ||
     queuedRequests.length === 0
   )
@@ -408,7 +403,7 @@ function dispatchNextRequest(): void {
 function dispatchReservedRequest(): void {
   // Options/project may have coalesced while autosave owned the lane.
   const next = queuedRequests[0];
-  if (next === undefined || quietWindowTimer !== null) {
+  if (next === undefined || quietWindow.armed) {
     retireWorker();
     return;
   }
@@ -458,10 +453,7 @@ function rejectQueuedRequests(error: Error, keepKey?: string): void {
 }
 
 function rejectAllPendingAndRetireWorker(message: string): void {
-  if (quietWindowTimer !== null) {
-    clearTimeout(quietWindowTimer);
-    quietWindowTimer = null;
-  }
+  quietWindow.reset();
   const stale = activeRequest;
   activeRequest = null;
   retireWorker();

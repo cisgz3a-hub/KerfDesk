@@ -8,6 +8,7 @@ import {
 } from './constrained-sketch-actions';
 import { reliefAuthoringActions, type ReliefAuthoringActions } from './relief-authoring-actions';
 import { reliefLinkMutationSetter } from './relief-link-mutation';
+import { numberingEditGuardSetter } from './numbering-edit-guard';
 import { observeDesignHierarchyDocument } from './design-hierarchy-store';
 import {
   freeProArtworkSetter,
@@ -427,7 +428,10 @@ export const useStore = create<AppState>((rawSet, get) => {
   // replacement, history and save tracking keep the unguarded setter.
   // Refresh linked relief data before checking the resulting artwork, so a
   // Free edit to a linked vector cannot silently author a different relief.
-  const set = reliefLinkMutationSetter(freeProArtworkSetter(rawSet));
+  const interactionSet = reliefLinkMutationSetter(freeProArtworkSetter(rawSet));
+  // Canvas numbering holds one interaction open; edits that Cancel would revert
+  // stand down until it closes. Only the interaction itself skips this guard.
+  const set = numberingEditGuardSetter(interactionSet);
   return {
     ...initialState(),
     ...projectActions(documentSet, get, initialState),
@@ -481,9 +485,9 @@ export const useStore = create<AppState>((rawSet, get) => {
     ...sceneActions(set, proOperationMutationSetter(set, get)),
     ...duplicateAction(proOperationMutationSetter(set, get)),
     ...fitToSelectionAction(get),
-    ...historyActions(documentSet),
+    ...historyActions(numberingEditGuardSetter(documentSet)),
     ...viewActions(set),
-    ...interactionActions(set),
+    ...interactionActions(interactionSet),
     ...saveTrackingActions(documentSet, get),
   };
 });

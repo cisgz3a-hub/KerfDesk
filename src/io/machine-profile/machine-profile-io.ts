@@ -19,6 +19,7 @@ import { normalizeCameraProfile } from '../../core/camera';
 import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model-record';
 import { normalizeOtherCameraModels } from '../../core/camera/model/saved-cameras';
 import { laserArcMovesEntry, validateMachineProfileShape } from './machine-profile-shape';
+import { recoverPositioningLight } from './machine-profile-positioning-light';
 import { optionalRotarySetup } from '../project/project-device-profile-validator';
 import { firstError } from '../project/project-shape-primitives';
 
@@ -170,9 +171,7 @@ function parseProfile(
       readonly recoveryNotes: ReadonlyArray<string>;
     }
   | { readonly kind: 'invalid'; readonly reason: string } {
-  if (!isRecord(value)) {
-    return { kind: 'invalid', reason: 'profile must be an object' };
-  }
+  if (!isRecord(value)) return { kind: 'invalid', reason: 'profile must be an object' };
   if (value['scanningOffsets'] !== undefined && !isScanOffsetTable(value['scanningOffsets'])) {
     return { kind: 'invalid', reason: 'profile.scanningOffsets is invalid' };
   }
@@ -181,8 +180,9 @@ function parseProfile(
     DEFAULT_CNC_MACHINE_PARAMS,
     'profile.cncSubProfile',
   );
+  const lightRecovery = recoverPositioningLight(value);
   const recoveredValue: Record<string, unknown> = {
-    ...value,
+    ...lightRecovery.value,
     ...(value['cncSubProfile'] === undefined ? {} : { cncSubProfile: cncRecovery.value }),
   };
   const profileShapeError = validateMachineProfileShape(recoveredValue);
@@ -195,7 +195,6 @@ function parseProfile(
   // Reuse the .lf2 validators — io imports io.
   const optionalFieldError = firstError([optionalRotarySetup(recoveredValue, 'rotary')]);
   if (optionalFieldError !== null) return { kind: 'invalid', reason: optionalFieldError };
-
   const canonical = canonicalProfile({
     ...validatedDeviceProfile(recoveredValue),
     gcodeDialect: normalizeGcodeDialectSelection(recoveredValue['gcodeDialect']),
@@ -210,9 +209,7 @@ function parseProfile(
   if (validationErrors.length > 0) {
     return { kind: 'invalid', reason: `profile is invalid: ${validationErrors.join('; ')}` };
   }
-  if (!isOrigin(profile.origin)) {
-    return { kind: 'invalid', reason: 'profile.origin is invalid' };
-  }
+  if (!isOrigin(profile.origin)) return { kind: 'invalid', reason: 'profile.origin is invalid' };
   if (!isAirAssistCommand(profile.airAssistCommand)) {
     return { kind: 'invalid', reason: 'profile.airAssistCommand is invalid' };
   }
@@ -224,6 +221,7 @@ function parseProfile(
         (issue) =>
           `CNC settings recovery: ${issue}; a default was applied. Review in Device Setup.`,
       ),
+      ...lightRecovery.notes,
       ...calibration.notes,
     ],
   };

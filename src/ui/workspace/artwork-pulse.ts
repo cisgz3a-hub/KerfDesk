@@ -4,20 +4,10 @@
 // its settings, rippling out from the piece under the pointer. A soft colour
 // edge stays while the pointer rests there. Pure: no DOM, no canvas.
 
-import {
-  DEFAULT_CNC_LAYER_SETTINGS,
-  layerOperationSettingsEqual,
-  operationIdsForObject,
-  type Layer,
-  type LayerOperationSettings,
-  type SceneObject,
-} from '../../core/scene';
-import { DEFAULT_OVERSCAN_MM } from '../../core/job/compile-job-defaults';
-import {
-  DEFAULT_PERFORATION_CUT_MM,
-  DEFAULT_PERFORATION_SKIP_MM,
-  DEFAULT_TAB_SPACING_MM,
-} from '../../core/job/operation-cut-extras';
+import { operationIdsForObject, type Layer, type SceneObject } from '../../core/scene';
+import { sameOperationSettings, type MachineKind } from './pulse-settings-match';
+
+export type { MachineKind } from './pulse-settings-match';
 
 export const PULSE_DURATION_MS = 1400;
 /** The pointer must settle this long before a hover counts, so a sweep across the bed stays calm. */
@@ -47,72 +37,6 @@ export function pulseStrength(t: number): number {
 export function pulseGlow(t: number): { readonly blurPx: number; readonly alpha: number } | null {
   if (!(t > 0 && t < 1)) return null;
   return { blurPx: 4 + 22 * easeOutCubic(t), alpha: 0.6 * (1 - t) ** 1.5 };
-}
-
-export type MachineKind = 'laser' | 'cnc';
-
-/** Same settings for the active machine; name, colour and visibility do not count. */
-export function sameOperationSettings(a: Layer, b: Layer, machine: MachineKind): boolean {
-  if (machine === 'cnc') {
-    // An operation with no CNC block cuts with the CNC defaults, as output does.
-    return (
-      canonicalJson(a.cnc ?? DEFAULT_CNC_LAYER_SETTINGS) ===
-      canonicalJson(b.cnc ?? DEFAULT_CNC_LAYER_SETTINGS)
-    );
-  }
-  return (
-    sameLaserSettings(a, b) &&
-    a.subLayers.length === b.subLayers.length &&
-    a.subLayers.every((subLayer, index) => {
-      const other = b.subLayers[index];
-      return (
-        other !== undefined &&
-        subLayer.enabled === other.enabled &&
-        sameLaserSettings(subLayer.settings, other.settings)
-      );
-    })
-  );
-}
-
-function sameLaserSettings(a: LayerOperationSettings, b: LayerOperationSettings): boolean {
-  return layerOperationSettingsEqual(laserSettingsWithDefaults(a), laserSettingsWithDefaults(b));
-}
-
-/** Match the optional defaults in cut extras, scan pass angles and scan direction policy.
- * Power mode and scan offset stay absent: those fall back to the device, not a fixed value. */
-function laserSettingsWithDefaults(settings: LayerOperationSettings): LayerOperationSettings {
-  return {
-    ...settings,
-    ...laserCutDefaults(settings),
-    allowUncalibratedBidirectionalScan: settings.allowUncalibratedBidirectionalScan ?? false,
-    imageScanAngleDeg: settings.imageScanAngleDeg ?? 0,
-    imageCrossHatch: settings.imageCrossHatch ?? false,
-    passAngleStepDeg: settings.passAngleStepDeg ?? 0,
-    autoOverscan: settings.autoOverscan ?? false,
-  };
-}
-
-function laserCutDefaults(settings: LayerOperationSettings): Partial<LayerOperationSettings> {
-  return {
-    perforationEnabled: settings.perforationEnabled ?? false,
-    perforationCutMm: settings.perforationCutMm ?? DEFAULT_PERFORATION_CUT_MM,
-    perforationSkipMm: settings.perforationSkipMm ?? DEFAULT_PERFORATION_SKIP_MM,
-    overcutMm: settings.overcutMm ?? 0,
-    imageOverscanMm: settings.imageOverscanMm ?? DEFAULT_OVERSCAN_MM,
-    tabLayout: settings.tabLayout ?? 'count',
-    tabSpacingMm: settings.tabSpacingMm ?? DEFAULT_TAB_SPACING_MM,
-    tabMaxPerShape: settings.tabMaxPerShape ?? 0,
-    tabCutPowerPercent: settings.tabCutPowerPercent ?? 0,
-  };
-}
-
-/** JSON with object keys sorted, so the same settings saved in another key order still match. */
-function canonicalJson(value: unknown): string {
-  return JSON.stringify(value, (_key, entry: unknown) =>
-    entry !== null && typeof entry === 'object' && !Array.isArray(entry)
-      ? Object.fromEntries(Object.entries(entry).sort(([a], [b]) => (a < b ? -1 : 1)))
-      : entry,
-  );
 }
 
 /**

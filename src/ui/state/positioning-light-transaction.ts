@@ -33,12 +33,36 @@ export async function positioningLightCommand(
   context.assertCurrent();
 }
 
+/** Several lines written together as one owned exchange; every line must
+ * acknowledge before it completes (the controller queues them as one move). */
+export async function positioningLightBatch(
+  context: PositioningLightTransaction,
+  commands: ReadonlyArray<string>,
+): Promise<void> {
+  if (commands.length === 1) return positioningLightCommand(context, commands[0] as string);
+  context.assertCurrent();
+  await startControllerCommand(context.refs, context.write, {
+    kind: 'interactive-command',
+    label: 'Positioning light',
+    command: commands.map((line) => `${line.trim()}\n`).join(''),
+    action: 'jog',
+    source: 'motion',
+    timeoutMode: 'non-idle-status-activity',
+    terminalAckCount: commands.length,
+  });
+  context.assertCurrent();
+}
+
 /** Register before dispatch: even an adapter's synchronous response belongs
  * to this query. Queued M114 also needs its own terminal ACK on Marlin. */
 export async function positioningLightStatus(
   context: PositioningLightTransaction,
 ): Promise<StatusReport> {
   context.assertCurrent();
+  // A rejected registration owns no waiter and must not cancel another action's
+  // pending readiness proof or dispatch a query into its exchange.
+  if (context.refs.controllerStatusWait != null)
+    throw new Error('A controller status confirmation is already active.');
   const state = context.get();
   const driver = context.refs.driver;
   const query = driver.realtime.statusQuery ?? driver.commands.queuedStatusQuery;

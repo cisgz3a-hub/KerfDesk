@@ -128,6 +128,38 @@ afterEach(async () => {
 });
 
 describe('ArtworkPulseOverlay (ADR-620)', () => {
+  it('ends a paused hover when capture is lost before pointer-up', async () => {
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    await render(false);
+    await act(async () => useStore.getState().setCursorMm(null));
+    await act(async () => canvas.dispatchEvent(new MouseEvent('lostpointercapture')));
+    await render(true);
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    expect(clock.frame(performance.now(), true).pieces).toEqual([]);
+    await pointAt({ x: 5, y: 5 });
+    expect(pulses()).toEqual([true, true]);
+  });
+
+  it('preserves an ordinary click hover through automatic capture release', async () => {
+    await render(true);
+    await pointAt({ x: 5, y: 5 });
+    await act(async () => canvas.dispatchEvent(new MouseEvent('pointerdown')));
+    await render(false);
+    await act(async () => useStore.getState().setCursorMm(null));
+    await act(async () => {
+      canvas.dispatchEvent(new MouseEvent('pointerup', { clientX: 50, clientY: 50 }));
+      canvas.dispatchEvent(new MouseEvent('lostpointercapture'));
+    });
+    await render(true);
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    expect(clock.frame(performance.now(), true).pieces.map((piece) => piece.objectId)).toEqual([
+      'heart',
+    ]);
+    await pointAt({ x: 5, y: 5 });
+    expect(pulses()).toEqual([true, false]);
+  });
+
   it('clears a canvas hover when another tool takes over and waits for a fresh dwell', async () => {
     await render(true);
     await pointAt({ x: 5, y: 5 });
