@@ -305,6 +305,18 @@ test('a deactivation retried from the licence window is valid cleanup evidence',
   const observed = publicNativePhase(result, processResult, profile, 'deactivate', 'cleanup');
   assert.equal(observed.passed, true);
   assert.equal(observed.nativeDeactivationObserved, true);
+  // The public receipt claims no picker or save it never exercised.
+  assert.equal(observed.filePickers, 'not-exercised');
+  assert.equal(observed.projectSaveTarget, 'not-exercised');
+  const workspace = publicNativePhase(
+    nativeResult('offline'),
+    processResult,
+    profile,
+    'offline',
+    'x',
+  );
+  assert.equal(workspace.filePickers, 'stubbed');
+  assert.equal(workspace.projectSaveTarget, 'memory');
 });
 
 test('only cleanup without developer rights may skip the workspace', () => {

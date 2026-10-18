@@ -88,8 +88,11 @@ link, and LightBurn has no free tier.
   chose on 2026-10-18 to keep refusing the fallback and to state the requirement
   on the download page instead. The window answers the main process's
   close requests, so Quit and the window's X close the app before the workspace
-  exists. The historical Free upgrade qualification (`installed-upgrade-profile.ps1`)
-  still expects a Free workspace: once its target carries this decision, it needs
-  a licensed profile.
+  exists. The release's historical upgrade qualification
+  (`installed-upgrade-profile.ps1`), as the owner chose on 2026-10-18, opens a
+  build that shows the licence window with the developer qualification licence
+  (`KERFDESK_NATIVE_QUALIFICATION_LICENCE`), runs its full retention checks, and
+  frees the seat in a final release phase, also after a failure. Only that child
+  process receives the key, and no evidence records it.
 - The startup splash fades for the settled licence window as it does for the
   painted workspace.

@@ -61,6 +61,8 @@ jobs:
         env:
           PREVIOUS_RELEASE_VERSION: ${{ inputs.previous_version }}
           TARGET_RELEASE_VERSION: ${{ inputs.target_version }}
+          # Opens a build behind the licence window, then releases the seat (ADR-623).
+          KERFDESK_NATIVE_QUALIFICATION_LICENCE: ${{ secrets.KERFDESK_NATIVE_QUALIFICATION_LICENCE }}
         shell: pwsh
         run: |
           $root = Join-Path $env:GITHUB_WORKSPACE 'artifacts/historical-installers'
