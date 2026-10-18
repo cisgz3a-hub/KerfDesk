@@ -66,7 +66,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Create a rectangle for the keychain’s bounds',
         examplePhase: 0,
         instruction:
-          'For this rounded rectangular leather blank, choose Rectangle and enter its measured overall width and height. Use one row and one column, then create the outline. Position it over the fixed wood and establish the job’s placement and origin before either run.',
+          'Registration Jig opens its own editor on Jig layout. For this rounded rectangular leather blank, choose Rectangle and enter its measured overall W and H. Keep one row and one column, then click Apply layout. Drag the outline over the fixed wood if needed, then click Save to canvas. Establish the job’s placement and origin before either run.',
         focus: 'Rectangle = the leather blank’s overall bounds',
         result:
           'The rectangle locates the blank’s outside edges; it does not copy its rounded corners.',
