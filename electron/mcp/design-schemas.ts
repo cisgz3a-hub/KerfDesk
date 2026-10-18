@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MCP_ARRANGE_ACTIONS } from './authoring-schemas.js';
 import { mcpSelectionArgsSchema } from './selection-schemas.js';
 
 const id = z.string().min(1).max(128);
@@ -129,22 +130,7 @@ export const mcpBatchEditSchemas = {
   }),
   arrange_artwork: z.strictObject({
     artworkIds: z.array(id).min(1).max(200),
-    action: z.enum([
-      'align_left',
-      'align_center',
-      'align_right',
-      'align_top',
-      'align_middle',
-      'align_bottom',
-      'distribute_horizontal',
-      'distribute_vertical',
-      'mirror_horizontal',
-      'mirror_vertical',
-      'group',
-      'ungroup',
-      'duplicate',
-      'delete',
-    ]),
+    action: z.enum(MCP_ARRANGE_ACTIONS),
   }),
   update_operation: z.strictObject({ operationId: id, patch: mcpOperationPatchSchema }),
   create_operation: z.strictObject(createOperationArgs),
