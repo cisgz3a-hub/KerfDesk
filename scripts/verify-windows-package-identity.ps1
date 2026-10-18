@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 $expectedCompanyName = 'Johann Stolk'
 $expectedProductName = 'KerfDesk'
 $appFileDescription = 'KerfDesk'
-$installerFileDescription = 'Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows desktop from one codebase.'
+$installerFileDescription = 'Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows, macOS and Linux desktop from one codebase.'
 $expectedFileDescription = if ($Kind -eq 'Installer') {
   $installerFileDescription
 } else {
