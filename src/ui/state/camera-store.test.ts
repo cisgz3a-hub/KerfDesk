@@ -186,6 +186,32 @@ describe('camera-store', () => {
     if (sourceState.kind === 'error') expect(sourceState.message).toBe('busy');
   });
 
+  it('says what to do when the camera cannot be started or none is connected', async () => {
+    // Chrome on Windows, measured with a second process holding the camera:
+    // "NotReadableError: Device in use". The same error covers Windows' camera
+    // privacy switch, so the message names both causes.
+    const busy = new DOMException('Device in use', 'NotReadableError');
+    await useCameraStore
+      .getState()
+      .startUsbSource(mockCamera({ openStream: async () => Promise.reject(busy) }));
+    const inUse = useCameraStore.getState().sourceState;
+    expect(inUse.kind).toBe('error');
+    if (inUse.kind === 'error') {
+      expect(inUse.message).toContain('Close other programs that use it');
+      expect(inUse.message).toContain('Settings, Privacy & security, Camera');
+      expect(inUse.message).toContain('press Start USB camera');
+      expect(inUse.message).not.toContain('NotReadableError');
+    }
+
+    const missing = new DOMException('Requested device not found', 'NotFoundError');
+    await useCameraStore
+      .getState()
+      .startUsbSource(mockCamera({ openStream: async () => Promise.reject(missing) }));
+    const notFound = useCameraStore.getState().sourceState;
+    expect(notFound.kind).toBe('error');
+    if (notFound.kind === 'error') expect(notFound.message).toContain('No camera was found');
+  });
+
   it('reports an error when no camera adapter is present', async () => {
     await useCameraStore.getState().startUsbSource(undefined);
     expect(useCameraStore.getState().sourceState.kind).toBe('error');
@@ -340,7 +366,11 @@ describe('camera-store', () => {
     );
     const noFfmpeg = useCameraStore.getState().sourceState;
     expect(noFfmpeg.kind).toBe('error');
-    if (noFfmpeg.kind === 'error') expect(noFfmpeg.message).toContain('FFmpeg');
+    if (noFfmpeg.kind === 'error') {
+      expect(noFfmpeg.message).toContain('FFmpeg');
+      // The bridge looks for FFmpeg once per run, so reconnecting cannot find it.
+      expect(noFfmpeg.message).toContain('restart KerfDesk');
+    }
 
     await useCameraStore.getState().startRtspSource(
       mockBridge({
