@@ -324,6 +324,28 @@ const LASER_LEAD_SETTING_KEYS = [
   'leadSide',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
+const LASER_LEAD_SETTING_KEY_SET: ReadonlySet<string> = new Set(LASER_LEAD_SETTING_KEYS);
+
+/** ADR-626: whether a setting key is one of the lead settings. */
+export function isLaserLeadSettingKey(key: string): boolean {
+  return LASER_LEAD_SETTING_KEY_SET.has(key);
+}
+
+/** ADR-626: whether two operations cut alike. With both lead switches off on
+ * both, lead shape and side change nothing, so artwork that differs only there
+ * is cut as one process, as with leads off. */
+export function layerOperationOutputEqual(
+  left: LayerOperationSettings,
+  right: LayerOperationSettings,
+): boolean {
+  const leadsAsked = [left, right].some(
+    (settings) => settings.leadInEnabled === true || settings.leadOutEnabled === true,
+  );
+  return LAYER_OPERATION_SETTING_KEYS.every(
+    (key) => left[key] === right[key] || (!leadsAsked && LASER_LEAD_SETTING_KEY_SET.has(key)),
+  );
+}
+
 /** ADR-626: the settings without leads. A stored setting set (saved defaults,
  * a recipe) holds lead fields only when it has leads, so before one is laid
  * over an operation its own leads are cleared: absent means no leads. */

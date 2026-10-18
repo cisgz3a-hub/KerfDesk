@@ -64,6 +64,8 @@ export function lineTopologyCollections(
     });
     const tabbed = applyLineTabs(segments, line.placedTabs, bucket.layer);
     const output = perforateLineSegments(tabbed.segments, bucket.layer);
+    const perforatedContours =
+      output === tabbed.segments ? 0 : segments.filter((segment) => segment.closed).length;
     // Only a job with leads somewhere reads them (ADR-626); others never carry them.
     const topologyRings = keepLeadRings ? brokenContourRings(segments, output, scope) : [];
     result.set(bucket, {
@@ -71,6 +73,7 @@ export function lineTopologyCollections(
       tabSpans: tabbed.tabSpans,
       kerfDiagnostics: layerKerfDiagnostics(line, bucket.layer),
       ...(tabbed.tabbedContours === undefined ? {} : { tabbedContours: tabbed.tabbedContours }),
+      ...(perforatedContours === 0 ? {} : { perforatedContours }),
       ...(topologyRings.length === 0 ? {} : { topologyRings }),
     });
   }

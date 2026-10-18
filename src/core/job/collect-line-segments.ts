@@ -31,6 +31,8 @@ export type LineSegmentCollection = {
   readonly kerfDiagnostics: ReadonlyArray<JobDiagnostic>;
   /** Closed contours split at tabs (ADR-494); laser leads skip them. */
   readonly tabbedContours?: number;
+  /** Closed contours perforation cut into dashes; laser leads skip them. */
+  readonly perforatedContours?: number;
   /** Whole outlines of the contours tabs or perforation split (ADR-626). */
   readonly topologyRings?: ReadonlyArray<CutTopologyRing>;
 };

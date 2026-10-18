@@ -5,10 +5,11 @@
 import { describe, expect, it } from 'vitest';
 import { pointInPolygon } from '../geometry';
 import type { Vec2 } from '../scene';
-import { applyLaserLeads, laserLeadBed } from './apply-laser-leads';
+import { applyLaserLeads } from './apply-laser-leads';
 import { withCutArcMoves } from './cut-arc-moves';
 import type { CutGroup, CutSegment, Job } from './job';
 import { leadPath } from './laser-lead-path';
+import { laserLeadBed } from './laser-lead-rotary';
 import type { CutGroupLaserLeads } from './laser-lead-settings';
 
 const LEADS: CutGroupLaserLeads = {

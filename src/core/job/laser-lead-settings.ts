@@ -8,9 +8,10 @@
 // meets the cut (90 degrees is a quarter circle); for a line, the angle it
 // meets the cut at (90 degrees comes straight in from the side).
 
-import type { LayerOperationSettings, Scene } from '../scene';
+import { operationOverrideForObject } from '../effective-output';
+import type { Layer, LayerOperationSettings, Scene, SceneObject } from '../scene';
 // Deep import: core/scene's barrel is ratcheted and may only shrink.
-import type { LaserLeadSide, LaserLeadStyle } from '../scene/layer';
+import { isLaserLeadSettingKey, type LaserLeadSide, type LaserLeadStyle } from '../scene/layer';
 
 export const DEFAULT_LEAD_LENGTH_MM = 2;
 export const MIN_LEAD_LENGTH_MM = 0.1;
@@ -131,4 +132,19 @@ function clamp(value: number, min: number, max: number): number {
 
 function finiteOr(value: number | undefined, fallback: number): number {
   return value !== undefined && Number.isFinite(value) ? value : fallback;
+}
+
+/** Whether an artwork's override changes what `effective` cuts, as output reads
+ * it: lead fields count only when the operation asks for leads, so a lead shape
+ * stored with both leads off changes nothing, as leads off promise. */
+export function hasOutputOperationOverride(
+  effective: Layer,
+  object: Pick<SceneObject, 'operationOverride'>,
+): boolean {
+  const override = operationOverrideForObject(effective, object);
+  if (override === undefined) return false;
+  return (
+    laserLeadSpecFor(effective) !== null ||
+    Object.keys(override).some((key) => !isLaserLeadSettingKey(key))
+  );
 }

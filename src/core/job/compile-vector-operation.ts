@@ -1,5 +1,6 @@
 import type { DeviceProfile } from '../devices';
-import { layerOperationSettingsEqual, type Layer, type Polyline, type SceneObject } from '../scene';
+import type { Layer, Polyline, SceneObject } from '../scene';
+import { layerOperationOutputEqual } from '../scene/layer';
 import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
 import { buildFillGroup } from './fill-group-build';
 import { hasExecutableFillSweep } from './fill-group-emission';
@@ -105,7 +106,7 @@ function resolveFillContext(
     fillBuckets.every(
       (bucket) =>
         bucket.power === firstFill.power &&
-        layerOperationSettingsEqual(bucket.layer, firstFill.layer),
+        layerOperationOutputEqual(bucket.layer, firstFill.layer),
     );
   const uniformMembers = new Set<SceneObject>(
     uniformFill ? fillBuckets.flatMap((bucket) => bucket.objects) : [],
@@ -188,7 +189,10 @@ function lineGroups(
   // layer would otherwise vanish from the job without a trace.
   const diagnostics = [
     ...line.kerfDiagnostics,
-    ...lineLeadDiagnostics(layer, line.tabbedContours ?? 0),
+    ...lineLeadDiagnostics(layer, {
+      tabbed: line.tabbedContours ?? 0,
+      perforated: line.perforatedContours ?? 0,
+    }),
   ];
   if (line.segments.length === 0 && line.tabSpans.length === 0) return { groups: [], diagnostics };
   const common = {

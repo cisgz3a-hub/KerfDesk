@@ -7,6 +7,7 @@ type LeadDiagnostic =
       readonly kind: 'laser-leads-perforated';
       readonly layerId: string;
       readonly layerName: string;
+      readonly count: number;
     }
   | {
       readonly kind: 'laser-leads-tabbed';
@@ -50,6 +51,8 @@ export function laserLeadWarnings(diagnostics: ReadonlyArray<LeadDiagnostic>): s
 function mergedLeadDiagnostic(earlier: LeadDiagnostic, next: LeadDiagnostic): LeadDiagnostic {
   if (earlier.kind === 'laser-leads-tabbed' && next.kind === 'laser-leads-tabbed')
     return { ...earlier, count: earlier.count + next.count };
+  if (earlier.kind === 'laser-leads-perforated' && next.kind === 'laser-leads-perforated')
+    return { ...earlier, count: earlier.count + next.count };
   if (earlier.kind === 'laser-leads-adjusted' && next.kind === 'laser-leads-adjusted')
     return {
       ...earlier,
@@ -63,7 +66,7 @@ function laserLeadWarning(diagnostic: LeadDiagnostic): string {
   const where = `Lead-in/lead-out on layer "${diagnostic.layerName}"`;
   switch (diagnostic.kind) {
     case 'laser-leads-perforated':
-      return `${where} is not used: perforation cuts every line as dashes, so there is no closed shape to lead into.`;
+      return `${where}: ${shapes(diagnostic.count)} with perforation ${diagnostic.count === 1 ? 'gets' : 'get'} no leads. Perforation cuts the line as dashes, so there is no closed shape to lead into.`;
     case 'laser-leads-tabbed':
       return `${where}: ${shapes(diagnostic.count)} with tabs ${diagnostic.count === 1 ? 'gets' : 'get'} no leads. A tabbed shape starts and stops at its tabs, where the edge is broken anyway.`;
     case 'laser-leads-adjusted':

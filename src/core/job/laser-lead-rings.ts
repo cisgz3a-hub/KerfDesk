@@ -9,10 +9,11 @@
 // tabbed outline on another operation would read as an outer contour, and its
 // lead would run into the part.
 //
-// The scrap side is the containment parity inside-first ordering uses
-// (containment-depth.ts): a contour inside an even number of rings is an
-// outer contour, its scrap outside; inside an odd number, a hole, its scrap
-// inside. Copies of one outline (the same shape cut by two operations) count
+// The scrap side is the containment parity line topology uses
+// (proper-contour-containment.ts): a contour wholly inside an even number of
+// rings is an outer contour, its scrap outside; inside an odd number, a hole,
+// its scrap inside. The whole outline decides, so a contour that crosses into
+// a concave neighbour is not read as its hole. Copies of one outline (the same shape cut by two operations) count
 // once, or a hole inside a twice-cut outline would read as an outer contour.
 // Containment is judged from the outlines alone here: the depth compile
 // carries already counts a container on the same path, which may also have a
@@ -21,11 +22,11 @@
 import { sampleArcMoves } from '../geometry/arc-fit';
 import type { Vec2 } from '../scene';
 import { emittedCutArcMoves } from './cut-arc-moves';
-import { containmentDepths } from './containment-depth';
 import type { CutSegment, Job } from './job';
 import { chainPieces } from './laser-lead-chain';
 import { isBurningLineGroup } from './line-start-region';
 import type { LeadRing } from './laser-lead-obstacles';
+import { properContourAncestors } from './proper-contour-containment';
 import { polylineBounds } from './segment-bounds';
 
 export type LeadJobLines = {
@@ -38,6 +39,8 @@ export type LeadJobLines = {
   readonly ringOfLine: ReadonlyMap<number, number>;
   /** Containment depth of each ring, copies counted once. */
   readonly depths: ReadonlyArray<number>;
+  /** The rings, copies included, that wholly hold each ring. */
+  readonly holders: ReadonlyArray<ReadonlySet<number>>;
   /** The other rings that are copies of each ring. */
   readonly copies: ReadonlyArray<ReadonlyArray<number>>;
 };
@@ -89,27 +92,39 @@ export function leadJobLines(job: Job): LeadJobLines {
     rings.push(ring(outline, [...ids, bridged], nesting));
   }
   const representatives = copyRepresentatives(rings);
+  const copies = copyLists(representatives);
   return {
     lines,
     lineOf,
     rings,
     ringOfLine,
-    depths: scrapDepths(rings, representatives),
-    copies: copyLists(representatives),
+    ...ringHolders(rings, representatives, copies),
+    copies,
   };
 }
 
-function scrapDepths(
+// Containment is judged once per outline, its copies aside, and then holds
+// for every copy of the container.
+function ringHolders(
   rings: ReadonlyArray<LeadRing>,
   representatives: ReadonlyArray<number>,
-): number[] {
+  copies: ReadonlyArray<ReadonlyArray<number>>,
+): Pick<LeadJobLines, 'depths' | 'holders'> {
   const unique = rings.flatMap((_, index) => (representatives[index] === index ? [index] : []));
-  const depths = containmentDepths(
+  const ancestors = properContourAncestors(
     unique.map((index) => ({ polyline: rings[index]?.points ?? [], closed: true })),
-    { strict: true },
   );
-  const byRepresentative = new Map(unique.map((index, at) => [index, depths[at] ?? 0]));
-  return rings.map((_, index) => byRepresentative.get(representatives[index] ?? index) ?? 0);
+  const at = new Map(unique.map((ring, position) => [ring, position]));
+  const containersOf = (index: number): ReadonlyArray<number> =>
+    (ancestors[at.get(representatives[index] ?? index) ?? -1] ?? []).map(
+      (container) => unique[container] as number,
+    );
+  return {
+    depths: rings.map((_, index) => containersOf(index).length),
+    holders: rings.map(
+      (_, index) => new Set(containersOf(index).flatMap((ring) => [ring, ...(copies[ring] ?? [])])),
+    ),
+  };
 }
 
 /** For each ring, the first ring in job order it is a copy of, through any

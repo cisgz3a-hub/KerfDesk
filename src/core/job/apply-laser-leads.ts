@@ -26,7 +26,6 @@
 import { sampleArcMoves } from '../geometry/arc-fit';
 import { overcutClosedPolyline } from '../geometry/overcut';
 import type { Vec2 } from '../scene';
-import { outlineInsideContainer } from './containment-depth';
 import {
   emittedCutArcMoves,
   validCutArcMoves,
@@ -46,46 +45,36 @@ import {
 } from './laser-lead-contour';
 import type { LeadJoin, LeadShape } from './laser-lead-path';
 import { leadJobLines, OBSTACLE_ARC_SAGITTA_MM, type LeadJobLines } from './laser-lead-rings';
+import { leadWrap, wrappedCopies, type LeadWrap } from './laser-lead-rotary';
 import { isBurningLineGroup } from './line-start-region';
-import { boundsContains } from './segment-bounds';
 
 export type LaserLeadOptions = {
   /** The physical bed in program coordinates; null when unknown. */
   readonly bed: JobBounds | null;
+  /** One turn of the object on an active rotary, in job Y; absent on a flat bed. */
+  readonly wrapMm?: number | null;
 };
 
 type LeadWorld = LeadJobLines & {
   readonly obstacles: LeadObstacles;
   readonly bed: JobBounds | null;
+  readonly wrap: LeadWrap | null;
   /** Line ids of the leads placed on each ring so far. */
   readonly leadLines: Map<number, number[]>;
 };
 
 type LeadCounts = { readonly layerName: string; shortened: number; omitted: number };
 
-/** The bed a lead must stay on: the program's bed, but on an active rotary
- * only its X limits. The rotary rebases Y and flat-bed Y placement means
- * nothing there, so the same artwork gets the same leads wherever it sits. */
-export function laserLeadBed(bed: JobBounds | null, rotary: boolean): JobBounds | null {
-  if (bed === null || !rotary) return bed;
-  return {
-    minX: bed.minX,
-    maxX: bed.maxX,
-    minY: Number.NEGATIVE_INFINITY,
-    maxY: Number.POSITIVE_INFINITY,
-  };
-}
-
 export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   if (!job.groups.some((group) => group.kind === 'cut' && group.laserLeads !== undefined))
     return withoutTopologyRings(job);
   const lines = leadJobLines(job);
-  const world: LeadWorld = {
-    ...lines,
-    obstacles: LeadObstacles.create(lines.lines, lines.rings),
-    bed: options.bed,
-    leadLines: new Map(),
-  };
+  const obstacles = LeadObstacles.create(lines.lines, lines.rings);
+  const wrap = leadWrap(options.wrapMm, lines.lines);
+  for (const line of lines.lines) {
+    for (const copy of wrappedCopies(line, wrap)) obstacles.addLine(copy);
+  }
+  const world: LeadWorld = { ...lines, obstacles, bed: options.bed, wrap, leadLines: new Map() };
   const counts = new Map<string, LeadCounts>();
   const groups = withoutTopologyRings(job).groups.map((group, groupIndex) => {
     // A group that burns nothing gets no leads: they would burn nothing too.
@@ -169,8 +158,8 @@ function leadSegment(
         .find((candidate) => candidate !== null && complete(candidate)) ?? planned);
   tallyContour(tally, attempt);
   const { leadIn, leadOut, finalPass } = attempt;
-  if (leadIn === null && leadOut === null) return segment;
-  recordLeads(world, attempt, group.passes);
+  if (leadIn === null && leadOut === null && (finalPass?.fit ?? null) === null) return segment;
+  recordLeads(world, attempt);
   return leadedSegment(attempt.segment, leadIn, leadOut, finalPass, group.passes);
 }
 
@@ -181,7 +170,9 @@ type LeadAttempt = {
   readonly arcsEmitted: boolean;
   readonly spec: CutGroupLaserLeads;
   readonly leadIn: LeadFit | null;
+  /** The lead-out of every pass but an overcut final pass; null when unused. */
   readonly leadOut: LeadFit | null;
+  readonly ordinaryOutBurns: boolean;
   readonly finalPass: FinalPass | null;
 };
 
@@ -195,8 +186,12 @@ function leadAttempt(
   if (plan === null) return null;
   const { spec, shape, context } = plan;
   const leadIn = spec.leadIn ? fitLead('in', plan.startJoin, shape, context) : null;
-  const leadOut = spec.leadOut ? fitLead('out', plan.endJoin, shape, context) : null;
-  const finalPass = finalPassLeadOut(segment, group, leadOut, plan);
+  const finalPass = finalPassLeadOut(segment, group, spec.leadOut, plan);
+  // With one pass and an overcut the final pass is the only one, so the
+  // ordinary lead-out never burns: it is not fitted, and cannot block.
+  const ordinaryOutBurns = group.passes > 1 || finalPass === null;
+  const leadOut =
+    spec.leadOut && ordinaryOutBurns ? fitLead('out', plan.endJoin, shape, context) : null;
   return {
     segment,
     ringId: plan.ringId,
@@ -204,6 +199,7 @@ function leadAttempt(
     spec,
     leadIn,
     leadOut,
+    ordinaryOutBurns,
     finalPass,
   };
 }
@@ -214,15 +210,16 @@ function leadAttempt(
 // goes out as G2/G3 is indexed as its arcs, sampled as finely as other arc
 // obstacles, so a later lead measures from the arc itself; the final pass goes
 // out as chords.
-function recordLeads(world: LeadWorld, attempt: LeadAttempt, passes: number): void {
-  // With one pass and an overcut the final pass is the only one, so the
-  // ordinary lead-out never burns.
-  const ordinaryOut = passes <= 1 && attempt.finalPass !== null ? null : attempt.leadOut;
-  const placed = [
+function recordLeads(world: LeadWorld, attempt: LeadAttempt): void {
+  const burned = [
     ...asBurned(attempt.leadIn, attempt.arcsEmitted),
-    ...asBurned(ordinaryOut, attempt.arcsEmitted),
+    ...asBurned(attempt.leadOut, attempt.arcsEmitted),
     ...asBurned(attempt.finalPass?.fit ?? null, false),
-  ].map((points) => world.obstacles.addLine(points));
+  ];
+  const placed = burned.map((points) => world.obstacles.addLine(points));
+  for (const points of burned) {
+    for (const copy of wrappedCopies(points, world.wrap)) world.obstacles.addLine(copy);
+  }
   world.leadLines.set(attempt.ringId, [...(world.leadLines.get(attempt.ringId) ?? []), ...placed]);
 }
 
@@ -244,7 +241,10 @@ function missingIn(attempt: LeadAttempt): boolean {
 }
 
 function missingOut(attempt: LeadAttempt): boolean {
-  return attempt.spec.leadOut && (attempt.leadOut === null || attempt.finalPass?.fit === null);
+  return (
+    attempt.spec.leadOut &&
+    ((attempt.ordinaryOutBurns && attempt.leadOut === null) || attempt.finalPass?.fit === null)
+  );
 }
 
 type LeadPlan = {
@@ -312,19 +312,20 @@ type FinalPass = {
 };
 
 // The final pass overcuts past the start (ADR-415); its lead-out then leaves
-// from where the overcut ends, along the contour's direction there. Null when
-// the final pass cuts what every other pass cuts.
+// from where the overcut ends, along the contour's direction there, fitted on
+// its own: whether the other passes' lead-out fits says nothing about it. Null
+// when the final pass cuts what every other pass cuts.
 function finalPassLeadOut(
   segment: CutSegment,
   group: CutGroup,
-  leadOut: LeadFit | null,
+  leadOutAsked: boolean,
   plan: LeadPlan,
 ): FinalPass | null {
   const overcutMm = group.finalPassOvercutMm ?? 0;
   if (!(overcutMm > 0)) return null;
   const points = overcutClosedPolyline(segment.polyline, overcutMm);
   if (points === segment.polyline) return null;
-  if (leadOut === null) return { points, fit: null };
+  if (!leadOutAsked) return { points, fit: null };
   const end = points[points.length - 1] as Vec2;
   // Read from the overcut run alone (it starts at the closing point), so a
   // run shorter than the tangent window keeps its own heading rather than
@@ -383,7 +384,6 @@ function fitContext(
   clearanceMm: number,
   world: LeadWorld,
 ): Omit<LeadFitContext, 'arcsEmitted'> {
-  const own = world.rings[ringId];
   // The same outline cut again, by another operation or another group: its
   // lines run along the contour, so a lead cannot keep clear of them, and
   // need not.
@@ -396,7 +396,7 @@ function fitContext(
       ...(world.leadLines.get(index) ?? []),
     ]),
   ]);
-  const holds = new Map<number, boolean>();
+  const holders = world.holders[ringId];
   return {
     obstacles: world.obstacles,
     ownLine: lineId,
@@ -406,17 +406,6 @@ function fitContext(
     inside,
     clearanceMm,
     bed: world.bed,
-    ringHoldsContour: (index) => {
-      const known = holds.get(index);
-      if (known !== undefined) return known;
-      const container = world.rings[index];
-      const result =
-        own !== undefined &&
-        container !== undefined &&
-        boundsContains(container.bounds, own.bounds) &&
-        outlineInsideContainer(ring, container.points);
-      holds.set(index, result);
-      return result;
-    },
+    ringHoldsContour: (index) => holders?.has(index) === true,
   };
 }

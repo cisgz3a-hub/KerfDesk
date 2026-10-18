@@ -50,8 +50,9 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    or, for a contour that goes out as G2/G3, from its first and last moves, so an arc lead meets an arc
    move tangentially.
 3. **The scrap side is found** (`core/job/laser-lead-rings.ts`). Automatic puts a lead outside an outer
-   contour and inside a hole, by the containment parity inside-first ordering uses, counted over every
-   closed contour of every Line cut group in the job that burns. A group at zero power, or artwork at
+   contour and inside a hole, by containment parity judged as line topology judges it
+   (`proper-contour-containment.ts`: the whole outline must lie inside, so a contour that crosses
+   into a concave neighbour is not read as its hole), counted over every closed contour of every Line cut group in the job that burns. A group at zero power, or artwork at
    0% power, cuts nothing and holds no part, so it is neither an obstacle nor a container, and gets no
    leads. A hole cut by its own operation is therefore still a hole. A contour that tabs or
    perforation broke into pieces still counts: compile keeps its whole outline on the cut group
@@ -66,13 +67,17 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    by vertex within 0.01 mm, however it starts or runs; shapes that only share bounds and length stay
    apart.
    Containment is judged from the outlines here, not from the depth compile carries, because that
-   depth already counts a container on the same path that may also have a copy. **Always outside**
+   depth already counts a container on the same path that may also have a copy. The same judgement
+   says which contours hold a contour for the free-end check below. **Always outside**
    and **Always inside** override it for the whole operation, for the cases parity cannot know (a
    closed score line around a hole counts as a container).
 4. **A lead only goes where it fits** (`core/job/laser-lead-fit.ts`). It must stay on the bed when
    the bed's place in program coordinates is known (on an active rotary only the bed's X limits
    apply: the rotary rebases Y, so where the artwork sits on the flat canvas does not change its
-   leads). Walking out from the join it may never come nearer its own contour than it already was
+   leads). On an active rotary the job wraps round the object, so every cut line and placed lead
+   within a lead's reach of either end of the job is also checked one circumference (π × the object
+   diameter, in surface Y) up and down (`core/job/laser-lead-rotary.ts`): a lead near one end keeps
+   clear of a cut near the other, across the seam. Walking out from the join it may never come nearer its own contour than it already was
    (within 0.03 mm, up to the clearance), and its free end, where the mark lands, must be on the scrap
    side and at least the clearance from the contour, or, for a lead too short to reach that far, 90%
    of the way its own shape takes it into the scrap, so every length the setting allows can fit. From
@@ -106,17 +111,22 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    Ruida motion plan, the preview route, both time estimates, Frame and Job Review bounds, coordinate
    checks and the job start mark) reads segments, so all of them carry the leads without code of
    their own. A job whose groups ask for no leads is returned as the same object, so its output is
-   byte-identical. The GRBL layer comment adds `leads in+out arc 2.000 mm at 90 deg` only when the
+   byte-identical. Lead shape or side stored with both lead switches off changes nothing either: it
+   does not split artwork into separate process groups, and an artwork override that holds only
+   such fields does not count as an override (no requested-override comment). The GRBL layer comment
+   adds `leads in+out arc 2.000 mm at 90 deg` only when the
    operation asks for leads.
 7. **Passes and overcut.** Every pass cuts lead-in, contour, lead-out, because every pass starts and
    stops. Overcut stays on the final pass only (ADR-415): that pass runs past the start first and
-   leaves by a lead-out from where the overcut ends, fitted separately. Preparation stores that pass's
+   leaves by a lead-out from where the overcut ends, fitted on its own, whether or not the other
+   passes' lead-out fits. Preparation stores that pass's
    burn on the segment (`finalPassBurn`); `finalPassCutSegments` hands it to every pass walker, and
    bounds, coordinate checks, the Ruida export's range check and the rotary Y mapping read it too.
    The overcut's lead-out takes its heading from the overcut run alone, so a run shorter than the
    tangent window keeps its own direction. With one pass the final pass is the only one, so its burn
    is the segment's own and no reader can count a path that never runs; the ordinary lead-out, which
-   that pass never cuts, is not kept as a line other leads must clear either.
+   that pass never cuts, is not fitted at all, so it can neither block the contour nor be kept as a
+   line other leads must clear.
 8. **Arcs (ADR-432).** A contour that goes out as G2/G3 keeps its arc moves, and its leads join them
    as moves: a line lead as G1, an arc lead as G2/G3 (quarter turns at most; chords below the arc
    fitter's 0.1 mm radius). A contour that goes out as chords gets its arc leads as chords within
@@ -124,9 +134,10 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    the middle of an edge keeps arcs only on an edge that is a single line move.
 9. **What gets no lead.** Open paths (no scrap side). Shapes with tabs: they start and stop at their
    tabs, where the edge is broken anyway. Perforated lines: every dash starts and stops, and no closed
-   shape is left. Job Review says how many shapes tabs left without leads and that perforation turns
-   them off, and how many shapes got a shorter lead or lost one, per operation (by its id, since
-   two operations can share a name). Those shapes are cut exactly as
+   shape is left. Job Review says how many shapes tabs, or perforation, left without leads (counted
+   per artwork group, so perforation on some artwork of an operation is not reported for all of it),
+   and how many shapes got a shorter lead or lost one, per operation (by its id, since two
+   operations can share a name). Those shapes are cut exactly as
    without leads.
 10. **Other settings.** Leads follow the kerf-offset path, the path the beam really cuts. The ADR-239
     laser-off contour entry (4040-safe profile) runs up collinear with the lead's first chord, before
@@ -171,7 +182,10 @@ covers a cut beside the join, broken outlines read whole from compile, sparse da
 coordinates in the G-code check and a very short overcut. `core/job/laser-leads-restart-and-rings.test.ts`
 covers a corner-started hole on finely divided sides, outlines kept only when leads are asked for,
 copies started elsewhere or run the other way, and an outline that burns nothing.
-`laser-lead-override-angle.test.ts` covers a bulk angle edit across arc and line leads.
+`core/job/laser-leads-scope-and-wrap.test.ts` covers a contour crossing a concave neighbour, the
+one-pass overcut lead-out beside a blocked seam, a cut across the rotary seam, artwork that stores
+lead shape with leads off, and perforation on one artwork only. `laser-lead-override-angle.test.ts`
+covers a bulk angle edit across arc and line leads.
 End-to-end tests (`io/gcode/laser-leads-output.test.ts`) pin byte-identical G-code, prepared jobs and
 Ruida plans with leads off (set or absent) on GRBL, arc GRBL, Marlin and Smoothieware with 1 and 3
 passes and with and without overcut, and show leads on every pass, in Marlin, Smoothieware and Ruida

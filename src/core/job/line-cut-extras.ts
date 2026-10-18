@@ -53,14 +53,25 @@ export function lineLeadFields(
   return { laserLeads: { ...spec, operationName: settings.name } };
 }
 
-/** What Job Review says when an operation asks for leads its cuts cannot take. */
+/** What Job Review says when an operation asks for leads its cuts cannot take:
+ * how many of its closed shapes perforation, or else tabs, left without. */
 export function lineLeadDiagnostics(
   settings: LayerOperationSettings & { readonly id: string; readonly name: string },
-  tabbedContours: number,
+  contours: { readonly tabbed: number; readonly perforated: number },
 ): ReadonlyArray<JobDiagnostic> {
   if (laserLeadSpecFor(settings) === null) return [];
   if (perforationPatternFor(settings) !== null)
-    return [{ kind: 'laser-leads-perforated', layerId: settings.id, layerName: settings.name }];
+    return contours.perforated > 0
+      ? [
+          {
+            kind: 'laser-leads-perforated',
+            layerId: settings.id,
+            layerName: settings.name,
+            count: contours.perforated,
+          },
+        ]
+      : [];
+  const tabbedContours = contours.tabbed;
   return tabbedContours > 0
     ? [
         {
