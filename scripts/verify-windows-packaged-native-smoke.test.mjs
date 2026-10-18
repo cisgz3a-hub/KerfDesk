@@ -50,7 +50,7 @@ function licenceWindowResult(userData) {
   renderer.licensing = {
     kind: 'observed',
     channel: 'commercial',
-    state: 'unavailable',
+    state: 'activation-required',
     edition: 'free',
     proEnabled: false,
     updateState: 'up-to-date',
@@ -218,8 +218,8 @@ test('rejects a legacy or mismatched profile before accepting UI evidence', () =
 test('commercial licence-window expectation accepts a settled unlicensed gate without workspace I/O', () => {
   const userData = resolve('tmp', 'native-smoke');
   const result = licenceWindowResult(userData);
-  const linux = { expectLicenceWindow: true, platform: 'linux' };
-  assert.equal(validateNativeSmokeResult(result, userData, linux), result);
+  const options = { expectLicenceWindow: true };
+  assert.equal(validateNativeSmokeResult(result, userData, options), result);
   assert.throws(() => validateNativeSmokeResult(result, userData), /SVG import was not observed/);
   assert.throws(
     () => validateNativeSmokeResult(result, userData, { expectFreshSandbox: true }),
@@ -229,33 +229,25 @@ test('commercial licence-window expectation accepts a settled unlicensed gate wi
 
 test('a commercial package must be one a trial or key can open', () => {
   const userData = resolve('tmp', 'native-smoke');
-  for (const platform of ['darwin', 'win32']) {
-    const options = { expectLicenceWindow: true, platform };
-    // Unavailable: an unusable release identity or keychain could never admit anyone.
+  const options = { expectLicenceWindow: true };
+  const fresh = licenceWindowResult(userData);
+  assert.equal(validateNativeSmokeResult(fresh, userData, options), fresh);
+  // Unavailable: an unusable release identity, keychain or Linux keyring could never
+  // admit anyone. The Linux rehearsal runs with an unlocked GNOME Keyring, so it too
+  // must reach activation-required.
+  for (const state of ['unavailable', 'trial-expired']) {
+    const result = licenceWindowResult(userData);
+    result.renderer.licensing.state = state;
     assert.throws(
-      () => validateNativeSmokeResult(licenceWindowResult(userData), userData, options),
+      () => validateNativeSmokeResult(result, userData, options),
       /commercial licence window/,
     );
-    const fresh = licenceWindowResult(userData);
-    fresh.renderer.licensing.state = 'activation-required';
-    assert.equal(validateNativeSmokeResult(fresh, userData, options), fresh);
   }
-  // A headless Linux runner has no Secret Service keyring; other states still fail there.
-  const expired = licenceWindowResult(userData);
-  expired.renderer.licensing.state = 'trial-expired';
-  assert.throws(
-    () =>
-      validateNativeSmokeResult(expired, userData, {
-        expectLicenceWindow: true,
-        platform: 'linux',
-      }),
-    /commercial licence window/,
-  );
 });
 
 test('commercial licence-window expectation rejects wrong licensing and workspace evidence', () => {
   const userData = resolve('tmp', 'native-smoke');
-  const options = { expectLicenceWindow: true, platform: 'linux' };
+  const options = { expectLicenceWindow: true };
   for (const patch of [
     { channel: 'free' },
     { edition: 'pro', proEnabled: true },

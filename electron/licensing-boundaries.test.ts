@@ -5,9 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createLicensingStore,
   LicenceStoreUnreadableError,
+  LinuxKeyringUnavailableError,
   validLicenceKey,
   type LicenceRecord,
 } from './licensing-store';
+import { MESSAGES, requestFailureMessage } from './licensing-messages';
+import { harness, TEST_KEY } from './licensing-runtime.test-support';
 import {
   licensingDeviceId,
   licensingHardwareId,
@@ -69,13 +72,44 @@ describe('main-process protected credential storage', () => {
     'refuses the Linux %s backend instead of storing weakly protected secrets',
     async (backend) => {
       const h = await storage('linux', backend);
-      await expect(h.store.write({ schemaVersion: 1, lastSeenAt: 10 })).rejects.toThrow(
-        'Secure operating-system',
+      await expect(h.store.write({ schemaVersion: 1, lastSeenAt: 10 })).rejects.toBeInstanceOf(
+        LinuxKeyringUnavailableError,
       );
+      await expect(h.store.read()).rejects.toBeInstanceOf(LinuxKeyringUnavailableError);
       expect(h.secureStorage.encryptStringAsync).not.toHaveBeenCalled();
       await expect(readFile(h.file)).rejects.toMatchObject({ code: 'ENOENT' });
     },
   );
+  it('names a missing keyring only on Linux, where the Secret Service is the cause', async () => {
+    const linux = await storage('linux');
+    linux.secureStorage.isAsyncEncryptionAvailable.mockResolvedValue(false);
+    await expect(linux.store.read()).rejects.toBeInstanceOf(LinuxKeyringUnavailableError);
+    const windows = await storage('win32', 'basic_text');
+    expect(await windows.store.read()).toBeNull();
+    windows.secureStorage.isAsyncEncryptionAvailable.mockResolvedValue(false);
+    const refused = windows.store.read();
+    await expect(refused).rejects.toThrow('Secure operating-system');
+    await expect(refused).rejects.not.toBeInstanceOf(LinuxKeyringUnavailableError);
+  });
+  it('tells a Linux user without a keyring what to install, not to check their connection', async () => {
+    const h = await storage('linux', 'basic_text');
+    const { options, fetch } = harness();
+    const runtime = createLicensingRuntime({ ...options, store: h.store });
+    const status = await runtime.status();
+    expect(status).toMatchObject({ state: 'unavailable', edition: 'free', tier: null });
+    expect(status.message).toBe(MESSAGES.linuxKeyring);
+    expect(status.message).not.toBe(MESSAGES.unavailable);
+    for (const remedy of ['GNOME Keyring', 'KWallet', 'restart KerfDesk', '--password-store'])
+      expect(status.message).toContain(remedy);
+    // Neither licence action reaches the service: the keyring, not the network, stops them.
+    expect((await runtime.startTrial()).message).toBe(MESSAGES.linuxKeyring);
+    expect((await runtime.activate(TEST_KEY)).message).toBe(MESSAGES.linuxKeyring);
+    expect(fetch).not.toHaveBeenCalled();
+    // With a keyring, an outage keeps its own message.
+    const online = harness();
+    online.fetch.mockRejectedValue(new TypeError('fetch failed'));
+    expect((await online.runtime.startTrial()).message).toBe(requestFailureMessage(new Error()));
+  });
   it('bounds stored data before decrypting and fails closed on corrupt encrypted data', async () => {
     const h = await storage();
     await writeFile(h.file, Buffer.alloc(131_073));

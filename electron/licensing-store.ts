@@ -47,6 +47,18 @@ export class LicenceStoreUnreadableError extends Error {
   }
 }
 
+/**
+ * Linux keeps a licence only in a Secret Service keyring, never Electron's
+ * basic_text fallback, whose key is the same on every computer. Without one, a
+ * trial or key cannot be saved here until a keyring runs and KerfDesk restarts.
+ */
+const LINUX_KEYRINGS = ['gnome_libsecret', 'kwallet', 'kwallet5', 'kwallet6'];
+export class LinuxKeyringUnavailableError extends Error {
+  constructor() {
+    super('No Secret Service keyring is available to keep the licence.');
+  }
+}
+
 export function validLicenceKey(value: unknown): value is string {
   return (
     typeof value === 'string' &&
@@ -113,13 +125,13 @@ export function createLicensingStore(options: {
   const file = join(options.userDataPath, FILE_NAME);
   const secure = options.secureStorage;
   const check = async (): Promise<void> => {
+    const available = await secure.isAsyncEncryptionAvailable();
     if (
-      !(await secure.isAsyncEncryptionAvailable()) ||
-      (options.platform === 'linux' &&
-        !['gnome_libsecret', 'kwallet', 'kwallet5', 'kwallet6'].includes(
-          secure.getSelectedStorageBackend(),
-        ))
-    ) {
+      options.platform === 'linux' &&
+      (!available || !LINUX_KEYRINGS.includes(secure.getSelectedStorageBackend()))
+    )
+      throw new LinuxKeyringUnavailableError();
+    if (!available) {
       throw new Error(
         'Secure operating-system credential storage is unavailable. Unlock your keychain or password manager and try again.',
       );

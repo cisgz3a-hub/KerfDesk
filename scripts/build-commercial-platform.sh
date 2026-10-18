@@ -81,13 +81,24 @@ else
   # restriction on, so the AppArmor profile it installs is what lets
   # Chromium's sandbox start (ADR-607).
   sudo apt-get update
-  sudo apt-get install -y xvfb shared-mime-info desktop-file-utils
+  sudo apt-get install -y xvfb shared-mime-info desktop-file-utils dbus gnome-keyring
   sudo apt-get install -y "./${deb}"
   test "$(readlink -f /usr/bin/kerfdesk)" = /opt/KerfDesk/kerfdesk
   grep -q '^application/x-kerfdesk-project=.*kerfdesk\.desktop' /usr/share/applications/mimeinfo.cache
   sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=1
   test "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = 1
-  xvfb-run -a pnpm smoke:desktop:native -- /opt/KerfDesk/kerfdesk --expect-licence-window
+
+  # Linux keeps a licence only in a Secret Service keyring (licensing-store.ts).
+  # Launch as a GNOME session with an unlocked GNOME Keyring would, so the window
+  # must offer a trial or key, not report a missing keyring. Its own D-Bus
+  # session bus, and the keyring on it, end with each launch.
+  with_keyring() {
+    dbus-run-session -- bash -c '
+      set -euo pipefail
+      printf %s rehearsal | gnome-keyring-daemon --unlock --components=secrets >/dev/null
+      XDG_CURRENT_DESKTOP=GNOME exec "$@"' with-keyring "$@"
+  }
+  with_keyring xvfb-run -a pnpm smoke:desktop:native -- /opt/KerfDesk/kerfdesk --expect-licence-window
 
   # The AppImage as double-clicked: no libfuse2, and its launcher must drop the
   # sandbox by itself where user namespaces are blocked.
@@ -97,7 +108,7 @@ else
     exit 1
   fi
   command -v fusermount3 || sudo apt-get install -y fuse3
-  xvfb-run -a pnpm smoke:desktop:native -- "${appimage}" --expect-licence-window
+  with_keyring xvfb-run -a pnpm smoke:desktop:native -- "${appimage}" --expect-licence-window
 
   sudo apt-get remove -y kerfdesk
   test ! -e /opt/KerfDesk/kerfdesk
