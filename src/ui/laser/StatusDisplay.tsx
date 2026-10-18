@@ -68,7 +68,7 @@ export function StatusDisplay({
 
 function unavailableStatus(variant: 'all' | 'state' | 'details'): JSX.Element {
   if (variant === 'details') return <div />;
-  return <div style={variant === 'state' ? stateRowStyle : dimStyle}>State: —</div>;
+  return <div style={variant === 'state' ? unknownStateStyle : dimStyle}>State: —</div>;
 }
 
 function StatusState({
@@ -130,6 +130,8 @@ const panelStyle: React.CSSProperties = {
   padding: '0 0 10px',
 };
 const stateRowStyle: React.CSSProperties = { color: 'var(--lf-success-fg)' };
+// No status report (disconnected, or none yet): green would read as "OK".
+const unknownStateStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
 const posRowStyle: React.CSSProperties = { color: 'var(--lf-text)' };
 const feedRowStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
 // Default origin row is muted (it's the boring case). Custom origin gets

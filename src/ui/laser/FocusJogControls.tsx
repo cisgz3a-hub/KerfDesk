@@ -30,6 +30,7 @@ export function FocusJogControls(props: {
       <div className="lf-focus-jog-header" style={headerStyle}>
         <strong>{isCncMachine ? 'Z axis' : 'Focus / Z'}</strong>
         <select
+          className="lf-select"
           value={props.focusStep}
           onChange={(event) => props.setFocusStep(Number(event.target.value))}
           disabled={props.disabled}
@@ -59,6 +60,7 @@ export function FocusJogControls(props: {
         {isCncMachine ? (
           <button
             type="button"
+            className="lf-btn"
             onClick={props.onZeroZ}
             disabled={disabled}
             aria-label="Zero work Z at current bit height"
@@ -93,6 +95,7 @@ function FocusButton(props: {
   return (
     <button
       type="button"
+      className="lf-btn lf-iconbtn"
       onClick={props.onClick}
       disabled={props.disabled}
       style={buttonStyle}
@@ -121,7 +124,4 @@ const hintStyle: React.CSSProperties = {
 const buttonStyle: React.CSSProperties = {
   width: 'var(--lf-jog-button, 36px)',
   height: 'var(--lf-jog-button, 36px)',
-  padding: 0,
-  fontSize: 14,
-  cursor: 'pointer',
 };

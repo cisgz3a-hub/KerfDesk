@@ -120,6 +120,11 @@
   min-width: 0;
 }
 
+.lf-jog-panel .lf-select {
+  min-height: 28px;
+  font-size: var(--lf-text-sm);
+}
+
 .lf-focus-jog-header > strong {
   flex-shrink: 0;
   white-space: nowrap;
@@ -135,12 +140,22 @@
   margin-top: 3px;
 }
 
+/* One type size and height for the pad's text buttons: the action column
+   beside the arrows and the Centre & LED row below them. */
+.lf-jog-panel .lf-btn {
+  font-size: var(--lf-text-sm);
+}
+
+.lf-jog-controls--machine-actions > .lf-btn,
+.lf-jog-light-actions > .lf-btn {
+  min-height: var(--lf-jog-button);
+  padding: 2px 8px;
+  line-height: 1.2;
+}
+
 .lf-jog-controls--machine-actions > .lf-btn {
   align-self: start;
-  min-height: var(--lf-jog-button);
-  padding: 2px 6px;
-  font-size: 12px;
-  line-height: 1.2;
+  padding-inline: 6px;
 }
 
 .lf-jog-center > .lf-jog-home {

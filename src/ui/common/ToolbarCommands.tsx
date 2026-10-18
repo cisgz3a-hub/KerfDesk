@@ -183,7 +183,8 @@ function primaryLabel(command: AppCommand): string {
   if (command.id === 'tools.add-text') return 'Text';
   if (command.id === 'tools.trace-image') return 'Trace image';
   if (command.id === 'tools.photo-engraving') return 'Photo engraving';
-  // Image Studio is no longer a primary button; in More it keeps its full label.
+  // Labelled beside Import (every format) so the two never read as one action
+  // shown twice: this one opens the picture picker (UI audit, toolbar 4).
   if (command.id === 'file.import-image') return 'Import image';
   return command.label;
 }
@@ -217,7 +218,6 @@ const ICON_ONLY_TOOLBAR_COMMANDS = new Set<CommandId>([
   'file.new',
   'file.save-as',
   'file.import-svg',
-  'file.import-image',
   'file.save-gcode',
   'file.inspect-gcode',
 ]);

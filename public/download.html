@@ -13,7 +13,7 @@
     <meta name="color-scheme" content="light dark" />
     <meta
       name="description"
-      content="Download KerfDesk for Windows 10 and 11. KerfDesk Free has no time limit, and the Pro tools unlock with a licence key or a free 30-day trial."
+      content="Download KerfDesk for Windows 10 and 11, and for Mac and Linux as each is released. KerfDesk Free has no time limit, and the Pro tools unlock with a licence key or a free 30-day trial."
     />
     <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -748,6 +748,30 @@
         margin-top: auto;
         font-size: 0.95rem;
       }
+      /* Mac and Linux: two files per system, the first one recommended. */
+      .card__downloads {
+        display: grid;
+        gap: 0.5rem;
+      }
+      .card__downloads .download {
+        margin-top: 0;
+      }
+      .download--secondary {
+        border-color: var(--border-strong);
+        background: var(--surface);
+        color: var(--text);
+      }
+      .download--secondary:hover,
+      .download--secondary:focus-visible {
+        border-color: var(--text);
+        background: var(--surface);
+      }
+      .card h4 {
+        margin: 1rem 0 0.35rem;
+      }
+      code.command {
+        overflow-wrap: anywhere;
+      }
       .os-steps {
         display: grid;
         gap: 2rem;
@@ -834,9 +858,10 @@
               <p class="eyebrow">Download</p>
               <h1>Download KerfDesk</h1>
               <p class="lead">
-                Download <strong>KerfDesk for Windows</strong>. Everything in KerfDesk Free works
-                with no time limit, and the Pro tools unlock with a licence key or a free 30-day
-                trial started in the app.
+                Download <strong>KerfDesk for Windows</strong>, or for <a href="#macos">Mac</a> and
+                <a href="#linux">Linux</a> below. Everything in KerfDesk Free works with no time
+                limit, and the Pro tools unlock with a licence key or a free 30-day trial started in
+                the app.
               </p>
               <ul class="ticks">
                 <li>
@@ -890,7 +915,7 @@
               </ul>
               <div class="hero__actions">
                 <a class="btn btn--secondary" href="/buy.html">Buy Pro</a>
-                <a href="#preview-heading">On a Mac?</a>
+                <a href="#platforms-heading">Mac or Linux?</a>
               </div>
             </div>
 
@@ -1134,10 +1159,191 @@
         </div>
       </section>
 
+      <section class="section" aria-labelledby="platforms-heading">
+        <div class="wrap">
+          <div class="section__head">
+            <p class="eyebrow">Mac and Linux</p>
+            <h2 id="platforms-heading">KerfDesk for Mac and Linux</h2>
+            <p class="muted">
+              The same KerfDesk as on Windows. Each download appears here once it is released and
+              this page has checked the publisher's signature on its details.
+            </p>
+          </div>
+          <noscript
+            >Enable JavaScript to verify and show the Mac and Linux download links.</noscript
+          >
+          <div class="grid">
+            <section class="card" id="macos" aria-labelledby="macos-heading">
+              <span class="card__icon"
+                ><svg
+                  class="icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z"
+                  />
+                  <path d="M20.054 15.987H3.946" /></svg
+              ></span>
+              <h3 id="macos-heading">KerfDesk for Mac</h3>
+              <p class="requirements">macOS 13 or newer, Apple silicon or Intel</p>
+              <p class="edition-kind" data-platform-edition hidden>Free, with a 30-day Pro trial</p>
+              <p class="status" role="status" data-platform-status>Checking for the Mac edition…</p>
+              <div class="card__downloads">
+                <a class="download" data-platform-file="macos-arm64.dmg" hidden>
+                  Download for Apple silicon
+                </a>
+                <p class="artifact-hash" data-platform-hash="macos-arm64.dmg"></p>
+                <a class="download download--secondary" data-platform-file="macos-x64.dmg" hidden>
+                  Download for Intel Mac
+                </a>
+                <p class="artifact-hash" data-platform-hash="macos-x64.dmg"></p>
+              </div>
+              <p class="muted">
+                Not sure which? Choose <strong>Apple menu &gt; About This Mac</strong>: a
+                <strong>Chip</strong> line means Apple silicon, a <strong>Processor</strong> line
+                means Intel.
+              </p>
+              <details class="disclosure">
+                <summary>Install on a Mac</summary>
+                <div class="disclosure__body">
+                  <ol class="numbered">
+                    <li>
+                      Open the downloaded <code>KerfDesk-…-macos-….dmg</code> and drag
+                      <strong>KerfDesk</strong> to <strong>Applications</strong>. To update, quit
+                      KerfDesk first and choose <strong>Replace</strong>.
+                    </li>
+                    <li>
+                      Open KerfDesk from Applications. macOS says it cannot check the app, because
+                      Apple has not notarized it yet: choose <strong>Done</strong>.
+                    </li>
+                    <li>
+                      Open <strong>System Settings &gt; Privacy &amp; Security</strong>, scroll to
+                      <strong>Security</strong>, choose <strong>Open Anyway</strong> beside KerfDesk
+                      and confirm with your password. You do this once for each new version you
+                      download.
+                    </li>
+                    <li>
+                      After an update, macOS may ask whether KerfDesk may use its keychain item.
+                      Choose <strong>Always Allow</strong>: KerfDesk keeps your licence there. If
+                      you deny it, enter your licence key again in
+                      <strong>Help &gt; Licence</strong>.
+                    </li>
+                  </ol>
+                  <p class="muted">
+                    These Mac builds are not yet signed with an Apple Developer ID or notarized.
+                    KerfDesk never turns off or works around Gatekeeper. Open a file only if it came
+                    from this page and its name starts with <strong>KerfDesk-</strong>.
+                  </p>
+                  <p data-platform-pro hidden>
+                    Start the Pro trial or activate a licence in <strong>Help &gt; Licence</strong>.
+                    On a Mac, paste the key there: <strong>Copy key &amp; open KerfDesk</strong>
+                    opens only the Windows app.
+                  </p>
+                </div>
+              </details>
+              <p><a data-platform-manifest hidden>Publisher-signed download manifest</a></p>
+            </section>
+
+            <section class="card" id="linux" aria-labelledby="linux-heading">
+              <span class="card__icon"
+                ><svg
+                  class="icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="m4 17 6-6-6-6" />
+                  <path d="M12 19h8" /></svg
+              ></span>
+              <h3 id="linux-heading">KerfDesk for Linux</h3>
+              <p class="requirements">64-bit (x64) Linux, checked on Ubuntu 24.04</p>
+              <p class="edition-kind" data-platform-edition hidden>Free, with a 30-day Pro trial</p>
+              <p class="status" role="status" data-platform-status>
+                Checking for the Linux edition…
+              </p>
+              <div class="card__downloads">
+                <a class="download" data-platform-file="linux-amd64.deb" hidden>
+                  Download .deb for Ubuntu and Debian
+                </a>
+                <p class="artifact-hash" data-platform-hash="linux-amd64.deb"></p>
+                <a
+                  class="download download--secondary"
+                  data-platform-file="linux-x86_64.AppImage"
+                  hidden
+                >
+                  Download AppImage for other distributions
+                </a>
+                <p class="artifact-hash" data-platform-hash="linux-x86_64.AppImage"></p>
+              </div>
+              <details class="disclosure">
+                <summary>Install on Linux</summary>
+                <div class="disclosure__body">
+                  <h4>Ubuntu and Debian (recommended on Ubuntu 24.04 and newer)</h4>
+                  <p>In the folder you downloaded it to, run:</p>
+                  <p>
+                    <code class="command"
+                      >sudo apt install ./KerfDesk-&lt;version&gt;-linux-amd64.deb</code
+                    >
+                  </p>
+                  <p>
+                    KerfDesk appears in your applications, opens <code>.lf2</code> projects, and
+                    keeps Chromium's sandbox on with the AppArmor profile it installs. Remove it
+                    with <code class="command">sudo apt remove kerfdesk</code>.
+                  </p>
+                  <h4>Other distributions</h4>
+                  <p>
+                    Make the AppImage executable (<strong
+                      >Properties &gt; Permissions &gt; Allow executing file as program</strong
+                    >, or
+                    <code class="command"
+                      >chmod +x KerfDesk-&lt;version&gt;-linux-x86_64.AppImage</code
+                    >), then open it. It needs no install and no <code>libfuse2</code>. Where the
+                    system blocks the user namespaces Chromium's sandbox needs, the AppImage runs
+                    without that sandbox; the <code>.deb</code> keeps it.
+                  </p>
+                  <h4>USB machines</h4>
+                  <p>
+                    Linux lets only the serial group open USB serial ports. Add your account once
+                    with <code class="command">sudo usermod -aG dialout $USER</code> (on Arch Linux
+                    the group is <code>uucp</code>), then log out and back in.
+                  </p>
+                  <p data-platform-pro hidden>
+                    Start the Pro trial or activate a licence in <strong>Help &gt; Licence</strong>.
+                    KerfDesk keeps the licence in your desktop's keyring (GNOME Keyring or KWallet).
+                    On Linux, paste the key there:
+                    <strong>Copy key &amp; open KerfDesk</strong> opens only the Windows app.
+                  </p>
+                </div>
+              </details>
+              <p><a data-platform-manifest hidden>Publisher-signed download manifest</a></p>
+            </section>
+          </div>
+          <p class="muted">
+            Updates: KerfDesk tells you when a new version is out and opens this page for it. It
+            never downloads or installs a Mac or Linux update by itself; close KerfDesk, then
+            install the new version.
+          </p>
+        </div>
+      </section>
+
       <section class="section section--alt" aria-labelledby="preview-heading">
         <div class="wrap">
           <div class="section__head">
-            <p class="eyebrow">Mac and early builds</p>
+            <p class="eyebrow">Early builds</p>
             <h2 id="preview-heading">KerfDesk Preview</h2>
             <p class="pill">Free · unsigned · manual updates</p>
           </div>
@@ -1161,16 +1367,17 @@
                 <path d="M20.054 15.987H3.946" /></svg
             ></span>
             <div>
-              <p class="callout__title">Using a Mac or Linux?</p>
+              <p class="callout__title">Preview is for trying early features</p>
               <p>
-                Preview is the only desktop build for Mac. It is for trying early features and
-                cannot use a Pro licence or the trial: Pro is only in KerfDesk for Windows. On any
-                Mac you can also use the <a href="https://kerfdesk.com">KerfDesk web app</a> in
-                Chrome or Edge.
+                A Preview cannot use a Pro licence or the trial. For KerfDesk on a Mac, use
+                <a href="#macos">KerfDesk for Mac</a> above once it is released. On any computer you
+                can also use the <a href="https://kerfdesk.com">KerfDesk web app</a> in Chrome or
+                Edge.
               </p>
               <p>
-                <strong>Linux:</strong> there is no Linux desktop Preview yet. Use the web app in
-                Chrome or Edge; it has the same CAM features and can be installed from the browser.
+                <strong>Linux:</strong> there is no Linux desktop Preview yet. Use
+                <a href="#linux">KerfDesk for Linux</a> above, or the web app in Chrome or Edge; it
+                has the same CAM features and can be installed from the browser.
               </p>
               <p class="status" id="release-status" role="status">
                 Checking for verified downloads…

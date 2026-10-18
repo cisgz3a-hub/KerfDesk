@@ -91,6 +91,7 @@ function JogArrowButton(
   return (
     <button
       type="button"
+      className="lf-btn lf-iconbtn"
       disabled={props.disabled}
       style={btnStyle}
       aria-label={label}
@@ -118,10 +119,6 @@ const centerStyle: React.CSSProperties = {
   placeItems: 'center',
   color: 'var(--lf-text-faint)',
 };
-const btnStyle: React.CSSProperties = {
-  width: JOG_BUTTON,
-  height: JOG_BUTTON,
-  padding: 0,
-  fontSize: 16,
-  cursor: 'pointer',
-};
+// The kit's .lf-btn/.lf-iconbtn classes give the arrows the Home button's look;
+// only the size is set here.
+const btnStyle: React.CSSProperties = { width: JOG_BUTTON, height: JOG_BUTTON };

@@ -62,3 +62,24 @@ it('does not expand a raw channel byte at the same output queue boundary', async
   );
   expect(socket.destroyed).toBe(true);
 });
+
+it('keeps the controller output received before a remote close for the final read', async () => {
+  const { socket, session } = fixture('grblhal-raw');
+  socket.emit('data', Buffer.from('ALARM:1\r\n'));
+  socket.emit('close');
+  expect(await session.read()).toEqual({
+    data: Buffer.from('ALARM:1\r\n').toString('base64'),
+    closed: true,
+    error: 'Network connection closed. No commands were replayed.',
+  });
+});
+
+it('discards an oversized receive queue instead of returning it after close', async () => {
+  const { socket, session } = fixture('grblhal-raw');
+  socket.emit('data', Buffer.alloc(512 * 1024 + 1, 0x41));
+  expect(await session.read()).toMatchObject({
+    data: '',
+    closed: true,
+    error: expect.stringContaining('receive queue'),
+  });
+});

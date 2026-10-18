@@ -130,10 +130,14 @@ function mm(value: number): string {
   return value >= 100 ? value.toFixed(0) : value.toFixed(1);
 }
 
+// A whole-pixel height keeps the 3D view on a pixel boundary (tokens.css,
+// .lf-dialog--gcode-inspector).
 const headerStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
+  boxSizing: 'border-box',
+  minHeight: 42,
   padding: '8px 12px',
   borderBottom: '1px solid var(--lf-border)',
 };

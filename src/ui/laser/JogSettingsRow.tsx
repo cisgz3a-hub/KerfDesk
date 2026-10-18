@@ -15,6 +15,7 @@ export function JogSettingsRow(props: {
       <label style={fieldStyle}>
         Step
         <select
+          className="lf-select"
           value={props.step}
           onChange={(event) => props.onStep(Number(event.target.value))}
           disabled={props.disabled}
@@ -31,6 +32,7 @@ export function JogSettingsRow(props: {
       <label style={fieldStyle}>
         Speed
         <select
+          className="lf-select"
           value={props.feed}
           onChange={(event) => props.onFeed(Number(event.target.value))}
           disabled={props.disabled}

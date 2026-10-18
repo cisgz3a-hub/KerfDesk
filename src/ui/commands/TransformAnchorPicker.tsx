@@ -59,9 +59,9 @@ export function TransformAnchorPicker(props: {
           setOpen(true);
         }}
       >
-        <Icon name="crosshair" size={17} />
+        <Icon name="crosshair" size={15} />
         <span>Anchor</span>
-        <Icon name="chevron-down" size={13} />
+        <Icon name="chevron-down" size={12} />
       </button>
       {open ? (
         <AnchoredPopover

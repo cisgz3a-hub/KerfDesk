@@ -12,6 +12,7 @@ import {
   consumeControllerCommandResponse,
 } from './laser-interactive-command';
 import { runConfirmedPauseJob, runConfirmedResumeJob } from './laser-job-pause-resume';
+import { runStopJob } from './laser-job-stop';
 import { handleLine } from './laser-line-handler';
 import { makeLineHandlerHarness } from './laser-line-handler.test-support';
 import { controllerOperationOwnsPolling } from './laser-status-polling-policy';
@@ -180,5 +181,21 @@ describe('Disconnect retains public ownership through controller boundaries', ()
     // owner must not reinterpret it as a successfully paused or stopped job.
     expect(context.get().streamer?.status).not.toBe('paused');
     expect(context.refs.writeEpoch).toBe(1);
+  });
+});
+
+describe('Abort during a no-reset Disconnect', () => {
+  it('leaves the stop and the disconnect operation to Disconnect', async () => {
+    const context = harness(marlinDriver);
+    const operation = { kind: 'disconnect', phase: 'stopping' } as const;
+    context.set({ controllerOperation: operation });
+
+    await runStopJob(context);
+
+    // Disconnect is already writing M107, M410, M5 I and M9 before it closes.
+    expect(context.safeWrite).not.toHaveBeenCalled();
+    expect(context.get().controllerOperation).toBe(operation);
+    expect(controllerOperationOwnsPolling(context.get())).toBe(true);
+    expect(context.get().streamer?.status).toBe('paused');
   });
 });
