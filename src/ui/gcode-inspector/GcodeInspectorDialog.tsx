@@ -12,6 +12,13 @@ import { InspectorView } from './InspectorView';
 import { MainThreadInspectionNotice } from './MainThreadInspectionNotice';
 import { loadingPreview, useGcodeInspection, type InspectionState } from './use-gcode-inspection';
 import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
+import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
+
+/** What the Run dialog reuses from a finished inspection (ADR-630). */
+export type InspectedProgram = {
+  readonly model: InspectorRenderModel;
+  readonly analysis: GcodeInspectorAnalysis;
+};
 
 export type GcodeInspectorDialogProps = {
   readonly programName: string;
@@ -19,6 +26,8 @@ export type GcodeInspectorDialogProps = {
   readonly machineKind: MachineKind;
   /** CNC-only handoff to the existing F-CNC10 2D simulator (flow retained). */
   readonly onOpen2dSimulator?: () => void;
+  /** Opened files only: Frame, review and Start this program (ADR-630). */
+  readonly onRunOnMachine?: (program: InspectedProgram) => void;
   readonly onClose: () => void;
 };
 
@@ -70,24 +79,56 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
         )
       ) : null}
       {state.kind === 'error' ? <p style={messageStyle}>{state.reason}</p> : null}
-      <footer style={footerStyle}>
-        {state.kind === 'ready' && state.result.parsed.kind === 'ok' ? (
-          <StatsStrip model={state.result.parsed.model} />
-        ) : (
-          <span />
-        )}
-        {props.machineKind === 'cnc' && props.onOpen2dSimulator !== undefined ? (
-          <button
-            type="button"
-            className="lf-btn"
-            title="Open this program in the 2D simulator (F-CNC10)"
-            onClick={props.onOpen2dSimulator}
-          >
-            Open in 2D simulator
-          </button>
-        ) : null}
-      </footer>
+      <InspectorFooter {...props} state={state} />
     </Dialog>
+  );
+}
+
+function InspectorFooter(
+  props: GcodeInspectorDialogProps & { readonly state: InspectionState },
+): JSX.Element {
+  const { state } = props;
+  const inspected =
+    state.kind === 'ready' && hasGcodeInspectorAnalysis(state.result)
+      ? { model: state.result.parsed.model, analysis: state.result.analysis }
+      : null;
+  return (
+    <footer style={footerStyle}>
+      {state.kind === 'ready' && state.result.parsed.kind === 'ok' ? (
+        <StatsStrip model={state.result.parsed.model} />
+      ) : (
+        <span />
+      )}
+      {props.onRunOnMachine !== undefined && inspected !== null ? (
+        <RunOnMachineButton program={inspected} onRun={props.onRunOnMachine} />
+      ) : null}
+      {props.machineKind === 'cnc' && props.onOpen2dSimulator !== undefined ? (
+        <button
+          type="button"
+          className="lf-btn"
+          title="Open this program in the 2D simulator (F-CNC10)"
+          onClick={props.onOpen2dSimulator}
+        >
+          Open in 2D simulator
+        </button>
+      ) : null}
+    </footer>
+  );
+}
+
+function RunOnMachineButton(props: {
+  readonly program: InspectedProgram;
+  readonly onRun: (program: InspectedProgram) => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="lf-btn lf-btn--primary"
+      title="Frame this program over the material, review it, then send it to the machine."
+      onClick={() => props.onRun(props.program)}
+    >
+      Run on machine...
+    </button>
   );
 }
 

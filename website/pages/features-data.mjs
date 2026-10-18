@@ -256,8 +256,8 @@ export const FILE_ROWS = [
   [html`CSV <code>.csv</code>`, 'Import', 'Data for variable text. Each job uses one row.'],
   [
     html`G-code <code>.nc</code>, <code>.gcode</code>, <code>.tap</code>`,
-    'View',
-    'Opens in the G-code Inspector, in every edition, for viewing only.',
+    'View and run',
+    'Opens in the G-code Inspector, in every edition. Run on machine frames its outline, then sends it.',
   ],
   [
     html`G-code <code>.gcode</code>, <code>.nc</code>`,

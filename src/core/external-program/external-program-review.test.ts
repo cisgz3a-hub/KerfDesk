@@ -1,0 +1,82 @@
+import { describe, expect, it } from 'vitest';
+import { buildGcodeRenderModel, type GcodeRenderModel } from '../gcode-view';
+import { reviewExternalProgram, type ExternalProgramContext } from './external-program-review';
+
+const LASER: ExternalProgramContext = { machineKind: 'laser', laserMaxPowerS: 1000 };
+const CNC: ExternalProgramContext = { machineKind: 'cnc', laserMaxPowerS: 1000 };
+
+function model(gcode: string, machineKind: 'laser' | 'cnc' = 'laser'): GcodeRenderModel {
+  const result = buildGcodeRenderModel(gcode, { machineKind });
+  if (result.kind !== 'ok') throw new Error(result.reason);
+  return result.model;
+}
+
+function review(gcode: string, context = LASER) {
+  return reviewExternalProgram(gcode, model(gcode, context.machineKind), context);
+}
+
+describe('external G-code program review (ADR-630)', () => {
+  it('measures the XY envelope in work millimetres', () => {
+    const result = review('G21 G90\nG0 X10 Y5\nM4 S500\nG1 X60 Y5 F1000\nG1 X60 Y45\nM5\n');
+    expect(result.envelope).toEqual({ minX: 10, minY: 5, maxX: 60, maxY: 45 });
+    expect(result.units).toBe('mm');
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('includes arc extents, relative moves and inch programs', () => {
+    const arc = review('G21 G90\nG0 X0 Y0\nM4 S300\nG2 X20 Y0 I10 J0 F600\nM5\n');
+    expect(arc.envelope?.maxY).toBeCloseTo(10, 6);
+    const relative = review('G21 G91\nG0 X5 Y5\nM4 S300\nG1 X10 F600\nG1 Y10\nM5\n');
+    // A relative program is read from the work origin, which it then leaves.
+    expect(relative.envelope).toEqual({ minX: 0, minY: 0, maxX: 15, maxY: 15 });
+    expect(relative.warnings.join()).toContain('relative moves (G91)');
+    const inches = review('G20 G90\nG0 X1 Y1\nM4 S300\nG1 X2 F20\nM5\n');
+    expect(inches.envelope).toEqual({ minX: 25.4, minY: 25.4, maxX: 50.8, maxY: 25.4 });
+    expect(inches.units).toBe('inch');
+    expect(inches.warnings.some((warning) => warning.includes('inches (G20)'))).toBe(true);
+  });
+
+  it('has no envelope for a program that never moves', () => {
+    expect(review('G21\nM5\n').envelope).toBeNull();
+  });
+
+  it('warns about moves the Frame cannot trace', () => {
+    const warnings = review(
+      'G21 G90\nG0 X1 Y1\nG53 G0 X0 Y0\nG55\nG92 X0 Y0\nG28\nM6 T2\nM5\n',
+      CNC,
+    ).warnings.join('\n');
+    expect(warnings).toContain('machine coordinates (G53)');
+    expect(warnings).toContain('switches to G55');
+    expect(warnings).toContain('own origin (G92)');
+    expect(warnings).toContain('stored position (G28 or G30)');
+    expect(warnings).toContain('tool change (M6)');
+  });
+
+  it('finds packed words and leaves look-alike numbers alone', () => {
+    expect(review('G21\nN10G0G53X0Y0\nM5\n').warnings.join()).toContain('G53');
+    expect(review('G21\nG0 X53 Y92\nG1 X28 F100 S60\nM5\n').warnings).toEqual([]);
+  });
+
+  it('warns when the laser or spindle is still on at the end', () => {
+    const warnings = review('G21 G90\nM3 S500\nG1 X10 F600\n').warnings.join('\n');
+    expect(warnings).toContain('never sends M5');
+  });
+
+  it('warns when the program looks like the other machine mode', () => {
+    const router = 'G21 G90\nM3 S18000\nG0 Z5\nG0 X0 Y0\nG1 Z-2 F300\nG1 X10 F800\nM5\n';
+    const laserWarnings = review(router, LASER).warnings.join('\n');
+    expect(laserWarnings).toContain('S18000, above');
+    expect(laserWarnings).toContain('moves Z');
+    const flat = review('G21 G90\nG0 X0 Y0\nM3 S800\nG1 X10 F800\nM5\n', CNC).warnings.join();
+    expect(flat).toContain('never moves Z');
+  });
+
+  it('adds Program Health findings above info severity', () => {
+    const gcode = 'G21\nG0 X1 Y1\n';
+    const result = reviewExternalProgram(gcode, model(gcode), LASER, [
+      { id: 'a', severity: 'warning', title: 'Odd', detail: 'Something odd.', line: 1, count: 1 },
+      { id: 'b', severity: 'info', title: 'Note', detail: 'Just a note.', line: null, count: 1 },
+    ]);
+    expect(result.warnings).toEqual(['Odd: Something odd.']);
+  });
+});

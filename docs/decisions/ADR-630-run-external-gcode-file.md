@@ -24,7 +24,8 @@ Factual refusals, because the program cannot be streamed as written (no policy r
 - a line is longer than the connected controller accepts (ADR-375's limits) or than its receive window;
 - a line holds a byte the controller treats as a realtime command (`?`, `!`, `~`, Ctrl-X, or any byte at or above 0x80);
 - a line is a `$` controller command (`$H`, `$X`, `$J=`, a `$` setting). GRBL runs those only while Idle and answers `error:8` mid-job, and the Frame cannot trace what they move. They belong in the Console.
-- the file is not text (it holds a NUL byte).
+- the file is not text (it holds a NUL byte);
+- the program never moves in X or Y, so the Frame has no outline to trace.
 
 ### The Frame
 
@@ -34,14 +35,15 @@ A clean completion records a Frame for this exact program: its fingerprint, its 
 
 ### Review and Start
 
-**Start** shows the one review for the file: name, lines and bytes to send, estimated time, the envelope and its size, the units the program declares, and the machine mode it will run in. Findings are warnings that never refuse:
+The **Run** dialog is the one review for the file: name, lines and bytes to send, estimated time, the envelope and its size, the units the program declares, and the machine mode it will run in. Findings are warnings that never refuse:
 
-- moves in machine coordinates (`G53`), a work coordinate change (`G54`-`G59`), `G92`, or `G28`/`G30`, which the Frame could not trace against the current work origin;
+- moves in machine coordinates (`G53`), a work coordinate change away from `G54`, `G92`, or `G28`/`G30`, which the Frame could not trace against the current work origin;
+- relative moves (`G91`): the Inspector reads them from the work origin, while the program really starts wherever the head is;
 - a program in inches (`G20`), which also leaves the controller in inches until the next program sets `G21`;
 - the laser or spindle still on at the end of the program (no `M5`);
 - a program that looks like the other machine mode (spindle speeds above the laser's S range in Laser mode, or no Z motion in CNC mode);
 - tool changes (`M6`), which stock GRBL does not support;
-- anything outside the bed the Inspector can calculate, as Job Review already reports for the project.
+- the Inspector's Program Health notices and warnings.
 
 In CNC mode the existing workholding and exclusive-access attestation applies; in Laser mode the existing `$32` laser-mode acknowledgement applies when the controller reports `$32=0`. Confirming **Start** checks the Frame is still the current one for this exact program, consumes it, and streams the program with the ordinary streamer. The Live Motion bar's Pause, Resume and **ABORT JOB** work as for any job (non-negotiable 9).
 

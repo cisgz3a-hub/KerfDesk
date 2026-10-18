@@ -6,6 +6,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import type { AutofocusResult } from './autofocus-action';
 import type { ConsoleCommandOptions } from './laser-console-actions';
 import type { FramedRunCandidate, FrameTraceCandidate } from './framed-run';
+import type { FrameVerification } from './frame-verification';
 import type { FrameWcsSelection } from './frame-wcs-selection';
 import type { StartJobOptions } from './laser-job-options';
 import type { JobStopReason } from './job-stop-request';
@@ -96,6 +97,9 @@ export type LaserStoreActions = {
      * Frame). Laser or CNC Frame motion follows this job, not the open canvas. */
     jobProject?: Project,
     owner?: MachineExecutionOwner,
+    /** Recorded as `frameVerification` on a clean completion when no run
+     * candidate is passed: an external G-code program's Frame (ADR-630). */
+    verification?: FrameVerification,
   ) => Promise<void>;
   /** Physically trace a job's bounds before its exact program exists. Same
    * motion and completion boundary as `frame`, but a clean completion records

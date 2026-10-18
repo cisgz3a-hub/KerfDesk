@@ -72,8 +72,8 @@ export function jogActions(
     jogToMachinePosition: (x, y, feed) => runJogToMachinePosition(context, x, y, feed),
     jog: (params, owner) => runJog(context, params, owner),
     cancelJog: () => runCancelJog(set, get, refs, safeWrite),
-    frame: (bounds, feed, candidate, jobProject, owner) =>
-      runFrame(context, bounds, feed, candidate, jobProject, owner),
+    frame: (bounds, feed, candidate, jobProject, owner, verification) =>
+      runFrame(context, bounds, feed, candidate, jobProject, owner, verification),
     traceFrame: (bounds, feed, candidate, owner) =>
       runFrame(context, bounds, feed, candidate, undefined, owner),
   };
@@ -200,6 +200,7 @@ async function runFrame(
   candidate: Parameters<LaserState['frame']>[2] | Parameters<LaserState['traceFrame']>[2],
   jobProject?: Parameters<LaserState['frame']>[3],
   owner?: MachineExecutionOwner,
+  verification?: Parameters<LaserState['frame']>[5],
 ): Promise<void> {
   assertMachineExecutionOwner(owner);
   context = { ...context, safeWrite: ownedMachineWrite(context.safeWrite, owner) };
@@ -238,7 +239,7 @@ async function runFrame(
       0,
       undefined,
       frameSettlementLine,
-      undefined,
+      candidate === undefined ? verification : undefined,
       plan.expectedReturnWorkZMm,
     ),
     ...(owner === undefined ? {} : { executionOwner: owner }),

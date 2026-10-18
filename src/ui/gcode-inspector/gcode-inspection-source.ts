@@ -60,7 +60,11 @@ export type GcodeInspectionSource = (
   | { readonly kind: 'blob'; readonly blob: Blob }
   | { readonly kind: 'text'; readonly text: string }
 ) &
-  GcodeInspectionContext;
+  GcodeInspectionContext & {
+    /** A file the operator opened, which the Inspector may run (ADR-630);
+     * the project's own program has Frame and Start already. */
+    readonly openedFile?: true;
+  };
 
 /** Context belongs to the compiled snapshot; arbitrary imported programs have
  * no inferred machine kind because CNC and laser share M3/M4/S words.

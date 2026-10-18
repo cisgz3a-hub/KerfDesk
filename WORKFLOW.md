@@ -9006,6 +9006,51 @@ validation must be supervised without cutting load.
    unsupported-word notes and zero junk lines (ADR-255 acceptance gate —
    own-output-clean).
 
+### F-M2. Run an opened G-code file (ADR-630)
+
+The G-code Inspector is free in every edition (ADR-627).
+
+#### Success
+
+1. Open a `.nc` / `.gcode` / `.tap` file in the Inspector (File → Open G-code…, or drop it on
+   the workspace). Once it is read, the footer offers **Run on machine...**. The project's own
+   program (Inspect G-code) does not offer it: it already has Frame and Start.
+2. **Run on machine...** opens **Run *file name***. It lists what is sent (lines and bytes; the
+   file's comments, `%` markers and blank lines are left out and nothing else changes), the
+   Inspector's estimated time, the Frame outline (its size and its lowest X and Y in work
+   coordinates), the units the program declares and whether it runs as a laser or a CNC job
+   (the current machine mode).
+3. **Frame** is enabled while connected, Idle and with no other motion running; its tooltip
+   says why otherwise. It runs the ordinary Frame preparation (G54 selection, report units)
+   and traces the program's XY outline at the current work origin with the tool off.
+4. A clean Frame unlocks **Start**. The status reads **Ready to start**. A Jog, Home, origin
+   or probe change, reset, alarm, reconnect, another Frame or a machine-mode switch locks it
+   again with the reason.
+5. **Start** asks the usual laser-mode (`$32`) or CNC workholding question, checks the Frame is
+   still current, then streams the program with the ordinary streamer and closes the
+   Inspector. The Live Motion bar's Pause, Resume and **ABORT JOB** work as for any job.
+6. One Frame allows one run. Running the file again needs another Frame.
+
+#### Warnings (never refuse)
+
+Moves in machine coordinates (`G53`), a work coordinate switch away from `G54`, `G92`,
+`G28`/`G30`, relative moves (`G91`), inches (`G20`, which also leaves the controller in
+inches), the laser or spindle still on at the end, a tool change (`M6`), a program that looks
+like the other machine mode, and the Inspector's Program Health notices and warnings.
+
+#### Refusals (factual only)
+
+The dialog shows the reason and offers only **Close** when the file holds a NUL byte, has no
+line to send, holds a `$` controller command, a realtime character (`?`, `!`, `~`), a
+control or non-ASCII character outside a comment, or never moves in X or Y. Start itself
+still refuses a line longer than the controller's line or receive buffer (ADR-375).
+
+#### Not included
+
+Interrupted-job resume, the second pass and job history are project features; an
+interrupted external run is reported but not resumed. The file is never edited or imported
+into the drawing.
+
 ## Phase N flows (Design Studio — ADR-272)
 
 The Design Studio is a full-window overlay for drawing a part to size by hand.

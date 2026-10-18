@@ -133,7 +133,7 @@ last, inner contours before outer — a part is machined completely before the c
 | `.lbdev` | LightBurn device profiles, with an Applied / Needs Review / Ignored card before anything is applied. GRBL-flavoured devices only. **Experimental — written against an inferred schema and never tested against a real LightBurn export.** |
 | `.png` `.jpg` | Engrave/trace sources. |
 | `.stl` | CNC relief through the unified Import picker or drag-and-drop, in either machine mode. |
-| `.nc` `.gcode` `.tap` | **View only**, in the G-code Inspector. Does not become editable geometry. (An older 2D simulator is reachable from inside the Inspector, in CNC mode only.) |
+| `.nc` `.gcode` `.tap` | **View and run**, in the G-code Inspector (free). **Run on machine...** frames the program's outline, then streams it unchanged except for removed comments. Does not become editable geometry. (An older 2D simulator is reachable from inside the Inspector, in CNC mode only.) |
 | `.ttf` `.otf` | Embedded into the project (≤10 MB each, ≤32 per project). |
 | `.csv` | Variable-text datasets. |
 | `.lf2` | KerfDesk's own project format (JSON, schema v4, auto-migrating from v1/v2/v3). |
