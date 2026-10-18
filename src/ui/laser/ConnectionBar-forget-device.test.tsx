@@ -102,7 +102,7 @@ describe('ConnectionBar device permission actions', () => {
     expect(auto).not.toContain('when KerfDesk starts');
   });
 
-  // ADR-606: macOS and Linux remember only adapters that report a USB serial number.
+  // ADR-607: macOS and Linux remember only adapters that report a USB serial number.
   it('says on macOS and Linux that an adapter without a serial number is chosen again', async () => {
     const host = await renderBar({
       connection: { kind: 'disconnected' },
@@ -165,7 +165,8 @@ describe('ConnectionBar device permission actions', () => {
       host.remove();
     };
 
-    expect(host.textContent).toContain('Controller information unavailable');
+    // A failed read on a controller that still answers stays in Controller info.
+    expect(host.querySelector('[aria-label="Controller notification"]')).toBeNull();
     expect(host.querySelector('[role="alert"]')).toBeNull();
     await openMenu(host);
     await act(async () => menuItem('Controller info')?.click());
