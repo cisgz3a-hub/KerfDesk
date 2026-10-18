@@ -708,7 +708,9 @@ the linked artwork.
    selected vector artwork. The artwork previews live while the handles are dragged; Enter or Apply
    applies it as one undo step, Esc or Cancel leaves it as it was, and Reset handles starts again.
    Shift keeps the Warp corners a parallelogram. Curves become fine lines within 0.05 mm; images,
-   reliefs and locked artwork are left as they are, and the notice says how many.
+   reliefs and locked artwork are left as they are, and the notice says how many. A bend that needs
+   more geometry than can be prepared accurately is not previewed: the artwork stays as it was and
+   the tool's hint says why, in the words Apply would use, until the handles allow the bend again.
 4. **Arrange → Layout → Copy Along Path…** copies the selected artwork along the top-most selected
    single path (or the path picked under Guide path): by number of copies, spacing between centres
    or gap between copies, from the start offset to the end offset, turned to follow the path unless
