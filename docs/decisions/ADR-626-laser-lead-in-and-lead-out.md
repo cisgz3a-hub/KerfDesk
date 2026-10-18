@@ -74,7 +74,9 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    of the way its own shape takes it into the scrap, so every length the setting allows can fit. From
    its very first step it must keep the clearance from every other cut line, including the bridged
    gaps of a tabbed or perforated outline (a lead slipping through two tab gaps would burn across that
-   part), except copies of its own outline on another operation. Its free end must lie inside exactly
+   part) and the leads already placed for earlier contours, so two leads aimed into the same scrap
+   cannot burn over each other; copies of its own outline on another operation, and their leads, are
+   exempt. Its free end must lie inside exactly
    the closed contours that hold its own contour, so it can never end inside another part or past the
    hole or sheet its contour sits in. The clearance is 0.2 mm or one kerf width (twice the kerf
    offset), whichever is wider, at most 1 mm. When the contour goes out as G2/G3, its arc leads do

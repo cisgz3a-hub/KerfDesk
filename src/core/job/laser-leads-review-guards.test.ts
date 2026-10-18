@@ -186,4 +186,45 @@ describe('laser lead review guards (ADR-626)', () => {
     const heading = Math.atan2(next.y - from.y, next.x - from.x);
     expect(Math.abs(heading)).toBeLessThan((15 * Math.PI) / 180);
   });
+
+  it('keeps a lead clear of a lead another contour placed before it', () => {
+    // Two squares 3.5 mm apart, started on their facing edges, with 2 mm
+    // straight leads aimed at each other across the gap.
+    const a: CutSegment = {
+      polyline: [
+        { x: 10, y: 5 },
+        { x: 10, y: 10 },
+        { x: 0, y: 10 },
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 5 },
+      ],
+      closed: true,
+    };
+    const b: CutSegment = {
+      polyline: [
+        { x: 13.5, y: 5 },
+        { x: 13.5, y: 0 },
+        { x: 23.5, y: 0 },
+        { x: 23.5, y: 10 },
+        { x: 13.5, y: 10 },
+        { x: 13.5, y: 5 },
+      ],
+      closed: true,
+    };
+    const leads = { ...LEADS, style: 'line' as const, angleDeg: 90, leadOut: false };
+    const done = applyLaserLeads({ groups: [group([a, b], { laserLeads: leads })] }, { bed: null });
+    const cut = done.groups[0];
+    if (cut?.kind !== 'cut') throw new Error('expected a cut group');
+    const leadA = cut.segments[0]?.polyline.slice(0, 2) ?? [];
+    const leadB = cut.segments[1]?.polyline.slice(0, 2) ?? [];
+    expect(leadA[0]).toEqual({ x: 12, y: 5 });
+    // Each end of B's lead stays at least the clearance from A's lead.
+    const gap = Math.min(...leadB.map((point) => Math.abs(point.x - 12)));
+    expect((leadB[0] as Vec2).x).toBeGreaterThan(12);
+    expect(gap).toBeGreaterThanOrEqual(0.2);
+    expect(done.diagnostics).toEqual([
+      { kind: 'laser-leads-adjusted', layerId: 'L', layerName: 'Cut', shortened: 1, omitted: 0 },
+    ]);
+  });
 });

@@ -3,7 +3,8 @@
 // every closed ring, indexed by its bounds so a lead can ask which rings hold
 // a point. Lines are the burns themselves, open or closed, from every Line cut
 // group; rings are the closed contours, including the outline a tabbed or
-// perforated contour still draws in pieces (laser-lead-rings.ts).
+// perforated contour still draws in pieces (laser-lead-rings.ts). Leads join
+// the lines once placed (addLine), so a later lead keeps clear of them too.
 
 import type { Vec2 } from '../scene';
 import { ContourBoxIndex } from '../trace/contour-box-index';
@@ -30,16 +31,16 @@ const PIECE_MM = CELL_MM / 2;
 const MAX_GRID_PIECES = 2000;
 
 type Grid = {
-  readonly cells: ReadonlyMap<number, ReadonlyArray<number>>;
-  readonly wide: ReadonlyArray<number>;
+  readonly cells: Map<number, number[]>;
+  readonly wide: number[];
 };
 
 type Chords = {
-  readonly ax: Float64Array;
-  readonly ay: Float64Array;
-  readonly bx: Float64Array;
-  readonly by: Float64Array;
-  readonly line: Int32Array;
+  readonly ax: number[];
+  readonly ay: number[];
+  readonly bx: number[];
+  readonly by: number[];
+  readonly line: number[];
 };
 
 export class LeadObstacles {
@@ -48,6 +49,7 @@ export class LeadObstacles {
     private readonly grid: Grid,
     private readonly ringIndex: ContourBoxIndex<SegmentBounds & { readonly ring: number }> | null,
     readonly rings: ReadonlyArray<LeadRing>,
+    private nextLine: number,
   ) {}
 
   static create(
@@ -58,12 +60,31 @@ export class LeadObstacles {
     const boxes = rings.flatMap((ring, index) =>
       finiteBounds(ring.bounds) ? [{ ...ring.bounds, ring: index }] : [],
     );
+    const grid: Grid = { cells: new Map(), wide: [] };
+    for (let chord = 0; chord < chords.line.length; chord += 1) insertChord(grid, chords, chord);
     return new LeadObstacles(
       chords,
-      chordGrid(chords),
+      grid,
       boxes.length === 0 ? null : ContourBoxIndex.create(boxes),
       rings,
+      lines.length,
     );
+  }
+
+  /** Adds a line (a placed lead) for later queries; returns its line id. */
+  addLine(points: ReadonlyArray<Vec2>): number {
+    const lineId = this.nextLine;
+    this.nextLine += 1;
+    for (let index = 1; index < points.length; index += 1) {
+      const chord = pushChord(
+        this.chords,
+        points[index - 1] as Vec2,
+        points[index] as Vec2,
+        lineId,
+      );
+      insertChord(this.grid, this.chords, chord);
+    }
+    return lineId;
   }
 
   /** How far `point` is from line `own`, and from the nearest other line that
@@ -121,66 +142,54 @@ export class LeadObstacles {
 }
 
 function collectChords(lines: ReadonlyArray<ReadonlyArray<Vec2>>): Chords {
-  let count = 0;
-  for (const points of lines) count += Math.max(0, points.length - 1);
-  const chords: Chords = {
-    ax: new Float64Array(count),
-    ay: new Float64Array(count),
-    bx: new Float64Array(count),
-    by: new Float64Array(count),
-    line: new Int32Array(count),
-  };
-  let next = 0;
+  const chords: Chords = { ax: [], ay: [], bx: [], by: [], line: [] };
   lines.forEach((points, lineId) => {
     for (let index = 1; index < points.length; index += 1) {
-      const a = points[index - 1] as Vec2;
-      const b = points[index] as Vec2;
-      chords.ax[next] = a.x;
-      chords.ay[next] = a.y;
-      chords.bx[next] = b.x;
-      chords.by[next] = b.y;
-      chords.line[next] = lineId;
-      next += 1;
+      pushChord(chords, points[index - 1] as Vec2, points[index] as Vec2, lineId);
     }
   });
   return chords;
 }
 
-function chordGrid(chords: Chords): Grid {
-  const cells = new Map<number, number[]>();
-  const wide: number[] = [];
-  const add = (cx: number, cy: number, chord: number): void => {
-    const key = cellKey(cx, cy);
-    const list = cells.get(key);
-    if (list === undefined) cells.set(key, [chord]);
-    else if (list[list.length - 1] !== chord) list.push(chord);
-  };
-  for (let chord = 0; chord < chords.line.length; chord += 1) {
-    const ax = chords.ax[chord] as number;
-    const ay = chords.ay[chord] as number;
-    const bx = chords.bx[chord] as number;
-    const by = chords.by[chord] as number;
-    if (![ax, ay, bx, by].every(Number.isFinite)) continue;
-    const pieces = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / PIECE_MM));
-    if (pieces > MAX_GRID_PIECES) {
-      wide.push(chord);
-      continue;
-    }
-    for (let piece = 0; piece < pieces; piece += 1) {
-      const t0 = piece / pieces;
-      const t1 = (piece + 1) / pieces;
-      const x0 = ax + (bx - ax) * t0;
-      const y0 = ay + (by - ay) * t0;
-      const x1 = ax + (bx - ax) * t1;
-      const y1 = ay + (by - ay) * t1;
-      for (let cx = cellOf(Math.min(x0, x1)); cx <= cellOf(Math.max(x0, x1)); cx += 1) {
-        for (let cy = cellOf(Math.min(y0, y1)); cy <= cellOf(Math.max(y0, y1)); cy += 1) {
-          add(cx, cy, chord);
-        }
+function pushChord(chords: Chords, a: Vec2, b: Vec2, lineId: number): number {
+  chords.ax.push(a.x);
+  chords.ay.push(a.y);
+  chords.bx.push(b.x);
+  chords.by.push(b.y);
+  chords.line.push(lineId);
+  return chords.line.length - 1;
+}
+
+function insertChord(grid: Grid, chords: Chords, chord: number): void {
+  const ax = chords.ax[chord] as number;
+  const ay = chords.ay[chord] as number;
+  const bx = chords.bx[chord] as number;
+  const by = chords.by[chord] as number;
+  if (![ax, ay, bx, by].every(Number.isFinite)) return;
+  const pieces = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / PIECE_MM));
+  if (pieces > MAX_GRID_PIECES) {
+    grid.wide.push(chord);
+    return;
+  }
+  for (let piece = 0; piece < pieces; piece += 1) {
+    const t0 = piece / pieces;
+    const t1 = (piece + 1) / pieces;
+    const x0 = ax + (bx - ax) * t0;
+    const y0 = ay + (by - ay) * t0;
+    const x1 = ax + (bx - ax) * t1;
+    const y1 = ay + (by - ay) * t1;
+    for (let cx = cellOf(Math.min(x0, x1)); cx <= cellOf(Math.max(x0, x1)); cx += 1) {
+      for (let cy = cellOf(Math.min(y0, y1)); cy <= cellOf(Math.max(y0, y1)); cy += 1) {
+        addToCell(grid.cells, cellKey(cx, cy), chord);
       }
     }
   }
-  return { cells, wide };
+}
+
+function addToCell(cells: Map<number, number[]>, key: number, chord: number): void {
+  const list = cells.get(key);
+  if (list === undefined) cells.set(key, [chord]);
+  else if (list[list.length - 1] !== chord) list.push(chord);
 }
 
 function cellOf(value: number): number {

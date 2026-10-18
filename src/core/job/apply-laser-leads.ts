@@ -55,6 +55,8 @@ export type LaserLeadOptions = {
 type LeadWorld = LeadJobLines & {
   readonly obstacles: LeadObstacles;
   readonly bed: JobBounds | null;
+  /** Line ids of the leads placed on each ring so far. */
+  readonly leadLines: Map<number, number[]>;
 };
 
 type LeadCounts = { readonly layerName: string; shortened: number; omitted: number };
@@ -80,6 +82,7 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
     ...lines,
     obstacles: LeadObstacles.create(lines.lines, lines.rings),
     bed: options.bed,
+    leadLines: new Map(),
   };
   const counts = new Map<string, LeadCounts>();
   const groups = withoutTopologyRings(job).groups.map((group, groupIndex) => {
@@ -163,11 +166,13 @@ function leadSegment(
   tallyContour(tally, attempt);
   const { leadIn, leadOut, finalPass } = attempt;
   if (leadIn === null && leadOut === null) return segment;
+  recordLeads(world, attempt);
   return leadedSegment(attempt.segment, leadIn, leadOut, finalPass, group.passes);
 }
 
 type LeadAttempt = {
   readonly segment: CutSegment;
+  readonly ringId: number;
   readonly spec: CutGroupLaserLeads;
   readonly leadIn: LeadFit | null;
   readonly leadOut: LeadFit | null;
@@ -186,7 +191,17 @@ function leadAttempt(
   const leadIn = spec.leadIn ? fitLead('in', plan.startJoin, shape, context) : null;
   const leadOut = spec.leadOut ? fitLead('out', plan.endJoin, shape, context) : null;
   const finalPass = finalPassLeadOut(segment, group, leadOut, plan);
-  return { segment, spec, leadIn, leadOut, finalPass };
+  return { segment, ringId: plan.ringId, spec, leadIn, leadOut, finalPass };
+}
+
+// Placed leads are cut lines too: a later contour's leads keep clear of them,
+// so two leads aimed into the same scrap cannot burn over each other. Copies
+// of this contour ignore them, as they ignore the contour itself.
+function recordLeads(world: LeadWorld, attempt: LeadAttempt): void {
+  const placed = [attempt.leadIn, attempt.leadOut, attempt.finalPass?.fit ?? null].flatMap((fit) =>
+    fit === null ? [] : [world.obstacles.addLine(fit.path.points)],
+  );
+  world.leadLines.set(attempt.ringId, [...(world.leadLines.get(attempt.ringId) ?? []), ...placed]);
 }
 
 /** Every lead asked for is there, on every pass. */
@@ -203,6 +218,7 @@ function missingOut(attempt: LeadAttempt): boolean {
 }
 
 type LeadPlan = {
+  readonly ringId: number;
   readonly spec: CutGroupLaserLeads;
   readonly shape: LeadShape;
   readonly context: LeadFitContext;
@@ -235,6 +251,7 @@ function leadPlan(
     scrap: scrapNormal(tangent, joins.counterClockwise, inside),
   });
   return {
+    ringId,
     spec,
     shape: { style: spec.style, lengthMm: spec.lengthMm, angleDeg: spec.angleDeg },
     context: {
@@ -344,7 +361,10 @@ function fitContext(
   const ignoredRings = new Set([ringId, ...copies]);
   const ignoredLines = new Set([
     lineId,
-    ...copies.flatMap((index) => world.rings[index]?.lineIds ?? []),
+    ...copies.flatMap((index) => [
+      ...(world.rings[index]?.lineIds ?? []),
+      ...(world.leadLines.get(index) ?? []),
+    ]),
   ]);
   const holds = new Map<number, boolean>();
   return {
