@@ -126,7 +126,9 @@ describe('Release train workflow gate (ADR-541)', () => {
     expect(packageCheckText).toMatch(
       /workflow_call:\n {4}inputs:[\s\S]*\n {6}ref:\n {8}type: string/u,
     );
-    expect(packageCheckText.match(/^ {10}ref: \$\{\{ inputs\.ref \}\}$/gmu)).toHaveLength(4);
+    // Every checkout, counting once the commercial rehearsal steps that both of
+    // its jobs share through one YAML anchor (ADR-613).
+    expect(packageCheckText.match(/^ {10}ref: \$\{\{ inputs\.ref \}\}$/gmu)).toHaveLength(5);
     expect(packageCheckText).toContain(
       'group: desktop-package-check-${{ inputs.ref || github.ref }}',
     );
