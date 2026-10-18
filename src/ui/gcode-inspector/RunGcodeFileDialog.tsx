@@ -106,7 +106,8 @@ function useExternalRunActions(
     attempt('framing', async () => {
       const framed = await frameExternalProgram(prepared.run);
       setFrame(framed);
-      if (framed === null) setError('The Frame did not finish cleanly, so Start stays locked.');
+      if (framed === null)
+        setError('The Frame did not run or did not finish cleanly, so Start stays locked.');
     });
   const runStart = (): Promise<void> =>
     attempt('starting', async () => {
