@@ -186,9 +186,10 @@ describe('camera-store', () => {
     if (sourceState.kind === 'error') expect(sourceState.message).toBe('busy');
   });
 
-  it('says what to do when another program holds the camera or none is connected', async () => {
+  it('says what to do when the camera cannot be started or none is connected', async () => {
     // Chrome on Windows, measured with a second process holding the camera:
-    // "NotReadableError: Device in use".
+    // "NotReadableError: Device in use". The same error covers Windows' camera
+    // privacy switch, so the message names both causes.
     const busy = new DOMException('Device in use', 'NotReadableError');
     await useCameraStore
       .getState()
@@ -196,7 +197,8 @@ describe('camera-store', () => {
     const inUse = useCameraStore.getState().sourceState;
     expect(inUse.kind).toBe('error');
     if (inUse.kind === 'error') {
-      expect(inUse.message).toContain('in use by another program');
+      expect(inUse.message).toContain('Close other programs that use it');
+      expect(inUse.message).toContain('Settings, Privacy & security, Camera');
       expect(inUse.message).toContain('press Start USB camera');
       expect(inUse.message).not.toContain('NotReadableError');
     }

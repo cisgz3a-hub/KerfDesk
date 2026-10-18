@@ -82,10 +82,11 @@ const BRIDGE_MISSING =
 // does not find a copy installed since.
 const FFMPEG_MISSING =
   'FFmpeg is not installed on this computer — RTSP cameras need it for preview and capture. Install it, then restart KerfDesk.';
-// Windows refuses a camera another program holds with NotReadableError
-// ("Device in use"); Chromium's older name for it was TrackStartError.
+// NotReadableError (Chromium's older name: TrackStartError) is any failure to
+// reach the camera hardware: on Windows another program holding it ("Device in
+// use") or Windows' camera privacy switch for desktop apps (ADR-551).
 const USB_CAMERA_BUSY =
-  'The camera is in use by another program, or it could not be started. Close other programs that use the camera (another KerfDesk window, LightBurn, a video call or the Camera app), then press Start USB camera.';
+  'The camera could not be started. Close other programs that use it (another KerfDesk window, LightBurn, a video call or the Camera app). On Windows, also open Settings, Privacy & security, Camera, and let desktop apps use the camera. Then press Start USB camera.';
 const USB_CAMERA_NOT_FOUND =
   'No camera was found. Connect the camera, then press Start USB camera.';
 const NO_PREVIEW_URL = 'The camera bridge did not return a preview URL for this RTSP camera.';

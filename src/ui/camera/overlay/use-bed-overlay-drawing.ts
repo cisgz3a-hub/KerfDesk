@@ -1,7 +1,7 @@
 // Keeps the bed overlay canvas drawn (ADR-440): owns the WebGL2 renderer for
 // the canvas, redraws right after any render that changed the view, the
-// opacity, the heights or the frame, and, for a live camera, on animation frames that show
-// a new picture, so a still or a paused feed costs nothing between changes.
+// opacity, the heights or the frame, and, for a live camera, on each new
+// picture it shows, so a still or a paused feed costs nothing between changes.
 // The camera model is applied to the frame's real size on every draw, so a
 // camera that changes resolution mid-session stays registered.
 
@@ -105,13 +105,19 @@ export function useBedOverlayDrawing(
 }
 
 // Redraws on animation frames that show a new picture, and once the context
-// comes back after a loss.
-function watchLiveFrames(
+// comes back after a loss. A video redraws once per frame it presents.
+export function watchLiveFrames(
   element: LiveCaptureElement,
   streaming: boolean,
-  renderer: BedOverlayRenderer,
+  renderer: Pick<BedOverlayRenderer, 'lost'>,
   redraw: () => void,
 ): () => void {
+  if (
+    element instanceof HTMLVideoElement &&
+    typeof element.requestVideoFrameCallback === 'function'
+  ) {
+    return watchPresentedVideoFrames(element, renderer, redraw);
+  }
   let handle = 0;
   let drawn = '';
   const tick = (): void => {
@@ -127,6 +133,25 @@ function watchLiveFrames(
   };
   handle = requestAnimationFrame(tick);
   return () => cancelAnimationFrame(handle);
+}
+
+// A camera stream's currentTime is a clock that advances on every animation
+// frame (W3C Media Capture and Streams, section 6), so keying a video on it
+// redraws at the display's rate, not the camera's. The video frame callback
+// runs once for each frame the element presents, just before animation
+// frames, so the texture upload sees that frame. A lost context skips the
+// draw; the next frame after it is restored draws again.
+function watchPresentedVideoFrames(
+  video: HTMLVideoElement,
+  renderer: Pick<BedOverlayRenderer, 'lost'>,
+  redraw: () => void,
+): () => void {
+  const onFrame = (): void => {
+    handle = video.requestVideoFrameCallback(onFrame);
+    if (!renderer.lost) redraw();
+  };
+  let handle = video.requestVideoFrameCallback(onFrame);
+  return () => video.cancelVideoFrameCallback(handle);
 }
 
 /** Draw one overlay frame; the issue that kept it from drawing, or null. */
@@ -179,31 +204,19 @@ function frameSize(
   return size.width > 0 && size.height > 0 ? size : null;
 }
 
-// Changes whenever the element shows a new picture: a video counts a new
-// frame, a polled image swaps or finishes its source. An MJPEG stream keeps
-// one src and repaints in place, so it is sampled about 30 times a second.
-export function liveFrameKey(element: LiveCaptureElement, streaming: boolean): string {
+// Changes whenever the element shows a new picture: a video advances its
+// clock (only where it has no video frame callback), a polled image swaps or
+// finishes its source. An MJPEG stream keeps one src and repaints in place,
+// so it is sampled about 30 times a second.
+function liveFrameKey(element: LiveCaptureElement, streaming: boolean): string {
   if (element instanceof HTMLVideoElement) {
-    return `video:${videoFrameCount(element)}:${element.videoWidth}x${element.videoHeight}`;
+    return `video:${element.currentTime}:${element.videoWidth}x${element.videoHeight}`;
   }
   const tick = streaming ? Math.floor(performance.now() / STREAM_FRAME_MS) : 0;
   return `image:${element.currentSrc}:${element.complete}:${element.naturalWidth}:${tick}`;
 }
 
 const STREAM_FRAME_MS = 33;
-
-// A camera stream's currentTime is a clock that advances on every animation
-// frame (W3C Media Capture and Streams, section 6), so it would redraw at the
-// display's rate, not the camera's. The frames the element has received only
-// change when the camera sends one. The clock remains for a browser that
-// counts none.
-function videoFrameCount(video: HTMLVideoElement): string {
-  const frames =
-    typeof video.getVideoPlaybackQuality === 'function'
-      ? video.getVideoPlaybackQuality().totalVideoFrames
-      : 0;
-  return frames > 0 ? `frames ${frames}` : `time ${video.currentTime}`;
-}
 
 const stillTextures = new WeakMap<RgbaImage, ImageData>();
 
