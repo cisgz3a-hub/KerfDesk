@@ -29,6 +29,7 @@ import {
   type JigImportPlacement,
 } from './jig-editor-artwork';
 import { useJigArtworkImport } from './JigArtworkImport';
+import { jigSelectAll } from './jig-canvas-selection';
 
 export function useJigEditor(onClose: () => void) {
   const [session, setSession] = useState(() => createJigEditorSession(useStore.getState()));
@@ -209,12 +210,9 @@ export function handleJigEditorKey(
   session: JigEditorSession,
   setSession: React.Dispatch<React.SetStateAction<JigEditorSession>>,
 ): void {
-  if (isTextInput(event.target)) return;
+  if (isTextInput(event.target) || handleJigCommandKey(event, setSession)) return;
   const key = event.key.toLowerCase();
-  if ((event.ctrlKey || event.metaKey) && (key === 'z' || key === 'y')) {
-    event.preventDefault();
-    setSession((current) => undoJigDraft(current, event.shiftKey || key === 'y'));
-  } else if (key === 'delete' || key === 'backspace') {
+  if (key === 'delete' || key === 'backspace') {
     event.preventDefault();
     const deletion = deleteJigArtworkWithRepairs(session);
     if (deletion.session === session) return;
@@ -227,4 +225,22 @@ export function handleJigEditorKey(
     event.preventDefault();
     setSession((current) => nudgeJigSelection(current, direction[0] * step, direction[1] * step));
   }
+}
+
+// Ctrl/Cmd+Z and +Y undo and redo; Ctrl/Cmd+A selects everything the canvas can select.
+function handleJigCommandKey(
+  event: React.KeyboardEvent,
+  setSession: React.Dispatch<React.SetStateAction<JigEditorSession>>,
+): boolean {
+  if (!event.ctrlKey && !event.metaKey) return false;
+  const key = event.key.toLowerCase();
+  if (key === 'z' || key === 'y') {
+    event.preventDefault();
+    setSession((current) => undoJigDraft(current, event.shiftKey || key === 'y'));
+    return true;
+  }
+  if (key !== 'a' || event.shiftKey) return false;
+  event.preventDefault();
+  setSession((current) => selectJigObjects(current, jigSelectAll(current.draft.project.scene)));
+  return true;
 }

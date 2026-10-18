@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "sinceSourceSha": "cbc7a91fa00452f0b171172307ac3fe5e5d8457b",
   "highlights": [
-    "Registration Jig now opens its own editor page with a canvas fitted to the jig. Edit outlines and artwork there, then Save to canvas; the main canvas keeps a compact Edit jig, Outline only and Artwork only bar.",
-    "In the jig editor, add text with your existing fonts, import artwork, or upload an image and trace it directly. Imported and traced artwork fits inside the jig outline, with Line or Fill settings for each piece.",
-    "After a complete outline burn, the jig switches to Artwork only and reminds you to place the piece and focus on its top surface. Job Review shows the burn order and the artwork focus reminder.",
-    "Collapsed Artwork and Machine panels now pulse in the orange accent, so a closed panel is easy to find and reopen.",
-    "New Centre & LED controls under the laser jog buttons move to the centre of the selected artwork and switch a configured pointer light on, with a separate LED off action.",
-    "Jobs complete more reliably when Pause races the final controller replies, and the canvas no longer shows an unsolicited selection popup."
+    "Registration Jig has its own editor page: add text, import or trace artwork, then Save to canvas. Escape no longer discards your edits, and after a complete outline burn the jig switches to Artwork only and reminds you to refocus.",
+    "With Absolute Coords on a flat bed, Centre & LED moves the pointer light to the centre of the selected artwork, and a Machine Setup option runs it after a clean Frame. Marlin fan-output laser profiles have no pointer light.",
+    "Find any command with Ctrl+K (Cmd+K on Mac). The workspace is denser and fits smaller screens, the jog pad is more compact, most dialogs keep their buttons visible, and Settings no longer changes size between sections.",
+    "Offset, Combine, Weld and Cut Shapes now run in the background so the app stays responsive. The artwork settings panel shows dither options as visual swatches, and the Material Test dialog previews its grid as you edit it.",
+    "On GRBL and Smoothieware controllers, jobs no longer hang when the last replies are lost. Reconnect pop-ups are quieter, speed sliders use realistic ranges, and a bed diagram sets the origin and records the homing corner.",
+    "Focus Test operations are clearly labelled, trim, node editing, shear and arrays are more accurate, paid licences keep checking in when the clock is off by up to 30 days, and Electron gets the latest Chromium security fixes."
   ]
 }
