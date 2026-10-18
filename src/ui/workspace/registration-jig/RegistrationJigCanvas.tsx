@@ -2,36 +2,25 @@ import {
   useEffect,
   useRef,
   useState,
-  type PointerEvent,
+  type DragEvent,
   type RefObject,
   type MutableRefObject,
-  type Dispatch,
-  type SetStateAction,
 } from 'react';
-import {
-  findRegistrationBoxes,
-  hitTest,
-  sceneObjectHasVisibleLayer,
-  transformedBBox,
-  type Project,
-  type Vec2,
-} from '../../../core/scene';
+import { findRegistrationBoxes, type Project } from '../../../core/scene';
 import { Button } from '../../kit';
 import { canvasTheme } from '../../theme/canvas-theme';
-import { drawScene } from '../draw-scene';
-import { createDisplayPolylineCache } from '../display-polylines';
 import { useCanvasBitmapSize } from '../use-canvas-bitmap-size';
 import {
   canvasMouseToScene,
   clientToCanvasPx,
-  computeView,
   zoomAtCursorPx,
   type ViewState,
 } from '../view-transform';
-import { jigSelectionForHit, moveJigSelection } from './jig-canvas-selection';
+import { useJigCanvasPaint } from './jig-canvas-paint';
 import { fitJigCanvasView, JIG_BED_VIEW } from './jig-canvas-view';
 import { jigOutlineAt } from './fit-jig-artwork';
 import { isJigArtworkFile } from './JigArtworkImport';
+import { useJigCanvasGesture, type JigGesture } from './use-jig-canvas-gesture';
 
 export type RegistrationJigCanvasProps = {
   readonly project: Project;
@@ -44,14 +33,8 @@ export type RegistrationJigCanvasProps = {
   readonly onDropFiles?: (files: ReadonlyArray<File>, outlineId: string | null) => void;
 };
 
-type Gesture = {
-  readonly pointerId: number;
-  readonly kind: 'move' | 'pan';
-  readonly start: Vec2;
-  readonly base: Project;
-  readonly selectedIds: ReadonlySet<string>;
-  readonly view: ViewState;
-};
+const CANVAS_HELP =
+  'Drag to move · Handles resize (Shift: free) and rotate (Shift: 15°) · Drag empty space to box-select · Shift-click to select more · Ctrl+A selects all artwork · Wheel to zoom · Space-drag to pan · Drop artwork files on an outline';
 
 export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.Element {
   const { project, selectedIds } = props;
@@ -68,8 +51,9 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
   }
   const view = manualView ?? fitJigCanvasView(fit.project, size);
   const [preview, setPreview] = useState<Project | null>(null);
+  const [dropOutlineId, setDropOutlineId] = useState<string | null>(null);
   const spaceHeld = useRef(false);
-  const { gesture, begin, update, end } = useJigCanvasGesture({
+  const { gesture, marquee, notice, cancel, begin, update, end } = useJigCanvasGesture({
     ...props,
     ref,
     view,
@@ -77,7 +61,7 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
     setPreview,
     spaceHeld,
   });
-  useJigCanvasPaint(ref, preview ?? project, selectedIds, size, view);
+  useJigCanvasPaint(ref, preview ?? project, { selectedIds, marquee, dropOutlineId }, size, view);
   useJigCanvasWheel({ ref, gesture, view, size, project, setView });
 
   return (
@@ -94,10 +78,7 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
         onPointerMove={update}
         onPointerUp={(event) => end(event, false)}
         onPointerCancel={(event) => end(event, true)}
-        onLostPointerCapture={() => {
-          gesture.current = null;
-          setPreview(null);
-        }}
+        onLostPointerCapture={cancel}
         onBlur={() => {
           spaceHeld.current = false;
         }}
@@ -113,12 +94,11 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
             event.preventDefault();
           }
         }}
-        {...jigCanvasDropHandlers(props.onDropFiles, project, view)}
+        {...jigCanvasDropHandlers(props.onDropFiles, project, view, setDropOutlineId)}
       />
       <div style={footerStyle}>
-        <span id="registration-jig-canvas-help">
-          Drag to move · Shift-click to select more · Wheel to zoom · Space-drag to pan · Drop
-          artwork files on an outline
+        <span id="registration-jig-canvas-help" role="status">
+          {notice === '' ? CANVAS_HELP : notice}
         </span>
         <Button onClick={() => setView(fitJigCanvasView(project, size))}>Fit jig</Button>
         <Button onClick={() => setView(JIG_BED_VIEW)}>Fit bed</Button>
@@ -127,34 +107,43 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
   );
 }
 
-// Artwork files dropped on the canvas go to the outline under the drop point.
+// Artwork files dropped on the canvas go to the outline under the drop point,
+// which is highlighted while files are dragged over it.
 function jigCanvasDropHandlers(
   onDropFiles: RegistrationJigCanvasProps['onDropFiles'],
   project: Project,
   view: ViewState,
-): Pick<React.DOMAttributes<HTMLCanvasElement>, 'onDragOver' | 'onDrop'> {
+  setDropOutlineId: (id: string | null) => void,
+): Pick<React.DOMAttributes<HTMLCanvasElement>, 'onDragOver' | 'onDragLeave' | 'onDrop'> {
+  const outlineAt = (event: DragEvent<HTMLCanvasElement>): string | null => {
+    const point = canvasMouseToScene(event, event.currentTarget, project, view);
+    const outlines = findRegistrationBoxes(project.scene);
+    const index = point === null ? -1 : jigOutlineAt(outlines, point);
+    return outlines[index]?.id ?? null;
+  };
   return {
     onDragOver: (event) => {
       if (onDropFiles === undefined) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = 'copy';
+      const carriesFiles = Array.from(event.dataTransfer.types).includes('Files');
+      setDropOutlineId(carriesFiles ? outlineAt(event) : null);
     },
+    onDragLeave: () => setDropOutlineId(null),
     onDrop: (event) => {
       event.preventDefault();
       event.stopPropagation();
+      setDropOutlineId(null);
       const files = Array.from(event.dataTransfer.files).filter(isJigArtworkFile);
       if (onDropFiles === undefined || files.length === 0) return;
-      const point = canvasMouseToScene(event, event.currentTarget, project, view);
-      const outlines = findRegistrationBoxes(project.scene);
-      const index = point === null ? -1 : jigOutlineAt(outlines, point);
-      onDropFiles(files, outlines[index]?.id ?? null);
+      onDropFiles(files, outlineAt(event));
     },
   };
 }
 
 function useJigCanvasWheel(args: {
   readonly ref: RefObject<HTMLCanvasElement>;
-  readonly gesture: MutableRefObject<Gesture | null>;
+  readonly gesture: MutableRefObject<JigGesture | null>;
   readonly view: ViewState;
   readonly size: { readonly width: number; readonly height: number };
   readonly project: Project;
@@ -196,160 +185,6 @@ function wheelZoomFactor(view: ViewState, deltaY: number): number {
     0.1,
     Math.min(Math.max(50, view.zoomFactor), view.zoomFactor * Math.exp(-deltaY * 0.0015)),
   );
-}
-
-type GestureArgs = RegistrationJigCanvasProps & {
-  readonly ref: RefObject<HTMLCanvasElement>;
-  readonly view: ViewState;
-  readonly setView: (view: ViewState) => void;
-  readonly setPreview: Dispatch<SetStateAction<Project | null>>;
-  readonly spaceHeld: MutableRefObject<boolean>;
-};
-
-function useJigCanvasGesture(args: GestureArgs) {
-  const {
-    project,
-    selectedIds,
-    onSelectionChange,
-    onCommit,
-    ref,
-    view,
-    setView,
-    setPreview,
-    spaceHeld,
-  } = args;
-  const gesture = useRef<Gesture | null>(null);
-  useEffect(() => {
-    gesture.current = null;
-    setPreview(null);
-  }, [project, setPreview]);
-
-  const begin = (event: PointerEvent<HTMLCanvasElement>): void => {
-    if (event.button !== 0 && event.button !== 1) return;
-    const point = canvasMouseToScene(event, ref.current, project, view);
-    if (point === null) return;
-    event.preventDefault();
-    event.currentTarget.focus();
-    const pan = event.button === 1 || spaceHeld.current;
-    const hit = pan ? null : hitTest(project.scene, point);
-    let nextIds = selectedIds;
-    if (!pan) {
-      nextIds = selectionAtHit(project, hit, selectedIds, event.shiftKey);
-      onSelectionChange(nextIds);
-    }
-    if (!pan && (hit === null || !nextIds.has(hit))) return;
-    gesture.current = {
-      pointerId: event.pointerId,
-      kind: pan ? 'pan' : 'move',
-      start: point,
-      base: project,
-      selectedIds: nextIds,
-      view,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const update = (event: PointerEvent<HTMLCanvasElement>): Project | null => {
-    const active = gesture.current;
-    if (active === null || active.pointerId !== event.pointerId || active.base !== project)
-      return null;
-    const point = canvasMouseToScene(event, ref.current, project, active.view);
-    if (point === null) return null;
-    const dx = point.x - active.start.x;
-    const dy = point.y - active.start.y;
-    if (active.kind === 'pan') {
-      setView({ ...active.view, panX: active.view.panX + dx, panY: active.view.panY + dy });
-      return null;
-    }
-    const next = moveJigSelection(active.base, active.selectedIds, dx, dy);
-    setPreview(next);
-    return next;
-  };
-
-  const end = (event: PointerEvent<HTMLCanvasElement>, cancelled: boolean): void => {
-    const active = gesture.current;
-    if (active === null || active.pointerId !== event.pointerId) return;
-    const next = cancelled ? null : update(event);
-    gesture.current = null;
-    setPreview(null);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    if (next !== null && next !== active.base) onCommit(next);
-  };
-
-  return { gesture, begin, update, end };
-}
-
-function selectionAtHit(
-  project: Project,
-  hit: string | null,
-  selectedIds: ReadonlySet<string>,
-  additive: boolean,
-): ReadonlySet<string> {
-  if (hit === null) return additive ? selectedIds : new Set<string>();
-  return jigSelectionForHit(project.scene, hit, selectedIds, additive);
-}
-
-function useJigCanvasPaint(
-  ref: RefObject<HTMLCanvasElement>,
-  displayed: Project,
-  selectedIds: ReadonlySet<string>,
-  size: { readonly width: number; readonly height: number },
-  view: ViewState,
-): void {
-  const [paintRevision, setPaintRevision] = useState(0);
-  const cache = useRef(createDisplayPolylineCache());
-  useEffect(() => {
-    const canvas = ref.current;
-    const ctx = canvas?.getContext('2d');
-    if (canvas === null || ctx == null) return;
-    const frame = requestAnimationFrame(() => {
-      drawScene(ctx, size.width, size.height, displayed, {
-        selectedId: null,
-        preview: false,
-        view,
-        displayPolylineCache: cache.current,
-        onRasterBitmapReady: () => setPaintRevision((revision) => revision + 1),
-        // The jig editor has no hover pulse or Alt peek, so it keeps showing
-        // operation colours rather than resting in ink (ADR-620).
-        operationColors: true,
-      });
-      drawSelection(ctx, displayed, selectedIds, size, view);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [ref, displayed, selectedIds, size, view, paintRevision]);
-}
-
-function drawSelection(
-  ctx: CanvasRenderingContext2D,
-  project: Project,
-  selectedIds: ReadonlySet<string>,
-  size: { readonly width: number; readonly height: number },
-  viewState: ViewState,
-): void {
-  const view = computeView(
-    size.width,
-    size.height,
-    project.device.bedWidth,
-    project.device.bedHeight,
-    viewState,
-  );
-  ctx.save();
-  ctx.strokeStyle = canvasTheme.selection;
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([5, 3]);
-  for (const object of project.scene.objects) {
-    if (!selectedIds.has(object.id) || !sceneObjectHasVisibleLayer(project.scene, object)) continue;
-    const bounds = transformedBBox(object);
-    ctx.strokeRect(
-      bounds.minX * view.scale + view.offsetX,
-      bounds.minY * view.scale + view.offsetY,
-      (bounds.maxX - bounds.minX) * view.scale,
-      (bounds.maxY - bounds.minY) * view.scale,
-    );
-  }
-  ctx.restore();
 }
 
 const hostStyle: React.CSSProperties = {
