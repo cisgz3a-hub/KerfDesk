@@ -34,3 +34,23 @@ test('pins the installer description that package.json builds', () => {
   const pinned = verifier.match(/\$installerFileDescription = '([^']*)'/)?.[1];
   assert.equal(pinned, description);
 });
+
+// Upgrade qualification installs the published release first; its installer
+// was built before ADR-606 and keeps the Windows-only description.
+test('accepts the earlier description only for the published baseline installer', () => {
+  const qualifier = readFileSync(
+    new URL('./qualify-windows-installer.ps1', import.meta.url),
+    'utf8',
+  );
+  assert.match(verifier, /\[switch\]\$Historical/);
+  assert.match(
+    verifier,
+    /\$windowsOnlyInstallerFileDescription = '[^']*Web \+ Windows desktop from one codebase\.'/,
+  );
+  assert.match(verifier, /if \(\$Historical -and \$Kind -ne 'Installer'\) \{ throw/);
+  assert.match(
+    qualifier,
+    /\$historical = \$Scenario -eq 'HistoricalUpgrade' -and \$candidate -eq \$Installer/,
+  );
+  assert.match(qualifier, /-Kind Installer -Historical:\$historical/);
+});
