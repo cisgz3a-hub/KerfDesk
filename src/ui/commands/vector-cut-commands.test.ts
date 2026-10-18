@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { buildAppCommands, commandById, runCommand } from './command-registry';
 import { baseCtx } from './command-registry-test-helpers';
@@ -11,12 +10,12 @@ afterEach(() => {
 
 describe('Trim Shapes and Cut Shapes commands', () => {
   it('offers Extend Shapes and toggles the endpoint tool', () => {
-    const context = vectorCutCommandContext(useStore.getState());
+    const context = vectorCutCommandContext();
     const command = commandById(buildAppCommands(baseCtx(context)), 'tools.extend-shapes');
     expect(command).toMatchObject({ enabled: true, active: false, label: 'Extend Shapes' });
     expect(runCommand(command)).toBe(true);
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'extend-shapes' });
-    expect(vectorCutCommandContext(useStore.getState()).extendShapesActive).toBe(true);
+    expect(vectorCutCommandContext().extendShapesActive).toBe(true);
     context.extendShapes();
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
   });
@@ -47,11 +46,11 @@ describe('Trim Shapes and Cut Shapes commands', () => {
   });
 
   it('turns the Trim tool on, and off again from the menu', () => {
-    const context = vectorCutCommandContext(useStore.getState());
+    const context = vectorCutCommandContext();
     expect(context.trimShapesActive).toBe(false);
     context.trimShapes();
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'trim-shapes' });
-    expect(vectorCutCommandContext(useStore.getState()).trimShapesActive).toBe(true);
+    expect(vectorCutCommandContext().trimShapesActive).toBe(true);
     context.trimShapes();
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
   });
