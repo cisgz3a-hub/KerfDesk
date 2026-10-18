@@ -40,8 +40,8 @@ mock-up, with a 1400 ms pulse.
 3. **Same settings** means what output would do, not how settings are stored
    (`pulse-settings-match.ts`). For a laser project: `layerOperationSettingsEqual` after an
    optional setting an older operation never stored takes the value output uses when it is absent
-   (perforation off, count tabs, no overcut and so on; the bidirectional scan offset stays
-   machine-dependent), plus sub-operations compared by their enabled state and settings, not their
+   (perforation off, count tabs, no overcut and so on; the power mode and bidirectional scan offset
+   stay machine-dependent), plus sub-operations compared by their enabled state and settings, not their
    ids or labels. For a CNC project: equal CNC settings, where an operation with no CNC block counts
    as the CNC defaults as it does in output, compared with object keys sorted. Name, colour and
    visibility do not count. Per-artwork setting overrides are not considered.

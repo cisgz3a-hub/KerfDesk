@@ -21,9 +21,9 @@ export type MachineKind = 'laser' | 'cnc';
 
 // Optional laser settings and the value output uses when one is absent
 // (operation-cut-extras.ts, automatic-overscan.ts, scan-pass-angles.ts). The
-// bidirectional scan offset is left out: absent, it comes from the machine.
+// power mode and bidirectional scan offset are left out: absent, each comes
+// from the machine, and no stored value means the same thing.
 const OPTIONAL_LASER_DEFAULTS = {
-  powerMode: 'auto',
   allowUncalibratedBidirectionalScan: false,
   perforationEnabled: false,
   perforationCutMm: DEFAULT_PERFORATION_CUT_MM,

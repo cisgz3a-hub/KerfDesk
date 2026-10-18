@@ -13,7 +13,6 @@ describe('sameOperationSettings (ADR-620)', () => {
       perforationEnabled: false,
       tabLayout: 'count',
       autoOverscan: false,
-      powerMode: 'auto',
       overcutMm: 0,
     });
     expect(sameOperationSettings(legacy, saved, 'laser')).toBe(true);
