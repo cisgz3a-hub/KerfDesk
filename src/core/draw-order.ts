@@ -2,7 +2,10 @@
 // `scene.objects`: later objects render on top and win hit tests. Machine
 // output follows `artworkOrder`, whose missing entries fall back to the
 // `objects` order, so the current output order is pinned before restacking.
-// Changing what is drawn on top therefore never changes what is cut first.
+// Changing what is drawn on top therefore keeps the run order. Artwork sharing
+// one operation is one machining unit (ADR-211), compiled in stacking order
+// (ADR-486 Amendment 2), so under Keep source order restacking it does change
+// the order of its shapes inside that unit.
 
 import { canonicalArtworkOrder } from './artwork-order';
 import type { Scene } from './scene';
