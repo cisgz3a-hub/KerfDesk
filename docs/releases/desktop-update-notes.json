@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sinceSourceSha": "cbc7a91fa00452f0b171172307ac3fe5e5d8457b",
   "highlights": [
-    "The desktop app now opens to an Activate KerfDesk window: start a free 30-day Pro trial, enter your licence key or buy Pro to continue. The free edition of KerfDesk stays available in your web browser.",
+    "Without an active trial or licence, the desktop app now opens to an Activate KerfDesk window: start a free 30-day trial, enter your licence key, or buy Pro. The free edition of KerfDesk stays in your web browser.",
     "Registration Jig has its own editor page: add text, import or trace artwork, then Save to canvas. Escape no longer discards your edits, and after a complete outline burn the jig switches to Artwork only and reminds you to refocus.",
     "Artwork centre & LED lights the centre of the selected artwork you pick and leaves the LED on afterwards. An option centres it on the whole framed job after Frame in any placement mode. Marlin fan-laser profiles have no pointer light.",
     "Find any command with Ctrl+K (Cmd+K on Mac). The workspace is denser and fits smaller screens, the jog pad is more compact, most dialogs keep their buttons visible, and Settings no longer changes size between sections.",
