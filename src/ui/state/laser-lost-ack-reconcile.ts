@@ -36,7 +36,7 @@ import type { StreamerState } from '../../core/controllers/grbl';
 import { queuedLineCount } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
-import { advanceStreamBy } from './laser-stream-ack';
+import { advanceStreamBy, streamOwnsTerminalAck } from './laser-stream-ack';
 import { beginPostJobSettle } from './laser-post-job-settle';
 import { programmedDwellSeconds } from './laser-stream-dwell';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
@@ -49,7 +49,7 @@ import {
 } from './laser-status-poll-schedule';
 import type { GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import type { LaserState } from './laser-store';
-import { hasUnsettledStreamAcks, pushLog } from './laser-store-helpers';
+import { pushLog } from './laser-store-helpers';
 
 /** Idle after the last reply, held this long, before a GRBL-family probe. */
 export const LOST_REPLY_PROBE_AFTER_MS = 1_000;
@@ -149,9 +149,11 @@ export function handleLostReplyProbeLine(
     return; // The report still updates the active work offset.
   }
   if (kind !== 'ok' && kind !== 'error') return;
-  // FIFO: after `[GC:` the next terminal reply is the probe's. Without it, a
-  // reply the job no longer awaits is the probe's too (its `[GC:` was lost).
-  if (probe.provenAt === null && hasUnsettledStreamAcks(get().streamer)) return;
+  // The probe's reply is the first one the job no longer claims: after `[GC:`
+  // the job's lost replies are applied, and without it (its `[GC:` was lost)
+  // the job has its own replies already. While the job still claims a reply,
+  // ordinary routing gives it to the job, so the probe must not count it.
+  if (streamOwnsTerminalAck(get())) return;
   probe.replied = true;
   queueMicrotask(() => {
     if (refs.lostReplyProbe === probe) finishProbe(set, get, refs, safeWrite, probe, false);
@@ -167,11 +169,14 @@ function applyProvenLostReplies(
 ): void {
   const state = get();
   const streamer = state.streamer;
-  if (streamer?.status !== 'streaming' || state.streamerEpoch !== probe.streamerEpoch) return;
+  if (streamer === null || state.streamerEpoch !== probe.streamerEpoch) return;
+  // A Pause pressed while the probe was out leaves the job paused: it drains
+  // the applied replies and stays paused until Resume completes it.
+  if (streamer.status !== 'streaming' && streamer.status !== 'paused') return;
   const lost = Math.max(0, probe.linesBefore - streamer.completed);
   if (lost === 0) return;
   set((current) => ({ log: pushLog(current, provenLostLogLine(lost)) }));
-  // The stream reaches 'done'; its settle and Idle release wait for the probe.
+  // A streaming job reaches 'done'; its settle and Idle release wait for the probe.
   applyLostReplies(set, get, refs, safeWrite, lost);
 }
 
@@ -447,7 +452,8 @@ function applyLostReplies(
   lost: number,
 ): void {
   let remaining = lost;
-  while (remaining > 0 && get().streamer?.status === 'streaming') {
+  const accepts = (): boolean => ['streaming', 'paused'].includes(get().streamer?.status ?? '');
+  while (remaining > 0 && accepts()) {
     const applied = advanceStreamBy(set, get, refs, safeWrite, 'ok', remaining);
     if (applied <= 0) break;
     remaining -= applied;

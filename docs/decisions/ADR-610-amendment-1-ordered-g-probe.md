@@ -98,7 +98,8 @@ The existing hold and stall fixtures answered `$G` ahead of job replies they
 were still withholding, which no ordered controller can do. They now queue
 that answer behind the withheld replies, and their assertions are unchanged.
 
-One case is left to the watchdog: Pause pressed during the second or two the
-probe is out. The proof then arrives for a paused stream, whose missing
-replies are not applied, and Resume waits as it did before this amendment.
+Pause pressed while the probe is out: its `[GC:` applies the job's lost
+replies to the paused job, which drains them and stays paused until Resume
+completes it, as for any paused job whose tail was acknowledged. The probe
+takes only a reply the job no longer claims.
 No machine was operated.
