@@ -6,7 +6,7 @@ import {
   type SceneObject,
 } from '../scene';
 // Deep import: core/scene's barrel is ratcheted and may only shrink.
-import { withoutLaserLeadSettings } from '../scene/layer';
+import { withoutInactiveLaserLeadSettings, withoutLaserLeadSettings } from '../scene/layer';
 import { cloneRecipeCnc, type ProcessRecipeStep } from './process-recipe';
 
 export function recipeStepFromLayer(layer: Layer): ProcessRecipeStep {
@@ -15,7 +15,8 @@ export function recipeStepFromLayer(layer: Layer): ProcessRecipeStep {
     color: layer.color,
     output: layer.output,
     visible: layer.visible,
-    settings: captureLayerOperationSettings(layer),
+    // Lead fields with both leads off change nothing (ADR-626).
+    settings: withoutInactiveLaserLeadSettings(captureLayerOperationSettings(layer)),
     ...(layer.cnc === undefined ? {} : { cnc: cloneRecipeCnc(layer.cnc) }),
     ...(layer.scanOffsetCalibrationMode === undefined
       ? {}

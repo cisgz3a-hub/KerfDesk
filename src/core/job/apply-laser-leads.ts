@@ -23,6 +23,7 @@
 // - Open paths, tab pieces and perforation dashes get no leads; compile says
 //   so for tabs and perforation (compile-vector-operation.ts).
 
+import type { DeviceProfile } from '../devices';
 import { sampleArcMoves } from '../geometry/arc-fit';
 import { overcutClosedPolyline } from '../geometry/overcut';
 import type { Vec2 } from '../scene';
@@ -46,6 +47,7 @@ import {
 import type { LeadJoin, LeadShape } from './laser-lead-path';
 import { leadJobLines, OBSTACLE_ARC_SAGITTA_MM, type LeadJobLines } from './laser-lead-rings';
 import { leadWrap, wrappedCopies, type LeadWrap } from './laser-lead-rotary';
+import { hasJobStartPower } from './job-start-power';
 import { isBurningLineGroup } from './line-start-region';
 
 export type LaserLeadOptions = {
@@ -53,6 +55,8 @@ export type LaserLeadOptions = {
   readonly bed: JobBounds | null;
   /** One turn of the object on an active rotary, in job Y; absent on a flat bed. */
   readonly wrapMm?: number | null;
+  /** The machine, so a power that rounds to S0 counts as no burn. */
+  readonly device?: DeviceProfile;
 };
 
 type LeadWorld = LeadJobLines & {
@@ -68,7 +72,11 @@ type LeadCounts = { readonly layerName: string; shortened: number; omitted: numb
 export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   if (!job.groups.some((group) => group.kind === 'cut' && group.laserLeads !== undefined))
     return withoutTopologyRings(job);
-  const lines = leadJobLines(job);
+  // As the job start mark judges it: a power the controller rounds to S0
+  // burns nothing, so it gets no leads and holds no part.
+  const burns = (group: CutGroup): boolean =>
+    isBurningLineGroup(group) && hasJobStartPower(group, options.device);
+  const lines = leadJobLines(job, burns);
   const obstacles = LeadObstacles.create(lines.lines, lines.rings);
   const wrap = leadWrap(options.wrapMm, lines.lines);
   for (const line of lines.lines) {
@@ -78,8 +86,7 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   const counts = new Map<string, LeadCounts>();
   const groups = withoutTopologyRings(job).groups.map((group, groupIndex) => {
     // A group that burns nothing gets no leads: they would burn nothing too.
-    if (group.kind !== 'cut' || group.laserLeads === undefined || !isBurningLineGroup(group))
-      return group;
+    if (group.kind !== 'cut' || group.laserLeads === undefined || !burns(group)) return group;
     const tally = countsFor(counts, group.layerId, group.laserLeads.operationName);
     return {
       ...group,
@@ -184,12 +191,14 @@ function leadAttempt(
 ): LeadAttempt | null {
   const plan = leadPlan(segment, group, key, world);
   if (plan === null) return null;
-  const { spec, shape, context } = plan;
-  const leadIn = spec.leadIn ? fitLead('in', plan.startJoin, shape, context) : null;
+  const { spec, shape } = plan;
   const finalPass = finalPassLeadOut(segment, group, spec.leadOut, plan);
-  // With one pass and an overcut the final pass is the only one, so the
-  // ordinary lead-out never burns: it is not fitted, and cannot block.
+  // With one pass and an overcut the final pass is the only one: it goes out
+  // as chords, so its lead-in is fitted as chords, and the ordinary lead-out
+  // never burns, so it is not fitted and cannot block.
   const ordinaryOutBurns = group.passes > 1 || finalPass === null;
+  const context = ordinaryOutBurns ? plan.context : asChords(plan.context);
+  const leadIn = spec.leadIn ? fitLead('in', plan.startJoin, shape, context) : null;
   const leadOut =
     spec.leadOut && ordinaryOutBurns ? fitLead('out', plan.endJoin, shape, context) : null;
   return {
@@ -313,8 +322,9 @@ type FinalPass = {
 
 // The final pass overcuts past the start (ADR-415); its lead-out then leaves
 // from where the overcut ends, along the contour's direction there, fitted on
-// its own: whether the other passes' lead-out fits says nothing about it. Null
-// when the final pass cuts what every other pass cuts.
+// its own: whether the other passes' lead-out fits says nothing about it. The
+// pass goes out as chords (withFinalPass), so the lead is fitted as chords.
+// Null when the final pass cuts what every other pass cuts.
 function finalPassLeadOut(
   segment: CutSegment,
   group: CutGroup,
@@ -334,8 +344,14 @@ function finalPassLeadOut(
   return {
     points,
     fit:
-      tangent === null ? null : fitLead('out', plan.join(end, tangent), plan.shape, plan.context),
+      tangent === null
+        ? null
+        : fitLead('out', plan.join(end, tangent), plan.shape, asChords(plan.context)),
   };
+}
+
+function asChords(context: LeadFitContext): LeadFitContext {
+  return context.arcsEmitted ? { ...context, arcsEmitted: false } : context;
 }
 
 function leadedSegment(

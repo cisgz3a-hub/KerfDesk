@@ -52,9 +52,10 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
 3. **The scrap side is found** (`core/job/laser-lead-rings.ts`). Automatic puts a lead outside an outer
    contour and inside a hole, by containment parity judged as line topology judges it
    (`proper-contour-containment.ts`: the whole outline must lie inside, so a contour that crosses
-   into a concave neighbour is not read as its hole), counted over every closed contour of every Line cut group in the job that burns. A group at zero power, or artwork at
-   0% power, cuts nothing and holds no part, so it is neither an obstacle nor a container, and gets no
-   leads. A hole cut by its own operation is therefore still a hole. A contour that tabs or
+   into a concave neighbour is not read as its hole), counted over every closed contour of every
+   Line cut group in the job that burns. A group at zero power, artwork at 0% power, or a power the
+   controller rounds to S0 (judged as the job start mark judges it, `hasJobStartPower`) cuts nothing
+   and holds no part, so it is neither an obstacle nor a container, and gets no leads. A hole cut by its own operation is therefore still a hole. A contour that tabs or
    perforation broke into pieces still counts: compile keeps its whole outline on the cut group
    (`CutGroup.topologyRings`, matched to the pieces by their topology identity, ADR-486 Amd 2;
    translated with the job, dropped from the prepared job once leads are placed, and kept only when
@@ -63,9 +64,10 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    thousands of sparse dashes chain quickly); where a gap skips a corner, the corner is put back where
    the edges on either side meet, so a hole in the corner is still inside. Copies of one outline, such
    as an outline cut by two operations, count once, or a hole inside a twice-cut outline would read as
-   an outer contour. A copy has the same bounds and length within 0.01 mm and is the same loop vertex
-   by vertex within 0.01 mm, however it starts or runs; shapes that only share bounds and length stay
-   apart.
+   an outer contour. A copy has the same bounds and length within 0.01 mm and is the same loop corner
+   by corner within 0.01 mm, however it starts or runs; a vertex that only splits a straight edge (an
+   outline started mid-edge has one) does not count, and shapes that only share bounds and length
+   stay apart.
    Containment is judged from the outlines here, not from the depth compile carries, because that
    depth already counts a container on the same path that may also have a copy. The same judgement
    says which contours hold a contour for the free-end check below. **Always outside**
@@ -113,9 +115,9 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    their own. A job whose groups ask for no leads is returned as the same object, so its output is
    byte-identical. Lead shape or side stored with both lead switches off changes nothing either: it
    does not split artwork into separate process groups, and an artwork override that holds only
-   such fields does not count as an override (no requested-override comment). The GRBL layer comment
-   adds `leads in+out arc 2.000 mm at 90 deg` only when the
-   operation asks for leads.
+   such fields does not count as an override (no requested-override comment); recipe steps leave
+   such fields out, so reapplying a recipe does not copy an operation over them. The GRBL layer
+   comment adds `leads in+out arc 2.000 mm at 90 deg` only when the operation asks for leads.
 7. **Passes and overcut.** Every pass cuts lead-in, contour, lead-out, because every pass starts and
    stops. Overcut stays on the final pass only (ADR-415): that pass runs past the start first and
    leaves by a lead-out from where the overcut ends, fitted on its own, whether or not the other
@@ -130,7 +132,8 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
 8. **Arcs (ADR-432).** A contour that goes out as G2/G3 keeps its arc moves, and its leads join them
    as moves: a line lead as G1, an arc lead as G2/G3 (quarter turns at most; chords below the arc
    fitter's 0.1 mm radius). A contour that goes out as chords gets its arc leads as chords within
-   0.005 mm. A final pass with an overcut is written as chords, as overcut already was. A restart in
+   0.005 mm. A final pass with an overcut is written as chords, as overcut already was, so its
+   lead-out, and with one pass its lead-in too, is fitted as chords. A restart in
    the middle of an edge keeps arcs only on an edge that is a single line move.
 9. **What gets no lead.** Open paths (no scrap side). Shapes with tabs: they start and stop at their
    tabs, where the edge is broken anyway. Perforated lines: every dash starts and stops, and no closed
@@ -184,8 +187,10 @@ covers a corner-started hole on finely divided sides, outlines kept only when le
 copies started elsewhere or run the other way, and an outline that burns nothing.
 `core/job/laser-leads-scope-and-wrap.test.ts` covers a contour crossing a concave neighbour, the
 one-pass overcut lead-out beside a blocked seam, a cut across the rotary seam, artwork that stores
-lead shape with leads off, and perforation on one artwork only. `laser-lead-override-angle.test.ts`
-covers a bulk angle edit across arc and line leads.
+lead shape with leads off, and perforation on one artwork only.
+`core/job/laser-leads-copies-and-power.test.ts` covers a copy started mid-edge, a power that rounds
+to S0, the chord-only final pass beside another cut, and recipe steps with leads off.
+`laser-lead-override-angle.test.ts` covers a bulk angle edit across arc and line leads.
 End-to-end tests (`io/gcode/laser-leads-output.test.ts`) pin byte-identical G-code, prepared jobs and
 Ruida plans with leads off (set or absent) on GRBL, arc GRBL, Marlin and Smoothieware with 1 and 3
 passes and with and without overcut, and show leads on every pass, in Marlin, Smoothieware and Ruida

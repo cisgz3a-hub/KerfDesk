@@ -21,11 +21,16 @@ export function laserLeadOptions(
   device: DeviceProfile,
   machine: MachineConfig | undefined,
   bed: JobBounds | null,
-): { readonly bed: JobBounds | null; readonly wrapMm: number | null } {
+): {
+  readonly bed: JobBounds | null;
+  readonly wrapMm: number | null;
+  readonly device: DeviceProfile;
+} {
   const rotary = rotaryAppliesTo(device, machine) ? device.rotary : undefined;
   return {
     bed: laserLeadBed(bed, rotary !== undefined),
     wrapMm: rotary === undefined ? null : rotaryCircumferenceMm(rotary),
+    device,
   };
 }
 

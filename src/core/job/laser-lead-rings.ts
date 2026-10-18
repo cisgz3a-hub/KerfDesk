@@ -22,7 +22,7 @@
 import { sampleArcMoves } from '../geometry/arc-fit';
 import type { Vec2 } from '../scene';
 import { emittedCutArcMoves } from './cut-arc-moves';
-import type { CutSegment, Job } from './job';
+import type { CutGroup, CutSegment, Job } from './job';
 import { chainPieces } from './laser-lead-chain';
 import { isBurningLineGroup } from './line-start-region';
 import type { LeadRing } from './laser-lead-obstacles';
@@ -51,17 +51,25 @@ const COPY_MM = 0.01;
 const COPY_LENGTH_RELATIVE = 1e-4;
 // Copies are looked up by their lower-left corner on a grid this fine.
 const COPY_CELL_MM = 0.1;
+// A vertex this close to the straight line through its neighbours only splits
+// an edge (a contour started mid-edge gains one), so copies ignore it.
+const STRAIGHT_MM = 1e-6;
 
-export function leadJobLines(job: Job): LeadJobLines {
+/** `burns` says which cut groups really burn; others hold no part. */
+export function leadJobLines(
+  job: Job,
+  burns: (group: CutGroup) => boolean = isBurningLineGroup,
+): LeadJobLines {
   const lines: Array<ReadonlyArray<Vec2>> = [];
   const lineOf = new Map<string, number>();
   const rings: LeadRing[] = [];
   const ringOfLine = new Map<number, number>();
   const pieces = new Map<string, { nesting: NonNullable<CutSegment['nesting']>; ids: number[] }>();
   job.groups.forEach((group, groupIndex) => {
-    // A group that burns nothing (zero power, or an artwork at 0% power) cuts
-    // no line and holds no part: it is neither an obstacle nor a container.
-    if (group.kind !== 'cut' || !isBurningLineGroup(group)) return;
+    // A group that burns nothing (zero power, an artwork at 0% power, or a
+    // power the controller rounds to S0) cuts no line and holds no part: it is
+    // neither an obstacle nor a container.
+    if (group.kind !== 'cut' || !burns(group)) return;
     group.segments.forEach((segment, segmentIndex) => {
       const lineId = lines.length;
       lines.push(burnLine(segment, group.entryRunwayMm));
@@ -166,8 +174,10 @@ function earlierCopy(
 
 // Same bounds and length first, cheaply; then the outlines themselves, vertex
 // by vertex: a copy is the same loop, perhaps started elsewhere or run the other
-// way, every vertex within COPY_MM. Two different shapes that share bounds and
-// length (mirrored L shapes, or detours between sampled points) stay apart.
+// way, every corner within COPY_MM. Vertices that only split a straight edge
+// do not count, so an outline started mid-edge still matches its copy. Two
+// different shapes that share bounds and length (mirrored L shapes, or detours
+// between sampled points) stay apart.
 function ringsAreCopies(a: LeadRing, b: LeadRing): boolean {
   return (
     Math.abs(a.bounds.minX - b.bounds.minX) <= COPY_MM &&
@@ -175,17 +185,49 @@ function ringsAreCopies(a: LeadRing, b: LeadRing): boolean {
     Math.abs(a.bounds.maxX - b.bounds.maxX) <= COPY_MM &&
     Math.abs(a.bounds.maxY - b.bounds.maxY) <= COPY_MM &&
     Math.abs(a.lengthMm - b.lengthMm) <= COPY_MM + a.lengthMm * COPY_LENGTH_RELATIVE &&
-    sameLoop(openLoop(a.points), openLoop(b.points))
+    sameLoop(cornerLoop(a), cornerLoop(b))
   );
 }
 
-/** The loop's vertices without a closing point that repeats the first. */
-function openLoop(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
-  const first = points[0];
-  const last = points[points.length - 1];
-  return points.length > 1 && first !== undefined && last !== undefined && near(first, last)
-    ? points.slice(0, -1)
-    : points;
+const corners = new WeakMap<LeadRing, ReadonlyArray<Vec2>>();
+
+/** The loop's corners: no closing point that repeats the first, no repeated
+ * points, and no vertex that lies on the straight edge through its neighbours. */
+function cornerLoop(ring: LeadRing): ReadonlyArray<Vec2> {
+  const known = corners.get(ring);
+  if (known !== undefined) return known;
+  const kept: Vec2[] = [];
+  for (const point of ring.points) {
+    const last = kept[kept.length - 1];
+    if (last !== undefined && point.x === last.x && point.y === last.y) continue;
+    kept.push(point);
+    while (kept.length >= 3 && splitsEdge(kept.at(-3), kept.at(-2), kept.at(-1)))
+      kept.splice(-2, 1);
+  }
+  closeSeam(kept);
+  corners.set(ring, kept);
+  return kept;
+}
+
+/** Drops a closing point that repeats the first, and edge-splitting vertices
+ * across the seam where the loop closes. */
+function closeSeam(kept: Vec2[]): void {
+  const first = kept[0];
+  const last = kept[kept.length - 1];
+  if (kept.length > 1 && first !== undefined && last !== undefined && near(first, last)) kept.pop();
+  while (kept.length >= 3 && splitsEdge(kept.at(-2), kept.at(-1), kept[0])) kept.pop();
+  while (kept.length >= 3 && splitsEdge(kept.at(-1), kept[0], kept[1])) kept.shift();
+}
+
+/** Whether `vertex` only splits the straight edge from `before` to `after`. */
+function splitsEdge(before: Vec2 | undefined, vertex: Vec2 | undefined, after: Vec2 | undefined) {
+  if (before === undefined || vertex === undefined || after === undefined) return false;
+  const ax = vertex.x - before.x;
+  const ay = vertex.y - before.y;
+  const bx = after.x - vertex.x;
+  const by = after.y - vertex.y;
+  const span = Math.hypot(after.x - before.x, after.y - before.y);
+  return ax * bx + ay * by > 0 && Math.abs(ax * by - ay * bx) <= STRAIGHT_MM * span;
 }
 
 function sameLoop(a: ReadonlyArray<Vec2>, b: ReadonlyArray<Vec2>): boolean {

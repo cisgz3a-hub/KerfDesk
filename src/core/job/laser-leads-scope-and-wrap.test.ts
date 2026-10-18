@@ -178,6 +178,7 @@ describe('laser lead scope and wrap (ADR-626)', () => {
     expect(laserLeadOptions(DEFAULT_DEVICE_PROFILE, undefined, bed)).toEqual({
       bed,
       wrapMm: null,
+      device: DEFAULT_DEVICE_PROFILE,
     });
     const rotary = {
       ...DEFAULT_DEVICE_PROFILE,

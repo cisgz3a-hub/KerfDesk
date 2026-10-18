@@ -365,6 +365,17 @@ export function withoutLaserLeadSettings<T extends Partial<LayerOperationSetting
   return rest as T;
 }
 
+/** ADR-626: the settings without their lead fields when neither lead is on,
+ * because those fields then change nothing: a recipe step or comparison taken
+ * from them matches one without leads. */
+export function withoutInactiveLaserLeadSettings<T extends Partial<LayerOperationSettings>>(
+  settings: T,
+): T {
+  return settings.leadInEnabled === true || settings.leadOutEnabled === true
+    ? settings
+    : withoutLaserLeadSettings(settings);
+}
+
 export function createLayerSubLayer(
   layer: Layer,
   args: {
