@@ -28,7 +28,7 @@ function renderButton(): HTMLButtonElement {
   return button;
 }
 
-describe('CommandSearchButton shortcut (ADR-606)', () => {
+describe('CommandSearchButton shortcut (ADR-607)', () => {
   it('shows Ctrl+K on Windows and Linux', () => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Win32');
     const button = renderButton();

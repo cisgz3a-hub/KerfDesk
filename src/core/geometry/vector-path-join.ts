@@ -85,7 +85,7 @@ function collectJoinSources(
   for (const object of objects) {
     if (!validTransform(object)) return invalidGeometry();
     for (const [pathIndex, path] of object.paths.entries()) {
-      const signature = joinSignature(object, path, operations);
+      const signature = pathJoinSignature(object, path, operations);
       for (const [curveIndex, curve] of pathCurves(path).entries()) {
         if (curve.closed || curve.segments.length === 0) continue;
         const protectedPath =
@@ -158,7 +158,7 @@ function repairObject(
     }
     paths.push({
       ...path,
-      operationIds: boundIds(object, path, operations),
+      operationIds: pathBoundOperationIds(object, path, operations),
       ...materializedStrokeFields(path, object.transform),
       fillRule: pathFillRule(object, path),
       curves,
@@ -211,7 +211,8 @@ function pathCurves(path: ColoredPath): ReadonlyArray<CurveSubpath> {
   return path.curves ?? path.polylines.map(polylineToCurveSubpath);
 }
 
-function boundIds(
+/** The operations a path is cut by: its own binding, else the artwork's, else colour matching. */
+export function pathBoundOperationIds(
   object: VectorSceneObject,
   path: ColoredPath,
   operations: ReadonlyArray<Layer>,
@@ -227,13 +228,14 @@ function boundIds(
   ].sort();
 }
 
-function joinSignature(
+/** Equal only for paths that cut identically: same operations, colour, power scale and overrides. */
+export function pathJoinSignature(
   object: VectorSceneObject,
   path: ColoredPath,
   operations: ReadonlyArray<Layer>,
 ): string {
   return stableValue({
-    operations: boundIds(object, path, operations),
+    operations: pathBoundOperationIds(object, path, operations),
     color: path.color.toLowerCase(),
     powerScale: object.powerScale ?? 100,
     override: object.operationOverride ?? {},
