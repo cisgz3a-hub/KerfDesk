@@ -1,5 +1,5 @@
 // Text render results return from the text worker as packed geometry
-// (ADR-616, after ADR-346 and ADR-609).
+// (ADR-624, after ADR-346 and ADR-609).
 //
 // A paragraph of text is hundreds of thousands of {x, y} points. Structured
 // cloning that reply cost the UI thread about as long as laying the text out

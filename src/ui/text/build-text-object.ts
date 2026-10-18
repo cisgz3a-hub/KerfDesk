@@ -23,7 +23,7 @@ export class TextObjectValidationError extends Error {
 
 /**
  * Builds editable vector text without changing the project or its undo history.
- * The layout runs in a text worker (ADR-616): the caller's session for a
+ * The layout runs in a text worker (ADR-624): the caller's session for a
  * preview, or one of its own for an explicit action.
  */
 export async function buildTextObject(

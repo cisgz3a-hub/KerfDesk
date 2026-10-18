@@ -1,4 +1,4 @@
-## ADR-616 - Canvas text lays out in a text worker, reusing a parsed font only where that is provably identical
+## ADR-624 - Canvas text lays out in a text worker, reusing a parsed font only where that is provably identical
 
 **Status:** Accepted; measured in Node on the maintainer's PC, Chromium covered by an e2e spec, packaged-desktop qualification pending. | **Date:** 2026-10-18
 

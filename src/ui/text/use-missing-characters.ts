@@ -7,7 +7,7 @@ import type { TextWorkerSession } from './text-worker-session';
 import { useTextWorkerSession } from './use-text-worker-session';
 
 // Checking an outline font parses it, so the check waits for typing to settle,
-// and runs in the text worker (ADR-616).
+// and runs in the text worker (ADR-624).
 const CHECK_DELAY_MS = 300;
 const COLUMN_SEPARATOR = '\u0000';
 
