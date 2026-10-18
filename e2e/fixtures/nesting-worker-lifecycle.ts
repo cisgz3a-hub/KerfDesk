@@ -62,10 +62,12 @@ interface WorkerRuntime {
 const CHROMIUM_FORCIBLE_TERMINATION_MS = 2_000;
 const THREAD_TEARDOWN_ALLOWANCE_MS = 3_000;
 
-class RuntimeObserver {
+export class RuntimeObserver {
   readonly workers = new Map<string, WorkerRuntime>();
   private readonly sessions = new Map<string, WorkerRuntime>();
   private readonly requests = new Map<number, WorkerRuntime>();
+  private readonly attachments = new Set<Promise<void>>();
+  private releasing = false;
   private readonly listeners = new Set<() => void>();
   private nextRequest = 0;
 
@@ -85,7 +87,10 @@ class RuntimeObserver {
         destroyed: false,
       };
       this.workers.set(worker.target, worker);
-      void this.attach(worker);
+      if (this.releasing) return;
+      const attachment = this.attach(worker);
+      this.attachments.add(attachment);
+      void attachment.finally(() => this.attachments.delete(attachment));
     });
     cdp.on('Target.targetInfoChanged', ({ targetInfo }) => {
       const worker = this.workers.get(targetInfo.targetId);
@@ -130,6 +135,7 @@ class RuntimeObserver {
         flatten: false,
       });
       this.sessions.set(sessionId, worker);
+      if (this.releasing) return;
       const id = ++this.nextRequest;
       this.requests.set(id, worker);
       await this.cdp.send('Target.sendMessageToTarget', {
@@ -188,6 +194,11 @@ class RuntimeObserver {
     // Debugger attachments can retain a terminated worker target and its last
     // context metadata. Release our sessions, but keep browser discovery active:
     // detachment itself is never accepted as proof that a runtime was destroyed.
+    // A target can be discovered while its attach request is still in flight.
+    // Close admission first, then drain those requests before taking the session
+    // snapshot, otherwise a late attachment can keep the terminated target alive.
+    this.releasing = true;
+    await Promise.all(this.attachments);
     const sessions = [...this.sessions.keys()];
     await Promise.all(
       sessions.map(async (sessionId) => {
