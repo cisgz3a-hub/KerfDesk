@@ -253,6 +253,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
   // cursor move).
   const penDraft = useUiStore((s) => s.penDraft);
   const wireframe = useUiStore((s) => s.wireframeView);
+  const operationColors = useUiStore((s) => s.operationColorPeek);
   const [rasterRedrawTick, setRasterRedrawTick] = useState(0);
   const colorScheme = useCanvasColorScheme();
   const previewBackgroundKey = useMemo(
@@ -280,6 +281,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
       snapMarker,
       gridMm,
       wireframe,
+      operationColors,
     });
     // `args` is recreated by Workspace; its consumed fields are listed below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -316,6 +318,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
     snapMarker,
     gridMm,
     wireframe,
+    operationColors,
   ]);
 }
 
@@ -335,6 +338,7 @@ function drawWorkspaceScene(
     readonly snapMarker: ReturnType<typeof useUiStore.getState>['snapMarker'];
     readonly gridMm: number;
     readonly wireframe: boolean;
+    readonly operationColors: boolean;
   },
 ): void {
   drawScene(ctx, canvas.width, canvas.height, args.project, {
@@ -365,6 +369,7 @@ function drawWorkspaceScene(
     ...(args.warpDeformEditor === undefined ? {} : { warpDeformEditor: args.warpDeformEditor }),
     ...(args.artworkRunFocus === null ? {} : { artworkRunFocus: args.artworkRunFocus }),
     wireframe: state.wireframe,
+    operationColors: state.operationColors,
   });
   // Startup reveals the editor after a successful artwork/chrome paint, not
   // merely after React has inserted an empty canvas element.

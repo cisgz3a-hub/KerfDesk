@@ -42,6 +42,7 @@ import { useMaterialLibraryPersistence } from './use-material-library-persistenc
 import { usePolylineFairingUpgrade } from './use-polyline-fairing-upgrade';
 import { useShortcuts } from './use-shortcuts';
 import { useSingleArtworkSelection } from './use-single-artwork-selection';
+import { useOperationColorPeek } from './use-operation-color-peek';
 import { useSpacePan } from './use-space-pan';
 import { useUnloadStop } from './use-unload-stop';
 import { useUnsavedChangesGuard } from './use-unsaved-changes-guard';
@@ -134,6 +135,7 @@ function AppLifecycle(): null {
   useJobShortcuts();
   useShortcuts();
   useSpacePan();
+  useOperationColorPeek();
   useActiveJobWakeLock();
   useJobWatch();
   useAutoConnectController();
