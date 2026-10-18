@@ -23,6 +23,7 @@ describe('drawScene multi-operation visibility', () => {
 const drawOptions = {
   selectedId: null,
   preview: false,
+  operationColors: true,
   view: { zoomFactor: 1, panX: 0, panY: 0 },
 } as const;
 
