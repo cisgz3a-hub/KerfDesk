@@ -34,6 +34,7 @@
 
 import type { StreamerState } from '../../core/controllers/grbl';
 import { queuedLineCount } from '../../core/controllers/grbl';
+import { isTerminal } from '../../core/controllers/grbl/streamer';
 import type { ControllerDriver } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
 import { advanceStreamBy, streamOwnsTerminalAck } from './laser-stream-ack';
@@ -380,8 +381,8 @@ function sendLostReplyProbe(
 }
 
 /** The probe's reply is overdue: its `ok` after `[GC:` was lost, or every
- *  line of its answer was lost once the job had ended. While the job still
- *  streams, the existing watchdog governs instead. */
+ *  line of its answer was lost once the job had ended. Before proof arrives,
+ *  an active or paused stream keeps the probe's reply reservation. */
 function resolveOverdueProbe(
   set: SetFn,
   get: GetFn,
@@ -393,11 +394,13 @@ function resolveOverdueProbe(
   if (probe == null || probe.replied) return false;
   const state = get();
   const schedule = refs.statusPollSchedule;
-  const streaming =
-    state.streamer?.status === 'streaming' && state.streamerEpoch === probe.streamerEpoch;
-  // A held program may keep the job streaming far longer than any grace; the
+  const active =
+    state.streamer !== null &&
+    !isTerminal(state.streamer.status) &&
+    state.streamerEpoch === probe.streamerEpoch;
+  // A held or paused program can stay active far longer than any grace; the
   // clock starts only once the job has ended (done, errored or released).
-  if (!streaming) probe.streamEndedAt ??= now;
+  if (!active) probe.streamEndedAt ??= now;
   const overdue =
     probe.provenAt !== null
       ? onScheduleElapsed(schedule, probe.provenAt, LOST_REPLY_PROBE_REPLY_GRACE_MS, now)

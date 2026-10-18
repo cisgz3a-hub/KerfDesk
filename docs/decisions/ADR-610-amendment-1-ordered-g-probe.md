@@ -65,7 +65,7 @@ missing at that moment was lost on the link.
 - If the probe's `ok` after `[GC:` is lost too, the probe finishes 2 s after
   the proof. If every line of its answer was lost, the probe is released 10 s
   after both the transport accepted it and the job stopped streaming (done,
-  errored or released). A held program can keep the job streaming for longer
+  errored or released). A held or paused program can keep the job active for longer
   than any grace, so that time does not count, and while the write is still
   pending no reply can be due, so nothing is released.
   A rejected probe write may still have reached the controller, so the probe

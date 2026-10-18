@@ -206,6 +206,18 @@ describe('probe give-up starts once the job has ended and the probe is on the wi
     expect(run.store.pendingUntrackedAcks).toBe(0);
   });
 
+  it('keeps an unanswered probe and its FIFO reservation throughout Pause and Resume', () => {
+    const run = harness({ ...streaming, status: 'paused' }, 0);
+    expect(run.tick(1_000)).toBe(false);
+    expect(run.tick(12_000)).toBe(false);
+    expect(run.refs.lostReplyProbe?.streamEndedAt).toBeNull();
+    expect(run.store.pendingUntrackedAcks).toBe(1);
+    run.store.streamer = streaming;
+    expect(run.tick(60_000)).toBe(false);
+    expect(run.refs.lostReplyProbe?.streamEndedAt).toBeNull();
+    expect(run.store.pendingUntrackedAcks).toBe(1);
+  });
+
   it('retires an unanswered probe after the job errored and was released', () => {
     const run = harness(null, 0);
     expect(run.tick(1_000)).toBe(false);

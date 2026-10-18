@@ -193,6 +193,36 @@ describe('lost job-line replies at the end of a job', () => {
     expect(state.log.join('\n')).not.toMatch(/lost on the serial link/);
   });
 
+  it('keeps a held probe reply owned through a long Pause and completes after Resume', async () => {
+    const wire = link();
+    const sim = await connectIdle(wire);
+    wire.okCount = 0;
+    wire.holding = true;
+    await startTestLaserJobOnClock(JOB);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(probesSent(sim)).toBe(1);
+
+    const pausing = useLaserStore.getState().pauseJob();
+    await vi.advanceTimersByTimeAsync(500);
+    await pausing;
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(useLaserStore.getState().streamer?.status).toBe('paused');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+    expect(useLaserStore.getState().log.join('\n')).not.toMatch(/\$G confirmation was lost/);
+    const sent = sim.outbound();
+    expect(sent.slice(sent.findIndex((line) => line.includes('G1 X10 Y0')))).not.toContain(
+      'G4 P0.01\n',
+    );
+
+    const resuming = useLaserStore.getState().resumeJob();
+    await vi.advanceTimersByTimeAsync(500);
+    await resuming;
+    wire.holding = false;
+    wire.deliverHeld?.();
+    expect(await msUntilReleased(10_000)).not.toBeNull();
+    expectCleanFinish(sim);
+  });
+
   it('finishes when the probe’s own reply is lost after its [GC:] report', async () => {
     const wire = link([5]);
     const sim = await connectIdle(wire);
