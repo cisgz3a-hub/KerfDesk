@@ -6,7 +6,7 @@
     "In the jig editor, add text with your existing fonts, import artwork, or upload an image and trace it directly. Imported and traced artwork fits inside the jig outline, with Line or Fill settings for each piece.",
     "After a complete outline burn, the jig switches to Artwork only and reminds you to place the piece and focus on its top surface. Job Review shows the burn order and the artwork focus reminder.",
     "Collapsed Artwork and Machine panels now pulse in the orange accent, so a closed panel is easy to find and reopen.",
-    "Enable Centre & LED after Frame to automatically show the centre of the framed artwork on the board in every placement mode. Configured pointer offsets are respected, and Start keeps the same artwork position after the head moves. Separate Centre & LED and LED off controls remain under the laser jog buttons.",
+    "With Centre & LED after Frame enabled, the pointer shows the framed artwork's centre on the board in every placement mode. It uses the configured LED offset, and Start keeps the same artwork position.",
     "Jobs complete more reliably when Pause races the final controller replies, and the canvas no longer shows an unsolicited selection popup."
   ]
 }
