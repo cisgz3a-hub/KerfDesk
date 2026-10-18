@@ -1,15 +1,24 @@
 import { BooleanResultModeFields } from './BooleanResultModeFields';
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  combineVectorObjects,
   isVectorPathObject,
+  type VectorOpError,
   type VectorSceneObject,
 } from '../../core/geometry';
-import { artworkOperationName } from '../../core/scene';
+import type { Result } from '../../core/result';
+import { artworkOperationName, type ImportedSvg } from '../../core/scene';
 import { useStore } from '../state';
 import { selectedObjectIds } from '../state/scene-group-actions';
-import { planWeldSelection } from '../state/vector-path-weld-plan';
+import type { PreparedVectorCombine } from '../state/vector-op-prepared';
+import { uniqueObjectId, uniqueWeldId } from '../state/vector-path-selection';
+import {
+  finishWeldSelection,
+  prepareWeldSelection,
+  type WeldSelectionPlan,
+} from '../state/vector-path-weld-plan';
 import { Button, Dialog, DialogActions } from '../kit';
+import { useVectorOpPreview } from './use-vector-op-preview';
+import type { VectorOpTask } from './vector-op-worker-protocol';
 import { VectorComparisonPreview } from './VectorComparisonPreview';
 import {
   useBooleanDialogStore,
@@ -34,10 +43,11 @@ function BooleanDialog({ session }: { readonly session: BooleanSession }): JSX.E
     setKeepOperands,
     retainCompound,
     setRetainCompound,
-    deferredOperation,
     sources,
     preview,
     after,
+    updating,
+    canApply,
     unchanged,
     apply,
     close,
@@ -50,7 +60,7 @@ function BooleanDialog({ session }: { readonly session: BooleanSession }): JSX.E
       onClose={close}
       onSubmit={(event) => {
         event.preventDefault();
-        if (unchanged && deferredOperation === operation && preview.kind === 'ok') apply();
+        if (unchanged && canApply) apply();
       }}
     >
       <label className="lf-field">
@@ -85,20 +95,11 @@ function BooleanDialog({ session }: { readonly session: BooleanSession }): JSX.E
         setRetain={setRetainCompound}
       />
       <p role="status" aria-live="polite">
-        {booleanReviewStatus(
-          unchanged,
-          deferredOperation !== operation,
-          preview.kind === 'error' ? preview.error.message : null,
-          keepOperands,
-        )}
+        {booleanReviewStatus(unchanged, updating, preview.problem, keepOperands)}
       </p>
       <DialogActions>
         <Button onClick={close}>Cancel</Button>
-        <Button
-          variant="primary"
-          type="submit"
-          disabled={!unchanged || deferredOperation !== operation || preview.kind !== 'ok'}
-        >
+        <Button variant="primary" type="submit" disabled={!unchanged || !canApply}>
           Apply
         </Button>
       </DialogActions>
@@ -129,13 +130,12 @@ function useBooleanReview(session: BooleanSession) {
     if (value) changeKeepOperands(false);
   };
   const [submitted, setSubmitted] = useState(false);
-  const deferredOperation = useDeferredValue(operation);
   const currentProject = useStore((state) => state.project);
   const epoch = useStore((state) => state.projectDocumentEpoch);
   const primary = useStore((state) => state.selectedObjectId);
   const additional = useStore((state) => state.additionalSelectedIds);
   const close = useBooleanDialogStore((state) => state.close);
-  const { sources, preview, after } = useBooleanPreview(session, deferredOperation);
+  const { sources, preview, after } = useBooleanPreview(session, operation);
   const ids = selectedObjectIds({ selectedObjectId: primary, additionalSelectedIds: additional });
   const unchanged =
     currentProject === session.project &&
@@ -159,6 +159,7 @@ function useBooleanReview(session: BooleanSession) {
       expectedProject: session.project,
       expectedIds: session.ids,
       isCurrent,
+      ...(preview.prepared === undefined ? {} : { prepared: preview.prepared }),
     };
     if (operation === 'weld') state.weldSelection(options);
     else state.booleanSelection(operation, options);
@@ -171,10 +172,11 @@ function useBooleanReview(session: BooleanSession) {
     setKeepOperands,
     retainCompound,
     setRetainCompound,
-    deferredOperation,
     sources,
     preview,
     after,
+    updating: preview.updating,
+    canApply: preview.canApply,
     unchanged,
     apply,
     close,
@@ -193,30 +195,90 @@ function booleanSessionIsCurrent(session: BooleanSession): boolean {
   );
 }
 
-function useBooleanPreview(session: BooleanSession, deferredOperation: BooleanPreviewOperation) {
+type BooleanPreviewState = {
+  /** The current operation's error, or the reason the background preview cannot run. */
+  readonly problem: string | null;
+  readonly updating: boolean;
+  readonly canApply: boolean;
+  readonly prepared: PreparedVectorCombine | undefined;
+};
+
+// The union runs in the vector worker (ADR-609) with the ids Apply will use, so
+// Apply commits the settled result instead of computing it again on this thread.
+function useBooleanPreview(session: BooleanSession, operation: BooleanPreviewOperation) {
+  const scene = session.project.scene;
   const sources = useMemo(
     () =>
-      session.project.scene.objects.filter(
+      scene.objects.filter(
         (object): object is VectorSceneObject =>
           session.ids.includes(object.id) && isVectorPathObject(object) && object.locked !== true,
       ),
-    [session],
+    [scene, session.ids],
   );
-  const preview = useMemo(
+  const weld = useMemo(
+    () => (operation === 'weld' ? prepareWeldSelection(scene, sources, uniqueWeldId(scene)) : null),
+    [scene, sources, operation],
+  );
+  const task = useMemo<VectorOpTask>(
     () =>
-      deferredOperation === 'weld'
-        ? planWeldSelection(session.project.scene, sources, 'boolean-preview')
-        : combineVectorObjects(sources, deferredOperation, 'boolean-preview'),
-    [session, sources, deferredOperation],
+      weld === null
+        ? {
+            kind: 'combine',
+            op: operation as Exclude<BooleanPreviewOperation, 'weld'>,
+            id: uniqueObjectId(scene, operation),
+          }
+        : { kind: 'weld', id: weld.resultId },
+    [scene, operation, weld],
   );
-  const after = useMemo(
-    () =>
-      preview.kind === 'ok'
-        ? ['object' in preview.value ? preview.value.object : preview.value]
-        : [],
-    [preview],
-  );
+  const vector = useVectorOpPreview(weld === null ? sources : weld.operands, task);
+  const settled = vector.current?.result as Result<ImportedSvg, VectorOpError> | undefined;
+  const result: Result<ImportedSvg | WeldSelectionPlan, VectorOpError> | undefined =
+    settled === undefined || weld === null ? settled : finishWeldSelection(weld, settled);
+  const preview: BooleanPreviewState = {
+    ...previewStatus(result, vector.unavailable, vector.failed),
+    prepared: preparedCombine(session, sources, task, result),
+  };
+  // The last settled result stays visible, marked as updating, while the next one runs.
+  const shown = vector.settled?.result as Result<ImportedSvg, VectorOpError> | undefined;
+  const after = useMemo(() => (shown?.kind === 'ok' ? [shown.value] : []), [shown]);
   return { sources, preview, after };
+}
+
+function previewStatus(
+  result: Result<unknown, VectorOpError> | undefined,
+  unavailable: string | null,
+  failed: string | null,
+): Omit<BooleanPreviewState, 'prepared'> {
+  if (result !== undefined) {
+    return {
+      problem: result.kind === 'error' ? result.error.message : null,
+      updating: false,
+      canApply: result.kind === 'ok',
+    };
+  }
+  // Work that ran and failed is not retried in thread (ADR-609).
+  if (failed !== null) return { problem: failed, updating: false, canApply: false };
+  // Where the background preview cannot run, Apply computes in thread as before.
+  if (unavailable !== null) {
+    return { problem: `${unavailable} Apply still works.`, updating: false, canApply: true };
+  }
+  return { problem: null, updating: true, canApply: false };
+}
+
+function preparedCombine(
+  session: BooleanSession,
+  sources: ReadonlyArray<VectorSceneObject>,
+  task: VectorOpTask,
+  result: Result<ImportedSvg | WeldSelectionPlan, VectorOpError> | undefined,
+): PreparedVectorCombine | undefined {
+  if (result?.kind !== 'ok') return undefined;
+  const value = result.value;
+  if ('object' in value) {
+    return { kind: 'weld', scene: session.project.scene, sources, plan: value };
+  }
+  return task.kind === 'combine'
+    ? { kind: 'combine', sources, op: task.op, object: value }
+    : undefined;
 }
 
 function booleanReviewStatus(

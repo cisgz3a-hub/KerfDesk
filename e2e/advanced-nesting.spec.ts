@@ -156,6 +156,38 @@ test('cancelling advanced nesting retains its standard draft and terminates owne
   await expectNestingStopped(page, false);
 });
 
+test('nesting lifetime proof waits for forcible termination of a busy nested worker tree', async ({
+  page,
+}) => {
+  // Cancellation can land while solver pthreads boot synchronously. Chromium
+  // then forcibly terminates each busy level only after its grace period.
+  await observeNestingLifetime(page);
+  await page.goto('/packing-solver-worker.js');
+  await page.evaluate(() => {
+    const child = `onmessage = event => {
+      Atomics.store(new Int32Array(event.data), 1, 1);
+      for (;;);
+    };`;
+    const root = `onmessage = event => {
+      const counts = new Int32Array(event.data);
+      new Worker(URL.createObjectURL(new Blob([${JSON.stringify(child)}], { type: 'text/javascript' }))).postMessage(event.data);
+      const spin = () => {
+        if (Atomics.load(counts, 1) === 0) return setTimeout(spin, 5);
+        Atomics.store(counts, 2, 1);
+        for (;;);
+      };
+      spin();
+    };`;
+    window.__nestingBlockedWorker = new Worker(
+      URL.createObjectURL(new Blob([root], { type: 'text/javascript' })),
+    );
+    window.__nestingBlockedWorker.postMessage(window.__nestingLifetime.counts.buffer);
+  });
+  await page.waitForFunction(() => Atomics.load(window.__nestingLifetime.counts, 2) === 1);
+  await page.evaluate(() => window.__nestingBlockedWorker?.terminate());
+  await expectNestingStopped(page, false);
+});
+
 test('nesting lifetime proof rejects a still-running worker after reported termination', async ({
   page,
 }) => {

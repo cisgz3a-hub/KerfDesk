@@ -27,7 +27,7 @@ export function designToolsCommandContext(
   const selected =
     app.project.scene.objects.find((object) => object.id === app.selectedObjectId) ?? null;
   return {
-    ...vectorCutCommandContext(app),
+    ...vectorCutCommandContext(),
     ...warpDeformCommandContext(app.project, selectedIds),
     selectContainedShapes: app.selectContainedShapes,
     selectSmallerShapes: app.selectSmallerShapes,

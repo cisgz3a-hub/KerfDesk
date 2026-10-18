@@ -15,12 +15,17 @@ import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-acti
 import { pruneOrphanLayers, pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 import { useToastStore } from './toast-store';
+import { reusableCutShapes, type PreparedCutShapes } from './vector-op-prepared';
 
 const CUT_FEWER = 'Cut fewer shapes, or delete some objects first.';
 
 export type CutShapesActions = {
-  /** Cut the selection with its top-most closed shape; true when anything was cut. */
-  readonly cutSelectedShapes: () => boolean;
+  /**
+   * Cut the selection with its top-most closed shape; true when anything was
+   * cut. A background plan for this exact scene and selection is committed as
+   * it is (ADR-609); otherwise the cut is planned here.
+   */
+  readonly cutSelectedShapes: (prepared?: PreparedCutShapes) => boolean;
 };
 
 type Setter = (
@@ -31,12 +36,12 @@ type Report = (notify: () => void) => void;
 
 export function cutShapesActions(set: Setter): CutShapesActions {
   return {
-    cutSelectedShapes: () => {
+    cutSelectedShapes: (prepared) => {
       let cut = false;
       const notifications: Array<() => void> = [];
       const committed = set(
         (state) => {
-          const next = cutShapesMutation(state, (notify) => notifications.push(notify));
+          const next = cutShapesMutation(state, (notify) => notifications.push(notify), prepared);
           cut = next !== state;
           return next;
         },
@@ -47,14 +52,16 @@ export function cutShapesActions(set: Setter): CutShapesActions {
   };
 }
 
-function cutShapesMutation(state: AppState, report: Report): AppState | Partial<AppState> {
-  const ids = new Set(selectedObjectIds(state));
+function cutShapesMutation(
+  state: AppState,
+  report: Report,
+  prepared?: PreparedCutShapes,
+): AppState | Partial<AppState> {
   const scene = state.project.scene;
-  const selected = scene.objects.filter((object) => ids.has(object.id));
-  const plan = planCutShapes(
-    selected.filter(isUnlockedVectorArtwork),
-    new Set(scene.objects.map((object) => object.id)),
-  );
+  const selected = cutShapesSelection(scene, selectedObjectIds(state));
+  const sources = selected.filter(isUnlockedVectorArtwork);
+  const plan =
+    reusableCutShapes(prepared, scene, sources) ?? planCutShapes(sources, cutShapesUsedIds(scene));
   if (plan.kind === 'error') {
     report(() => useToastStore.getState().pushToast(plan.error.message, 'warning'));
     return state;
@@ -79,6 +86,20 @@ function cutShapesMutation(state: AppState, report: Report): AppState | Partial<
     redoStack: [],
     dirty: true,
   };
+}
+
+/** The selected objects, in scene order; Cut Shapes works on the unlocked vector ones. */
+export function cutShapesSelection(
+  scene: Scene,
+  selectedIds: ReadonlyArray<string>,
+): ReadonlyArray<SceneObject> {
+  const ids = new Set(selectedIds);
+  return scene.objects.filter((object) => ids.has(object.id));
+}
+
+/** Every object id, which new piece ids avoid. */
+export function cutShapesUsedIds(scene: Scene): ReadonlySet<string> {
+  return new Set(scene.objects.map((object) => object.id));
 }
 
 /** The scene with each cut source replaced in place by its pieces and the cutter removed. */
