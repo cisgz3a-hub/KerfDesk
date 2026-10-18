@@ -1,5 +1,5 @@
 // working-speed-range — the speeds a laser operation's Speed slider spans
-// (ADR-613). This is a convenience range for dragging, not a firmware or
+// (ADR-615). This is a convenience range for dragging, not a firmware or
 // compile limit: exact entry still accepts any speed up to device.maxFeed,
 // which compile caps (feed-ceiling.tsx), and the controller still applies its
 // own $110/$111 max rates.

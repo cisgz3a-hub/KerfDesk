@@ -1,4 +1,4 @@
-## ADR-613 - The Speed slider spans the machine's working speeds on a log scale
+## ADR-615 - The Speed slider spans the machine's working speeds on a log scale
 
 **Status:** Accepted on 2026-10-18 at the maintainer's request ("the slider for speed can be set to unrealistic numbers ... create realistic numbers maybe per machine"). Amends the slider behaviour ADR-430 and its WORKFLOW.md entry describe. Software verification only; no material or hardware qualification.
 

@@ -26,7 +26,7 @@ export function SpeedInput(props: {
   const maxFeed = ceiling.maxFeed;
   const profileId = useStore((state) => state.project.device.profileId);
   const laserSubProfile = useStore((state) => state.project.device.laserSubProfile);
-  // Slider over this machine's working speeds (ADR-613); typing still reaches maxFeed.
+  // Slider over this machine's working speeds (ADR-615); typing still reaches maxFeed.
   const range = useMemo(
     () => speedSliderRange({ profileId, laserSubProfile, maxFeed }),
     [profileId, laserSubProfile, maxFeed],

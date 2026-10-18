@@ -816,7 +816,7 @@ the linked artwork.
   full-width sliders with exact numeric entry; Passes remains numeric. Sliders show their endpoints
   and commit one edit when a drag ends. Power spans 0-100%. Speed's slider spans the machine's
   usual working speeds on a log scale of round values, labelled at each decade, from 60 mm/min to
-  the lower of Output max feed and the machine's working maximum (ADR-613); its label also reads
+  the lower of Output max feed and the machine's working maximum (ADR-615); its label also reads
   the speed in mm/s. Exact entry still accepts 1 mm/min up to Output max feed.
   Numeric typing retains the 300 ms debounce. Mixed values show a neutral, disabled slider until
   an exact value is entered. **More cut settings**
