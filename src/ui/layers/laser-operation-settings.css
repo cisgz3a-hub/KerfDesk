@@ -245,6 +245,12 @@
   grid-column: 1 / -1;
 }
 
+/* A control too wide to share a row with its name (the Dither swatches) sits
+   under it at full width. */
+.lf-laser-field.lf-laser-field--stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .lf-laser-field {
   display: grid;
   grid-template-columns: minmax(100px, 1fr) minmax(0, 1.35fr);

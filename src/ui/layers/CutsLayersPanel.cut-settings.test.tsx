@@ -116,16 +116,15 @@ describe('selected artwork cut settings', () => {
     useStore.getState().setLayerParam(operation().id, { mode: 'image' });
     const panel = await renderPanel();
     try {
-      const dither = panel.host.querySelector('select[aria-label="Dither for selected objects"]');
-      if (!(dither instanceof HTMLSelectElement)) throw new Error('dither missing');
+      const grayscale = requireInput(
+        panel.host,
+        '[role="radiogroup"][aria-label="Dither for selected objects"] input[value="grayscale"]',
+      );
       const interval = requireInput(
         panel.host,
         'input[aria-label="Line interval for selected objects"]',
       );
-      await act(async () => {
-        dither.value = 'grayscale';
-        Simulate.change(dither);
-      });
+      await act(async () => grayscale.click());
       await act(async () => {
         interval.value = '0.2';
         Simulate.change(interval);
