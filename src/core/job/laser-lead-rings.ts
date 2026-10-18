@@ -12,7 +12,11 @@
 // The scrap side is the containment parity inside-first ordering uses
 // (containment-depth.ts): a contour inside an even number of rings is an
 // outer contour, its scrap outside; inside an odd number, a hole, its scrap
-// inside.
+// inside. Copies of one outline (the same shape cut by two operations) count
+// once, or a hole inside a twice-cut outline would read as an outer contour.
+// Containment is judged from the outlines alone here: the depth compile
+// carries already counts a container on the same path, which may also have a
+// copy on another operation.
 
 import type { Vec2 } from '../scene';
 import { containmentDepths } from './containment-depth';
@@ -28,9 +32,18 @@ export type LeadJobLines = {
   readonly rings: ReadonlyArray<LeadRing>;
   /** Ring id of each closed segment's line. */
   readonly ringOfLine: ReadonlyMap<number, number>;
-  /** Containment depth of each ring. */
+  /** Containment depth of each ring, copies counted once. */
   readonly depths: ReadonlyArray<number>;
+  /** The other rings that are copies of each ring. */
+  readonly copies: ReadonlyArray<ReadonlyArray<number>>;
 };
+
+// Two rings are one outline cut twice when their bounds and lengths agree to
+// within this.
+const COPY_MM = 0.01;
+const COPY_LENGTH_RELATIVE = 1e-4;
+// Copies are looked up by their lower-left corner on a grid this fine.
+const COPY_CELL_MM = 0.1;
 
 // A ring chained from more pieces than this is left out of containment: one
 // contour cut as thousands of dashes is too costly to chain and rare.
@@ -66,15 +79,87 @@ export function leadJobLines(job: Job): LeadJobLines {
     const outline = chainPieces(ids.map((id) => lines[id] ?? []));
     if (outline.length >= 3) rings.push(ring(outline, ids, nesting));
   }
+  const representatives = copyRepresentatives(rings);
+  return {
+    lines,
+    lineOf,
+    rings,
+    ringOfLine,
+    depths: scrapDepths(rings, representatives),
+    copies: copyLists(representatives),
+  };
+}
+
+function scrapDepths(
+  rings: ReadonlyArray<LeadRing>,
+  representatives: ReadonlyArray<number>,
+): number[] {
+  const unique = rings.flatMap((_, index) => (representatives[index] === index ? [index] : []));
   const depths = containmentDepths(
-    rings.map((entry) => ({
-      polyline: entry.points,
-      closed: true,
-      ...(entry.nesting === undefined ? {} : { nesting: entry.nesting }),
-    })),
+    unique.map((index) => ({ polyline: rings[index]?.points ?? [], closed: true })),
     { strict: true },
   );
-  return { lines, lineOf, rings, ringOfLine, depths };
+  const byRepresentative = new Map(unique.map((index, at) => [index, depths[at] ?? 0]));
+  return rings.map((_, index) => byRepresentative.get(representatives[index] ?? index) ?? 0);
+}
+
+/** For each ring, the first ring in job order it is a copy of, through any
+ * chain of copies; the ring itself when it is the first. */
+function copyRepresentatives(rings: ReadonlyArray<LeadRing>): number[] {
+  const cells = new Map<string, number[]>();
+  const representatives: number[] = [];
+  const cellOf = (value: number): number => Math.round(value / COPY_CELL_MM);
+  rings.forEach((ring, index) => {
+    const cx = cellOf(ring.bounds.minX);
+    const cy = cellOf(ring.bounds.minY);
+    const copy = earlierCopy(ring, rings, cells, cx, cy);
+    representatives.push(copy === null ? index : (representatives[copy] ?? copy));
+    const key = `${cx},${cy}`;
+    const list = cells.get(key);
+    if (list === undefined) cells.set(key, [index]);
+    else list.push(index);
+  });
+  return representatives;
+}
+
+function earlierCopy(
+  ring: LeadRing,
+  rings: ReadonlyArray<LeadRing>,
+  cells: ReadonlyMap<string, ReadonlyArray<number>>,
+  cx: number,
+  cy: number,
+): number | null {
+  for (let dx = -1; dx <= 1; dx += 1) {
+    for (let dy = -1; dy <= 1; dy += 1) {
+      for (const other of cells.get(`${cx + dx},${cy + dy}`) ?? []) {
+        const candidate = rings[other];
+        if (candidate !== undefined && ringsAreCopies(ring, candidate)) return other;
+      }
+    }
+  }
+  return null;
+}
+
+function ringsAreCopies(a: LeadRing, b: LeadRing): boolean {
+  return (
+    Math.abs(a.bounds.minX - b.bounds.minX) <= COPY_MM &&
+    Math.abs(a.bounds.minY - b.bounds.minY) <= COPY_MM &&
+    Math.abs(a.bounds.maxX - b.bounds.maxX) <= COPY_MM &&
+    Math.abs(a.bounds.maxY - b.bounds.maxY) <= COPY_MM &&
+    Math.abs(a.lengthMm - b.lengthMm) <= COPY_MM + a.lengthMm * COPY_LENGTH_RELATIVE
+  );
+}
+
+function copyLists(representatives: ReadonlyArray<number>): number[][] {
+  const members = new Map<number, number[]>();
+  representatives.forEach((representative, index) => {
+    const list = members.get(representative);
+    if (list === undefined) members.set(representative, [index]);
+    else list.push(index);
+  });
+  return representatives.map((representative, index) =>
+    (members.get(representative) ?? []).filter((other) => other !== index),
+  );
 }
 
 function ring(

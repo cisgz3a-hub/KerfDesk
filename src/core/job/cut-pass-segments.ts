@@ -34,12 +34,8 @@ export function cutSegmentsForPass(
   return passIndex === passes - 1 ? finalPass : group.segments;
 }
 
+// The ordinary pass's arc moves do not fit this burn: it goes out as chords.
 function finalPassBurnSegment(segment: CutSegment): CutSegment {
   const { finalPassBurn, arcMoves: _ordinaryPassArcs, ...rest } = segment;
-  if (finalPassBurn === undefined) return segment;
-  return {
-    ...rest,
-    polyline: finalPassBurn.polyline,
-    ...(finalPassBurn.arcMoves === undefined ? {} : { arcMoves: finalPassBurn.arcMoves }),
-  };
+  return finalPassBurn === undefined ? segment : { ...rest, polyline: finalPassBurn.polyline };
 }

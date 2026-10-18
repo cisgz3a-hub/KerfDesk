@@ -275,7 +275,10 @@ function fitContext(
   world: LeadWorld,
 ): LeadFitContext {
   const own = world.rings[ringId];
-  const copies = own === undefined ? [] : copiesOf(ringId, world);
+  // The same outline cut again, by another operation or another group: its
+  // lines run along the contour, so a lead cannot keep clear of them, and
+  // need not.
+  const copies = world.copies[ringId] ?? [];
   const ignoredRings = new Set([ringId, ...copies]);
   const ignoredLines = new Set([
     lineId,
@@ -304,28 +307,4 @@ function fitContext(
       return result;
     },
   };
-}
-
-// The same outline cut again, by another operation or another pass group:
-// same bounds and length within COPY_MM. Its lines run along the contour, so a
-// lead cannot keep clear of them, and it needs not to.
-const COPY_MM = 0.01;
-
-function copiesOf(ringId: number, world: LeadWorld): number[] {
-  const own = world.rings[ringId];
-  const start = own?.points[0];
-  if (own === undefined || start === undefined) return [];
-  return world.obstacles.ringsHolding(start).filter((index) => {
-    const other = world.rings[index];
-    if (index === ringId || other === undefined) return false;
-    const a = own.bounds;
-    const b = other.bounds;
-    return (
-      Math.abs(a.minX - b.minX) <= COPY_MM &&
-      Math.abs(a.minY - b.minY) <= COPY_MM &&
-      Math.abs(a.maxX - b.maxX) <= COPY_MM &&
-      Math.abs(a.maxY - b.maxY) <= COPY_MM &&
-      Math.abs(own.lengthMm - other.lengthMm) <= COPY_MM + own.lengthMm * 1e-4
-    );
-  });
 }

@@ -16,6 +16,7 @@
 
 import { pointInPolygon } from '../geometry';
 import type { Vec2 } from '../scene';
+import { extendBoundsByEmittedArcMoves } from './cut-arc-moves';
 import type { JobBounds } from './job-bounds';
 import type { LeadObstacles } from './laser-lead-obstacles';
 import {
@@ -71,7 +72,7 @@ export function leadFits(
   at: Vec2,
   context: LeadFitContext,
 ): boolean {
-  if (!onBed(path.points, context.bed)) return false;
+  if (!onBed(path, context.bed)) return false;
   const outward = kind === 'in' ? [...path.points].reverse() : path.points;
   if (!clearOfCutLines(walkSamples(outward), at, context)) return false;
   return freeEndInScrap(path.freeEnd, at, context);
@@ -121,14 +122,26 @@ function walkSamples(points: ReadonlyArray<Vec2>): Vec2[] {
   return samples;
 }
 
-function onBed(points: ReadonlyArray<Vec2>, bed: JobBounds | null): boolean {
+// The lead's extent as written: its points, and on a machine that takes arcs
+// the full sweep of each G2/G3, which bulges past the sampled points and is
+// measured exactly as job bounds measure it.
+function onBed(path: LeadPath, bed: JobBounds | null): boolean {
   if (bed === null) return true;
-  return points.every(
-    (point) =>
-      point.x >= bed.minX - BED_SLACK_MM &&
-      point.x <= bed.maxX + BED_SLACK_MM &&
-      point.y >= bed.minY - BED_SLACK_MM &&
-      point.y <= bed.maxY + BED_SLACK_MM,
+  const start = path.points[0];
+  if (start === undefined) return false;
+  const extent = { minX: start.x, minY: start.y, maxX: start.x, maxY: start.y };
+  for (const point of path.points) {
+    extent.minX = Math.min(extent.minX, point.x);
+    extent.minY = Math.min(extent.minY, point.y);
+    extent.maxX = Math.max(extent.maxX, point.x);
+    extent.maxY = Math.max(extent.maxY, point.y);
+  }
+  extendBoundsByEmittedArcMoves(extent, start, path.moves);
+  return (
+    extent.minX >= bed.minX - BED_SLACK_MM &&
+    extent.maxX <= bed.maxX + BED_SLACK_MM &&
+    extent.minY >= bed.minY - BED_SLACK_MM &&
+    extent.maxY <= bed.maxY + BED_SLACK_MM
   );
 }
 

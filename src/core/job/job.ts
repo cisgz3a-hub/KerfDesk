@@ -66,11 +66,9 @@ export type CutSegment = {
   /** ADR-626: the burn the final pass runs instead of `polyline`, present only
    * on a contour that has leads and an overcut: the overcut runs past the start
    * and the lead-out leaves from where it ends. Read it through
-   * finalPassCutSegments; bounds read it too. */
-  readonly finalPassBurn?: {
-    readonly polyline: ReadonlyArray<Vec2>;
-    readonly arcMoves?: CutArcMoves;
-  };
+   * finalPassCutSegments; bounds, coordinate checks and the rotary mapping read
+   * it too. Written as chords, as an overcut final pass always is (ADR-415). */
+  readonly finalPassBurn?: { readonly polyline: ReadonlyArray<Vec2> };
 };
 
 /** Fitted line/arc moves for a CutSegment (ADR-432), with a fingerprint of
