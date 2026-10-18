@@ -39,7 +39,7 @@ export type ConnectionBarProps = {
   readonly qualification?: ControllerQualification;
   readonly qualificationReadBlockReason?: string | null;
   readonly reconnectRecommended?: boolean;
-  /** The controller stopped answering status queries; only this pops up (ADR-611). */
+  /** The controller stopped answering status queries; only this pops up (ADR-607). */
   readonly controllerStoppedResponding?: boolean;
   readonly onRetryQualification?: () => void;
   readonly onReconnectQualification?: () => void;
@@ -69,9 +69,6 @@ type Props = ConnectionBarProps;
 export function ConnectionBar(props: Props): JSX.Element {
   const { connection } = props;
   const notice = useControllerNotice(props);
-  // The brief notice fades after a few seconds; a failed controller check stays
-  // visible on the status until it is resolved.
-  const needsRecovery = connection.kind === 'connected' && props.qualification?.kind === 'failed';
   return (
     <section
       className="lf-connection-compact"
@@ -91,8 +88,7 @@ export function ConnectionBar(props: Props): JSX.Element {
           <CompactConnectionControls
             machineName={props.machineName ?? 'Unnamed machine'}
             status={connectionStatusLabel(connection)}
-            {...(needsRecovery ? { statusNote: 'controller needs recovery' } : {})}
-            statusDot={<StatusDot connection={connection} needsRecovery={needsRecovery} />}
+            statusDot={<StatusDot connection={connection} />}
             machine={props.machine}
             details={props.details}
             leading={props.mode}
@@ -321,11 +317,8 @@ export function connectionFailureText(
 const LINUX_SERIAL_ACCESS =
   'On Linux your account also needs serial access: run sudo usermod -aG dialout $USER (on Arch, uucp instead of dialout), then log out and back in.';
 
-function StatusDot(props: {
-  readonly connection: ConnectionState;
-  readonly needsRecovery: boolean;
-}): JSX.Element {
-  const color = props.needsRecovery ? 'var(--lf-warning)' : connectionStatusColor(props.connection);
+function StatusDot({ connection }: { readonly connection: ConnectionState }): JSX.Element {
+  const color = connectionStatusColor(connection);
   return (
     <span
       aria-hidden="true"

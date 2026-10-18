@@ -148,10 +148,7 @@ describe('compact machine connection', () => {
       onReconnectQualification,
     });
     expect(document.querySelector('[aria-label="Machine details"]')).toBeNull();
-    // The brief notice fades; the status keeps saying recovery is needed.
-    expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe(
-      'Connected · controller needs recovery',
-    );
+    expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe('Connected');
     expect(host.querySelectorAll('[role="alert"]')).toHaveLength(0);
     expect(host.querySelector('[aria-label="Controller notification"]')).toBeNull();
     await openMenu(host);
