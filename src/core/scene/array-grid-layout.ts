@@ -19,10 +19,30 @@ export function gridSteps(
   if (spec.spaceBy === 'centres') {
     return { stepX: finiteNonNegative(spec.spacingX), stepY: finiteNonNegative(spec.spacingY) };
   }
+  const cell = gridCellSize(bounds, spec.randomRotation);
   return {
-    stepX: span(bounds.minX, bounds.maxX) + finiteNonNegative(spec.spacingX),
-    stepY: span(bounds.minY, bounds.maxY) + finiteNonNegative(spec.spacingY),
+    stepX: cell.width + finiteNonNegative(spec.spacingX),
+    stepY: cell.height + finiteNonNegative(spec.spacingY),
   };
+}
+
+/**
+ * The room one copy can take up, across and down. A copy turned at random
+ * about its centre may stand either way round, so an edge gap is measured from
+ * the box any of its turns fits: quarter turns swap width and height, and any
+ * other angle needs the diagonal. Half turns change nothing.
+ */
+export function gridCellSize(
+  bounds: Bounds,
+  randomRotation: GridArraySpec['randomRotation'],
+): { readonly width: number; readonly height: number } {
+  const width = span(bounds.minX, bounds.maxX);
+  const height = span(bounds.minY, bounds.maxY);
+  if (randomRotation === undefined) return { width, height };
+  const step = finiteNonNegative(randomRotation.stepDeg);
+  if (step > 0 && step % 180 === 0) return { width, height };
+  const side = step > 0 && step % 90 === 0 ? Math.max(width, height) : Math.hypot(width, height);
+  return { width: side, height: side };
 }
 
 export function gridPlacements(bounds: Bounds, spec: GridArraySpec): ReadonlyArray<ArrayPlacement> {

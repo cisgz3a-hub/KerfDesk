@@ -30,7 +30,8 @@ export function ShearDialogHost(): JSX.Element | null {
 }
 
 function parseAngle(text: string): number | null {
-  const value = text.trim() === '' ? 0 : Number(text);
+  if (text.trim() === '') return null;
+  const value = Number(text);
   return Number.isFinite(value) && Math.abs(value) <= MAX_SHEAR_DEG ? value : null;
 }
 
@@ -41,7 +42,13 @@ function ShearDialog(): JSX.Element {
   const [vertical, setVertical] = useState('0');
   const ax = parseAngle(horizontal);
   const ay = parseAngle(vertical);
-  const valid = ax !== null && ay !== null && (ax !== 0 || ay !== 0);
+  const problem =
+    ax === null || ay === null
+      ? `Enter both angles in degrees, from -${MAX_SHEAR_DEG} to ${MAX_SHEAR_DEG}.`
+      : ax === 0 && ay === 0
+        ? 'Enter a horizontal or vertical angle other than 0.'
+        : null;
+  const valid = problem === null && ax !== null && ay !== null;
   const field = (label: string, value: string, set: (next: string) => void) => (
     <label className="lf-field">
       <span>{label}</span>
@@ -78,6 +85,7 @@ function ShearDialog(): JSX.Element {
         Slants the selection about its centre, up to {MAX_SHEAR_DEG}° each way. The shear is written
         into the paths; text, drawn shapes and images need converting to paths first.
       </p>
+      {problem === null ? null : <p role="alert">{problem}</p>}
       <DialogActions>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" type="submit" disabled={!valid}>

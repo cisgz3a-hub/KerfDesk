@@ -15,7 +15,8 @@ const encoder = new TextEncoder();
 const DOMAIN = encoder.encode('kerfdesk-project-seal:v1:');
 const BLOCK = 64;
 
-let key: Uint8Array | null = null;
+// Backed by a plain ArrayBuffer, as WebCrypto's importKey requires.
+let key: Uint8Array<ArrayBuffer> | null = null;
 let ready: Promise<void> = Promise.resolve();
 const trusted = new WeakSet<object>();
 
@@ -38,6 +39,34 @@ export function projectSealReady(): Promise<void> {
 /** Project text with this computer's seal appended; unchanged without a key or when sealed. */
 export function sealProjectText(text: string): string {
   return key === null || hasProjectSeal(text) ? text : withProjectSeal(text, sealFor(key, text));
+}
+
+/**
+ * The same seal as `sealProjectText`, computed by the browser's native WebCrypto
+ * HMAC where available, so a large manual save does not hash on the canvas thread.
+ */
+export async function sealProjectTextAsync(text: string): Promise<string> {
+  const secret = key;
+  if (secret === null || hasProjectSeal(text)) return text;
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle === undefined) return sealProjectText(text);
+  try {
+    const hmacKey = await subtle.importKey(
+      'raw',
+      secret,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    );
+    const body = encoder.encode(text);
+    const message = new Uint8Array(DOMAIN.length + body.length);
+    message.set(DOMAIN);
+    message.set(body, DOMAIN.length);
+    const signature = new Uint8Array(await subtle.sign('HMAC', hmacKey, message));
+    return withProjectSeal(text, base64url(signature));
+  } catch {
+    return withProjectSeal(text, sealFor(secret, text));
+  }
 }
 
 /** The loaded key, passed to an autosave worker so large text is hashed off the canvas thread. */
@@ -79,7 +108,7 @@ export function resetProjectSealForTests(value: string | null = null): void {
   ready = Promise.resolve();
 }
 
-function decodeKey(value: string | null): Uint8Array | null {
+function decodeKey(value: string | null): Uint8Array<ArrayBuffer> | null {
   if (value === null || !/^[A-Za-z0-9_-]{43}$/.test(value)) return null;
   const binary = atob(value.replaceAll('-', '+').replaceAll('_', '/'));
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
