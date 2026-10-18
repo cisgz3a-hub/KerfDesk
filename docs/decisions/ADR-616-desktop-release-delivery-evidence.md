@@ -90,7 +90,7 @@ launch has no visible main-window title to verify. The exact-title, normal-close
 and unchanged-project checks remain required, with bounded window observations
 and failure screenshots retained for diagnosis.
 
-The main-branch ruleset also requires `Desktop packaging gate`. Emit this named
+The desktop workflow emits `Desktop packaging gate`. Emit this named
 aggregate after every packaging job, including failures and cancellations. All
 ordinary Linux packaging and commercial-rehearsal jobs must pass; native jobs
 may be skipped only when the existing native input is false. A selected native
