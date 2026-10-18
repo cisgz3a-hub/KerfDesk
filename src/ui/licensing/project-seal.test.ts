@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createProject } from '../../core/scene';
 import { deserializeProject, serializeProject } from '../../io/project';
@@ -7,6 +8,7 @@ import {
   projectTextSealedHere,
   resetProjectSealForTests,
   sealProjectText,
+  sealProjectTextAsync,
   trustIfSealedHere,
 } from './project-seal';
 
@@ -45,6 +47,28 @@ describe('project device seals (ADR-592)', () => {
     );
     resetProjectSealForTests(OTHER_KEY);
     expect(projectTextSealedHere(sealed)).toBe(false);
+  });
+
+  it('seals byte-identically through native WebCrypto and the synchronous HMAC', async () => {
+    expect(globalThis.crypto?.subtle).toBeDefined();
+    resetProjectSealForTests(KEY);
+    const texts = [
+      serializeProject(createProject()),
+      serializeProject({ ...createProject(), notes: 'é ✓ '.repeat(20_000) }, { compact: true }),
+    ];
+    for (const text of texts) {
+      const sealed = await sealProjectTextAsync(text);
+      expect(sealed).toBe(sealProjectText(text));
+      expect(projectTextSealedHere(sealed)).toBe(true);
+      // An independent RFC 2104 HMAC-SHA256 over the domain-tagged text.
+      const expected = createHmac('sha256', Buffer.from(KEY, 'base64url'))
+        .update(`kerfdesk-project-seal:v1:${text}`, 'utf8')
+        .digest('base64url');
+      expect(splitProjectSeal(sealed).seal).toBe(expected);
+      expect(await sealProjectTextAsync(sealed)).toBe(sealed);
+    }
+    resetProjectSealForTests();
+    expect(await sealProjectTextAsync(texts[0]!)).toBe(texts[0]);
   });
 
   it('never seals or trusts without a key', () => {

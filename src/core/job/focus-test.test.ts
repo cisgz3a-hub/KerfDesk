@@ -3,6 +3,8 @@ import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { createProject } from '../scene';
 import { compileJob } from './compile-job';
 import {
+  FOCUS_TEST_Z_TRAVEL_EXCEEDED_WARNING,
+  FOCUS_TEST_Z_UNCONFIRMED_WARNING,
   focusTestOptionsIssue,
   generateFocusTest,
   focusTestWarnings,
@@ -54,6 +56,7 @@ describe('Focus Test', () => {
     { minOffsetMm: -1001 },
     { speed: 0 },
     { power: 101 },
+    { power: 0 },
     { spacingMm: 0 },
     { travelFeedMmPerMin: -1 },
     { maxOffsetMm: -0.999 },
@@ -165,5 +168,22 @@ describe('Focus Test', () => {
     });
     expect(warnings.join(' ')).toContain('Frame traces XY only');
     expect(warnings.join(' ')).toContain('exceeds');
+    // Job Review lists Focus warnings first: the unconfirmed Z axis leads.
+    expect(warnings[0]).toBe(FOCUS_TEST_Z_UNCONFIRMED_WARNING);
+    expect(warnings[1]).toBe(FOCUS_TEST_Z_TRAVEL_EXCEEDED_WARNING);
+  });
+  it('gives every sample a distinct, unique operation colour', () => {
+    const colors = generateFocusTest({
+      ...OPTIONS,
+      steps: 101,
+      minOffsetMm: -5,
+      maxOffsetMm: 5,
+    }).layers.map((layer) => layer.color);
+    expect(new Set(colors).size).toBe(101);
+    const rgb = (hex: string): number[] =>
+      [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16));
+    const [a, b] = [colors[1], colors[2]].map((color) => rgb(color ?? '#000000'));
+    const distance = Math.hypot(...(a ?? []).map((value, index) => value - (b?.[index] ?? 0)));
+    expect(distance).toBeGreaterThan(100);
   });
 });
