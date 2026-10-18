@@ -22,6 +22,7 @@ import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { installFramedRunPermitForCurrentState } from './framed-run-testing';
 import { cancelRegistrationJigCompletion } from './registration-jig-stream-completion';
+import { hashOnSimulatedClock } from './host-sha256-testing';
 import { runStartJobFlow } from './start-job-flow';
 
 let untrack: (() => void) | null = null;
@@ -29,6 +30,9 @@ let uninstallReview: (() => void) | null = null;
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // Archive and settlement SHA-256 must not let the simulated machine stream on
+  // while WebCrypto waits for a real event-loop turn (see host-sha256-testing).
+  hashOnSimulatedClock();
   resetStore();
   useStore.setState({ registrationArtworkOutputSnapshot: null });
   useLaserStore.setState(initialLaserState());
