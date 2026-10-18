@@ -2,7 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useDesignStudioStore } from '../design-studio';
-import { setActiveEdition, UNRESTRICTED_EDITION } from '../licensing/edition';
+import { EditionContext, setActiveEdition, UNRESTRICTED_EDITION } from '../licensing/edition';
 import { ToolStrip } from '../workspace/ToolStrip';
 import { Toolbar } from './Toolbar';
 
@@ -27,23 +27,26 @@ describe('Design Studio toolbar entry', () => {
       if (allowed) onAllowed?.();
       return allowed;
     });
-    setActiveEdition({ ...UNRESTRICTED_EDITION, pro: allowed, requestPro });
+    const edition = { ...UNRESTRICTED_EDITION, pro: allowed, requestPro };
+    setActiveEdition(edition);
     host = document.createElement('div');
     document.body.appendChild(host);
     root = createRoot(host);
     await act(async () => {
       root?.render(
-        <>
+        <EditionContext.Provider value={edition}>
           <Toolbar commands={[]} machineKind="laser" />
           <ToolStrip />
-        </>,
+        </EditionContext.Provider>,
       );
     });
     const entries = host.querySelectorAll<HTMLButtonElement>('[aria-label="Open Design Studio"]');
     expect(entries).toHaveLength(1);
     const button = entries[0];
     expect(button?.closest('[aria-label="Toolbar"]')).not.toBeNull();
-    expect(button?.textContent).toContain('Pro');
+    // Labelled Pro only while Pro is locked.
+    expect(button?.querySelector('.lf-toolbar-pro-badge') !== null).toBe(!allowed);
+    expect(button?.title.includes('(Pro)')).toBe(!allowed);
     await act(async () => button?.click());
     expect(requestPro).toHaveBeenCalledWith('design-studio', expect.any(Function));
     expect(open).toHaveBeenCalledTimes(allowed ? 1 : 0);

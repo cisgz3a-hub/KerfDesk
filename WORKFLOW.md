@@ -1709,7 +1709,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 3. Chrome keeps a port grant across restarts on Windows, and on macOS and Linux only for adapters
    that report a USB serial number; a CH340 there needs one Connect after each replug or browser
    restart. The desktop app remembers picks the same way on Windows (ADR-552) and on macOS and
-   Linux (ADR-606): an adapter with a USB serial number is remembered there, and a CH340 without
+   Linux (ADR-607): an adapter with a USB serial number is remembered there, and a CH340 without
    one is granted for the run only (ADR-366), so after a restart its first Connect shows the
    picker.
 4. Turning it off in the **⋯** menu is remembered in this browser.
@@ -2865,6 +2865,14 @@ authorization, Frame proof, controller command, or safety boundary.
   The reader discards the damaged tail through the next line delimiter before accepting fresh
   records, so a response suffix cannot become a false acknowledgement. The writer remains
   available for Stop; no missing reply is synthesized or replayed (ADR-600).
+- A reply lost that way leaves the last line of the job unacknowledged after the machine has
+  finished. Once every line has been sent and nothing else is owed a reply, fresh Idle status
+  reports finish the job instead of the 90-second watchdog resetting the controller: an empty
+  `Bf` receive buffer and planner for 8 s, or, when the controller reports no `Bf`, Idle for
+  15 s, plus the time of any G4 still in flight. A `Bf` showing unread input keeps waiting, so
+  a controller holding its own program is not finished early. The ordinary post-job settle
+  then confirms completion, and the log names how many replies were lost and that one may
+  have been an error (ADR-606).
 - After any page stall, the controller output that queued up meanwhile is handed to the app
   in slices of about 8 ms, with input, drawing and the status poll running in between,
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
@@ -3156,6 +3164,11 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    again when clicked. Reconnect is offered for current communication or
    unresolved ownership failures, and rechecks that condition before replacing
    a connection. Neither action dismisses the physical-safety notice.
+   Both live in **More connection options → Controller info**. Reading settings
+   after a reset, and a read that failed while the controller still answers
+   status queries, do not pop up a toolbar notice: the machine runs without
+   them, as in other senders. Only a controller that has stopped answering
+   shows the brief "Controller is not responding" notice (ADR-607).
 4. A CNC Pause/Resume confirmation warning retains the paused job and its saved
    artifact. A later accepted Abort, actual Disconnect or controller fault
    records its own terminal cause. A reset-owned host freeze remains provisional.

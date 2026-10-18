@@ -1,7 +1,7 @@
 // The desktop serial port picker (select-serial-port). Chromium hands main the
 // ports it can see; main asks the operator which one to open, waiting with
 // them when none is attached yet (serial-port-wait.ts). Only the picked port
-// is granted (ADR-366); main also remembers it across restarts (ADR-552, ADR-606).
+// is granted (ADR-366); main also remembers it across restarts (ADR-552, ADR-607).
 
 import {
   app,
@@ -35,7 +35,7 @@ export type ElectronSerialPort = ElectronSerialPortSummary & {
   readonly deviceInstanceId?: string;
 };
 
-/** Where picks are remembered across restarts (ADR-552, ADR-606); absent where they are not. */
+/** Where picks are remembered across restarts (ADR-552, ADR-607); absent where they are not. */
 export type SerialPortMemory = {
   readonly recordPick: (port: ElectronSerialPort) => void;
   readonly preferredIndex: (ports: ReadonlyArray<ElectronSerialPort>) => number;

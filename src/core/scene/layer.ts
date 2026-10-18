@@ -305,6 +305,13 @@ export function createLayerSubLayer(
   };
 }
 
+/** The same operation as an ordinary one: its Focus Test Z intent removed. */
+export function layerWithoutFocusTest(layer: Layer): Layer {
+  if (layer.focusTest === undefined) return layer;
+  const { focusTest: _focus, ...ordinary } = layer;
+  return ordinary;
+}
+
 export function layerFromSubLayer(layer: Layer, subLayer: LayerSubLayer): Layer {
   return {
     ...(layer.focusTest === undefined ? {} : { focusTest: layer.focusTest }),

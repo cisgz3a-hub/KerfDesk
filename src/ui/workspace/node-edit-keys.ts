@@ -31,7 +31,8 @@ const TANGENT_DT = 1e-4;
 export function handleNodeEditKey(app: App, key: string, cursor: Vec2, pxToMm: number): boolean {
   if (!NODE_EDIT_KEYS.has(key)) return false;
   const scene = app.project.scene;
-  if (key === 't') return app.trimShapeAt(cursor, 8 * pxToMm);
+  // Like a Trim tool click without Ctrl (the hover keys never fire with Ctrl): auto-join.
+  if (key === 't') return app.trimShapeAt(cursor, 8 * pxToMm, { autoJoin: true });
   if (key === 'e') return app.extendShapeAt(cursor, 8 * pxToMm);
   const hovered = hitPathNode(scene, cursor, pxToMm, app.selectedPathNodes);
   const node = hovered?.handle === undefined ? hovered : null;
