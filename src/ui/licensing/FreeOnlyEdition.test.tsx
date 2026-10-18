@@ -11,7 +11,7 @@ const NO_UPDATES: CommercialUpdateStatus = {
 };
 import { EditionProvider } from './EditionProvider';
 import { EditionStatusButton, PRO_IN_DESKTOP_LABEL } from './EditionStatusButton';
-import { LICENCE_SETTINGS_EVENT, proFeaturesUnlocked, useEdition } from './edition';
+import { LICENCE_SETTINGS_EVENT, proFeaturesUnlocked, proPromptOpen, useEdition } from './edition';
 import { DESKTOP_DOWNLOAD_URL } from './edition-policy';
 import { PRO_FEATURES } from './pro-features';
 
@@ -93,10 +93,17 @@ function expectEveryProFeatureListed(): void {
   expect(document.body.textContent).not.toContain('Start free 30-day trial');
 }
 async function expectDesktopDialog(open: () => void): Promise<void> {
+  expect(proPromptOpen()).toBe(false);
   await act(async () => openButton().click());
   expect(open).not.toHaveBeenCalled();
   expect(document.body.textContent).toContain('V-carve is a Pro tool');
+  expect(proPromptOpen()).toBe(true);
   expectEveryProFeatureListed();
+  const decline = [...document.querySelectorAll('button')].find(
+    (value) => value.textContent === 'Not now',
+  );
+  await act(async () => decline?.click());
+  expect(proPromptOpen()).toBe(false);
 }
 function statusChip(): HTMLButtonElement | undefined {
   return [...document.querySelectorAll('button')].find(

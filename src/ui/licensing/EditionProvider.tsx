@@ -76,25 +76,25 @@ function LicensedEdition({
   const link = useLicenceLink(client);
   // A desktop build without commercial metadata cannot take a licence.
   const freeBuild = unlicensedRunsFree && session.status?.channel === 'free';
-  const { load, isPro, hasPendingPro } = session;
-  const { showAll } = desktop;
+  const { load, isPro, hasPendingPro, requestPro, status } = session;
+  const { showAll, hasPrompt, request } = desktop;
   const { managing, closeManager } = useLicenceManager(freeBuild, load, showAll);
   const value = useMemo<EditionValue>(
     () => ({
-      status: session.status,
-      licensed: session.status?.channel === 'commercial',
+      status,
+      licensed: status?.channel === 'commercial',
       // Store mutations must also check elapsed time when browser timers slept.
       get pro() {
         return isPro();
       },
       proInDesktop: freeBuild,
       get proPromptOpen() {
-        return hasPendingPro();
+        return hasPendingPro() || hasPrompt();
       },
-      requestPro: freeBuild ? desktop.request : session.requestPro,
+      requestPro: freeBuild ? request : requestPro,
       openLicence: freeBuild ? showAll : openLicence,
     }),
-    [desktop.request, freeBuild, hasPendingPro, isPro, session.requestPro, session.status, showAll],
+    [freeBuild, hasPendingPro, hasPrompt, isPro, request, requestPro, status, showAll],
   );
   useEffect(() => {
     setActiveEdition(value);

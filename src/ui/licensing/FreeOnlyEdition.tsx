@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   EditionContext,
   LICENCE_SETTINGS_EVENT,
@@ -20,15 +20,25 @@ export function useProInDesktop(): {
   readonly request: (feature: ProFeature) => boolean;
   readonly showAll: () => void;
   readonly close: () => void;
+  readonly hasPrompt: () => boolean;
 } {
   const [shown, setShown] = useState<ProFeature | 'all' | null>(null);
+  const shownRef = useRef<ProFeature | 'all' | null>(null);
   const request = useCallback((next: ProFeature): boolean => {
+    shownRef.current = next;
     setShown(next);
     return false;
   }, []);
-  const showAll = useCallback(() => setShown('all'), []);
-  const close = useCallback(() => setShown(null), []);
-  return { shown, request, showAll, close };
+  const showAll = useCallback(() => {
+    shownRef.current = 'all';
+    setShown('all');
+  }, []);
+  const close = useCallback(() => {
+    shownRef.current = null;
+    setShown(null);
+  }, []);
+  const hasPrompt = useCallback(() => shownRef.current !== null, []);
+  return { shown, request, showAll, close, hasPrompt };
 }
 
 /** Runs `show` whenever Help > Licence is chosen. */
@@ -42,18 +52,22 @@ export function useLicenceSettingsEvent(show: () => void): void {
 /** KerfDesk Free for builds without a desktop licence adapter. */
 export function FreeOnlyEdition({ children }: { readonly children: ReactNode }): JSX.Element {
   const desktop = useProInDesktop();
+  const { hasPrompt, request, showAll } = desktop;
   const browserWelcome = BROWSER_FREE_BUILD && window.location.protocol !== 'app:';
-  useLicenceSettingsEvent(desktop.showAll);
+  useLicenceSettingsEvent(showAll);
   const value = useMemo<EditionValue>(
     () => ({
       status: null,
       licensed: false,
       pro: false,
       proInDesktop: true,
-      requestPro: desktop.request,
-      openLicence: desktop.showAll,
+      get proPromptOpen() {
+        return hasPrompt();
+      },
+      requestPro: request,
+      openLicence: showAll,
     }),
-    [desktop.request, desktop.showAll],
+    [hasPrompt, request, showAll],
   );
   useEffect(() => {
     setActiveEdition(value);

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setActiveEdition, UNRESTRICTED_EDITION } from '../licensing/edition';
+import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { resetStore } from '../state/test-helpers';
 import {
@@ -106,6 +107,25 @@ describe('one-click background vector commands (ADR-609)', () => {
     expect(messages()).toContain(
       'Offset outlines was not applied: a Pro prompt is open. Close it, then run Offset outlines again.',
     );
+  });
+
+  it('reports a geometry error while a Pro prompt is open without committing', async () => {
+    const offset = command('Offset outlines');
+    const running = runVectorCommandInBackground(offset);
+    const project = useStore.getState().project;
+    setActiveEdition({ ...UNRESTRICTED_EDITION, proPromptOpen: true });
+    sessions[0]!.resolve({
+      kind: 'done',
+      result: {
+        kind: 'error',
+        error: { kind: 'operation-failed', message: 'The offset collapsed.' },
+      },
+    });
+    await expect(running).resolves.toBe(false);
+    expect(messages()).toContain('The offset collapsed.');
+    expect(offset.commit).not.toHaveBeenCalled();
+    expect(offset.inThread).not.toHaveBeenCalled();
+    expect(useStore.getState().project).toBe(project);
   });
 
   it('keeps its working notice up until the work settles', async () => {

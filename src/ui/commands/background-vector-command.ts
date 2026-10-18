@@ -81,6 +81,12 @@ export async function runVectorCommandInBackground<T extends VectorOpTask>(
       .pushToast(`${command.label} could not be completed. ${outcome.message}`, 'error');
     return false;
   }
+  // A domain error has no edit to admit or commit. Preserve its specific
+  // warning even while another tool is waiting on a Pro prompt.
+  if (outcome.kind === 'done' && outcome.result.kind === 'error') {
+    useToastStore.getState().pushToast(outcome.result.error.message, 'warning');
+    return false;
+  }
   if (proPromptOpen()) {
     useToastStore
       .getState()
