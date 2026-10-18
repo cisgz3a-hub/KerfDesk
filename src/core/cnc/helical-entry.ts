@@ -70,6 +70,11 @@ function helicalRequestIssue(
   settings: CncHelixEntrySettings,
 ): string | null {
   if (!validSettings(settings)) return 'Helix diameters and angle must be positive and finite.';
+  // The entered angle is a maximum. A value below the planner's floor is
+  // disclosed rather than silently steepened to it (audit 2026-10-18).
+  if (settings.angleDeg < MIN_ANGLE_DEG) {
+    return `Helix entry angle must be at least ${String(MIN_ANGLE_DEG)} degrees.`;
+  }
   if (settings.minDiameterMm > settings.maxDiameterMm) {
     return 'Helix minimum diameter exceeds its maximum diameter.';
   }
@@ -183,7 +188,7 @@ function helicalPass(
   zMm: number,
   angleDeg: number,
 ): CncHelicalContourPass {
-  const angle = Math.min(MAX_ANGLE_DEG, Math.max(MIN_ANGLE_DEG, angleDeg));
+  const angle = Math.min(MAX_ANGLE_DEG, angleDeg);
   const dropPerRevolution = Math.PI * 2 * entry.radiusMm * Math.tan((angle * Math.PI) / 180);
   const revolutions = Math.max(1, Math.ceil((startZMm - zMm) / dropPerRevolution));
   return {
