@@ -1,4 +1,6 @@
 import type { StatusReport } from '../../core/controllers/grbl';
+import { isFalconPointerLight, type PositioningLight } from '../../core/devices/positioning-light';
+import { switchFalconPointer } from './falcon-pointer-link';
 import {
   cancelFreshControllerStatusWait,
   waitForFreshControllerStatus,
@@ -30,6 +32,20 @@ export async function positioningLightCommand(
     source: 'motion',
     timeoutMode: 'non-idle-status-activity',
   });
+  context.assertCurrent();
+}
+
+/** One light state inside the owned transaction: the mapping's G-code line, or
+ * the Falcon pointer's network switch, which the controller never sees (ADR-635). */
+export async function switchLight(
+  context: PositioningLightTransaction,
+  mapping: PositioningLight,
+  on: boolean,
+): Promise<void> {
+  if (!isFalconPointerLight(mapping))
+    return positioningLightCommand(context, on ? mapping.onCommand : mapping.offCommand);
+  context.assertCurrent();
+  await switchFalconPointer(on);
   context.assertCurrent();
 }
 

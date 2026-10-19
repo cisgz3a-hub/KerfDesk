@@ -480,7 +480,14 @@ export type CameraBridgeAdapter = {
   // app origin, so frames fetched through it are pixel-readable.
   readonly proxiedFrameUrl: (cameraUrl: string) => string;
   readonly health: () => Promise<CameraBridgeHealth>;
+  // Switch the Falcon A1 Pro's head pointer at `host` over its HTTP link (ADR-635).
+  readonly switchFalconPointer?: (host: string, on: boolean) => Promise<FalconPointerSwitchResult>;
 };
+
+export type FalconPointerSwitchResult =
+  | { readonly kind: 'ok' }
+  // Refused, unreachable, or the bridge is missing; `reason` says which.
+  | { readonly kind: 'failed'; readonly reason: string };
 
 // Unsigned desktop Preview update discovery (ADR-249). This is notification
 // only: the adapter can report a newer version and supply one fixed website
