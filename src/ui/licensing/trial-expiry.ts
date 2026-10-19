@@ -70,6 +70,6 @@ export function expireTrialStatus(status: LicenceStatus, clock?: TrialExpiryCloc
     edition: 'free',
     state: 'trial-expired',
     message:
-      'Your 30-day Pro trial has ended. Existing work keeps working. Buy a licence or enter your key to choose new Pro tools.',
+      'Your 30-day trial has ended. Your open work keeps working until KerfDesk closes. Buy a licence or enter your key to keep using KerfDesk.',
   };
 }

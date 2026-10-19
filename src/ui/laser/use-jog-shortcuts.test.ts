@@ -102,7 +102,7 @@ describe('PageUp/PageDown Z-focus jog', () => {
     expect(event.defaultPrevented).toBe(false);
   });
 
-  it('never moves the machine from inside the Artwork / Operations panel', () => {
+  it('never moves the machine from inside the Artwork panel', () => {
     const { onFocusJog, uninstall } = install();
     cleanup = uninstall;
     const host = mount(

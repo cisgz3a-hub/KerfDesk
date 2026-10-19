@@ -20,7 +20,7 @@ test('independent wall finish values survive UI editing, compilation and save/re
     .getByRole('tab', { name: 'Artwork', exact: true });
   if (await artworkTab.isVisible()) await artworkTab.click();
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await page

@@ -46,6 +46,21 @@ function repoFile(path: string): string {
 const needsOf = (job: Job): readonly string[] =>
   job.needs === undefined ? [] : typeof job.needs === 'string' ? [job.needs] : job.needs;
 const stepText = (job: Job): string => JSON.stringify(job.steps ?? []);
+
+function expectPackagingSourceRefs(text: string): void {
+  const packageJobs = (load(text) as Pick<Workflow, 'jobs'>).jobs;
+  for (const [name, job] of Object.entries(packageJobs)) {
+    const checkouts = (job.steps ?? []).filter((step) =>
+      step.uses?.startsWith('actions/checkout@'),
+    );
+    expect(checkouts, name).toHaveLength(1);
+    // The aggregate gate judges results with its own workflow revision; every
+    // packaging job builds the commit the caller selected.
+    const expectedRef = name === 'desktop-packaging-gate' ? undefined : '${{ inputs.ref }}';
+    expect(checkouts[0]?.with?.ref, name).toBe(expectedRef);
+  }
+}
+
 const CUT_CRON = '17 7 * * 2';
 const PROMOTE_CRON = '43 9 * * *';
 const DUE = "needs.decide.outputs.due == 'true'";
@@ -126,9 +141,9 @@ describe('Release train workflow gate (ADR-541)', () => {
     expect(packageCheckText).toMatch(
       /workflow_call:\n {4}inputs:[\s\S]*\n {6}ref:\n {8}type: string/u,
     );
-    // Every checkout, counting once the commercial rehearsal steps that both of
-    // its jobs share through one YAML anchor (ADR-613).
-    expect(packageCheckText.match(/^ {10}ref: \$\{\{ inputs\.ref \}\}$/gmu)).toHaveLength(5);
+    // Parse aliases too: every packaging job, including the aggregate, must
+    // execute the requested release source rather than the moving main tip.
+    expectPackagingSourceRefs(packageCheckText);
     expect(packageCheckText).toContain(
       'group: desktop-package-check-${{ inputs.ref || github.ref }}',
     );

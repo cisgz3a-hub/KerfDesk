@@ -25,7 +25,7 @@ test('New and a renderer restart retain committed machine setup while new artwor
   await setup.getByRole('button', { name: 'Save machine setup', exact: true }).click();
   await expect(setup).toBeHidden();
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   for (const [name, value] of [

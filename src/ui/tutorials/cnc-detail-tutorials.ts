@@ -117,7 +117,7 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 4,
-    location: 'Artwork / Operations → Settings → Operation → Bit; Machine Setup → Bit library',
+    location: 'Artwork panel → Properties → Operation → Bit; Machine Setup → Bit library',
     prerequisites: 'CNC mode and the specifications of the cutters you intend to use.',
     visual: 'library',
     steps: [
@@ -140,7 +140,7 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Assign default and operation bits',
         instruction:
-          'In Artwork / Operations → Settings → Operation, choose the Bit and any applicable Floor clearing, Pocket roughing or Relief finishing bit shown under it. Use job default bit removes an operation override. Change the job default in Machine Setup.',
+          'In Artwork panel → Properties → Operation, choose the Bit and any applicable Floor clearing, Pocket roughing or Relief finishing bit shown under it. Use job default bit removes an operation override. Change the job default in Machine Setup.',
         focus: 'Bit',
         result:
           'Each operation has a visible cutter assignment, including any separate clearing stage.',

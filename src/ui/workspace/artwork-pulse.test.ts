@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createLayer,
+  createLayerSubLayer,
   DEFAULT_CNC_LAYER_SETTINGS,
   IDENTITY_TRANSFORM,
   type Layer,
@@ -11,12 +12,14 @@ import {
   pulseColorSources,
   PULSE_DURATION_MS,
   PULSE_EDGE_ALPHA,
-  pulseGlow,
+  PULSE_PEAK_STRENGTH,
+  pulseGlowAlpha,
   pulseStartOffsets,
   pulseStrength,
   pulseTargetFor,
   type PulseTarget,
 } from './artwork-pulse';
+import { sameOperationSettings } from './pulse-settings-match';
 
 function layer(id: string, color: string, overrides: Partial<Layer> = {}): Layer {
   return { ...createLayer({ id, color }), ...overrides };
@@ -36,22 +39,30 @@ function artwork(id: string, operationId: string, x: number): TracedImage {
 }
 
 describe('pulse shape', () => {
-  it('rises quickly, holds full colour, then fades back to ink', () => {
+  it('swells gently to a soft tint, never full colour, then ebbs back to ink', () => {
     expect(pulseStrength(0)).toBe(0);
-    expect(pulseStrength(0.08)).toBeGreaterThan(0.5);
-    expect(pulseStrength(0.2)).toBe(1);
+    // An eased start: no flash in the first frames.
+    expect(pulseStrength(0.04)).toBeLessThan(0.1);
+    expect(pulseStrength(0.17)).toBeGreaterThan(pulseStrength(0.08));
+    const samples = Array.from({ length: 101 }, (_, index) => pulseStrength(index / 100));
+    expect(Math.max(...samples)).toBeCloseTo(PULSE_PEAK_STRENGTH, 2);
+    expect(PULSE_PEAK_STRENGTH).toBeLessThan(1);
+    // No flat hold: the peak is a moment, and the ebb is longer than the swell.
+    expect(samples.filter((value) => value > 0.99 * PULSE_PEAK_STRENGTH).length).toBeLessThan(10);
     expect(pulseStrength(0.6)).toBeGreaterThan(pulseStrength(0.8));
     expect(pulseStrength(1)).toBe(0);
     expect(pulseStrength(-0.1)).toBe(0);
   });
 
-  it('blooms the glow outward while it fades', () => {
-    const early = pulseGlow(0.1);
-    const late = pulseGlow(0.8);
-    expect(late?.blurPx).toBeGreaterThan(early?.blurPx ?? Infinity);
-    expect(late?.alpha).toBeLessThan(early?.alpha ?? 0);
-    expect(pulseGlow(0)).toBeNull();
-    expect(pulseGlow(1)).toBeNull();
+  it('breathes a faint halo with the colour', () => {
+    const start = pulseGlowAlpha(0.02);
+    const peak = pulseGlowAlpha(0.34);
+    const late = pulseGlowAlpha(0.8);
+    expect(start).toBeLessThan(peak);
+    expect(late).toBeLessThan(peak);
+    expect(peak).toBeLessThan(0.4);
+    expect(pulseGlowAlpha(0)).toBe(0);
+    expect(pulseGlowAlpha(1)).toBe(0);
   });
 });
 
@@ -75,6 +86,73 @@ describe('which artwork pulses together', () => {
     expect(group.get('cut')).toBe('cut');
     expect(group.get('engrave-2')).toBe('engrave-2');
     expect(group.get('engrave')).toBe('engrave-2');
+  });
+
+  it('groups equal sub-operations independently of their ids and labels', () => {
+    const a = {
+      ...engrave,
+      subLayers: [createLayerSubLayer(cut, { id: 'first-cut', label: 'Outline' })],
+    };
+    const b = {
+      ...sameEngrave,
+      subLayers: [createLayerSubLayer(cut, { id: 'second-cut', label: 'Finish' })],
+    };
+    expect([...pulseColorSources([a, b], [a.id], 'laser').keys()]).toEqual([a.id, b.id]);
+    expect(sameOperationSettings(a, { ...b, subLayers: [] }, 'laser')).toBe(false);
+    expect(
+      sameOperationSettings(
+        a,
+        { ...b, subLayers: [createLayerSubLayer(cut, { id: 'cut', label: '', enabled: false })] },
+        'laser',
+      ),
+    ).toBe(false);
+    expect(
+      sameOperationSettings(
+        a,
+        { ...b, subLayers: [createLayerSubLayer(engrave, { id: 'cut', label: '' })] },
+        'laser',
+      ),
+    ).toBe(false);
+  });
+
+  it('groups absent laser options with their explicit legacy defaults, including sub-operations', () => {
+    const explicit = {
+      ...sameEngrave,
+      allowUncalibratedBidirectionalScan: false,
+      perforationEnabled: false,
+      perforationCutMm: 3,
+      perforationSkipMm: 1,
+      overcutMm: 0,
+      imageOverscanMm: 5,
+      tabLayout: 'count' as const,
+      tabSpacingMm: 50,
+      tabMaxPerShape: 0,
+      tabCutPowerPercent: 0,
+      imageScanAngleDeg: 0,
+      imageCrossHatch: false,
+      passAngleStepDeg: 0,
+      autoOverscan: false,
+    };
+    expect(sameOperationSettings(engrave, explicit, 'laser')).toBe(true);
+    expect(
+      sameOperationSettings(
+        { ...engrave, subLayers: [createLayerSubLayer(engrave, { id: 'sub', label: '' })] },
+        { ...explicit, subLayers: [createLayerSubLayer(explicit, { id: 'sub', label: '' })] },
+        'laser',
+      ),
+    ).toBe(true);
+    for (const changed of [
+      { perforationEnabled: true },
+      { tabLayout: 'spacing' as const },
+      { autoOverscan: true },
+      { imageOverscanMm: 0 },
+      { imageScanAngleDeg: 45 },
+      { powerMode: 'dynamic' as const },
+      // Absence uses the device's calibration; explicit zero disables that offset.
+      { bidirectionalScanOffsetMm: 0 },
+    ]) {
+      expect(sameOperationSettings(engrave, { ...explicit, ...changed }, 'laser')).toBe(false);
+    }
   });
 
   it('treats an operation with no CNC block as the CNC defaults', () => {
@@ -124,7 +202,7 @@ describe('which artwork pulses together', () => {
     const pieces = Array.from({ length: 40 }, (_, index) => ({ id: `p${index}`, x: -index, y: 0 }));
     const offsets = pulseStartOffsets(pieces, null);
     expect(offsets.get('p39')).toBe(0);
-    expect(offsets.get('p0')).toBeLessThanOrEqual(420);
+    expect(offsets.get('p0')).toBeLessThanOrEqual(560);
     expect(offsets.get('p0')).toBeGreaterThan(offsets.get('p1') ?? Infinity);
   });
 });
@@ -140,11 +218,17 @@ describe('pulse clock', () => {
     const clock = new ArtworkPulseClock();
     clock.hover(target, 0);
     expect(clock.frame(0, false).busy).toBe(true);
-    expect(clock.frame(0.2 * PULSE_DURATION_MS, false).pieces[0]?.strength).toBe(1);
+    expect(clock.frame(0.34 * PULSE_DURATION_MS, false).pieces[0]?.strength).toBeCloseTo(
+      PULSE_PEAK_STRENGTH,
+    );
     // Hovering again mid-pulse does not restart it.
     clock.hover(target, 0.5 * PULSE_DURATION_MS);
     const done = clock.frame(PULSE_DURATION_MS + 1000, false);
-    expect(done.pieces[0]).toMatchObject({ strength: 0, glow: null, edgeAlpha: PULSE_EDGE_ALPHA });
+    expect(done.pieces[0]).toMatchObject({
+      strength: 0,
+      glowAlpha: 0,
+      edgeAlpha: PULSE_EDGE_ALPHA,
+    });
     expect(done.busy).toBe(false);
   });
 
@@ -172,7 +256,7 @@ describe('pulse clock', () => {
     clock.frame(PULSE_DURATION_MS + 1016, false);
     clock.hover(target, PULSE_DURATION_MS + 1100, { pulse: false });
     const resumed = clock.frame(PULSE_DURATION_MS + 1200, false);
-    expect(resumed.pieces[0]).toMatchObject({ strength: 0, glow: null });
+    expect(resumed.pieces[0]).toMatchObject({ strength: 0, glowAlpha: 0 });
     expect(resumed.pieces[0]?.edgeAlpha).toBeGreaterThan(0);
   });
 
@@ -180,7 +264,11 @@ describe('pulse clock', () => {
     const clock = new ArtworkPulseClock();
     clock.hover(target, 0);
     const shown = clock.frame(10, true);
-    expect(shown.pieces[0]).toMatchObject({ strength: 1, glow: null, edgeAlpha: PULSE_EDGE_ALPHA });
+    expect(shown.pieces[0]).toMatchObject({
+      strength: PULSE_PEAK_STRENGTH,
+      glowAlpha: 0,
+      edgeAlpha: PULSE_EDGE_ALPHA,
+    });
     expect(shown.busy).toBe(false);
     clock.leave();
     expect(clock.frame(20, true).pieces).toEqual([]);

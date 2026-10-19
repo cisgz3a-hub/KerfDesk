@@ -15,14 +15,14 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the travel policy',
         instruction:
-          'Open Optimization Settings. Under Travel policy, choose Reduce travel to plan a shorter route or Keep source order to retain the existing path sequence within the chosen layer order.',
+          'Open Optimization Settings. Under Travel policy, choose Reduce travel to plan a shorter route or Keep source order to retain the existing path sequence within the chosen operation order.',
         focus: 'Reduce travel / Keep source order',
         result: 'The planner follows the selected policy when ordering the laser paths.',
       },
       {
         title: 'Set the priorities you need',
         instruction:
-          'Choose Layer priority. With Reduce travel, inspect Inside paths first, Path direction and Planning start. Keep source order disables those extra planning choices while retaining the chosen layer order. Start closed shapes picks where each closed shape starts and stops: where drawn, at the nearest point, or at the nearest corner to hide the mark.',
+          'Choose Operation priority. With Reduce travel, inspect Inside paths first, Path direction and Planning start. Keep source order disables those extra planning choices while retaining the chosen operation order. Start closed shapes picks where each closed shape starts and stops: where drawn, at the nearest point, or at the nearest corner to hide the mark.',
         focus: 'Layers · inner paths · direction',
         result:
           'The route can prioritise enclosed paths and choose endpoints according to your settings.',
@@ -94,14 +94,14 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 2,
-    location: 'Artwork / Operations → Settings → Artwork → Offset outlines',
+    location: 'Artwork panel → Properties → Artwork → Offset outlines',
     prerequisites: 'One or more unlocked, closed vector shapes selected in the main workspace.',
     visual: 'offset',
     steps: [
       {
         title: 'Select a closed outline',
         instruction:
-          'Select the vector shape in the main workspace and open the Artwork tab in Settings. Offset outlines appears for eligible closed vector selections; images, locked objects and open paths are not the same input.',
+          'Select the vector shape in the main workspace and open the Artwork tab in Properties. Offset outlines appears for eligible closed vector selections; images, locked objects and open paths are not the same input.',
         focus: 'Selected closed vector',
         result: 'The selected boundary is the reference from which the offset is measured.',
         visual: 'select',
@@ -133,7 +133,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 2,
-    location: 'Artwork / Operations → Settings → Artwork → Corner relief · dogbones',
+    location: 'Artwork panel → Properties → Artwork → Corner relief · dogbones',
     prerequisites: 'CNC mode, an unlocked closed vector and the diameter of the intended cutter.',
     visual: 'dogbone',
     steps: [

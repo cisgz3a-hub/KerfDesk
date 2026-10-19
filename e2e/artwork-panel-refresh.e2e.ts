@@ -9,7 +9,7 @@ test('panel tasks stay separate and fit a narrow rail', async ({ page, kerfdesk 
   await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/, { timeout: 30_000 });
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await expect(panel.getByRole('radiogroup', { name: /^Mode for/ })).toBeVisible();
@@ -62,7 +62,7 @@ test('panel tasks stay separate and fit a narrow rail', async ({ page, kerfdesk 
         flex: `0 0 ${size}px`,
       });
     }, width);
-    for (const name of ['Settings', 'Run order', 'Materials']) {
+    for (const name of ['Properties', 'Run order', 'Materials']) {
       await tabs.getByRole('tab', { name, exact: true }).click();
       if (
         name === 'Materials' &&
@@ -89,7 +89,7 @@ test('panel tasks stay separate and fit a narrow rail', async ({ page, kerfdesk 
     }
   }
   await panel.getByRole('button', { name: 'Apply selected material preset to layer' }).click();
-  await tabs.getByRole('tab', { name: 'Settings', exact: true }).click();
+  await tabs.getByRole('tab', { name: 'Properties', exact: true }).click();
   await expect(panel.getByRole('spinbutton', { name: /^Power for/ })).toHaveValue('25');
   await expect(panel.getByRole('spinbutton', { name: /^Speed for/ })).toHaveValue('2400');
 });

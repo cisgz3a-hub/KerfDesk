@@ -160,7 +160,10 @@ export async function verifyAsarIntegrity(
       `unmodified package did not complete its native smoke baseline (exit=${baseline.code}, signal=${baseline.signal}, failure=${baseline.failure?.kind ?? 'none'}, spawned=${baseline.spawned}, closed=${baseline.childClosed})`,
     );
   }
-  validateNativeSmokeResult(baseline.smokeResult, baseline.userData);
+  // An unlicensed commercial package opens behind its licence window (ADR-623).
+  validateNativeSmokeResult(baseline.smokeResult, baseline.userData, {
+    expectLicenceWindow: options.expectLicenceWindow === true,
+  });
   const { prefix, header } = readHeader(archive);
   const tamper = headerTamper(prefix, header);
   writeByte(archive, tamper.offset, tamper.replacement);
@@ -182,7 +185,7 @@ async function runCli() {
   const [executable, asarPath] = args.filter((arg) => !arg.startsWith('--'));
   if (executable === undefined || asarPath === undefined || !isAbsolute(executable)) {
     throw new Error(
-      'usage: verify-asar-integrity-enforced.mjs <absolute executable> <app.asar> [--timeout-ms=N] [--output=directory]',
+      'usage: verify-asar-integrity-enforced.mjs <absolute executable> <app.asar> [--timeout-ms=N] [--output=directory] [--expect-licence-window]',
     );
   }
   const timeoutArg = args.find((arg) => arg.startsWith('--timeout-ms='));
@@ -198,6 +201,7 @@ async function runCli() {
     launch,
     {
       output: outputArg?.slice(9),
+      expectLicenceWindow: args.includes('--expect-licence-window'),
       reportEvidence: (directory) => process.stdout.write(`ASAR_INTEGRITY_EVIDENCE=${directory}\n`),
     },
   );

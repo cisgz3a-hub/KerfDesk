@@ -1,4 +1,5 @@
 import { rotaryAppliesTo } from '../../core/job';
+import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import {
   POSITIONING_LIGHT_UNSUPPORTED_MESSAGE,
   positioningLightIssue,
@@ -7,6 +8,8 @@ import {
 import type { PositioningLight } from '../../core/devices/positioning-light';
 import type { DeviceProfile } from '../../core/devices/device-profile';
 import { inferCurrentMachinePosition } from './infer-machine-position';
+import { positioningLightEditGuard } from './positioning-light-edit-guard';
+import { currentFrameSpatialSignature } from '../laser/frame-spatial-identity';
 import {
   controllerOperationOwner,
   interactiveControllerOperation,
@@ -42,11 +45,21 @@ export function positioningLightActions(
   get: () => LaserState,
   refs: LiveRefs,
   write: SafeWrite,
-): Pick<LaserState, 'centrePositioningLight' | 'switchPositioningLightOff'> {
+): Pick<
+  LaserState,
+  'centrePositioningLight' | 'switchPositioningLightOn' | 'switchPositioningLightOff'
+> {
   return {
-    centrePositioningLight: (x, y, feed) =>
-      runPositioningLight(set, get, refs, write, { x, y, feed }),
-    switchPositioningLightOff: () => runPositioningLight(set, get, refs, write),
+    centrePositioningLight: (x, y, feed, assertTargetCurrent, coordinateFrame = 'machine') =>
+      runPositioningLight(set, get, refs, write, true, {
+        x,
+        y,
+        feed,
+        assertTargetCurrent,
+        coordinateFrame,
+      }),
+    switchPositioningLightOn: () => runPositioningLight(set, get, refs, write, true),
+    switchPositioningLightOff: () => runPositioningLight(set, get, refs, write, false),
   };
 }
 
@@ -81,19 +94,33 @@ function assertAdmission(state: LaserState, refs: LiveRefs): void {
     throw new Error('Wait for the current controller command to settle.');
 }
 
-type Target = { readonly x: number; readonly y: number; readonly feed: number };
+type Target = {
+  readonly x: number;
+  readonly y: number;
+  readonly feed: number;
+  readonly assertTargetCurrent: (() => void) | undefined;
+  readonly coordinateFrame: 'machine' | 'work';
+};
 
 async function runPositioningLight(
   set: SetFn,
   get: () => LaserState,
   refs: LiveRefs,
   write: SafeWrite,
+  enabled: boolean,
   target?: Target,
 ): Promise<void> {
   assertAdmission(get(), refs);
   assertTarget(target);
-  const mapping = resolveMapping(get(), refs, target);
-  const { context, owns, session } = createTransaction(set, get, refs, write, target);
+  const mapping = resolveMapping(get(), refs, enabled);
+  const { context, owns, session, dispose } = createTransaction(
+    set,
+    get,
+    refs,
+    write,
+    enabled,
+    target,
+  );
   const driver = refs.driver;
   let mayHaveMoved = false;
   let settled = false;
@@ -101,24 +128,23 @@ async function runPositioningLight(
     const report = await positioningLightStatus(context);
     if (report.state !== 'Idle')
       throw new Error('Positioning light needs a fresh Idle controller.');
-    if (target !== undefined) {
+    if (enabled) {
       await turnOffPreviousLight(context);
-      for (const line of driver.commands.frameToolOffLines)
+      for (const line of lightToolOffLines(driver.commands.frameToolOffLines, target !== undefined))
         await positioningLightCommand(context, line);
       await positioningLightCommand(context, mapping.offCommand);
       set({ positioningLightEnabled: false });
+      lightSnapshots.delete(refs);
       await positioningLightFence(context);
       const ready = await positioningLightStatus(context);
       if (ready.state !== 'Idle') throw new Error('The controller left Idle before positioning.');
-      await moveToLightTarget(context, set, target, () => {
-        mayHaveMoved = true;
-      });
+      if (target !== undefined)
+        await moveToLightTarget(context, set, target, () => {
+          mayHaveMoved = true;
+        });
       settled = true;
       lightSnapshots.set(refs, { mapping: { ...mapping }, session, connection: refs.connection });
-      // May have reached hardware even if its acknowledgement is subsequently
-      // lost. Keep Off available until a positively acknowledged off or reset.
-      set({ positioningLightEnabled: true });
-      await positioningLightCommand(context, mapping.onCommand);
+      await sendLightOn(context, set, mapping, owns);
     } else {
       await positioningLightCommand(context, mapping.offCommand);
       set({ positioningLightEnabled: false });
@@ -136,6 +162,8 @@ async function runPositioningLight(
       else set({ controllerOperation: null });
     }
     throw error;
+  } finally {
+    dispose();
   }
 }
 
@@ -161,14 +189,48 @@ async function containUnsettledMove(
     .catch(() => undefined);
 }
 
+// On may have reached hardware even if its acknowledgement is subsequently
+// lost or a generic fault rejects the exchange. Keep the captured Off mapping.
+// GRBL-family error:20 rejects an unsupported command before execution, so only
+// that qualified response proves the preceding acknowledged Off still holds.
+async function sendLightOn(
+  context: PositioningLightTransaction,
+  set: SetFn,
+  mapping: PositioningLight,
+  owns: () => boolean,
+): Promise<void> {
+  set({ positioningLightEnabled: true });
+  try {
+    await positioningLightCommand(context, mapping.onCommand);
+  } catch (error) {
+    const kind = context.refs.driver.kind;
+    if (
+      error instanceof ControllerCommandRefusedError &&
+      error.controllerErrorCode === 20 &&
+      (kind === 'grbl-v1.1' || kind === 'grblhal' || kind === 'fluidnc') &&
+      owns()
+    ) {
+      set({ positioningLightEnabled: false });
+      lightSnapshots.delete(context.refs);
+    }
+    throw error;
+  }
+}
+
 async function turnOffPreviousLight(context: PositioningLightTransaction): Promise<void> {
   const previous = lightSnapshots.get(context.refs);
   if (previous?.session() === true && context.get().positioningLightEnabled)
     await positioningLightCommand(context, previous.mapping.offCommand);
 }
 
+// Standalone LED switching keeps unrelated coolant/fan accessories unchanged.
+function lightToolOffLines(lines: ReadonlyArray<string>, moves: boolean): ReadonlyArray<string> {
+  return moves ? lines : lines.filter((line) => line !== 'M9' && line !== 'M107');
+}
+
 function assertTarget(target: Target | undefined): void {
   if (target === undefined) return;
+  target.assertTargetCurrent?.();
   const project = useStore.getState().project;
   if (project.machine?.kind === 'cnc' || rotaryAppliesTo(project.device, project.machine))
     throw new Error('Centre and light needs a Cartesian laser placement.');
@@ -190,20 +252,16 @@ function assertLightSupported(): DeviceProfile {
   return device;
 }
 
-function resolveMapping(
-  state: LaserState,
-  refs: LiveRefs,
-  target: Target | undefined,
-): PositioningLight {
+function resolveMapping(state: LaserState, refs: LiveRefs, enabled: boolean): PositioningLight {
   const device = assertLightSupported();
   const previous = lightSnapshots.get(refs);
-  if (target === undefined && previous?.session() === true) return previous.mapping;
+  if (!enabled && previous?.session() === true) return previous.mapping;
   assertProfileDriver(refs);
   const mapping = device.positioningLight;
   const issue = positioningLightIssue(mapping, refs.driver.kind, device.gcodeDialect?.dialectId);
   if (mapping === undefined || issue !== null)
     throw new Error(issue ?? 'Configure the separate positioning light in Device Profile first.');
-  if (target === undefined && state.positioningLightEnabled && previous?.session() !== true)
+  if (state.positioningLightEnabled && previous?.session() !== true)
     throw new Error(
       'The positioning light belongs to an earlier connection; check it at the machine.',
     );
@@ -215,9 +273,11 @@ function createTransaction(
   get: () => LaserState,
   refs: LiveRefs,
   write: SafeWrite,
+  enabled: boolean,
   target: Target | undefined,
 ) {
   const initial = get();
+  const editGuard = positioningLightEditGuard(target !== undefined);
   const device = useStore.getState().project.device;
   const connection = refs.connection;
   const driver = refs.driver;
@@ -230,7 +290,11 @@ function createTransaction(
     refs.writeEpoch === writeEpoch;
   const operation = {
     ...interactiveControllerOperation(
-      target === undefined ? 'Switching positioning light off' : 'Centring positioning light',
+      target !== undefined
+        ? 'Centring positioning light'
+        : enabled
+          ? 'Switching positioning light on'
+          : 'Switching positioning light off',
       'terminal-exchange',
     ),
     ...(target === undefined ? {} : { mayMove: true as const }),
@@ -246,8 +310,11 @@ function createTransaction(
       get().mpgActive
     )
       throw new Error('Positioning light was cancelled or its controller session changed.');
-    if (target !== undefined && useStore.getState().project.device !== device)
+    assertLightSupported();
+    target?.assertTargetCurrent?.();
+    if (enabled && useStore.getState().project.device !== device)
       throw new Error('Device settings changed during positioning.');
+    editGuard.assertUnchanged();
   };
   const context: PositioningLightTransaction = {
     get,
@@ -256,7 +323,7 @@ function createTransaction(
     write: (line, action, source) => write(line, action, source, assertCurrent),
   };
   set({ controllerOperation: operation, lastWriteError: null });
-  return { context, owns, session };
+  return { context, owns, session, dispose: editGuard.dispose };
 }
 
 async function moveToLightTarget(
@@ -265,12 +332,9 @@ async function moveToLightTarget(
   target: Target,
   onMotion: () => void,
 ): Promise<void> {
-  const current = inferCurrentMachinePosition(
-    context.get().statusReport,
-    context.get().wcoCache,
-    context.get().controllerSettings?.reportInches === true,
-  );
-  if (current === null) throw new Error('Positioning light needs a live machine position.');
+  const current = lightTargetPosition(context, target);
+  if (current === null)
+    throw new Error('Positioning light needs a live position in its captured coordinate frame.');
   const params = { dx: target.x - current.x, dy: target.y - current.y, feed: target.feed };
   const moving = Math.abs(params.dx) >= 0.001 || Math.abs(params.dy) >= 0.001;
   if (!moving) {
@@ -301,8 +365,8 @@ async function moveToLightTarget(
 }
 
 type LightMoveFrameProof = StashedFrameProof & {
-  readonly project: unknown;
-  readonly jobPlacement: unknown;
+  readonly spatialSignature: string;
+  readonly projectDocumentEpoch: number;
 };
 
 function stashFrameProof(state: LaserState): LightMoveFrameProof {
@@ -311,30 +375,30 @@ function stashFrameProof(state: LaserState): LightMoveFrameProof {
     framedRun: state.framedRun,
     completedFrame: state.completedFrame ?? null,
     frameVerification: state.frameVerification,
-    project: app.project,
-    jobPlacement: app.jobPlacement,
+    spatialSignature: currentFrameSpatialSignature(app),
+    projectDocumentEpoch: app.projectDocumentEpoch,
   };
 }
 
-// The proof was voided for the move itself, so the drift subscription could
-// not watch the canvas meanwhile; any edit, even one undone, keeps it void.
+// The ordinary drift subscription cannot watch a temporarily absent proof.
+// assertCurrent checks the one-way transaction observer, including undone edits.
 function restoreFrameProof(
   context: PositioningLightTransaction,
   set: SetFn,
   proof: LightMoveFrameProof,
 ): void {
   const app = useStore.getState();
-  if (app.project !== proof.project || app.jobPlacement !== proof.jobPlacement) return;
+  if (
+    currentFrameSpatialSignature(app) !== proof.spatialSignature ||
+    app.projectDocumentEpoch !== proof.projectDocumentEpoch
+  )
+    return;
   context.assertCurrent();
   set((state) => rebasedLightMoveFramePatch(proof, state));
 }
 
 function assertLightTargetReached(context: PositioningLightTransaction, target: Target): void {
-  const final = inferCurrentMachinePosition(
-    context.get().statusReport,
-    context.get().wcoCache,
-    context.get().controllerSettings?.reportInches === true,
-  );
+  const final = lightTargetPosition(context, target);
   const settings = context.get().controllerSettings;
   const reportTick =
     context.refs.driver.kind === 'marlin'
@@ -354,4 +418,16 @@ function assertLightTargetReached(context: PositioningLightTransaction, target: 
     throw new Error(
       'The head did not reach the selected trace centre; the positioning light stays off.',
     );
+}
+
+function lightTargetPosition(context: PositioningLightTransaction, target: Target) {
+  const state = context.get();
+  const inches = state.controllerSettings?.reportInches === true;
+  if (target.coordinateFrame === 'machine')
+    return inferCurrentMachinePosition(state.statusReport, state.wcoCache, inches);
+  // Verified Origin can know only WPos. Never invent MPos or a zero WCO.
+  const work = state.statusReport?.wPos;
+  if (work == null) return null;
+  const [x, y] = normalizeReportedMPosToMm([work.x, work.y, work.z], inches);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
