@@ -1977,9 +1977,10 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
 
 #### Edge — cancel mid-frame
 1. **Cancel** records permanent cancel intent and writes real-time jog-cancel (`0x85`); pending Frame
-   lines are dropped immediately. On grblHAL, whose `0x85` also discards any line it has not parsed
-   yet without answering it, Cancel first waits for the last line to leave the transport, then at
-   most 250 ms for the replies owed to lines already sent, then writes `0x85` (ADR-375). After the old command handoff settles, the app queries state. If
+   lines are dropped immediately. grblHAL's `0x85` also discards any line it has not parsed yet
+   without answering it, and grblHAL can greet as stock GRBL, so on every controller Cancel first
+   waits for the last line to leave the transport, then at most 250 ms for the replies owed to lines
+   already sent, then writes `0x85` (ADR-375, ADR-638). After the old command handoff settles, the app queries state. If
    GRBL reports `Jog`, the first byte lost the Idle-to-Jog race, so `0x85` is sent again. No queued
    settlement marker is written until a fresh `Idle`; a second post-marker `Idle` releases ownership.
 2. An owned G54 selection remains active after cancellation; the stored G55-G59 offsets remain
@@ -2006,6 +2007,10 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
 3. After Unlock without Home, stock GRBL's own reported MPos aims the hold, while the rest of the
    app still treats the position as unknown (ADR-375).
 4. Otherwise the jog asks for full travel and relies on the release.
+5. A release just after the jog went out waits for its reply before `0x85`, as Cancel does
+   (F-B4). If a motion line's reply never comes, Cancel says so after 8 s and the jog stays owned,
+   since the reply may still arrive; once the controller reports Idle, Disconnect and Connect stay
+   available to clear it (ADR-638).
 
 ### F-B6. Start job
 

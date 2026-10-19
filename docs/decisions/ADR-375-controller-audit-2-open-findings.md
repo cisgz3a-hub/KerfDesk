@@ -1,6 +1,6 @@
 ## ADR-375 - Controller audit 2: the controller faults main still had (2026-09-29)
 
-**Status:** Accepted. | **Date:** 2026-09-29
+**Status:** Accepted; the grblHAL-only jog-cancel wait (finding 6, M-6) amended by ADR-638, which applies it to every driver. | **Date:** 2026-09-29
 
 **Fire timing correction:** [ADR-355 Amendment 1](ADR-355-amendment-1-acknowledged-override-baseline.md)
 supersedes the known-100% Fire reset omission below. Pending flags are processed at an owned
