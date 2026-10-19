@@ -1,6 +1,6 @@
 // Hold Alt (Option on a Mac) to see every operation colour on the canvas, and
 // let go to return to plain ink (ADR-620). The peek waits a moment and is
-// cancelled by any other key, so Alt shortcuts such as Alt+Left (align left)
+// cancelled by another key or pointer gesture, so shortcuts such as Alt+Left
 // never flash the colours on the way through.
 
 import { useEffect } from 'react';
@@ -17,17 +17,24 @@ export function useOperationColorPeek(): void {
       if (timer !== null) clearTimeout(timer);
       timer = null;
     };
+    const cancelPeek = (): void => {
+      chord = true;
+      cancel();
+      setPeek(false);
+    };
+    const pointers = trackPointerGestures(cancelPeek);
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key !== 'Alt') {
         // Another key joined the Alt press: this is a shortcut, not a peek.
-        if (e.altKey) {
-          chord = true;
-          cancel();
-          setPeek(false);
-        }
+        if (e.altKey) cancelPeek();
         return;
       }
       if (e.repeat || timer !== null || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      // Alt can join a drag after pointer-down, without another pointer event.
+      if (pointers.active()) {
+        cancelPeek();
+        return;
+      }
       chord = false;
       timer = setTimeout(() => {
         timer = null;
@@ -44,6 +51,7 @@ export function useOperationColorPeek(): void {
       setPeek(false);
     };
     const onBlur = (): void => {
+      pointers.clear();
       cancel();
       setPeek(false);
     };
@@ -55,6 +63,42 @@ export function useOperationColorPeek(): void {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
+      pointers.dispose();
     };
   }, [setPeek]);
+}
+
+/** Track presses in capture phase: canvas gestures may stop them bubbling. */
+function trackPointerGestures(cancelPeek: () => void) {
+  const active = new Set<number>();
+  const onDown = (event: PointerEvent): void => {
+    active.add(event.pointerId);
+    if (event.altKey) cancelPeek();
+  };
+  const onMove = (event: PointerEvent): void => {
+    // A drag can begin outside this window and enter without a pointer-down.
+    if (event.buttons === 0) active.delete(event.pointerId);
+    else {
+      active.add(event.pointerId);
+      if (event.altKey) cancelPeek();
+    }
+  };
+  const onEnd = (event: PointerEvent): void => {
+    active.delete(event.pointerId);
+  };
+  const listeners = [
+    ['pointerdown', onDown],
+    ['pointermove', onMove],
+    ['pointerup', onEnd],
+    ['pointercancel', onEnd],
+  ] as const;
+  for (const [type, handler] of listeners) window.addEventListener(type, handler, true);
+  return {
+    active: () => active.size > 0,
+    clear: () => active.clear(),
+    dispose: () => {
+      active.clear();
+      for (const [type, handler] of listeners) window.removeEventListener(type, handler, true);
+    },
+  };
 }

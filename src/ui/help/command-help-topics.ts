@@ -298,7 +298,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'window.toggle-layers-panel': {
     family: 'window',
-    tooltip: 'Show or hide the Cuts / Layers panel to control the workspace width.',
+    tooltip: 'Show or hide the Artwork panel to control the workspace width.',
   },
   'window.toggle-machine-panel': {
     family: 'window',

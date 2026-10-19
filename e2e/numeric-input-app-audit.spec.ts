@@ -62,7 +62,7 @@ test('mixed artwork power scale accepts explicit 100 after clearing its blank dr
     .filter({ has: page.getByText('Select All', { exact: true }) })
     .click();
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await panel
@@ -157,7 +157,7 @@ async function openBasicProject(page: Page): Promise<Locator> {
     .getByRole('tab', { name: 'Artwork', exact: true });
   if (await sideTab.isVisible()) await sideTab.click();
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await expect(panel.getByRole('radiogroup', { name: /^Mode for/ })).toBeVisible();

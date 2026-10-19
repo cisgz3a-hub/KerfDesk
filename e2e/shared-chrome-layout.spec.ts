@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
 
 test('a scrolled dialog keeps its footer on the bottom edge', async ({ page }) => {
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await panel.getByRole('button', { name: 'More cut settings', exact: true }).click();

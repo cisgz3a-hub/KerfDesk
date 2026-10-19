@@ -19,20 +19,20 @@ test.describe('workspace shell acceptance', () => {
     await expectFocusRing(studio);
 
     const collapseLayers = page.getByRole('button', {
-      name: 'Collapse Artwork / Operations panel',
+      name: 'Collapse Artwork panel',
       exact: true,
     });
     await collapseLayers.focus();
     await page.keyboard.press('Enter');
-    await expect(page.getByLabel('Artwork / Operations panel collapsed')).toBeVisible();
+    await expect(page.getByLabel('Artwork panel collapsed')).toBeVisible();
 
     const expandLayers = page.getByRole('button', {
-      name: 'Expand Artwork / Operations panel',
+      name: 'Expand Artwork panel',
       exact: true,
     });
     await expandLayers.focus();
     await page.keyboard.press('Enter');
-    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Artwork panel', { exact: true })).toBeVisible();
 
     await page.getByRole('tab', { name: 'Machine', exact: true }).click();
     await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
@@ -67,7 +67,7 @@ test.describe('workspace shell acceptance', () => {
   test('keeps a usable overflow-free canvas at compact sizes', async ({ page }) => {
     await page.setViewportSize({ width: 640, height: 450 });
 
-    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Artwork panel', { exact: true })).toBeVisible();
     await expectNoPageOverflow(page);
     await expectInsideViewport(page, page.getByRole('contentinfo', { name: 'Status bar' }));
     await expectUsableToolbarRows(page);
@@ -128,20 +128,18 @@ test.describe('workspace shell acceptance', () => {
     const panels = page.getByRole('region', { name: 'Workspace side panels' });
     const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
     const expandedWidth = (await canvas.boundingBox())?.width ?? 0;
-    await page
-      .getByRole('button', { name: 'Collapse Artwork / Operations panel', exact: true })
-      .click();
+    await page.getByRole('button', { name: 'Collapse Artwork panel', exact: true }).click();
     expect((await panels.boundingBox())?.width ?? 0).toBeLessThanOrEqual(49);
     expect((await canvas.boundingBox())?.width ?? 0).toBeGreaterThan(expandedWidth + 250);
     await expect(page.getByRole('region', { name: 'Job actions' })).toHaveCount(0);
     await page.getByRole('tab', { name: 'Artwork', exact: true }).click();
-    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Artwork panel', { exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Job actions' })).toBeVisible();
 
     await page.keyboard.press('F12');
     expect((await panels.boundingBox())?.width ?? 0).toBeLessThanOrEqual(49);
     await page.keyboard.press('F12');
-    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Artwork panel', { exact: true })).toBeVisible();
     await page.keyboard.press('F12');
     await page.getByRole('menuitem', { name: 'Window', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Reset Workspace Layout', exact: true }).click();
@@ -160,9 +158,9 @@ test.describe('workspace shell acceptance', () => {
     await page.setViewportSize({ width: 1024, height: 700 });
 
     await page.keyboard.press('F12');
-    await expect(page.getByLabel('Artwork / Operations panel collapsed')).toBeVisible();
+    await expect(page.getByLabel('Artwork panel collapsed')).toBeVisible();
     await page.keyboard.press('F12');
-    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Artwork panel', { exact: true })).toBeVisible();
     await page.getByRole('tab', { name: 'Machine', exact: true }).click();
     await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
     await page.keyboard.press('F12');
@@ -171,10 +169,8 @@ test.describe('workspace shell acceptance', () => {
     await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
 
     await page.getByRole('tab', { name: 'Artwork', exact: true }).click();
-    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
-    await page
-      .getByRole('button', { name: 'Collapse Artwork / Operations panel', exact: true })
-      .click();
+    await expect(page.getByLabel('Artwork panel', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Collapse Artwork panel', exact: true }).click();
     await page.getByRole('tab', { name: 'Machine', exact: true }).click();
     await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).click();
     await page.getByText('Window', { exact: true }).click();
@@ -184,7 +180,7 @@ test.describe('workspace shell acceptance', () => {
       'aria-selected',
       'true',
     );
-    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Artwork panel', { exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Workspace side panels' })).toHaveAttribute(
       'data-layout',
       'compact',

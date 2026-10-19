@@ -6,6 +6,7 @@ export function ShowOnlyLayerButton({ layer }: { readonly layer: Layer }): JSX.E
   return (
     <button
       type="button"
+      className="lf-btn lf-btn--sm"
       onClick={() => showOnlyLayer(layer.id)}
       aria-label={`Show only ${layer.name}`}
       title="Show this operation and hide every other operation on the workspace"

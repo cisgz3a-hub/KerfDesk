@@ -58,7 +58,7 @@ test('imports a 24 MiB SVG through the production worker while the UI stays resp
   await (await toolbarCommand(page, 'Import...')).click();
 
   await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible({ timeout: 120_000 });
-  await expect(page.getByText('Layers: 1 (1 output)', { exact: true })).toBeVisible();
+  await expect(page.getByText('Operations: 1 (1 output)', { exact: true })).toBeVisible();
 
   const heartbeatAtImport = await page.evaluate(
     () => (window as Window & { __svgHeartbeatAtImport?: number }).__svgHeartbeatAtImport ?? 0,
