@@ -143,6 +143,7 @@ function useRowLayout(
     return () => {
       current = false;
       window.clearTimeout(timer);
+      textWorker.release();
     };
   }, [rows, values, textWorker]);
   return layouts;

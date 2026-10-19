@@ -67,7 +67,7 @@ export function useMissingCharacters(query: MissingCharacterQuery): MissingChara
       window.clearTimeout(timer);
     };
   }, [enabled, fontKey, embeddedFonts, characters, textWorker]);
-  if (!enabled || checked?.fontKey !== fontKey) return NOT_CHECKED;
+  if (!enabled || characters === '' || checked?.fontKey !== fontKey) return NOT_CHECKED;
   // A character deleted since the last check leaves the warning at once.
   return {
     missing: checked.missing.filter((character) => characters.includes(character)),
