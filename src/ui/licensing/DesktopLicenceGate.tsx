@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
 import { usePlatformOptional } from '../app/platform-context';
 import { useCommercialUpdateStore } from '../state/commercial-update-store';
@@ -52,10 +52,12 @@ export function DesktopLicenceGate({
     initialKey,
   );
   const dialog = useRef<HTMLElement>(null);
+  const checkUpdates = useRef<HTMLButtonElement>(null);
   // Check for updates opens its panel over this window: it then holds the
   // modal role, so assistive technology can reach it.
   const updatesOpen = useCommercialUpdateStore((state) => state.controls?.panelOpen === true);
   useEffect(() => dialog.current?.focus(), []);
+  useUpdatesHandOff(dialog, checkUpdates, updatesOpen);
   // The workspace has not mounted its close receiver yet (ADR-623). Keep the
   // ordinary guarded handoff available for Quit and the native window close.
   useEffect(() => installDesktopCloseReceiver(window), []);
@@ -100,10 +102,33 @@ export function DesktopLicenceGate({
         <LicenceDevicesPanel client={client} status={status} typedKey={key} busy={busy} />
         <LicencePaymentActions client={client} status={status} busy={busy} run={run} />
         <EditionSummary />
-        <GateExits />
+        <GateExits checkUpdates={checkUpdates} />
       </section>
     </div>
   );
+}
+
+/**
+ * While the updates panel is open over this window, the window is inert, so
+ * neither Tab nor assistive technology reaches it, and focus moves into the
+ * panel; it comes back to Check for updates when the panel closes.
+ */
+function useUpdatesHandOff(
+  dialog: RefObject<HTMLElement>,
+  checkUpdates: RefObject<HTMLButtonElement>,
+  updatesOpen: boolean,
+): void {
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (dialog.current !== null) dialog.current.inert = updatesOpen;
+    if (updatesOpen) {
+      const panel = document.querySelector<HTMLElement>(
+        '[role="dialog"][aria-label="KerfDesk updates"]',
+      );
+      panel?.querySelector<HTMLElement>('button:not(:disabled), a[href], input, select')?.focus();
+    } else if (wasOpen.current) checkUpdates.current?.focus();
+    wasOpen.current = updatesOpen;
+  }, [checkUpdates, dialog, updatesOpen]);
 }
 
 /** Quit KerfDesk closes the app as its window's X does. */
@@ -115,11 +140,16 @@ function useQuit(): () => void {
   }, [desktopWindow]);
 }
 
-function GateExits(): JSX.Element {
+function GateExits({
+  checkUpdates,
+}: {
+  readonly checkUpdates: RefObject<HTMLButtonElement>;
+}): JSX.Element {
   const quit = useQuit();
   return (
     <div style={{ ...licenceButtons, justifyContent: 'space-between' }}>
       <button
+        ref={checkUpdates}
         type="button"
         className="lf-btn lf-btn--ghost"
         onClick={() => window.dispatchEvent(new Event(CHECK_UPDATES_EVENT))}

@@ -311,8 +311,6 @@ class LicensingService {
     now: this.now,
     request: this.request,
     apply: (reply) => this.acquire('refresh', undefined, undefined, reply),
-    mutation: (active) =>
-      active ? this.updateCache.beginMutation() : this.updateCache.endMutation(),
   });
   readonly deactivate = () =>
     this.safe(async () => {

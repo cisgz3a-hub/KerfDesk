@@ -40,7 +40,6 @@ export function createBackgroundLicenceRefresh(options: {
   readonly now: () => number;
   readonly request: (path: string, body: unknown) => Promise<unknown>;
   readonly apply: (reply: RefreshReply) => Promise<LicenceStatus>;
-  readonly mutation: (active: boolean) => void;
 }): () => Promise<LicenceStatus> {
   let running: Promise<LicenceStatus> | null = null;
   const prepare = async () => {
@@ -66,21 +65,18 @@ export function createBackgroundLicenceRefresh(options: {
   const refresh = async (): Promise<LicenceStatus> => {
     const { status, pending } = await prepare();
     if (pending === null) return status;
-    options.mutation(true);
-    try {
-      const reply: RefreshReply = await options.request(pending.path, pending.body).then(
-        (value) => ({ kind: 'success', value }),
-        (error: unknown) => ({ kind: 'failure', error }),
-      );
-      return await options.safe(async () => {
-        const { saved, device } = await options.load();
-        return refreshIdentity(saved, device) === pending.identity
-          ? options.apply(reply)
-          : options.evaluate(saved, device);
-      }, true);
-    } finally {
-      options.mutation(false);
-    }
+    // Saved rights stay in force while the request waits, so update
+    // eligibility is not held off; applying the reply is the mutation.
+    const reply: RefreshReply = await options.request(pending.path, pending.body).then(
+      (value) => ({ kind: 'success', value }),
+      (error: unknown) => ({ kind: 'failure', error }),
+    );
+    return options.safe(async () => {
+      const { saved, device } = await options.load();
+      return refreshIdentity(saved, device) === pending.identity
+        ? options.apply(reply)
+        : options.evaluate(saved, device);
+    }, true);
   };
   return () => (running ??= refresh().finally(() => (running = null)));
 }

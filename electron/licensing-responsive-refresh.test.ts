@@ -5,6 +5,7 @@ import {
   grant,
   harness,
   NOW,
+  release,
   saved,
   TEST_KEY,
   trialClaims,
@@ -74,4 +75,23 @@ it('coalesces background checks while allowing trial expiry to remain observable
   });
   reply(grant(rights));
   await expect(first).resolves.toMatchObject({ edition: 'free', state: 'trial-expired' });
+});
+
+it('keeps a covered update eligible while a quiet confirmation waits on the network', async () => {
+  const covered = release('update-manifest', '2026-09-28T00:00:00.000Z', '1.1.0');
+  const h = harness({ ...saved(), refreshedAt: NOW / 1000 - 8 * 86_400 });
+  expect(await h.runtime.status()).toMatchObject({ edition: 'pro' });
+  let reply!: (response: Response) => void;
+  h.fetch.mockImplementationOnce(
+    () =>
+      new Promise<Response>((resolve) => {
+        reply = resolve;
+      }),
+  );
+  const background = h.runtime.refreshInBackground();
+  await vi.waitFor(() => expect(h.fetch).toHaveBeenCalledOnce());
+  // Check for Updates must not report "not covered" just because a confirmation is pending.
+  expect(await h.runtime.isReleaseEligible(covered, '1.1.0')).toBe(true);
+  reply(grant());
+  await background;
 });

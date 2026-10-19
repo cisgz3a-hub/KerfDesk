@@ -91,6 +91,7 @@ function LicensedEdition({
     freeBuild,
     gated,
     session.status !== null,
+    linkFulfilled(link.linkedKey, session.status),
     load,
     showAll,
   );
@@ -197,33 +198,44 @@ function useSessionAdmission(status: LicenceStatus | null, client: LicenceAdapte
  * Help > Licence opens the Licence panel; a free build has none to manage, and
  * the window the desktop app opens behind already is one (ADR-623).
  */
+/** The window was opened with the linked key itself: the link has done its job. */
+function linkFulfilled(linkedKey: string | null, status: LicenceStatus | null): boolean {
+  return linkedKey !== null && status?.licenseKey === linkedKey;
+}
+
 function useLicenceManager(
   freeBuild: boolean,
   gated: boolean,
   statusKnown: boolean,
+  linkFulfilled: boolean,
   load: () => Promise<void>,
   showProInDesktop: () => void,
 ): { readonly managing: boolean; readonly closeManager: () => void } {
   const [managing, setManaging] = useState(false);
-  // A purchase link that launched KerfDesk asks before the first status says
-  // whether this build takes a licence, or opens behind the licence window.
+  // A purchase link that arrives before the first status, or while the licence
+  // window shows its key, opens Help > Licence once the workspace is let in.
   const [deferred, setDeferred] = useState(false);
   const manage = useCallback((): void => {
     if (freeBuild) {
       showProInDesktop();
       return;
     }
-    if (!gated) setManaging(true);
-    else if (!statusKnown) setDeferred(true);
+    if (gated) setDeferred(true);
+    else setManaging(true);
     void load();
-  }, [freeBuild, gated, load, showProInDesktop, statusKnown]);
+  }, [freeBuild, gated, load, showProInDesktop]);
   useEffect(() => {
     if (!deferred || !statusKnown) return;
+    if (freeBuild) {
+      setDeferred(false);
+      showProInDesktop();
+      return;
+    }
+    // Behind the licence window, which shows the linked key, wait for admission.
+    if (gated) return;
     setDeferred(false);
-    // The licence window already shows the linked key.
-    if (freeBuild) showProInDesktop();
-    else if (!gated) setManaging(true);
-  }, [deferred, freeBuild, gated, showProInDesktop, statusKnown]);
+    if (!linkFulfilled) setManaging(true);
+  }, [deferred, freeBuild, gated, linkFulfilled, showProInDesktop, statusKnown]);
   useLicenceSettingsEvent(manage);
   const closeManager = useCallback(() => setManaging(false), []);
   // Help > Check for Updates opens its panel in the same place.

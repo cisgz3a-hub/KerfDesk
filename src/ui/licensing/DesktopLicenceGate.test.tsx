@@ -183,10 +183,16 @@ it('hands the modal role to the updates panel it opens, and takes it back', asyn
   expect(document.querySelector('[role="dialog"][aria-label="KerfDesk updates"]')).not.toBeNull();
   expect(licenceWindow()?.getAttribute('aria-modal')).toBe('false');
   expect(licenceWindow()?.getAttribute('aria-hidden')).toBe('true');
+  // Neither Tab nor assistive technology reaches the window behind the panel.
+  expect(licenceWindow()?.inert).toBe(true);
+  const panel = document.querySelector('[role="dialog"][aria-label="KerfDesk updates"]');
+  expect(panel?.contains(document.activeElement)).toBe(true);
   await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   expect(document.querySelector('[role="dialog"][aria-label="KerfDesk updates"]')).toBeNull();
   expect(licenceWindow()?.getAttribute('aria-modal')).toBe('true');
   expect(licenceWindow()?.hasAttribute('aria-hidden')).toBe(false);
+  expect(licenceWindow()?.inert).toBe(false);
+  expect(document.activeElement?.textContent).toBe('Check for updates');
 });
 it('opens a build that cannot take a licence without the licence window', async () => {
   const api = client({ ...free, channel: 'free', state: 'ready' });
@@ -284,4 +290,29 @@ it('releases the licence close receiver and its approval when the workspace is a
   expect(desktopCloseController.approve(51)).toEqual({ status: 'retry' });
   // This fixture has no workspace receiver: the licence receiver must be gone.
   expect(await requestClose('prepare', 52)).toEqual({ status: 'unavailable' });
+});
+it('shows a purchase-link key that arrives during a trial start once the workspace opens', async () => {
+  let finishTrial: (status: LicenceStatus) => void = () => undefined;
+  const licenceLink = vi.fn().mockResolvedValue({ open: false, licenseKey: null });
+  const api = {
+    ...client(free),
+    licenceLink,
+    startTrial: vi.fn(() => new Promise<LicenceStatus>((resolve) => (finishTrial = resolve))),
+  };
+  await act(async () =>
+    root.render(
+      <EditionProvider client={api}>
+        <div data-workspace>workspace</div>
+      </EditionProvider>,
+    ),
+  );
+  await act(async () => button('Start free 30-day trial').click());
+  // The purchase page's link reaches the app while the trial is still starting.
+  licenceLink.mockResolvedValueOnce({ open: true, licenseKey: LINKED_KEY });
+  await act(async () => window.dispatchEvent(new Event('kerfdesk:licence-link')));
+  await act(async () => finishTrial(trial));
+  expect(licenceWindow()).toBeNull();
+  expect(host.querySelector('[data-workspace]')).not.toBeNull();
+  expect(document.querySelector('[role="dialog"][aria-label="KerfDesk licence"]')).not.toBeNull();
+  expect(keyField()?.value).toBe(LINKED_KEY);
 });
