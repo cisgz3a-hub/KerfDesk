@@ -25,7 +25,8 @@ board.
 
 1. **Custom shape.** A third board shape captures three to 64 corners, normally in order around
    the edge. If the capture order crosses itself, the corners are re-sorted around their centroid
-   when that gives a simple outline, and the panel says so; otherwise the outline is refused.
+   when that gives a simple outline, and the panel says so and draws the re-sorted outline on the
+   map; otherwise the outline is refused.
    The outline is a locked, closed, straight-edged registration polyline (stamped at the current
    pen fairing version so it is never rounded) that is excluded from the burn like any captured
    board. Its job placement is the rectangle's: user origin, front-left anchor.
@@ -34,13 +35,21 @@ board.
    machine position (`setOriginAtMachinePoint`, the same write as ADR-341 Amendment 5's Restore
    saved origin) without moving the head, and Place board refuses the outline unless the
    controller confirms the new offset. Commit accepts exactly the one work-origin change it wrote.
-   Where the head already is on the point, the ordinary Set origin here is used instead.
+   An unconfirmed or failed write may still have landed and uses up that change, so Place board
+   then says the work origin may have moved and sends the operator to Start over; it does not
+   write a second G92 that the commit would refuse. Where the head already is on the point, the
+   ordinary Set origin here is used instead.
 3. **Rectangle first corner.** If the first captured corner is more than 5 mm from the front-left
    corner, creating the outline moves the origin to the front-left corner by the same offset G92
    and says so. Otherwise the first corner stays the origin, as before.
 4. **The pointer.** When the device profile has a usable separate positioning light (ADR-612,
-   Machine Setup), the panel switches it on when board capture starts and off again when the
-   board is created or the panel closes, but only a light the panel itself switched on. It uses
+   Machine Setup) and the project is in Laser mode, the panel switches it on as soon as Place
+   Board is open with a board still to capture, so the operator aims with it from the first
+   corner, and off again when the board is created or the panel closes, but only a light the
+   panel itself switched on. In CNC mode Place Board neither switches nor aims with the light,
+   like the jog panel's LED controls: its mapped command can be coolant (M7/M8) and its offset is
+   from the beam, not the bit. A failed automatic switch-off is shown as a toast, since the page
+   may already be closed. It uses
    the ordinary positioning-light transaction (fresh Idle check, beam-off lines, then the light's
    own command), waits for the controller to be free instead of queueing, and tries once per
    capture. The operator can switch it by hand and can turn the automatic switch off; the choice is
@@ -98,7 +107,9 @@ board.
 ### Verification
 
 Unit tests cover the custom-shape geometry (ordering, re-sorting, orientation, origin and
-correction), the nine-point placement on rectangles, circles, a triangle and an L-shape, the
+correction), the rectangle and circle check points, rectangle corrections, the front-left corner
+and the pointer offset on every origin corner, the offset G92 and its refusal when unconfirmed,
+the nine-point placement on rectangles, circles, a triangle and an L-shape, the
 reducer's origin-advance rule, and the panel flows, including the pointer switching on for capture
 and off after it. The panel was checked in the browser build. It has not been run on hardware:
 the positioning light and the offset G92 still need an air test on a machine.

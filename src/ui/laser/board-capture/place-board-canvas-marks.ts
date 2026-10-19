@@ -11,7 +11,11 @@ import type { ViewTransform } from '../../workspace/view-transform';
 export type PlaceBoardOutlineStyle = 'points' | 'path' | 'closed' | 'box';
 
 export type PlaceBoardCanvasMarks = {
+  /** The captured points, numbered in capture order. */
   readonly points: ReadonlyArray<Vec2>;
+  /** The outline's corner order when it differs from the capture order: a
+   * crossed custom-shape capture is joined round the board instead. */
+  readonly outlinePoints?: ReadonlyArray<Vec2>;
   readonly outline: PlaceBoardOutlineStyle;
   /** Where the head (or the positioning light) is now. */
   readonly sight: { readonly point: Vec2; readonly pointer: boolean } | null;
@@ -31,7 +35,7 @@ export function paintPlaceBoardMarks(
     y: view.offsetY + p.y * view.scale,
   });
   ctx.save();
-  paintOutline(ctx, marks.points.map(toScreen), marks.outline);
+  paintOutline(ctx, (marks.outlinePoints ?? marks.points).map(toScreen), marks.outline);
   marks.points.forEach((point, index) => paintPoint(ctx, toScreen(point), index + 1));
   for (const check of marks.checks) paintCheck(ctx, toScreen(check.point), check.active);
   if (marks.sight !== null) paintSight(ctx, toScreen(marks.sight.point), marks.sight.pointer);

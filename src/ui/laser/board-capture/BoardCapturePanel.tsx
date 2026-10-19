@@ -3,6 +3,7 @@ import { deviceForActiveHead } from '../../../core/cnc/cnc-head-feeds';
 import type { Origin } from '../../../core/devices/device-profile';
 import { jogAxisSignsForOrigin } from '../../../core/devices/jog-direction';
 import { findRegistrationBoxBounds, type Vec2 } from '../../../core/scene';
+import type { BoardPolygonResult } from '../../../core/scene/board-polygon';
 import { sameBoardVerificationTarget } from '../../../core/scene/board-verification';
 import { useStore } from '../../state';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
@@ -90,7 +91,13 @@ function PlaceBoardPage({
   const [step, setStep] = usePlaceBoardStep(committed);
   const fitRequest = useFitRequest(outlineId);
   const sight = boardSightView(livePosition, pointer, origin);
-  const marks = usePlaceBoardMarks(capture.state, sight, verification, outlineValid);
+  const marks = usePlaceBoardMarks(
+    capture.state,
+    handlers.polygon,
+    sight,
+    verification,
+    outlineValid,
+  );
   const reset = (): void => {
     if (panelLocked || useLaserStore.getState().motionOperation !== null) return;
     verification.cancel();
@@ -153,11 +160,16 @@ function useFitRequest(outlineId: string | null): number {
 
 function usePlaceBoardMarks(
   state: BoardCaptureState,
+  polygon: BoardPolygonResult | null,
   sight: BoardSightView,
   verification: BoardVerificationController,
   outlineValid: boolean,
 ): PlaceBoardCanvasMarks {
   const scene = useStore((app) => app.project.scene);
+  // A crossed capture order is joined round the board instead: draw that
+  // outline, not the capture order's bow-tie, so the map matches the notice.
+  const reordered =
+    polygon?.kind === 'ok' && polygon.polygon.reordered ? onBed(polygon.polygon.points) : null;
   const sightOnBed = sight.point === null ? null : machinePointOnBed(sight.point);
   const sightMark =
     sightOnBed === null ? null : { point: sightOnBed, pointer: sight.aim === 'pointer' };
@@ -174,7 +186,13 @@ function usePlaceBoardMarks(
       active: sameBoardVerificationTarget(handle.target, verification.activeTarget),
     }));
   }, [scene, state.committed, state.geometry, outlineValid, verification.activeTarget]);
-  return { points, outline: outlineStyle(state), sight: sightMark, checks };
+  return {
+    points,
+    ...(reordered === null ? {} : { outlinePoints: reordered }),
+    outline: outlineStyle(state),
+    sight: sightMark,
+    checks,
+  };
 }
 
 function onBed(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {

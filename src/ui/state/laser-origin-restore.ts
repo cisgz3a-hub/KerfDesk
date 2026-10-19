@@ -48,6 +48,11 @@ export const RESTORE_ORIGIN_UNCONFIRMED_NOTICE =
   'The recovery review keeps its last reported offset, which may still differ. ' +
   'Wait for a new position report and check the origin before you start.';
 
+/** An unconfirmed board origin may still have landed: the G92 was acknowledged. */
+export const BOARD_ORIGIN_UNCONFIRMED_MESSAGE =
+  'The controller has not confirmed the board origin, so the work origin may have moved. ' +
+  'Wait for a position report and try again.';
+
 /** GRBL reports offsets to three decimals; the G92 is written to three. */
 const RESTORED_OFFSET_TOLERANCE_MM = 0.005;
 const RESTORE_WCO_WAIT_TIMEOUT_MS = 3_000;
@@ -114,7 +119,10 @@ export async function setOriginAtProgramPoint(
  * a board corner sighted with the positioning light, or the front-left of a
  * custom-shape board's bounding box — with one G92 at the live machine
  * position, without moving the head. A board outline is only as good as its
- * origin, so an unconfirmed offset is an error here, not a notice.
+ * origin, so an unconfirmed offset is an error here, not a notice. The write
+ * still counts as an origin change (workOriginVersion advances), so corners
+ * captured before it no longer commit; Place Board sends the operator to Start
+ * over rather than writing a second G92 (ADR-636).
  */
 export async function setOriginAtMachinePoint(
   set: SetFn,
@@ -126,10 +134,7 @@ export async function setOriginAtMachinePoint(
   if (!Number.isFinite(pointMm.x) || !Number.isFinite(pointMm.y))
     throw new Error('The board origin needs finite machine coordinates.');
   const outcome = await writeXyOffset(set, get, refs, safeWrite, BOARD_ORIGIN_WRITE, () => pointMm);
-  if (!outcome.confirmed)
-    throw new Error(
-      'The controller has not confirmed the board origin. Wait for a position report and try again.',
-    );
+  if (!outcome.confirmed) throw new Error(BOARD_ORIGIN_UNCONFIRMED_MESSAGE);
 }
 
 type XyOffsetWrite = { readonly label: string; readonly unconfirmedNotice: string };

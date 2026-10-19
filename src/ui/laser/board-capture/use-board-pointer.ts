@@ -16,6 +16,7 @@ import { useStore } from '../../state';
 import { useLaserStore, type LaserState } from '../../state/laser-store';
 import { jogFrameCommandBlockMessage } from '../../state/laser-store-helpers';
 import { pendingTransportWriteCount } from '../../state/laser-start-queue-fence';
+import { reportControllerActionFailure } from '../report-controller-action-failure';
 import { boardPointerConfigured, boardPointerOffsetMm } from './board-sight';
 
 const AUTO_POINTER_STORAGE_KEY = 'kerfdesk.placeBoard.autoPointer';
@@ -47,7 +48,8 @@ export type BoardPointer = {
 
 export function useBoardPointer(active: boolean): BoardPointer {
   const device = useStore((state) => state.project.device);
-  const configured = boardPointerConfigured(device);
+  const machine = useStore((state) => state.project.machine);
+  const configured = boardPointerConfigured(device, machine);
   const enabled = useLaserStore((state) => state.positioningLightEnabled);
   const auto = useBoardPointerPreference((state) => state.autoPointer);
   const setAuto = useBoardPointerPreference((state) => state.setAutoPointer);
@@ -77,9 +79,11 @@ export function useBoardPointer(active: boolean): BoardPointer {
         owned.current = on && automatic;
       })
       .catch((cause: unknown) => {
-        setError(
-          `${on ? 'Could not switch the pointer on' : 'Could not switch the pointer off'}: ${errorMessage(cause)}`,
-        );
+        const failed = on ? 'Could not switch the pointer on' : 'Could not switch the pointer off';
+        setError(`${failed}: ${errorMessage(cause)}`);
+        // The automatic switch-off runs once the page has closed or moved on
+        // from capture, where the pointer bar and its error are not shown.
+        if (automatic && !on) reportControllerActionFailure(failed, cause);
       })
       .finally(() => {
         busy.current = false;

@@ -265,8 +265,15 @@ function createPolygonFinishHandler(
   };
 }
 
+const ORIGIN_MOVED_SINCE_CAPTURE_MESSAGE =
+  'The board origin was not confirmed, and the work origin may have moved since these corners ' +
+  'were captured. Start over and capture the board again.';
+
 // Set the origin at the board's reference point, then commit; the origin
 // write is the one advance of the work-origin version the commit accepts.
+// A failed or unconfirmed write may still have landed and has used that
+// advance, so a retry would write a second G92 only to be refused: once the
+// origin has moved since capture, send the operator to Start over instead.
 async function commitWithNewOrigin(
   args: BoardCaptureHandlerArgs,
   geometry: CapturedBoardGeometry,
@@ -280,11 +287,18 @@ async function commitWithNewOrigin(
     if (!args.capture.isSessionCurrent()) {
       throw new Error('The board capture method changed before the outline was created.');
     }
+    if (!originUnchangedSinceCapture(args.capture)) {
+      throw new Error(ORIGIN_MOVED_SINCE_CAPTURE_MESSAGE);
+    }
     await setBoardOrigin(args, capturedBoardOrigin(geometry));
     commit(geometry, 1);
     return true;
   } catch (error) {
-    messages.setError(errorMessage(error, 'Could not set the board origin. Try again.'));
+    messages.setError(
+      originUnchangedSinceCapture(args.capture)
+        ? errorMessage(error, 'Could not set the board origin. Try again.')
+        : ORIGIN_MOVED_SINCE_CAPTURE_MESSAGE,
+    );
     return false;
   } finally {
     messages.setBusy(false);
@@ -336,6 +350,11 @@ function assertCaptureEpoch(capture: BoardCapture, current: BoardRegistrationEpo
   if (captured !== null && !registrationEpochMatches(captured, current)) {
     throw new Error('Machine coordinates changed during capture. Start over and capture it again.');
   }
+}
+
+function originUnchangedSinceCapture(capture: BoardCapture): boolean {
+  const captured = capture.state.captureEpoch;
+  return captured !== null && registrationEpochMatches(captured, currentRegistrationEpoch());
 }
 
 function firstCaptureSetsOrigin(capture: BoardCapture): boolean {

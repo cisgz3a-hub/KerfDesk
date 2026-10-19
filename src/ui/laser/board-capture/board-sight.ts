@@ -13,7 +13,7 @@ import {
   positioningLightSupported,
 } from '../../../core/devices/positioning-light';
 import type { DeviceProfile } from '../../../core/devices/device-profile';
-import type { Vec2 } from '../../../core/scene';
+import { machineKindOf, type MachineConfig, type Vec2 } from '../../../core/scene';
 import type { BoardAxisSigns } from '../../../core/scene/board-polygon';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
@@ -21,9 +21,15 @@ import { headFrameContext } from '../head-move-dispatch';
 
 const ZERO: Vec2 = { x: 0, y: 0 };
 
-/** True when this profile has a usable separate positioning light. */
-export function boardPointerConfigured(device: DeviceProfile): boolean {
+/** True when this profile has a usable separate positioning light. Laser mode
+ * only, like the jog panel's LED controls: in CNC mode the mapped M-code can be
+ * coolant (M7/M8), and the configured offset is from the beam, not the bit. */
+export function boardPointerConfigured(
+  device: DeviceProfile,
+  machine: MachineConfig | undefined,
+): boolean {
   return (
+    machineKindOf(machine) === 'laser' &&
     device.positioningLight !== undefined &&
     device.controllerKind !== 'ruida' &&
     positioningLightSupported(device.gcodeDialect?.dialectId) &&
@@ -48,8 +54,8 @@ export function boardPointerOffsetMm(device: DeviceProfile): Vec2 {
 /** The offset to add to the head position for what the operator is aiming with now. */
 export function boardSightOffsetMm(): Vec2 {
   if (!useLaserStore.getState().positioningLightEnabled) return ZERO;
-  const device = useStore.getState().project.device;
-  return boardPointerConfigured(device) ? boardPointerOffsetMm(device) : ZERO;
+  const { device, machine } = useStore.getState().project;
+  return boardPointerConfigured(device, machine) ? boardPointerOffsetMm(device) : ZERO;
 }
 
 export function sightedPoint(head: Vec2, offset: Vec2 = boardSightOffsetMm()): Vec2 {

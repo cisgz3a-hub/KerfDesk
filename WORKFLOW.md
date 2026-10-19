@@ -4611,18 +4611,25 @@ resized and rotated on it. **Done** returns to the main canvas.
 than 5 mm from the front-left corner, **Create board outline** moves the work
 origin to the front-left corner and says so; there is no need to start over.
 
-**Pointer.** Only a light Place Board switched on is switched off again; a light the
-operator turned on stays on. **Switch on automatically while capturing** can be
-unticked (remembered in this browser). While the light is on, every capture, the
-calculated circle centre and every board check use the light's spot, allowing for
-its Machine Setup offset. Machines without a light see **Set it up**. The cutting
-beam is never used as a pointer.
+**Pointer.** The light comes on as soon as Place Board is open with a board still
+to capture, so the first corner can be aimed with it. Only a light Place Board
+switched on is switched off again; a light the operator turned on stays on. If the
+automatic switch-off fails, a toast says so (the page may already be closed).
+**Switch on automatically while capturing** can be unticked (remembered in this
+browser). While the light is on, every capture, the calculated circle centre and
+every board check use the light's spot, allowing for its Machine Setup offset.
+Machines without a light see **Set it up**. Laser mode only: in CNC mode the light's
+command can be coolant (M7/M8), so Place Board neither switches it nor allows for
+its offset, and captures use the spindle position. The cutting beam is never used
+as a pointer.
 
 **Edge / empty / error.** Fewer than three corners, corners almost in a line, or an
 outline that crosses itself cannot be created; a crossed capture order is re-sorted
-round the board when that gives a clean outline, with a notice to check the map. If
-the controller does not confirm the new origin, the outline is not created and the
-panel says so. A design larger than the board inside the margin is still aligned,
+round the board when that gives a clean outline; the map draws that outline, with a
+notice to check it. If the controller does not confirm the new origin (or the write
+fails), the outline is not created: the G92 may still have landed, so the panel says
+the work origin may have moved and asks for **Start over** instead of writing a
+second G92. A design larger than the board inside the margin is still aligned,
 with a warning to use Fit to board. Array on board keeps only the copies that sit
 on a custom shape; nesting still uses its bounding box.
 

@@ -64,7 +64,7 @@ export function BoardPointerBar(props: {
       <label>
         <input
           type="checkbox"
-          title="Switch the pointer on when capture starts and off when the board is created"
+          title="Switch the pointer on while Place Board has a board to capture, and off when the board is created or Place Board closes"
           checked={pointer.auto}
           onChange={(event) => pointer.setAuto(event.target.checked)}
         />
