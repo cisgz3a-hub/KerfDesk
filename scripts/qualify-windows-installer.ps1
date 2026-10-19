@@ -103,7 +103,7 @@ $receipt = [ordered]@{
       'Install, packaged launch/import/save on a throwaway profile, and uninstall only; no upgrade and no real file dialogs.'
     }),
     $(if ($Scenario -eq 'HistoricalUpgrade') {
-      'Authenticated production baseline and exact-source upgrade candidate with a native-created Free profile; paid licensing state remains separate qualification.'
+      'Authenticated production baseline and exact-source upgrade candidate with a native-created profile, opened with the developer qualification licence wherever the licence window appears (ADR-623); paid licensing state remains separate qualification.'
     } else { 'Both candidates use this same source commit; historical release/profile migrations remain separate checks.' }),
     'Hosted runner OS and account only; consumer Windows, standard-user UAC and SmartScreen remain separate checks.',
     'No physical controller, camera, laser, spindle or other hardware was operated.'

@@ -69,8 +69,9 @@ link, and LightBurn has no free tier.
   first Pro status in a commercial build, and latches the session in after that.
   The main process holds its own services the same way: the RTSP camera bridge
   runs only once the current renderer acknowledges its mounted workspace after
-  normalising trial expiry (always in a build without licensing), and each opening renderer, a
-  reopened macOS window or a reload, stops it until then. The startup licence
+  normalising trial expiry (always in a build without licensing). Each opening
+  renderer (a reopened macOS window or a reload), a closed window and a crashed
+  renderer stop it until then. The startup licence
   confirmation, which may wait on the network, queues after the window's first
   local status read, and each background confirmation signals the renderer to
   read its status again, so a restored licence opens the workspace at once.
@@ -80,9 +81,10 @@ link, and LightBurn has no free tier.
 - PROJECT non-negotiable 21 is unchanged: the window is not a Start guard. It
   stands before the workspace exists, and nothing in a running session gates
   Frame, Start, output or a job.
-- The website, download page, pricing page, FAQ and licence emails still describe
-  a desktop Free edition. They must change before the release that carries this
-  decision. The EULA and the website licence terms are the owner's to change.
+- The purchase email now points to the licence window. The website, download
+  page, pricing page and FAQ change in a separate pull request, which must go live
+  with the release that carries this decision, not before. The EULA and the
+  website licence terms are the owner's to change.
 - The native licence qualification activates from the window, not from Help >
   Licence, because an unlicensed profile no longer reaches the workspace. The
   fresh sandbox smoke now proves the window stands alone instead of importing and
