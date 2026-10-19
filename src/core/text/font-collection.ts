@@ -18,6 +18,11 @@ const POSTSCRIPT_NAME_ID = 6;
 const FS_TYPE_OFFSET = 8;
 const FS_TYPE_USAGE_MASK = 0x000f;
 const FS_TYPE_RESTRICTED = 0x0002;
+const FS_TYPE_PREVIEW_PRINT = 0x0004;
+const FS_TYPE_EDITABLE = 0x0008;
+const FS_TYPE_BITMAP_ONLY = 0x0200;
+/** OS/2 versions 0 and 1 assign only fsType bits 0 to 3. */
+const OS2_FIRST_VERSION_WITH_BITMAP_FLAG = 2;
 
 type TableRecord = {
   readonly tag: number;
@@ -155,13 +160,25 @@ export function fontChecksum(bytes: Uint8Array): number {
   return sum;
 }
 
-/** True when the face's OS/2 fsType asks for Restricted License embedding. */
+/** True when the face's OS/2 fsType limits embedding it in a project that can
+ * be edited and shared: Restricted License, Preview & Print only, or bitmap
+ * embedding only (a project embeds outlines). Installable and Editable faces
+ * are not limited. When several usage bits are set, as some version 0 to 2
+ * fonts do, the least restrictive applies (OpenType OS/2 fsType):
+ * https://learn.microsoft.com/en-us/typography/opentype/spec/os2#fstype */
 export function fontEmbeddingRestricted(bytes: Uint8Array): boolean {
   const directoryOffset = isFontCollection(bytes) ? (collectionFaceOffsets(bytes)[0] ?? 0) : 0;
   const os2 = tableRecords(bytes, directoryOffset).find((record) => record.tag === OS2_TAG);
   if (os2 === undefined || os2.length < FS_TYPE_OFFSET + 2) return false;
-  const fsType = view(bytes).getUint16(os2.offset + FS_TYPE_OFFSET);
-  return (fsType & FS_TYPE_USAGE_MASK) === FS_TYPE_RESTRICTED;
+  const data = view(bytes);
+  const fsType = data.getUint16(os2.offset + FS_TYPE_OFFSET);
+  const version = data.getUint16(os2.offset);
+  if (version >= OS2_FIRST_VERSION_WITH_BITMAP_FLAG && (fsType & FS_TYPE_BITMAP_ONLY) !== 0) {
+    return true;
+  }
+  const usage = fsType & FS_TYPE_USAGE_MASK;
+  if (usage === 0 || (usage & FS_TYPE_EDITABLE) !== 0) return false;
+  return (usage & (FS_TYPE_RESTRICTED | FS_TYPE_PREVIEW_PRINT)) !== 0;
 }
 
 function view(bytes: Uint8Array): DataView {

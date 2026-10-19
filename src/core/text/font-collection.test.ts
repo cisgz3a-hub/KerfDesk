@@ -109,8 +109,23 @@ describe('font collections (ADR-628)', () => {
     expect(fontEmbeddingRestricted(roboto)).toBe(false);
     const restricted = withFsType(roboto, 0x0002);
     expect(fontEmbeddingRestricted(restricted)).toBe(true);
-    expect(fontEmbeddingRestricted(withFsType(roboto, 0x0004))).toBe(false);
     expect(fontEmbeddingRestricted(withFsType(roboto, 0x0302))).toBe(true);
+  });
+
+  // A project file is edited and shared, so Preview & Print (documents opened
+  // read-only) and bitmap-only embedding (no outlines) limit it too.
+  it('reports Preview & Print and bitmap-only embedding, not Installable or Editable', () => {
+    expect(fontEmbeddingRestricted(withFsType(roboto, 0x0004))).toBe(true);
+    expect(fontEmbeddingRestricted(withFsType(roboto, 0x0200))).toBe(true);
+    expect(fontEmbeddingRestricted(withFsType(roboto, 0x0208))).toBe(true);
+    expect(fontEmbeddingRestricted(withFsType(roboto, 0x0000))).toBe(false);
+    expect(fontEmbeddingRestricted(withFsType(roboto, 0x0008))).toBe(false);
+    expect(fontEmbeddingRestricted(withFsType(roboto, 0x0100))).toBe(false);
+    // Several usage bits (OS/2 versions 0 to 2): the least restrictive wins.
+    expect(fontEmbeddingRestricted(withFsType(roboto, 0x000c))).toBe(false);
+    expect(fontEmbeddingRestricted(withFsType(roboto, 0x0006))).toBe(true);
+    // Versions 0 and 1 assign only bits 0 to 3, so bit 9 is ignored there.
+    expect(fontEmbeddingRestricted(withOs2Version(withFsType(roboto, 0x0200), 1))).toBe(false);
   });
 });
 
@@ -121,6 +136,17 @@ function withFsType(font: Uint8Array, fsType: number): Uint8Array {
   for (let index = 0; index < tables; index++) {
     const at = 12 + index * 16;
     if (data.getUint32(at) === 0x4f532f32) data.setUint16(data.getUint32(at + 8) + 8, fsType);
+  }
+  return copy;
+}
+
+function withOs2Version(font: Uint8Array, version: number): Uint8Array {
+  const copy = font.slice();
+  const data = new DataView(copy.buffer);
+  const tables = data.getUint16(4);
+  for (let index = 0; index < tables; index++) {
+    const at = 12 + index * 16;
+    if (data.getUint32(at) === 0x4f532f32) data.setUint16(data.getUint32(at + 8), version);
   }
   return copy;
 }
