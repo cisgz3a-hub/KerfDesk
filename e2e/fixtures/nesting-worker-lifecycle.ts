@@ -29,10 +29,17 @@ const probe = `
 })
 `;
 
+interface RootRecord {
+  terminated: boolean;
+  terminatedAt?: number;
+  retiredAt?: number;
+  url: string;
+}
+
 interface LifetimeState {
   counts: Int32Array;
   owners: Int32Array;
-  roots: { terminated: boolean; terminatedAt?: number; url: string }[];
+  roots: RootRecord[];
 }
 
 declare global {
@@ -61,6 +68,8 @@ interface WorkerRuntime {
 // torn down within one grace period per nesting level plus thread teardown.
 const CHROMIUM_FORCIBLE_TERMINATION_MS = 2_000;
 const THREAD_TEARDOWN_ALLOWANCE_MS = 3_000;
+// Exceeds the client's 5 s engine retirement limit (production-nesting-worker-client.ts).
+const SOLVER_RETIREMENT_ALLOWANCE_MS = 8_000;
 
 export class RuntimeObserver {
   readonly workers = new Map<string, WorkerRuntime>();
@@ -246,12 +255,17 @@ export async function observeNestingLifetime(page: Page): Promise<void> {
     window.__nestingLifetime = state;
     const NativeWorker = window.Worker;
     window.Worker = class extends NativeWorker {
-      private readonly record: { terminated: boolean; terminatedAt?: number; url: string };
+      private readonly record: RootRecord;
       constructor(url: string | URL, options?: WorkerOptions) {
         super(url, options);
         this.record = { terminated: false, url: String(url) };
         state.roots.push(this.record);
         if (String(url).includes('packing-solver-worker.js')) {
+          const record = this.record;
+          this.addEventListener('message', (event) => {
+            if ((event.data as { kind?: unknown } | null)?.kind === 'retired')
+              record.retiredAt ??= Date.now();
+          });
           this.postMessage({
             kind: 'nesting-lifetime-probe',
             buffer: state.counts.buffer,
@@ -284,9 +298,23 @@ export async function expectNestingStopped(page: Page, completed: boolean): Prom
       counts: Array.from(window.__nestingLifetime.counts),
       owners: Array.from(window.__nestingLifetime.owners),
     }));
+  // The client terminates a solver host only after the host has retired its
+  // pthread workers, or at the client's retirement limit.
+  await expect
+    .poll(async () => (await snapshot()).roots.every((worker) => worker.terminated), {
+      timeout: SOLVER_RETIREMENT_ALLOWANCE_MS,
+    })
+    .toBe(true);
   const before = await snapshot();
   expect(before.roots.length).toBeGreaterThanOrEqual(completed ? 4 : 1);
-  expect(before.roots.every((worker) => worker.terminated)).toBe(true);
+  // Chromium can keep a host forever if its pthreads' termination notices
+  // arrive during its own shutdown, so each host must retire before termination.
+  for (const root of before.roots.filter((worker) =>
+    worker.url.includes('packing-solver-worker.js'),
+  )) {
+    expect(root.retiredAt, 'solver host retired before termination').toBeDefined();
+    expect(root.retiredAt).toBeLessThanOrEqual(root.terminatedAt ?? 0);
+  }
   if (completed) {
     const solverOwners = before.roots.flatMap((root, index) =>
       root.url.includes('packing-solver-worker.js') ? [index + 1] : [],
