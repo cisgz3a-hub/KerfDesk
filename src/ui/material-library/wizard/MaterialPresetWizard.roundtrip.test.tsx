@@ -81,6 +81,20 @@ async function next(host: HTMLElement): Promise<void> {
   await act(async () => form.querySelector<HTMLButtonElement>('button[type="submit"]')?.click());
 }
 
+async function back(host: HTMLElement): Promise<void> {
+  const button = [...host.querySelectorAll('button')].find((item) => item.textContent === 'Back');
+  if (!button) throw new Error('missing Back');
+  await act(async () => button.click());
+}
+
+function ditherSwatch(host: HTMLElement, algorithm: string): HTMLInputElement {
+  const radio = host.querySelector(
+    `[role="radiogroup"][aria-label="Cut settings dither"] input[value="${algorithm}"]`,
+  );
+  if (!(radio instanceof HTMLInputElement)) throw new Error(`missing ${algorithm} swatch`);
+  return radio;
+}
+
 describe('existing material recipe roundtrips', () => {
   it.each(['line', 'fill', 'image'] as const)(
     'preserves every %s recipe setting through native Next/Save',
@@ -98,6 +112,31 @@ describe('existing material recipe roundtrips', () => {
       }
     },
   );
+
+  it('saves the dither swatch chosen in Image details and keeps it through Back', async () => {
+    const existing = preset('image');
+    useStore.getState().upsertMaterialPreset(existing);
+    const view = await renderWizard(existing);
+    try {
+      await next(view.host);
+      await next(view.host);
+      expect(ditherSwatch(view.host, 'grayscale').checked).toBe(true);
+      expect(view.host.querySelector('input[name="minPower"]')).not.toBeNull();
+      await act(async () => ditherSwatch(view.host, 'stucki').click());
+      expect(view.host.querySelector('input[name="minPower"]')).toBeNull();
+      await back(view.host);
+      await next(view.host);
+      expect(ditherSwatch(view.host, 'stucki').checked).toBe(true);
+      await next(view.host);
+      await next(view.host);
+      expect(useStore.getState().materialLibrary?.entries[0]?.recipe).toEqual({
+        ...materialRecipePatch(existing.recipe),
+        ditherAlgorithm: 'stucki',
+      });
+    } finally {
+      await view.close();
+    }
+  });
 
   it.each([true, false])(
     'saves toggled air from %s, reopens it, and applies it to a layer',
