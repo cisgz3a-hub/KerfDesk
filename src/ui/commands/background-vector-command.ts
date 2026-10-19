@@ -7,7 +7,7 @@
 // when the project and selection are still the ones the click saw. A real
 // browser whose worker cannot start runs the command in thread, as before;
 // work that ran and failed is reported, never retried on the UI thread. While
-// any Pro prompt is open, a finished result is not committed: the prompt holds
+// a tool's Pro prompt is open, a finished result is not committed: the prompt holds
 // another tool's edit, which committing over it would lose.
 
 import type { VectorSceneObject } from '../../core/geometry';
@@ -81,7 +81,16 @@ export async function runVectorCommandInBackground<T extends VectorOpTask>(
       .pushToast(`${command.label} could not be completed. ${outcome.message}`, 'error');
     return false;
   }
-  // A domain error has no edit to admit or commit. Preserve its specific
+  if (!unchanged(before)) {
+    useToastStore
+      .getState()
+      .pushToast(
+        `${command.label} was not applied: the project or selection changed while it was worked out.`,
+        'info',
+      );
+    return false;
+  }
+  // A current domain error has no edit to admit or commit. Preserve its specific
   // warning even while another tool is waiting on a Pro prompt.
   if (outcome.kind === 'done' && outcome.result.kind === 'error') {
     useToastStore.getState().pushToast(outcome.result.error.message, 'warning');
@@ -92,15 +101,6 @@ export async function runVectorCommandInBackground<T extends VectorOpTask>(
       .getState()
       .pushToast(
         `${command.label} was not applied: a Pro prompt is open. Close it, then run ${command.label} again.`,
-        'info',
-      );
-    return false;
-  }
-  if (!unchanged(before)) {
-    useToastStore
-      .getState()
-      .pushToast(
-        `${command.label} was not applied: the project or selection changed while it was worked out.`,
         'info',
       );
     return false;

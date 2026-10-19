@@ -128,6 +128,31 @@ describe('one-click background vector commands (ADR-609)', () => {
     expect(useStore.getState().project).toBe(project);
   });
 
+  it.each(['project', 'selection'] as const)(
+    'does not report a geometry error for a superseded %s',
+    async (changed) => {
+      const offset = command('Offset outlines');
+      const running = runVectorCommandInBackground(offset);
+      if (changed === 'project') useStore.setState({ project: { ...useStore.getState().project } });
+      else useStore.setState({ selectedObjectId: 'another-artwork' });
+      setActiveEdition({ ...UNRESTRICTED_EDITION, proPromptOpen: true });
+      sessions[0]!.resolve({
+        kind: 'done',
+        result: {
+          kind: 'error',
+          error: { kind: 'operation-failed', message: 'The old offset collapsed.' },
+        },
+      });
+      await expect(running).resolves.toBe(false);
+      expect(messages()).not.toContain('The old offset collapsed.');
+      expect(messages()).toContain(
+        'Offset outlines was not applied: the project or selection changed while it was worked out.',
+      );
+      expect(offset.commit).not.toHaveBeenCalled();
+      expect(offset.inThread).not.toHaveBeenCalled();
+    },
+  );
+
   it('keeps its working notice up until the work settles', async () => {
     vi.useFakeTimers();
     const running = runVectorCommandInBackground(command('Cut Shapes'));

@@ -62,7 +62,9 @@ menus and typing were frozen, and an open dialog froze again on every edit and o
    it), the result is not committed and a notice asks for the command to be run again; committing
    would replace or invalidate that waiting edit. The edition provider exposes the open prompt as
    a read-only `proPromptOpen`, including the prompt in Free-only builds, which gates nothing.
-   A geometry error reports its specific warning without committing, even while a prompt is open.
+   The all-features licence information notice holds no pending edit and does not count as a
+   tool prompt. A geometry error reports its specific warning without committing, even while a
+   tool prompt is open, after confirming that its project and selection still match the request.
 5. **Newer work cancels older work.** Clipper cannot be interrupted, and these runs last
    seconds to minutes. A newer request therefore terminates a busy worker and starts at once in
    a fresh one, instead of queuing behind work whose answer is no longer wanted. This differs

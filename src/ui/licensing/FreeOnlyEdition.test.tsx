@@ -211,6 +211,7 @@ it('opens the same notice from Help > Licence in the web app', async () => {
   await act(async () => window.dispatchEvent(new Event(LICENCE_SETTINGS_EVENT)));
   expect(document.body.textContent).toContain('Pro is in the desktop app');
   expectEveryProFeatureListed();
+  expect(proPromptOpen()).toBe(false);
 });
 
 it('gives a free desktop build the notice instead of the licence panel', async () => {
@@ -226,6 +227,7 @@ it('gives a free desktop build the notice instead of the licence panel', async (
   expect(document.body.textContent).toContain('Pro is in the desktop app');
   expect(document.querySelector('[aria-label="KerfDesk licence"]')).toBeNull();
   expectEveryProFeatureListed();
+  expect(proPromptOpen()).toBe(false);
 });
 
 it('shows no Pro notice in explicit unrestricted development providers', async () => {

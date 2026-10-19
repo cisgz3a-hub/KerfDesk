@@ -37,7 +37,8 @@ export function useProInDesktop(): {
     shownRef.current = null;
     setShown(null);
   }, []);
-  const hasPrompt = useCallback(() => shownRef.current !== null, []);
+  // The all-features notice holds no tool request or pending edit.
+  const hasPrompt = useCallback(() => shownRef.current !== null && shownRef.current !== 'all', []);
   return { shown, request, showAll, close, hasPrompt };
 }
 
