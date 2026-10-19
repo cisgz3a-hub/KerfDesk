@@ -1,4 +1,4 @@
-// What the chosen machine brings with it (ADR-636), under the machine list:
+// What the chosen machine brings with it (ADR-637), under the machine list:
 // its size and type, the profile's evidence and notes, and for a CNC preset
 // the geometry-only, controller-unchanged disclosure and its sources. A
 // Laser + CNC machine also asks which toolhead is fitted.

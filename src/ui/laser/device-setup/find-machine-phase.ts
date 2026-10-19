@@ -1,5 +1,5 @@
 // Which state the Machine stage's connection strip is in, with its heading and
-// one-line explanation (ADR-420, ADR-636). Derived from the live connection
+// one-line explanation (ADR-420, ADR-637). Derived from the live connection
 // each render. Choosing a machine never waits on it.
 
 import { assertNever } from '../../../core/scene';

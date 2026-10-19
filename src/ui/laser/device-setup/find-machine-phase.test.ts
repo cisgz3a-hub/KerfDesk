@@ -23,7 +23,7 @@ const connected: FindMachineFacts = {
   connectedBaudRate: 115200,
 };
 
-describe('connection strip states (ADR-420, ADR-636)', () => {
+describe('connection strip states (ADR-420, ADR-637)', () => {
   it('says it is not connected, and that connecting is optional', () => {
     const idlePhase = phaseFromFacts(idle);
     expect(idlePhase).toMatchObject({ kind: 'idle', title: 'Not connected' });

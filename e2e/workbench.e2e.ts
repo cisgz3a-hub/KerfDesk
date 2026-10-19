@@ -189,7 +189,7 @@ baseTest(
     const dialog = page.getByRole('dialog');
     await expect(dialog).toHaveAccessibleName('Machine Setup');
 
-    // A CNC machine is chosen from the same list as a laser (ADR-636).
+    // A CNC machine is chosen from the same list as a laser (ADR-637).
     await dialog.getByRole('radio', { name: 'Use Genmitsu 3018-PRO', exact: true }).check();
     await expect(dialog).toHaveAccessibleName('CNC Machine Setup');
     await dialog.getByRole('button', { name: 'Next', exact: true }).click();

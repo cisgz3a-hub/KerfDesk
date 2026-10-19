@@ -29,7 +29,7 @@ function listed(state: DeviceSetupState, name: string): MachinePickerEntry {
   return found;
 }
 
-describe('machine list (ADR-636)', () => {
+describe('machine list (ADR-637)', () => {
   it('lists every brand laser profile and CNC preset, and no generic firmware starter', () => {
     const entries = machinePickerEntries(starter());
     const brandLasers = GRBL_MACHINE_PROFILE_CATALOG.filter(

@@ -2,7 +2,7 @@
 // (#796) connects with the generic grblHAL driver, whose Frame sends M9 just
 // before Start (ADR-323). Re-applying the preset is the deliberate fix, so the
 // machine list must not show that copy as the chosen machine (ADR-375), nor as a
-// machine that isn't listed (ADR-636).
+// machine that isn't listed (ADR-637).
 
 import { act, useReducer } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

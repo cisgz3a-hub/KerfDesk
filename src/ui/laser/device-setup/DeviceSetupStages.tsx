@@ -29,7 +29,7 @@ export function DeviceSetupStages(props: DeviceSetupStagesProps): JSX.Element {
   return <DeviceSetupReviewStep {...props} operationDrafts={props.cncSetup.operationDrafts} />;
 }
 
-// The machine list leads (ADR-636). The connection strip above it reports
+// The machine list leads (ADR-637). The connection strip above it reports
 // the controller and fills a new machine's values in (ADR-420); connecting is
 // never needed to choose.
 function MachineStage(props: DeviceSetupStagesProps): JSX.Element {

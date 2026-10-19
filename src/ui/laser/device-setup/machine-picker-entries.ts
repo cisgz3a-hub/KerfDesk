@@ -1,4 +1,4 @@
-// The Machine stage's one list of machines (ADR-636): every brand laser
+// The Machine stage's one list of machines (ADR-637): every brand laser
 // profile and every CNC preset, grouped by brand. The generic firmware
 // starters are not machines, so they stay out of the list; "My machine isn't
 // listed" covers them with a firmware choice. Choosing an entry only changes

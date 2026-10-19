@@ -406,7 +406,7 @@ async function advanceToReview(host: HTMLElement): Promise<void> {
   expect(host.textContent).toContain('Step 3 of 3');
 }
 
-/** A machine that isn't listed asks its type (ADR-636). */
+/** A machine that isn't listed asks its type (ADR-637). */
 async function chooseUnlistedType(host: HTMLElement, type: string): Promise<void> {
   const unlisted = host.querySelector('input[aria-label="My machine isn’t listed"]');
   if (!(unlisted instanceof HTMLInputElement)) throw new Error('Not-listed choice missing');

@@ -1,4 +1,4 @@
-// Machine type for a machine that isn't listed (ADR-636): a listed machine
+// Machine type for a machine that isn't listed (ADR-637): a listed machine
 // already says what it is, so the type is asked only in the "My machine isn't
 // listed" form. A Laser + CNC machine also says which toolhead is fitted.
 

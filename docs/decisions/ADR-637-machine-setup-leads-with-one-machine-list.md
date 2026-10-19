@@ -1,4 +1,4 @@
-## ADR-636 - Machine Setup leads with one machine list (2026-10-19)
+## ADR-637 - Machine Setup leads with one machine list (2026-10-19)
 
 **Status:** Accepted. Amends ADR-420 (the Machine stage's order and its Find card), ADR-420
 Amendment 4 (the **Review setup** shortcut) and ADR-347 (the profile card picker and the

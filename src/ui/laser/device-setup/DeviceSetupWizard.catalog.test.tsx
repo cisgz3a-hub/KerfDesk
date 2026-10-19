@@ -1,4 +1,4 @@
-// Machine-stage wizard behavior (ADR-636): the three-stage shell with one Next,
+// Machine-stage wizard behavior (ADR-637): the three-stage shell with one Next,
 // the searchable machine list, "My machine isn't listed", and verbatim profile
 // application.
 

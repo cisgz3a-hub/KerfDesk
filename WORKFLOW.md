@@ -3341,7 +3341,7 @@ record is per machine profile and Laser/CNC head. Only **Save machine setup**
 completes it; Cancel or an unsuccessful connection leaves the next Connect eligible.
 Configured profiles connect directly. Automatic connections and recovery Reconnect
 keep their existing behavior and do not open setup (ADR-420 Amendment 3).
-Machine and Essentials each have one forward button, **Next** (ADR-636; it replaces ADR-420
+Machine and Essentials each have one forward button, **Next** (ADR-637; it replaces ADR-420
 Amendment 4's **Review setup** shortcut and **Check essentials**). The stage buttons still open any
 stage directly, Review included; only **Save machine setup** applies the draft. Neither moving
 between stages nor saving an ordinary software profile disconnects the controller.
@@ -3350,7 +3350,7 @@ the operator changed the draft (a new machine's automatic fill alone does not co
 first ask **Discard your changes to this setup?** with **Keep editing** (focused, and Escape
 again) or **Discard changes**.
 
-1. **Machine** — the stage asks **Which machine do you have?** (ADR-636). A one-line connection
+1. **Machine** — the stage asks **Which machine do you have?** (ADR-637). A one-line connection
    strip sits at the top and the machine list follows; connecting is never needed to choose.
    - The strip (ADR-420) connects with the draft's controller, baud and streaming choice when the
      operator presses **Connect**, reusing the remembered port as the rail's Connect does, and
@@ -6535,7 +6535,7 @@ as the pane's design record.
 
 #### Success
 1. When a controller is connected and its `$$` snapshot differs from the current setup,
-   **Machine Setup > Machine**'s connection strip shows the detected values (ADR-420, ADR-636). **Use detected
+   **Machine Setup > Machine**'s connection strip shows the detected values (ADR-420, ADR-637). **Use detected
    values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131) into the setup
    draft; **Save machine setup** commits them, then the difference clears.
    `$30` is offered as spindle RPM only when the same dump reports `$32=0`;

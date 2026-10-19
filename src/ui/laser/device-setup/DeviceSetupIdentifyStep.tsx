@@ -1,4 +1,4 @@
-// The machine choice on the Machine stage (ADR-636): one list of listed laser
+// The machine choice on the Machine stage (ADR-637): one list of listed laser
 // and CNC machines, "My machine isn't listed", and machine-file import/export.
 // Controller and serial settings live in the connection strip's Connection
 // options, beside the connection they shape (ADR-420).

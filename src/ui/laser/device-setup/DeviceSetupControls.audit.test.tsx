@@ -194,7 +194,7 @@ describe('Setup control audit', () => {
     };
     render(<DeviceSetupIdentifyStep state={state} dispatch={dispatch} />);
     toggles('Import or export a machine profile');
-    // The connection contract lives in the connection strip (ADR-420, ADR-636).
+    // The connection contract lives in the connection strip (ADR-420, ADR-637).
     render(<DeviceSetupConnectionOptions state={state} dispatch={dispatch} />);
     toggles('Advanced connection and streaming');
     const worker = host.querySelector<HTMLInputElement>(

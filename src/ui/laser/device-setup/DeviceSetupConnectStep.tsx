@@ -1,4 +1,4 @@
-// The connection strip at the top of the Machine stage (ADR-420, ADR-636). It
+// The connection strip at the top of the Machine stage (ADR-420, ADR-637). It
 // connects with the draft's controller contract, shows what the controller
 // reported, and fills a new machine's setup from it (use-controller-auto-fill.ts).
 // Identity and settings reads do not move the machine or change its settings.

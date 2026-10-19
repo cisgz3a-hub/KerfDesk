@@ -1,6 +1,6 @@
 ## ADR-420 - Connect reuses the remembered port, and Machine Setup opens with Find my machine (2026-09-26)
 
-**Status:** Accepted; the Machine stage order, the Find card and the Amendment 4 shortcut are amended by ADR-636. | **Date:** 2026-09-26
+**Status:** Accepted; the Machine stage order, the Find card and the Amendment 4 shortcut are amended by ADR-637. | **Date:** 2026-09-26
 
 Maintainer direction, 2026-09-26, with a screenshot of Machine Setup step 1: the setup "still
 feels difficult and weird to navigate and handle. Even the connect button is weird", and it

@@ -1,4 +1,4 @@
-// "My machine isn't listed" (ADR-636): the four things KerfDesk needs to know
+// "My machine isn't listed" (ADR-637): the four things KerfDesk needs to know
 // first, on the Machine stage, so a machine outside the list is as quick to set
 // up as one in it. Everything else is on Essentials. The firmware choice is the
 // same draft value as Connection options' controller, with the same effects.

@@ -1,4 +1,4 @@
-// Which machine do you have? (ADR-636). One searchable list of every listed
+// Which machine do you have? (ADR-637). One searchable list of every listed
 // laser and CNC machine, grouped by brand, then "My machine isn't listed".
 // The whole row is the control (ADR-347): one radio group, so choosing a
 // machine never depends on hitting a small button. Choosing one only changes

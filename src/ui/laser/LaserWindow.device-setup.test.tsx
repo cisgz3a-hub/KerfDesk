@@ -92,7 +92,7 @@ describe('LaserWindow device-setup nudge', () => {
       await act(async () => button(host, 'Machine Setup').click());
       expect(host.textContent).toContain('Step 1 of 3');
       // The machine list leads the first stage, never collapsed behind a
-      // <details> (ADR-240, ADR-636).
+      // <details> (ADR-240, ADR-637).
       const machineList = host.querySelector('section[aria-label="Choose your machine"]');
       expect(machineList?.closest('details')).toBeNull();
       expect(machineList?.querySelector('input[aria-label="Search machines"]')).toBeInstanceOf(

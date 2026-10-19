@@ -10,7 +10,7 @@ import { deviceSetupReducer, initDeviceSetup, type DeviceSetupState } from './de
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-describe('CNC presets in the machine list (ADR-636)', () => {
+describe('CNC presets in the machine list (ADR-637)', () => {
   it('keeps Onefinity geometry separate from firmware selection and output support', async () => {
     let snapshot: DeviceSetupState = initDeviceSetup(
       { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'grblhal' },

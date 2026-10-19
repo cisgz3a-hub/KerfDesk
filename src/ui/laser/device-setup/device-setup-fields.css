@@ -1,4 +1,4 @@
-/* Machine type in the "My machine isn't listed" form (ADR-636): three compact
+/* Machine type in the "My machine isn't listed" form (ADR-637): three compact
    choices in a row, the whole pill being the control. */
 .lf-setup-machine-types {
   padding: 0;
@@ -98,7 +98,7 @@
   padding-left: 18px;
   line-height: 1.6;
 }
-/* The connection strip (ADR-420, ADR-636): one row of status and actions at
+/* The connection strip (ADR-420, ADR-637): one row of status and actions at
    the top of the Machine stage; what the controller reported opens below it. */
 .lf-setup-find {
   display: grid;
