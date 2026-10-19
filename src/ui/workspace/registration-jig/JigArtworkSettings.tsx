@@ -54,9 +54,7 @@ export function JigArtworkSettings(props: {
         onChange={change}
       />
       {operation.mode === 'fill' && <FillOptions operation={operation} onChange={change} />}
-      <p className="lf-jig-muted">
-        Applies to selected artwork using this operation. Save to canvas to keep these settings.
-      </p>
+      <p className="lf-jig-muted">Applies to selected artwork using this operation.</p>
     </section>
   );
 }

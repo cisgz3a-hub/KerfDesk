@@ -17,13 +17,16 @@ export function JigOutlinesStep({ editor }: { readonly editor: JigEditorControll
   return (
     <>
       {locked && <JigOutlineLock onUnlock={editor.unlockOutlines} />}
-      <RegistrationJigOutlineControls
-        key={layoutKey}
-        scene={project.scene}
-        onPendingChange={editor.setPendingLayout}
-        onReplace={editor.onReplaceLayout}
-        onRemove={editor.onRemoveLayout}
-      />
+      {/* Burned outlines keep their layout until Unlock outlines. */}
+      <fieldset className="lf-jig-edit" disabled={locked}>
+        <RegistrationJigOutlineControls
+          key={layoutKey}
+          scene={project.scene}
+          onPendingChange={editor.setPendingLayout}
+          onReplace={editor.onReplaceLayout}
+          onRemove={editor.onRemoveLayout}
+        />
+      </fieldset>
       <Button
         title="Select every outline to move the whole jig set together"
         onClick={() =>
@@ -46,8 +49,8 @@ function JigOutlineLock(props: { readonly onUnlock: () => void }): JSX.Element {
   return (
     <div className="lf-jig-lock" role="note">
       <p>
-        The outlines are locked because they are marked as burned. Moving them would misplace the
-        artwork on the pieces.
+        The outlines are locked because they are marked as burned. Moving them or changing their
+        layout would misplace the artwork on the pieces.
       </p>
       <Button
         title="Allow the outlines to be dragged and resized again until you leave the jig page"

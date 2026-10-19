@@ -27,7 +27,9 @@ On the main canvas, Trace Image works on the selected image and lays the trace e
    **Delete image after trace** on. The trace takes the image's stacking, run order, group and
    design-tree places and becomes the selection. The image's Image operation goes when nothing
    else uses it, so the trace takes the first free operation colour. The draft keeps one undo step
-   for it, and the main project changes only on **Save to canvas**.
+   for it, and the main project changes only on **Save to canvas**. *Amended by ADR-641: jig mode
+   has no draft and no Save to canvas; the trace is one ordinary undoable edit of the open
+   project.*
 3. **Copies are traced together.** Centre + copy puts the same artwork in every outline, so
    tracing that image, or any of its copies, replaces the original and each copy. Each copy's
    trace lies over the bitmap it replaces and is recorded as a jig copy of the new trace, so a

@@ -2683,17 +2683,22 @@ authorization, Frame proof, controller command, or safety boundary.
 
 1. Open **Registration Jig** or **Edit jig** to enter jig mode (ADR-641). The jig page
    takes the place of the tool strip and the main canvas; the machine panel stays docked
-   beside it, and dialogs, alarms and the live motion bar appear above it as usual. Its
+   beside it, and dialogs, alarms and the live motion bar appear above it as usual. When
+   the page has no burn step to hold Frame and Start (a captured board, no outline, or
+   outlines and artwork set to burn together), the machine panel keeps its own. Its
    canvas opens fitted to the jig, with **Fit jig** and **Fit bed** available. The page
    has three steps: **1 Burn outlines**, **2 Place pieces & artwork** and **3 Burn
    artwork**. A new jig opens on step 1; one whose outlines are burned opens on step 2.
    Opening jig mode without a jig creates its first outline, in **Outline only**, as one
-   undoable edit. Every edit goes straight into the project with the ordinary Undo
-   (Ctrl+Z, Ctrl+Shift+Z, or Ctrl+Y on the jig page); there is nothing to save or
-   discard. **Done** returns to the main canvas. Escape in a field only leaves the
-   field; otherwise Escape clears the selection and never leaves jig mode. While the
-   machine runs a job, Frames or moves, the page says editing is paused: the canvas only
-   pans and zooms and the step fields are disabled.
+   undoable edit; so does applying a layout to a project without outlines. Every edit
+   goes straight into the project with the ordinary Undo (Ctrl+Z, Ctrl+Shift+Z, or
+   Ctrl+Y on the jig page); there is nothing to save or discard. **Done**, or
+   **Registration Jig** in the Tools menu, returns to the main canvas and drops the
+   outlines from the selection. Escape in a field only leaves the field; otherwise
+   Escape clears the selection and never leaves jig mode. While the machine runs a job,
+   Frames or moves, the page says editing is paused: the canvas only pans and zooms and
+   the step fields are disabled. An import, trace or text that is ready only then is
+   not added, and the page says so.
    On the jig canvas, drag a selection to move it. Drag a corner handle to resize it
    proportionally (Shift resizes freely), an edge handle to stretch one side, or the
    round handle above it to rotate it about its centre (Shift snaps to 15°). Each drag
@@ -2775,8 +2780,11 @@ authorization, Frame proof, controller command, or safety boundary.
 2. **Remove all outlines** deletes the complete set and its reserved operation.
 3. Outlines are always locked in the project, so the main canvas cannot move them; jig
    mode shows them movable until they are burned. With **Artwork only** selected the
-   outlines may already be burned, so jig mode shows them locked. **Unlock outlines**
-   in step 1 makes them movable again until **Done**.
+   outlines may already be burned, so jig mode shows them locked, with the layout fields,
+   **Apply layout** and **Remove all outlines** disabled. **Unlock outlines** in step 1
+   makes them movable again until **Done**. Once a job has run or **Artwork only** was
+   selected, even a jig created in this visit keeps its first outline in place when its
+   grid changes, also after **Burn outlines again**.
 4. A captured-board outline remains owned by **Place Board** and is not replaced
    from Registration Jig; the existing provenance explanation remains in the panel.
 5. Repeating **Centre + copy artwork to all N** replaces the generated copies

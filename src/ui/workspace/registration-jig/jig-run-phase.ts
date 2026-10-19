@@ -16,3 +16,15 @@ export function jigRunPhase(scene: Scene): JigRunPhase {
   if (!layer.output) return 'artwork';
   return registrationOutputConflict(scene) ? 'both' : 'outlines';
 }
+
+/** True when the jig page's burn panel holds Frame and Start (ADR-641): one
+ *  run is next and the outlines are not a captured board, which the page only
+ *  explains. Otherwise the machine panel keeps its own, so there is always
+ *  exactly one Frame and one Start. */
+export function jigPageHoldsJobActions(scene: Scene): boolean {
+  const phase = jigRunPhase(scene);
+  return (
+    (phase === 'outlines' || phase === 'artwork') &&
+    !findRegistrationBoxes(scene).some((box) => box.provenance === 'captured-board')
+  );
+}

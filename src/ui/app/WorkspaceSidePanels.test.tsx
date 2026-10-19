@@ -2,6 +2,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
+import { IDENTITY_TRANSFORM, REGISTRATION_LAYER_ID } from '../../core/scene';
+import { createRectangle } from '../../core/shapes/primitives';
+import { useStore } from '../state';
+import { jigRunPhase } from '../workspace/registration-jig/jig-run-phase';
 import { useLaserStore } from '../state/laser-store';
 import { useUiStore } from '../state/ui-store';
 import { useWorkspaceLayoutStore } from '../state/workspace-layout-store';
@@ -336,12 +340,16 @@ describe('WorkspaceSidePanels', () => {
 });
 
 describe('WorkspaceSidePanels in jig mode', () => {
+  beforeEach(() => useStore.getState().newProject());
   afterEach(() => useUiStore.getState().closeRegistrationPanel());
 
   it.each([false, true])(
     'shows only the machine panel and leaves Frame and Start to the jig steps (compact: %s)',
     async (compact) => {
       media.compact = compact;
+      useStore.getState().addRegistrationBox(80, 40);
+      useStore.getState().setRegistrationOutput('box');
+      expect(jigRunPhase(useStore.getState().project.scene)).toBe('outlines');
       useUiStore.getState().openRegistrationPanel();
       const { host, root } = await renderPanels();
       try {
@@ -353,6 +361,40 @@ describe('WorkspaceSidePanels in jig mode', () => {
             (button) => button.textContent?.trim() === 'Artwork',
           ),
         ).toBe(false);
+      } finally {
+        await act(async () => root.unmount());
+      }
+    },
+  );
+
+  // The jig page shows no Frame or Start for a captured board, without an
+  // outline, or while both runs are set to burn together.
+  it.each([
+    ['no outline', 'none'],
+    ['a captured board', 'artwork'],
+    ['outlines and artwork set to burn together', 'both'],
+  ] as const)(
+    'keeps the machine panel Frame and Start when the jig page has none: %s',
+    async (situation, phase) => {
+      if (situation === 'a captured board') useStore.getState().addCapturedBoardBox(120, 80);
+      if (phase === 'both') {
+        useStore.getState().drawShape(
+          createRectangle({
+            id: 'art',
+            color: '#0000ff',
+            spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+            transform: IDENTITY_TRANSFORM,
+          }),
+        );
+        useStore.getState().addRegistrationBox(80, 40);
+        useStore.getState().setRegistrationOutput('artwork');
+        useStore.getState().setLayerParam(REGISTRATION_LAYER_ID, { output: true });
+      }
+      expect(jigRunPhase(useStore.getState().project.scene)).toBe(phase);
+      useUiStore.getState().openRegistrationPanel();
+      const { host, root } = await renderPanels();
+      try {
+        expect(host.querySelectorAll('[aria-label="Job actions"]')).toHaveLength(1);
       } finally {
         await act(async () => root.unmount());
       }
