@@ -46,15 +46,24 @@ export function dismissStartupSplash(options: { readonly desktop?: boolean } = {
   let visibleMs = 0;
   let visibleSince: number | null = null;
   let started = false;
+  let nativeShown = false;
+  const isVisible = (now: number): boolean => {
+    const documentVisible = document.visibilityState !== 'hidden';
+    if (options.desktop !== true) return documentVisible;
+    // backgroundThrottling=false keeps Electron's document "visible" while
+    // hidden. Main publishes actual BrowserWindow visibility independently.
+    const native = document.documentElement.dataset.desktopWindowVisible;
+    if (native === 'true') nativeShown = true;
+    // A missing publication, or one that never reports the window shown (a
+    // reveal or compositor main did not observe), must not hold input forever.
+    const unobserved =
+      native === undefined || (!nativeShown && now - installedAt >= WORKSPACE_WAIT_MS);
+    return unobserved ? documentVisible : native === 'true';
+  };
   const recordVisibility = (): void => {
     const now = performance.now();
     if (visibleSince !== null) visibleMs += now - visibleSince;
-    // backgroundThrottling=false keeps Electron's document "visible" while
-    // hidden. Main publishes actual BrowserWindow visibility independently.
-    const visible = options.desktop
-      ? document.documentElement.dataset.desktopWindowVisible === 'true'
-      : document.visibilityState !== 'hidden';
-    visibleSince = visible ? now : null;
+    visibleSince = isVisible(now) ? now : null;
   };
   const onVisibilityChange = (): void => {
     if (started) recordVisibility();

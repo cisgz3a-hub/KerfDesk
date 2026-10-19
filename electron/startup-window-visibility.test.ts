@@ -11,10 +11,15 @@ class FakeWindow extends EventEmitter {
   visible = false;
   minimized = false;
   destroyed = false;
-  readonly webContents = Object.assign(new EventEmitter(), {
-    isDestroyed: () => false,
+  closed = false;
+  readonly contents = Object.assign(new EventEmitter(), {
+    isDestroyed: () => this.closed,
     executeJavaScript: vi.fn(async (_script: string) => undefined),
   });
+  // Electron clears this reference by the time 'closed' is emitted.
+  get webContents() {
+    return this.closed ? null : this.contents;
+  }
   isVisible() {
     return this.visible;
   }
@@ -33,7 +38,7 @@ describe('startup BrowserWindow visibility', () => {
     const dataset: Record<string, string> = {};
     const dispatchEvent = vi.fn();
     const applyLatest = () => {
-      const script = window.webContents.executeJavaScript.mock.lastCall?.[0];
+      const script = window.contents.executeJavaScript.mock.lastCall?.[0];
       if (script === undefined) throw new Error('missing publication');
       runInNewContext(script, {
         document: { documentElement: { dataset } },
@@ -41,14 +46,14 @@ describe('startup BrowserWindow visibility', () => {
         Event,
       });
     };
-    window.webContents.emit('dom-ready');
+    window.contents.emit('dom-ready');
     applyLatest();
     expect(dataset.desktopWindowVisible).toBe('false');
     window.visible = true;
     window.emit('show');
     applyLatest();
     expect(dataset.desktopWindowVisible).toBe('true');
-    const olderShow = window.webContents.executeJavaScript.mock.lastCall?.[0] as string;
+    const olderShow = window.contents.executeJavaScript.mock.lastCall?.[0] as string;
     window.minimized = true;
     window.emit('minimize');
     applyLatest();
@@ -67,9 +72,22 @@ describe('startup BrowserWindow visibility', () => {
     window.emit('hide');
     applyLatest();
     expect(dataset.desktopWindowVisible).toBe('false');
-    window.emit('closed');
-    expect(window.listenerCount('show')).toBe(0);
-    expect(window.webContents.listenerCount('dom-ready')).toBe(0);
+    window.closed = true;
+    expect(() => window.emit('hide')).not.toThrow();
+    expect(() => window.emit('closed')).not.toThrow();
+    for (const event of ['show', 'hide', 'minimize', 'restore', 'maximize', 'focus'])
+      expect(window.listenerCount(event)).toBe(0);
+    expect(window.contents.listenerCount('dom-ready')).toBe(0);
+  });
+
+  it('resynchronises a maximized reveal that emits no show event', () => {
+    const window = new FakeWindow();
+    installStartupWindowVisibility(window as unknown as BrowserWindow);
+    window.visible = true;
+    window.emit('maximize');
+    expect(window.contents.executeJavaScript.mock.lastCall?.[0]).toContain(
+      "desktopWindowVisible = 'true'",
+    );
   });
 
   it('does not deliver into a destroyed window', () => {
@@ -77,6 +95,6 @@ describe('startup BrowserWindow visibility', () => {
     installStartupWindowVisibility(window as unknown as BrowserWindow);
     window.destroyed = true;
     window.emit('hide');
-    expect(window.webContents.executeJavaScript).not.toHaveBeenCalled();
+    expect(window.contents.executeJavaScript).not.toHaveBeenCalled();
   });
 });

@@ -23,9 +23,13 @@ workspace remains inert and the splash consumes pointer and keyboard input until
 Both browser and desktop hold the splash for four visible seconds, starting at the first
 animation frame after the workspace module installs its dismissal lifecycle, then fade over
 750 ms. Hidden document intervals do not consume that hold. The fade also waits for a successful
-workspace paint. In Electron, native BrowserWindow show/hide/minimize/restore events publish
+workspace paint. In Electron, native BrowserWindow show/hide/minimize/restore/maximize/focus events publish
 actual window visibility with monotonic revisions; document visibility alone remains unsuitable
-because background throttling stays off to preserve running-job wake locks. The five-second
+because background throttling stays off to preserve running-job wake locks. The hold is
+cosmetic and must never lock the workspace indefinitely: when no native signal arrives, or
+none reports the window shown within five seconds of installation (a reveal or compositor
+main cannot observe), the hold counts document visibility instead. Wayland reports no
+compositor minimize, so a window minimized there may spend its hold off-screen. The five-second
 missing-workspace fallback still starts when the workspace
 module installs dismissal. A root startup error bypasses the minimum. Reduced motion removes
 the fade and animated light, while retaining the hold.
@@ -36,4 +40,6 @@ A fast launch presents the complete timber screen for about 4.75 seconds after t
 workspace module starts. A cold module graph can extend the total startup-screen duration;
 time already spent loading cannot erase the visible hold. Embedding adds roughly 177 KB to
 uncompressed HTML and removes a separate fetch/decode race. No machine, output, licence,
-startup interaction or publication policy changes.
+startup interaction or publication policy changes. Browser specs therefore wait for the splash
+to be removed before keyboard or focus interaction; the shared Playwright fixture does this
+after each navigation.

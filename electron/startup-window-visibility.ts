@@ -10,9 +10,12 @@ export function createStartupWindow(options: BrowserWindowConstructorOptions): B
 // throttling stays off so minimized jobs retain their wake lock (ADR-117).
 // Publish only a boolean and monotonic revision to this window's renderer.
 export function installStartupWindowVisibility(window: BrowserWindow): void {
+  // Keep the contents captured: BrowserWindow.webContents is gone by 'closed',
+  // and a main-process throw there blocks quitting behind Electron's dialog.
+  const contents = window.webContents;
   let revision = 0;
   const publish = (): void => {
-    if (window.isDestroyed() || window.webContents.isDestroyed()) return;
+    if (window.isDestroyed() || contents.isDestroyed()) return;
     const visible = window.isVisible() && !window.isMinimized();
     revision += 1;
     const script = `(() => {
@@ -22,20 +25,17 @@ export function installStartupWindowVisibility(window: BrowserWindow): void {
       root.dataset.desktopWindowVisible = '${visible}';
       window.dispatchEvent(new Event('kerfdesk:window-visibility'));
     })()`;
-    void window.webContents.executeJavaScript(script).catch(() => {
+    void contents.executeJavaScript(script).catch(() => {
       // Navigation or closing can remove the document before delivery.
     });
   };
-  window.on('show', publish);
-  window.on('hide', publish);
-  window.on('minimize', publish);
-  window.on('restore', publish);
-  window.webContents.on('dom-ready', publish);
+  // A maximized reveal and focus also resynchronise a missed show transition.
+  const emitter = window as unknown as NodeJS.EventEmitter;
+  const windowEvents = ['show', 'hide', 'minimize', 'restore', 'maximize', 'focus'];
+  for (const event of windowEvents) emitter.on(event, publish);
+  contents.on('dom-ready', publish);
   window.once('closed', () => {
-    window.removeListener('show', publish);
-    window.removeListener('hide', publish);
-    window.removeListener('minimize', publish);
-    window.removeListener('restore', publish);
-    window.webContents.removeListener('dom-ready', publish);
+    for (const event of windowEvents) emitter.removeListener(event, publish);
+    contents.removeListener('dom-ready', publish);
   });
 }

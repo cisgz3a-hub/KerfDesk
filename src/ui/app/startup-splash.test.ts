@@ -161,7 +161,7 @@ describe('startup splash', () => {
     nativeVisible(false);
     paintWorkspace();
     dismissStartupSplash({ desktop: true });
-    frame(20_000);
+    frame(3000);
     nativeVisible(true);
     frame(1500);
     nativeVisible(false);
@@ -172,6 +172,35 @@ describe('startup splash', () => {
     frame(1);
     frame();
     expect(splash()?.classList.contains('app-splash--hidden')).toBe(true);
+  });
+
+  it('uses document visibility when main never publishes desktop visibility', () => {
+    paintWorkspace();
+    dismissStartupSplash({ desktop: true });
+    frame();
+    frame(3999);
+    expect(splash()?.classList.contains('app-splash--hidden')).toBe(false);
+    frame(1);
+    frame();
+    expect(splash()?.classList.contains('app-splash--hidden')).toBe(true);
+  });
+
+  it('stops waiting for a desktop window that is never reported shown', () => {
+    document.documentElement.dataset.desktopWindowVisible = 'false';
+    paintWorkspace();
+    dismissStartupSplash({ desktop: true });
+    frame();
+    frame(4983);
+    // From the five-second mark the document's own visibility counts.
+    frame(1);
+    frame(3999);
+    expect(splash()?.classList.contains('app-splash--hidden')).toBe(false);
+    frame(1);
+    frame();
+    expect(splash()?.classList.contains('app-splash--hidden')).toBe(true);
+    expect(document.getElementById('app-root')?.hasAttribute('inert')).toBe(true);
+    vi.advanceTimersByTime(800);
+    expect(document.getElementById('app-root')?.hasAttribute('inert')).toBe(false);
   });
 
   it('waits for a successful workspace paint after the minimum hold has elapsed', () => {

@@ -3,6 +3,9 @@ import type { Route } from '@playwright/test';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 
+// These specs observe the splash itself, so navigation must not wait it out.
+test.use({ startupSplash: 'manual' });
+
 test('paints the splash before the bundle and honours reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   const waitForDesktopModule = await observeDesktopModule(page);
@@ -176,7 +179,7 @@ test('does not paint a partial splash while embedded HTML artwork is still strea
   const html = (await response.text()).replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '');
   const split = html.indexOf('data:image/webp;base64,') + 40_000;
   expect(split).toBeGreaterThan(40_000);
-  let release = () => {};
+  let release: () => void = () => undefined;
   const continuation = new Promise<void>((resolve) => {
     release = resolve;
   });
@@ -283,16 +286,22 @@ async function holdRequest(page: Page, url: RegExp) {
   const gate = new Promise<void>((resolve) => {
     resume = resolve;
   });
-  const handler = async (route: Route): Promise<void> => {
+  const held = new Set<Promise<void>>();
+  const handler = (route: Route): Promise<void> => {
     requested = true;
-    await gate;
-    await route.continue();
+    const continued = gate.then(() => route.continue());
+    held.add(continued);
+    return continued;
   };
   await page.route(url, handler);
   return {
     requested: () => requested,
     release: async (): Promise<void> => {
       resume?.();
+      // Unrouting with a request still held lets Playwright fall it back first,
+      // and the handler's own continue then fails as already handled.
+      await Promise.all(held);
+      held.clear();
       await page.unroute(url, handler);
     },
   };
