@@ -48,7 +48,8 @@ A UI audit of the Artwork panel found:
 4. **The Artwork picker lists artwork names.** One shared helper (`artwork-display-names.ts`)
    names each artwork, numbered in canvas order when several share a name ("Rectangle (2)"),
    and the header, the picker and Run order all use it, so a number means the same artwork
-   everywhere.
+   everywhere. Generated labels reserve every natural name and earlier assigned label, so an
+   imported name such as "Rectangle (1)" cannot collide with a numbered unnamed rectangle.
 5. **The row ••• menu no longer repeats Show.** The row's eye owns visibility. It keeps one
    **Include in output** switch: the editor cannot reach an operation whose artwork is all
    locked, or one with no artwork, so the row is the only place that operation's output can be

@@ -144,7 +144,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **After a job completes (ADR-340, ADR-603)**: the job dock shows **Job complete** and **Done** after controller settlement. Pausing during final settlement retains that run's completion owner and Resume requires fresh Idle evidence. Missing acknowledgements say **Waiting for controller replies**, without asserting a controller hold; a new acknowledgement clears the stale wait immediately. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains offered while its receipt still matches the job, and like Start it needs a fresh Frame (ADR-372 Amendment 1). Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
 - **Workspace colours**: panels, drawing bed, grid, rulers and controls use the application appearance preference, defaulting to Light. Window > Appearance offers Light, Dark and Match System (ADR-339). Dark mode uses the approved charcoal drawing surface and light, readable vector ink. Contrast adjustments happen only while drawing the workspace; saved artwork, raster pixels, exported files and machine output retain their original colours and settings. The layout menu uses the same themed surface as the rest of the workspace.
 - **Notifications**: transient messages stay within the available canvas area, clear of the job dock, Live Motion bar, and zoom controls. An open modal gives notifications a reserved scrolling row so they do not cover its actions. Message lifetimes and dismissal controls are unchanged.
-- **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores Auto and opens both panels. Compact still displays one tab at a time. Panel visibility does not affect the Live Motion bar.
+- **Window menu**: checked `Artwork Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores Auto and opens both panels. Compact still displays one tab at a time. Panel visibility does not affect the Live Motion bar.
 - **Studio keyboard ownership**: native form and activation controls retain their browser keys. Focusable resize separators and sliders retain their arrow keys, and a Studio root never reuses a key already handled by a nested control.
 
 #### Disabled controls
@@ -152,7 +152,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - `File → Save Project As`
 - `File → Save G-code`
 - All transform controls
-- Cuts/Layers row controls
+- Artwork operation row controls
 
 #### Enabled controls
 - `File → New` (no-op when already empty)
@@ -933,7 +933,7 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 1. Click Output checkbox.
 2. Layer's paths immediately hidden from preview render.
 3. Layer's paths *excluded* from generated G-code.
-4. Cuts/Layers row appears dimmed.
+4. The Artwork operation row appears dimmed.
 
 #### Success - reorder a layer
 1. Click a layer's up or down order control.
@@ -1042,7 +1042,7 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 ### F-A7b. Operations list tools and Sort cuts last (ADR-480)
 
-1. The **•••** button on the Cuts / Layers header opens **Turn output on for all**, **Turn output
+1. The **•••** button in the Artwork panel's **All operations** section opens **Turn output on for all**, **Turn output
    off for all**, **Invert output**, **Show all**, **Hide all**, **Invert visibility** and **Sort
    cuts last**. Each row's **Show only this** hides every other operation.
 2. Each is one undo step. Hidden artwork leaves the selection. The registration jig's output is
@@ -3878,7 +3878,7 @@ or traced image) with at least one closed polyline.
 
 **Empty**:
 - *No SceneObjects yet* — the Mode dropdown still works, but no
-  geometry exists to fill. The Cuts/Layers panel shows its "Import a
+  geometry exists to fill. The Artwork panel shows its "Import a
   design to populate layers" hint.
 
 **Edge cases**:
@@ -4770,7 +4770,7 @@ share them as files.
 details directly — name, thickness, then cut settings — without first
 editing a layer.
 
-**Entry.** Cuts / Layers rail → **Materials** → **New material...** (or **Edit** on a
+**Entry.** Artwork panel → **Materials** → **New material...** (or **Edit** on a
 preset row) opens a multi-step `Dialog` wizard. The draft commits only
 on the final Save, so Cancel/Escape at any step discards it.
 
@@ -4820,7 +4820,7 @@ of the active library auto-saves. The legacy single-library slot
 (`laserforge.material-library.v1`, F-ML1) is migrated in once, then
 removed.
 
-**Entry.** Cuts / Layers rail → **Materials** → **Saved Libraries...** opens a
+**Entry.** Artwork panel → **Materials** → **Saved Libraries...** opens a
 `Dialog` listing every saved library: name, device hint, preset count,
 last updated.
 
