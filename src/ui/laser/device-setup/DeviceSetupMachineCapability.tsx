@@ -77,6 +77,7 @@ function MachineChoice(props: {
         aria-label={props.label}
         checked={props.checked}
         onChange={props.onChange}
+        title={props.description}
       />
       <strong>{props.label}</strong>
     </label>

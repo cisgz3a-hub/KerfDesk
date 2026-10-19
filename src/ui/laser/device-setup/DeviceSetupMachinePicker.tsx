@@ -23,10 +23,14 @@ import {
 } from './machine-picker-entries';
 import './device-setup-picker.css';
 
-const KIND_FILTERS: ReadonlyArray<{ readonly value: MachineKindFilter; readonly label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'laser', label: 'Laser' },
-  { value: 'cnc', label: 'CNC' },
+const KIND_FILTERS: ReadonlyArray<{
+  readonly value: MachineKindFilter;
+  readonly label: string;
+  readonly title: string;
+}> = [
+  { value: 'all', label: 'All', title: 'Show every listed machine.' },
+  { value: 'laser', label: 'Laser', title: 'Show lasers, including Laser + CNC machines.' },
+  { value: 'cnc', label: 'CNC', title: 'Show CNC machines, including Laser + CNC machines.' },
 ];
 
 export function DeviceSetupMachinePicker({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
@@ -58,6 +62,7 @@ export function DeviceSetupMachinePicker({ state, dispatch }: DeviceSetupStepPro
                 name="setup-machine-kind-filter"
                 checked={kind === filter.value}
                 onChange={() => setKind(filter.value)}
+                title={filter.title}
               />
               {filter.label}
             </label>
@@ -98,6 +103,7 @@ export function DeviceSetupMachinePicker({ state, dispatch }: DeviceSetupStepPro
             run(chooseCustomMachineActions(state, entries));
           }}
           aria-label="My machine isn’t listed"
+          title="Enter your machine's type, work area and firmware yourself."
         />
         <span className="lf-setup-picker-name">My machine isn’t listed</span>
         <span className="lf-setup-picker-meta">Enter its type, work area and firmware</span>
