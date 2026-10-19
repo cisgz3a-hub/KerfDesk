@@ -27,6 +27,8 @@ export type LicenceStatus = {
   readonly accessExpiresAt: number | null;
   /** Native remaining trial budget, including retained time; older statuses omit it. */
   readonly trialExpiresInMs?: number;
+  /** The opening renderer's identity, acknowledged only after its workspace mounts. */
+  readonly admissionGeneration?: number;
   /** Unix seconds on this computer's clock when new Pro choices pause without a check-in (ADR-592). */
   readonly checkInDueAt?: number;
   readonly updatesUntil: number | null;
@@ -55,6 +57,7 @@ export type LicenceDevices = {
 
 export type LicenceAdapter = {
   readonly status: () => Promise<LicenceStatus>;
+  readonly workspaceAdmitted?: (generation: number) => Promise<void>;
   readonly activate: (licenseKey: string) => Promise<LicenceStatus>;
   /** The KerfDesk key on the clipboard, read by the main process on an explicit click; null if none. */
   readonly clipboardKey?: () => Promise<string | null>;

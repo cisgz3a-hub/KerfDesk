@@ -23,17 +23,18 @@ the single command that needs it.
 | Paid licence | Forever, for eligible versions | Releases published on or before the update cutoff; one year from purchase, plus one year per US$20 renewal | 3 active at once |
 | Developer (Johann, Father) | Forever | All future releases | 3 active at once |
 
-- Help > Licence shows the tier, the trial end or the "Updates through" date, and
-  the actions available on that computer.
-- KerfDesk always opens (ADR-540). Without Pro it runs KerfDesk Free: only the
-  Pro tools (V-carve, 3D relief, adaptive clearing, advanced tracing, camera
-  alignment, box generator, Design Studio, G-code Inspector) ask for a licence.
-  Existing desktop projects that use them still preview, frame, start and save G-code.
-- A version released after the update cutoff opens as Free with "This version is
-  newer" and the update date in Help > Licence. Older eligible versions keep Pro
-  and stay downloadable under **Earlier versions** on the download page.
-- Pro stays unlocked for the rest of a running session even if a trial ends.
-  Nothing a licence does can stop a running job.
+- The commercial desktop app opens behind its licence window until this computer
+  has an active trial or licence (ADR-623). The workspace, projects and machine
+  connections stay unavailable until then. The window offers activation and the
+  state's repair actions; **Quit KerfDesk** is the other way out. Once admitted,
+  Help > Licence shows the tier, trial end or "Updates through" date and actions.
+- A version released after the update cutoff opens to that window with "This
+  version is newer" and the update date. Renew for the newer version, or download
+  an older eligible version under **Earlier versions** on the download page.
+- If rights end after admission, the workspace stays open for the rest of that
+  session. Existing work, Frame, Start, Save G-code and a running job keep working;
+  new Pro tool choices ask for a licence. The licence window returns at the next
+  launch. The commercial desktop app does not fall back to Free.
 - The web app and the free Preview builds never need a licence. Those builds run
   KerfDesk Free and send Pro tools to the desktop app. Browser Free preserves Pro
   machining projects for desktop, with a complete Save As copy; it does not remove
@@ -94,6 +95,22 @@ Check the service first: `https://license.kerfdesk.com/v1/public/health` answers
 status 503 when they are not. It answers even while licensing is switched off, but
 only after the Worker is redeployed with ADR-523 Amendment 3: the Worker deployed
 from 27855387e predates the route and answers 503 `service_unavailable`.
+
+### Linux: "no keyring is running here"
+
+KerfDesk for Linux keeps its licence only under a desktop keyring's key: GNOME
+Keyring, KWallet or another Secret Service such as KeePassXC (ADR-623). It never
+falls back to Electron's built-in key, which is the same on every computer. The
+licence window then says a keyring is missing and that the connection is fine.
+Neither Start trial nor Activate reaches the service until a keyring runs.
+
+Ask the customer to install GNOME Keyring (`sudo apt install gnome-keyring` on
+Ubuntu and Debian), or use their desktop's KWallet or KeePassXC with its Secret
+Service turned on. It must start and unlock when they sign in. Then they restart
+KerfDesk, which picks its key once at start. Ubuntu, Fedora and most GNOME and
+KDE desktops already have one. This usually comes up on tiling window managers,
+minimal installs and remote sessions. A licence saved before the keyring ran is
+kept and moves under the keyring's key on the next start.
 
 ### The trial was already used on this computer
 

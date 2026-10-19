@@ -84,7 +84,12 @@ export function dismissStartupSplash(options: { readonly desktop?: boolean } = {
     recordVisibility();
     const crashed = document.querySelector('#app-root > [role="alert"]') !== null;
     const painted =
-      document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null;
+      document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null ||
+      // A commercial build without a trial or licence opens to its settled
+      // licence window instead of a workspace (ADR-623).
+      document.querySelector(
+        '#app-root [data-licence-state]:not([data-licence-state="checking"])',
+      ) !== null;
     const timedOut = performance.now() - installedAt >= WORKSPACE_WAIT_MS;
     if (crashed || ((painted || timedOut) && visibleMs >= MINIMUM_VISIBLE_MS)) {
       stopWatching();

@@ -22,8 +22,6 @@ import {
 import type { PlatformAdapter } from '../../platform/types';
 import { webAdapter } from '../../platform/web';
 import { ErrorBoundary, type SoftwareAbort } from '../common/ErrorBoundary';
-import { startPagedAssetReconciliation } from '../import/paged-asset-startup';
-import { watchPagedRasterOwnership } from '../import/paged-raster-ownership-watch';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { unownedControllerMotion } from '../state/unowned-controller-motion';
@@ -39,6 +37,7 @@ import { installProjectSealKey } from '../licensing/project-seal';
 import { startLicensedEditionLocked } from '../licensing/edition';
 import { watchPreloadErrors } from './preload-error-toast';
 import { DesktopStartupGate } from './DesktopStartupGate';
+import { WorkspaceAssetLifecycle } from './WorkspaceAssetLifecycle';
 import { dismissStartupSplash } from './startup-splash';
 
 const rootElement = document.getElementById('app-root');
@@ -50,8 +49,6 @@ if (rootElement === null) {
 // paints a frame in one theme and then flips (ADR-339).
 initAppTheme();
 
-startPagedAssetReconciliation();
-watchPagedRasterOwnership();
 // Before anything lazy loads: a chunk gone after an update in another window
 // gets one advisory toast, and nothing reloads by itself (ADR-060).
 watchPreloadErrors();
@@ -125,6 +122,7 @@ createRoot(rootElement).render(
                 : {})}
               {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
             >
+              <WorkspaceAssetLifecycle />
               <App />
             </EditionProvider>
           </DesktopDownloadContext.Provider>

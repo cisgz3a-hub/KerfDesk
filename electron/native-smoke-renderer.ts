@@ -13,7 +13,9 @@ export const RENDERER_NODE_PRIMITIVES_SOURCE = String.raw`({
 
 // ready-to-show can precede React's ordinary workspace-ready handshake. Wait
 // for usable App controls behind that gate; qualification must never open it.
-// This leaves the existing 45s native watchdog and 60s wrapper unchanged.
+// A commercial build without a trial or licence settles behind its licence
+// window instead, with no workspace mounted (ADR-623); that answers
+// 'licence-window'. This leaves the 45s native watchdog and 60s wrapper unchanged.
 export const RENDERER_WORKSPACE_READY_SOURCE = String.raw`(async () => {
   for (let attempt = 0; attempt < 400; attempt += 1) {
     if (document.querySelector('#app-root > [role="alert"]'))
@@ -22,7 +24,10 @@ export const RENDERER_WORKSPACE_READY_SOURCE = String.raw`(async () => {
     const button = toolbar?.querySelector(
       'button[aria-label="Import..."]:not(:disabled), button[aria-label="More commands"]:not(:disabled)',
     );
-    if (button instanceof HTMLButtonElement) return;
+    if (button instanceof HTMLButtonElement) return 'workspace';
+    if (toolbar === null && document.querySelector(
+      '[role="dialog"][aria-label="Activate KerfDesk"][data-licence-state]:not([data-licence-state="checking"])',
+    )) return 'licence-window';
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error('Workspace did not open within the native smoke budget');
@@ -59,12 +64,24 @@ export const RENDERER_LICENSING_SOURCE = String.raw`(async () => {
 })()`;
 
 export const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
-  await ${RENDERER_WORKSPACE_READY_SOURCE};
+  const opened = await ${RENDERER_WORKSPACE_READY_SOURCE};
   // Read the actual main-world globals before installing the picker stubs.
   // This deliberately performs no Node access or device I/O. The licensing
   // observation below uses only the app's local protocol, never a provider.
   const nodePrimitives = ${RENDERER_NODE_PRIMITIVES_SOURCE};
   const licensing = await ${RENDERER_LICENSING_SOURCE};
+  // Behind the licence window there is no workspace to import into or save.
+  if (opened === 'licence-window')
+    return {
+      readyToShow: true,
+      licenceWindow: true,
+      imported: false,
+      saved: false,
+      nodePrimitives,
+      licensing,
+      title: document.title,
+      url: location.href,
+    };
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const labelled = (selector, label) =>
     [...document.querySelectorAll(selector)].find(

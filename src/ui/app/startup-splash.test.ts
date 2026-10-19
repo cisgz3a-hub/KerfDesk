@@ -217,6 +217,22 @@ describe('startup splash', () => {
     expect(splash()?.classList.contains('app-splash--hidden')).toBe(true);
   });
 
+  it('treats a settled licence window like a painted workspace (ADR-623)', () => {
+    const gate = document.createElement('section');
+    gate.dataset.licenceState = 'checking';
+    document.getElementById('app-root')?.append(gate);
+    dismissStartupSplash({ desktop: true });
+    frame();
+    frame(4000);
+    // Still checking the licence: keep the hold.
+    expect(splash()?.classList.contains('app-splash--hidden')).toBe(false);
+    gate.dataset.licenceState = 'activation-required';
+    frame();
+    frame();
+    expect(performance.now()).toBeLessThan(5000);
+    expect(splash()?.classList.contains('app-splash--hidden')).toBe(true);
+  });
+
   it('uses the five-second missing-workspace fallback', () => {
     dismissStartupSplash();
     frame();
