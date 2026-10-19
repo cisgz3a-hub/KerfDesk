@@ -3941,9 +3941,10 @@ or traced image) with at least one closed polyline.
 ### F-F2. Image-engrave a raster (Phase F.2 — code shipped through F.2.e; hardware burn pending)
 
 For portraits, import a sharp photograph, set its physical size, select it and choose
-**Photo engraving...** in the toolbar or Tools → Image (ADR-581). Compare Jarvis and
-Stucki, select whether the material marks dark or light, then adjust midtones before
-brightness and contrast. Higher gamma lightens midtones in KerfDesk. The preview
+**Photo engraving...** in the toolbar or Tools → Image (ADR-581). Compare the Jarvis and
+Stucki swatches under Photo processing, select whether the material marks dark or
+light, then adjust midtones before brightness and contrast. Higher gamma lightens
+midtones in KerfDesk. The preview
 uses the selected engraving grid and reports when its display has been reduced;
 it simulates relative marks, not material colour or beam/heat spread. **Apply photo
 settings** preserves original pixels and writes only that photo's settings in one
@@ -3989,7 +3990,13 @@ correct M4-mode raster G-code from Compile.
      dark-to-light ramp run through that mode's real `dither()`; Grayscale shows a
      smooth ramp. A caption names the chosen mode and says what it is for, the
      arrow keys move and select like radios, and artwork with different dithers
-     shows **Mixed** with no swatch chosen. Default `floyd-steinberg`.
+     shows **Mixed** with no swatch chosen. Default `floyd-steinberg`. **More cut
+     settings → Image detail**, the material preset wizard's Image details and
+     **Adjust Image** show the same swatches, and the checked swatch is the Dither
+     they save; the **Photo engraving** dialog shows only Jarvis, Stucki and
+     Floyd-Steinberg. While Use original pixels (Pass-through in Adjust Image) is
+     on and a binary swatch is chosen, a note under the swatches says the image
+     burns as Grayscale until that box is off.
    - **Lines/mm**: number input, 5..25, default 10.
 6. Workspace shows the image where it will burn; no separate "preview
    the dither" overlay in v1 — the image itself is the preview.
@@ -4797,7 +4804,7 @@ on the final Save, so Cancel/Escape at any step discards it.
    speed, passes, air assist.
 3. **Mode details.** Only the chosen mode's fields — Line (kerf,
    tabs/bridges), Fill (interval/LPI, angle, overscan, cross-hatch,
-   direction, style), or Image (dither, DPI/interval, dot width,
+   direction, style), or Image (dither swatches, DPI/interval, dot width,
    negative, pass-through, image direction, uncalibrated-direction intent,
    and optional local scan-offset override). Saving a recipe records those
    effective image fields; applying a recipe without a local offset clears a

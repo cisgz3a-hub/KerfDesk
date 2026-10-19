@@ -87,7 +87,10 @@ test('stored fractional tones and low density allow unrelated photo edits', asyn
   await (await toolbarCommand(page, 'Photo engraving...')).click();
   const dialog = page.getByRole('dialog', { name: 'Photo engraving', exact: true });
   await expect(dialog.getByRole('spinbutton', { name: 'Photo engraving DPI' })).toHaveValue('50.8');
-  await dialog.getByRole('combobox', { name: 'Photo processing' }).selectOption('stucki');
+  await dialog
+    .getByRole('radiogroup', { name: 'Photo processing' })
+    .getByRole('radio', { name: 'Stucki', exact: true })
+    .check();
   expect(
     await dialog.locator('form').evaluate((form: HTMLFormElement) => form.checkValidity()),
   ).toBe(true);

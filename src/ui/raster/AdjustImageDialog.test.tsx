@@ -56,9 +56,7 @@ describe('AdjustImageDialog', () => {
       },
     });
     try {
-      expect(host.querySelector<HTMLSelectElement>('select[name="ditherAlgorithm"]')?.value).toBe(
-        'jarvis',
-      );
+      expect(checkedDither(host)).toBe('jarvis');
       expect(host.querySelector<HTMLInputElement>('input[name="imageDpi"]')?.value).toBe('127');
       expect(host.querySelector<HTMLInputElement>('input[name="minPower"]')?.value).toBe('3');
     } finally {
@@ -74,7 +72,7 @@ describe('AdjustImageDialog', () => {
       change(host, 'input[name="brightness"]', '25');
       change(host, 'input[name="contrast"]', '-10');
       change(host, 'input[name="gamma"]', '1.4');
-      change(host, 'select[name="ditherAlgorithm"]', 'grayscale');
+      chooseDither(host, 'grayscale');
       change(host, 'input[name="minPower"]', '12');
       change(host, 'input[name="imageDpi"]', '304.8');
       change(host, 'input[name="dotWidthCorrectionMm"]', '0.05');
@@ -272,7 +270,7 @@ describe('AdjustImageDialog', () => {
       change(host, 'input[name="brightness"]', '33');
       change(host, 'input[name="contrast"]', '-12');
       change(host, 'input[name="gamma"]', '1.8');
-      change(host, 'select[name="ditherAlgorithm"]', 'jarvis');
+      chooseDither(host, 'jarvis');
       change(host, 'input[name="minPower"]', '9');
       change(host, 'input[name="imageDpi"]', '381');
       change(host, 'input[name="dotWidthCorrectionMm"]', '0.02');
@@ -287,7 +285,7 @@ describe('AdjustImageDialog', () => {
       change(host, 'input[name="brightness"]', '0');
       change(host, 'input[name="contrast"]', '0');
       change(host, 'input[name="gamma"]', '1');
-      change(host, 'select[name="ditherAlgorithm"]', 'threshold');
+      chooseDither(host, 'threshold');
       change(host, 'input[name="minPower"]', '0');
       change(host, 'input[name="imageDpi"]', '254');
       change(host, 'input[name="dotWidthCorrectionMm"]', '0');
@@ -300,9 +298,7 @@ describe('AdjustImageDialog', () => {
       expect((host.querySelector('input[name="brightness"]') as HTMLInputElement).value).toBe('33');
       expect((host.querySelector('input[name="contrast"]') as HTMLInputElement).value).toBe('-12');
       expect((host.querySelector('input[name="gamma"]') as HTMLInputElement).value).toBe('1.8');
-      expect(
-        (host.querySelector('select[name="ditherAlgorithm"]') as HTMLSelectElement).value,
-      ).toBe('jarvis');
+      expect(checkedDither(host)).toBe('jarvis');
       expect((host.querySelector('input[name="minPower"]') as HTMLInputElement).value).toBe('9');
       expect((host.querySelector('input[name="imageDpi"]') as HTMLInputElement).value).toBe('381');
       expect(
@@ -374,6 +370,16 @@ function click(host: HTMLElement, selector: string): void {
     input.checked = !input.checked;
     Simulate.change(input);
   });
+}
+
+function chooseDither(host: HTMLElement, algorithm: string): void {
+  const swatch = host.querySelector(`input[name="ditherAlgorithm"][value="${algorithm}"]`);
+  if (!(swatch instanceof HTMLInputElement)) throw new Error(`${algorithm} swatch missing`);
+  act(() => swatch.click());
+}
+
+function checkedDither(host: HTMLElement): string | undefined {
+  return host.querySelector<HTMLInputElement>('input[name="ditherAlgorithm"]:checked')?.value;
 }
 
 function clickButton(host: HTMLElement, selector: string): void {
