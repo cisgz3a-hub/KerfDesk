@@ -10,6 +10,7 @@ import {
 import { UNLICENSED_BUILDS_RUN_FREE } from './edition-policy';
 import { FreeOnlyEdition, useLicenceSettingsEvent, useProInDesktop } from './FreeOnlyEdition';
 import { BrowserUpdatesNotice, CommercialUpdates } from './CommercialUpdates';
+import { DesktopLicenceGate } from './DesktopLicenceGate';
 import { LicencePanel } from './LicencePanel';
 import { panelOverlay, useDismissOnEscape } from './panel-overlay';
 import { CHECK_UPDATES_EVENT } from './update-status-text';
@@ -23,6 +24,9 @@ import { useLicenceLink } from './use-licence-link';
 
 export { LICENCE_SETTINGS_EVENT };
 
+/** The main process's data-free signal that a quiet licence confirmation finished. */
+export const LICENCE_REFRESHED_EVENT = 'kerfdesk:licence-refreshed';
+
 type PendingPro = { readonly feature: ProFeature; readonly onAllowed?: (() => void) | undefined };
 
 function openLicence(): void {
@@ -30,10 +34,11 @@ function openLicence(): void {
 }
 
 /**
- * Supplies the Free/Pro edition to the app (ADR-540). The workspace always
- * mounts at once: a licence never blocks opening KerfDesk, a project or a
- * machine. Builds without a licence adapter run Free. The browser build's
- * fixed capabilities cannot be unlocked by passing a desktop licence client.
+ * Supplies the edition to the app. A commercial desktop build mounts the
+ * workspace only once this device has an active trial or licence, and keeps it
+ * mounted until KerfDesk closes (ADR-623). Builds without a licence adapter,
+ * and desktop builds that cannot take a licence, run Free (ADR-540). The browser
+ * build's fixed capabilities cannot be unlocked by passing a desktop licence client.
  */
 export function EditionProvider({
   client,
@@ -74,15 +79,26 @@ function LicensedEdition({
   const session = useLicenceSession(client, unlicensedRunsFree);
   const desktop = useProInDesktop();
   const link = useLicenceLink(client);
+  const linkedKey = link.linkedKey ?? '';
+  const channel = session.status?.channel;
   // A desktop build without commercial metadata cannot take a licence.
-  const freeBuild = unlicensedRunsFree && session.status?.channel === 'free';
+  const freeBuild = unlicensedRunsFree && channel === 'free';
+  // Until the first status, the build's channel is unknown, so nothing mounts.
+  const gated = !useSessionAdmission(session.status, client) && channel !== 'free';
   const { load, isPro } = session;
   const { showAll } = desktop;
-  const { managing, closeManager } = useLicenceManager(freeBuild, load, showAll);
+  const { managing, closeManager } = useLicenceManager(
+    freeBuild,
+    gated,
+    session.status !== null,
+    linkFulfilled(link.linkedKey, session.status),
+    load,
+    showAll,
+  );
   const value = useMemo<EditionValue>(
     () => ({
       status: session.status,
-      licensed: session.status?.channel === 'commercial',
+      licensed: channel === 'commercial',
       // Store mutations must also check elapsed time when browser timers slept.
       get pro() {
         return isPro();
@@ -91,45 +107,39 @@ function LicensedEdition({
       requestPro: freeBuild ? desktop.request : session.requestPro,
       openLicence: freeBuild ? showAll : openLicence,
     }),
-    [desktop.request, freeBuild, isPro, session.requestPro, session.status, showAll],
+    [channel, desktop.request, freeBuild, isPro, session.requestPro, session.status, showAll],
   );
   useEffect(() => {
     setActiveEdition(value);
     return () => setActiveEdition(null);
   }, [value]);
+  const licence = {
+    client,
+    status: session.status,
+    failure: session.failure,
+    onStatus: session.accept,
+    onRetry: load,
+  };
   return (
     <EditionContext.Provider value={value}>
-      {children}
+      {gated ? (
+        <DesktopLicenceGate key={link.serial} initialKey={linkedKey} {...licence} />
+      ) : (
+        children
+      )}
       {managing ? (
         <div role="dialog" aria-modal="false" aria-label="KerfDesk licence" style={panelOverlay}>
           <LicencePanel
             key={link.serial}
-            initialKey={link.linkedKey ?? ''}
-            client={client}
-            status={session.status}
-            failure={session.failure}
-            onStatus={session.accept}
-            onRetry={load}
+            initialKey={linkedKey}
+            {...licence}
             onClose={closeManager}
           />
         </div>
       ) : null}
-      {session.pending !== null && !managing ? (
-        freeBuild ? (
-          <ProInDesktopDialog
-            feature={session.pending.feature}
-            onClose={() => session.settle(null)}
-          />
-        ) : (
-          <ProFeatureDialog
-            feature={session.pending.feature}
-            client={client}
-            status={session.status}
-            onStatus={session.accept}
-            onClose={() => session.settle(null)}
-          />
-        )
-      ) : null}
+      {managing || gated ? null : (
+        <PendingProDialog client={client} session={session} freeBuild={freeBuild} />
+      )}
       {desktop.shown === null ? null : (
         <ProInDesktopDialog feature={desktop.shown} onClose={desktop.close} />
       )}
@@ -138,21 +148,94 @@ function LicensedEdition({
   );
 }
 
-/** Help > Licence opens the Licence panel; a free build has none to manage. */
+/** The Pro tool waiting on a licence, explained the way this build can unlock it. */
+function PendingProDialog({
+  client,
+  session,
+  freeBuild,
+}: {
+  readonly client: LicenceAdapter;
+  readonly session: ReturnType<typeof useLicenceSession>;
+  readonly freeBuild: boolean;
+}): JSX.Element | null {
+  const { pending, settle } = session;
+  if (pending === null) return null;
+  const close = (): void => settle(null);
+  return freeBuild ? (
+    <ProInDesktopDialog feature={pending.feature} onClose={close} />
+  ) : (
+    <ProFeatureDialog
+      feature={pending.feature}
+      client={client}
+      status={session.status}
+      onStatus={session.accept}
+      onClose={close}
+    />
+  );
+}
+
+/**
+ * Lets the workspace in the first time this session reports Pro, and keeps it
+ * in until KerfDesk closes: a licence change never unmounts a running job or an
+ * open project (ADR-623).
+ */
+function useSessionAdmission(status: LicenceStatus | null, client: LicenceAdapter): boolean {
+  const [admitted, setAdmitted] = useState(false);
+  const acknowledged = useRef<number | null>(null);
+  if (!admitted && status?.edition === 'pro') setAdmitted(true);
+  useEffect(() => {
+    const generation = status?.admissionGeneration;
+    if (!admitted || generation === undefined || acknowledged.current === generation) return;
+    acknowledged.current = generation;
+    void client.workspaceAdmitted?.(generation).catch(() => {
+      acknowledged.current = null;
+    });
+  }, [admitted, client, status]);
+  return admitted || status?.edition === 'pro';
+}
+
+/**
+ * Help > Licence opens the Licence panel; a free build has none to manage, and
+ * the window the desktop app opens behind already is one (ADR-623).
+ */
+/** The window was opened with the linked key itself: the link has done its job. */
+function linkFulfilled(linkedKey: string | null, status: LicenceStatus | null): boolean {
+  return linkedKey !== null && status?.licenseKey === linkedKey;
+}
+
 function useLicenceManager(
   freeBuild: boolean,
+  gated: boolean,
+  statusKnown: boolean,
+  linkFulfilled: boolean,
   load: () => Promise<void>,
   showProInDesktop: () => void,
 ): { readonly managing: boolean; readonly closeManager: () => void } {
   const [managing, setManaging] = useState(false);
+  // A purchase link that arrives before the first status, or while the licence
+  // window shows its key, opens Help > Licence once the workspace is let in.
+  const [deferred, setDeferred] = useState(false);
   const manage = useCallback((): void => {
     if (freeBuild) {
       showProInDesktop();
       return;
     }
-    setManaging(true);
+    if (gated) setDeferred(true);
+    else setManaging(true);
     void load();
-  }, [freeBuild, load, showProInDesktop]);
+  }, [freeBuild, gated, load, showProInDesktop]);
+  useEffect(() => {
+    if (!deferred || !statusKnown) return;
+    if (freeBuild) {
+      setDeferred(false);
+      showProInDesktop();
+      return;
+    }
+    // Behind the licence window, which shows the linked key, wait for admission.
+    if (gated) return;
+    setDeferred(false);
+    if (!linkFulfilled) setManaging(true);
+  }, [deferred, freeBuild, gated, linkFulfilled, showProInDesktop, statusKnown]);
   useLicenceSettingsEvent(manage);
   const closeManager = useCallback(() => setManaging(false), []);
   // Help > Check for Updates opens its panel in the same place.
@@ -219,11 +302,15 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
     const checkVisible = (): void => {
       if (document.visibilityState !== 'hidden') void load();
     };
+    // A quiet confirmation that just finished may open the licence window (ADR-623).
+    const refreshed = (): void => void load();
     window.addEventListener('focus', checkVisible);
+    window.addEventListener(LICENCE_REFRESHED_EVENT, refreshed);
     document.addEventListener('visibilitychange', checkVisible);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener('focus', checkVisible);
+      window.removeEventListener(LICENCE_REFRESHED_EVENT, refreshed);
       document.removeEventListener('visibilitychange', checkVisible);
     };
   }, [load]);

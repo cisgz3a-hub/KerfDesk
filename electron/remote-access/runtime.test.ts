@@ -1,7 +1,11 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RemoteCredentialStore, RemoteIdentity } from './credential-store.js';
+import {
+  RemoteStorageUnavailableError,
+  type RemoteCredentialStore,
+  type RemoteIdentity,
+} from './credential-store.js';
 import type { RemoteRendererQueue } from './renderer-queue.js';
 import type { RemoteScope } from './relay-types.js';
 import { createRemoteRendererQueue } from './renderer-queue.js';
@@ -234,6 +238,27 @@ describe('native opt-in, scoped pairing and durable revocation', () => {
     expect(JSON.stringify(f.runtime.status())).not.toContain('secret/path');
     expect(f.queue.ready()).toBe(true);
     f.runtime.closed();
+  });
+
+  it('asks refused storage again at the next attach but keeps an unopenable record shut', async () => {
+    const f = fixture();
+    // A Linux keyring probe that failed outright, for example while the bus starts.
+    vi.mocked(f.store.read).mockRejectedValueOnce(new RemoteStorageUnavailableError());
+    await f.runtime.opened();
+    expect(f.runtime.status()).toMatchObject({ available: false, enabled: false });
+    await expect(f.runtime.configure(true)).rejects.toThrow('unavailable');
+    expect(f.store.write).not.toHaveBeenCalled();
+    await f.runtime.opened();
+    expect(f.runtime.status()).toMatchObject({ available: true, enabled: true, error: null });
+    expect(captured.relay.start).toHaveBeenCalledOnce();
+    f.runtime.closed();
+
+    const unreadable = fixture();
+    vi.mocked(unreadable.store.read).mockRejectedValueOnce(new Error('authentication failed'));
+    await unreadable.runtime.opened();
+    await unreadable.runtime.opened();
+    expect(unreadable.store.read).toHaveBeenCalledOnce();
+    expect(unreadable.runtime.status().available).toBe(false);
   });
 });
 

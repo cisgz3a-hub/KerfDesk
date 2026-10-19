@@ -1,6 +1,6 @@
 ## ADR-540 - KerfDesk Free and Pro: the app always opens, only Pro tools need a licence (2026-09-29)
 
-**Status:** Implemented for the commercial desktop build; Pro is desktop only | **Date:** 2026-09-29 | **Amends:** ADR-523 (launch admission and update eligibility)
+**Status:** Implemented for the commercial desktop build; Pro is desktop only. Item 1 and the desktop Free edition are superseded by [ADR-623](ADR-623-desktop-opens-behind-a-licence-window.md) | **Date:** 2026-09-29 | **Amends:** ADR-523 (launch admission and update eligibility)
 
 ### Context
 

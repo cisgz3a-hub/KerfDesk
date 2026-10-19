@@ -147,7 +147,8 @@
 }
 
 .lf-jog-controls--machine-actions > .lf-btn,
-.lf-jog-light-actions > .lf-btn {
+.lf-jog-light-actions > .lf-btn,
+.lf-jog-light-actions > [role='group'] > .lf-btn {
   min-height: var(--lf-jog-button);
   padding: 2px 8px;
   line-height: 1.2;

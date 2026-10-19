@@ -179,7 +179,7 @@ describe('support report edition', () => {
           accessExpiresAt: NOW,
         }),
       }),
-      'KerfDesk Free: trial ends 2026-09-29, licence state trial-expired',
+      'Licence needed: trial ends 2026-09-29, licence state trial-expired',
     ],
     [
       edition({

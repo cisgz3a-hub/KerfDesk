@@ -3,10 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, open, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { validConfiguration, type AiConfiguration } from './contracts.js';
+import { createSecureStorageCheck } from '../secure-storage-check.js';
 
 type SecureStorage = {
   isAsyncEncryptionAvailable(): Promise<boolean>;
-  getSelectedStorageBackend(): string;
   encryptStringAsync(value: string): Promise<Buffer>;
   decryptStringAsync(value: Buffer): Promise<{ result: string; shouldReEncrypt: boolean }>;
 };
@@ -18,12 +18,8 @@ export function createAiCredentialStore(options: {
 }) {
   const file = join(options.userDataPath, 'ai-assistant.v1');
   const secure = options.secureStorage;
-  const available = async (): Promise<boolean> =>
-    (await secure.isAsyncEncryptionAvailable()) &&
-    (options.platform !== 'linux' ||
-      ['gnome_libsecret', 'kwallet', 'kwallet5', 'kwallet6'].includes(
-        secure.getSelectedStorageBackend(),
-      ));
+  // On Linux, only a keyring's key counts, never the shared fallback key.
+  const available = createSecureStorageCheck(secure, options.platform);
   const check = async (): Promise<void> => {
     if (!(await available()))
       throw new AiFailure('Secure assistant credential storage is unavailable.');

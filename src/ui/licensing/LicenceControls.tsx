@@ -112,17 +112,17 @@ export function LicenceDeviceActions({ client, status, busy, run }: ActionProps)
       <div style={licenceButtons}>
         <button
           type="button"
-          className="lf-btn"
+          className="lf-btn lf-btn--primary"
           disabled={busy}
           onClick={() => void run(client.startTrial)}
-          title="Unlock every Pro tool on this device for 30 days"
+          title="Use every KerfDesk tool on this device for 30 days"
         >
-          Start free 30-day Pro trial
+          Start free 30-day trial
         </button>
       </div>
       <p style={licenceMuted}>
-        Every Pro tool for 30 days on this device. Starting the trial needs an internet connection.
-        No payment details required.
+        Every tool for 30 days on this device. Starting the trial needs an internet connection. No
+        payment details required.
       </p>
     </>
   );
