@@ -37,7 +37,7 @@ export type ExternalProgramContext = {
   readonly start?: { readonly x: number; readonly y: number };
 };
 
-type ReviewModel = Pick<GcodeRenderModel, 'stats' | 'events'>;
+type ReviewModel = Pick<GcodeRenderModel, 'stats' | 'events' | 'skippedMotions'>;
 
 /** The G and M commands a program uses, to a tenth (G28.1 is 28.1). */
 type Commands = {
@@ -125,7 +125,11 @@ export function reviewExternalProgram(
   findings: ReadonlyArray<ProgramFinding> = [],
 ): ExternalProgramReview {
   const commands = commandsIn(gcode);
-  const still = model.stats.programBounds === null ? context.start : undefined;
+  // Motion the Inspector could not draw is not "never moves": it has no envelope.
+  const still =
+    model.stats.programBounds === null && model.skippedMotions.length === 0
+      ? context.start
+      : undefined;
   const warnings = [
     ...offsetWriteWarnings(commands),
     ...COMMAND_WARNINGS.filter((check) => check.matches(commands)).map((check) => check.warning),

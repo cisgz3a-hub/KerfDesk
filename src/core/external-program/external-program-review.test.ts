@@ -265,6 +265,8 @@ describe('external program placement (ADR-630 Amendment 1)', () => {
     const result = reviewFrom('M3 S10000\nG4 P60\nM5\n', HEAD, CNC);
     expect(result.envelope).toEqual({ minX: 50, minY: 50, maxX: 50, maxY: 50 });
     expect(result.warnings.join('\n')).toContain('never moves');
+    // Arcs the Inspector cannot draw are motion: no point is framed for them.
+    expect(reviewFrom('G21 G90\nG18\nG2 X10 I5 F100\n', HEAD, CNC).envelope).toBeNull();
   });
 });
 
