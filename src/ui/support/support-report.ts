@@ -115,7 +115,7 @@ export function describeEdition(edition: EditionValue): string {
 }
 
 function editionName(status: LicenceStatus): string {
-  if (status.edition === 'free') return 'KerfDesk Free';
+  if (status.edition === 'free') return 'Licence needed';
   if (status.tier === 'trial') return 'KerfDesk Pro trial';
   return status.tier === 'developer' ? 'KerfDesk Pro (developer licence)' : 'KerfDesk Pro';
 }

@@ -9,6 +9,27 @@ import { useLaserStore } from './laser-store';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 import { disconnectOnTestClock } from './laser-disconnect-testing';
+import { prepareOutputRequestForTest } from '../../__fixtures__/output-preparation-request';
+import { connectedFixture } from '../laser/frame-artwork-centre-led.test-support';
+import { runFrameNow } from '../laser/use-frame-action';
+import { framedRunStartHandoffIssue } from './framed-run';
+import { inferCurrentMachinePosition } from './infer-machine-position';
+import type * as OutputPreparationWorker from '../laser/output-preparation-worker-client';
+
+vi.mock('./job-aware-dialogs', () => ({
+  jobAwareAlert: vi.fn(),
+  jobAwareConfirm: vi.fn(() => true),
+}));
+vi.mock('../laser/output-preparation-worker-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof OutputPreparationWorker>()),
+  prepareStartOutputOffThread: async (
+    request: Parameters<typeof prepareOutputRequestForTest>[0],
+  ) => {
+    const response = await prepareOutputRequestForTest(request);
+    if (response.kind !== 'start') throw new Error('Expected start preparation');
+    return response.result;
+  },
+}));
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -72,13 +93,17 @@ describe('positioning light through real store serial and ACK ownership', () => 
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
     expect(sim.outbound().join('')).toContain('M7\n');
+    const lastOn = sim.outbound().length;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(useLaserStore.getState().positioningLightEnabled).toBe(true);
+    expect(sim.outbound().slice(lastOn).join('')).not.toContain('M9\n');
     await finish(useLaserStore.getState().switchPositioningLightOff());
     expect(useLaserStore.getState().positioningLightEnabled).toBe(false);
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 
   it.each(families)('switches a lit light off as part of Disconnect on %s', async (kind) => {
-    const offLinesAtDisconnect = async (lightOn: boolean): Promise<number> => {
+    const offLinesAtDisconnect = async (mode: 'off' | 'centre' | 'on'): Promise<number> => {
       resetStore();
       const sim =
         kind === 'marlin'
@@ -92,7 +117,9 @@ describe('positioning light through real store serial and ACK ownership', () => 
       });
       await useLaserStore.getState().connect(sim.adapter, { controllerKind: kind });
       await vi.advanceTimersByTimeAsync(1500);
-      if (lightOn) await finish(useLaserStore.getState().centrePositioningLight(10, 15, 1000));
+      if (mode === 'centre')
+        await finish(useLaserStore.getState().centrePositioningLight(10, 15, 1000));
+      else if (mode === 'on') await finish(useLaserStore.getState().switchPositioningLightOn());
       const before = sim.outbound().length;
       await disconnectOnTestClock();
       await vi.advanceTimersByTimeAsync(5000);
@@ -103,7 +130,52 @@ describe('positioning light through real store serial and ACK ownership', () => 
         .split('\n')
         .filter((line) => line.trim() === 'M9').length;
     };
-    const unlit = await offLinesAtDisconnect(false);
-    expect(await offLinesAtDisconnect(true)).toBe(unlit + 1);
+    const unlit = await offLinesAtDisconnect('off');
+    expect(await offLinesAtDisconnect('centre')).toBe(unlit + 1);
+    expect(await offLinesAtDisconnect('on')).toBe(unlit + 1);
   });
+});
+
+describe('independent LED switching with a real completed Frame', () => {
+  it.each(families)(
+    'preserves captured Current Position placement without motion on %s',
+    async (kind) => {
+      const { sim } = await connectedFixture(kind, 'current-position');
+      const framed = runFrameNow();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(await framed).toBe(true);
+      const permit = useLaserStore.getState().completedFrame!;
+      expect(permit).not.toBeNull();
+      const position = inferCurrentMachinePosition(
+        useLaserStore.getState().statusReport,
+        useLaserStore.getState().wcoCache,
+      );
+      const origin = permit.candidate.preparedStart.jobOrigin;
+      const firstWrite = sim.outbound().length;
+      await finish(useLaserStore.getState().switchPositioningLightOn());
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(useLaserStore.getState().positioningLightEnabled).toBe(true);
+      expect(sim.outbound().slice(firstWrite).join('')).toContain('M7\n');
+      const afterOn = sim.outbound().slice(firstWrite).join('').split('M7\n')[1]!;
+      expect(afterOn).not.toContain('M9\n');
+      expect(useLaserStore.getState().completedFrame).toBe(permit);
+      expect(useLaserStore.getState().framedRun).toBe(permit);
+      await finish(useLaserStore.getState().switchPositioningLightOff());
+      const laser = useLaserStore.getState();
+      expect(laser.positioningLightEnabled).toBe(false);
+      expect(laser.completedFrame).toBe(permit);
+      expect(laser.completedFrame?.candidate.preparedStart.jobOrigin).toBe(origin);
+      expect(inferCurrentMachinePosition(laser.statusReport, laser.wcoCache)).toEqual(position);
+      expect(framedRunStartHandoffIssue(permit, laser)).toBeNull();
+      expect(laser.pendingUntrackedAcks).toBe(0);
+      expect(laser.controllerOperation).toBeNull();
+      const sent = sim
+        .outbound()
+        .slice(firstWrite)
+        .map((line) => line.trim());
+      expect(
+        sent.some((line) => /^(?:\$J=|\$H|G(?:0|1|10|28|54|90|91|92)(?:\s|$))/.test(line)),
+      ).toBe(false);
+    },
+  );
 });

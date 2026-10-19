@@ -12,6 +12,7 @@ import {
 import { createLicensingStore } from './licensing-store.js';
 import { createLicensingRuntime, type LicensingRuntime } from './licensing-runtime.js';
 import { scheduleLicenceChecks } from './licensing-schedule.js';
+import { createStartupSignals } from './licensing-startup-signals.js';
 import {
   checkCommercialUpdates,
   commercialUpdatesOffered,
@@ -29,11 +30,44 @@ import { createProjectSealKey } from './project-seal-key.js';
 import { officialPlatformDownloadUrl } from './official-download-page.js';
 
 // A plain label for the device list; the computer's own name is never sent.
+// The startup licence confirmation waits this long for the renderer's first
+// status read before running anyway (ADR-623).
+export const FIRST_STATUS_GRACE_MS = 10_000;
+
 const DEVICE_NAMES: Readonly<Record<string, string>> = {
   win32: 'Windows computer',
   darwin: 'Mac',
   linux: 'Linux computer',
 };
+
+/** Fixed, data-free signal: the renderer reads the refreshed status itself (ADR-623). */
+export const LICENCE_REFRESHED_SIGNAL =
+  "window.dispatchEvent(new CustomEvent('kerfdesk:licence-refreshed')); undefined";
+
+/**
+ * A quiet confirmation can turn an overdue check-in back into a licence, so the
+ * licence window, or Help > Licence, reads the status again at once.
+ */
+function announceLicenceRefresh(): void {
+  try {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (window.isDestroyed() || !isAppRenderer(window.webContents.getURL())) continue;
+      void window.webContents.executeJavaScript(LICENCE_REFRESHED_SIGNAL).catch(() => undefined);
+    }
+  } catch {
+    // Only a convenience: the renderer also rereads its status every 30 seconds.
+  }
+}
+
+// A packaged build only ever shows its own app://app renderer.
+function isAppRenderer(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'app:' && parsed.host === 'app';
+  } catch {
+    return false;
+  }
+}
 
 function announceDownloadedUpdate(version: string): void {
   if (Notification.isSupported())
@@ -88,7 +122,13 @@ export function createDesktopLicensing(options: Options) {
     fetch: (url, init) => net.fetch(url, init),
     ...browserOpeners(config.channel === 'commercial' && config.sandbox === true),
   });
-  const entry = licenceEntry(config, desktopLicenceLink(config, options.packaged), options);
+  // What the licence window is sent decides when desktop services start (ADR-623).
+  const signals = createStartupSignals(config.channel === 'free');
+  const entry = {
+    ...licenceEntry(config, desktopLicenceLink(config, options.packaged), options),
+    observeRequest: signals.observeRequest,
+    admitWorkspace: signals.admitWorkspace,
+  };
   const rings = createUpdateRingStore(options.userDataPath);
   const { manual, installer } = manualUpdateChecks(config, options, runtime);
   /** Beta remains exclusive to the trusted signed updater (ADR-541). */
@@ -106,6 +146,8 @@ export function createDesktopLicensing(options: Options) {
     runtime,
     config,
     updates,
+    /** Whether a workspace is admitted past the licence window (ADR-623). */
+    admission: signals.admission,
     /** The licensing and update routes in front of the app's own files. */
     routes: (fallback: ProtocolHandler): ProtocolHandler =>
       withLicensingRoutes(
@@ -118,19 +160,23 @@ export function createDesktopLicensing(options: Options) {
       ),
     /**
      * Runs once the window is open: a quiet weekly licence confirmation, then
-     * the update check. The workspace never waits for either (ADR-540).
+     * the update check. Neither holds the licence window: the confirmation
+     * starts once the renderer has read the saved status (ADR-623).
      * Licence confirmation and manual release discovery repeat every 30 minutes.
      */
     start: (): void => {
       if (config.channel !== 'commercial' || stopChecks !== null) return;
-      void runtime
-        .refreshInBackground()
+      void signals
+        .afterFirstStatusRead(FIRST_STATUS_GRACE_MS)
+        .then(() => runtime.refreshInBackground())
         .catch(() => undefined)
         .then(() => {
+          announceLicenceRefresh();
           updates.check();
         });
       stopChecks = scheduleLicenceChecks(async () => {
         await runtime.refreshInBackground().catch(() => undefined);
+        announceLicenceRefresh();
         manual?.check();
       });
       app.once('will-quit', () => stopChecks?.());
@@ -172,15 +218,7 @@ function desktopLicenceLink(config: LicensingConfig, packaged: boolean) {
     argv: process.argv,
     readClipboard: () => clipboard.readText(),
     primaryWindow: () => BrowserWindow.getAllWindows()[0],
-    // A packaged build only ever shows its own app://app renderer.
-    isTrustedRenderer: (url) => {
-      try {
-        const parsed = new URL(url);
-        return parsed.protocol === 'app:' && parsed.host === 'app';
-      } catch {
-        return false;
-      }
-    },
+    isTrustedRenderer: isAppRenderer,
   });
 }
 

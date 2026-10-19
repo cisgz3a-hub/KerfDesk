@@ -2,7 +2,7 @@
 param(
   [Parameter(Mandatory = $true)][int]$AppProcessId,
   [Parameter(Mandatory = $true)][string]$ExpectedExecutable,
-  [Parameter(Mandatory = $true)][ValidateSet('Free', 'Pro')][string]$ExpectedEdition,
+  [Parameter(Mandatory = $true)][ValidateSet('Licence needed', 'Pro')][string]$ExpectedEdition,
   [Parameter(Mandatory = $true)][string]$Output
 )
 $ErrorActionPreference = 'Stop'

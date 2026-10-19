@@ -88,6 +88,7 @@ function makeLaserState(): LaserState {
     jog: async () => undefined,
     jogToMachinePosition: async () => undefined,
     centrePositioningLight: async () => undefined,
+    switchPositioningLightOn: async () => undefined,
     switchPositioningLightOff: async () => undefined,
     setAirAssistEnabled: async () => undefined,
     setFireActive: async () => undefined,

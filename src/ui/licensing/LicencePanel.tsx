@@ -1,6 +1,4 @@
-import { useState, type FormEvent } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
-import { findLicenceKey } from '../../../public/licence-key-text.mjs';
 import { EarlyUpdatesOption } from './EarlyUpdatesOption';
 import { LicenceDevicesPanel } from './LicenceDevicesPanel';
 import {
@@ -11,6 +9,8 @@ import {
   licenceButtons,
   licenceMuted,
 } from './LicenceControls';
+import { PRO_PRICE_LABEL } from './pro-features';
+import { useLicenceActions } from './use-licence-actions';
 
 type Props = {
   readonly client: LicenceAdapter;
@@ -23,7 +23,7 @@ type Props = {
   readonly initialKey?: string;
 };
 
-/** Help > Licence: the edition, the saved key and every licence action (ADR-540). */
+/** Help > Licence: the licence, the saved key and every licence action (ADR-540, ADR-623). */
 export function LicencePanel({
   client,
   status,
@@ -33,40 +33,14 @@ export function LicencePanel({
   onClose,
   initialKey = '',
 }: Props): JSX.Element {
-  const [key, setKey] = useState(initialKey);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const run = async (work: () => Promise<LicenceStatus>, activatedKey?: string): Promise<void> => {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const next = await work();
-      await onStatus(next);
-      // Failures may resolve with cached rights. Only clear a confirmed matching
-      // activation, never a rejected key or an unrelated licence action.
-      if (
-        activatedKey !== undefined &&
-        next.state === 'ready' &&
-        next.licenseKey === activatedKey &&
-        next.message === null
-      )
-        setKey('');
-    } catch {
-      setError('This request could not be completed. Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  };
-  const activate = (event: FormEvent): void => {
-    event.preventDefault();
-    const submitted = key.trim();
-    // The app activates the key found in pasted text; that is the key it saves.
-    void run(() => client.activate(submitted), findLicenceKey(submitted) ?? submitted);
-  };
+  const { key, setKey, busy, error, run, activate } = useLicenceActions(
+    client,
+    onStatus,
+    initialKey,
+  );
   if (status?.channel === 'free') return <EveryFeaturePanel onClose={onClose} />;
   return (
-    <section style={panel} aria-busy={busy}>
+    <section style={licencePanelStyle} aria-busy={busy}>
       <LicenceHeading onClose={onClose} />
       <p style={{ margin: '12px 0 4px', fontWeight: 600 }}>{editionTitle(status)}</p>
       <LicenceNotice
@@ -97,7 +71,7 @@ export function LicencePanel({
 
 function EveryFeaturePanel({ onClose }: { readonly onClose: () => void }): JSX.Element {
   return (
-    <section style={panel}>
+    <section style={licencePanelStyle}>
       <LicenceHeading onClose={onClose} />
       <p>Every feature included</p>
       <p style={licenceMuted}>
@@ -107,7 +81,7 @@ function EveryFeaturePanel({ onClose }: { readonly onClose: () => void }): JSX.E
   );
 }
 
-function SavedLicence({
+export function SavedLicence({
   client,
   status,
   busy,
@@ -139,28 +113,26 @@ function SavedLicence({
   );
 }
 
-function EditionSummary(): JSX.Element {
+/** What a desktop licence includes. KerfDesk Free is the browser app (ADR-623). */
+export function EditionSummary(): JSX.Element {
   return (
     <>
       <p style={licenceMuted}>
-        Free covers drawing, text, import, Line Art tracing, laser cut and engrave, 2D CNC cuts, all
-        machine control and the G-code Inspector. Pro adds V-carve, 3D relief, adaptive clearing,
-        advanced tracing, camera alignment, the box generator and Design Studio.
-      </p>
-      <p style={licenceMuted}>
-        A Pro licence runs on three devices at a time and keeps working with every version released
+        The KerfDesk desktop app runs with a free 30-day trial or a licence, {PRO_PRICE_LABEL} once.
+        A licence runs on three devices at a time and keeps working with every version released
         during its year of updates. Licence changes never stop a job that is running.
       </p>
+      <p style={licenceMuted}>KerfDesk Free, with no licence, runs in your web browser.</p>
     </>
   );
 }
 
 function editionTitle(status: LicenceStatus | null): string {
   if (status === null) return 'KerfDesk';
-  return status.edition === 'pro' ? 'KerfDesk Pro' : 'KerfDesk Free';
+  return status.edition === 'pro' ? 'KerfDesk Pro' : 'Licence needed';
 }
 
-function offersActivation(status: LicenceStatus | null): boolean {
+export function offersActivation(status: LicenceStatus | null): boolean {
   if (status === null || status.deactivationPending) return false;
   return status.tier === null || status.tier === 'trial' || status.state !== 'ready';
 }
@@ -184,7 +156,7 @@ function LicenceHeading({ onClose }: { readonly onClose: () => void }): JSX.Elem
   );
 }
 
-function LicenceNotice({
+export function LicenceNotice({
   status,
   failure,
   message,
@@ -229,7 +201,7 @@ export function licenceDescription(status: LicenceStatus): string {
     return `30-day Pro trial${status.accessExpiresAt === null ? '' : ` · Ends ${date(status.accessExpiresAt)}`}`;
   return `Pro licence${status.updatesUntil === null ? '' : ` · Updates through ${date(status.updatesUntil)}`}`;
 }
-const panel = {
+export const licencePanelStyle = {
   width: '100%',
   maxWidth: 480,
   padding: 28,
