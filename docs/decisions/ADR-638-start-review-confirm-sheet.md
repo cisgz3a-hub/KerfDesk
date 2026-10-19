@@ -1,4 +1,4 @@
-# ADR-637 - Start review becomes a compact confirm sheet with in-place Edit and Save
+# ADR-638 - Start review becomes a compact confirm sheet with in-place Edit and Save
 
 **Status:** Accepted | **Date:** 2026-10-19 | **Amends:** ADR-224 (v2 revision, settings-approval
 amendment)

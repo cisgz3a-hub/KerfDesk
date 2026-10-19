@@ -926,7 +926,7 @@ the linked artwork.
 Artwork overrides preserve Constant, Dynamic, and an explicit Auto choice through Save/Open.
 An absent artwork power-mode override inherits the assigned operation; explicit Auto follows the
 device default even when that operation selects Constant or Dynamic. Saving a Job Review card
-(ADR-637) writes power, speed, passes and air through the same store actions, including artwork
+(ADR-638) writes power, speed, passes and air through the same store actions, including artwork
 that owns those fields, without changing the existing Frame/Start policy.
 
 #### Success — edit power value
@@ -2037,7 +2037,7 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
    Settings changed since Frame are prepared before review; no job streams before confirmation.
    A laser controller that reports `$32=0` contributes
    the `$32` acknowledgement banner rather than refusing Frame or Start.
-6. Job Review uses the compact confirm sheet (ADR-637): one row of stat tiles (estimated time as
+6. Job Review uses the compact confirm sheet (ADR-638): one row of stat tiles (estimated time as
    the accent hero tile with cut/travel split, job size and motion envelope, operations/cutters,
    G-code lines and bytes, and read-only Origin and Output scope tiles); an amber warnings box with
    the count and one short headline per warning, each warning's full text one click away; a
