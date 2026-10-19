@@ -32,9 +32,9 @@ notice must stay until acknowledged and must keep its recovery actions.
    a safety incident outranks an available update. For the same reason it is drawn above the
    in-canvas hints (the run-order numbering prompt at the top centre, and the trace, tab, trim
    and warp hints that reach up from the bottom left of a short canvas). The menu bar, popovers,
-   modal dialogs and the Live Motion popup stay above it.
-   While the Live Motion popup is up (a job, jog or Frame), the notice measures it, as the toast
-   stack does, and ends above it, so the popup never hides the notice's buttons on a short window.
+   modal dialogs and the Live Motion popup stay above it. While the Live Motion popup is up (a
+   job, jog or Frame), the notice measures it, as the toast stack does, and ends above it, so the
+   popup never hides the notice's buttons on a short window.
 4. It keeps its current behaviour: `role="alert"`, the same Reconnect controller…, Reset
    controller and **I made the machine safe** actions, and no timeout or close button. It is at
    most 420 px wide and scrolls inside itself on a short canvas. Clicks beside it still reach the
@@ -47,8 +47,8 @@ notice must stay until acknowledged and must keep its recovery actions.
 
 `WorkspaceSafetyNotice.test.tsx` pins that a failed write appears over the canvas and not in
 the machine toolbar, that its layer is above the in-canvas hints and below modal dialogs, and
-that it stops above the Live Motion popup while that is open. `e2e/safety-notice-toast.spec.ts` raises a write-failed notice at several
-window sizes (1920 to 360 px) and checks that the top bar, canvas and rails keep their positions,
-that the notice sits inside the canvas or spans the window when the canvas is too narrow, and
-that it never overlaps Frame job or Start. Rendered and unit-tested only; no machine was
-operated.
+that it stops above the Live Motion popup while that is open. `e2e/safety-notice-toast.spec.ts`
+raises a write-failed notice at several window sizes (1920 to 360 px) and checks that the top
+bar, canvas and rails keep their positions, that the notice sits inside the canvas or spans the
+window when the canvas is too narrow, and that it never overlaps Frame job or Start. Rendered and
+unit-tested only; no machine was operated.
