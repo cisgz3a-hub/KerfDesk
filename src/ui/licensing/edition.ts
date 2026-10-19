@@ -22,6 +22,12 @@ export type EditionValue = {
   readonly requestPro: (feature: ProFeature, onAllowed?: () => void) => boolean;
   readonly openLicence: () => void;
   /**
+   * A Pro prompt is open and holds an edit to run if the operator unlocks Pro.
+   * Read-only: it gates nothing. Background work that finishes meanwhile must
+   * not commit over that edit (ADR-609).
+   */
+  readonly proPromptOpen?: boolean;
+  /**
    * This build cannot take a licence and runs KerfDesk Free: its Pro tools are
    * in the desktop app (ADR-544), and it says so in the status bar.
    */
@@ -114,6 +120,11 @@ export function activeEdition(): EditionValue {
 /** The same gate as `useEdition().requestPro`, for command handlers and stores. */
 export function requestProFeature(feature: ProFeature, onAllowed?: () => void): boolean {
   return active.requestPro(feature, onAllowed);
+}
+
+/** Whether a Pro prompt is waiting on the operator, for callers outside React. */
+export function proPromptOpen(): boolean {
+  return active.proPromptOpen === true;
 }
 
 export function proFeaturesUnlocked(): boolean {

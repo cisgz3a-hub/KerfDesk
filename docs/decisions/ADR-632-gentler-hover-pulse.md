@@ -1,6 +1,6 @@
 ## ADR-632 - A gentler hover pulse (2026-10-19)
 
-**Status:** Accepted. Amends ADR-620 decision 2 (the pulse's timing, strength, glow and edge). | **Date:** 2026-10-19
+**Status:** Accepted; decision 3 (the halo) amended by ADR-632 Amendment 1. Amends ADR-620 decision 2 (the pulse's timing, strength, glow and edge). | **Date:** 2026-10-19
 
 ### Context
 

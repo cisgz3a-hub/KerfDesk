@@ -86,15 +86,17 @@
   min-width: 0;
 }
 
-.lf-photo-engraving__controls label {
+/* Direct children only, so the Dither swatches keep their own tile styles. */
+.lf-photo-engraving__controls > label,
+.lf-photo-engraving__field {
   display: grid;
   gap: 6px;
   min-width: 0;
   font-size: 13px;
 }
 
-.lf-photo-engraving__controls select,
-.lf-photo-engraving__controls input {
+.lf-photo-engraving__controls > label select,
+.lf-photo-engraving__controls > label input {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;

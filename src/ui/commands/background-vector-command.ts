@@ -6,9 +6,12 @@
 // The result is committed through the ordinary action, as one undo step, only
 // when the project and selection are still the ones the click saw. A real
 // browser whose worker cannot start runs the command in thread, as before;
-// work that ran and failed is reported, never retried on the UI thread.
+// work that ran and failed is reported, never retried on the UI thread. While
+// a tool's Pro prompt is open, a finished result is not committed: the prompt holds
+// another tool's edit, which committing over it would lose.
 
 import type { VectorSceneObject } from '../../core/geometry';
+import { proPromptOpen } from '../licensing/edition';
 import { useStore } from '../state';
 import { selectedObjectIds } from '../state/scene-group-actions';
 import { useToastStore } from '../state/toast-store';
@@ -83,6 +86,21 @@ export async function runVectorCommandInBackground<T extends VectorOpTask>(
       .getState()
       .pushToast(
         `${command.label} was not applied: the project or selection changed while it was worked out.`,
+        'info',
+      );
+    return false;
+  }
+  // A current domain error has no edit to admit or commit. Preserve its specific
+  // warning even while another tool is waiting on a Pro prompt.
+  if (outcome.kind === 'done' && outcome.result.kind === 'error') {
+    useToastStore.getState().pushToast(outcome.result.error.message, 'warning');
+    return false;
+  }
+  if (proPromptOpen()) {
+    useToastStore
+      .getState()
+      .pushToast(
+        `${command.label} was not applied: a Pro prompt is open. Close it, then run ${command.label} again.`,
         'info',
       );
     return false;
