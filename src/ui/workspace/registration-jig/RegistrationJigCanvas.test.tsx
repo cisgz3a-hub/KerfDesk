@@ -240,6 +240,23 @@ describe('registration jig canvas drag transactions', () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
+  it('pans with a right-button drag, as the main canvas does, without selecting or editing', () => {
+    const before = lastView();
+    // The press lands on the artwork; the right button still pans rather than moves it.
+    pointer('pointerdown', 10, 10, before, { button: 2 });
+    pointer('pointermove', 30, 25, before, { button: 2 });
+    pointer('pointerup', 30, 25, before, { button: 2 });
+    expect(lastView().panX).toBeCloseTo(before.panX + 20);
+    expect(lastView().panY).toBeCloseTo(before.panY + 15);
+    expect(commit).not.toHaveBeenCalled();
+    expect(selection).not.toHaveBeenCalled();
+    const menu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 });
+    act(() => {
+      host.querySelector('canvas')!.dispatchEvent(menu);
+    });
+    expect(menu.defaultPrevented).toBe(true);
+  });
+
   it('zooms with a non-passive native wheel listener so the page does not scroll', () => {
     const add = vi.spyOn(HTMLCanvasElement.prototype, 'addEventListener');
     act(() => root.render(<Harness key="wheel" />));
@@ -262,6 +279,10 @@ describe('registration jig canvas drag transactions', () => {
 
 function lastOverlay(): JigCanvasOverlay {
   return vi.mocked(useJigCanvasPaint).mock.lastCall![2];
+}
+
+function lastView(): ViewState {
+  return vi.mocked(useJigCanvasPaint).mock.lastCall![4];
 }
 
 function committed(): Project['scene']['objects'][number] {

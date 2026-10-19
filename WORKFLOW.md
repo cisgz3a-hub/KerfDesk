@@ -2691,6 +2691,8 @@ authorization, Frame proof, controller command, or safety boundary.
    what the box encloses, right to left what it touches. Shift-drag or Shift-click adds
    to the selection, and Ctrl+A selects all the artwork (not the outlines) unless a field
    has focus. Locked or hidden objects, including locked outlines, are never selected.
+   As on the main canvas, drag with the right or middle mouse button, or hold Space and
+   drag, to pan; the wheel zooms.
 2. In **Jig layout**, choose Rectangle or Circle, enter the outline size, then enter
    rows, columns, and horizontal/vertical spacing. Apply the layout before saving;
    until then the tab reads **Jig layout •**. A 1 x 5 grid creates five independently
