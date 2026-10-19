@@ -29,10 +29,17 @@ const probe = `
 })
 `;
 
+interface RootRecord {
+  terminated: boolean;
+  terminatedAt?: number;
+  retiredAt?: number;
+  url: string;
+}
+
 interface LifetimeState {
   counts: Int32Array;
   owners: Int32Array;
-  roots: { terminated: boolean; terminatedAt?: number; url: string }[];
+  roots: RootRecord[];
 }
 
 declare global {
@@ -46,51 +53,37 @@ interface WorkerRuntime {
   target: string;
   url: string;
   parent: string | undefined;
-  contexts: Set<number>;
-  sawContext: boolean;
-  enabled: boolean;
   destroyed: boolean;
   destroyedAt?: number;
-  error?: string;
 }
 
-// Chromium (blink WorkerThread::Terminate) lets a worker whose thread is busy,
-// such as a solver pthread synchronously booting its module, run for a fixed
-// kForcibleTerminationDelay of 2 s before forcing termination, and shuts a
-// parent down only after every nested child has. A worker tree is therefore
-// torn down within one grace period per nesting level plus thread teardown.
+// Busy workers can need Chromium's 2 s forcible-termination grace period at
+// each nesting level. Keep a bounded allowance for that asynchronous teardown;
+// only a browser targetDestroyed event proves that the worker was released.
 const CHROMIUM_FORCIBLE_TERMINATION_MS = 2_000;
 const THREAD_TEARDOWN_ALLOWANCE_MS = 3_000;
+// Exceeds the client's 5 s engine retirement limit (production-nesting-worker-client.ts).
+const SOLVER_RETIREMENT_ALLOWANCE_MS = 8_000;
 
 export class RuntimeObserver {
   readonly workers = new Map<string, WorkerRuntime>();
-  private readonly sessions = new Map<string, WorkerRuntime>();
-  private readonly requests = new Map<number, WorkerRuntime>();
-  private readonly attachments = new Set<Promise<void>>();
-  private releasing = false;
   private readonly listeners = new Set<() => void>();
-  private nextRequest = 0;
 
   constructor(
     private readonly cdp: CDPSession,
     contextId: string,
   ) {
+    // Browser discovery sees nested workers without attaching debugger sessions.
+    // Those attachments can perturb the same worker teardown we are measuring.
     cdp.on('Target.targetCreated', ({ targetInfo }) => {
       if (targetInfo.type !== 'worker' || targetInfo.browserContextId !== contextId) return;
       const worker: WorkerRuntime = {
         target: targetInfo.targetId,
         url: targetInfo.url,
         parent: (targetInfo as { parentId?: string }).parentId,
-        contexts: new Set(),
-        sawContext: false,
-        enabled: false,
         destroyed: false,
       };
       this.workers.set(worker.target, worker);
-      if (this.releasing) return;
-      const attachment = this.attach(worker);
-      this.attachments.add(attachment);
-      void attachment.finally(() => this.attachments.delete(attachment));
     });
     cdp.on('Target.targetInfoChanged', ({ targetInfo }) => {
       const worker = this.workers.get(targetInfo.targetId);
@@ -103,48 +96,6 @@ export class RuntimeObserver {
       worker.destroyedAt = Date.now();
       this.changed();
     });
-    cdp.on('Target.receivedMessageFromTarget', ({ sessionId, message }) => {
-      const worker = this.sessions.get(sessionId);
-      if (!worker) return;
-      const event = JSON.parse(message) as {
-        id?: number;
-        error?: { message: string };
-        method?: string;
-        params?: { context?: { id: number }; executionContextId?: number };
-      };
-      if (event.id !== undefined && this.requests.delete(event.id)) {
-        worker.enabled = event.error === undefined;
-        if (event.error) worker.error = event.error.message;
-      }
-      if (event.method === 'Runtime.executionContextCreated' && event.params?.context) {
-        worker.sawContext = true;
-        worker.contexts.add(event.params.context.id);
-      } else if (event.method === 'Runtime.executionContextDestroyed') {
-        worker.contexts.delete(event.params?.executionContextId ?? -1);
-      } else if (event.method === 'Runtime.executionContextsCleared') worker.contexts.clear();
-      this.changed();
-    });
-    // Detachment alone is not destruction: a parent can detach while its child
-    // is still blocked. These sessions attach from the browser, not the parent.
-  }
-
-  private async attach(worker: WorkerRuntime): Promise<void> {
-    try {
-      const { sessionId } = await this.cdp.send('Target.attachToTarget', {
-        targetId: worker.target,
-        flatten: false,
-      });
-      this.sessions.set(sessionId, worker);
-      if (this.releasing) return;
-      const id = ++this.nextRequest;
-      this.requests.set(id, worker);
-      await this.cdp.send('Target.sendMessageToTarget', {
-        sessionId,
-        message: JSON.stringify({ id, method: 'Runtime.enable' }),
-      });
-    } catch (error) {
-      worker.error = String(error);
-    }
   }
 
   private changed(): void {
@@ -159,8 +110,8 @@ export class RuntimeObserver {
     return Math.max(0, ...[...this.workers.values()].map((worker) => level(worker, 0)));
   }
 
-  // Settles on the browser's own destruction events rather than a polling
-  // window, by the deadline Chromium's forcible termination guarantees.
+  // Settle on positive browser destruction events within the existing bounded
+  // teardown allowance. Silence, detachment and context loss do not pass.
   async destruction(): Promise<string[]> {
     const deadline = this.depth() * CHROMIUM_FORCIBLE_TERMINATION_MS + THREAD_TEARDOWN_ALLOWANCE_MS;
     await new Promise<void>((resolve) => {
@@ -181,36 +132,10 @@ export class RuntimeObserver {
 
   pending(): string[] {
     return [...this.workers.values()]
-      .filter(
-        (worker) =>
-          !worker.destroyed && !(worker.enabled && worker.sawContext && worker.contexts.size === 0),
-      )
-      .map(
-        (worker) => `${worker.target} (${worker.url}): ${worker.error ?? 'runtime not destroyed'}`,
-      );
+      .filter((worker) => !worker.destroyed)
+      .map((worker) => worker.target + ' (' + worker.url + '): target not destroyed');
   }
 
-  async releaseAttachments(): Promise<void> {
-    // Debugger attachments can retain a terminated worker target and its last
-    // context metadata. Release our sessions, but keep browser discovery active:
-    // detachment itself is never accepted as proof that a runtime was destroyed.
-    // A target can be discovered while its attach request is still in flight.
-    // Close admission first, then drain those requests before taking the session
-    // snapshot, otherwise a late attachment can keep the terminated target alive.
-    this.releasing = true;
-    await Promise.all(this.attachments);
-    const sessions = [...this.sessions.keys()];
-    await Promise.all(
-      sessions.map(async (sessionId) => {
-        try {
-          await this.cdp.send('Target.detachFromTarget', { sessionId });
-        } catch {
-          // A worker can finish and detach before this request reaches Chromium.
-        }
-        this.sessions.delete(sessionId);
-      }),
-    );
-  }
   async dispose(): Promise<void> {
     await this.cdp.detach();
   }
@@ -246,12 +171,17 @@ export async function observeNestingLifetime(page: Page): Promise<void> {
     window.__nestingLifetime = state;
     const NativeWorker = window.Worker;
     window.Worker = class extends NativeWorker {
-      private readonly record: { terminated: boolean; terminatedAt?: number; url: string };
+      private readonly record: RootRecord;
       constructor(url: string | URL, options?: WorkerOptions) {
         super(url, options);
         this.record = { terminated: false, url: String(url) };
         state.roots.push(this.record);
         if (String(url).includes('packing-solver-worker.js')) {
+          const record = this.record;
+          this.addEventListener('message', (event) => {
+            if ((event.data as { kind?: unknown } | null)?.kind === 'retired')
+              record.retiredAt ??= Date.now();
+          });
           this.postMessage({
             kind: 'nesting-lifetime-probe',
             buffer: state.counts.buffer,
@@ -284,9 +214,23 @@ export async function expectNestingStopped(page: Page, completed: boolean): Prom
       counts: Array.from(window.__nestingLifetime.counts),
       owners: Array.from(window.__nestingLifetime.owners),
     }));
+  // The client terminates a solver host only after the host has retired its
+  // pthread workers, or at the client's retirement limit.
+  await expect
+    .poll(async () => (await snapshot()).roots.every((worker) => worker.terminated), {
+      timeout: SOLVER_RETIREMENT_ALLOWANCE_MS,
+    })
+    .toBe(true);
   const before = await snapshot();
   expect(before.roots.length).toBeGreaterThanOrEqual(completed ? 4 : 1);
-  expect(before.roots.every((worker) => worker.terminated)).toBe(true);
+  // Chromium can keep a host forever if its pthreads' termination notices
+  // arrive during its own shutdown, so each host must retire before termination.
+  for (const root of before.roots.filter((worker) =>
+    worker.url.includes('packing-solver-worker.js'),
+  )) {
+    expect(root.retiredAt, 'solver host retired before termination').toBeDefined();
+    expect(root.retiredAt).toBeLessThanOrEqual(root.terminatedAt ?? 0);
+  }
   if (completed) {
     const solverOwners = before.roots.flatMap((root, index) =>
       root.url.includes('packing-solver-worker.js') ? [index + 1] : [],
@@ -304,9 +248,8 @@ export async function expectNestingStopped(page: Page, completed: boolean): Prom
   ).length;
   const observedWorkers = Math.max(before.roots.length, (before.counts[0] ?? 0) + nonSolverRoots);
   expect(observer.workers.size).toBeGreaterThanOrEqual(observedWorkers);
-  // Positive runtime destruction or target destruction is required. No heartbeat,
-  // protocol timeout, or detached parent session can stand in for that evidence.
-  await observer.releaseAttachments();
+  // Every discovered worker needs positive target destruction. No heartbeat,
+  // protocol timeout, context loss or detached parent can stand in for that evidence.
   expect(await observer.destruction()).toEqual([]);
   // Worker.terminate() requests asynchronous teardown. Heartbeats may advance
   // before the browser confirms destruction, but must stop after that barrier.
@@ -319,7 +262,6 @@ export async function expectNestingStopped(page: Page, completed: boolean): Prom
 export function nestingRuntimeSnapshot(page: Page) {
   return [...(observers.get(page)?.workers.values() ?? [])].map((worker) => ({
     ...worker,
-    contexts: [...worker.contexts],
   }));
 }
 

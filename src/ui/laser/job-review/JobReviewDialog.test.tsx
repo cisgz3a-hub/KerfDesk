@@ -175,7 +175,7 @@ describe('JobReviewDialog', () => {
       power.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
     });
     expect(useStore.getState().project.scene.layers[0]?.power).toBe(55);
-    expect(host.textContent).toContain('Changes are synced to the main Artwork / Operations');
+    expect(host.textContent).toContain('Changes are synced to the Artwork panel');
 
     await act(async () => buttonByText('Approve settings').click());
 

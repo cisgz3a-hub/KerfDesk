@@ -1269,7 +1269,9 @@
                   <path d="M12 19h8" /></svg
               ></span>
               <h3 id="linux-heading">KerfDesk for Linux</h3>
-              <p class="requirements">64-bit (x64) Linux, checked on Ubuntu 24.04</p>
+              <p class="requirements">
+                64-bit (x64) Linux with a desktop keyring, checked on Ubuntu 24.04
+              </p>
               <p class="edition-kind" data-platform-edition hidden>Pro, with a free 30-day trial</p>
               <p class="status" role="status" data-platform-status>
                 Checking for the Linux edition…
@@ -1314,6 +1316,15 @@
                     system blocks the user namespaces Chromium's sandbox needs, the AppImage runs
                     without that sandbox; the <code>.deb</code> keeps it.
                   </p>
+                  <h4>Desktop keyring</h4>
+                  <p>
+                    KerfDesk keeps its licence in your desktop's keyring: GNOME Keyring, KWallet, or
+                    another Secret Service such as KeePassXC. Ubuntu and most GNOME and KDE desktops
+                    run one already. On a window manager or minimal install without one, install
+                    GNOME Keyring (<code class="command">sudo apt install gnome-keyring</code>),
+                    make sure it starts and unlocks when you sign in, then open KerfDesk. Without a
+                    keyring, KerfDesk cannot save a trial or licence key.
+                  </p>
                   <h4>USB machines</h4>
                   <p>
                     Linux lets only the serial group open USB serial ports. Add your account once
@@ -1323,11 +1334,11 @@
                   <p data-platform-pro hidden>
                     KerfDesk opens to <strong>Activate KerfDesk</strong>: start the free 30-day
                     trial or paste your licence key there. KerfDesk keeps the licence in your
-                    desktop's keyring. A supported, unlocked GNOME Keyring or KWallet is required:
-                    install and unlock one in your desktop session before opening KerfDesk. Without
-                    it, you cannot start a trial or activate a licence. On Linux, paste the key
-                    yourself: <strong>Copy key &amp; open KerfDesk</strong> opens only the Windows
-                    app.
+                    desktop's keyring. An unlocked desktop keyring (GNOME Keyring, KWallet or
+                    another Secret Service) is required: set one up in your desktop session before
+                    opening KerfDesk. Without it, you cannot start a trial or activate a licence. On
+                    Linux, paste the key yourself:
+                    <strong>Copy key &amp; open KerfDesk</strong> opens only the Windows app.
                   </p>
                 </div>
               </details>

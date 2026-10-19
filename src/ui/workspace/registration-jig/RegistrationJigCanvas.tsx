@@ -34,7 +34,7 @@ export type RegistrationJigCanvasProps = {
 };
 
 const CANVAS_HELP =
-  'Drag to move · Handles resize (Shift: free) and rotate (Shift: 15°) · Drag empty space to box-select · Shift-click to select more · Ctrl+A selects all artwork · Wheel to zoom · Space-drag to pan · Drop artwork files on an outline';
+  'Drag to move · Handles resize (Shift: free) and rotate (Shift: 15°) · Drag empty space to box-select · Shift-click to select more · Ctrl+A selects all artwork · Wheel to zoom · Right-drag or Space-drag to pan · Drop artwork files on an outline';
 
 export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.Element {
   const { project, selectedIds } = props;
@@ -79,6 +79,8 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
         onPointerUp={(event) => end(event, false)}
         onPointerCancel={(event) => end(event, true)}
         onLostPointerCapture={cancel}
+        // A right-button drag pans; releasing it must not open a menu.
+        onContextMenu={(event) => event.preventDefault()}
         onBlur={() => {
           spaceHeld.current = false;
         }}

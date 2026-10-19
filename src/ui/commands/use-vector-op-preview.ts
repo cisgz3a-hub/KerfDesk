@@ -1,6 +1,8 @@
 // A dialog's background vector preview (ADR-609). Each change of sources or
 // task supersedes the previous run; the dialog keeps showing the last settled
-// result, marked as updating, until the current request settles.
+// result, marked as updating, until the current request settles. A request
+// that settles with a problem clears that older result, so the preview never
+// shows geometry the status no longer describes.
 
 import { useEffect, useRef, useState } from 'react';
 import type { VectorSceneObject } from '../../core/geometry';
@@ -53,8 +55,10 @@ export function useVectorOpPreview<T extends VectorOpTask>(
         setState({ settled: { sources, task, result: outcome.result }, problem: null });
         return;
       }
-      const problem = { kind: outcome.kind, sources, task, message: outcome.message };
-      setState((previous) => ({ ...previous, problem }));
+      setState({
+        settled: null,
+        problem: { kind: outcome.kind, sources, task, message: outcome.message },
+      });
     });
     return () => {
       active = false;

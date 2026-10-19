@@ -64,7 +64,7 @@ export function WorkspaceSidePanels(): JSX.Element {
     >
       <div className="lf-workspace-panel-toggles">
         <PanelToggle
-          label="Layers"
+          label="Artwork"
           icon="panel-left"
           expanded={cutsOpen}
           onToggle={() => setCutsOpen((open) => !open)}
@@ -78,7 +78,7 @@ export function WorkspaceSidePanels(): JSX.Element {
       </div>
       <div className="lf-workspace-desktop-panels">
         {cutsOpen ? (
-          <ResizablePanel label="Cuts / Layers" collapsed={!layersExpanded}>
+          <ResizablePanel label="Artwork" collapsed={!layersExpanded}>
             <CutsLayersPanel />
           </ResizablePanel>
         ) : null}
@@ -239,8 +239,8 @@ function PanelToggle(props: {
   );
 }
 
-// One panel width, whatever view is showing (ADR-348). Switching the Artwork /
-// Operations panel to Run order used to widen the whole rail, which moved the
+// One panel width, whatever view is showing (ADR-348). Switching the Artwork
+// panel to Run order used to widen the whole rail, which moved the
 // canvas under the operator mid-task and overwrote any width they had dragged
 // for themselves.
 function ResizablePanel(props: {

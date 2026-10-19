@@ -86,7 +86,7 @@ test('Fill repair from the Tools menu adds output and survives Undo, Redo and sa
   );
   await selectWorkspacePanel(page, 'Artwork');
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   const fill = panel

@@ -9,6 +9,14 @@ export function validateNativeSmokeResult(result, expectedUserData, options = {}
   const expected = normalizedPath(expectedUserData);
   const renderer = object(result?.renderer);
   const failures = Array.isArray(result?.failures) ? result.failures : ['invalid failures field'];
+  const freshSandbox = options.expectFreshSandbox === true;
+  const expectLicenceWindow = options.expectLicenceWindow === true;
+  // Fresh commercial packages and a qualification profile still signing out
+  // open behind a licence window, with no workspace to import into or save from
+  // (ADR-623). The commercial-package expectation also rejects workspace evidence.
+  const behindLicence =
+    (freshSandbox || expectLicenceWindow || options.acceptLicenceWindow === true) &&
+    renderer?.licenceWindow === true;
   const problems = [
     ...(result?.ok === true ? [] : ['result was not ok']),
     ...(result?.isPackaged === true ? [] : ['app was not packaged']),
@@ -18,21 +26,61 @@ export function validateNativeSmokeResult(result, expectedUserData, options = {}
     ...(result?.windowVisible === true ? [] : ['window did not become visible']),
     ...(failures.length === 0 ? [] : [`runtime failures: ${failures.join(' / ')}`]),
     ...(renderer?.readyToShow === true ? [] : ['ready-to-show was not reached']),
+    ...(behindLicence ? noWorkspaceProblems(renderer) : workspaceProblems(renderer)),
+    ...(expectLicenceWindow ? licenceWindowProblems(renderer) : []),
+    ...(freshSandbox && !behindLicence
+      ? ['fresh sandbox must open behind the licence window, not the workspace']
+      : []),
+    ...(renderer?.url === 'app://app/index.html' ? [] : ['unexpected renderer URL']),
+    ...nativeSmokeSecurityProblems(result),
+    ...nativeSmokeLicensingProblems(renderer?.licensing, freshSandbox),
+  ];
+  if (problems.length > 0) throw new Error(problems.join('; '));
+  return result;
+}
+
+/** Behind the licence window no workspace exists, so nothing may claim I/O there. */
+function noWorkspaceProblems(renderer) {
+  return renderer.imported === false &&
+    renderer.saved === false &&
+    renderer.savedBytes === undefined &&
+    renderer.fileAccess === undefined
+    ? []
+    : ['the licence window reported workspace import, save or file access'];
+}
+
+/**
+ * A fresh commercial package must be one a trial or key can open. Linux keeps
+ * licences only in a Secret Service keyring (licensing-store.ts), so
+ * build-commercial-platform.sh launches it with an unlocked GNOME Keyring.
+ */
+function licenceWindowProblems(renderer) {
+  const licensing = renderer?.licensing;
+  return renderer?.licenceWindow === true &&
+    renderer.imported === false &&
+    renderer.saved === false &&
+    renderer.savedBytes === undefined &&
+    renderer.fileAccess === undefined &&
+    licensing?.channel === 'commercial' &&
+    licensing.edition === 'free' &&
+    licensing.proEnabled === false &&
+    licensing.state === 'activation-required'
+    ? []
+    : ['commercial licence window must report unlicensed commercial status and no workspace I/O'];
+}
+
+function workspaceProblems(renderer) {
+  return [
     ...(renderer?.imported === true ? [] : ['SVG import was not observed']),
     ...(renderer?.saved === true && Number(renderer?.savedBytes) > 0
       ? []
       : ['project save was not observed']),
-    ...(renderer?.url === 'app://app/index.html' ? [] : ['unexpected renderer URL']),
-    ...nativeSmokeSecurityProblems(result),
-    ...nativeSmokeLicensingProblems(renderer?.licensing, options.expectFreshSandbox === true),
     ...(renderer?.fileAccess?.openPicker === 'stubbed' &&
     renderer?.fileAccess?.savePicker === 'stubbed' &&
     renderer?.fileAccess?.writeTarget === 'memory'
       ? []
       : ['file access evidence must identify stubbed pickers and an in-memory save']),
   ];
-  if (problems.length > 0) throw new Error(problems.join('; '));
-  return result;
 }
 
 function nativeSmokeLicensingProblems(observed, expectFreshSandbox) {
@@ -112,7 +160,7 @@ async function runCli() {
   if (!['win32', 'darwin', 'linux'].includes(process.platform)) {
     throw new Error('Packaged smoke runs on Windows, macOS or Linux');
   }
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseNativeSmokeArgs(process.argv.slice(2));
   await runNativeSmoke(args, spawn, {
     reportEvidence: (path) => process.stdout.write(`NATIVE_SMOKE_EVIDENCE=${path}\n`),
   });
@@ -136,12 +184,15 @@ export async function runNativeSmoke(args, spawnProcess = spawn, dependencies = 
   return result;
 }
 
-function parseArgs(args) {
+export function parseNativeSmokeArgs(args) {
   const executable = args.find((arg) => !arg.startsWith('--'));
   if (executable === undefined || !isAbsolute(executable)) {
     throw new Error(
-      'usage: verify-windows-packaged-native-smoke.mjs <absolute packaged executable> [--expect-fresh-sandbox]',
+      'usage: verify-windows-packaged-native-smoke.mjs <absolute packaged executable> [--expect-fresh-sandbox | --expect-licence-window]',
     );
+  }
+  if (args.includes('--expect-fresh-sandbox') && args.includes('--expect-licence-window')) {
+    throw new Error('choose one licensing expectation');
   }
   const output = valueFor(args, '--output=');
   const timeout = valueFor(args, '--timeout-ms=');
@@ -152,6 +203,7 @@ function parseArgs(args) {
     output,
     timeoutMs,
     expectFreshSandbox: args.includes('--expect-fresh-sandbox'),
+    expectLicenceWindow: args.includes('--expect-licence-window'),
   };
 }
 

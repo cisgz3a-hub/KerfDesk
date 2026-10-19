@@ -18,7 +18,6 @@ export function RailPanelHeading(props: {
       </h2>
       <IconButton
         icon="chevron-right"
-        size="sm"
         label={label}
         title={props.collapseDisabledReason ?? label}
         {...(props.collapseDisabled === undefined ? {} : { disabled: props.collapseDisabled })}

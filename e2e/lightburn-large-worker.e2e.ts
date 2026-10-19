@@ -57,7 +57,7 @@ test('imports a 24 MiB LightBurn project through the production worker', async (
   await (await toolbarCommand(page, 'Open...')).click();
 
   await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible({ timeout: 120_000 });
-  await expect(page.getByText('Layers: 1 (1 output)', { exact: true })).toBeVisible();
+  await expect(page.getByText('Operations: 1 (1 output)', { exact: true })).toBeVisible();
   await expect(page).toHaveTitle(/large-streamed\.lf2/);
 
   const heartbeatAtImport = await page.evaluate(
