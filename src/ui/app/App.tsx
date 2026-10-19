@@ -153,7 +153,7 @@ function AppLifecycle(): null {
   return null;
 }
 
-// Jig mode (ADR-638) puts the registration jig page where the tool strip and
+// Jig mode (ADR-641) puts the registration jig page where the tool strip and
 // the main canvas are. The side panels stay, so the machine panel is docked
 // beside the jig while it is laid out, placed and burned.
 function WorkspaceCentre(): JSX.Element {

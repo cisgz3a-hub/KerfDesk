@@ -2681,7 +2681,7 @@ authorization, Frame proof, controller command, or safety boundary.
 
 ### F-B15a. Burn a multi-outline registration jig set (ADR-057 amendment)
 
-1. Open **Registration Jig** or **Edit jig** to enter jig mode (ADR-638). The jig page
+1. Open **Registration Jig** or **Edit jig** to enter jig mode (ADR-641). The jig page
    takes the place of the tool strip and the main canvas; the machine panel stays docked
    beside it, and dialogs, alarms and the live motion bar appear above it as usual. Its
    canvas opens fitted to the jig, with **Fit jig** and **Fit bed** available. The page

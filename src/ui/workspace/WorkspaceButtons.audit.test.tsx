@@ -301,7 +301,7 @@ describe('viewport and preview individual outcomes', () => {
 });
 
 describe('registration jig remaining actions', () => {
-  // Jig mode edits the open project directly (ADR-638), so each action is
+  // Jig mode edits the open project directly (ADR-641), so each action is
   // checked in the project as soon as it is used.
   function outlineAir(): boolean | undefined {
     return useStore
