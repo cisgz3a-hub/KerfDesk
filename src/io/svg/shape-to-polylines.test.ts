@@ -78,6 +78,14 @@ describe('elementToSubPaths — <polyline> / <polygon>', () => {
       { x: 0, y: 0 },
     ]);
   });
+
+  // Audit 2026-10-18: a polygon whose points already repeat the start gained a
+  // second closing point, leaving a zero-length final edge in the outline.
+  it('closes a polygon that already repeats its first point exactly once', () => {
+    expect(elementToSubPaths(svgEl('<polygon points="0,0 10,0 10,10 0,0"/>'))).toEqual(
+      elementToSubPaths(svgEl('<polygon points="0,0 10,0 10,10"/>')),
+    );
+  });
 });
 
 describe('elementToSubPaths — <rect>', () => {
