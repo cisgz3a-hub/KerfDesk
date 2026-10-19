@@ -8,7 +8,6 @@ import {
   type Layer,
   type Project,
 } from '../../core/scene';
-import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import type { PulsePieceFrame } from './artwork-pulse';
 import { ArtworkPulsePainter } from './draw-artwork-pulse';
 import * as objectDisplay from './object-display';
@@ -176,42 +175,13 @@ describe('ArtworkPulsePainter (ADR-620)', () => {
     expect(created).not.toHaveBeenCalled();
   });
 
-  it('paints each piece in its own operation colour, not the colour of another', () => {
-    const blue = createLayer({ id: 'blue', color: '#2563eb' });
-    const red = createLayer({ id: 'red', color: '#dc2626' });
-    const base = createProject();
-    const project = {
-      ...base,
-      scene: {
-        ...base.scene,
-        objects: [square('heart', 'blue', 10), square('box', 'red', 40)],
-        layers: [blue, red],
-      },
-    };
-    const painted = vi.spyOn(objectDisplay, 'paintObjectDisplay');
-
-    new ArtworkPulsePainter().draw(canvas2d(), project, view, [
-      pulse('heart', 'blue'),
-      pulse('box', 'red'),
-    ]);
-
-    const colours = painted.mock.calls.map(([, object, display]) => [
-      object.id,
-      display.paths[0]?.paint.color,
-    ]);
-    expect(colours).toEqual([
-      ['heart', canvasVectorDisplayColor('#2563eb')],
-      ['box', canvasVectorDisplayColor('#dc2626')],
-    ]);
-  });
-
-  it("renders one piece per artwork, never pairing a piece with another piece's operation", () => {
+  it('renders one piece per artwork, not one per artwork and group operation', () => {
     const count = 30;
     const { project, layers } = repeatedImports(count);
-    const operationIds = new Set(layers.map((layer) => layer.id));
+    const colorSources = new Map(layers.map((layer) => [layer.id, 'op-0']));
     const pieces: PulsePieceFrame[] = project.scene.objects.map((object) => ({
       objectId: object.id,
-      operationIds,
+      colorSources,
       strength: 1,
       glow: null,
       edgeAlpha: 0,
@@ -223,7 +193,7 @@ describe('ArtworkPulsePainter (ADR-620)', () => {
 
     const canvases = created.mock.calls.filter(([tag]) => tag === 'canvas').length;
     // A colour bitmap and a glow bitmap per piece: 2N, where pairing every
-    // piece with every listed operation would make 2N².
+    // piece with every same-settings operation would make 2N².
     expect(canvases).toBe(2 * count);
   });
 
@@ -250,7 +220,7 @@ describe('ArtworkPulsePainter (ADR-620)', () => {
         {
           objectId: 'both',
           // The second operation: the canvas styles the path with the first.
-          operationIds: new Set(['fill']),
+          colorSources: new Map([['fill', 'fill']]),
           strength: 1,
           glow: null,
           edgeAlpha: 0,
@@ -265,7 +235,7 @@ describe('ArtworkPulsePainter (ADR-620)', () => {
 function pulse(objectId: string, operationId: string): PulsePieceFrame {
   return {
     objectId,
-    operationIds: new Set([operationId]),
+    colorSources: new Map([[operationId, operationId]]),
     strength: 1,
     glow: null,
     edgeAlpha: 0,

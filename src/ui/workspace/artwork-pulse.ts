@@ -1,10 +1,13 @@
-// Timing and targets for the operation colour pulse (ADR-620, ADR-632). The
-// workspace draws artwork in plain ink; pointing at a piece plays one pulse on
-// that piece alone, each of its paths in its own operation's colour, and
-// pointing at an operation row pulses that operation's artwork. A soft colour
+// Timing and grouping for the operation colour pulse (ADR-620). The workspace
+// draws artwork in plain ink; pointing at artwork, or at an operation row,
+// plays one pulse in that operation's colour across every piece that shares
+// its settings, rippling out from the piece under the pointer. A soft colour
 // edge stays while the pointer rests there. Pure: no DOM, no canvas.
 
 import { operationIdsForObject, type Layer, type SceneObject } from '../../core/scene';
+import { sameOperationSettings, type MachineKind } from './pulse-settings-match';
+
+export type { MachineKind } from './pulse-settings-match';
 
 export const PULSE_DURATION_MS = 1400;
 /** The pointer must settle this long before a hover counts, so a sweep across the bed stays calm. */
@@ -15,6 +18,8 @@ export const PULSE_EDGE_BLUR_PX = 5;
 
 const RISE_END = 0.16;
 const HOLD_END = 0.3;
+const RIPPLE_BASE_MS = 80;
+const RIPPLE_MS_PER_PX = 0.6;
 const SWEEP_STEP_MS = 70;
 const MAX_STAGGER_MS = 420;
 const EDGE_TIME_CONSTANT_MS = 90;
@@ -34,54 +39,92 @@ export function pulseGlow(t: number): { readonly blurPx: number; readonly alpha:
   return { blurPx: 4 + 22 * easeOutCubic(t), alpha: 0.6 * (1 - t) ** 1.5 };
 }
 
+/**
+ * The seed operations plus every operation whose settings match one of them,
+ * each mapped to the seed whose colour it pulses in. Every artwork has its own
+ * operation colour, so a same-settings group would otherwise flash as a
+ * rainbow; one colour per group says "these share the settings you point at".
+ */
+export function pulseColorSources(
+  layers: ReadonlyArray<Layer>,
+  seedIds: ReadonlyArray<string>,
+  machine: MachineKind,
+): ReadonlyMap<string, string> {
+  const seeds = layers.filter((layer) => seedIds.includes(layer.id));
+  const sources = new Map<string, string>();
+  for (const layer of layers) {
+    const seed =
+      seeds.find((candidate) => candidate.id === layer.id) ??
+      seeds.find((candidate) => sameOperationSettings(candidate, layer, machine));
+    if (seed !== undefined) sources.set(layer.id, seed.id);
+  }
+  return sources;
+}
+
 export type PulseSeed =
   | { readonly kind: 'object'; readonly objectId: string }
   | { readonly kind: 'operation'; readonly operationId: string };
 
+/** Operation id → id of the operation whose colour its artwork pulses in. */
+export type PulseColorSources = ReadonlyMap<string, string>;
+
 export type PulseTarget = {
-  /** The operations whose artwork pulses, each in its own colour. */
-  readonly operationIds: ReadonlySet<string>;
+  readonly colorSources: PulseColorSources;
   readonly objectIds: ReadonlyArray<string>;
   /** Start delay per object, in milliseconds. */
   readonly offsets: ReadonlyMap<string, number>;
 };
 
 /**
- * What pulses for a hover: the piece under the pointer alone, in the colours
- * of its own operations, or every piece an operation row's operation draws,
- * swept left to right. Other artwork stays in ink, even when it has the same
- * settings or shares an operation with the hovered piece. `centerOf` places
- * each piece on screen for the sweep.
+ * Everything that pulses for a hover: the hovered artwork's operations (or
+ * the hovered row's) widened to every operation with the same settings, and
+ * the artwork that uses them. `centerOf` places each piece on screen so the
+ * pulse can ripple out from the hovered piece, or sweep left to right from a row.
  */
 export function pulseTargetFor(
   objects: ReadonlyArray<SceneObject>,
   layers: ReadonlyArray<Layer>,
+  machine: MachineKind,
   seed: PulseSeed,
   centerOf: (object: SceneObject) => { readonly x: number; readonly y: number },
 ): PulseTarget | null {
+  let seedIds: ReadonlyArray<string> = seed.kind === 'operation' ? [seed.operationId] : [];
+  let originId: string | null = null;
   if (seed.kind === 'object') {
     const origin = objects.find((object) => object.id === seed.objectId);
     if (origin === undefined) return null;
-    const operationIds = new Set(operationIdsForObject(origin, layers));
-    if (operationIds.size === 0) return null;
-    return { operationIds, objectIds: [origin.id], offsets: new Map([[origin.id, 0]]) };
+    seedIds = operationIdsForObject(origin, layers);
+    originId = origin.id;
   }
+  const colorSources = pulseColorSources(layers, seedIds, machine);
+  if (colorSources.size === 0) return null;
   const members = objects.filter((object) =>
-    operationIdsForObject(object, layers).includes(seed.operationId),
+    operationIdsForObject(object, layers).some((id) => colorSources.has(id)),
   );
   if (members.length === 0) return null;
   const pieces = members.map((object) => ({ id: object.id, ...centerOf(object) }));
   return {
-    operationIds: new Set([seed.operationId]),
+    colorSources,
     objectIds: members.map((object) => object.id),
-    offsets: pulseStartOffsets(pieces),
+    offsets: pulseStartOffsets(pieces, originId),
   };
 }
 
-/** Sweep left to right across an operation's pieces, keeping the whole sweep short. */
+/** Ripple outward from the origin by screen distance, or sweep left to right without one. */
 export function pulseStartOffsets(
   pieces: ReadonlyArray<{ readonly id: string; readonly x: number; readonly y: number }>,
+  originId: string | null,
 ): ReadonlyMap<string, number> {
+  const origin = pieces.find((piece) => piece.id === originId);
+  if (origin !== undefined) {
+    return new Map(
+      pieces.map((piece) => {
+        if (piece.id === origin.id) return [piece.id, 0];
+        const distance = Math.hypot(piece.x - origin.x, piece.y - origin.y);
+        return [piece.id, Math.min(MAX_STAGGER_MS, RIPPLE_BASE_MS + distance * RIPPLE_MS_PER_PX)];
+      }),
+    );
+  }
   const step =
     pieces.length <= 1 ? 0 : Math.min(SWEEP_STEP_MS, MAX_STAGGER_MS / (pieces.length - 1));
   const sorted = [...pieces].sort((a, b) => a.x - b.x);
@@ -90,7 +133,7 @@ export function pulseStartOffsets(
 
 export type PulsePieceFrame = {
   readonly objectId: string;
-  readonly operationIds: ReadonlySet<string>;
+  readonly colorSources: PulseColorSources;
   readonly strength: number;
   readonly glow: { readonly blurPx: number; readonly alpha: number } | null;
   readonly edgeAlpha: number;
@@ -98,7 +141,7 @@ export type PulsePieceFrame = {
 
 type Entry = {
   start: number | null;
-  operationIds: ReadonlySet<string>;
+  colorSources: PulseColorSources;
   edge: number;
 };
 
@@ -115,8 +158,8 @@ export class ArtworkPulseClock {
   hover(target: PulseTarget, now: number, options: { readonly pulse?: boolean } = {}): void {
     this.hovered = new Set(target.objectIds);
     for (const objectId of target.objectIds) {
-      const entry = this.entries.get(objectId) ?? { start: null, operationIds: new Set(), edge: 0 };
-      entry.operationIds = target.operationIds;
+      const entry = this.entries.get(objectId) ?? { start: null, colorSources: new Map(), edge: 0 };
+      entry.colorSources = target.colorSources;
       if (options.pulse !== false && !isRunning(entry, now)) {
         entry.start = now + (target.offsets.get(objectId) ?? 0);
       }
@@ -145,7 +188,7 @@ export class ArtworkPulseClock {
         if (!hovered && entry.start === null) this.entries.delete(objectId);
         continue;
       }
-      pieces.push({ objectId, operationIds: entry.operationIds, ...step.piece });
+      pieces.push({ objectId, colorSources: entry.colorSources, ...step.piece });
     }
     if (!busy) this.lastNow = null;
     return { pieces, busy };
@@ -154,7 +197,7 @@ export class ArtworkPulseClock {
 
 type EntryStep = {
   readonly busy: boolean;
-  readonly piece: Omit<PulsePieceFrame, 'objectId' | 'operationIds'> | null;
+  readonly piece: Omit<PulsePieceFrame, 'objectId' | 'colorSources'> | null;
 };
 
 function stepEntry(

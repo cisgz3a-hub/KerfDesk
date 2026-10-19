@@ -1,12 +1,13 @@
-// The operation colour pulse (ADR-620, ADR-632). Artwork rests in plain ink.
-// When the pointer settles on a piece (select tool), that piece alone pulses
-// once in its own operation colours; on an operation row, that operation's
-// artwork does. A soft colour edge stays while the pointer stays. Drawn on its
+// The operation colour pulse (ADR-620). Artwork rests in plain ink. When the
+// pointer settles on a piece (select tool) or on an operation row, every piece
+// sharing those settings pulses once in that operation's colour, rippling
+// outward, and keeps a soft colour edge while the pointer stays. Drawn on its
 // own pointer-transparent canvas, so a pulse never redraws the scene.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   hitTest,
+  machineKindOf,
   transformedBBox,
   type Project,
   type Scene,
@@ -221,9 +222,10 @@ function usePulseLoop(
     seed === null ? '' : seed.kind === 'object' ? `o:${seed.objectId}` : `r:${seed.operationId}`;
   const lastSeedKey = useRef('');
   const scene = project.scene;
+  const machineKind = machineKindOf(project.machine);
   useEffect(() => {
-    // An edit during the hover (moving the hovered piece to another operation,
-    // say) can change what pulses: retarget without pulsing again.
+    // An edit during the hover (Paste settings on the hovered row, say) can
+    // change which operations share its settings: regroup without pulsing again.
     const sameHover = seedKey !== '' && seedKey === lastSeedKey.current;
     lastSeedKey.current = seedKey;
     // A click or drag pauses the canvas hover. Coming back to the same piece
@@ -235,16 +237,16 @@ function usePulseLoop(
     const target =
       seed === null
         ? null
-        : pulseTargetFor(project.scene.objects, project.scene.layers, seed, (object) =>
+        : pulseTargetFor(project.scene.objects, project.scene.layers, machineKind, seed, (object) =>
             screenCenter(object, view),
           );
     if (target === null) loop.clock.leave();
     else loop.clock.hover(target, performance.now(), { pulse: !resumed });
     loop.kick();
-    // Keyed on the hover and scene: a view change repaints through the effect
-    // below and must not retarget or restart anything.
+    // Keyed on the hover, scene and machine kind: a view change repaints through
+    // the effect below and must not regroup or restart anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seedKey, scene, canvasObjectId]);
+  }, [seedKey, scene, machineKind, canvasObjectId]);
   useEffect(() => {
     loop.kick();
   }, [project, view, reducedMotion, colorScheme, displayMode, loop]);

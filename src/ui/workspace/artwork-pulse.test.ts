@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   createLayer,
+  createLayerSubLayer,
+  DEFAULT_CNC_LAYER_SETTINGS,
   IDENTITY_TRANSFORM,
   type Layer,
-  type SceneObject,
   type TracedImage,
 } from '../../core/scene';
 import {
   ArtworkPulseClock,
+  pulseColorSources,
   PULSE_DURATION_MS,
   PULSE_EDGE_ALPHA,
   pulseGlow,
@@ -16,12 +18,13 @@ import {
   pulseTargetFor,
   type PulseTarget,
 } from './artwork-pulse';
+import { sameOperationSettings } from './pulse-settings-match';
 
 function layer(id: string, color: string, overrides: Partial<Layer> = {}): Layer {
   return { ...createLayer({ id, color }), ...overrides };
 }
 
-function artwork(id: string, operationIds: ReadonlyArray<string>, x: number): TracedImage {
+function artwork(id: string, operationId: string, x: number): TracedImage {
   return {
     kind: 'traced-image',
     id,
@@ -29,7 +32,7 @@ function artwork(id: string, operationIds: ReadonlyArray<string>, x: number): Tr
     traceMode: 'filled-contours',
     bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
     transform: { ...IDENTITY_TRANSFORM, x },
-    operationIds: [...operationIds],
+    operationIds: [operationId],
     paths: [{ color: '#000000', polylines: [] }],
   };
 }
@@ -54,63 +57,141 @@ describe('pulse shape', () => {
   });
 });
 
-describe('what pulses for a hover', () => {
+describe('which artwork pulses together', () => {
   const engrave = layer('engrave', '#2563eb', { power: 40, speed: 3000 });
   const sameEngrave = layer('engrave-2', '#16a34a', { power: 40, speed: 3000, name: 'Other' });
   const cut = layer('cut', '#dc2626', { power: 100, speed: 480 });
-  const layers = [engrave, sameEngrave, cut];
-  const centre = (object: SceneObject) => ({ x: object.transform.x, y: 0 });
 
-  it('pulses only the hovered piece, even beside artwork with the same settings', () => {
+  it('groups operations by settings in the colour of the one pointed at', () => {
+    const group = pulseColorSources([engrave, sameEngrave, cut], ['engrave'], 'laser');
+    // Name and colour do not count; the whole group pulses in the seed's colour.
+    expect([...group]).toEqual([
+      ['engrave', 'engrave'],
+      ['engrave-2', 'engrave'],
+    ]);
+    expect([...pulseColorSources([engrave, cut], ['cut'], 'laser')]).toEqual([['cut', 'cut']]);
+  });
+
+  it('keeps each seed its own colour when the pointer is on artwork with two operations', () => {
+    const group = pulseColorSources([engrave, sameEngrave, cut], ['cut', 'engrave-2'], 'laser');
+    expect(group.get('cut')).toBe('cut');
+    expect(group.get('engrave-2')).toBe('engrave-2');
+    expect(group.get('engrave')).toBe('engrave-2');
+  });
+
+  it('groups equal sub-operations independently of their ids and labels', () => {
+    const a = {
+      ...engrave,
+      subLayers: [createLayerSubLayer(cut, { id: 'first-cut', label: 'Outline' })],
+    };
+    const b = {
+      ...sameEngrave,
+      subLayers: [createLayerSubLayer(cut, { id: 'second-cut', label: 'Finish' })],
+    };
+    expect([...pulseColorSources([a, b], [a.id], 'laser').keys()]).toEqual([a.id, b.id]);
+    expect(sameOperationSettings(a, { ...b, subLayers: [] }, 'laser')).toBe(false);
+    expect(
+      sameOperationSettings(
+        a,
+        { ...b, subLayers: [createLayerSubLayer(cut, { id: 'cut', label: '', enabled: false })] },
+        'laser',
+      ),
+    ).toBe(false);
+    expect(
+      sameOperationSettings(
+        a,
+        { ...b, subLayers: [createLayerSubLayer(engrave, { id: 'cut', label: '' })] },
+        'laser',
+      ),
+    ).toBe(false);
+  });
+
+  it('groups absent laser options with their explicit legacy defaults, including sub-operations', () => {
+    const explicit = {
+      ...sameEngrave,
+      allowUncalibratedBidirectionalScan: false,
+      perforationEnabled: false,
+      perforationCutMm: 3,
+      perforationSkipMm: 1,
+      overcutMm: 0,
+      imageOverscanMm: 5,
+      tabLayout: 'count' as const,
+      tabSpacingMm: 50,
+      tabMaxPerShape: 0,
+      tabCutPowerPercent: 0,
+      imageScanAngleDeg: 0,
+      imageCrossHatch: false,
+      passAngleStepDeg: 0,
+      autoOverscan: false,
+    };
+    expect(sameOperationSettings(engrave, explicit, 'laser')).toBe(true);
+    expect(
+      sameOperationSettings(
+        { ...engrave, subLayers: [createLayerSubLayer(engrave, { id: 'sub', label: '' })] },
+        { ...explicit, subLayers: [createLayerSubLayer(explicit, { id: 'sub', label: '' })] },
+        'laser',
+      ),
+    ).toBe(true);
+    for (const changed of [
+      { perforationEnabled: true },
+      { tabLayout: 'spacing' as const },
+      { autoOverscan: true },
+      { imageOverscanMm: 0 },
+      { imageScanAngleDeg: 45 },
+      { powerMode: 'dynamic' as const },
+      // Absence uses the device's calibration; explicit zero disables that offset.
+      { bidirectionalScanOffsetMm: 0 },
+    ]) {
+      expect(sameOperationSettings(engrave, { ...explicit, ...changed }, 'laser')).toBe(false);
+    }
+  });
+
+  it('treats an operation with no CNC block as the CNC defaults', () => {
+    const legacy = layer('legacy', '#2563eb');
+    const explicit = layer('explicit', '#dc2626', { cnc: DEFAULT_CNC_LAYER_SETTINGS });
+    const deeper = layer('deeper', '#16a34a', {
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm: DEFAULT_CNC_LAYER_SETTINGS.depthMm + 1 },
+    });
+    const group = pulseColorSources([legacy, explicit, deeper], ['legacy'], 'cnc');
+    expect([...group.keys()]).toEqual(['legacy', 'explicit']);
+  });
+
+  it('compares CNC operations by their CNC settings only', () => {
+    const a = layer('a', '#2563eb', { power: 10 });
+    const b = layer('b', '#dc2626', { power: 90 });
+    expect([...pulseColorSources([a, b], ['a'], 'cnc').keys()]).toEqual(['a', 'b']);
+  });
+
+  it('pulses every piece sharing the hovered artwork settings, rippling out from it', () => {
     const objects = [
-      artwork('heart', ['engrave'], 0),
-      artwork('name', ['engrave-2'], 100),
-      artwork('box', ['cut'], 200),
+      artwork('heart', 'engrave', 0),
+      artwork('name', 'engrave-2', 100),
+      artwork('box', 'cut', 200),
     ];
-    const target = pulseTargetFor(objects, layers, { kind: 'object', objectId: 'heart' }, centre);
-    expect(target?.objectIds).toEqual(['heart']);
-    expect([...(target?.operationIds ?? [])]).toEqual(['engrave']);
+    const target = pulseTargetFor(
+      objects,
+      [engrave, sameEngrave, cut],
+      'laser',
+      { kind: 'object', objectId: 'heart' },
+      (object) => ({ x: object.transform.x, y: 0 }),
+    );
+    expect(target?.objectIds).toEqual(['heart', 'name']);
     expect(target?.offsets.get('heart')).toBe(0);
+    expect(target?.offsets.get('name')).toBeGreaterThan(0);
   });
 
-  it('leaves other artwork in the same operation in ink', () => {
-    const objects = [artwork('heart', ['engrave'], 0), artwork('star', ['engrave'], 100)];
-    const target = pulseTargetFor(objects, layers, { kind: 'object', objectId: 'star' }, centre);
-    expect(target?.objectIds).toEqual(['star']);
-  });
-
-  it('pulses each operation of a piece with two operations, each in its own colour', () => {
-    const objects = [artwork('badge', ['cut', 'engrave-2'], 0)];
-    const target = pulseTargetFor(objects, layers, { kind: 'object', objectId: 'badge' }, centre);
-    expect(target?.objectIds).toEqual(['badge']);
-    expect([...(target?.operationIds ?? [])].sort()).toEqual(['cut', 'engrave-2']);
-  });
-
-  it('pulses nothing for a piece that is gone', () => {
-    const gone = { kind: 'object', objectId: 'deleted' } as const;
-    expect(pulseTargetFor([artwork('box', ['cut'], 0)], layers, gone, centre)).toBeNull();
-  });
-
-  it("pulses an operation row's own artwork only, and nothing for a missing operation", () => {
-    const objects = [
-      artwork('box', ['cut'], 50),
-      artwork('lid', ['cut'], 0),
-      artwork('heart', ['engrave'], 100),
-    ];
+  it('pulses an operation row from its operation id, and nothing for a missing one', () => {
+    const objects = [artwork('box', 'cut', 0)];
+    const centre = () => ({ x: 0, y: 0 });
     const seed = { kind: 'operation', operationId: 'cut' } as const;
-    const target = pulseTargetFor(objects, layers, seed, centre);
-    expect(target?.objectIds).toEqual(['box', 'lid']);
-    expect([...(target?.operationIds ?? [])]).toEqual(['cut']);
-    // The row sweeps left to right.
-    expect(target?.offsets.get('lid')).toBe(0);
-    expect(target?.offsets.get('box')).toBeGreaterThan(0);
+    expect(pulseTargetFor(objects, [cut], 'laser', seed, centre)?.objectIds).toEqual(['box']);
     const gone = { kind: 'operation', operationId: 'deleted' } as const;
-    expect(pulseTargetFor(objects, layers, gone, centre)).toBeNull();
+    expect(pulseTargetFor(objects, [cut], 'laser', gone, centre)).toBeNull();
   });
 
-  it('sweeps left to right and keeps the whole sweep short', () => {
+  it('sweeps left to right without an origin and keeps the whole ripple short', () => {
     const pieces = Array.from({ length: 40 }, (_, index) => ({ id: `p${index}`, x: -index, y: 0 }));
-    const offsets = pulseStartOffsets(pieces);
+    const offsets = pulseStartOffsets(pieces, null);
     expect(offsets.get('p39')).toBe(0);
     expect(offsets.get('p0')).toBeLessThanOrEqual(420);
     expect(offsets.get('p0')).toBeGreaterThan(offsets.get('p1') ?? Infinity);
@@ -119,7 +200,7 @@ describe('what pulses for a hover', () => {
 
 describe('pulse clock', () => {
   const target: PulseTarget = {
-    operationIds: new Set(['engrave']),
+    colorSources: new Map([['engrave', 'engrave']]),
     objectIds: ['heart'],
     offsets: new Map([['heart', 0]]),
   };

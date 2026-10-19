@@ -60,8 +60,10 @@ type PieceBitmap = {
 
 type CacheEntry = {
   readonly object: SceneObject;
-  /** The operation whose artwork is drawn, in its own colour. */
+  /** The operation whose artwork is drawn… */
   readonly layer: Layer;
+  /** …in this operation's colour (the one the pointer is on). */
+  readonly colorLayer: Layer;
   /** Other bound operations can change the path's visible fill/stroke style. */
   readonly lookup: ReadonlyMap<string, Layer>;
   readonly viewKey: string;
@@ -106,14 +108,17 @@ export class ArtworkPulsePainter {
     for (const piece of pieces) {
       const object = objectById.get(piece.objectId);
       if (object === undefined) continue;
-      // The piece's own operations that this hover pulses, each in its own
-      // colour: an operation row pulses only that operation's paths.
+      // Only the piece's own operations: a group of N same-settings imports
+      // carries N operations, and pairing every piece with every one of them
+      // would render N² empty bitmaps.
       for (const operationId of this.operationsOf(object, layers)) {
+        const sourceId = piece.colorSources.get(operationId);
         const layer = layerById.get(operationId);
-        if (!piece.operationIds.has(operationId) || layer === undefined || !layer.visible) continue;
+        if (sourceId === undefined || layer === undefined || !layer.visible) continue;
+        const colorLayer = layerById.get(sourceId) ?? layer;
         const key = `${object.id}\u0000${operationId}`;
         live.add(key);
-        const identity = { object, layer, lookup, viewKey, displayMode };
+        const identity = { object, layer, colorLayer, lookup, viewKey, displayMode };
         const bitmap = this.bitmapFor(key, identity, lookup, view, ctx.canvas);
         if (bitmap !== null) drawPiece(ctx, bitmap, piece);
       }
@@ -181,6 +186,7 @@ export class ArtworkPulsePainter {
       cached !== undefined &&
       cached.object === identity.object &&
       cached.layer === identity.layer &&
+      cached.colorLayer === identity.colorLayer &&
       cached.lookup === identity.lookup &&
       cached.viewKey === identity.viewKey &&
       cached.displayMode === identity.displayMode
@@ -188,7 +194,7 @@ export class ArtworkPulsePainter {
       this.entries.set(key, cached);
       return cached.bitmap;
     }
-    const color = canvasVectorDisplayColor(identity.layer.color);
+    const color = canvasVectorDisplayColor(identity.colorLayer.color);
     const bitmap = renderPiece(
       identity.object,
       identity.layer,
