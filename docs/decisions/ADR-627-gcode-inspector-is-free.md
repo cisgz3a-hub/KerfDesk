@@ -16,7 +16,7 @@ The Inspector is also the base of ADR-630 (running an external G-code file). Run
 2. The browser Free build keeps the Inspector's implementation. `InspectorView` and `CanvasGcodeView` leave `PRO_BUILD_ENTRIES` (ADR-540 Amendment 1); every other Pro entry stays replaced.
 3. The Pro list and its copy (the Pro dialog, the website's feature list, the gap audit) stop naming the Inspector.
 
-The rest of ADR-540 is unchanged: V-carve, 3D relief, adaptive clearing, advanced tracing, camera alignment, Registration Jig, Place Board, the box generator and Design Studio remain Pro. If ADR-623 (desktop opens behind a licence window) lands, this decision governs the browser app and any other Free surface; it adds no new licence check either way.
+The rest of ADR-540 is unchanged: V-carve, 3D relief, adaptive clearing, advanced tracing, camera alignment, Registration Jig, Place Board, the box generator and Design Studio remain Pro. ADR-623 has since made the desktop app open behind a licence window with no Free edition, so the Free surface this decision governs is the browser app; in a desktop session the Inspector is no longer a Pro tool and opens without a Pro prompt. This decision adds no licence check.
 
 ## Consequences
 

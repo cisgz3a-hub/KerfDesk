@@ -31,4 +31,4 @@ Non-negotiable 6 says the internal model is millimetres and inches are accepted 
 
 ## Verification
 
-Unit tests cover the conversion and formatting helpers (round trips, four-decimal display, negative and zero values, typed unit suffixes overriding the preference), and that showing a value or switching units commits nothing. Component tests cover the transform boxes, the speed and CNC fields, the status bar and the Machine panel readout in both units. The Settings test covers the preference's storage and its default.
+Unit tests cover the conversion and formatting helpers (round trips, four-decimal display, negative and zero values, typed unit suffixes overriding the preference), and that showing a value or switching units commits nothing. Component tests cover the transform boxes, the speed and CNC fields, the status bar (bed and selection) and the Machine panel's position and origin readout in both units, and the rulers' inch steps. A unit test of the display-units store covers the preference's storage and its default; the Settings control itself has no component test.
