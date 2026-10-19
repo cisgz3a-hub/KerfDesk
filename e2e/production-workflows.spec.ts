@@ -417,10 +417,10 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   await expect(setup).toContainText('Step 1 of 3');
   await setup.getByText('Connection options', { exact: true }).click();
   await setup.getByLabel('Controller firmware').selectOption('grblhal');
-  await setup.getByLabel('Search machine profiles').fill('Creality Falcon A1 Pro');
+  await setup.getByLabel('Search machines').fill('Creality Falcon A1 Pro');
   await page.getByRole('radio', { name: 'Use Creality Falcon A1 Pro' }).check();
-  await setup.getByRole('button', { name: 'Check essentials', exact: true }).click();
-  await setup.getByRole('button', { name: 'Review setup', exact: true }).click();
+  await setup.getByRole('button', { name: 'Next', exact: true }).click();
+  await setup.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Save machine setup' })).toBeEnabled();
   const finishBox = await page.getByRole('button', { name: 'Save machine setup' }).boundingBox();
   expect(finishBox).not.toBeNull();
@@ -456,19 +456,21 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
   await setup.getByText('Connection options', { exact: true }).click();
   await expect(setup.getByLabel('Controller firmware')).toHaveValue('grbl-v1.1');
 
-  // A firmware mismatch informs on the card but never disables it — the
-  // catalog stays guard-free (rule 7); detection is advisory only.
-  await setup.getByLabel('Search machine profiles').fill('Generic Marlin laser');
-  const marlinCard = page.locator('article').filter({ hasText: 'Generic Marlin laser 300' });
-  await expect(marlinCard).toContainText('Profile controller is marlin, but detected grbl-v1.1.');
+  // A firmware mismatch informs on the row but never disables it — the
+  // machine list stays guard-free (rule 7); detection is advisory only.
+  await setup.getByLabel('Search machines').fill('Falcon A1 Pro');
+  const falconRow = setup
+    .locator('label.lf-setup-picker-row')
+    .filter({ hasText: 'Falcon A1 Pro (vendor command set)' });
+  await expect(falconRow).toContainText('Other firmware');
   await expect(
-    marlinCard.getByRole('radio', { name: 'Use Generic Marlin laser 300×200' }),
+    falconRow.getByRole('radio', { name: 'Use Creality Falcon A1 Pro (vendor command set)' }),
   ).toBeEnabled();
 
-  await setup.getByLabel('Search machine profiles').fill('xTool D1 Pro');
+  await setup.getByLabel('Search machines').fill('xTool D1 Pro');
   await page.getByRole('radio', { name: 'Use xTool D1 Pro (20 W)', exact: true }).check();
-  await setup.getByRole('button', { name: 'Check essentials', exact: true }).click();
-  await setup.getByRole('button', { name: 'Review setup', exact: true }).click();
+  await setup.getByRole('button', { name: 'Next', exact: true }).click();
+  await setup.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
   await setup.getByRole('button', { name: 'Save machine setup' }).click();
   await saveProjectAs(page, kerfdesk);
 

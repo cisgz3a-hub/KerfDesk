@@ -3341,65 +3341,77 @@ record is per machine profile and Laser/CNC head. Only **Save machine setup**
 completes it; Cancel or an unsuccessful connection leaves the next Connect eligible.
 Configured profiles connect directly. Automatic connections and recovery Reconnect
 keep their existing behavior and do not open setup (ADR-420 Amendment 3).
-The Machine stage keeps a primary **Review setup** shortcut beside **Check essentials** (ADR-420
-Amendment 4). After choosing a profile, **Review setup** opens the final review directly; only
-**Save machine setup** applies it. **Check essentials** remains available to edit values first.
-Neither selecting the shortcut nor saving an ordinary software profile disconnects the controller.
+Machine and Essentials each have one forward button, **Next** (ADR-636; it replaces ADR-420
+Amendment 4's **Review setup** shortcut and **Check essentials**). The stage buttons still open any
+stage directly, Review included; only **Save machine setup** applies the draft. Neither moving
+between stages nor saving an ordinary software profile disconnects the controller.
 **Cancel without saving** closes at once. Escape and the header close button close at once unless
 the operator changed the draft (a new machine's automatic fill alone does not count); then they
 first ask **Discard your changes to this setup?** with **Keep editing** (focused, and Escape
 again) or **Discard changes**.
 
-1. **Machine** — **Find my machine** opens the stage (ADR-420). It connects with the draft's
-   controller, baud and streaming choice, reusing the remembered port as the rail's Connect does,
-   and reads the controller's identity and settings; nothing moves and no controller setting is
-   written. Its heading follows the connection: **Find your machine**, **Connecting…**,
-   **Reading your controller…**, **Waiting for the controller…**, **Found your <firmware>
-   controller**, **Your machine didn’t answer**, **Couldn’t connect**, or **No answer at any
-   common speed**. When found it lists the
-   reported travel, max speed, power range, laser mode and Z travel.
-   - For a machine not set up before in this browser, or after the operator presses **Find my
-     machine**, the reported values are filled into the draft by themselves: the firmware the
+1. **Machine** — the stage asks **Which machine do you have?** (ADR-636). A one-line connection
+   strip sits at the top and the machine list follows; connecting is never needed to choose.
+   - The strip (ADR-420) connects with the draft's controller, baud and streaming choice when the
+     operator presses **Connect**, reusing the remembered port as the rail's Connect does, and
+     reads the controller's identity and settings; nothing moves and no controller setting is
+     written. Its heading follows the connection: **Not connected**, **Connecting…**, **Reading
+     your controller…**, **Waiting for the controller…**, **Found your <firmware> controller**,
+     **Your machine didn’t answer**, **Couldn’t connect**, or **No answer at any common speed**.
+     When found it lists the reported travel, max speed, power range, laser mode and Z travel.
+   - For a machine not set up before in this browser, or after the operator presses **Connect** in
+     the strip, the reported values are filled into the draft by themselves: the firmware the
      banner names (when the driver can connect to it), the baud rate that answered, the machine
      type from `$32` (laser mode on or off; a Laser + CNC draft keeps both), and the mapped `$$`
-     values. The card lists each change
+     values. The strip lists each change
      as old → new with one **Undo** that restores the draft as it was. A machine already set up
      that the operator only opens setup for keeps its values and offers **Use detected values**
      for the ones that differ (ADR-347). When the adopted firmware differs from the one it
-     connected with, Find reconnects once with it.
+     connected with, Connect reconnects once with it.
    - **Your machine didn’t answer** appears when nothing came back within 10 s of connecting (a
      board that restarts when the port opens can take several seconds to answer, ADR-375). It
      offers **Try other speeds**, which reconnects at 115200,
      230400, 250000, 921600, 57600, 38400, 19200 and 9600 baud in turn and stops at the first that
      answers; **Stop** ends it. **Use a different port…** always shows the picker.
-   - **Set up without connecting** keeps the whole stage usable offline; a browser without
-     WebSerial says so and keeps the offline path. A file-only controller explains that its jobs
-     are saved as files.
-   - **Connection options**, under the card, holds the controller family, baud, output dialect,
+   - A browser without WebSerial says so in the strip and the list stays usable. A file-only
+     controller explains that its jobs are saved as files.
+   - **Connection options**, under the strip, holds the controller family, baud, output dialect,
      advanced streaming and the command contract.
-   The capability cards follow: choose **Laser only**, **CNC only**, or **Laser + CNC**; hybrids
-   also choose the active mode after Save. Laser-capable machines then see up to two compact profile previews, keeping the selected catalog
-   profile in view. Search or **Browse all N profiles** opens the rest of the catalog. CNC-capable
-   machines also have CNC presets. A profile card is one option in a radio group: a pointer
-   anywhere on the card chooses that profile and copies it into the draft, while **Profile details**
-   sits outside the choice so reading the evidence selects nothing. Choosing copies the preset
-   whole, so a later correction to the preset never reaches that copy; when a saved copy still
-   holds a value a correction replaced (the xTool D1 Pro's front-left origin, the Sculpfun S30's
-   410 x 400 mm bed), Job Review names the old and corrected values as an advisory (ADR-322
-   Amendment 1), and Machine Setup shows a **Preset correction** row under Origin with one click
-   to use the corrected value (ADR-322 Amendment 2). Nothing is applied on its own. A saved copy
-   of the Creality Falcon A1 Pro preset made before the preset had its vendor command set connects
-   with the generic grblHAL commands: Machine Setup shows its card unselected at the head of the
-   preview with a notice, one click re-applies the preset into the draft, and Job Review names the
-   copy and why it matters, since Frame then sends `M9` just before Start (ADR-375). A preset's
-   content is pinned to its `catalogVersion`, so a preset change has to bump the version. Detected
-   matches are
-   prioritised among the remaining profiles and explain their evidence under **Profile details**,
-   but generic `$$` values never establish hardware identity: "Possible match" remains the
-   ceiling, so Find my machine never picks a catalog profile. **Import or export a machine
-   profile** is a separate disclosure on Machine.
+   - **The machine list** holds every listed laser profile and CNC preset in one scrolling list,
+     grouped by brand from A to Z, with **Search machines** (brand, model, type or `WxH`) and an
+     **All / Laser / CNC** filter; a Laser + CNC machine shows under both. The generic firmware
+     starters are not machines, so they are not listed. A row is one option in a radio group: a
+     pointer anywhere on it chooses that machine and copies it into the draft. A row shows the
+     model, work area, laser power and type; once a controller has named its firmware, laser rows
+     add **Same firmware** or **Other firmware** as a hint. Under the list the chosen machine shows
+     its facts, evidence label, warnings and **Profile details**, which sit outside the choice so
+     reading the evidence selects nothing; a Laser + CNC machine also asks which toolhead is fitted.
+   - Choosing a CNC preset makes the draft a CNC-only machine with the preset's name, work area and
+     spindle ceiling, and leaves the controller unchanged; over a listed laser profile it starts
+     from the generic starter for the same controller, so no laser brand's values stay behind.
+   - **My machine isn’t listed**, after the list, asks four things: name, type (**Laser only**,
+     **CNC only** or **Laser + CNC**, with the active toolhead for a hybrid, chosen after Save with
+     the toolbar's Laser / CNC), work area and firmware (the same draft value as Connection
+     options' controller). Chosen while a listed machine is in the draft, it starts again from the
+     generic starter for the same controller, named **My machine**, keeping the work area; chosen on
+     the untouched starter it only names it **My machine**. A draft that is neither listed nor the
+     untouched starter (imported, filled in from the controller, or set up earlier) opens with this
+     choice selected.
+   - Choosing copies the preset whole, so a later correction to the preset never reaches that
+     copy; when a saved copy still holds a value a correction replaced (the xTool D1 Pro's
+     front-left origin, the Sculpfun S30's 410 x 400 mm bed), Job Review names the old and
+     corrected values as an advisory (ADR-322 Amendment 1), and Machine Setup shows a **Preset
+     correction** row under Origin with one click to use the corrected value (ADR-322 Amendment 2).
+     Nothing is applied on its own. A saved copy of the Creality Falcon A1 Pro preset made before
+     the preset had its vendor command set connects with the generic grblHAL commands: Machine
+     Setup shows its row unchosen with a notice, one click re-applies the preset into the draft,
+     and Job Review names the copy and why it matters, since Frame then sends `M9` just before
+     Start (ADR-375). A preset's content is pinned to its `catalogVersion`, so a preset change has
+     to bump the version. Generic `$$` values never establish hardware identity, so connecting
+     never chooses a machine from the list. **Import or export a machine profile** is a separate
+     disclosure on Machine.
    CNC catalogue entries supply geometry and an assumed spindle ceiling only; they leave the
-   controller choice unchanged. Controller notes and sources remain visible beside the selected
+   controller choice unchanged. Controller notes and sources remain visible beside the chosen
    preset. Onefinity entries require an external controller/postprocessor integration and do not
    claim compatible KerfDesk output.
    A connection whose driver or command set differs from the draft's shows **The connection does
@@ -3450,7 +3462,7 @@ settings and Job Review keep their existing read-only setup references.
 #### Success — connected controller answers its read commands
 
 1. Detected identity remains a separate observation from the saved profile. For a new machine, or
-   after **Find my machine**, the draft adopts the reported firmware, baud, machine type and
+   after **Connect** in Machine Setup's connection strip, the draft adopts the reported firmware, baud, machine type and
    values with one **Undo**; otherwise a mismatch is explicit and must be resolved deliberately.
 2. Supported numeric readback values can be copied into the draft with **Use detected values**.
    Using `$30` as the CNC spindle ceiling requires the explicit option and reported CNC mode
@@ -6523,7 +6535,7 @@ as the pane's design record.
 
 #### Success
 1. When a controller is connected and its `$$` snapshot differs from the current setup,
-   **Machine Setup > Machine > Find my machine** shows the detected values (ADR-420). **Use detected
+   **Machine Setup > Machine**'s connection strip shows the detected values (ADR-420, ADR-636). **Use detected
    values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131) into the setup
    draft; **Save machine setup** commits them, then the difference clears.
    `$30` is offered as spindle RPM only when the same dump reports `$32=0`;
@@ -6532,7 +6544,7 @@ as the pane's design record.
 #### Error — none (opt-in)
 1. Nothing changes until **Use detected values** updates the draft and **Save machine setup**
    commits it; leaving or cancelling the flow changes neither project nor controller. A new
-   machine, or one the operator pressed **Find my machine** for, gets the values in the draft by
+   machine, or one the operator pressed **Connect** for in the strip, gets the values in the draft by
    themselves with one **Undo**; the Save boundary is the same.
 
 #### Empty

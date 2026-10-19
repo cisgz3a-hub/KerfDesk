@@ -53,7 +53,7 @@ test('first explicit Connect opens Machine setup, connects, and saved catalog se
   await expectConnectReadsOnly(kerfdesk);
   await page.screenshot({ path: testInfo.outputPath('first-connect-machine-setup.png') });
 
-  await setup.getByRole('searchbox', { name: 'Search machine profiles' }).fill('Falcon A1 Pro');
+  await setup.getByRole('searchbox', { name: 'Search machines' }).fill('Falcon A1 Pro');
   const profile = setup.getByRole('radio', {
     name: 'Use Creality Falcon A1 Pro (vendor command set)',
     exact: true,
@@ -96,7 +96,7 @@ test('cancelled unsaved setup leaves the profile unconfigured and asks again on 
   await toolbar.getByRole('button', { name: 'Connect', exact: true }).click();
   await expect(setup).toBeVisible();
   await expectConnected(toolbar);
-  await setup.getByRole('button', { name: 'Check essentials', exact: true }).click();
+  await setup.getByRole('button', { name: 'Next', exact: true }).click();
   await setup
     .getByRole('textbox', { name: 'Device name', exact: true })
     .fill('Unsaved setup draft');
@@ -348,7 +348,7 @@ async function expectConnected(toolbar: Locator): Promise<void> {
 }
 
 async function saveSetup(setup: Locator): Promise<void> {
-  await setup.getByRole('button', { name: 'Review setup', exact: true }).click();
+  await setup.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
   await expect(setup).toContainText('Step 3 of 3');
   await setup.getByRole('button', { name: 'Save machine setup', exact: true }).click();
   await expect(setup).toHaveCount(0);

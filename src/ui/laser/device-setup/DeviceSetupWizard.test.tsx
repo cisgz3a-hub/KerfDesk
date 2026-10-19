@@ -82,14 +82,10 @@ describe('DeviceSetupWizard', () => {
       useLaserStore.setState({ connect });
       const view = await renderWizard(undefined, mockPlatform(false));
       try {
-        if (kind === 'cnc') {
-          const cnc = view.host.querySelectorAll('input[name="machine-capability"]').item(1);
-          if (!(cnc instanceof HTMLInputElement)) throw new Error('CNC radio missing');
-          await act(async () => cnc.click());
-        }
-        await act(async () => button(view.host, 'Check essentials').click());
+        if (kind === 'cnc') await chooseUnlistedType(view.host, 'CNC only');
+        await act(async () => button(view.host, 'Next').click());
         expect(view.host.textContent).toContain('Step 2 of 3');
-        await act(async () => button(view.host, 'Review setup').click());
+        await act(async () => button(view.host, 'Next').click());
         expect(view.host.textContent).toContain('Step 3 of 3');
         expect(
           button(view.host, kind === 'cnc' ? 'Save CNC machine setup' : 'Save machine setup')
@@ -112,7 +108,7 @@ describe('DeviceSetupWizard', () => {
       await openSetupDisclosure(view.host, 'Connection options');
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       await act(async () => {
-        button(view.host, 'Find my machine').click();
+        button(view.host, 'Connect').click();
         await Promise.resolve();
       });
       expect(connect).toHaveBeenCalledWith(expect.anything(), {
@@ -154,7 +150,7 @@ describe('DeviceSetupWizard', () => {
   it('disables serial connection when the platform does not support it', async () => {
     const view = await renderWizard(undefined, mockPlatform(false));
     try {
-      expect(buttonOrNull(view.host, 'Find my machine')).toBeNull();
+      expect(buttonOrNull(view.host, 'Connect')).toBeNull();
       expect(view.host.textContent).toContain('This browser can’t reach USB machines');
     } finally {
       await view.unmount();
@@ -186,15 +182,15 @@ describe('DeviceSetupWizard', () => {
     });
     const view = await renderWizard();
     try {
-      expect(button(view.host, 'Check essentials').disabled).toBe(false);
-      await act(async () => button(view.host, 'Check essentials').click());
+      expect(button(view.host, 'Next').disabled).toBe(false);
+      await act(async () => button(view.host, 'Next').click());
       expect(input(view.host, 'Bed width (mm)').value).toBe('0');
-      expect(button(view.host, 'Review setup').disabled).toBe(false);
-      await act(async () => button(view.host, 'Review setup').click());
+      expect(button(view.host, 'Next').disabled).toBe(false);
+      await act(async () => button(view.host, 'Next').click());
       expect(button(view.host, 'Save machine setup').disabled).toBe(true);
       await act(async () => button(view.host, 'Back').click());
       await changeInput(view.host, 'Bed width (mm)', '510');
-      await act(async () => button(view.host, 'Review setup').click());
+      await act(async () => button(view.host, 'Next').click());
       expect(button(view.host, 'Save machine setup').disabled).toBe(false);
       expect(useStore.getState().project.device.bedWidth).toBe(0);
     } finally {
@@ -205,7 +201,7 @@ describe('DeviceSetupWizard', () => {
   it('atomically saves a laser profile and workspace at the end', async () => {
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Check essentials').click());
+      await act(async () => button(view.host, 'Next').click());
       await changeInput(view.host, 'Device name', 'Beginner laser');
       await changeInput(view.host, 'Bed width (mm)', '510');
       await advanceToReview(view.host);
@@ -226,13 +222,10 @@ describe('DeviceSetupWizard', () => {
   it('shows CNC-only machine settings and commits them with the profile', async () => {
     const view = await renderWizard();
     try {
-      const radios = view.host.querySelectorAll('input[name="machine-capability"]');
-      const cncRadio = radios.item(1);
-      if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
-      await act(async () => cncRadio.click());
-      await changeSelect(view.host, 'Built-in CNC machine', 'genmitsu-3018');
-      await act(async () => button(view.host, 'Load into draft').click());
-      await act(async () => button(view.host, 'Check essentials').click());
+      const genmitsu = view.host.querySelector('input[aria-label="Use Genmitsu 3018-PRO"]');
+      if (!(genmitsu instanceof HTMLInputElement)) throw new Error('Genmitsu row missing');
+      await act(async () => genmitsu.click());
+      await act(async () => button(view.host, 'Next').click());
       expect(view.host.textContent).toContain('CNC machine limits');
       expect(view.host.textContent).toContain('assumes an installed, powered Z axis');
       expect(view.host.textContent).toContain('Recorded Z travel is informational');
@@ -259,12 +252,10 @@ describe('DeviceSetupWizard', () => {
   it('saves a hybrid machine with both output contracts and one explicit active mode', async () => {
     const view = await renderWizard();
     try {
-      const hybridRadio = view.host.querySelectorAll('input[name="machine-capability"]').item(2);
-      if (!(hybridRadio instanceof HTMLInputElement)) throw new Error('hybrid radio missing');
-      await act(async () => hybridRadio.click());
+      await chooseUnlistedType(view.host, 'Laser + CNC');
       expect(view.host.querySelectorAll('input[name="active-machine-kind"]')).toHaveLength(2);
 
-      await act(async () => button(view.host, 'Check essentials').click());
+      await act(async () => button(view.host, 'Next').click());
       // Hybrid saves with Laser active, retaining both output contracts in Essentials.
       expect(input(view.host, 'GRBL $30 max power S')).toBeInstanceOf(HTMLInputElement);
       expect(view.host.textContent).toContain('CNC machine limits');
@@ -275,7 +266,7 @@ describe('DeviceSetupWizard', () => {
       const cncMode = view.host.querySelectorAll('input[name="active-machine-kind"]').item(1);
       if (!(cncMode instanceof HTMLInputElement)) throw new Error('Active CNC mode missing');
       await act(async () => cncMode.click());
-      await act(async () => button(view.host, 'Check essentials').click());
+      await act(async () => button(view.host, 'Next').click());
       await openSetupDisclosure(view.host, 'CNC job setup');
       expect(select(view.host, 'Project material')).toBeInstanceOf(HTMLSelectElement);
 
@@ -283,7 +274,7 @@ describe('DeviceSetupWizard', () => {
       const laserMode = view.host.querySelectorAll('input[name="active-machine-kind"]').item(0);
       if (!(laserMode instanceof HTMLInputElement)) throw new Error('Active Laser mode missing');
       await act(async () => laserMode.click());
-      await act(async () => button(view.host, 'Check essentials').click());
+      await act(async () => button(view.host, 'Next').click());
       expect(view.host.querySelector('select[aria-label="Project material"]')).toBeNull();
       await changeInput(view.host, 'Safe Z', '10');
       await advanceToReview(view.host);
@@ -304,13 +295,11 @@ describe('DeviceSetupWizard', () => {
   it('allows review of an unsupported CNC controller but keeps invalid setup unsaved', async () => {
     const view = await renderWizard();
     try {
-      const cncRadio = view.host.querySelectorAll('input[name="machine-capability"]').item(1);
-      if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
-      await act(async () => cncRadio.click());
+      await chooseUnlistedType(view.host, 'CNC only');
       await openSetupDisclosure(view.host, 'Connection options');
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       expect(view.host.textContent).toContain('not a KerfDesk CNC streaming target');
-      expect(button(view.host, 'Check essentials').disabled).toBe(false);
+      expect(button(view.host, 'Next').disabled).toBe(false);
       await advanceToReview(view.host);
       expect(button(view.host, 'Save CNC machine setup').disabled).toBe(true);
       expect(view.host.textContent).toContain('cannot run KerfDesk CNC jobs');
@@ -344,7 +333,7 @@ describe('DeviceSetupWizard', () => {
       expect(view.host.querySelector('[aria-label="G-code output dialect"]')).toBeNull();
       expect(view.host.querySelector('[aria-label="Streaming mode"]')).toBeNull();
       expect(view.host.textContent).toContain('jobs are saved as files');
-      expect(buttonOrNull(view.host, 'Find my machine')).toBeNull();
+      expect(buttonOrNull(view.host, 'Connect')).toBeNull();
     } finally {
       await view.unmount();
     }
@@ -411,13 +400,23 @@ describe('DeviceSetupWizard', () => {
 });
 
 async function advanceToReview(host: HTMLElement): Promise<void> {
-  for (const label of ['Check essentials', 'Review setup']) {
-    const next = [...host.querySelectorAll('button')].find((candidate) =>
-      candidate.textContent?.includes(label),
-    );
-    if (next !== undefined) await act(async () => next.click());
+  for (let step = 0; step < 2 && !host.textContent?.includes('Step 3 of 3'); step += 1) {
+    await act(async () => button(host, 'Next').click());
   }
   expect(host.textContent).toContain('Step 3 of 3');
+}
+
+/** A machine that isn't listed asks its type (ADR-636). */
+async function chooseUnlistedType(host: HTMLElement, type: string): Promise<void> {
+  const unlisted = host.querySelector('input[aria-label="My machine isn’t listed"]');
+  if (!(unlisted instanceof HTMLInputElement)) throw new Error('Not-listed choice missing');
+  await act(async () => unlisted.click());
+  // Compared by attribute: jsdom's selector engine misreads the + in "Laser + CNC".
+  const radio = [
+    ...host.querySelectorAll<HTMLInputElement>('input[name="machine-capability"]'),
+  ].find((candidate) => candidate.getAttribute('aria-label') === type);
+  if (!(radio instanceof HTMLInputElement)) throw new Error(`Type missing: ${type}`);
+  await act(async () => radio.click());
 }
 
 function button(host: HTMLElement, label: string): HTMLButtonElement {

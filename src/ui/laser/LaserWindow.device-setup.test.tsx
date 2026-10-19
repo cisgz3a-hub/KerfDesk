@@ -91,14 +91,16 @@ describe('LaserWindow device-setup nudge', () => {
     try {
       await act(async () => button(host, 'Machine Setup').click());
       expect(host.textContent).toContain('Step 1 of 3');
-      expect(host.querySelectorAll('input[name="machine-capability"]')).toHaveLength(3);
-      // The catalog is a plain always-visible section now — never collapsed
-      // behind a <details> (ADR-240).
-      const profileCatalog = host.querySelector('section[aria-label="Reviewed machine profiles"]');
-      expect(profileCatalog?.closest('details')).toBeNull();
-      expect(
-        profileCatalog?.querySelector('input[aria-label="Search machine profiles"]'),
-      ).toBeInstanceOf(HTMLInputElement);
+      // The machine list leads the first stage, never collapsed behind a
+      // <details> (ADR-240, ADR-636).
+      const machineList = host.querySelector('section[aria-label="Choose your machine"]');
+      expect(machineList?.closest('details')).toBeNull();
+      expect(machineList?.querySelector('input[aria-label="Search machines"]')).toBeInstanceOf(
+        HTMLInputElement,
+      );
+      expect(machineList?.querySelectorAll('input[name="setup-machine"]').length).toBeGreaterThan(
+        10,
+      );
       expect(host.textContent).not.toContain('Run guided setup');
     } finally {
       await unmount();
@@ -171,8 +173,8 @@ describe('LaserWindow device-setup nudge', () => {
     try {
       expect(host.textContent).toContain('set up yet');
       await act(async () => button(host, 'Machine Setup').click());
-      await act(async () => button(host, 'Check essentials').click());
-      await act(async () => button(host, 'Review setup').click());
+      await act(async () => button(host, 'Next').click());
+      await act(async () => button(host, 'Next').click());
       await act(async () => button(host, 'Save machine setup').click());
       expect(host.textContent).not.toContain('set up yet');
       // The 4040 fill-policy rail banner was removed at the maintainer's
@@ -216,8 +218,8 @@ describe('LaserWindow device-setup nudge', () => {
     const { host, unmount } = await renderLaserWindow();
     try {
       await act(async () => button(host, 'Machine Setup').click());
-      const search = host.querySelector('input[aria-label="Search machine profiles"]');
-      if (!(search instanceof HTMLInputElement)) throw new Error('Profile search missing');
+      const search = host.querySelector('input[aria-label="Search machines"]');
+      if (!(search instanceof HTMLInputElement)) throw new Error('Machine search missing');
       await act(async () => {
         search.value = 'Neotronics 4040';
         Simulate.change(search);
@@ -228,8 +230,8 @@ describe('LaserWindow device-setup nudge', () => {
       await act(async () => restore.click());
 
       expect(useStore.getState().project.device.gcodeDialect.dialectId).toBe('grbl-dynamic');
-      await act(async () => button(host, 'Check essentials').click());
-      await act(async () => button(host, 'Review setup').click());
+      await act(async () => button(host, 'Next').click());
+      await act(async () => button(host, 'Next').click());
       await act(async () => button(host, 'Save machine setup').click());
 
       expect(useStore.getState().project.device.gcodeDialect.dialectId).toBe(

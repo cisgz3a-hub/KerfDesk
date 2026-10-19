@@ -1,10 +1,10 @@
-// Find my machine (ADR-420): the first thing on the Machine stage. It connects
-// with the draft's controller contract, shows what the controller reported,
-// and fills a new machine's setup from it (use-controller-auto-fill.ts).
+// The connection strip at the top of the Machine stage (ADR-420, ADR-636). It
+// connects with the draft's controller contract, shows what the controller
+// reported, and fills a new machine's setup from it (use-controller-auto-fill.ts).
 // Identity and settings reads do not move the machine or change its settings.
-// Setting up without connecting stays one click away.
+// It is one line until there is something to show: choosing a machine below
+// never needs a connection.
 
-import { useState } from 'react';
 import { assertNever } from '../../../core/scene';
 import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
@@ -26,18 +26,20 @@ type Props = DeviceSetupStepProps & {
 
 export function DeviceSetupConnectStep(props: Props): JSX.Element {
   const model = useFindMachine(props.state, props.automatic, props.connection);
-  const [offline, setOffline] = useState(false);
-  const phase = findMachinePhase(model, offline);
+  const phase = findMachinePhase(model);
   return (
-    <section className="lf-setup-find" aria-label="Find my machine" data-phase={phase.kind}>
-      <div className="lf-setup-find-head">
-        <h4>{phase.title}</h4>
-        <p>{phase.detail}</p>
-        {model.networkTarget === undefined ? null : (
-          <p title={`Retries reconnect only to ${model.networkTarget}.`}>
-            Network target: {model.networkTarget}
-          </p>
-        )}
+    <section className="lf-setup-find" aria-label="Controller connection" data-phase={phase.kind}>
+      <div className="lf-setup-find-row">
+        <div className="lf-setup-find-head">
+          <h4>{phase.title}</h4>
+          <p>{phase.detail}</p>
+          {model.networkTarget === undefined ? null : (
+            <p title={`Retries reconnect only to ${model.networkTarget}.`}>
+              Network target: {model.networkTarget}
+            </p>
+          )}
+        </div>
+        <FindActions model={model} phase={phase} />
       </div>
       {model.connectionBlocked === null ? null : <p role="alert">{model.connectionBlocked}</p>}
       {phase.kind === 'found' ? (
@@ -50,7 +52,6 @@ export function DeviceSetupConnectStep(props: Props): JSX.Element {
       {model.driverMismatch || model.bannerDiffers ? (
         <ConnectionMismatch model={model} state={props.state} dispatch={props.dispatch} />
       ) : null}
-      <FindActions model={model} phase={phase} onOffline={setOffline} />
       <details className="lf-setup-disclosure lf-setup-disclosure--nested" open={props.openOptions}>
         <summary title="Choose the controller firmware, output dialect and connection settings.">
           <span>Connection options</span>
@@ -77,7 +78,6 @@ export function DeviceSetupConnectStep(props: Props): JSX.Element {
 type FindActionsProps = {
   readonly model: FindMachineModel;
   readonly phase: FindMachinePhase;
-  readonly onOffline: (offline: boolean) => void;
 };
 
 function FindActions(props: FindActionsProps): JSX.Element | null {
@@ -93,8 +93,7 @@ function ConnectionPhaseActions(props: FindActionsProps): JSX.Element | null {
   switch (phase.kind) {
     case 'idle':
     case 'failed':
-    case 'offline':
-      return <StartActions {...props} failed={phase.kind === 'failed'} />;
+      return <StartActions model={model} failed={phase.kind === 'failed'} />;
     case 'silent':
       return <SilentActions model={model} />;
     case 'scanning':
@@ -132,49 +131,20 @@ function SilentActions({ model }: { readonly model: FindMachineModel }): JSX.Ele
   );
 }
 
+// Connecting is optional here, so it is not the page's primary action: Next is.
 function StartActions(props: {
   readonly model: FindMachineModel;
-  readonly phase: FindMachinePhase;
   readonly failed: boolean;
-  readonly onOffline: (offline: boolean) => void;
 }): JSX.Element {
   const { model } = props;
   return (
     <div className="lf-setup-find-actions">
-      <Button
-        variant="primary"
-        onClick={() => {
-          props.onOffline(false);
-          model.find();
-        }}
-        {...helpProps('control:laser.device-setup.connect')}
-      >
-        {props.failed ? 'Try again' : 'Find my machine'}
+      <Button onClick={model.find} {...helpProps('control:laser.device-setup.connect')}>
+        {props.failed ? 'Try again' : 'Connect'}
       </Button>
       {props.failed ? <ChoosePort model={model} /> : null}
-      {props.phase.kind === 'idle' ? (
-        <Button
-          onClick={(event) => {
-            focusMachineType(event.currentTarget);
-            props.onOffline(true);
-          }}
-          title="Choose the machine type and a profile below without connecting."
-        >
-          Set up without connecting
-        </Button>
-      ) : null}
     </div>
   );
-}
-
-// The button leaves with the idle phase, so focus moves to the next choice
-// (the machine type) instead of falling back to the document.
-function focusMachineType(from: HTMLElement): void {
-  const types = from
-    .closest('.lf-setup-stack')
-    ?.querySelector<HTMLElement>('.lf-setup-machine-types');
-  types?.querySelector<HTMLInputElement>('input:checked')?.focus({ preventScroll: true });
-  types?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
 }
 
 function FoundActions({ model }: { readonly model: FindMachineModel }): JSX.Element {

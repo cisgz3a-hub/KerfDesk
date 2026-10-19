@@ -1,6 +1,6 @@
 ## ADR-347 - Machine Setup leads with what the controller already reported, and a profile is chosen by its whole card (2026-09-22)
 
-**Status:** Accepted. | **Date:** 2026-09-22
+**Status:** Accepted; the profile cards and the machine-type cards are replaced by ADR-636's machine list. | **Date:** 2026-09-22
 
 Maintainer direction, 2026-09-22, with a screenshot of the profile card: machine
 setup should be mostly automatic, and choosing a profile should not depend on a

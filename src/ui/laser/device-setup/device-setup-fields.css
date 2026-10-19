@@ -1,30 +1,36 @@
+/* Machine type in the "My machine isn't listed" form (ADR-636): three compact
+   choices in a row, the whole pill being the control. */
 .lf-setup-machine-types {
   padding: 0;
   margin: 0;
   border: 0;
   min-width: 0;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
 }
 .lf-setup-machine-types legend {
+  float: left;
   padding: 0;
-  margin-bottom: 12px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  color: var(--lf-text-muted);
 }
 .lf-setup-type-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .lf-setup-type-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 16px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
   border: 1px solid var(--lf-border);
-  border-radius: 10px;
+  border-radius: 999px;
   background: var(--lf-bg-1);
   cursor: pointer;
+  font-size: 12px;
 }
 .lf-setup-type-card:hover {
   border-color: var(--lf-accent-fg);
@@ -34,32 +40,14 @@
   border-color: var(--lf-accent);
 }
 .lf-setup-type-card input {
-  position: absolute;
-  right: 12px;
-  top: 12px;
   margin: 0;
   accent-color: var(--lf-accent);
 }
 .lf-setup-type-card strong {
-  font-size: 14px;
-}
-.lf-setup-type-card > span {
-  color: var(--lf-text-muted);
-  font-size: 11px;
-  line-height: 1.5;
-  max-width: 160px;
-}
-.lf-setup-type-icon {
-  width: 44px;
-  height: 44px;
-  color: var(--lf-text-muted);
-  margin-bottom: 4px;
-}
-.lf-setup-type-card[data-selected='true'] .lf-setup-type-icon {
-  color: var(--lf-accent-fg);
+  font-weight: 600;
 }
 .lf-setup-active-mode {
-  margin: 14px 0 0;
+  margin: 10px 0 0;
   padding: 10px 12px;
   border: 1px solid var(--lf-border);
   border-radius: 8px;
@@ -80,101 +68,10 @@
   font-size: 11px;
 }
 
-.lf-setup-catalog {
-  display: grid;
-  gap: 12px;
-}
-.lf-setup-catalog-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-/* "Browse all N profiles" sits under the cards it expands, at their text size. */
-.lf-setup-catalog > .lf-btn {
-  justify-self: start;
-  padding: 4px 8px;
-  margin-left: -8px;
-  color: var(--lf-accent-fg);
-  font-size: 12px;
-  font-weight: 600;
-}
-.lf-setup-catalog-heading h4 {
-  margin: 0 0 4px;
-  font-size: 13px;
-}
-.lf-setup-catalog-heading p,
-.lf-setup-catalog-hint {
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--lf-text-muted);
-  margin: 0;
-}
-.lf-setup-catalog-heading input {
-  width: 190px;
-  min-width: 0;
-  font-size: 12px;
-  padding: 8px 10px;
-  border-radius: 6px;
-}
-.lf-setup-profile-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-.lf-setup-profile {
-  border: 1px solid var(--lf-border);
-  border-radius: 8px;
-  background: var(--lf-bg-1);
-  min-width: 0;
-}
-.lf-setup-profile:hover {
-  border-color: var(--lf-accent-fg);
-}
-.lf-setup-profile[data-selected='true'] {
-  border-color: var(--lf-accent);
-  background: var(--lf-tint-accent);
-}
-/* The card itself is the control, so the whole block reacts to the pointer and
-   one tab stop per profile lands on a radio in the catalog group. */
-.lf-setup-profile-choice {
-  position: relative;
-  display: block;
-  padding: 14px 34px 14px 14px;
-  cursor: pointer;
-  min-width: 0;
-}
-/* Keep keyboard focus around the full card, including expandable notes. */
-.lf-setup-profile:has(.lf-setup-profile-choice > input:focus-visible) {
-  outline: 2px solid var(--lf-focus);
-  outline-offset: 2px;
-}
-.lf-setup-profile-choice > input {
-  position: absolute;
-  top: 14px;
-  right: 12px;
-  margin: 0;
-  accent-color: var(--lf-accent);
-}
-.lf-setup-profile-main {
-  display: block;
-  min-width: 0;
-}
-.lf-setup-profile-main strong {
-  font-size: 13px;
-}
-.lf-setup-profile-size {
-  display: block;
-  color: var(--lf-text-muted);
-  margin-top: 4px;
-  font-size: 11px;
-}
 .lf-setup-profile-badges {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 10px;
 }
 .lf-setup-profile-badges span {
   font-size: 10px;
@@ -188,10 +85,8 @@
   font-size: 11px;
   line-height: 1.5;
   color: var(--lf-warning-fg);
-  margin-top: 8px;
 }
 .lf-setup-profile-notes {
-  margin: 0 14px 12px;
   font-size: 11px;
   color: var(--lf-text-muted);
 }
@@ -199,23 +94,24 @@
   cursor: pointer;
 }
 .lf-setup-profile-notes ul {
+  margin: 6px 0 0;
   padding-left: 18px;
   line-height: 1.6;
 }
-/* Find my machine (ADR-420): the Machine stage's first card. */
+/* The connection strip (ADR-420, ADR-636): one row of status and actions at
+   the top of the Machine stage; what the controller reported opens below it. */
 .lf-setup-find {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 10px 12px;
   border: 1px solid var(--lf-border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--lf-bg-1);
   min-width: 0;
 }
 .lf-setup-find[data-phase='found'] {
   border-color: var(--lf-success);
 }
-.lf-setup-find[data-phase='idle'],
 .lf-setup-find[data-phase='connecting'],
 .lf-setup-find[data-phase='reading'],
 .lf-setup-find[data-phase='scanning'] {
@@ -226,19 +122,28 @@
 .lf-setup-find[data-phase='failed'] {
   border-color: var(--lf-warning);
 }
+.lf-setup-find-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 .lf-setup-find-head {
   display: grid;
-  gap: 4px;
+  gap: 2px;
+  flex: 1 1 260px;
+  min-width: 0;
 }
 .lf-setup-find-head h4 {
   margin: 0;
-  font-size: 15px;
+  font-size: 13px;
 }
 .lf-setup-find-head p,
 .lf-setup-find p {
   margin: 0;
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: 11px;
+  line-height: 1.5;
   color: var(--lf-text-muted);
 }
 .lf-setup-find-actions {
@@ -264,6 +169,29 @@
   margin: 0;
   padding-left: 18px;
   line-height: 1.6;
+}
+/* Closed, Connection options is one small line under the strip's status; it
+   becomes a panel only when opened. */
+.lf-setup-find > .lf-setup-disclosure--nested:not([open]) {
+  margin-top: -4px;
+  border: 0;
+  background: none;
+}
+.lf-setup-find > .lf-setup-disclosure--nested:not([open]) > summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 18px 0 0;
+  font-size: 11px;
+  color: var(--lf-accent-fg);
+}
+.lf-setup-find > .lf-setup-disclosure--nested:not([open]) > summary small {
+  display: inline;
+  margin: 0;
+}
+.lf-setup-find > .lf-setup-disclosure--nested:not([open]) > summary::after {
+  right: 0;
+  font-size: 14px;
 }
 .lf-setup-find-contract {
   margin-top: 10px;
@@ -447,28 +375,8 @@
 }
 
 @media (max-width: 480px) {
-  .lf-setup-type-grid {
-    gap: 6px;
-  }
-  .lf-setup-type-card {
-    padding: 12px 8px;
-  }
-  .lf-setup-type-card > span {
-    font-size: 10px;
-  }
-  .lf-setup-type-card strong {
-    font-size: 12px;
-  }
-  .lf-setup-type-icon {
-    width: 36px;
-    height: 36px;
-  }
-  .lf-setup-type-card input {
-    top: 8px;
-    right: 8px;
-  }
-  .lf-setup-catalog-heading input {
-    width: 100%;
+  .lf-setup-machine-types {
+    grid-template-columns: minmax(0, 1fr);
   }
   .lf-setup-panel,
   .lf-setup-disclosure-body {
@@ -476,19 +384,6 @@
   }
   .lf-setup-fields input[type='number'] {
     width: 68px !important;
-  }
-  .lf-setup-profile-choice {
-    padding: 12px 30px 12px 12px;
-  }
-  .lf-setup-profile-choice > input {
-    top: 12px;
-    right: 10px;
-  }
-  .lf-setup-profile-notes {
-    margin: 0 12px 10px;
-  }
-  .lf-setup-find {
-    padding: 12px;
   }
 }
 
@@ -519,9 +414,6 @@
   min-width: 0;
 }
 @media (max-width: 600px) {
-  .lf-setup-profile-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .lf-setup-editor .lf-device-setting-row > span:first-child {
     width: 74px !important;
     flex-basis: 74px;
