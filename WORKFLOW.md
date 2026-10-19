@@ -54,11 +54,15 @@ Phone QR scanning and direct preview gestures follow ADR-569 Amendment 2. **Scan
 #### Success — first run (no prior project)
 
 The startup loading screen uses a charcoal-and-copper KerfDesk wordmark over sculpted timber
-artwork, with **Created by Ons Houtkombuis** visible below. Its text and indeterminate activity
-bar paint before the artwork loads, and remain readable if the image is unavailable. Reduced
-motion uses a static indicator. In the web app the screen fades away once the workspace canvas
-has had a paint opportunity. The desktop app keeps it up until at least two seconds after launch
-and fades it over half a second, so a fast local start does not flash (ADR-049 Amendment 1). A
+artwork, with **Created by Ons Houtkombuis** visible below. The artwork is embedded in the
+startup page and decoded with the text, so the wood is present on the first splash paint.
+The splash becomes visible only after its complete markup is parsed, even when the HTML
+arrives in chunks. The workspace does not accept pointer or keyboard input behind it.
+Reduced motion uses a static indicator. Both web and desktop hold the screen for at least four
+visible seconds from its first frame after the workspace module starts, then fade it over
+750 ms once the workspace canvas has had a paint opportunity. Time before that frame or while
+the browser document or native desktop window is hidden does not consume the hold
+(ADR-049 Amendment 2). A
 startup crash is shown at once. It introduces no startup interaction or modal.
 
 1. App opens to **empty workspace** state (see F-A2).
