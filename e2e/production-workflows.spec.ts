@@ -418,7 +418,11 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   await setup.getByText('Connection options', { exact: true }).click();
   await setup.getByLabel('Controller firmware').selectOption('grblhal');
   await setup.getByLabel('Search machines').fill('Creality Falcon A1 Pro');
-  await page.getByRole('radio', { name: 'Use Creality Falcon A1 Pro' }).check();
+  // project-basic's machine has values of its own, so choosing names them and
+  // waits for Replace settings (ADR-637 Amendment 1).
+  await page.getByRole('radio', { name: 'Use Creality Falcon A1 Pro' }).click();
+  await setup.getByRole('button', { name: 'Replace settings', exact: true }).click();
+  await expect(page.getByRole('radio', { name: 'Use Creality Falcon A1 Pro' })).toBeChecked();
   await setup.getByRole('button', { name: 'Next', exact: true }).click();
   await setup.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Save machine setup' })).toBeEnabled();
@@ -468,7 +472,11 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
   ).toBeEnabled();
 
   await setup.getByLabel('Search machines').fill('xTool D1 Pro');
-  await page.getByRole('radio', { name: 'Use xTool D1 Pro (20 W)', exact: true }).check();
+  await page.getByRole('radio', { name: 'Use xTool D1 Pro (20 W)', exact: true }).click();
+  await setup.getByRole('button', { name: 'Replace settings', exact: true }).click();
+  await expect(
+    page.getByRole('radio', { name: 'Use xTool D1 Pro (20 W)', exact: true }),
+  ).toBeChecked();
   await setup.getByRole('button', { name: 'Next', exact: true }).click();
   await setup.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
   await setup.getByRole('button', { name: 'Save machine setup' }).click();
