@@ -6,9 +6,8 @@ import {
   MAX_RASTER_LINES_PER_MM,
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster';
-import { imageDitherAlgorithm } from '../../core/raster/image-processing';
 import type { Layer, LayerOperationSettings } from '../../core/scene';
-import { DitherSwatchPicker } from './DitherSwatchPicker';
+import { DitherSwatchPicker, originalPixelsNotice } from './DitherSwatchPicker';
 import { mixedCheckboxProps, useMixedOperationNumber } from './mixed-operation-input';
 import type { MixedOperationFields } from './selected-operation-mixed';
 
@@ -175,10 +174,8 @@ function passThroughNotice(
   if (mixed?.passThrough) {
     return 'Some selected artwork uses original pixels, which always burns as Grayscale.';
   }
-  if (!settings.passThrough) return undefined;
   const chosen = mixed?.ditherAlgorithm ? null : settings.ditherAlgorithm;
-  if (chosen !== null && imageDitherAlgorithm(settings) === chosen) return undefined;
-  return 'Use original pixels is on, so this burns as Grayscale. The dither chosen here applies once it is off.';
+  return originalPixelsNotice('Use original pixels', settings.passThrough, chosen);
 }
 
 function LineIntervalInput(props: {

@@ -180,6 +180,45 @@ describe('Dither swatch picker', () => {
     }
   });
 
+  it('submits the checked swatch under its form name and offers only the given modes', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const onChange = vi.fn<(algorithm: DitherAlgorithm) => void>();
+    await act(async () =>
+      root.render(
+        <form>
+          <DitherSwatchPicker
+            name="ditherAlgorithm"
+            value="stucki"
+            algorithms={['jarvis', 'stucki', 'floyd-steinberg']}
+            ariaLabel="Dither for photo"
+            title={TITLE}
+            onChange={onChange}
+          />
+        </form>,
+      ),
+    );
+    try {
+      const form = host.querySelector('form');
+      if (form === null) throw new Error('form missing');
+      expect(radios(host).map((input) => input.value)).toEqual([
+        'jarvis',
+        'stucki',
+        'floyd-steinberg',
+      ]);
+      expect(new FormData(form).getAll('ditherAlgorithm')).toEqual(['stucki']);
+      await press(radio(host, 'floyd-steinberg'), 'ArrowRight');
+      await press(radio(host, 'jarvis'), 'End');
+      expect(onChange.mock.calls.map(([algorithm]) => algorithm)).toEqual([
+        'jarvis',
+        'floyd-steinberg',
+      ]);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('jumps with Home and End and leaves other keys and shortcuts alone', async () => {
     const view = await mountPicker('atkinson');
     try {
