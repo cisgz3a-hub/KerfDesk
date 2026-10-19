@@ -25,7 +25,7 @@ for (const mode of ['laser', 'cnc'] as const) {
       await runMenuCommand(page, 'Edit', 'Select All');
       await selectWorkspacePanel(page, 'Artwork');
       const panel = page.getByRole('complementary', {
-        name: 'Artwork / Operations panel',
+        name: 'Artwork panel',
         exact: true,
       });
       // Import preserves the black and red artwork as separate operations.
@@ -61,7 +61,7 @@ for (const mode of ['laser', 'cnc'] as const) {
     expect(after.project.scene).toEqual(before.project.scene);
     expect(after.undoCount).toBe(before.undoCount);
     await expect(
-      page.getByRole('complementary', { name: 'Artwork / Operations panel', exact: true }),
+      page.getByRole('complementary', { name: 'Artwork panel', exact: true }),
     ).toBeVisible();
     await page.screenshot({ path: info.outputPath(`${mode}-revealed-artwork.png`) });
     writeFileSync(

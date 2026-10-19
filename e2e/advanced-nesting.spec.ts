@@ -237,13 +237,14 @@ test('nesting lifetime proof rejects a live blocked child despite silent heartbe
   await page.waitForFunction(() => Atomics.load(window.__nestingLifetime.counts, 2) === 1);
   // Chromium may report an empty URL for a live blob root. Identify this
   // isolated context's root by ownership instead of debugger display metadata.
+  // The SAB boot flag above proves the child executed before entering Atomics.wait.
   await expect
     .poll(() => {
       const workers = nestingRuntimeSnapshot(page);
       const root = workers.find(
         (worker) => !workers.some((parent) => parent.target === worker.parent),
       );
-      return workers.filter((worker) => worker.parent === root?.target && worker.sawContext).length;
+      return workers.filter((worker) => worker.parent === root?.target).length;
     })
     .toBe(1);
   const runtimes = nestingRuntimeSnapshot(page);

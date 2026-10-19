@@ -47,7 +47,7 @@ export async function openRecipeAcceptanceProject(
 }
 
 export function recipeArtworkPanel(page: Page): Locator {
-  return page.getByRole('complementary', { name: 'Artwork / Operations panel', exact: true });
+  return page.getByRole('complementary', { name: 'Artwork panel', exact: true });
 }
 
 export async function recipePanelView(page: Page, name: string): Promise<void> {
@@ -74,7 +74,7 @@ export async function selectRecipeTarget(page: Page, index: number): Promise<voi
     .nth(index)
     .getByRole('button', { name: /^Select / })
     .click();
-  await recipePanelView(page, 'Settings');
+  await recipePanelView(page, 'Properties');
 }
 
 export async function saveRecipeAcceptanceProject(

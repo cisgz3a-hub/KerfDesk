@@ -92,6 +92,7 @@ export function Workspace(): JSX.Element {
   useWorkspaceWheelZoom(ref);
   useDropPenDraftOnProjectReplace(project);
   const dragOverlay = useUiStore((s) => s.dragOverlay);
+  const pointerOverlayProps = { canvasRef: ref, canvasSize, dragging: dragKind !== null };
   return (
     <div className="lf-workspace-view">
       <div className="lf-workspace-stage">
@@ -112,7 +113,7 @@ export function Workspace(): JSX.Element {
           dragKind={dragKind}
           viewState={viewState}
         />
-        <WorkspacePointerOverlays canvasSize={canvasSize} dragging={dragKind !== null} />
+        <WorkspacePointerOverlays {...pointerOverlayProps} />
         <WorkspaceDesignChrome overlay={canvasMotionOverlay} warpFailure={warpDeformFailure} />
       </div>
       <WorkspacePreviewDock

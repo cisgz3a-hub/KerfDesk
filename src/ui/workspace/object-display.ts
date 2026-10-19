@@ -56,7 +56,7 @@ export type ObjectDisplay = {
   /** Segments the canvas actually draws for this object (after display sampling). */
   readonly displaySegmentCount: number;
   readonly isSimplified: boolean;
-  /** Changes whenever any resolved paint or width would draw differently. */
+  /** Changes whenever visible geometry, resolved paint or width draws differently. */
   readonly styleKey: string;
 };
 
@@ -93,14 +93,16 @@ export function resolveObjectDisplay(
   let displaySegmentCount = 0;
   let isSimplified = false;
   const styleParts: string[] = [];
-  for (const path of obj.paths) {
+  for (const [pathIndex, path] of obj.paths.entries()) {
     const resolution = sceneLayerVisibility.resolvePath(obj, path, layerByColor);
     if (!resolution.visible) continue;
     const paint = resolvePaint(obj, path, resolution.operation, mode, palette);
     const display = displayPathFor(path, obj, view, cache, paint.kind === 'fill');
     displaySegmentCount += countPolylineSegments(display.polylines);
     isSimplified ||= display.isSimplified;
-    styleParts.push(paintKey(paint));
+    // The sprite's geometry identity is the entire immutable paths array.
+    // Equal ink styles must still distinguish which paths are visible.
+    styleParts.push(`${pathIndex}:${paintKey(paint)}`);
     paths.push({ display, paint, operationId: resolution.operation?.id ?? null, path });
   }
   return {

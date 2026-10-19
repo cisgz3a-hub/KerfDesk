@@ -166,7 +166,7 @@ async function openProject(page: Page): Promise<Locator> {
   await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/, { timeout: 30_000 });
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await expect(panel.getByRole('spinbutton', { name: /^Power for/ })).toBeVisible();

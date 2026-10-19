@@ -34,7 +34,7 @@ Tutorial UI state is separate from project state and undo. The reader is lazy-lo
 
 ## Content boundaries
 
-Teach only shipped tools. Unavailable Focus Test explains its status; planned Design Studio tools are not advertised as usable. CNC cutting values belong to Artwork / Operations; machine, stock, material and tool-plan choices belong to Startup Setup. A completed Frame for the exact current job remains the ordinary Start policy gate. Start opens Job Review; review findings remain warnings. Reading a lesson never frames, starts, jogs, probes, connects, exports, changes controller settings or edits the project.
+Teach only shipped tools. Unavailable Focus Test explains its status; planned Design Studio tools are not advertised as usable. CNC cutting values belong to the Artwork panel; machine, stock, material and tool-plan choices belong to Startup Setup. A completed Frame for the exact current job remains the ordinary Start policy gate. Start opens Job Review; review findings remain warnings. Reading a lesson never frames, starts, jogs, probes, connects, exports, changes controller settings or edits the project.
 
 Software checks and diagrams do not establish hardware, material or packaged-desktop qualification. Representative users should still evaluate whether the lessons help them complete real tasks; that usability validation is distinct from functional verification.
 

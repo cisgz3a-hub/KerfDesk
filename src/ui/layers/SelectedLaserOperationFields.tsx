@@ -30,6 +30,9 @@ export function LaserOperationFields(props: {
   readonly ariaContext: string;
   readonly mixedFields: MixedOperationFields;
   readonly reconcileKey: string;
+  // Shown under the Line / Fill / Image switch, so a warning the click causes
+  // never pushes the switch away from the pointer.
+  readonly processNotice?: React.ReactNode;
 }): JSX.Element {
   const setLayerParam = useStore((state) => state.setLayerParam);
   const setObjectsOverride = useStore((state) => state.setObjectsOperationOverrideForOperation);
@@ -65,6 +68,7 @@ export function LaserOperationFields(props: {
         ariaLabel={`Mode for ${props.ariaContext}`}
         onChange={(mode) => commit({ mode })}
       />
+      {props.processNotice}
       <LaserEssentialsFields layer={props.operation} operationTarget={target} compact />
       {modeMixed ? null : <ProcessEssentials layer={props.operation} target={target} />}
       <div className="lf-laser-toggles">

@@ -1,5 +1,5 @@
 // StatusBar — WORKFLOW.md F-A16. Bottom bar with cursor position, selection
-// summary, object / layer counts, device name, bed dimensions, and the
+// summary, object / operation counts, device name, bed dimensions, and the
 // right-aligned Update button when a new version is ready (ADR-227). In the web
 // app the action rail also links the pricing and policy pages (ADR-524
 // Amendment 3). Job estimate is Phase C. Also hosts the canvas motion status slot (see
@@ -60,7 +60,7 @@ export function StatusBar({ children }: { readonly children?: React.ReactNode })
         {groupCount > 0 && <Segment>Groups: {groupCount}</Segment>}
         {lockedCount > 0 && <Segment>Locked: {lockedCount}</Segment>}
         <Segment>
-          Layers: {layerCount} ({outputLayerCount} output)
+          Operations: {layerCount} ({outputLayerCount} output)
         </Segment>
         <Segment>Device: {project.device.name}</Segment>
         <Segment>

@@ -53,6 +53,17 @@ export const checkboxStyle: React.CSSProperties = {
 
 export const labelStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 13 };
 
+// The Dither swatches take the full row, named level with their first row.
+export const ditherFieldStyle: React.CSSProperties = {
+  gridColumn: '1 / -1',
+  display: 'grid',
+  gridTemplateColumns: '112px minmax(0, 1fr)',
+  alignItems: 'start',
+  gap: 8,
+};
+
+export const ditherLabelStyle: React.CSSProperties = { ...labelStyle, paddingTop: 10 };
+
 // Width only - control chrome comes from .lf-input / .lf-select.
 export const inputStyle: React.CSSProperties = {
   width: '100%',

@@ -179,6 +179,25 @@ describe('object display resolution', () => {
     expect(orphan.paths[0]).toMatchObject({ operationId: null, paint: { color: '#16a34a' } });
   });
 
+  it('changes the ink style key when a different operation is the visible one', () => {
+    // Two paths on two operations paint alike in ink; the key must still say
+    // which survived visibility, or a cached sprite would show the hidden one.
+    const object = traced([square(10)], {
+      paths: [
+        { color: '#000000', polylines: [square(10)], operationIds: ['a'] },
+        { color: '#000000', polylines: [square(4)], operationIds: ['b'] },
+      ],
+    });
+    const showing = (visible: 'a' | 'b') =>
+      sceneLayerVisibility.lookup([
+        { ...createLayer({ id: 'a', color: '#2563eb' }), visible: visible === 'a' },
+        { ...createLayer({ id: 'b', color: '#dc2626' }), visible: visible === 'b' },
+      ]);
+    const onlyA = resolveObjectDisplay(object, showing('a'), view, undefined, 'design', 'ink');
+    const onlyB = resolveObjectDisplay(object, showing('b'), view, undefined, 'design', 'ink');
+    expect(onlyA.styleKey).not.toBe(onlyB.styleKey);
+  });
+
   it('keeps one flattening of a curved trace while wheel notches stay inside a zoom bucket', () => {
     const object = traced([square(10)], {
       transform: { ...IDENTITY_TRANSFORM, scaleX: 2, scaleY: -2 },
@@ -231,6 +250,52 @@ describe('object display resolution', () => {
 });
 
 describe('object display painting', () => {
+  it('repaints a dense ink sprite when equal-style operations swap their visible paths', () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 600;
+    const main = recordingContext();
+    Object.assign(main.ctx, { canvas });
+    const sprite = recordingContext();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(sprite.ctx);
+    const first = zigzag(SPRITE_MIN_DISPLAY_SEGMENTS + 1);
+    const second = {
+      ...first,
+      points: first.points.map(({ x, y }) => ({ x, y: y + 10 })),
+    };
+    const object = traced([], {
+      paths: [
+        { color: '#dc2626', operationIds: ['first'], polylines: [first] },
+        { color: '#16a34a', operationIds: ['second'], polylines: [second] },
+      ],
+    });
+    const display = (firstVisible: boolean) =>
+      resolveObjectDisplay(
+        object,
+        sceneLayerVisibility.lookup([
+          { ...createLayer({ id: 'first', color: '#dc2626' }), visible: firstVisible },
+          { ...createLayer({ id: 'second', color: '#16a34a' }), visible: !firstVisible },
+        ]),
+        view,
+        undefined,
+        'design',
+        'ink',
+      );
+    const before = display(true);
+    const after = display(false);
+    expect(before.paths[0]?.path).toBe(object.paths[0]);
+    expect(after.paths[0]?.path).toBe(object.paths[1]);
+    expect(before.paths[0]?.paint).toEqual(after.paths[0]?.paint);
+    drawObjectDisplay(main.ctx, object, before, view);
+    expect(sprite.calls.lineTo).toBe(SPRITE_MIN_DISPLAY_SEGMENTS);
+    drawObjectDisplay(main.ctx, object, after, view);
+    expect(sprite.calls.lineTo).toBe(SPRITE_MIN_DISPLAY_SEGMENTS * 2);
+    drawObjectDisplay(main.ctx, object, display(false), view);
+    expect(sprite.calls.lineTo).toBe(SPRITE_MIN_DISPLAY_SEGMENTS * 2);
+    expect(main.calls.drawImage).toBe(3);
+    expect(main.calls.lineTo).toBe(0);
+  });
+
   it('paints sparse artwork directly at the ordinary weight', () => {
     const { ctx, widths, calls } = recordingContext();
     const object = traced([zigzag(50)]);

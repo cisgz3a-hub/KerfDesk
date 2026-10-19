@@ -46,6 +46,8 @@ export function useJigCanvasPaint(
       drawScene(ctx, size.width, size.height, displayed, {
         selectedId: null,
         preview: false,
+        // This editor has no pulse or Alt peek, so operation colours stay visible.
+        operationColors: true,
         view: viewState,
         displayPolylineCache: cache.current,
         onRasterBitmapReady: () => setPaintRevision((revision) => revision + 1),

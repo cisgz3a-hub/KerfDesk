@@ -111,7 +111,7 @@ describe('OptimizationSettingsDialog', () => {
         false,
       );
       expect(host.textContent).toContain('saved but bypassed');
-      expect(host.textContent).toContain('Layer priority still applies');
+      expect(host.textContent).toContain('Operation priority still applies');
       const overlaps = host.querySelector<HTMLInputElement>('input[name="removeOverlappingLines"]');
       expect(overlaps?.checked).toBe(false);
       expect(overlaps?.disabled).toBe(false);

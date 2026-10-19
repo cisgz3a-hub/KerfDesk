@@ -122,13 +122,15 @@ function SelectedOperationEditor(props: {
           inspectCreatedOperation(() => makeUnique(objectIds, props.active.id), props.onSelect)
         }
       />
-      <CompatibilityNote
-        objects={props.objects}
-        operation={effectiveOperation}
-        machineKind={props.machineKind}
-      />
       {props.machineKind === 'cnc' ? (
-        <CncLayerFields layer={props.active} />
+        <>
+          <CompatibilityNote
+            objects={props.objects}
+            operation={effectiveOperation}
+            machineKind="cnc"
+          />
+          <CncLayerFields layer={props.active} />
+        </>
       ) : (
         <LaserOperationFields
           key={selectionKey}
@@ -139,6 +141,13 @@ function SelectedOperationEditor(props: {
           ariaContext={props.selectionActive ? 'selected objects' : 'inspected artwork'}
           mixedFields={mixedFields}
           reconcileKey={reconcileKey}
+          processNotice={
+            <CompatibilityNote
+              objects={props.objects}
+              operation={effectiveOperation}
+              machineKind="laser"
+            />
+          }
         />
       )}
       <OperationFooter

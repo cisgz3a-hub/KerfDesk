@@ -66,6 +66,8 @@ export type LaserStoreActions = {
   readonly retryControllerQualification: () => Promise<void>;
   readonly getMachineSettingsReadBlockReason: () => string | null;
   readonly getControllerReconnectRecommended: () => boolean;
+  /** "Not responding": a controller that answered went quiet while the poll ran (ADR-611 A1). */
+  readonly getControllerWentSilent: () => boolean;
   readonly writeGrblSetting: (id: number, value: string) => Promise<void>;
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   /** Owned G54 selection used before preparing Frame so Frame and emitted

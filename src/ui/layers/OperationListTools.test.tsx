@@ -37,6 +37,22 @@ describe('operations list tools', () => {
     expect(sort.disabled).toBe(false);
     await click(sort);
 
+    const groups = [
+      ...host.querySelectorAll<HTMLElement>('.lf-operation-list-tools [role="group"]'),
+    ];
+    expect(
+      groups.map(
+        (group) => document.getElementById(group.getAttribute('aria-labelledby')!)?.textContent,
+      ),
+    ).toEqual(['Output', 'Visibility', 'Order']);
+    for (const group of groups) {
+      for (const tool of group.querySelectorAll('button')) {
+        expect(tool.classList.contains('lf-btn')).toBe(true);
+        // The accessible name contains the visible word (label in name).
+        const visible = (tool.textContent ?? '').trim().toLowerCase();
+        expect((tool.getAttribute('aria-label') ?? visible).toLowerCase()).toContain(visible);
+      }
+    }
     expect(actions.setAllLayersOutput.mock.calls).toEqual([[true], [false], ['invert']]);
     expect(actions.setAllLayersVisible.mock.calls).toEqual([[true], [false], ['invert']]);
     expect(actions.sortCutsLast).toHaveBeenCalledTimes(1);

@@ -634,7 +634,7 @@ src/
     help/                        built-in help/reference surfaces
     kit/                         local component primitives
     laser/                       Laser window and job controls
-    layers/                      Cuts/Layers window
+    layers/                      Artwork panel
     material-library/            material and preset UI
     raster/                      raster/image controls
     state/                       app/project state glue
