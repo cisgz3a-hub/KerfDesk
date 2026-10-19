@@ -192,6 +192,8 @@ test('a saved laser setup does not suppress first Connect setup for the CNC head
   await toolbar.getByRole('button', { name: 'Connect', exact: true }).click();
   await expect(laserSetup).toBeVisible();
   await expectConnected(toolbar);
+  // The machine type is asked for a machine that isn't listed (ADR-637).
+  await laserSetup.getByRole('radio', { name: 'My machine isn’t listed', exact: true }).check();
   await laserSetup.getByRole('radio', { name: /Laser \+ CNC/ }).check();
   await saveSetup(laserSetup);
   const saved = await configuredSignatures(page);
