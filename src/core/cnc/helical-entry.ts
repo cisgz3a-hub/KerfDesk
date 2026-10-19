@@ -10,7 +10,12 @@ import {
 
 export type HelicalEntryPlan =
   | { readonly ok: true; readonly passes: ReadonlyArray<CncPass> }
-  | { readonly ok: false; readonly reason: string };
+  | ({ readonly ok: false } & HelicalEntryIssue);
+
+type HelicalEntryIssue = {
+  readonly reason: string;
+  readonly fallback?: 'ordinary-pocket';
+};
 
 const MIN_ANGLE_DEG = 0.5;
 const MAX_ANGLE_DEG = 15;
@@ -22,7 +27,7 @@ export function planHelicalPocketPasses(
   settings: CncHelixEntrySettings,
 ): HelicalEntryPlan {
   const requestIssue = helicalRequestIssue(toolpaths, settings);
-  if (requestIssue !== null) return { ok: false, reason: requestIssue };
+  if (requestIssue !== null) return { ok: false, ...requestIssue };
   const entryBoundary = largestRing(toolpaths);
   if (entryBoundary === null) {
     return { ok: false, reason: 'Helical entry could not identify a pocket boundary.' };
@@ -68,13 +73,23 @@ export function planHelicalPocketPasses(
 function helicalRequestIssue(
   toolpaths: ReadonlyArray<Polyline>,
   settings: CncHelixEntrySettings,
-): string | null {
-  if (!validSettings(settings)) return 'Helix diameters and angle must be positive and finite.';
+): HelicalEntryIssue | null {
+  if (!validSettings(settings)) {
+    return { reason: 'Helix diameters and angle must be positive and finite.' };
+  }
+  // The entered angle is a maximum. A value below the planner's floor is
+  // disclosed rather than silently steepened to it (audit 2026-10-18).
+  if (settings.angleDeg < MIN_ANGLE_DEG) {
+    return {
+      reason: `Helix entry angle must be at least ${String(MIN_ANGLE_DEG)} degrees. This pocket keeps its ordinary entry.`,
+      fallback: 'ordinary-pocket',
+    };
+  }
   if (settings.minDiameterMm > settings.maxDiameterMm) {
-    return 'Helix minimum diameter exceeds its maximum diameter.';
+    return { reason: 'Helix minimum diameter exceeds its maximum diameter.' };
   }
   return toolpaths.some((toolpath) => !toolpath.closed || toolpath.points.length < 3)
-    ? 'Helical entry requires closed offset-pocket rings.'
+    ? { reason: 'Helical entry requires closed offset-pocket rings.' }
     : null;
 }
 
@@ -183,7 +198,7 @@ function helicalPass(
   zMm: number,
   angleDeg: number,
 ): CncHelicalContourPass {
-  const angle = Math.min(MAX_ANGLE_DEG, Math.max(MIN_ANGLE_DEG, angleDeg));
+  const angle = Math.min(MAX_ANGLE_DEG, angleDeg);
   const dropPerRevolution = Math.PI * 2 * entry.radiusMm * Math.tan((angle * Math.PI) / 180);
   const revolutions = Math.max(1, Math.ceil((startZMm - zMm) / dropPerRevolution));
   return {

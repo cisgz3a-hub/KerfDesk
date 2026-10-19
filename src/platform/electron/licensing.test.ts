@@ -6,6 +6,19 @@ import {
 } from './licensing';
 
 describe('desktop early updates setting (ADR-541)', () => {
+  it('acknowledges the mounted workspace through the trusted generation route', async () => {
+    const fetchLicence = vi.fn(async () => Response.json({ ok: true }));
+    await createDesktopLicenceAdapter(fetchLicence).workspaceAdmitted?.(7);
+    expect(fetchLicence).toHaveBeenCalledExactlyOnceWith(
+      './api/licensing/workspace-admitted',
+      expect.objectContaining({
+        method: 'POST',
+        body: '{"generation":7}',
+        headers: expect.objectContaining({ 'X-KerfDesk-Licensing': '1' }),
+      }),
+    );
+  });
+
   it('reads and changes the setting through the licensing route', async () => {
     const fetchLicence = vi.fn(async (_input: string, init: RequestInit) =>
       Response.json({ available: true, enabled: init.method === 'POST' }),
