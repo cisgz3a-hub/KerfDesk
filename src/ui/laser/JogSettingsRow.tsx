@@ -54,7 +54,7 @@ export function JogSettingsRow(props: {
         >
           {jogFeedOptions(props.maxFeed).map((option) => (
             <option key={option} value={option}>
-              {unit === 'in' ? Math.round(option / MM_PER_INCH) : option} {feedUnitLabel(unit)}
+              {formatDisplayLength(option, unit)} {feedUnitLabel(unit)}
             </option>
           ))}
         </select>

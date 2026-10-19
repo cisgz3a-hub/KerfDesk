@@ -23,6 +23,8 @@ type OperationSliderFieldProps = {
   readonly mixed?: boolean | undefined;
   readonly reconcileKey?: unknown;
   readonly parse: (value: string) => number;
+  readonly validate?: ((value: string) => string | null) | undefined;
+  readonly inputType?: 'number' | 'text';
   readonly commit: (value: number) => void;
   readonly observe?: (value: string) => void;
 };
@@ -43,6 +45,7 @@ function useSliderDraft(props: OperationSliderFieldProps) {
     mixed: props.mixed,
     reconcileKey: props.reconcileKey,
     parse: props.parse,
+    validate: props.validate,
     commit: props.commit,
     commitOnBlur: dragging,
   });
@@ -159,7 +162,7 @@ export function OperationSliderField(props: OperationSliderFieldProps): JSX.Elem
   const id = useId();
   const draft = useSliderDraft(props);
   const mixed = draft.inputProps['data-mixed'] === 'true';
-  const parsed = Number.parseFloat(draft.displayValue);
+  const parsed = props.parse(draft.displayValue);
   const value = Math.max(
     props.min,
     Math.min(props.max, Number.isFinite(parsed) ? parsed : props.value),
@@ -183,7 +186,9 @@ export function OperationSliderField(props: OperationSliderFieldProps): JSX.Elem
         </label>
         <input
           id={`${id}-number`}
-          type="number"
+          type={props.inputType ?? 'number'}
+          inputMode="decimal"
+          aria-invalid={draft.errorMessage !== null}
           min={props.min}
           max={props.max}
           value={draft.displayValue}

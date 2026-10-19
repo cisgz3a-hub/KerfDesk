@@ -45,6 +45,29 @@ async function typeAndBlur(input: HTMLInputElement, value: string): Promise<void
 }
 
 describe('CNC depth and feed fields in inches (ADR-629)', () => {
+  it.each([
+    ['length', '10mm'],
+    ['feed', '10mm/min'],
+  ] as const)('lets explicit millimetres override inches in %s fields', async (dimension, text) => {
+    const onCommit = vi.fn();
+    const input = await render(
+      <NumberField
+        layer={layer}
+        label="Setting"
+        unit={dimension === 'feed' ? 'mm/min' : 'mm'}
+        dimension={dimension}
+        value={6.35}
+        min={0.05}
+        max={20000}
+        step={0.5}
+        title="setting"
+        onCommit={onCommit}
+      />,
+    );
+    await typeAndBlur(input, text);
+    expect(onCommit).toHaveBeenLastCalledWith(10);
+  });
+
   it('shows a depth in inches and commits a typed inch depth in millimetres', async () => {
     const onCommit = vi.fn();
     const input = await render(

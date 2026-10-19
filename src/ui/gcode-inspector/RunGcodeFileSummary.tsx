@@ -23,16 +23,13 @@ export function RunGcodeFileSummary(props: {
 }): JSX.Element {
   const { program, review, run } = props.prepared;
   const { envelope } = run;
-  const dropped =
-    program.droppedLineCount > 0 || program.commentsRemoved
-      ? ' Comments, % markers and blank lines are left out; nothing else is changed.'
-      : '';
   return (
     <div className="lf-run-gcode-summary">
       <dl>
         <dt>Sends</dt>
         <dd>
-          {program.lineCount} lines, {program.byteCount} bytes.{dropped}
+          {program.lineCount} lines, {program.byteCount} bytes. Comments, % markers and blank lines
+          are left out; surrounding spaces and tabs are trimmed. Lines are sent with LF endings.
         </dd>
         <dt>Estimated time</dt>
         <dd>

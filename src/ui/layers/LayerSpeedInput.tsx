@@ -11,6 +11,7 @@ import type { LayerOperationControlTarget } from './LayerRowFields';
 import { OperationSliderField } from './OperationSliderField';
 import { useLengthUnit } from '../state/display-units';
 import { MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
+import { dimensionEntry, dimensionEntryError } from './dimension-entry';
 
 const mmPerSecFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
 
@@ -63,10 +64,15 @@ export function SpeedInput(props: {
     [profileId, laserSubProfile, maxFeed],
   );
   const stops = useMemo(() => speedSliderStops(range), [range]);
-  const display = speedDisplay(useLengthUnit());
+  const unit = useLengthUnit();
+  const display = speedDisplay(unit);
+  const reconcileKey = useMemo(
+    () => ({ target: operationTarget.reconcileKey, unit }),
+    [operationTarget.reconcileKey, unit],
+  );
   const value = display.toDisplay(operationTarget.settings.speed);
-  const min = display.toDisplay(1);
-  const max = display.toDisplay(maxFeed);
+  const min = unit === 'in' ? 1 / MM_PER_INCH : 1;
+  const max = unit === 'in' ? maxFeed / MM_PER_INCH : maxFeed;
   return (
     <OperationSliderField
       label="Speed"
@@ -74,17 +80,23 @@ export function SpeedInput(props: {
       ariaContext={targetAriaContext(layer, operationTarget)}
       value={value}
       mixed={operationTarget.mixedFields?.speed}
-      reconcileKey={operationTarget.reconcileKey}
+      reconcileKey={reconcileKey}
+      inputType="text"
+      validate={(text) => dimensionEntryError(text, unit, 'feed')}
       commit={(speed) =>
         operationTarget.commit({
           speed: clamp(display.fromDisplay(speed), 1, maxFeed),
         })
       }
-      parse={(s) => clamp(numericValue(s, value), min, max)}
+      parse={(text) => {
+        const parsed = dimensionEntry(text, unit, 'feed');
+        const mmPerMin = parsed.kind === 'ok' ? parsed.value : operationTarget.settings.speed;
+        return clamp(unit === 'in' ? mmPerMin / MM_PER_INCH : mmPerMin, min, max);
+      }}
       // The ceiling note compares millimetres per minute.
       observe={(raw) => {
-        const typed = Number.parseFloat(raw);
-        ceiling.observe(Number.isFinite(typed) ? String(display.fromDisplay(typed)) : raw);
+        const typed = dimensionEntry(raw, unit, 'feed');
+        ceiling.observe(typed.kind === 'ok' ? String(typed.value) : '');
       }}
       min={min}
       max={max}

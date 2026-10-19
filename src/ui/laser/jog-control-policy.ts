@@ -1,5 +1,6 @@
 import type { JogAxisSigns, MachineBounds } from '../../core/devices';
 import type { Vec2 } from '../../core/scene';
+import { formatLengthWithUnit, type DisplayLengthUnit } from '../display-length';
 
 export const DEFAULT_JOG_FEED_MM_PER_MIN = 3000;
 
@@ -56,11 +57,15 @@ export function continuousJogVector(
   return vector.dx === undefined && vector.dy === undefined ? null : vector;
 }
 
-export function jogVectorLabel(vector: JogVector, stepMm: number): string {
+export function jogVectorLabel(
+  vector: JogVector,
+  stepMm: number,
+  unit: DisplayLengthUnit = 'mm',
+): string {
   const parts: string[] = [];
   if (vector.dx !== undefined) parts.push(`${signedAxis('X', vector.dx)}`);
   if (vector.dy !== undefined) parts.push(`${signedAxis('Y', vector.dy)}`);
-  return `Jog ${parts.join(' ')} ${stepMm} mm`;
+  return `Jog ${parts.join(' ')} ${formatLengthWithUnit(stepMm, unit)}`;
 }
 
 function vectorForDistances(

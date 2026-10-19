@@ -148,6 +148,7 @@ function SystemFontList(props: {
   const shown = matches.slice(0, SYSTEM_FONT_ROW_LIMIT);
   return (
     <div className="lf-system-fonts">
+      <style>{shown.flatMap((family) => family.faces.map(facePreviewRule)).join('\n')}</style>
       <input
         type="search"
         className="lf-input"
@@ -179,7 +180,9 @@ function SystemFontList(props: {
                   aria-label={`Use ${face.fullName}`}
                   onClick={() => props.onChoose(face)}
                 >
-                  {props.busy === face.postscriptName ? 'Embedding…' : face.style}
+                  <span style={facePreviewStyle(face)}>
+                    {props.busy === face.postscriptName ? 'Embedding…' : face.style}
+                  </span>
                 </Button>
               ))}
             </span>
@@ -198,4 +201,32 @@ function countText(total: number, shown: number): string {
 
 function quoted(family: string): string {
   return `"${family.replace(/["\\]/g, '')}", system-ui`;
+}
+
+function previewFamily(face: SystemFontFace): string {
+  return `KerfDesk system font preview ${face.postscriptName}`;
+}
+
+function facePreviewRule(face: SystemFontFace): string {
+  // local() selects the exact enumerated face, including named weights and
+  // widths, without guessing CSS descriptors from a possibly localised style
+  // name or reading font bytes before the operator chooses to embed it.
+  // https://www.w3.org/TR/css-fonts-3/#src-desc
+  return `@font-face { font-family: ${cssString(previewFamily(face))}; src: local(${cssString(face.postscriptName)}), local(${cssString(face.fullName)}); font-weight: 400; font-style: normal; }`;
+}
+
+function facePreviewStyle(face: SystemFontFace): React.CSSProperties {
+  return {
+    fontFamily: `${cssString(previewFamily(face))}, ${quoted(face.family)}`,
+    fontWeight: 400,
+    fontStyle: 'normal',
+    fontSynthesis: 'none',
+  };
+}
+
+function cssString(value: string): string {
+  return `"${value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/[\r\n\f]/g, ' ')}"`;
 }

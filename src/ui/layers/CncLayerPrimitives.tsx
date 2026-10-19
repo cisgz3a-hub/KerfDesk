@@ -7,6 +7,7 @@ import type { Layer } from '../../core/scene';
 import { useDebouncedCommit } from './use-debounced-commit';
 import { useLengthUnit } from '../state/display-units';
 import { MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
+import { dimensionEntry, dimensionEntryError } from './dimension-entry';
 
 export function Row(props: {
   readonly label: string;
@@ -79,24 +80,33 @@ function clampToRange(props: NumberFieldProps, value: number): number {
 }
 
 export function NumberField(props: NumberFieldProps): JSX.Element {
-  const display = fieldDisplay(props, useLengthUnit());
-  const shown = display.show(props.value);
+  const unit = useLengthUnit();
+  const dimension = props.dimension;
+  const display = fieldDisplay(props, unit);
   const debounced = useDebouncedCommit<number>({
-    value: shown,
-    commit: (value) =>
-      props.onCommit(display.scale === 1 ? value : clampToRange(props, value * display.scale)),
+    value: props.value,
+    reconcileKey: unit,
+    format: (value) => String(display.show(value)),
+    commit: props.onCommit,
+    ...(dimension === undefined
+      ? {}
+      : { validate: (text: string) => dimensionEntryError(text, unit, dimension) }),
     parse: (s) => {
-      const n = Number.parseFloat(s);
-      if (!Number.isFinite(n)) return shown;
-      if (props.positiveOnly === true) return n > 0 ? n : shown;
-      return Math.max(props.min / display.scale, Math.min(props.max / display.scale, n));
+      const parsed =
+        props.dimension === undefined ? null : dimensionEntry(s, unit, props.dimension);
+      const n = parsed === null ? Number.parseFloat(s) : parsed.kind === 'ok' ? parsed.value : NaN;
+      if (!Number.isFinite(n)) return props.value;
+      if (props.positiveOnly === true) return n > 0 ? n : props.value;
+      return clampToRange(props, n);
     },
   });
   const unitBesideBox = props.stacked !== true && display.unit.length > 0;
   return (
     <Row label={props.label} {...(props.stacked ? { stacked: true, unit: display.unit } : {})}>
       <input
-        type="number"
+        type={props.dimension === undefined ? 'number' : 'text'}
+        inputMode="decimal"
+        aria-invalid={debounced.errorMessage !== null}
         {...(props.positiveOnly === true
           ? {}
           : { min: props.min / display.scale, max: props.max / display.scale })}

@@ -49,12 +49,38 @@ async function renderSpeed(speed: number, commit = vi.fn(), observe = vi.fn()) {
       />,
     ),
   );
-  const number = host.querySelector('input[type="number"]');
+  const number = host.querySelector('input[aria-label="Speed for Engrave"]');
   if (!(number instanceof HTMLInputElement)) throw new Error('Speed box missing');
   return { number, commit, observe };
 }
 
 describe('laser Speed in inches (ADR-629)', () => {
+  it.each(['10mm', '10mm/min'])(
+    'honours explicit %s without applying the inch scale twice',
+    async (text) => {
+      const { number, commit, observe } = await renderSpeed(1524);
+      await act(async () => {
+        number.value = text;
+        Simulate.change(number);
+      });
+      await act(async () => Simulate.blur(number));
+      expect(commit).toHaveBeenLastCalledWith({ speed: 10 });
+      expect(observe).toHaveBeenLastCalledWith('10');
+    },
+  );
+
+  it('does not commit a partially parsed value with an unknown unit', async () => {
+    const { number, commit } = await renderSpeed(1524);
+    await act(async () => {
+      number.value = '10mystery';
+      Simulate.change(number);
+    });
+    await act(async () => Simulate.blur(number));
+    await act(async () => vi.advanceTimersByTime(400));
+    expect(commit).not.toHaveBeenCalled();
+    expect(number.validity.valid).toBe(false);
+  });
+
   it('shows in/min and an in/s reading', async () => {
     const { number } = await renderSpeed(1524);
     expect(number.value).toBe('60');
