@@ -1,5 +1,5 @@
 // PlaceBoardCanvas — the Place Board page's canvas (ADR-636): jig mode's
-// editing canvas (ADR-638) on the open project, so artwork is dragged, resized
+// editing canvas (ADR-641) on the open project, so artwork is dragged, resized
 // and rotated on the board the same way, plus the capture marks: the points
 // captured so far, the outline they make, the live head or pointer crosshair
 // and the board's check points. Edits are ordinary project edits with Undo.

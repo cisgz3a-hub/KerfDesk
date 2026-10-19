@@ -1,7 +1,7 @@
 // PlaceBoardSteps — steps 2 and 3 of the Place Board page (ADR-636). Step 2
 // brings artwork in and places it on the board; step 3 sets its laser power,
 // speed and passes, then Frame and Start, which are the workspace's own job
-// actions mounted here while the page is open (as jig mode does, ADR-638).
+// actions mounted here while the page is open (as jig mode does, ADR-641).
 
 import {
   isRegistrationBox,

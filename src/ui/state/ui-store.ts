@@ -277,7 +277,7 @@ function uiLibrarySlice(
   };
 }
 
-// Jig mode and Place Board mode (ADR-638, ADR-636): each page takes the main
+// Jig mode and Place Board mode (ADR-641, ADR-636): each page takes the main
 // canvas's place, so opening one closes the other.
 function uiPageSlice(
   set: UiStateSetter,

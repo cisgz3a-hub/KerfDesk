@@ -1,6 +1,6 @@
 ## ADR-606 - Registration jig editor usability
 
-**Status:** Accepted. Amends ADR-057 (dedicated jig editor amendment of 2026-10-17). The draft, its close prompt and Amendment 1's rebase are superseded by ADR-638 (jig mode edits the open project).
+**Status:** Accepted. Amends ADR-057 (dedicated jig editor amendment of 2026-10-17). The draft, its close prompt and Amendment 1's rebase are superseded by ADR-641 (jig mode edits the open project).
 
 ## Context
 

@@ -1,7 +1,7 @@
 ## ADR-636 - Place board: custom shapes, the pointer, nine-point placement (2026-10-19)
 
 **Status:** Accepted. Extends ADR-124 (capture board corners), ADR-125 (fit and array on a board)
-and ADR-126 (board shapes); uses ADR-341 Amendment 5's offset G92 and ADR-638's jig-mode page. | **Date:** 2026-10-19
+and ADR-126 (board shapes); uses ADR-341 Amendment 5's offset G92 and ADR-641's jig-mode page. | **Date:** 2026-10-19
 
 ### Context
 
@@ -61,7 +61,7 @@ board.
    use the device origin's axis directions, so they match the physical board on every origin
    corner. Front-left and centre origins behave exactly as before.
 8. **Place Board mode.** A floating card over the canvas covered the artwork it was meant to place,
-   so Place Board became a page, built like jig mode (ADR-638): it takes the place of the tool
+   so Place Board became a page, built like jig mode (ADR-641): it takes the place of the tool
    strip and the main canvas while the machine panel (connect, jog, positioning light) stays
    docked beside it, and the whole job happens there, from the first capture to the last burn.
    Its three steps are **1 Capture board** (shape tiles, the pointer bar, the capture card, then
