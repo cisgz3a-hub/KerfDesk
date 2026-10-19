@@ -121,13 +121,11 @@ export const statTextValueStyle: CSSProperties = {
 
 export const heroValueColor = 'var(--lf-accent-fg)';
 
-// One line; the whole detail is the tile's hover title.
+// The whole detail, wrapped: a hover title cannot be read by keyboard or touch.
 export const statDetailStyle: CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-text-muted)',
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
+  overflowWrap: 'anywhere',
 };
 
 export const recomputingStyle: CSSProperties = {

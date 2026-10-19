@@ -145,6 +145,22 @@ describe('Job Review laser card editing', () => {
     expect(host.textContent).toContain('Saved');
   });
 
+  it('writes only the values whose fields were changed, leaving an untouched speed as stored', async () => {
+    const maxFeed = useStore.getState().project.device.maxFeed;
+    // Stored above Output max feed (lowered after the speed was set): the
+    // compiler caps it at output, so the review must not rewrite it.
+    const layer = { ...createLayer({ id: 'red', color: '#ff0000' }), speed: maxFeed + 2000 };
+    seedLayers([layer]);
+    await render();
+
+    await click(button('Edit'));
+    await type(numberInput(`Power % for ${layer.name}`), '42');
+    await click(button('Save'));
+
+    expect(storedLayer('red')).toMatchObject({ power: 42, speed: maxFeed + 2000 });
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+
   it('keeps the card editing and the store unchanged when a number is not valid', async () => {
     const layer = createLayer({ id: 'red', color: '#ff0000' });
     seedLayers([layer]);
