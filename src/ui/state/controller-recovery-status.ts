@@ -59,7 +59,9 @@ export function controllerStoppedResponding(state: RecoveryStatus, now = Date.no
  * queued-poll controller is not asked while a job streams, so neither counts.
  */
 export function controllerWentSilent(
-  state: RecoveryStatus & Pick<LaserState, 'capabilities'>,
+  state: RecoveryStatus &
+    Pick<LaserState, 'capabilities'> &
+    Partial<Pick<LaserState, 'transcript'>>,
   now = Date.now(),
   schedule: StatusPollSchedule | null = null,
 ): boolean {
@@ -73,16 +75,24 @@ export function controllerWentSilent(
   if (state.pendingUntrackedAcks > 0) return false;
   const observed = state.statusResponseObservation ?? state.statusObservation;
   if (observed === null || observed.sessionEpoch !== state.controllerSessionEpoch) return false;
+  // Any line the controller sent proves it is talking, not only a status
+  // report: the `ok` that ends a Console `$H` restarts the window before the
+  // next status reply arrives.
+  const lastHeardAt = Math.max(observed.observedAt, lastInboundLineAt(state.transcript));
   // Only time the status poll ran on schedule counts: a hidden, throttled or
   // sleeping page asked nothing, so its gap is not the controller's silence.
   return (
-    hostAwareSilenceRemainingMs(
-      schedule,
-      observed.observedAt,
-      CONTROLLER_RESPONSE_WINDOW_MS,
-      now,
-    ) === 0
+    hostAwareSilenceRemainingMs(schedule, lastHeardAt, CONTROLLER_RESPONSE_WINDOW_MS, now) === 0
   );
+}
+
+function lastInboundLineAt(transcript: LaserState['transcript'] | undefined): number {
+  if (transcript === undefined) return Number.NEGATIVE_INFINITY;
+  for (let index = transcript.length - 1; index >= 0; index -= 1) {
+    const entry = transcript[index];
+    if (entry?.direction === 'in') return entry.at;
+  }
+  return Number.NEGATIVE_INFINITY;
 }
 
 function currentQualificationFailed(state: RecoveryStatus): boolean {

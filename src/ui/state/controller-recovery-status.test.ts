@@ -271,3 +271,40 @@ describe('a line still owed its reply (Console $H homing)', () => {
     expect(controllerWentSilent({ ...homing, pendingUntrackedAcks: 0 }, now)).toBe(true);
   });
 });
+
+describe('any controller line restarts the silence window', () => {
+  it('does not flip to silent when the reply that ends a Console $H arrives', () => {
+    const afterHoming = state({
+      controllerQualification: { kind: 'qualified', epoch: 4, settings: 'verified' },
+      // The last status report is from before homing; the `$H` reply just arrived.
+      statusObservation: {
+        sessionEpoch: 4,
+        positionEpoch: 1,
+        sequence: 7,
+        observedAt: now - 30_000,
+      },
+      transcript: [
+        {
+          id: 1,
+          at: now - 30_000,
+          direction: 'in',
+          raw: '<Idle>',
+          kind: 'status',
+          source: 'controller',
+        },
+        {
+          id: 2,
+          at: now - 29_000,
+          direction: 'out',
+          raw: '$H',
+          kind: 'command',
+          source: 'console',
+        },
+        { id: 3, at: now - 200, direction: 'in', raw: 'ok', kind: 'ok', source: 'controller' },
+      ] as never,
+    });
+    expect(controllerWentSilent(afterHoming, now)).toBe(false);
+    // Eight seconds after that reply, with no status since, it is silent.
+    expect(controllerWentSilent(afterHoming, now + 8_000)).toBe(true);
+  });
+});

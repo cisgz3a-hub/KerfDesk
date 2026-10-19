@@ -21,6 +21,9 @@ Other senders show such a link as stalled.
 - The connection bar re-reads the rule on every store write and on its own
   1 s timer. A status write stuck in a wedged transport stops the poll from
   writing to the store, which is the case this label exists for.
+- Any line the controller sends counts as an answer, not only a status
+  report: the `ok` that ends a Console `$H` restarts the window before the
+  next status reply arrives.
 - It does not apply while a sent line is still owed its reply. GRBL answers
   neither `?` nor a Console `$H` until homing ends, and a Console `$H` owns
   no controller operation.
