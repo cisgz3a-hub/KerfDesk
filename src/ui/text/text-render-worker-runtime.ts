@@ -1,4 +1,4 @@
-// What the text worker does with each request (ADR-631), kept apart from the
+// What the text worker does with each request (ADR-643), kept apart from the
 // worker entry so tests can run the full round trip without a Worker.
 //
 // The worker holds the last font file it was sent, so typing posts only the

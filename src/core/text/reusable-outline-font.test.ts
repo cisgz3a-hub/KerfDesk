@@ -88,7 +88,7 @@ function syntheticFont(glyphs: ReadonlyArray<ReadonlyArray<number> | null>): Arr
   return file.buffer;
 }
 
-describe('reusableOutlineFont (ADR-631)', () => {
+describe('reusableOutlineFont (ADR-643)', () => {
   it.each([
     '../../ui/text/fonts/Roboto-Regular.ttf',
     '../../ui/text/fonts/GreatVibes-Regular.ttf',

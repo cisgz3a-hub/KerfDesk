@@ -18,7 +18,7 @@ export type TextDraftResult = {
 
 export function useCanvasTextDraft(session: CanvasTextSession, values: DialogValues) {
   const stableValues = useStableTextValues(values);
-  // Layout runs in this draft's own text worker (ADR-631).
+  // Layout runs in this draft's own text worker (ADR-643).
   const textWorker = useTextWorkerSession();
   const [result, setResult] = useState<TextDraftResult>({
     object: null,

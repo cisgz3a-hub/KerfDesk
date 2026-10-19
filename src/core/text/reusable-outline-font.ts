@@ -1,5 +1,5 @@
 // Whether one opentype.js parse of a font may serve every later render, with
-// output identical to parsing the font again for each render (ADR-631).
+// output identical to parsing the font again for each render (ADR-643).
 //
 // opentype.js 2 completes a Font lazily while it draws, and some of that state
 // feeds later layouts, so a reused Font can lay the same text out differently:

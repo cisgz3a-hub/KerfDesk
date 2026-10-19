@@ -27,7 +27,7 @@ const line = {
   ],
 };
 
-describe('text render result transfer (ADR-631)', () => {
+describe('text render result transfer (ADR-643)', () => {
   it('packs rendered text into transferred buffers and rebuilds it exactly', async () => {
     const file = await readFile('src/ui/text/fonts/GreatVibes-Regular.ttf');
     const rendered = await textToPolylines({

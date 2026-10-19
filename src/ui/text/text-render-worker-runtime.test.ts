@@ -71,7 +71,7 @@ function outlineCases(content: string): ReadonlyArray<Case> {
   ];
 }
 
-// What renderTextGeometry did before ADR-631: parse the font for every render.
+// What renderTextGeometry did before ADR-643: parse the font for every render.
 async function direct(input: TextGeometryRequest, fontBuffer?: ArrayBuffer) {
   const shared = {
     content: input.content,
@@ -134,7 +134,7 @@ async function expectWorkerParity(
 }
 
 // Each case renders twice through the worker and twice directly, parsing fonts.
-describe('text worker runtime parity (ADR-631)', { timeout: 60_000 }, () => {
+describe('text worker runtime parity (ADR-643)', { timeout: 60_000 }, () => {
   it.each([
     ['Roboto', 'fonts/Roboto-Regular.ttf'],
     ['Tinos', 'fonts/Tinos-Regular.ttf'],

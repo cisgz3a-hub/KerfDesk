@@ -97,3 +97,39 @@ it('releases busy row layout on close and can render again after reopening', asy
   await act(async () => vi.advanceTimersByTimeAsync(100));
   expect(session.render).toHaveBeenCalledTimes(2);
 });
+
+it('keeps an idle row-layout worker, and its parsed font, across an edit', async () => {
+  session.render.mockResolvedValue({ textBoxLayout: undefined });
+  const textValues = (sizeMm: number): DialogValues => ({
+    content: '{{serial:3}}',
+    fontKey: 'roboto-regular',
+    sizeMm,
+    alignment: 'left',
+    lineHeight: 1.2,
+    letterSpacing: 0,
+    bendDeg: 0,
+    color: '#000',
+    embeddedFonts,
+    textBox: { mode: 'fixed', widthMm: 20, heightMm: 10, wrap: true, fit: 'none', minSizeMm: 1 },
+  });
+  const show = (sizeMm: number) =>
+    root.render(
+      <VariableRowsPreview
+        source="{{serial:3}}"
+        variables={DEFAULT_PROJECT_VARIABLE_DATA}
+        textValues={textValues(sizeMm)}
+      />,
+    );
+  await act(async () => show(10));
+  const details = host.querySelector('details')!;
+  await act(async () => {
+    details.open = true;
+    Simulate.toggle(details);
+  });
+  await act(async () => vi.advanceTimersByTimeAsync(100));
+  expect(session.render).toHaveBeenCalledTimes(1);
+  await act(async () => show(12));
+  await act(async () => vi.advanceTimersByTimeAsync(100));
+  expect(session.render).toHaveBeenCalledTimes(2);
+  expect(session.release).not.toHaveBeenCalled();
+});

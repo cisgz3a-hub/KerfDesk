@@ -128,7 +128,7 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('text worker session (ADR-631)', () => {
+describe('text worker session (ADR-643)', () => {
   it('posts the font file once and then only the settings', async () => {
     const { session, workers } = harness({ auto: true });
     const first = await session.render(input());

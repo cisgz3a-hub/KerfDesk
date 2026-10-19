@@ -117,7 +117,12 @@ function useRowLayout(
         current = false;
       };
     }
+    // Set while a row is being laid out. Only busy work is released when the
+    // rows change or the preview closes; an idle worker keeps its parsed font
+    // for the next edit (ADR-643, decision 5).
+    let busy = false;
     const render = async (): Promise<void> => {
+      busy = true;
       const result: Record<number, string> = {};
       for (const row of rows) {
         if (!current) return;
@@ -135,6 +140,7 @@ function useRowLayout(
           }
         }
       }
+      busy = false;
       if (current) setLayouts(result);
     };
     const timer = window.setTimeout(() => {
@@ -143,7 +149,7 @@ function useRowLayout(
     return () => {
       current = false;
       window.clearTimeout(timer);
-      textWorker.release();
+      if (busy) textWorker.release();
     };
   }, [rows, values, textWorker]);
   return layouts;
