@@ -37,20 +37,27 @@ would open behind it. It covered the machine panel and suspended the app's short
    **Close without saving**, the **Save jig changes?** prompt, the unsaved-changes footer and the
    ADR-606 Amendment 1 rebase are removed. Each jig edit is one ordinary undoable project edit.
    A selection change adds no undo step, and an edit that changes nothing is not recorded.
-   **Done** returns to the main canvas. Escape only clears the selection; it never leaves jig
-   mode. Opening another project leaves jig mode.
+   **Done** returns to the main canvas, as does **Registration Jig** in the Tools menu; either way
+   the outlines leave the selection, which the main canvas cannot edit. Escape only clears the
+   selection; it never leaves jig mode. Opening another project leaves jig mode.
 3. **Outlines stay locked in the project.** Every jig edit locks the outlines again before it
    reaches the project, so a stray drag on the main canvas still cannot move them. The jig page
    shows them unlocked while they may still be moved: until they are burned, or after
-   **Unlock outlines**, which now lasts until Done.
+   **Unlock outlines**, which now lasts until Done. While the page shows them locked, their
+   layout is locked too: shape, size, grid, **Apply layout** and **Remove** are disabled, and the
+   project refuses a rebuild or removal, so a new grid never moves a burned outline.
 4. **Three steps, in the order of the job.** The page's steps are **1 Burn outlines**
    (shape, size, grid and the outline laser settings), **2 Place pieces & artwork** and
    **3 Burn artwork** (the artwork Line / Fill settings). A new jig opens on step 1, and one whose
    outlines are burned opens on step 2. Opening jig mode on a project without a jig creates its
-   first outline, in Outline only, as one undoable edit.
+   first outline, in Outline only, as one undoable edit. A layout applied to a project without
+   outlines, after **Remove** or when jig mode opened while the machine moved, also creates the
+   jig in Outline only.
 5. **Frame and Start live in the burn steps, and only in the step whose run is next.** Steps 1
    and 3 hold the workspace's own Frame and Start. While jig mode is open, the machine panel does
-   not show its copy, so there is still exactly one Frame and one Start. The next run is
+   not show its copy, so there is still exactly one Frame and one Start. When the page has no burn
+   panel to hold them (a captured board, no outline, or outlines and artwork set to burn
+   together), the machine panel keeps its copy instead. The next run is
    read from the outline operation's output: it outputs (Outline only), it does not (Artwork only),
    or it outputs together with artwork, the one-pass mix the two-run jig avoids. When a step's
    run is not next, the step says which run is and offers one explicit switch: **Burn outlines
@@ -60,7 +67,9 @@ would open behind it. It covered the machine panel and suspended the app's short
 6. **Editing pauses while the machine runs.** While a job, Frame or other machine motion is
    active, the jig canvas only pans and zooms, the step fields are disabled and project edits
    from the page are refused. The run was prepared from the project as it was, and the
-   outline-run completion only switches an unchanged project.
+   outline-run completion only switches an unchanged project. An import, trace or text that is
+   ready only once the machine moves is not added: the import toast, the tracer or the text form
+   says why instead of reporting success.
 7. **The main canvas bar only says what burns next.** It keeps **Edit jig** and drops **Outline
    only** and **Artwork only**; the run is chosen in jig mode. Job Review keeps its alternate-output
    offer.
@@ -70,7 +79,8 @@ would open behind it. It covered the machine panel and suspended the app's short
 The jig page always shows what Frame and Start burn. Leaving jig mode, or a lost connection, can
 no longer strand a burned outline outside the project. The draft's isolation is gone: a half-done
 jig edit is in the project, and Undo is the way back. Grid growth stays centred for a jig created
-in this visit of jig mode, and keeps the first outline's corner otherwise (ADR-606).
+in this visit of jig mode until it is burned (a job ran, or Artwork only was selected), and keeps
+the first outline's corner otherwise (ADR-606).
 
 The browser Free build keeps both hosts inert (`RegistrationJigPanel`, `RegistrationJigWorkspace`).
 The jig still needs Pro to open; Frame and Start are never licence-gated.
@@ -81,10 +91,15 @@ Session tests cover creating a jig as one undoable edit in Outline only, editing
 with the outlines kept locked, burned outlines shown locked until unlocked, centred and corner
 grid growth, keeping the run and artwork intent on a rebuild, no undo step for a selection or a
 no-op, the project Undo, refusing project edits while the machine moves, removing the jig and a
-captured board. Component tests cover the steps, Done with no Save or Close without saving,
-Frame and Start only in the step whose run is next, moving to step 2 when the outline run selects
-Artwork only, editing straight into the project, Escape and Ctrl+A, the paused page while the
-machine moves, and leaving jig mode for another project. The side panels test shows only the
+captured board, refusing to rebuild or remove burned outlines, corner growth for a burned jig
+this visit created, and Outline only for a jig a layout creates. Component tests cover the steps,
+Done with no Save or Close without saving, Frame and Start only in the step whose run is next,
+moving to step 2 when the outline run selects Artwork only, editing straight into the project,
+Escape and Ctrl+A, the paused page while the machine moves, refusing late artwork, the layout
+locked with burned outlines and kept in place after Burn outlines again, and leaving jig mode
+for another project or by the Tools menu with the outlines dropped from the selection. The side
+panels test keeps the machine panel's job actions when the jig page has no burn panel, and
+otherwise shows only the
 machine panel without its job actions in jig mode; the shortcut test shows the canvas keys
 standing down while Undo still works. The completion simulator test checks the run phase after a
 clean and a rejected outline run. No hardware was run.
