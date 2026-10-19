@@ -216,7 +216,7 @@ describe('registration jig draft artwork edits', () => {
   });
 });
 
-describe('one design on every piece (ADR-638)', () => {
+describe('one design on every piece (ADR-641)', () => {
   function gridSession(): JigEditorSession {
     resetStore();
     useStore.setState({ registrationArtworkOutputSnapshot: null });

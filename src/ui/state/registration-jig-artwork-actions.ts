@@ -76,7 +76,7 @@ type JigArtworkState = Pick<
 >;
 
 /** `grow: false` keeps artwork that already fits at its size (a jig import or
- *  new text copied to every piece, ADR-638); Centre on every piece grows it. */
+ *  new text copied to every piece, ADR-641); Centre on every piece grows it. */
 export function applyCenterArtworkInRegistrationJigSet(
   state: JigArtworkState,
   options: { readonly grow?: boolean } = {},

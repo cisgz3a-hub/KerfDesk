@@ -1,6 +1,6 @@
 import { IconButton } from '../kit';
 
-/** The shared artwork size (ADR-057 2026-08-25, ADR-638): W and H apply on
+/** The shared artwork size (ADR-057 2026-08-25, ADR-641): W and H apply on
  *  Enter or when the field is left, and one lock keeps the proportions. */
 export function RegistrationJigArtworkSizeFields(props: {
   readonly count: number;

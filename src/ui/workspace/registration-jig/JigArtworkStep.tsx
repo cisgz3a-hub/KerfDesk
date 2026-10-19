@@ -11,7 +11,7 @@ import type { JigEditorController } from './use-jig-editor';
 type JigAddPanel = 'text' | 'trace' | null;
 
 /** Step 2: put the pieces in the burned outlines, then add the artwork. One
- *  row adds it (ADR-638): a single design goes on every piece by itself. */
+ *  row adds it (ADR-641): a single design goes on every piece by itself. */
 export function JigArtworkStep({ editor }: { readonly editor: JigEditorController }): JSX.Element {
   const [panel, setPanel] = useState<JigAddPanel>(null);
   const project = editor.session.draft.project;

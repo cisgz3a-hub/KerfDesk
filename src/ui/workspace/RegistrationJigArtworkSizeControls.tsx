@@ -56,7 +56,7 @@ export function RegistrationJigArtworkSizeEditor(props: {
       setWidthDraft(formatDimension(height * ratio));
     }
   };
-  // Applied when a field is left or on Enter (ADR-638): an unchanged size adds
+  // Applied when a field is left or on Enter (ADR-641): an unchanged size adds
   // no undo step, and an invalid one returns to the current size.
   const apply = (): void => {
     if (

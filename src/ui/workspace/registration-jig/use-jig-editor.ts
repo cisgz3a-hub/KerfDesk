@@ -336,7 +336,7 @@ function handleJigCommandKey(event: React.KeyboardEvent, editor: JigEditorContro
   return true;
 }
 
-// Clear canvas (ADR-638): one undoable edit that empties the pieces and says so.
+// Clear canvas (ADR-641): one undoable edit that empties the pieces and says so.
 function clearJigCanvas(setSession: (edit: JigEdit) => JigEditorSession): void {
   let cleared = 0;
   let repairs: ReturnType<typeof clearJigArtwork>['repairs'] = null;

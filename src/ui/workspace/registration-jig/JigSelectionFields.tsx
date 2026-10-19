@@ -11,7 +11,7 @@ import { jigEditableSelection, withJigTransforms } from './jig-canvas-selection'
 
 /**
  * The selection's position, size and rotation, on a bar above the jig canvas
- * that shows only while something is selected (ADR-638). Selected artwork can
+ * that shows only while something is selected (ADR-641). Selected artwork can
  * be centred on every piece again after it was moved.
  */
 export function JigSelectionBar(props: {
