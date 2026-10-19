@@ -96,14 +96,15 @@ export class Cut3DOffscreenSession {
     this.mesh = mesh;
     this.stockThicknessMm = stockThicknessMm;
     this.surfaceId += 1;
+    const outgoing = isNewMesh ? transferableMesh(mesh) : null;
     const request: Cut3DOffscreenWorkerRequest = {
       kind: 'surface',
       sessionId: this.sessionId,
       surfaceId: this.surfaceId,
-      mesh: isNewMesh ? mesh : null,
+      mesh: outgoing === null ? null : outgoing.mesh,
       stockThicknessMm,
     };
-    this.send(request, isNewMesh ? meshBuffers(mesh) : []);
+    this.send(request, outgoing === null ? [] : outgoing.transfer);
   }
 
   attach(
@@ -158,15 +159,16 @@ export class Cut3DOffscreenSession {
     try {
       const viewport = measureViewport(this.canvas);
       const offscreen = this.canvas.transferControlToOffscreen();
+      const outgoing = transferableMesh(this.mesh);
       const request: Cut3DOffscreenWorkerRequest = {
         kind: 'init',
         sessionId: this.sessionId,
         canvas: offscreen,
-        mesh: this.mesh,
+        mesh: outgoing.mesh,
         stockThicknessMm: this.stockThicknessMm,
         ...viewport,
       };
-      this.worker.postMessage(request, [offscreen, ...meshBuffers(this.mesh)]);
+      this.worker.postMessage(request, [offscreen, ...outgoing.transfer]);
     } catch (error) {
       this.fail(error instanceof Error ? error.message : String(error));
     }
@@ -257,8 +259,22 @@ export class Cut3DOffscreenSession {
   }
 }
 
-function meshBuffers(mesh: Cut3DSurfaceMesh): Transferable[] {
-  return [mesh.positions.buffer, mesh.indices.buffer, mesh.normals.buffer];
+// The prepared mesh stays owned by the dialog: a failed renderer gets a fresh
+// session for the same mesh, and a transferred buffer is detached for good, so
+// posting the caller's arrays again would throw DataCloneError. Each session
+// transfers its own copy; the display mesh is budgeted (256 cells across), so
+// the copy is small.
+function transferableMesh(mesh: Cut3DSurfaceMesh): {
+  readonly mesh: Cut3DSurfaceMesh;
+  readonly transfer: Transferable[];
+} {
+  const positions = mesh.positions.slice();
+  const indices = mesh.indices.slice();
+  const normals = mesh.normals.slice();
+  return {
+    mesh: { ...mesh, positions, indices, normals },
+    transfer: [positions.buffer, indices.buffer, normals.buffer],
+  };
 }
 
 function createDeferred(): Deferred {
