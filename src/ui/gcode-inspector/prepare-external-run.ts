@@ -1,6 +1,6 @@
 // prepare-external-run — the exact program and review behind the Run dialog
 // (ADR-630). A refusal here is factual: the file cannot be sent as a job, or
-// it never moves in X or Y, so there is nothing for the Frame to trace. The
+// its parser has no finite motion envelope for the Frame to visit. The
 // caller supplies normalized bytes and the fresh inspection of those bytes.
 
 import { type ExternalProgram, type ExternalProgramReview } from '../../core/external-program';
@@ -16,7 +16,7 @@ export type PreparedExternalRun =
     };
 
 export const NO_FRAME_ENVELOPE =
-  'The program never moves in X or Y, so there is no outline for the Frame to trace.';
+  'The Inspector could not construct a finite motion envelope for the Frame to visit.';
 
 export function prepareExternalRun(
   name: string,
