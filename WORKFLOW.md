@@ -2705,7 +2705,7 @@ authorization, Frame proof, controller command, or safety boundary.
    canvas shows its X, Y, W and H, a **Keep proportions** lock and its rotation, and for
    artwork **Centre on every piece**. **Clear canvas** beside **Fit jig** and **Fit bed**
    removes the artwork in the jig's pieces, keeping the outlines and every design
-   outside them, as one undoable edit (ADR-634 Amendment 1).
+   outside them, as one undoable edit (ADR-638 Amendment 1).
    As on the main canvas, drag with the right or middle mouse button, or hold Space and
    drag, to pan; the wheel zooms.
 2. In **1 Burn outlines**, choose Rectangle or Circle, enter the outline size, then enter

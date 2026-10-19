@@ -34,7 +34,7 @@ export type RegistrationJigCanvasProps = {
   readonly onCommit: (project: Project) => void;
   /** Artwork files dropped on the canvas, with the outline under the drop point. */
   readonly onDropFiles?: (files: ReadonlyArray<File>, outlineId: string | null) => void;
-  /** Position and size of the selection, shown above the footer (ADR-634). */
+  /** Position and size of the selection, shown above the footer (ADR-638). */
   readonly selectionBar?: ReactNode;
   /** How much jig artwork Clear canvas would remove, and the action itself. */
   readonly clearCount?: number;

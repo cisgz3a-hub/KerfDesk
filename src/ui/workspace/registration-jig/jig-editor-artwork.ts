@@ -31,7 +31,7 @@ import {
 export type JigImportPlacement = {
   readonly anchorIds: ReadonlySet<string>;
   readonly batchIndex: number;
-  /** One design for the whole jig (ADR-634): after fitting, it is centred in
+  /** One design for the whole jig (ADR-638): after fitting, it is centred in
    *  the first outline and copied into every other one, in the same edit. */
   readonly copyToEveryOutline?: boolean;
 };
@@ -184,7 +184,7 @@ export function deleteJigArtworkWithRepairs(session: JigEditorSession): JigArtwo
   return deleteJigArtworkIds(session, selectedJigIds(session.draft));
 }
 
-/** Clear canvas (ADR-634): removes the artwork in the jig's pieces and keeps
+/** Clear canvas (ADR-638): removes the artwork in the jig's pieces and keeps
  *  the outlines and every design outside them. */
 export function clearJigArtwork(session: JigEditorSession): JigArtworkDeletion {
   return deleteJigArtworkIds(session, jigArtworkIds(session.draft.project.scene));

@@ -72,7 +72,7 @@ export function jigSelectionForHit(
 /** Ctrl+A: all the artwork the canvas could select. Outlines are left out;
  * Jig layout has its own Select all outlines. */
 /** Ctrl+A: every selectable artwork object, or in the outline step every
- *  movable outline (ADR-634). */
+ *  movable outline (ADR-638). */
 export function jigSelectAll(
   scene: Scene,
   target: 'artwork' | 'outlines' = 'artwork',

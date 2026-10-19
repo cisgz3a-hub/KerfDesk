@@ -38,7 +38,7 @@ type OutlineFieldValues = {
 };
 
 /**
- * The outline shape, size and grid (ADR-634). A change applies when Enter is
+ * The outline shape, size and grid (ADR-638). A change applies when Enter is
  * pressed, the shape is picked, or focus leaves the fields, so W, H, rows and
  * columns typed together rebuild the grid once. Escape returns the fields to
  * the outlines as they are; an invalid value says why and goes back too.
