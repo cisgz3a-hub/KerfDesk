@@ -390,7 +390,9 @@ try {
   $candidates = foreach ($candidate in @($Installer, $UpgradeInstaller | Where-Object { $_ })) {
     $signature = (Get-AuthenticodeSignature -LiteralPath $candidate).Status.ToString()
     if ($signature -ne 'NotSigned') { throw "Expected unsigned test candidate, found $signature" }
-    & (Join-Path $PSScriptRoot 'verify-windows-package-identity.ps1') -Executable $candidate -Kind Installer | Out-Null
+    # The historical baseline is the published installer, built from older source.
+    $historical = $Scenario -eq 'HistoricalUpgrade' -and $candidate -eq $Installer
+    & (Join-Path $PSScriptRoot 'verify-windows-package-identity.ps1') -Executable $candidate -Kind Installer -Historical:$historical | Out-Null
     [pscustomobject]@{ file = (Get-FileEvidence $candidate); signature = $signature }
   }
   $receipt.candidates = @($candidates)
