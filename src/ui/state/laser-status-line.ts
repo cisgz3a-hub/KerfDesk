@@ -80,7 +80,7 @@ export function handleStatusLine(
   // A 'done' streamer normally belongs to the post-job settle, which releases
   // it itself — but when the settle failed or never started, no operation owns
   // the release and the same Idle-means-motion-stopped reasoning applies.
-  const jobOverAtIdle = shouldReleaseStreamerAtIdle(streamer, state.controllerOperation, report);
+  const jobOverAtIdle = shouldReleaseStreamerAtIdle(state, report, refs);
   // Releasing the streamer is the moment the run is over, so the run's own
   // state goes with it — otherwise a finished CNC job left the store claiming
   // machineKind 'cnc' and holding an unconsumed tool-change queue indefinitely.
