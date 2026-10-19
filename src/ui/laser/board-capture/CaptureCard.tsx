@@ -3,7 +3,8 @@
 // a beam-off jog pad to reach the next point, and the capture buttons.
 
 import type { ReactNode } from 'react';
-import type { BoardAxisSigns, Vec2 } from '../../../core/scene';
+import type { Vec2 } from '../../../core/scene';
+import type { BoardAxisSigns } from '../../../core/scene/board-polygon';
 import { Button } from '../../kit';
 import { BoardFineJogControls } from './BoardFineJogControls';
 import { CaptureMap, type CaptureMapOutline } from './CaptureMap';

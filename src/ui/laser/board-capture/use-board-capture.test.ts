@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { boardPolygonFromPoints, type Vec2 } from '../../../core/scene';
+import { type Vec2 } from '../../../core/scene';
+import { boardPolygonFromPoints } from '../../../core/scene/board-polygon';
 import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
 import {
   CIRCLE_RIM_POINT_COUNT,

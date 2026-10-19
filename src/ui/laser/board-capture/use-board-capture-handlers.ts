@@ -8,15 +8,17 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   bestFitRectangleFromCorners,
-  boardFrontLeftCorner,
-  boardPolygonFromPoints,
   findRegistrationBoxes,
   firstCornerOffsetMm,
   type BestFitRectangle,
-  type BoardAxisSigns,
-  type BoardPolygonResult,
   type Vec2,
 } from '../../../core/scene';
+import { boardFrontLeftCorner } from '../../../core/scene/board-capture';
+import {
+  boardPolygonFromPoints,
+  type BoardAxisSigns,
+  type BoardPolygonResult,
+} from '../../../core/scene/board-polygon';
 import {
   capturedBoardOrigin,
   capturedBoardShape,

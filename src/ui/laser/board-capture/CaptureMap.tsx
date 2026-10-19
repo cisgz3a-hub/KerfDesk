@@ -3,7 +3,8 @@
 // head or positioning light is now. Drawn as the operator stands at the
 // machine — front edge at the bottom — whatever the controller's origin corner.
 
-import type { BoardAxisSigns, Vec2 } from '../../../core/scene';
+import type { Vec2 } from '../../../core/scene';
+import type { BoardAxisSigns } from '../../../core/scene/board-polygon';
 
 export type CaptureMapOutline = 'points' | 'path' | 'closed' | 'box';
 

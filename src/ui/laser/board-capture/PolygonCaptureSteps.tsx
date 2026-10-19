@@ -4,12 +4,12 @@
 // "Create board outline" sets the work origin at the front-left of the shape's
 // bounding box (no head motion) and draws the locked outline.
 
+import { type Vec2 } from '../../../core/scene';
 import {
   MAX_BOARD_POLYGON_POINTS,
   MIN_BOARD_POLYGON_POINTS,
   type BoardPolygonResult,
-  type Vec2,
-} from '../../../core/scene';
+} from '../../../core/scene/board-polygon';
 import { Button } from '../../kit';
 import { CaptureCard, type BoardSightView } from './CaptureCard';
 import { MIN_BOARD_DIMENSION_MM } from './constants';

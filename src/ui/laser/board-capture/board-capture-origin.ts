@@ -2,7 +2,8 @@
 // Place board capture and correction handlers (ADR-124, ADR-636).
 
 import type { Dispatch, SetStateAction } from 'react';
-import type { BoardPolygonIssue, BoardShape, Vec2 } from '../../../core/scene';
+import type { BoardShape, Vec2 } from '../../../core/scene';
+import type { BoardPolygonIssue } from '../../../core/scene/board-polygon';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
 import { useLaserStore } from '../../state/laser-store';
 import type { BoardCapture, BoardRegistrationEpoch } from './use-board-capture';

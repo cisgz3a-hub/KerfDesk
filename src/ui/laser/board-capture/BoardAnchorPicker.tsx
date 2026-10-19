@@ -8,7 +8,7 @@ import {
   BOARD_PLACEMENT_ANCHORS,
   boardPlacementAnchorLabel,
   type BoardPlacementAnchor,
-} from '../../../core/scene';
+} from '../../../core/scene/board-anchor-placement';
 import { NumberInput } from '../../kit';
 
 export function BoardAnchorPicker(props: {

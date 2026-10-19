@@ -12,7 +12,8 @@ import {
   positioningLightSupported,
 } from '../../../core/devices/positioning-light';
 import type { DeviceProfile } from '../../../core/devices/device-profile';
-import type { BoardAxisSigns, Vec2 } from '../../../core/scene';
+import type { Vec2 } from '../../../core/scene';
+import type { BoardAxisSigns } from '../../../core/scene/board-polygon';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 

@@ -6,14 +6,16 @@
 // undoable move. Artwork that cannot fit is still aligned, with a warning.
 
 import {
-  boardRegionOf,
   combinedBBox,
   findRegistrationBoxes,
-  planBoardPlacement,
   sceneObjectHasVisibleLayer,
-  type BoardPlacementAnchor,
   type SceneObject,
 } from '../../core/scene';
+import { boardRegionOf } from '../../core/scene/board-region';
+import {
+  planBoardPlacement,
+  type BoardPlacementAnchor,
+} from '../../core/scene/board-anchor-placement';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 import { useToastStore } from './toast-store';

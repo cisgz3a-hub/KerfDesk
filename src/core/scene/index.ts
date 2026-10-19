@@ -132,31 +132,11 @@ export {
   BOARD_CORNER_COUNT,
   bestFitRectangleFromCorners,
   boardCornersFromOrigin,
-  boardFrontLeftCorner,
   boardMachinePoints,
   diameterFromCenterEdge,
   firstCornerOffsetMm,
 } from './board-capture';
 export type { BoardVerificationTarget, CapturedBoardGeometry } from './board-verification';
-export type {
-  BoardAxisSigns,
-  BoardPolygon,
-  BoardPolygonIssue,
-  BoardPolygonResult,
-} from './board-polygon';
-export {
-  boardPolygonFromPoints,
-  MAX_BOARD_POLYGON_POINTS,
-  MIN_BOARD_POLYGON_POINTS,
-} from './board-polygon';
-export type { BoardRegion } from './board-region';
-export { boardRegionOf, boxInsideBoardRegion } from './board-region';
-export type { BoardPlacementAnchor, BoardPlacementPlan } from './board-anchor-placement';
-export {
-  BOARD_PLACEMENT_ANCHORS,
-  boardPlacementAnchorLabel,
-  planBoardPlacement,
-} from './board-anchor-placement';
 export type { BoxAnchorAlignError, BoxAnchorAlignResult } from './box-anchor-align';
 export { buildBoxAnchorAlign } from './box-anchor-align';
 export type {

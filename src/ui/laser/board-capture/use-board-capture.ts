@@ -1,11 +1,9 @@
 import { useReducer, useRef } from 'react';
+import { assertNever, type BoardShapeKind, type Vec2 } from '../../../core/scene';
 import {
-  assertNever,
   MAX_BOARD_POLYGON_POINTS,
   MIN_BOARD_POLYGON_POINTS,
-  type BoardShapeKind,
-  type Vec2,
-} from '../../../core/scene';
+} from '../../../core/scene/board-polygon';
 import {
   boardVerificationPoint,
   type CapturedBoardGeometry,
