@@ -260,7 +260,10 @@ type PulseLoopState = {
   readonly displayMode: ObjectDisplayMode;
 };
 
-/** Runs animation frames only while a pulse or an edge fade is in flight. */
+/**
+ * Runs animation frames only while a pulse or an edge fade is in flight, or
+ * while the painter still has bitmaps to render or a moved view to settle.
+ */
 function createPulseLoop(
   read: () => { readonly ctx: CanvasRenderingContext2D | null; readonly state: PulseLoopState },
 ) {
@@ -272,8 +275,8 @@ function createPulseLoop(
     const { ctx, state } = read();
     if (ctx === null) return;
     const frame = clock.frame(now, state.reducedMotion);
-    painter.draw(ctx, state.project, state.view, frame.pieces, state.displayMode);
-    if (frame.busy) kick();
+    const pending = painter.draw(ctx, state.project, state.view, frame.pieces, state.displayMode);
+    if (frame.busy || pending) kick();
   }
   function kick(): void {
     if (frameId === null) frameId = requestAnimationFrame(tick);

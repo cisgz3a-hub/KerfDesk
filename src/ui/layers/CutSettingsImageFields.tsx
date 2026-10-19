@@ -10,11 +10,12 @@ import {
   imageOverscanMmFor,
   MAX_IMAGE_OVERSCAN_MM,
 } from '../../core/job/operation-cut-extras';
-import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
+import type { Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { imageDensityBounds } from '../raster/image-density-bounds';
 import { dotWidthCorrectionMax } from './cut-settings-draft';
+import { DitherSwatchPicker, originalPixelsNotice } from './DitherSwatchPicker';
 import { ImageScanPatternFields } from './CutSettingsScanPatternFields';
 import { AutoOverscanSwitch, automaticOverscanNote } from './CutSettingsAutoOverscan';
 import { normalizedScanAngleDeg } from '../../core/raster/raster-scan-frame';
@@ -33,28 +34,18 @@ export function CutSettingsImageFields(props: {
   readonly onImageLinesPerMmChange: (linesPerMm: number) => void;
 }): JSX.Element {
   const maxPower = props.deferArtworkBounds ? 100 : (props.maxPower ?? props.layer.power);
+  const [passThrough, setPassThrough] = useState(props.layer.passThrough);
   return (
     <fieldset className="lf-fieldset lf-cut-settings-group">
       <legend className="lf-legend">Image detail</legend>
       <p className="lf-laser-help">
         Dither creates a pattern of dots. Grayscale varies the laser power with image brightness.
       </p>
-      <Field label="Dither">
-        <select
-          name="ditherAlgorithm"
-          className="lf-select"
-          value={props.dither}
-          onChange={(event) => props.onDitherChange(parseDither(event.target.value))}
-          aria-label="Cut settings dither"
-          title="Choose how image brightness is converted into laser dots or grayscale power."
-        >
-          {DITHER_ALGORITHMS.map((algorithm) => (
-            <option key={algorithm} value={algorithm}>
-              {DITHER_LABELS[algorithm]}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <DitherField
+        dither={props.dither}
+        passThrough={passThrough}
+        onChange={props.onDitherChange}
+      />
       {props.dither === 'grayscale' ? (
         <Field label="Min Power">
           <MinPowerInput initialValue={props.layer.minPower} maxPower={maxPower} />
@@ -97,8 +88,33 @@ export function CutSettingsImageFields(props: {
         checked={props.layer.imageBidirectional}
         title="Alternate raster rows in both directions. Turn off for scan-offset diagnosis."
       />
-      <ImageExtraFields layer={props.layer} />
+      <ImageExtraFields layer={props.layer} onPassThroughChange={setPassThrough} />
     </fieldset>
+  );
+}
+
+// A div, not a Field label: a label would hand a click on "Dither" to the first
+// swatch. The checked swatch submits as ditherAlgorithm.
+function DitherField(props: {
+  readonly dither: Layer['ditherAlgorithm'];
+  readonly passThrough: boolean;
+  readonly onChange: (dither: Layer['ditherAlgorithm']) => void;
+}): JSX.Element {
+  const notice = originalPixelsNotice('Use original pixels', props.passThrough, props.dither);
+  return (
+    <div className="lf-field lf-field--top">
+      <span className="lf-field-label lf-field-label--md">Dither</span>
+      <div className="lf-field__control">
+        <DitherSwatchPicker
+          name="ditherAlgorithm"
+          value={props.dither}
+          ariaLabel="Cut settings dither"
+          title="Choose how image brightness is converted into laser dots or grayscale power."
+          {...(notice === undefined ? {} : { notice })}
+          onChange={props.onChange}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -164,7 +180,10 @@ function formatNumber(value: number): string {
   return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
 }
 
-function ImageExtraFields(props: { readonly layer: Layer }): JSX.Element {
+function ImageExtraFields(props: {
+  readonly layer: Layer;
+  readonly onPassThroughChange: (passThrough: boolean) => void;
+}): JSX.Element {
   return (
     <details className="lf-cut-settings-disclosure">
       <summary title="Show original-pixel processing and scan-calibration options">
@@ -186,6 +205,7 @@ function ImageExtraFields(props: { readonly layer: Layer }): JSX.Element {
           name="passThrough"
           checked={props.layer.passThrough}
           title="Use the image pixels as-is and skip KerfDesk image processing."
+          onChange={props.onPassThroughChange}
         />
         <p className="lf-laser-help">
           Pass-through keeps original pixels and density, skipping brightness, contrast, gamma,
@@ -304,6 +324,7 @@ function ImageCheckboxField(props: {
   readonly name: string;
   readonly checked: boolean;
   readonly title: string;
+  readonly onChange?: (checked: boolean) => void;
 }): JSX.Element {
   return (
     <Field label={props.label}>
@@ -313,6 +334,7 @@ function ImageCheckboxField(props: {
         className="lf-checkbox"
         defaultChecked={props.checked}
         title={props.title}
+        onChange={(event) => props.onChange?.(event.target.checked)}
       />
     </Field>
   );
@@ -326,26 +348,6 @@ function Field(props: { readonly label: string; readonly children: React.ReactNo
     </label>
   );
 }
-
-function parseDither(value: string): Layer['ditherAlgorithm'] {
-  return DITHER_ALGORITHMS.some((algorithm) => algorithm === value)
-    ? (value as Layer['ditherAlgorithm'])
-    : 'floyd-steinberg';
-}
-
-const DITHER_LABELS: Readonly<Record<Layer['ditherAlgorithm'], string>> = {
-  threshold: 'Threshold',
-  'floyd-steinberg': 'Floyd-Steinberg',
-  jarvis: 'Jarvis',
-  stucki: 'Stucki',
-  atkinson: 'Atkinson',
-  burkes: 'Burkes',
-  sierra3: 'Sierra 3',
-  sierra2: 'Sierra 2',
-  'sierra-lite': 'Sierra Lite',
-  ordered: 'Ordered',
-  grayscale: 'Grayscale',
-};
 
 function displayNumber(value: number, decimals: number): number {
   return Number(value.toFixed(decimals));
