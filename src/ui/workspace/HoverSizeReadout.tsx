@@ -1,7 +1,8 @@
 // Hover an object, see how big it is (ADR-348). Size used to be readable only
 // once artwork was selected — from the numeric bar, or by dragging a handle
 // and watching the drag chip. Hovering answers "how wide is that one?" without
-// touching the scene at all.
+// touching the scene at all. On a laser it also says the power and speed the
+// piece runs at (ADR-348 Amendment 1), so checking a setting needs no click.
 //
 // Hit-testing runs on a short dwell, NOT on every pointer move: a hit inside a
 // large vector flattens its curves (100k segment budget), which is far too
@@ -17,6 +18,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import { useStore } from '../state';
+import { hoverOutputSettings, type HoverOutputSettings } from './hover-output-settings';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { computeView, type ViewState } from './view-transform';
 
@@ -35,6 +37,7 @@ export function HoverSizeReadout(props: {
   const object = props.project.scene.objects.find((candidate) => candidate.id === hovered.id);
   if (object === undefined) return null;
   const bbox = transformedBBox(object);
+  const settings = hoverOutputSettings(props.project, object);
   const view = computeView(
     props.canvasSize.width,
     props.canvasSize.height,
@@ -56,7 +59,31 @@ export function HoverSizeReadout(props: {
       <span style={positionStyle}>
         X {formatMm(bbox.minX)}, Y {formatMm(bbox.minY)}
       </span>
+      {settings === null ? null : <SettingsLines settings={settings} />}
     </div>
+  );
+}
+
+function SettingsLines(props: { readonly settings: HoverOutputSettings }): JSX.Element {
+  const { settings } = props;
+  if (settings.kind === 'note') return <span style={settingsStyle}>{settings.text}</span>;
+  // One colour dot per line only when there is more than one: a single line
+  // needs no key, and the dot would read as decoration.
+  const keyed = settings.lines.length > 1;
+  return (
+    <>
+      {settings.lines.map((line) => (
+        <span key={`${line.color} ${line.power} ${line.speed}`} style={settingsStyle}>
+          {keyed ? <span style={{ ...swatchStyle, background: line.color }} /> : null}
+          Power {line.power} · Speed {line.speed}
+        </span>
+      ))}
+      {settings.more > 0 ? (
+        <span style={positionStyle}>
+          +{settings.more} more setting{settings.more === 1 ? '' : 's'}
+        </span>
+      ) : null}
+    </>
   );
 }
 
@@ -91,7 +118,7 @@ const readoutStyle: React.CSSProperties = {
   zIndex: 6,
   display: 'grid',
   gap: 1,
-  maxWidth: 220,
+  maxWidth: 320,
   padding: '5px 8px',
   boxShadow: 'var(--lf-shadow)',
   pointerEvents: 'none',
@@ -118,4 +145,20 @@ const positionStyle: React.CSSProperties = {
   fontFamily: 'ui-monospace, Menlo, monospace',
   fontSize: 'var(--lf-text-xs)',
   whiteSpace: 'nowrap',
+};
+
+const settingsStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 5,
+  fontFamily: 'ui-monospace, Menlo, monospace',
+  fontSize: 'var(--lf-text-xs)',
+  whiteSpace: 'nowrap',
+};
+
+const swatchStyle: React.CSSProperties = {
+  flex: 'none',
+  width: 7,
+  height: 7,
+  borderRadius: '50%',
 };

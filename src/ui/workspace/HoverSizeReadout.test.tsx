@@ -100,6 +100,12 @@ describe('HoverSizeReadout', () => {
     expect(container.textContent).toContain('X 100.0, Y 50.0');
   });
 
+  it('reports the power and speed the hovered artwork runs at', async () => {
+    const container = await render(projectWithRect());
+    await hoverAt(130, 70);
+    expect(container.textContent).toContain('Power 30% · Speed 1500 mm/min');
+  });
+
   it('says nothing over empty bed, after the pointer leaves, or while disabled', async () => {
     const project = projectWithRect();
     const container = await render(project);
