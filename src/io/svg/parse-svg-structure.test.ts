@@ -76,6 +76,19 @@ describe.each(parsers)('SVG <use> expansion through %s', (_name, parse) => {
     expect(presentationNotes(result).join(' ')).toMatch(/Skipped 2 circular <use>/);
   });
 
+  // Audit 2026-10-18: a <use> walked its own child elements as artwork, so
+  // SVG 1.1 fallback content imported on top of the referenced instance.
+  it('imports only the referenced instance, never the <use> element’s own children', async () => {
+    const result = await parse(
+      svg(
+        '<defs><path id="r" d="M0 0 L10 0" stroke="#ff0000"/></defs>' +
+          '<use href="#r"><path d="M0 20 L10 20" stroke="#0000ff"/></use>',
+      ),
+    );
+    expect(colours(result)).toEqual(['#ff0000']);
+    expect(polylineCount(result)).toBe(1);
+  });
+
   it('expands a <use> fan-out within the budget in full', async () => {
     expect(polylineCount(await parse(fanout(4)))).toBe(10_000);
   });
