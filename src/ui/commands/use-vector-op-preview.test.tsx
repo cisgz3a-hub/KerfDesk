@@ -61,6 +61,18 @@ describe('useVectorOpPreview (ADR-609)', () => {
     expect(seen?.failed).toBeNull();
   });
 
+  it('drops an older result once the current request settles with a problem', async () => {
+    const first = parityObjects();
+    await act(async () => root.render(<Probe sources={first} />));
+    await act(async () => pending[0]?.({ kind: 'done', result: { kind: 'ok', value: 'first' } }));
+    expect(seen?.settled?.sources).toBe(first);
+
+    await act(async () => root.render(<Probe sources={[openLineObject()]} />));
+    await act(async () => pending[1]?.({ kind: 'unavailable', message: 'No worker.' }));
+    expect(seen?.unavailable).toBe('No worker.');
+    expect(seen?.settled).toBeNull();
+  });
+
   it('reports only a result settled for the current sources as current', async () => {
     const first = parityObjects();
     await act(async () => root.render(<Probe sources={first} />));

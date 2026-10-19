@@ -18,12 +18,12 @@ export const PULSE_PEAK_STRENGTH = 0.78;
 /** Strength of the soft colour edge while the pointer rests on the artwork. */
 export const PULSE_EDGE_ALPHA = 0.5;
 export const PULSE_EDGE_BLUR_PX = 8;
+/** The wider, softer halo that breathes with the pulse. Both halos are blurred once per piece. */
+export const PULSE_BLOOM_BLUR_PX = 16;
 
 /** The swell peaks a third of the way in, then ebbs slowly: no flash, no flat hold. */
 const SWELL_PEAK = 0.34;
 const GLOW_PEAK_ALPHA = 0.34;
-const GLOW_START_BLUR_PX = 6;
-const GLOW_GROWTH_BLUR_PX = 16;
 const RIPPLE_BASE_MS = 110;
 const RIPPLE_MS_PER_PX = 0.8;
 const SWEEP_STEP_MS = 90;
@@ -43,13 +43,9 @@ export function pulseStrength(t: number): number {
   return PULSE_PEAK_STRENGTH * swell(t);
 }
 
-/** A faint halo that breathes with the colour and drifts outward as it fades. */
-export function pulseGlow(t: number): { readonly blurPx: number; readonly alpha: number } | null {
-  if (!(t > 0 && t < 1)) return null;
-  return {
-    blurPx: GLOW_START_BLUR_PX + GLOW_GROWTH_BLUR_PX * easeOutSine(t),
-    alpha: GLOW_PEAK_ALPHA * swell(t),
-  };
+/** A faint halo that breathes with the colour: the bloom's strength, 0..GLOW_PEAK_ALPHA. */
+export function pulseGlowAlpha(t: number): number {
+  return GLOW_PEAK_ALPHA * swell(t);
 }
 
 /**
@@ -148,7 +144,7 @@ export type PulsePieceFrame = {
   readonly objectId: string;
   readonly colorSources: PulseColorSources;
   readonly strength: number;
-  readonly glow: { readonly blurPx: number; readonly alpha: number } | null;
+  readonly glowAlpha: number;
   readonly edgeAlpha: number;
 };
 
@@ -228,9 +224,9 @@ function stepEntry(
   const busy = (running && !reducedMotion) || entry.edge !== edgeTarget;
   // Reduced motion: no pulse, the colour simply shows while the pointer rests.
   const strength = reducedMotion ? (hovered ? PULSE_PEAK_STRENGTH : 0) : pulseStrength(t);
-  const glow = reducedMotion ? null : pulseGlow(t);
-  if (strength === 0 && glow === null && entry.edge === 0) return { busy, piece: null };
-  return { busy, piece: { strength, glow, edgeAlpha: entry.edge } };
+  const glowAlpha = reducedMotion ? 0 : pulseGlowAlpha(t);
+  if (strength === 0 && glowAlpha === 0 && entry.edge === 0) return { busy, piece: null };
+  return { busy, piece: { strength, glowAlpha, edgeAlpha: entry.edge } };
 }
 
 function isRunning(entry: Entry, now: number): boolean {
@@ -245,8 +241,4 @@ function nextEdge(current: number, target: number, dt: number, reducedMotion: bo
 
 function easeInOutSine(x: number): number {
   return (1 - Math.cos(Math.PI * x)) / 2;
-}
-
-function easeOutSine(x: number): number {
-  return Math.sin((Math.PI * x) / 2);
 }
