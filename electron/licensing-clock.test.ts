@@ -4,6 +4,7 @@ import {
   checkGrantTime,
   checkInOverdue,
   clockErrorMessage,
+  clockWarningMessage,
   clockRolledBack,
   LicenceClockError,
   nextClockMark,
@@ -87,16 +88,26 @@ describe('licence clock rules (ADR-523 Amendment 2)', () => {
     }
   });
   it('says roughly how far off the clock is, which way, and what to do', () => {
-    expect(clockErrorMessage(301)).toContain('about 5 minutes ahead');
-    expect(clockErrorMessage(-89 * 60)).toContain('about 89 minutes behind');
-    expect(clockErrorMessage(90 * 60 - 1)).toContain('about 90 minutes ahead');
-    expect(clockErrorMessage(-90 * 60)).toContain('about 2 hours behind');
-    expect(clockErrorMessage(47 * 3600)).toContain('about 47 hours ahead');
-    expect(clockErrorMessage(48 * 3600 - 1)).toContain('about 48 hours ahead');
-    expect(clockErrorMessage(48 * 3600)).toContain('about 2 days ahead');
-    expect(clockErrorMessage(-400 * 86_400)).toContain('about 400 days behind');
-    expect(clockErrorMessage(600)).toContain(
+    expect(clockErrorMessage(301, 'win32')).toContain('about 5 minutes ahead');
+    expect(clockErrorMessage(-89 * 60, 'win32')).toContain('about 89 minutes behind');
+    expect(clockErrorMessage(90 * 60 - 1, 'win32')).toContain('about 90 minutes ahead');
+    expect(clockErrorMessage(-90 * 60, 'win32')).toContain('about 2 hours behind');
+    expect(clockErrorMessage(47 * 3600, 'win32')).toContain('about 47 hours ahead');
+    expect(clockErrorMessage(48 * 3600 - 1, 'win32')).toContain('about 48 hours ahead');
+    expect(clockErrorMessage(48 * 3600, 'win32')).toContain('about 2 days ahead');
+    expect(clockErrorMessage(-400 * 86_400, 'win32')).toContain('about 400 days behind');
+    expect(clockErrorMessage(600, 'win32')).toContain(
       'Turn on Set time automatically in Windows’ Date & time settings, check the time zone',
     );
+  });
+  // The desktop app ships for macOS and Linux too (ADR-623 Amendment 1).
+  it.each([
+    ['win32', 'Set time automatically in Windows’ Date & time settings'],
+    ['darwin', 'Set time and date automatically in System Settings > General > Date & Time'],
+    ['linux', 'automatic date and time in your desktop’s date and time settings'],
+  ])('names where %s keeps its automatic time setting', (platform, setting) => {
+    expect(clockErrorMessage(600, platform)).toContain(`Turn on ${setting}, check the time zone`);
+    expect(clockWarningMessage(-600, platform)).toContain(`but turn on ${setting} and check`);
+    if (platform !== 'win32') expect(clockErrorMessage(600, platform)).not.toContain('Windows');
   });
 });
