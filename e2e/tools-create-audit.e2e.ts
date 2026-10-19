@@ -90,7 +90,7 @@ async function tool(page: Page, name: string) {
   const command = menu.locator('button').filter({ has: page.getByText(name, { exact: true }) });
   await command.click({ timeout: 15_000 });
   if (name !== 'Measure' && name !== 'Text...') {
-    // Jig mode (ADR-634) is a workspace region in place of the canvas, not a dialog.
+    // Jig mode (ADR-638) is a workspace region in place of the canvas, not a dialog.
     await page
       .locator(
         '[role="dialog"], section[aria-label="Place board"], [role="region"][aria-label="Registration Jig"]',

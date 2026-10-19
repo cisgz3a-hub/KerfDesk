@@ -153,7 +153,7 @@ function AppLifecycle(): null {
   return null;
 }
 
-// Jig mode (ADR-634) and Place Board mode (ADR-636) put their page where the
+// Jig mode (ADR-638) and Place Board mode (ADR-636) put their page where the
 // tool strip and the main canvas are. The side panels stay, so the machine
 // panel is docked beside the page from the first capture to the last burn.
 // The Place Board host is always mounted: it owns the capture session, so

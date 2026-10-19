@@ -348,7 +348,7 @@ export function handleEditShortcut(e: KeyboardEvent, ctx: EditCtx): boolean {
   return !isEditableTarget(e) && invokeFirstBinding(e, EDIT_BINDINGS, ctx);
 }
 
-/** Undo and Redo only: jig mode (ADR-634) handles every other canvas key on
+/** Undo and Redo only: jig mode (ADR-638) handles every other canvas key on
  *  its own page, while history stays one project-wide Ctrl/Cmd+Z. */
 export function handleHistoryShortcut(e: KeyboardEvent, ctx: EditCtx): boolean {
   return !isEditableTarget(e) && invokeFirstBinding(e, EDIT_BINDINGS.slice(0, 2), ctx);

@@ -18,7 +18,7 @@ export function WorkspaceSidePanels(): JSX.Element {
   const [machineOpen, setMachineOpen] = useState(true);
   const layersExpanded = useUiStore((state) => state.railPanelVisibility.layers);
   const machinePanel = useMachineRailVisibility();
-  // Jig mode (ADR-634) shows only the machine panel: the jig page has its own
+  // Jig mode (ADR-638) shows only the machine panel: the jig page has its own
   // artwork and laser settings, and its burn steps hold Frame and Start.
   // Place Board mode (ADR-636) is a page like the jig's, with Frame and Start
   // in its burn step, so it shows the machine panel alone too.

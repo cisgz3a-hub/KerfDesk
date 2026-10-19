@@ -15,7 +15,7 @@ import { applyRegistrationOutput } from '../../state/registration-output-actions
 import { pushUndo } from '../../state/scene-mutations';
 import { jigRunPhase } from './jig-run-phase';
 
-// Jig mode edits the open project itself (ADR-634): there is no draft to save
+// Jig mode edits the open project itself (ADR-638): there is no draft to save
 // or discard, so what the jig page shows is always what Frame and Start burn.
 // The helpers here stay pure. They work on a view of the project in which the
 // outlines are unlocked while they may still be moved, and `jigStoreChange`

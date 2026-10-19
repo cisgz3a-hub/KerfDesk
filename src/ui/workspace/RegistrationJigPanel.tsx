@@ -1,5 +1,5 @@
 // The main canvas's compact jig bar, and the lazily loaded jig page that takes
-// the canvas's place in jig mode (ADR-634).
+// the canvas's place in jig mode (ADR-638).
 import { lazy, Suspense } from 'react';
 import { findRegistrationBoxes } from '../../core/scene';
 import { Button } from '../kit';
