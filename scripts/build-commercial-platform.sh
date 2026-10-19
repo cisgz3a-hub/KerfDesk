@@ -66,7 +66,8 @@ if [[ "${platform}" == macos ]]; then
   trap - EXIT
 
   unpacked="$(pwd)/$(ls -d "${release}"/mac*/KerfDesk.app)"
-  node scripts/verify-asar-integrity-enforced.mjs \
+  # The unlicensed baseline opens behind its licence window (ADR-623).
+  node scripts/verify-asar-integrity-enforced.mjs --expect-licence-window \
     "${unpacked}/Contents/MacOS/KerfDesk" "${unpacked}/Contents/Resources/app.asar"
   files=("${dmg}")
 else
