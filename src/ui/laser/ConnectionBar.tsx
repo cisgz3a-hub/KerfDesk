@@ -41,6 +41,8 @@ export type ConnectionBarProps = {
   readonly reconnectRecommended?: boolean;
   /** The controller stopped answering status queries; only this pops up (ADR-611). */
   readonly controllerStoppedResponding?: boolean;
+  /** A controller that answered this session has gone quiet: "Not responding" (ADR-611 A1). */
+  readonly controllerWentSilent?: boolean;
   readonly onRetryQualification?: () => void;
   readonly onReconnectQualification?: () => void;
   /** Show the port picker even when a remembered port is attached. */
@@ -69,11 +71,13 @@ type Props = ConnectionBarProps;
 export function ConnectionBar(props: Props): JSX.Element {
   const { connection } = props;
   const notice = useControllerNotice(props);
+  const silent = connection.kind === 'connected' && props.controllerWentSilent === true;
   return (
     <section
       className="lf-connection-compact"
       aria-label="Machine connection"
       data-state={connection.kind}
+      data-silent={silent ? 'true' : undefined}
     >
       <div className="lf-connection-toolbar-layout">
         <div
@@ -87,8 +91,8 @@ export function ConnectionBar(props: Props): JSX.Element {
         <div className="lf-connection-toolbar-controls">
           <CompactConnectionControls
             machineName={props.machineName ?? 'Unnamed machine'}
-            status={connectionStatusLabel(connection)}
-            statusDot={<StatusDot connection={connection} />}
+            status={silent ? 'Not responding' : connectionStatusLabel(connection)}
+            statusDot={<StatusDot connection={connection} silent={silent} />}
             machine={props.machine}
             details={props.details}
             leading={props.mode}
@@ -317,8 +321,11 @@ export function connectionFailureText(
 const LINUX_SERIAL_ACCESS =
   'On Linux your account also needs serial access: run sudo usermod -aG dialout $USER (on Arch, uucp instead of dialout), then log out and back in.';
 
-function StatusDot({ connection }: { readonly connection: ConnectionState }): JSX.Element {
-  const color = connectionStatusColor(connection);
+function StatusDot(props: {
+  readonly connection: ConnectionState;
+  readonly silent: boolean;
+}): JSX.Element {
+  const color = props.silent ? 'var(--lf-warning)' : connectionStatusColor(props.connection);
   return (
     <span
       aria-hidden="true"

@@ -51,6 +51,7 @@ import {
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { forgetAlarmBeforeBanner, takeAlarmBeforeBanner } from './laser-reset-alarm';
 import { handleAlarmLine } from './laser-alarm-line';
+import { handleLostReplyProbeLine } from './laser-lost-ack-reconcile';
 import { rearmParserWhenDrained } from './laser-parser-rearm';
 import { handleStatusLine, originUnknownAfterControllerReset } from './laser-status-line';
 import { settleUntrackedAck, streamOwnsTerminalAck } from './laser-stream-ack';
@@ -112,6 +113,7 @@ function handleNonBannerLine(
   line: string,
   state: LaserState,
 ): void {
+  handleLostReplyProbeLine(set, get, refs, safeWrite, cls.kind, line);
   const acknowledgesLine = cls.kind !== 'error' || cls.acknowledgesLine !== false;
   const ackSettlement = settleUntrackedAck(set, state, cls.kind, refs, acknowledgesLine);
   const ownedCommandLine = activeControllerCommandLine(refs);

@@ -125,7 +125,11 @@ export function publicNativePhase(result, processResult, profile, phase, label) 
   const offline = result?.networkIsolation;
   let passed = false;
   try {
-    validateNativeSmokeResult(result, profile);
+    // Cleanup of a profile without developer rights starts behind the licence
+    // window (ADR-623): there is no workspace, only the deactivation retry.
+    validateNativeSmokeResult(result, profile, {
+      acceptLicenceWindow: phase === 'deactivate' && !developer(observation?.before),
+    });
     const stateMatches =
       phase === 'deactivate'
         ? free(observation?.after)
@@ -186,8 +190,11 @@ export function publicNativePhase(result, processResult, profile, phase, label) 
       offline?.mode === 'offline-enforced' &&
       offline.chromiumProbeBlocked === true &&
       offline.nodeProbeBlocked === true,
-    filePickers: 'stubbed',
-    projectSaveTarget: 'memory',
+    // Cleanup behind the licence window opens no workspace, so no pickers run (ADR-623).
+    filePickers:
+      result?.renderer?.fileAccess?.openPicker === 'stubbed' ? 'stubbed' : 'not-exercised',
+    projectSaveTarget:
+      result?.renderer?.fileAccess?.writeTarget === 'memory' ? 'memory' : 'not-exercised',
   };
 }
 

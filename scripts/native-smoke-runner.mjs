@@ -23,7 +23,12 @@ export async function runIsolatedNativeSmoke(args, validateResult, dependencies 
       outcome: 'running',
       executable: resolve(args.executable),
       timeoutMs: args.timeoutMs,
-      licensingExpectation: args.expectFreshSandbox === true ? 'fresh-sandbox' : 'observe',
+      licensingExpectation:
+        args.expectFreshSandbox === true
+          ? 'fresh-sandbox'
+          : args.expectLicenceWindow === true
+            ? 'commercial-licence-window'
+            : 'observe',
       failure: null,
       validationFailure: null,
       evidenceErrors: [],

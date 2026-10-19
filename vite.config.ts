@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { pdfResources } from './scripts/pdf-resources';
 import { browserFreeBuild } from './scripts/browser-free-build';
+import { startupArtwork } from './scripts/startup-artwork';
 
 import {
   appVersion,
@@ -62,6 +63,7 @@ function fileSystemAllowList(): ReadonlyArray<string> {
 export default defineConfig({
   plugins: [
     browserFreeBuild(),
+    startupArtwork(),
     react(),
     pdfResources(),
     // Offline PWA (ADR-060). registerType 'prompt' (never auto-reload — see
