@@ -85,7 +85,7 @@ function LicensedEdition({
   const freeBuild = unlicensedRunsFree && channel === 'free';
   // Until the first status, the build's channel is unknown, so nothing mounts.
   const gated = !useSessionAdmission(session.status, client) && channel !== 'free';
-  const { load, isPro } = session;
+  const { load } = session;
   const { showAll } = desktop;
   const { managing, closeManager } = useLicenceManager(
     freeBuild,
@@ -95,20 +95,7 @@ function LicensedEdition({
     load,
     showAll,
   );
-  const value = useMemo<EditionValue>(
-    () => ({
-      status: session.status,
-      licensed: channel === 'commercial',
-      // Store mutations must also check elapsed time when browser timers slept.
-      get pro() {
-        return isPro();
-      },
-      proInDesktop: freeBuild,
-      requestPro: freeBuild ? desktop.request : session.requestPro,
-      openLicence: freeBuild ? showAll : openLicence,
-    }),
-    [channel, desktop.request, freeBuild, isPro, session.requestPro, session.status, showAll],
-  );
+  const value = useEditionValue(session, desktop, freeBuild);
   useEffect(() => {
     setActiveEdition(value);
     return () => setActiveEdition(null);
@@ -145,6 +132,33 @@ function LicensedEdition({
       )}
       <CommercialUpdates client={client} updatesUntil={session.status?.updatesUntil ?? null} />
     </EditionContext.Provider>
+  );
+}
+
+/** The edition the app reads, rebuilt only when what it reports changes. */
+function useEditionValue(
+  session: ReturnType<typeof useLicenceSession>,
+  desktop: ReturnType<typeof useProInDesktop>,
+  freeBuild: boolean,
+): EditionValue {
+  const { status, isPro, hasPendingPro, requestPro } = session;
+  const { showAll, hasPrompt, request } = desktop;
+  return useMemo<EditionValue>(
+    () => ({
+      status,
+      licensed: status?.channel === 'commercial',
+      // Store mutations must also check elapsed time when browser timers slept.
+      get pro() {
+        return isPro();
+      },
+      proInDesktop: freeBuild,
+      get proPromptOpen() {
+        return hasPendingPro() || hasPrompt();
+      },
+      requestPro: freeBuild ? request : requestPro,
+      openLicence: freeBuild ? showAll : openLicence,
+    }),
+    [freeBuild, hasPendingPro, hasPrompt, isPro, request, requestPro, status, showAll],
   );
 }
 
@@ -247,6 +261,30 @@ function useLicenceManager(
   return { managing, closeManager };
 }
 
+/** Re-read the local licence status on a timer, on focus and after a quiet check. */
+function useLicenceStatusPolling(load: () => Promise<void>): void {
+  useEffect(() => {
+    void load();
+    // Reads the main process's local status, not the network. Its quiet checks
+    // can revoke rights or pause a trial between panel visits (ADR-592).
+    const timer = window.setInterval(() => void load(), 30_000);
+    const checkVisible = (): void => {
+      if (document.visibilityState !== 'hidden') void load();
+    };
+    // A quiet confirmation that just finished may open the licence window (ADR-623).
+    const refreshed = (): void => void load();
+    window.addEventListener('focus', checkVisible);
+    window.addEventListener(LICENCE_REFRESHED_EVENT, refreshed);
+    document.addEventListener('visibilitychange', checkVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', checkVisible);
+      window.removeEventListener(LICENCE_REFRESHED_EVENT, refreshed);
+      document.removeEventListener('visibilitychange', checkVisible);
+    };
+  }, [load]);
+}
+
 /** The saved licence, and the Pro request waiting on it, for one running app. */
 function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) {
   const [status, setStatus] = useState<LicenceStatus | null>(null);
@@ -294,26 +332,7 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
         setFailure('The licence service could not be reached. Please retry or restart KerfDesk.');
     }
   }, [accept, client]);
-  useEffect(() => {
-    void load();
-    // Reads the main process's local status, not the network. Its quiet checks
-    // can revoke rights or pause a trial between panel visits (ADR-592).
-    const timer = window.setInterval(() => void load(), 30_000);
-    const checkVisible = (): void => {
-      if (document.visibilityState !== 'hidden') void load();
-    };
-    // A quiet confirmation that just finished may open the licence window (ADR-623).
-    const refreshed = (): void => void load();
-    window.addEventListener('focus', checkVisible);
-    window.addEventListener(LICENCE_REFRESHED_EVENT, refreshed);
-    document.addEventListener('visibilitychange', checkVisible);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener('focus', checkVisible);
-      window.removeEventListener(LICENCE_REFRESHED_EVENT, refreshed);
-      document.removeEventListener('visibilitychange', checkVisible);
-    };
-  }, [load]);
+  useLicenceStatusPolling(load);
   useTrialExpiry(status, accept, trialClock);
   useCheckInReminder(status);
   const isPro = useCallback(
@@ -334,5 +353,6 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
     },
     [accept, settle, trialClock],
   );
-  return { status, failure, pending, settle, accept, load, requestPro, isPro };
+  const hasPendingPro = useCallback(() => pendingRef.current !== null, []);
+  return { status, failure, pending, settle, accept, load, requestPro, isPro, hasPendingPro };
 }

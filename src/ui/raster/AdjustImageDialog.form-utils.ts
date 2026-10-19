@@ -19,10 +19,3 @@ export function parseDither(value: string): Layer['ditherAlgorithm'] {
 export function dotWidthCorrectionMax(linesPerMm: number): number {
   return 1 / Math.max(1, linesPerMm);
 }
-
-export function algorithmLabel(algorithm: Layer['ditherAlgorithm']): string {
-  return algorithm
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
