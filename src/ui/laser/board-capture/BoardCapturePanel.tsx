@@ -112,11 +112,7 @@ function BoardCapturePanelBody({
   return (
     <>
       <section aria-label="Place board" className="lf-chip lf-place-board">
-        <PlaceBoardHeader
-          step={panelStep(capture)}
-          disabled={panelLocked}
-          onClose={close}
-        />
+        <PlaceBoardHeader step={panelStep(capture)} disabled={panelLocked} onClose={close} />
         <PanelMessages connected={connected} handlers={handlers} />
         <BoardPointerBar pointer={pointer} connected={connected} />
         <BoardCapturePanelContent

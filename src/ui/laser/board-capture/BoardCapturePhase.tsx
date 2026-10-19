@@ -1,4 +1,9 @@
-import type { BestFitRectangle, BoardPolygonResult, BoardShapeKind, Vec2 } from '../../../core/scene';
+import type {
+  BestFitRectangle,
+  BoardPolygonResult,
+  BoardShapeKind,
+  Vec2,
+} from '../../../core/scene';
 import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
 import { BoardCaptureSteps } from './BoardCaptureSteps';
 import { BoardPlacementControls } from './BoardPlacementControls';

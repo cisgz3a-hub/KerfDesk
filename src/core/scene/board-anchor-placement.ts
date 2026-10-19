@@ -101,7 +101,12 @@ export function planBoardPlacement(
   );
   let center = start;
   if (direction.x !== 0 && direction.y !== 0) {
-    center = slide(center, { x: direction.x / Math.SQRT2, y: direction.y / Math.SQRT2 }, reach, fitsAt);
+    center = slide(
+      center,
+      { x: direction.x / Math.SQRT2, y: direction.y / Math.SQRT2 },
+      reach,
+      fitsAt,
+    );
   }
   // Settle into the corner along each axis in turn (twice, so a slanted edge
   // reached first along X can still give way along Y).

@@ -123,7 +123,12 @@ function viewBox(points: ReadonlyArray<Vec2>): {
   readonly height: number;
 } {
   if (points.length === 0) {
-    return { x: -MIN_EXTENT_MM / 2, y: -MIN_EXTENT_MM / 2, width: MIN_EXTENT_MM, height: MIN_EXTENT_MM };
+    return {
+      x: -MIN_EXTENT_MM / 2,
+      y: -MIN_EXTENT_MM / 2,
+      width: MIN_EXTENT_MM,
+      height: MIN_EXTENT_MM,
+    };
   }
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);

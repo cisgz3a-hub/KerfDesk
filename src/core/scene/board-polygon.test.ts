@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { boardPolygonFromPoints, boardPolygonWithPoint, polygonSelfIntersects } from './board-polygon';
+import {
+  boardPolygonFromPoints,
+  boardPolygonWithPoint,
+  polygonSelfIntersects,
+} from './board-polygon';
 
 const FRONT_LEFT = { x: 1, y: 1 } as const;
 const REAR_LEFT = { x: 1, y: -1 } as const;

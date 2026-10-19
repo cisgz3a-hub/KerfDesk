@@ -128,7 +128,8 @@ function MeasuredBoard(props: {
 
 function stepGuidance(count: number, allCaptured: boolean, aim: BoardSightView['aim']): string {
   const tool = aim === 'pointer' ? 'the pointer' : 'the head';
-  if (allCaptured) return `All ${BOARD_CORNER_COUNT} corners captured. Check the size, then create the outline.`;
+  if (allCaptured)
+    return `All ${BOARD_CORNER_COUNT} corners captured. Check the size, then create the outline.`;
   if (count === 0) {
     return `Corner 1 of ${BOARD_CORNER_COUNT}: jog ${tool} to the front-left (bottom-left) corner, then Capture. This corner sets the work origin.`;
   }

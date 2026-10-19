@@ -112,7 +112,6 @@ function BoardAnchorButton(props: {
   );
 }
 
-
 type ElementSize = { readonly width: number; readonly height: number };
 
 function useParentElementSize(): [React.RefObject<HTMLDivElement>, ElementSize | null] {

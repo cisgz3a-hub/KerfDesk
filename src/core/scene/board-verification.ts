@@ -103,7 +103,11 @@ export function boardVerificationTargets(
     case 'circle':
       return CIRCLE_BOARD_VERIFICATION_ANCHORS.map((anchor) => ({ kind: 'circle', anchor }));
     case 'polygon':
-      return geometry.polygon.points.map((_, index) => ({ kind: 'polygon', anchor: 'vertex', index }));
+      return geometry.polygon.points.map((_, index) => ({
+        kind: 'polygon',
+        anchor: 'vertex',
+        index,
+      }));
   }
 }
 
@@ -206,9 +210,7 @@ export function correctCapturedBoardGeometry(
       confirmed,
       geometry.axisSigns,
     );
-    return polygon === null
-      ? null
-      : { geometry: { ...geometry, polygon }, crossAxisErrorMm: 0 };
+    return polygon === null ? null : { geometry: { ...geometry, polygon }, crossAxisErrorMm: 0 };
   }
   return null;
 }

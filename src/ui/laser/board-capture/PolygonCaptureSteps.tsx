@@ -31,7 +31,11 @@ export function PolygonCaptureSteps(props: {
   return (
     <CaptureCard
       title="Capture each corner"
-      progress={count < MIN_BOARD_POLYGON_POINTS ? `${count} of ${MIN_BOARD_POLYGON_POINTS}+` : `${count} corners`}
+      progress={
+        count < MIN_BOARD_POLYGON_POINTS
+          ? `${count} of ${MIN_BOARD_POLYGON_POINTS}+`
+          : `${count} corners`
+      }
       guidance={guidance(count, props.sight.aim)}
       points={props.corners}
       outline={count >= MIN_BOARD_POLYGON_POINTS ? 'closed' : 'path'}
@@ -59,7 +63,11 @@ export function PolygonCaptureSteps(props: {
         </ol>
       )}
       {count >= MIN_BOARD_POLYGON_POINTS && props.polygon !== null && (
-        <PolygonSummary polygon={props.polygon} disabled={props.disabled} onFinish={props.onFinish} />
+        <PolygonSummary
+          polygon={props.polygon}
+          disabled={props.disabled}
+          onFinish={props.onFinish}
+        />
       )}
     </CaptureCard>
   );

@@ -69,9 +69,12 @@ export function useBoardCaptureHandlers(args: BoardCaptureHandlerArgs): BoardCap
   const [captureNotice, setCaptureNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const { corners, shapeKind, committed } = args.capture.state;
-  const rect = shapeKind === 'rect' && corners.length === 4 ? bestFitRectangleFromCorners(corners) : null;
+  const rect =
+    shapeKind === 'rect' && corners.length === 4 ? bestFitRectangleFromCorners(corners) : null;
   const polygon =
-    shapeKind === 'polygon' && !committed ? boardPolygonFromPoints(corners, boardAxisSigns()) : null;
+    shapeKind === 'polygon' && !committed
+      ? boardPolygonFromPoints(corners, boardAxisSigns())
+      : null;
   const commitGeometry = createGeometryCommit(args);
   const messages = { setError: setCaptureError, setNotice: setCaptureNotice, setBusy };
   return {
@@ -238,18 +241,24 @@ function createPolygonFinishHandler(
     }
     const { polygon } = result;
     if (polygon.widthMm < MIN_BOARD_DIMENSION_MM || polygon.heightMm < MIN_BOARD_DIMENSION_MM) {
-      messages.setError('That shape is too small to be a board. Jog to each corner and capture it.');
+      messages.setError(
+        'That shape is too small to be a board. Jog to each corner and capture it.',
+      );
       return;
     }
-    void commitWithNewOrigin(args, { kind: 'polygon', polygon, axisSigns: signs }, commit, messages)
-      .then((done) => {
-        if (done && polygon.reordered) {
-          messages.setNotice(
-            'The corners crossed over in the order they were captured, so they were joined ' +
-              'around the board instead. Check the outline matches.',
-          );
-        }
-      });
+    void commitWithNewOrigin(
+      args,
+      { kind: 'polygon', polygon, axisSigns: signs },
+      commit,
+      messages,
+    ).then((done) => {
+      if (done && polygon.reordered) {
+        messages.setNotice(
+          'The corners crossed over in the order they were captured, so they were joined ' +
+            'around the board instead. Check the outline matches.',
+        );
+      }
+    });
   };
 }
 

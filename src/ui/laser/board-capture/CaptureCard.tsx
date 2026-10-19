@@ -64,7 +64,11 @@ export function CaptureCard(props: {
         >
           {props.captureLabel}
         </button>
-        <Button variant="ghost" disabled={props.sessionDisabled || count === 0} onClick={props.onUndo}>
+        <Button
+          variant="ghost"
+          disabled={props.sessionDisabled || count === 0}
+          onClick={props.onUndo}
+        >
           Undo last
         </Button>
         {count > 0 && (

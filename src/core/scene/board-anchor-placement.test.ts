@@ -117,9 +117,9 @@ describe('planBoardPlacement on a custom shape', () => {
     const box = placed(planBoardPlacement(ART, TRIANGLE, 'bottom-left', 2));
     expect(box.maxY).toBeCloseTo(98, 3);
     expect(boxInsideBoardRegion(TRIANGLE, box, 2)).toBe(true);
-    expect(boxInsideBoardRegion(TRIANGLE, { ...box, minX: box.minX - 1, maxX: box.maxX - 1 }, 2)).toBe(
-      false,
-    );
+    expect(
+      boxInsideBoardRegion(TRIANGLE, { ...box, minX: box.minX - 1, maxX: box.maxX - 1 }, 2),
+    ).toBe(false);
   });
 
   it('centres on the material when the bounding-box centre is a notch', () => {
@@ -130,9 +130,9 @@ describe('planBoardPlacement on a custom shape', () => {
 
   it('never jumps across a notch to reach an anchor', () => {
     const plan = planBoardPlacement({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, ELL, 'top-right', 0);
-    expect(boxInsideBoardRegion(ELL, placed(plan, { minX: 0, minY: 0, maxX: 10, maxY: 10 }), 0)).toBe(
-      true,
-    );
+    expect(
+      boxInsideBoardRegion(ELL, placed(plan, { minX: 0, minY: 0, maxX: 10, maxY: 10 }), 0),
+    ).toBe(true);
   });
 
   it('reports artwork larger than the board', () => {
