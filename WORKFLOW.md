@@ -925,9 +925,9 @@ the linked artwork.
 
 Artwork overrides preserve Constant, Dynamic, and an explicit Auto choice through Save/Open.
 An absent artwork power-mode override inherits the assigned operation; explicit Auto follows the
-device default even when that operation selects Constant or Dynamic. Job Review's settings approval
-tracks artwork overrides, power scale, operation bindings, and operation settings, so the badge
-marks later edits as unapproved without changing the existing Frame/Start policy.
+device default even when that operation selects Constant or Dynamic. Saving a Job Review card
+(ADR-637) writes power, speed, passes and air through the same store actions, including artwork
+that owns those fields, without changing the existing Frame/Start policy.
 
 #### Success — edit power value
 1. Click input, type new value (or use stepper).
@@ -2037,12 +2037,15 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
    Settings changed since Frame are prepared before review; no job streams before confirmation.
    A laser controller that reports `$32=0` contributes
    the `$32` acknowledgement banner rather than refusing Frame or Start.
-6. Job Review uses the v2 surface: five stat tiles (estimated time as the accent hero tile with
-   cut/travel split, job size and motion envelope, operations/cutters, G-code lines and bytes, and a
-   read-only Origin tile); a collapsed amber **Warnings (N)** dropdown whose summary always shows
-   the count and groups identical warnings; a CNC **Material & stock** card; the editable **Artwork
-   settings** table; collapsible read-only Controller and Machine fact sections; and the applicable
-   laser acknowledgement or CNC workholding/exclusive-access attestation. If Frame preparation
+6. Job Review uses the compact confirm sheet (ADR-637): one row of stat tiles (estimated time as
+   the accent hero tile with cut/travel split, job size and motion envelope, operations/cutters,
+   G-code lines and bytes, and read-only Origin and Output scope tiles); an amber warnings box with
+   the count and one short headline per warning, each warning's full text one click away; a
+   **Settings** card per operation with power (and a meter), speed, passes and air, or the CNC bit,
+   depths, feeds and spindle speed; a CNC **Material & stock** card; folded read-only Controller and
+   Machine facts side by side; and the applicable laser acknowledgement or CNC
+   workholding/exclusive-access attestation. A verified laser session shows a **Laser mode
+   verified** chip in the header instead. If Frame preparation
    selected G54 from G55-G59, the durable warning names the original WCS and says the active
    selection changed, stored offsets were not erased, and Cancel leaves G54 selected. Placement is
    not editable in review; the sticky footer echoes the resolved origin beside Cancel and **Start
@@ -2052,9 +2055,11 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
    maximum, or the laser profile's S maximum in laser mode. A CNC operation above its configured
    spindle maximum still contributes a warning when controller settings are unavailable. These
    facts describe requested/compiled settings and controller scaling, not measured spindle RPM.
-7. Editing a value in Job Review commits through the normal store actions and re-runs preparation.
-   The stat tiles dim behind **Recomputing…** while synchronized evidence refreshes. **Approve
-   settings** remains informational and never adds a Start gate. A power/speed edit retains
+7. **Edit** on a laser card turns its values into fields; **Save** writes them to the main
+   settings through the normal store actions and re-runs preparation, and **Discard** or Escape
+   drops the draft. Start waits while a card is mid-edit, so the job never runs values other than
+   the ones shown. The stat tiles dim behind **Recomputing…** while synchronized evidence
+   refreshes. CNC cards stay read-only. A power/speed edit retains
    Frame when the new motion envelope and placement are unchanged. Changed coordinates require
    another Frame; changed executable settings require fresh displayed review and approval before
    streaming. Each Start claims the approved program once.
@@ -2204,7 +2209,7 @@ minimum target size.
    bound still applies; the CNC-only Door progress extension does not.
 
 #### Success — generic CNC resume (ADR-180 amendment 2)
-1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens its Warnings list for a router job whose `$32` is on or unreported. When a GRBL or grblHAL controller reports `$32=1`, that warning carries **Send $32=0**: after a confirm, it writes the setting through Machine Settings' guarded write, reads `$$` back to verify, and the warning clears (ADR-180 Amendment 6). FluidNC, whose `$32` follows its YAML spindle type, gets no button.
+1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens that warning's full text for a router job whose `$32` is on or unreported. When a GRBL or grblHAL controller reports `$32=1`, that warning carries **Send $32=0**: after a confirm, it writes the setting through Machine Settings' guarded write, reads `$$` back to verify, and the warning clears (ADR-180 Amendment 6). FluidNC, whose `$32` follows its YAML spindle type, gets no button.
 2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues. In laser mode (`$32=1`) GRBL and grblHAL skip that delay, and the stopped cutter moves the instant power returns (CNC audit MC-1).
 3. Fresh post-command same-session `Door:3` reports keep **JOB RESUMING** live without refilling.
    Two seconds of silence fails; a non-resettable 30-second maximum bounds custom firmware. Only

@@ -27,7 +27,7 @@ import {
 import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
-import { JobReviewLayersTable } from './JobReviewLayersTable';
+import { JobReviewOperations } from './JobReviewOperations';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -111,7 +111,7 @@ async function renderReview(
   root = createRoot(host);
   await act(async () => {
     root?.render(
-      <JobReviewLayersTable
+      <JobReviewOperations
         machineKind="cnc"
         effectiveOperations={buildEffectiveOperationReview(job)}
       />,
@@ -120,16 +120,16 @@ async function renderReview(
   return host;
 }
 
-// The chip in the operation row's Cut column.
+// The cut chip in the operation card's header.
 function cutChip(host: HTMLElement): HTMLElement | null {
-  return host.querySelector('tbody tr td:nth-child(2) span');
+  return host.querySelector('[data-review-chip]');
 }
 
 function output(host: HTMLElement, label: string): HTMLOutputElement | null {
   return host.querySelector(`output[aria-label="${label} for ${NAME}"]`);
 }
 
-describe('JobReviewLayersTable for an operation that cuts only reliefs', () => {
+describe('JobReviewOperations for an operation that cuts only reliefs', () => {
   it('shows Relief and the deepest compiled relief pass instead of the cut type and Cut depth', async () => {
     const host = await renderReview([flatRelief()]);
 

@@ -3,7 +3,7 @@
 // an override from import, and an Artwork-panel speed edit on it lands there,
 // so the row used to show and change only the operation base while the trace
 // kept its own speed (controller audit 2026-09-23, speed-2). The oracle is
-// compileJob, not the table's own state.
+// compileJob, not the card's own state.
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -20,14 +20,14 @@ import {
 } from '../../../core/scene';
 import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
-import { JobReviewLayersTable } from './JobReviewLayersTable';
+import { JobReviewOperations } from './JobReviewOperations';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 const OP_ID = 'fill-op';
-const SPEED_CELL = 'input[aria-label^="Speed mm/min for"]';
+const SPEED_FIELD = 'input[aria-label^="Speed mm/min for"]';
 
 afterEach(() => {
   resetStore();
@@ -90,6 +90,7 @@ function compiledSpeeds(): number[] {
 }
 
 async function mountReview(): Promise<{
+  readonly host: HTMLElement;
   readonly cell: HTMLInputElement;
   readonly unmount: () => Promise<void>;
 }> {
@@ -97,22 +98,31 @@ async function mountReview(): Promise<{
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () =>
-    root.render(<JobReviewLayersTable machineKind="laser" effectiveOperations={[]} />),
+    root.render(<JobReviewOperations machineKind="laser" effectiveOperations={[]} />),
   );
-  const cell = host.querySelector<HTMLInputElement>(SPEED_CELL);
-  if (cell === null) throw new Error('Job Review speed cell missing');
-  return { cell, unmount: async () => act(async () => root.unmount()) };
+  await act(async () => cardButton(host, 'Edit').click());
+  const cell = host.querySelector<HTMLInputElement>(SPEED_FIELD);
+  if (cell === null) throw new Error('Job Review speed field missing');
+  return { host, cell, unmount: async () => act(async () => root.unmount()) };
 }
 
-async function typeAndBlur(input: HTMLInputElement, value: string): Promise<void> {
+function cardButton(host: HTMLElement, text: string): HTMLButtonElement {
+  const button = [...host.querySelectorAll('button')].find((b) => b.textContent === text);
+  if (button === undefined) throw new Error(`${text} button missing`);
+  return button;
+}
+
+async function typeAndSave(
+  host: HTMLElement,
+  input: HTMLInputElement,
+  value: string,
+): Promise<void> {
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
     setter?.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await act(async () => {
-    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
-  });
+  await act(async () => cardButton(host, 'Save').click());
 }
 
 const TRACE_OVERRIDE: ObjectOperationOverride = {
@@ -137,7 +147,7 @@ describe('Job Review speed on artwork that owns its speed', () => {
     seed([square('trace', 10, TRACE_OVERRIDE)]);
     const review = await mountReview();
     try {
-      await typeAndBlur(review.cell, '4000');
+      await typeAndSave(review.host, review.cell, '4000');
     } finally {
       await review.unmount();
     }
@@ -152,7 +162,7 @@ describe('Job Review speed on artwork that owns its speed', () => {
     expect([...compiledSpeeds()].sort((a, b) => a - b)).toEqual([1000, 2500]);
     const review = await mountReview();
     try {
-      await typeAndBlur(review.cell, '3000');
+      await typeAndSave(review.host, review.cell, '3000');
     } finally {
       await review.unmount();
     }

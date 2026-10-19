@@ -1,7 +1,8 @@
 // The Job Review stat-tile band: estimated time (hero tile), job size,
-// operations / cutters, G-code size, and the read-only origin, computed
-// from the exact prepared program (ADR-224). Dims with aria-busy while the
-// gate re-prepares after an edit.
+// operations / cutters, G-code size, the read-only origin and output scope,
+// computed from the exact prepared program (ADR-224). Each tile keeps one
+// line of detail; the full detail is its hover title (v3). Dims with
+// aria-busy while the gate re-prepares after an edit.
 
 import type { JobReviewStatTile } from './job-review-model';
 import {
@@ -23,7 +24,11 @@ export function JobReviewStats(props: {
   return (
     <div aria-busy={props.isPreparing} style={statRowStyle}>
       {props.stats.map((tile, index) => (
-        <div key={tile.label} style={tileStyle(index === 0, props.isPreparing)}>
+        <div
+          key={tile.label}
+          title={`${tile.label}: ${tile.value}\n${tile.detail}`}
+          style={tileStyle(index === 0, props.isPreparing)}
+        >
           <span style={statLabelStyle}>{tile.label}</span>
           <span style={valueStyle(tile, index === 0)}>{tile.value}</span>
           <span style={statDetailStyle}>{tile.detail}</span>
