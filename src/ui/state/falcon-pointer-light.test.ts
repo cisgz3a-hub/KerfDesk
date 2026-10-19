@@ -146,9 +146,8 @@ describe('Falcon red pointer through the LED controls (ADR-635)', () => {
   it('refuses the Falcon pointer on another machine profile without any request', async () => {
     const h = falconHarness();
     const project = useStore.getState().project;
-    useStore.setState({
-      project: { ...project, device: { ...project.device, controllerCommandSet: undefined } },
-    });
+    const { controllerCommandSet: _falcon, ...device } = project.device;
+    useStore.setState({ project: { ...project, device } });
     await expect(h.actions.switchPositioningLightOn()).rejects.toThrow(
       'needs the Creality Falcon A1 Pro machine profile',
     );
