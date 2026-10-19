@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Vec2 } from '../../../core/scene';
+import { boardPolygonFromPoints, type Vec2 } from '../../../core/scene';
 import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
 import {
   CIRCLE_RIM_POINT_COUNT,
@@ -241,5 +241,57 @@ describe('committed capture updates', () => {
       committed: false,
     });
     expect(reset.sessionRevision).toBeGreaterThan(circle.sessionRevision);
+  });
+});
+
+describe('boardCaptureReducer custom shape', () => {
+  const HOUSE = [P(100, 50), P(200, 50), P(200, 120), P(150, 160), P(100, 120)];
+
+  function polygonGeometry(): CapturedBoardGeometry {
+    const result = boardPolygonFromPoints(HOUSE, { x: 1, y: 1 });
+    if (result.kind !== 'ok') throw new Error('expected a polygon');
+    return { kind: 'polygon', polygon: result.polygon, axisSigns: { x: 1, y: 1 } };
+  }
+
+  function polygonState(): BoardCaptureState {
+    const chosen = boardCaptureReducer(INITIAL_BOARD_CAPTURE, {
+      type: 'set-shape',
+      shapeKind: 'polygon',
+    });
+    return capture(chosen, ...HOUSE);
+  }
+
+  it('captures corners in order and needs three before it can commit', () => {
+    const chosen = boardCaptureReducer(INITIAL_BOARD_CAPTURE, {
+      type: 'set-shape',
+      shapeKind: 'polygon',
+    });
+    const two = capture(chosen, P(0, 0), P(50, 0));
+    expect(boardCaptureCanCommit(two, polygonGeometry(), EPOCH, 0)).toBe(false);
+    expect(polygonState().corners).toEqual(HOUSE);
+  });
+
+  it('accepts exactly the one origin write the commit made itself', () => {
+    const state = polygonState();
+    const afterOrigin = { ...EPOCH, workOriginVersion: EPOCH.workOriginVersion + 1 };
+    expect(boardCaptureCanCommit(state, polygonGeometry(), afterOrigin, 1)).toBe(true);
+    // Without the declared write, a moved origin means someone else changed it.
+    expect(boardCaptureCanCommit(state, polygonGeometry(), afterOrigin, 0)).toBe(false);
+    const twice = { ...EPOCH, workOriginVersion: EPOCH.workOriginVersion + 2 };
+    expect(boardCaptureCanCommit(state, polygonGeometry(), twice, 1)).toBe(false);
+  });
+
+  it('keeps the outline corners after commit', () => {
+    const state = polygonState();
+    const committed = boardCaptureReducer(state, {
+      type: 'commit',
+      geometry: polygonGeometry(),
+      registrationEpoch: { ...EPOCH, workOriginVersion: EPOCH.workOriginVersion + 1 },
+      outlineId: 'captured-board',
+      expectedSessionRevision: state.sessionRevision,
+      originAdvance: 1,
+    });
+    expect(committed.committed).toBe(true);
+    expect(committed.corners).toEqual(HOUSE);
   });
 });

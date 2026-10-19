@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { diameterFromCenterEdge, type Vec2 } from '../../../core/scene';
 import { bestFitCircleFromRimPoints } from '../../../core/scene/board-circle-fit';
 import { Button, NumberInput } from '../../kit';
+import { BoardFineJogControls } from './BoardFineJogControls';
+import type { BoardSightView } from './CaptureCard';
+import { CaptureMap } from './CaptureMap';
 import { CircleCenterConfirmation } from './CircleCenterConfirmation';
 import { CIRCLE_RIM_POINT_COUNT, type CircleCaptureMethod } from './use-board-capture';
 import { MIN_BOARD_DIMENSION_MM } from './constants';
@@ -9,7 +12,7 @@ import { MIN_BOARD_DIMENSION_MM } from './constants';
 export function CircleCaptureSteps(props: {
   readonly method: CircleCaptureMethod;
   readonly corners: ReadonlyArray<Vec2>;
-  readonly livePosition: Vec2 | null;
+  readonly sight: BoardSightView;
   readonly disabled: boolean;
   readonly sessionDisabled: boolean;
   readonly onMethodChange: (method: CircleCaptureMethod) => void;
@@ -19,7 +22,7 @@ export function CircleCaptureSteps(props: {
   readonly onFinish: (center: Vec2, diameterMm: number) => Promise<void>;
 }): JSX.Element {
   return (
-    <div style={columnStyle}>
+    <div className="lf-place-board__card">
       <p style={stepStyle}>How should Place Board locate the circle center?</p>
       <div role="group" aria-label="Circle center method" style={buttonRowStyle}>
         <Button
@@ -55,11 +58,12 @@ function RimFitCapture(props: Parameters<typeof CircleCaptureSteps>[0]): JSX.Ele
   return (
     <div style={columnStyle}>
       <p style={stepStyle}>{rimGuidance(count)}</p>
-      <LivePositionRow position={props.livePosition} />
+      <CircleCaptureMap points={props.corners} sight={props.sight} />
+      {!complete && <BoardFineJogControls disabled={props.disabled} />}
       <div style={buttonRowStyle}>
         <Button
           variant="primary"
-          disabled={props.disabled || props.livePosition === null || complete}
+          disabled={props.disabled || props.sight.point === null || complete}
           title="Record a well-spaced point on the physical circle rim. The laser stays off."
           onClick={props.onCapture}
         >
@@ -92,7 +96,7 @@ function RimFitCapture(props: Parameters<typeof CircleCaptureSteps>[0]): JSX.Ele
         <CircleCenterConfirmation
           key={captureKey(props.corners)}
           fit={fit}
-          livePosition={props.livePosition}
+          livePosition={props.sight.point}
           disabled={props.disabled}
           onMoveToPoint={props.onMoveToPoint}
           onFinish={props.onFinish}
@@ -111,12 +115,13 @@ function MarkedCenterCapture(props: Parameters<typeof CircleCaptureSteps>[0]): J
   return (
     <div style={columnStyle}>
       <p style={stepStyle}>{markedCenterGuidance(count)}</p>
-      <LivePositionRow position={props.livePosition} />
+      <CircleCaptureMap points={props.corners} sight={props.sight} />
+      {count < 2 && <BoardFineJogControls disabled={props.disabled} />}
       <div style={buttonRowStyle}>
         <Button
           variant="primary"
-          disabled={props.disabled || props.livePosition === null || count >= 2}
-          title={markedCaptureTitle(count, props.livePosition)}
+          disabled={props.disabled || props.sight.point === null || count >= 2}
+          title={markedCaptureTitle(count, props.sight.point)}
           onClick={props.onCapture}
         >
           {count === 0 ? 'Capture center' : 'Capture edge'}
@@ -210,14 +215,27 @@ function CircleDiameterForm(props: {
   );
 }
 
-function LivePositionRow({ position }: { readonly position: Vec2 | null }): JSX.Element {
+function CircleCaptureMap(props: {
+  readonly points: ReadonlyArray<Vec2>;
+  readonly sight: BoardSightView;
+}): JSX.Element {
+  const { point, aim } = props.sight;
   return (
-    <div style={liveStyle}>
-      <strong>Head:</strong>{' '}
-      {position === null
-        ? 'waiting for position…'
-        : `X ${position.x.toFixed(1)} Y ${position.y.toFixed(1)}`}
-    </div>
+    <>
+      <CaptureMap
+        points={props.points}
+        sight={point}
+        signs={props.sight.signs}
+        outline="points"
+        label={`${props.points.length} circle points captured`}
+      />
+      <div style={liveStyle}>
+        <strong>{aim === 'pointer' ? 'Pointer' : 'Head'}:</strong>{' '}
+        {point === null
+          ? 'waiting for position…'
+          : `X ${point.x.toFixed(1)} Y ${point.y.toFixed(1)}`}
+      </div>
+    </>
   );
 }
 
@@ -249,7 +267,7 @@ function errorMessage(error: unknown, fallback: string): string {
 const columnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 const stepStyle: React.CSSProperties = { margin: 0, fontSize: 12, lineHeight: 1.3 };
 const liveStyle: React.CSSProperties = {
-  fontFamily: 'ui-monospace, Menlo, monospace',
+  fontFamily: 'var(--lf-font-mono)',
   fontSize: 12,
   color: 'var(--lf-text-muted)',
 };

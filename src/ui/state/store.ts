@@ -111,6 +111,7 @@ import {
 } from './selection-transform-actions';
 import { registrationActions, type RegistrationActions } from './registration-actions';
 import { boardCaptureActions } from './board-capture-actions';
+import { boardPlacementActions, type BoardPlacementActions } from './board-placement-actions';
 import { boardTileActions, type BoardTileActions } from './board-tile-actions';
 import {
   pathNodeEditActions,
@@ -198,6 +199,7 @@ export type AppState = PartGeneratorActions &
   CncLiveCapsActions &
   MachineActions &
   BoardTileActions &
+  BoardPlacementActions &
   AirAssistDefaultActions &
   ProjectActions & {
     readonly project: Project;
@@ -475,6 +477,7 @@ export const useStore = create<AppState>((rawSet, get) => {
     ...registrationActions(set),
     ...boardCaptureActions(set),
     ...boardTileActions(proOperationMutationSetter(set, get)),
+    ...boardPlacementActions(set),
     ...pathNodeEditActions(set),
     ...pathNodeCurveCommandActions(set),
     ...objectDeleteActions(set),

@@ -1,50 +1,62 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deviceForActiveHead } from '../../../core/cnc/cnc-head-feeds';
-import { Button, Icon } from '../../kit';
-import { TutorialButton } from '../../tutorials/TutorialButton';
+import { jogAxisSignsForOrigin } from '../../../core/devices/jog-direction';
 import { useStore } from '../../state';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
 import { useLaserStore } from '../../state/laser-store';
 import { useUiStore } from '../../state/ui-store';
 import { BoardAnchorOverlay } from './BoardAnchorOverlay';
 import { BoardCapturePhase } from './BoardCapturePhase';
+import { BoardPointerBar } from './BoardPointerBar';
 import { BoardShapeToggle } from './BoardShapeToggle';
+import { headTargetForSight, sightedPoint } from './board-sight';
+import type { BoardSightView } from './CaptureCard';
 import { capturedBoardOutlineMatches } from './captured-board-outline';
+import { PlaceBoardHeader, type PlaceBoardStep } from './PlaceBoardHeader';
 import {
   useBoardCapture,
   type BoardCapture,
   type BoardRegistrationEpoch,
 } from './use-board-capture';
 import { useBoardCaptureHandlers, type BoardCaptureHandlers } from './use-board-capture-handlers';
+import { useBoardPointer, type BoardPointer } from './use-board-pointer';
 import { useBoardVerification, type BoardVerificationController } from './use-board-verification';
 import { useCaptureGating } from './use-capture-gating';
+import './place-board.css';
 
 const BOARD_JOG_FEED_MM_PER_MIN = 3000;
 
 // The panel is always mounted beside the canvas, and its body follows the live
 // controller (status report, transport writes, status sequence): mounted while
 // closed, it re-rendered twice per acknowledged line of a running job for a
-// panel nobody could see. This gate reads only `open`. It owns the capture
-// session, so closing and reopening resumes it, and keeps the body mounted
+// panel nobody could see. This gate reads only `open` and a few booleans. It
+// owns the capture session, so closing and reopening resumes it, and the
+// positioning-light automation, so a light switched on for capture is switched
+// off again even after the body has gone (ADR-636). It keeps the body mounted
 // after a close until the body has declined to stay open
 // (useKeepBoardPanelOpenWhileBusy): a close never tears down a busy session.
 export function BoardCapturePanel(): JSX.Element | null {
   const open = useUiStore((state) => state.boardCapturePanelOpen);
   const capture = useBoardCapture();
+  const pointer = useBoardPointer(open && !capture.state.committed);
   const [bodyMounted, setBodyMounted] = useState(open);
   const release = useCallback(() => setBodyMounted(false), []);
   if (open && !bodyMounted) setBodyMounted(true);
   if (!open && !bodyMounted) return null;
-  return <BoardCapturePanelBody open={open} capture={capture} onRelease={release} />;
+  return (
+    <BoardCapturePanelBody open={open} capture={capture} pointer={pointer} onRelease={release} />
+  );
 }
 
 function BoardCapturePanelBody({
   open,
   capture,
+  pointer,
   onRelease,
 }: {
   readonly open: boolean;
   readonly capture: BoardCapture;
+  readonly pointer: BoardPointer;
   readonly onRelease: () => void;
 }): JSX.Element | null {
   const close = useUiStore((state) => state.closeBoardCapturePanel);
@@ -52,6 +64,7 @@ function BoardCapturePanelBody({
   const currentEpoch = useCurrentRegistrationEpoch();
   const motionActive = useLaserStore((state) => state.motionOperation !== null);
   const setOriginHere = useLaserStore((state) => state.setOriginHere);
+  const setOriginAtMachinePoint = useLaserStore((state) => state.setOriginAtMachinePoint);
   const jogToMachinePosition = useLaserStore((state) => state.jogToMachinePosition);
   const device = useStore((state) => state.project.device);
   const machine = useStore((state) => state.project.machine);
@@ -67,10 +80,11 @@ function BoardCapturePanelBody({
     capture,
     livePosition,
     setOriginHere,
+    setOriginAtMachinePoint,
     addCapturedBoard,
     updateCapturedBoard,
   });
-  const interactionDisabled = disabled || handlers.busy;
+  const interactionDisabled = disabled || handlers.busy || pointer.switching;
   const sessionDisabled = handlers.busy || motionActive;
   const verification = useBoardVerification({
     geometry,
@@ -88,18 +102,28 @@ function BoardCapturePanelBody({
     verification.cancel();
     capture.reset();
   };
+  const sight: BoardSightView = {
+    point: livePosition === null ? null : sightedPoint(livePosition, pointerOffset(pointer)),
+    aim: pointer.configured && pointer.enabled ? 'pointer' : 'head',
+    signs: jogAxisSignsForOrigin(device.origin),
+  };
 
   if (!open) return null;
   return (
     <>
-      <section aria-label="Place board" className="lf-chip" style={panelStyle}>
-        <PanelHeader disabled={panelLocked} onClose={close} />
+      <section aria-label="Place board" className="lf-chip lf-place-board">
+        <PlaceBoardHeader
+          step={panelStep(capture)}
+          disabled={panelLocked}
+          onClose={close}
+        />
         <PanelMessages connected={connected} handlers={handlers} />
+        <BoardPointerBar pointer={pointer} connected={connected} />
         <BoardCapturePanelContent
           capture={capture}
           geometry={geometry}
           handlers={handlers}
-          livePosition={livePosition}
+          sight={sight}
           disabled={interactionDisabled}
           sessionDisabled={sessionDisabled}
           verification={verification}
@@ -117,6 +141,15 @@ function BoardCapturePanelBody({
       />
     </>
   );
+}
+
+function panelStep(capture: BoardCapture): PlaceBoardStep {
+  if (capture.state.committed) return 'place';
+  return capture.state.corners.length > 0 ? 'capture' : 'shape';
+}
+
+function pointerOffset(pointer: BoardPointer): { readonly x: number; readonly y: number } {
+  return pointer.configured && pointer.enabled ? pointer.offset : { x: 0, y: 0 };
 }
 
 function useLiveMachinePosition(): ReturnType<typeof inferCurrentMachinePosition> {
@@ -137,7 +170,7 @@ function BoardCapturePanelContent(props: {
   readonly capture: ReturnType<typeof useBoardCapture>;
   readonly geometry: ReturnType<typeof useBoardCapture>['state']['geometry'];
   readonly handlers: BoardCaptureHandlers;
-  readonly livePosition: ReturnType<typeof inferCurrentMachinePosition>;
+  readonly sight: BoardSightView;
   readonly disabled: boolean;
   readonly sessionDisabled: boolean;
   readonly verification: BoardVerificationController;
@@ -171,7 +204,8 @@ function BoardCapturePanelContent(props: {
         corners={state.corners}
         geometry={props.geometry}
         rect={props.handlers.rect}
-        livePosition={props.livePosition}
+        polygon={props.handlers.polygon}
+        sight={props.sight}
         disabled={props.disabled}
         sessionDisabled={props.sessionDisabled}
         verification={props.verification}
@@ -181,8 +215,10 @@ function BoardCapturePanelContent(props: {
         onUndo={undoCapture}
         onFinishRect={props.handlers.onFinishRect}
         onManualSize={props.handlers.onManualSize}
+        onFinishPolygon={props.handlers.onFinishPolygon}
         onFinishCircle={props.handlers.onFinishCircle}
         onReset={props.onReset}
+        onRestartCapture={() => changeShape(state.shapeKind)}
       />
     </>
   );
@@ -204,7 +240,9 @@ function moveToCapturedPoint(
       ),
     );
   }
-  return props.jogToMachinePosition(point.x, point.y, props.feed);
+  // With the positioning light on, put the light (not the beam) on the point.
+  const head = headTargetForSight(point);
+  return props.jogToMachinePosition(head.x, head.y, props.feed);
 }
 
 function registrationEpochIsLive(captured: BoardRegistrationEpoch): boolean {
@@ -248,40 +286,24 @@ function useKeepBoardPanelOpenWhileBusy(
   }, [captureBusy, open, verification, onRelease]);
 }
 
-function PanelHeader(props: {
-  readonly disabled: boolean;
-  readonly onClose: () => void;
-}): JSX.Element {
-  return (
-    <header style={headerStyle}>
-      <strong>Place Board</strong>
-      <TutorialButton tutorialId="board" compact label="Place board" />
-      <Button
-        variant="ghost"
-        aria-label="Close board capture panel"
-        disabled={props.disabled}
-        onClick={props.onClose}
-      >
-        <Icon name="close" size={16} />
-      </Button>
-    </header>
-  );
-}
-
 function PanelMessages(props: {
   readonly connected: boolean;
   readonly handlers: BoardCaptureHandlers;
 }): JSX.Element {
   return (
     <>
-      {!props.connected && <p style={hintStyle}>Connect the machine to capture a board.</p>}
+      {!props.connected && (
+        <p className="lf-place-board__message lf-place-board__message--hint">
+          Connect the machine to capture a board.
+        </p>
+      )}
       {props.handlers.captureError !== null && (
-        <p style={errorHintStyle} role="alert">
+        <p className="lf-place-board__message lf-place-board__message--error" role="alert">
           {props.handlers.captureError}
         </p>
       )}
       {props.handlers.captureNotice !== null && (
-        <p style={noticeStyle} role="status">
+        <p className="lf-place-board__message lf-place-board__message--notice" role="status">
           {props.handlers.captureNotice}
         </p>
       )}
@@ -308,43 +330,3 @@ function CommittedBoardOverlay(props: {
     />
   );
 }
-
-const panelStyle: React.CSSProperties = {
-  position: 'absolute',
-  zIndex: 5,
-  top: 12,
-  left: 12,
-  width: 280,
-  maxHeight: 'calc(100% - 24px)',
-  overflowY: 'auto',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 6,
-  padding: 12,
-  boxShadow: 'var(--lf-shadow)',
-  pointerEvents: 'auto',
-  fontSize: 13,
-};
-const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-};
-const hintStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  color: 'var(--lf-text-muted)',
-  fontStyle: 'italic',
-};
-const errorHintStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  lineHeight: 1.3,
-  color: 'var(--lf-danger-fg)',
-};
-const noticeStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  lineHeight: 1.3,
-  color: 'var(--lf-warning-fg)',
-};

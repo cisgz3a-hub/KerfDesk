@@ -109,7 +109,37 @@ export async function setOriginAtProgramPoint(
   return outcome.offsetMm;
 }
 
+/**
+ * Place Board (ADR-636): make the machine point `pointMm` the work origin —
+ * a board corner sighted with the positioning light, or the front-left of a
+ * custom-shape board's bounding box — with one G92 at the live machine
+ * position, without moving the head. A board outline is only as good as its
+ * origin, so an unconfirmed offset is an error here, not a notice.
+ */
+export async function setOriginAtMachinePoint(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: OriginSafeWrite,
+  pointMm: SavedXyOffsetMm,
+): Promise<void> {
+  if (!Number.isFinite(pointMm.x) || !Number.isFinite(pointMm.y))
+    throw new Error('The board origin needs finite machine coordinates.');
+  const outcome = await writeXyOffset(set, get, refs, safeWrite, BOARD_ORIGIN_WRITE, () => pointMm);
+  if (!outcome.confirmed)
+    throw new Error(
+      'The controller has not confirmed the board origin. Wait for a position report and try again.',
+    );
+}
+
 type XyOffsetWrite = { readonly label: string; readonly unconfirmedNotice: string };
+
+const BOARD_ORIGIN_WRITE: XyOffsetWrite = {
+  label: 'Set board origin',
+  unconfirmedNotice:
+    '[lf2] Board origin written, but the controller has not confirmed the new work offset. ' +
+    'Capture the board again once a position report arrives.',
+};
 
 const RESTORE_ORIGIN_WRITE: XyOffsetWrite = {
   label: 'Restore saved origin',

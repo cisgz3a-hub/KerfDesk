@@ -9,7 +9,6 @@ import { BoardFineJogControls } from './BoardFineJogControls';
 import { BoardPlacementControls } from './BoardPlacementControls';
 import { BoardShapeToggle } from './BoardShapeToggle';
 import { BoardVerificationControls } from './BoardVerificationControls';
-import { CircleBoardPlacementControls } from './CircleBoardPlacementControls';
 import { CircleCaptureSteps } from './CircleCaptureSteps';
 import type { BoardVerificationController } from './use-board-verification';
 
@@ -17,6 +16,7 @@ const placement = vi.hoisted(() => ({
   canAlign: true,
   canFit: true,
   alignToBox: vi.fn(),
+  placeOnBoard: vi.fn(),
   fitToBoard: vi.fn(),
   arrayToBoard: vi.fn(),
   removeBoard: vi.fn(),
@@ -29,6 +29,7 @@ let host: HTMLDivElement;
 let root: Root;
 const rect = { kind: 'rect', origin: { x: 0, y: 0 }, widthMm: 100, heightMm: 60 } as const;
 const circle = { kind: 'circle', center: { x: 50, y: 50 }, radiusMm: 40 } as const;
+const sight = { point: { x: 2, y: 2 }, aim: 'head', signs: { x: 1, y: 1 } } as const;
 function verification(): BoardVerificationController {
   return {
     activeTarget: null,
@@ -70,6 +71,11 @@ function button(text: string): HTMLButtonElement {
 function click(text: string): void {
   act(() => button(text).click());
 }
+function clickLabel(label: string): void {
+  const node = host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+  if (!node) throw new Error(`Missing button: ${label}`);
+  act(() => node.click());
+}
 
 describe('Board control audit', () => {
   it('array toggles between fill and explicit grid and refuses clicks while unavailable', () => {
@@ -104,14 +110,19 @@ describe('Board control audit', () => {
         />,
       ),
     );
-    for (const text of ['Center', 'Btm-left', 'Btm-right', 'Top-left', 'Top-right']) click(text);
-    expect(placement.alignToBox.mock.calls).toEqual([
-      ['center'],
-      ['bottom-left'],
-      ['bottom-right'],
-      ['top-left'],
-      ['top-right'],
-    ]);
+    const anchors = [
+      ['top left', 'top-left'],
+      ['top middle', 'top-center'],
+      ['top right', 'top-right'],
+      ['middle left', 'middle-left'],
+      ['center', 'center'],
+      ['middle right', 'middle-right'],
+      ['bottom left', 'bottom-left'],
+      ['bottom middle', 'bottom-center'],
+      ['bottom right', 'bottom-right'],
+    ] as const;
+    for (const [label] of anchors) clickLabel(`Place artwork ${label}`);
+    expect(placement.placeOnBoard.mock.calls).toEqual(anchors.map(([, anchor]) => [anchor, 5]));
     click('Fit to board');
     expect(placement.fitToBoard).toHaveBeenCalledTimes(1);
     click('Array on board');
@@ -129,7 +140,7 @@ describe('Board control audit', () => {
     const controller = verification();
     act(() =>
       root.render(
-        <CircleBoardPlacementControls
+        <BoardPlacementControls
           geometry={circle}
           disabled={false}
           verification={controller}
@@ -137,15 +148,15 @@ describe('Board control audit', () => {
         />,
       ),
     );
-    click('Center');
-    expect(placement.alignToBox).toHaveBeenCalledWith('center');
+    clickLabel('Place artwork center');
+    expect(placement.placeOnBoard).toHaveBeenCalledWith('center', 5);
     click('Capture a new board');
     click('Remove board');
     expect(placement.removeBoard).toHaveBeenCalledTimes(1);
     expect(onReset).toHaveBeenCalledTimes(2);
     act(() =>
       root.render(
-        <CircleBoardPlacementControls
+        <BoardPlacementControls
           geometry={circle}
           disabled={false}
           verification={{ ...controller, activeTarget: { kind: 'circle', anchor: 'rim-top' } }}
@@ -167,18 +178,19 @@ describe('Board control audit', () => {
     );
     click('Circle');
     click('Rectangle');
-    expect(onChange.mock.calls).toEqual([['circle'], ['rect']]);
+    click('Custom shape');
+    expect(onChange.mock.calls).toEqual([['circle'], ['rect'], ['polygon']]);
     act(() =>
       root.render(<BoardShapeToggle shapeKind="rect" disabled={true} onChange={onChange} />),
     );
     click('Circle');
-    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange).toHaveBeenCalledTimes(3);
   });
 
   it('rectangle capture Undo and Start over use their distinct callbacks and lock during a session operation', () => {
     const props = {
       corners: [{ x: 1, y: 1 }],
-      livePosition: { x: 2, y: 2 },
+      sight,
       rect: null,
       disabled: false,
       sessionDisabled: false,
@@ -210,7 +222,7 @@ describe('Board control audit', () => {
       const props = {
         method,
         corners: [{ x: 10, y: 10 }],
-        livePosition: { x: 15, y: 15 },
+        sight: { ...sight, point: { x: 15, y: 15 } },
         disabled: false,
         sessionDisabled: false,
         onMethodChange: vi.fn(),

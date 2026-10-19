@@ -3,6 +3,12 @@ import { applyTransform } from './transform';
 import { transformedBBox, transformedBounds } from './hit-test';
 import type { SceneObject, ShapeObject } from './scene-object';
 import { isCanonicalEllipse } from './canonical-ellipse';
+import {
+  boardRegionFitCenter,
+  boardRegionOf,
+  boxInsideBoardRegion,
+  type BoardRegion,
+} from './board-region';
 
 export type BoardFitOptions = {
   readonly marginMm: number;
@@ -40,6 +46,10 @@ export function fitObjectToBoard(
   if (!(objectWidth > 0) || !(objectHeight > 0)) {
     return { kind: 'error', message: 'The selected artwork needs a measurable width and height.' };
   }
+  const shape = boardRegionOf(board);
+  if (shape.kind === 'polygon') {
+    return fitObjectToPolygonBoard(object, shape, options, objectWidth, objectHeight);
+  }
   // Captured round boards and circular jig outlines are circles. For an ellipse
   // use its smaller inscribed circle; never promise containment in its AABB.
   const availableScale =
@@ -76,6 +86,69 @@ export function fitObjectToBoard(
     },
     scale,
     fits: availableScale >= 1 || options.mode === 'fit',
+  };
+}
+
+// A custom-shape board (ADR-636) has no closed-form fit: centre the artwork on
+// the widest part of the material and find the largest scale whose footprint
+// keeps the edge margin, by bisection.
+function fitObjectToPolygonBoard(
+  object: SceneObject,
+  region: Extract<BoardRegion, { readonly kind: 'polygon' }>,
+  options: BoardFitOptions,
+  objectWidth: number,
+  objectHeight: number,
+): BoardFitPlan {
+  const center = boardRegionFitCenter(region);
+  const fitsAt = (scale: number): boolean =>
+    boxInsideBoardRegion(
+      region,
+      {
+        minX: center.x - (objectWidth * scale) / 2,
+        maxX: center.x + (objectWidth * scale) / 2,
+        minY: center.y - (objectHeight * scale) / 2,
+        maxY: center.y + (objectHeight * scale) / 2,
+      },
+      options.marginMm,
+    );
+  let low = 0;
+  let high = Math.min(
+    (region.bounds.maxX - region.bounds.minX) / objectWidth,
+    (region.bounds.maxY - region.bounds.minY) / objectHeight,
+  );
+  if (!fitsAt(high)) {
+    for (let round = 0; round < 40; round += 1) {
+      const middle = (low + high) / 2;
+      if (fitsAt(middle)) low = middle;
+      else high = middle;
+    }
+  } else {
+    low = high;
+  }
+  if (options.mode === 'fit' && !(low > 0)) {
+    return { kind: 'error', message: 'The edge margin leaves no room for artwork.' };
+  }
+  const scale = options.mode === 'keep-size' ? 1 : low;
+  const transform = {
+    ...object.transform,
+    x: 0,
+    y: 0,
+    scaleX: object.transform.scaleX * scale,
+    scaleY: object.transform.scaleY * scale,
+  };
+  const footprint = transformedBounds(object.bounds, transform);
+  return {
+    kind: 'ok',
+    object: {
+      ...object,
+      transform: {
+        ...transform,
+        x: center.x - (footprint.minX + footprint.maxX) / 2,
+        y: center.y - (footprint.minY + footprint.maxY) / 2,
+      },
+    },
+    scale,
+    fits: options.mode === 'fit' || low >= 1,
   };
 }
 

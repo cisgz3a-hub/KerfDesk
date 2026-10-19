@@ -1,68 +1,65 @@
-import type { BoardAnchor, TileLayout } from '../../../core/scene';
+// BoardPlacementControls — step 3 of Place board (ADR-124/126/636): with the
+// board captured, place the artwork on it. One layout for every board shape:
+// what was measured, the nine-point placement grid, Fit to board, Array on
+// board, the physical corner checks, and starting over.
+
 import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
-import { Button } from '../../kit';
+import { Button, Icon, type IconName } from '../../kit';
 import { useLaserStore } from '../../state/laser-store';
+import { BoardAnchorPicker } from './BoardAnchorPicker';
 import { BoardArrayForm } from './BoardArrayForm';
+import { BoardFitControls } from './BoardFitControls';
 import { BoardVerificationControls } from './BoardVerificationControls';
 import { useBoardPlacement } from './use-board-placement';
 import type { BoardVerificationController } from './use-board-verification';
-import type { BoardFitOptions } from '../../../core/scene/fit-object-to-board';
-import { BoardFitControls } from './BoardFitControls';
-
-const ANCHORS: ReadonlyArray<{ readonly anchor: BoardAnchor; readonly label: string }> = [
-  { anchor: 'center', label: 'Center' },
-  { anchor: 'bottom-left', label: 'Btm-left' },
-  { anchor: 'bottom-right', label: 'Btm-right' },
-  { anchor: 'top-left', label: 'Top-left' },
-  { anchor: 'top-right', label: 'Top-right' },
-];
 
 export function BoardPlacementControls(props: {
-  readonly geometry: Extract<CapturedBoardGeometry, { readonly kind: 'rect' }>;
+  readonly geometry: CapturedBoardGeometry;
   readonly disabled: boolean;
   readonly verification: BoardVerificationController;
   readonly onReset: () => void;
 }): JSX.Element {
-  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, removeBoard } =
+  const { canAlign, canFit, placeOnBoard, fitToBoard, arrayToBoard, removeBoard } =
     useBoardPlacement();
+  const locked = props.disabled || props.verification.activeTarget !== null;
   return (
-    <div style={columnStyle}>
-      <p style={measuredStyle}>
-        Measured: {props.geometry.widthMm.toFixed(1)} × {props.geometry.heightMm.toFixed(1)} mm —
-        check against the physical board.
-      </p>
-      <p style={hintStyle}>Add your artwork, select it, then place it:</p>
-      <AnchorRow label="Place artwork">
-        {ANCHORS.map(({ anchor, label }) => (
-          <Button
-            key={anchor}
-            disabled={!canAlign}
-            title={
-              canAlign ? `Move artwork to the ${label} of the board` : 'Select your artwork first'
-            }
-            onClick={() => alignToBox(anchor)}
-          >
-            {label}
-          </Button>
-        ))}
-      </AnchorRow>
-      <FillBoardControls canFit={canFit} onFit={fitToBoard} onArray={arrayToBoard} />
-      <BoardVerificationControls
-        geometry={props.geometry}
-        disabled={props.disabled}
-        controller={props.verification}
-      />
-      <div style={rowStyle}>
-        <Button
-          variant="ghost"
-          disabled={props.disabled || props.verification.activeTarget !== null}
-          onClick={props.onReset}
-        >
+    <>
+      <BoardSummary geometry={props.geometry} />
+      <div className="lf-place-board__card">
+        <div className="lf-place-board__card-title">
+          <span>Position artwork</span>
+        </div>
+        <BoardAnchorPicker shape={props.geometry.kind} canPlace={canAlign} onPlace={placeOnBoard} />
+      </div>
+      <details className="lf-section" open>
+        <summary>Fit to board</summary>
+        <div className="lf-section-body">
+          <BoardFitControls disabled={!canFit} onFit={fitToBoard} />
+        </div>
+      </details>
+      <details className="lf-section">
+        <summary>Fill with copies</summary>
+        <div className="lf-section-body">
+          <BoardArrayForm disabled={!canFit} onArray={arrayToBoard} />
+        </div>
+      </details>
+      <details className="lf-section" open>
+        <summary>Check the board</summary>
+        <div className="lf-section-body">
+          <BoardVerificationControls
+            geometry={props.geometry}
+            disabled={props.disabled}
+            controller={props.verification}
+          />
+        </div>
+      </details>
+      <div className="lf-place-board__row lf-place-board__row--end">
+        <Button variant="ghost" disabled={locked} onClick={props.onReset}>
           Capture a new board
         </Button>
         <Button
           variant="danger"
-          disabled={props.disabled || props.verification.activeTarget !== null}
+          disabled={locked}
           title="Delete this board outline"
           onClick={() => {
             if (boardSessionIsLocked(props.verification)) return;
@@ -73,51 +70,56 @@ export function BoardPlacementControls(props: {
           Remove board
         </Button>
       </div>
+    </>
+  );
+}
+
+function BoardSummary({ geometry }: { readonly geometry: CapturedBoardGeometry }): JSX.Element {
+  const { icon, name, size } = boardDescription(geometry);
+  return (
+    <div className="lf-place-board__card lf-place-board__card--accent">
+      <div className="lf-place-board__card-title">
+        <Icon name={icon} size={18} />
+        <span>{name}</span>
+        <span>locked · not burned</span>
+      </div>
+      <p>
+        <strong>Measured: {size}</strong>
+      </p>
+      <p className="lf-place-board__muted">
+        Check it against the physical board. Add your artwork, select it, then place it below.
+      </p>
     </div>
   );
+}
+
+function boardDescription(geometry: CapturedBoardGeometry): {
+  readonly icon: IconName;
+  readonly name: string;
+  readonly size: string;
+} {
+  switch (geometry.kind) {
+    case 'rect':
+      return {
+        icon: 'square',
+        name: 'Rectangular board',
+        size: `${geometry.widthMm.toFixed(1)} × ${geometry.heightMm.toFixed(1)} mm`,
+      };
+    case 'circle':
+      return {
+        icon: 'circle',
+        name: 'Round board',
+        size: `⌀ ${(geometry.radiusMm * 2).toFixed(1)} mm`,
+      };
+    case 'polygon':
+      return {
+        icon: 'pentagon',
+        name: `Custom shape · ${geometry.polygon.points.length} corners`,
+        size: `${geometry.polygon.widthMm.toFixed(1)} × ${geometry.polygon.heightMm.toFixed(1)} mm`,
+      };
+  }
 }
 
 function boardSessionIsLocked(verification: BoardVerificationController): boolean {
   return verification.activeTarget !== null || useLaserStore.getState().motionOperation !== null;
 }
-
-export function FillBoardControls(props: {
-  readonly canFit: boolean;
-  readonly onFit: (options: BoardFitOptions) => void;
-  readonly onArray: (layout: TileLayout) => void;
-}): JSX.Element {
-  return (
-    <>
-      <BoardFitControls disabled={!props.canFit} onFit={props.onFit} />
-      <BoardArrayForm disabled={!props.canFit} onArray={props.onArray} />
-    </>
-  );
-}
-
-export function AnchorRow(props: {
-  readonly label: string;
-  readonly children: React.ReactNode;
-}): JSX.Element {
-  return (
-    <div style={rowStyle}>
-      <span style={labelStyle}>{props.label}:</span>
-      {props.children}
-    </div>
-  );
-}
-
-const columnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
-const hintStyle: React.CSSProperties = { margin: 0, fontSize: 12, lineHeight: 1.3 };
-const measuredStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  fontWeight: 600,
-  lineHeight: 1.3,
-};
-const rowStyle: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  gap: 4,
-};
-const labelStyle: React.CSSProperties = { fontWeight: 600, marginRight: 2 };

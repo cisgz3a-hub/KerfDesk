@@ -119,7 +119,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     id: 'board',
     title: 'Place artwork on a measured board',
     summary:
-      'Capture a rectangular or circular board, place the design and physically check the outline.',
+      'Capture a rectangular, round or custom-shape board, place the design and physically check the outline.',
     category: 'Machine & setup',
     machine: 'all',
     minutes: 4,
@@ -131,14 +131,14 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the board shape',
         instruction:
-          'Choose Rectangle or Circle. For a rectangle, jog to and capture the bottom-left corner first; this establishes its work origin. For a circle, choose Find center from rim or Center already marked.',
-        focus: 'Rectangle or circle reference',
+          'Choose Rectangle, Circle or Custom shape. If Machine Setup has a positioning light, it switches on so you can aim with the red dot. For a rectangle, capture the front-left corner first when you can; it sets the work origin. For a circle, choose Find center from rim or Center already marked.',
+        focus: 'Rectangle, circle or custom shape',
         result: 'The chosen capture method matches how you can locate the physical board.',
       },
       {
         title: 'Finish measuring the outline',
         instruction:
-          'For a rectangle, capture the other three corners in any order or enter Width and Height after the first corner. A circle can use four well-spaced rim points, or a captured centre with an edge point or measured diameter.',
+          'For a rectangle, capture the other three corners in any order or enter Width and Height after the first corner. For a custom shape, capture each corner in order around the edge. A circle can use four well-spaced rim points, or a captured centre with an edge point or measured diameter.',
         focus: 'Measured points or known dimensions',
         result:
           'Create the board outline to obtain a locked placement reference excluded from the burn.',
@@ -146,8 +146,8 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Place or repeat the design',
         instruction:
-          'Select the artwork and choose a placement anchor. Use Fit to board for one design, or Array on board with a row-and-column count or Fit as many as fit and the desired spacing.',
-        focus: 'Anchor · Fit · Array',
+          'Select the artwork, set the edge margin and click one of the nine spots in the placement grid: a corner, the middle of an edge or the centre. Use Fit to board for one design, or Array on board with a row-and-column count or Fit as many as fit and the desired spacing.',
+        focus: 'Placement grid · Fit · Array',
         result: 'The design is positioned relative to the captured outline.',
         visual: 'array',
       },
@@ -162,7 +162,18 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       },
     ],
     tip: 'Board checks and capture controls can move the real head or change its coordinate reference. If the reference becomes stale, capture the board again.',
-    keywords: ['board', 'stock', 'capture', 'corners', 'circle', 'centre', 'placement', 'array'],
+    keywords: [
+      'board',
+      'stock',
+      'capture',
+      'corners',
+      'circle',
+      'custom shape',
+      'pointer',
+      'centre',
+      'placement',
+      'array',
+    ],
     related: ['origin', 'jog', 'array', 'registration', 'frame-start'],
   },
   {

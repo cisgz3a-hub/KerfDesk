@@ -13,7 +13,11 @@ import {
   type BoardShape,
   type ShapeObject,
 } from '../../core/scene';
-import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
+import {
+  createRegistrationBox,
+  createRegistrationCircle,
+  createRegistrationPolygon,
+} from '../../core/shapes';
 import { DEFAULT_JOB_PLACEMENT, type JobPlacementSettings } from '../job-placement';
 import {
   applyAddRegistrationBox,
@@ -100,6 +104,14 @@ function resizedOutline(
         x: bounds.minX,
         y: bounds.maxY - shape.heightMm,
       });
+    case 'polygon':
+      // Like a rectangle, the bottom-left of the bounding box is the anchor.
+      return createRegistrationPolygon({
+        id,
+        points: shape.outline,
+        x: bounds.minX,
+        y: bounds.maxY - shape.heightMm,
+      });
     case 'circle': {
       const centerX = (bounds.minX + bounds.maxX) / 2;
       const centerY = (bounds.minY + bounds.maxY) / 2;
@@ -132,6 +144,11 @@ function buildBoardOutline(s: AppState, shape: BoardShape): ShapeObject {
       const at = registrationBoxDefaultPosition(bedWidth, bedHeight, diameterMm, diameterMm);
       return locked(createRegistrationCircle({ diameterMm, x: at.x, y: at.y }));
     }
+    case 'polygon': {
+      const { widthMm, heightMm, outline } = shape;
+      const at = registrationBoxDefaultPosition(bedWidth, bedHeight, widthMm, heightMm);
+      return locked(createRegistrationPolygon({ points: outline, x: at.x, y: at.y }));
+    }
     default:
       return assertNever(shape, 'BoardShape');
   }
@@ -140,6 +157,9 @@ function buildBoardOutline(s: AppState, shape: BoardShape): ShapeObject {
 function placementFor(shape: BoardShape): JobPlacementSettings {
   switch (shape.kind) {
     case 'rect':
+    case 'polygon':
+      // A custom shape is anchored like a rectangle: the work origin sits at
+      // the physical front-left corner of its bounding box (ADR-636).
       return CAPTURED_RECT_PLACEMENT;
     case 'circle':
       return CAPTURED_CIRCLE_PLACEMENT;

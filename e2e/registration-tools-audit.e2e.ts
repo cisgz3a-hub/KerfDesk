@@ -58,6 +58,23 @@ test('Place Board: four captures, outline, point correction and stale epoch refu
   await expect(panel).toContainText('machine coordinates changed');
 });
 
+test('Place Board: a custom shape sets its origin at the front-left without moving', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Place Board workflow' }).click();
+  const panel = page.getByRole('region', { name: 'Place board', exact: true });
+  await panel.getByRole('button', { name: 'Custom shape', exact: true }).click();
+  for (const point of ['10,20', '110,20', '110,80', '60,110', '10,80']) {
+    await page.getByRole('button', { name: `Position ${point}`, exact: true }).click();
+    await panel.getByRole('button', { name: 'Capture corner', exact: true }).click();
+  }
+  await expect(panel).toContainText('Shape: 100.0 × 90.0 mm');
+  await panel.getByRole('button', { name: 'Create board outline', exact: true }).click();
+  await expect(page.getByTestId('board-result')).toContainText('"kind": "polyline"');
+  await expect(page.locator('pre').last()).toContainText('simulated set work origin at 10,20');
+  await expect(panel).toContainText('Custom shape · 5 corners');
+});
+
 test('Print and Cut: capture both marks, apply mapping, reopen and disable', async ({ page }) => {
   await page.getByRole('button', { name: 'Print and Cut workflow', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Print and Cut', exact: true });

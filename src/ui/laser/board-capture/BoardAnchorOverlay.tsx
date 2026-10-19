@@ -5,6 +5,10 @@ import {
   type BoardVerificationTarget,
   type CapturedBoardGeometry,
 } from '../../../core/scene';
+import {
+  boardVerificationTargetKey,
+  sameBoardVerificationTarget,
+} from '../../../core/scene/board-verification';
 import { useStore } from '../../state';
 import { useUiStore } from '../../state/ui-store';
 import { computeView, type ViewTransform } from '../../workspace/view-transform';
@@ -31,9 +35,10 @@ export function BoardAnchorOverlay(props: BoardAnchorOverlayProps): JSX.Element 
   const panY = useUiStore((state) => state.panY);
   const [overlayRef, parentSize] = useParentElementSize();
   const bounds = useMemo(() => findRegistrationBoxBounds(scene), [scene]);
+  const outline = props.geometry.kind === 'polygon' ? props.geometry.polygon.outline : undefined;
   const handles = useMemo(
-    () => (bounds === null ? [] : boardAnchorOverlayHandles(props.geometry.kind, bounds)),
-    [bounds, props.geometry.kind],
+    () => (bounds === null ? [] : boardAnchorOverlayHandles(props.geometry.kind, bounds, outline)),
+    [bounds, outline, props.geometry.kind],
   );
   const view = useMemo(
     () =>
@@ -57,10 +62,10 @@ export function BoardAnchorOverlay(props: BoardAnchorOverlayProps): JSX.Element 
         ? null
         : visibleHandles.map((handle) => (
             <BoardAnchorButton
-              key={`${handle.target.kind}:${handle.target.anchor}`}
+              key={boardVerificationTargetKey(handle.target)}
               handle={handle}
               view={view}
-              active={sameTarget(handle.target, props.activeTarget)}
+              active={sameBoardVerificationTarget(handle.target, props.activeTarget)}
               disabled={props.disabled}
               onSelect={props.onSelect}
             />
@@ -84,7 +89,11 @@ function BoardAnchorButton(props: {
       aria-pressed={props.active}
       title={props.handle.label}
       disabled={props.disabled}
-      data-board-anchor={props.handle.target.anchor}
+      data-board-anchor={
+        props.handle.target.kind === 'polygon'
+          ? `vertex-${props.handle.target.index}`
+          : props.handle.target.anchor
+      }
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation();
@@ -103,9 +112,6 @@ function BoardAnchorButton(props: {
   );
 }
 
-function sameTarget(left: BoardVerificationTarget, right: BoardVerificationTarget | null): boolean {
-  return right !== null && left.kind === right.kind && left.anchor === right.anchor;
-}
 
 type ElementSize = { readonly width: number; readonly height: number };
 

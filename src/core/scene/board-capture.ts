@@ -23,11 +23,19 @@ export const BOARD_CORNER_COUNT = 4;
 // The shape of a captured board (ADR-126). A rectangle comes from the four-corner
 // (or one-corner + typed size) capture; a circle comes from a single centre
 // capture plus a diameter (typed, or measured by jogging to a rim point).
-// Extensible — future variants (rounded-rect, polygon) add a `kind` arm wherever
-// it is matched (each ending in assertNever), gated by an ADR.
+// A custom shape (ADR-636) comes from three or more corners captured around an
+// irregular board; `outline` is its straight-edged outline in canvas mm (Y
+// down) relative to the bounding box's top-left. Further variants add a `kind`
+// arm wherever it is matched (each ending in assertNever), gated by an ADR.
 export type BoardShape =
   | { readonly kind: 'rect'; readonly widthMm: number; readonly heightMm: number }
-  | { readonly kind: 'circle'; readonly diameterMm: number };
+  | { readonly kind: 'circle'; readonly diameterMm: number }
+  | {
+      readonly kind: 'polygon';
+      readonly widthMm: number;
+      readonly heightMm: number;
+      readonly outline: ReadonlyArray<Vec2>;
+    };
 
 export type BoardShapeKind = BoardShape['kind'];
 
@@ -80,12 +88,29 @@ export function bestFitRectangleFromCorners(corners: ReadonlyArray<Vec2>): BestF
  * Returns null unless exactly four finite corners (the manual-size path
  * synthesizes the first corner AT the origin, so its offset is 0 — no warning).
  */
-export function firstCornerOffsetMm(corners: ReadonlyArray<Vec2>): number | null {
+export function firstCornerOffsetMm(
+  corners: ReadonlyArray<Vec2>,
+  signs: { readonly x: 1 | -1; readonly y: 1 | -1 } = { x: 1, y: 1 },
+): number | null {
   if (corners.length !== BOARD_CORNER_COUNT || !allFinite(corners)) return null;
   const first = corners[0];
-  if (first === undefined) return null;
+  const frontLeft = boardFrontLeftCorner(corners, signs);
+  if (first === undefined || frontLeft === null) return null;
+  return Math.hypot(first.x - frontLeft.x, first.y - frontLeft.y);
+}
+
+/**
+ * The machine point of the physical front-left corner of the captured
+ * corners' bounding box: (minX, minY) on a front-left origin, mirrored per
+ * axis where machine +X runs to the operator's left or +Y toward them.
+ */
+export function boardFrontLeftCorner(
+  corners: ReadonlyArray<Vec2>,
+  signs: { readonly x: 1 | -1; readonly y: 1 | -1 } = { x: 1, y: 1 },
+): Vec2 | null {
+  if (corners.length === 0 || !allFinite(corners)) return null;
   const box = boundingBox(corners);
-  return Math.hypot(first.x - box.minX, first.y - box.minY);
+  return { x: signs.x === 1 ? box.minX : box.maxX, y: signs.y === 1 ? box.minY : box.maxY };
 }
 
 /**
