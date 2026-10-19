@@ -16,6 +16,7 @@ import { isAllowedPrivateNetworkHost } from './private-network-host-policy.js';
 export const FALCON_HTTP_PORT = 8080;
 export const FALCON_POINTER_PATH = '/device/assistLight';
 const FALCON_POINTER_TIMEOUT_MS = 5000;
+const MAX_REPLY_BYTES = 4096;
 
 export type FalconPointerResult =
   | { readonly kind: 'ok' }
@@ -29,10 +30,23 @@ export function falconPointerBody(on: boolean): string {
 
 /** A bare private-network IPv4 address: no name, port, user, path or loopback. */
 export function falconPointerHostIssue(host: string): string | null {
-  const bare = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host);
-  return bare && !host.startsWith('127.') && isAllowedPrivateNetworkHost(host)
+  // Plain decimal octets only, and exactly the address fetch will connect to:
+  // the URL parser reads a leading zero as octal (010.8.8.8 is 8.8.8.8).
+  const bare = /^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(host);
+  return bare &&
+    urlHostname(host) === host &&
+    !host.startsWith('127.') &&
+    isAllowedPrivateNetworkHost(host)
     ? null
     : 'The Falcon address must be a private-network IPv4 address.';
+}
+
+function urlHostname(host: string): string | null {
+  try {
+    return new URL(`http://${host}`).hostname;
+  } catch {
+    return null;
+  }
 }
 
 export async function handleFalconPointerRequest(
@@ -72,10 +86,14 @@ export function switchFalconPointer(
         redirect: 'error',
         signal: AbortSignal.timeout(timeoutMs),
       });
-      await response.body?.cancel().catch(() => undefined);
-      return response.ok
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => undefined);
+        return { kind: 'failed', reason: `The Falcon answered HTTP ${response.status}.` };
+      }
+      const code = replyCode(await readShortReply(response));
+      return code === null || code === 0
         ? { kind: 'ok' }
-        : { kind: 'failed', reason: `The Falcon answered HTTP ${response.status}.` };
+        : { kind: 'failed', reason: `The Falcon refused the pointer switch (code ${code}).` };
     } catch (error) {
       return {
         kind: 'failed',
@@ -86,4 +104,41 @@ export function switchFalconPointer(
       };
     }
   });
+}
+
+/** The reply's numeric `code`, when it is a JSON object with one; null
+ * otherwise. Only a non-zero code is read as a refusal: an empty or other
+ * 2xx reply is accepted, as the request's evidence says nothing more (ADR-635). */
+function replyCode(reply: string): number | null {
+  try {
+    const value: unknown = JSON.parse(reply);
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const code = (value as Record<string, unknown>)['code'];
+    return typeof code === 'number' && Number.isFinite(code) ? code : null;
+  } catch {
+    return null;
+  }
+}
+
+// A status reply is a few bytes; stop reading anything longer, and treat an
+// unreadable body like an empty one.
+async function readShortReply(response: Response): Promise<string> {
+  const reader = response.body?.getReader();
+  if (reader === undefined) return '';
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_REPLY_BYTES) return '';
+      chunks.push(value);
+    }
+    return Buffer.concat(chunks).toString('utf8');
+  } catch {
+    return '';
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
 }

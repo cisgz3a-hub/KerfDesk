@@ -36,11 +36,14 @@ function falconHarness(found = 'http://192.168.10.1:8080/media/getCapturePhoto')
   });
   const calls: Array<{ host: string; on: boolean; writes: number }> = [];
   let onResult: FalconPointerSwitchResult = { kind: 'ok' };
-  const discover = vi.fn(async () =>
-    found === ''
+  // Whether KerfDesk held the controller while each discovery ran.
+  const heldDuringDiscovery: boolean[] = [];
+  const discover = vi.fn(async () => {
+    heldDuringDiscovery.push(h.get().controllerOperation !== null);
+    return found === ''
       ? { kind: 'not-found' as const }
-      : { kind: 'found' as const, cameraUrl: found, proxyFrameUrl: '' },
-  );
+      : { kind: 'found' as const, cameraUrl: found, proxyFrameUrl: '' };
+  });
   const bridge = {
     discoverMachineCamera: discover,
     switchFalconPointer: async (host: string, on: boolean) => {
@@ -55,6 +58,7 @@ function falconHarness(found = 'http://192.168.10.1:8080/media/getCapturePhoto')
     ...h,
     calls,
     discover,
+    heldDuringDiscovery,
     lines,
     failOn: (reason: string) => {
       onResult = { kind: 'failed', reason };
@@ -91,6 +95,23 @@ describe('Falcon red pointer through the LED controls (ADR-635)', () => {
     const on = h.calls.find((call) => call.on);
     expect(on?.writes).toBeGreaterThan(h.writes.findIndex((wire) => wire.includes('G1 X40.000')));
     expect(h.get().positioningLightEnabled).toBe(true);
+  });
+
+  it('finds the Falcon before taking the controller, so discovery never blocks jog or Start', async () => {
+    const h = falconHarness();
+    await h.actions.centrePositioningLight(40, 45, 1200);
+    expect(h.discover).toHaveBeenCalledTimes(1);
+    expect(h.heldDuringDiscovery).toEqual([false]);
+    expect(h.calls.map(({ on }) => on)).toEqual([false, true]);
+
+    // Nothing found: refused before any controller exchange.
+    resetFalconPointerLink();
+    const missing = falconHarness('');
+    await expect(missing.actions.switchPositioningLightOn()).rejects.toThrow(
+      'KerfDesk cannot find the Falcon on the network.',
+    );
+    expect(missing.heldDuringDiscovery).toEqual([false]);
+    expect(missing.writes).toEqual([]);
   });
 
   it('uses the address of the Falcon camera KerfDesk already reaches, not a phone camera', async () => {

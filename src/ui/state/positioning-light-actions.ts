@@ -15,8 +15,7 @@ import {
   controllerOperationOwner,
   interactiveControllerOperation,
 } from './laser-controller-operation';
-import { jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
-import { pendingTransportWriteCount } from './laser-start-queue-fence';
+import { pushLog } from './laser-store-helpers';
 import { frameProofReset } from './laser-session-reset';
 import { rebasedLightMoveFramePatch, type StashedFrameProof } from './completed-frame-run';
 import { warnJogMotionPolicy } from './laser-jog-warnings';
@@ -26,6 +25,8 @@ import { useStore } from './store';
 import { FalconPointerNotSentError, switchFalconPointer } from './falcon-pointer-link';
 import { ControllerCommandRefusedError } from './laser-interactive-command';
 import {
+  assertPositioningLightAdmission as assertAdmission,
+  findFalconBeforeHold,
   positioningLightBatch,
   positioningLightCommand,
   positioningLightFence,
@@ -80,6 +81,10 @@ export function falconPointerOffOnDisconnect(state: LaserState, refs: LiveRefs):
     void switchFalconPointer(false).catch(() => undefined);
 }
 
+function sessionLight(refs: LiveRefs): PositioningLight | undefined {
+  return lightSnapshots.get(refs)?.mapping;
+}
+
 function litMapping(state: LaserState, refs: LiveRefs): PositioningLight | null {
   const snapshot = lightSnapshots.get(refs);
   const dialect = useStore.getState().project.device.gcodeDialect?.dialectId;
@@ -90,23 +95,6 @@ function litMapping(state: LaserState, refs: LiveRefs): PositioningLight | null 
     snapshot.connection === refs.connection
     ? snapshot.mapping
     : null;
-}
-
-function assertAdmission(state: LaserState, refs: LiveRefs): void {
-  if (state.connection.kind !== 'connected' || refs.connection === null)
-    throw new Error('Connect a controller before using the positioning light.');
-  if (refs.driver.capabilities.transport === 'file-only')
-    throw new Error('This controller supports file export only, not a live positioning light.');
-  const blocked = jogFrameCommandBlockMessage(state);
-  if (blocked !== null) throw new Error(blocked);
-  if (
-    state.autofocusBusy ||
-    state.probeBusy ||
-    refs.controllerStatusWait != null ||
-    state.pendingUntrackedAcks > 0 ||
-    pendingTransportWriteCount(state) > 0
-  )
-    throw new Error('Wait for the current controller command to settle.');
 }
 
 type Target = {
@@ -127,6 +115,9 @@ async function runPositioningLight(
 ): Promise<void> {
   assertAdmission(get(), refs);
   assertTarget(target);
+  // The light this request switches, or the one still on from this session.
+  const lights = [resolveMapping(get(), refs, enabled), sessionLight(refs)];
+  await findFalconBeforeHold(set, get, refs, lights);
   const mapping = resolveMapping(get(), refs, enabled);
   const { context, owns, session, dispose } = createTransaction(
     set,

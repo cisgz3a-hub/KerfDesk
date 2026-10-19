@@ -5,10 +5,13 @@ import { useCameraStore } from './camera-store';
 // server, through the desktop camera bridge (ADR-635). The bridge comes from
 // the platform, which only React can read, so the app registers it here.
 let registeredBridge: CameraBridgeAdapter | undefined;
-// A Falcon found by discovery; reused until a switch cannot reach it.
+// A Falcon found by discovery; reused until a switch cannot reach it, the
+// controller connection changes or another machine profile is chosen.
 let discoveredHost: string | null = null;
 
 const FALCON_CAMERA_PATH = /^http:\/\/(\d{1,3}(?:\.\d{1,3}){3}):8080\/media\/getCapturePhoto$/;
+
+const NEEDS_DESKTOP = 'The Falcon red pointer needs KerfDesk Desktop: the web app cannot reach it.';
 
 const NOT_FOUND =
   'KerfDesk cannot find the Falcon on the network. Its red pointer is switched over the Falcon’s own network link, like Creality’s software: connect the PC to the Falcon the way Falcon Design Space does, check the Falcon camera appears in the Camera panel, then try again.';
@@ -20,13 +23,27 @@ export function registerFalconPointerBridge(bridge: CameraBridgeAdapter | undefi
   registeredBridge = bridge;
 }
 
+/** Forget a discovered Falcon: the next switch looks for the machine again. */
+export function forgetDiscoveredFalcon(): void {
+  discoveredHost = null;
+}
+
+/**
+ * Find the Falcon before the LED transaction takes the controller: discovery
+ * sends nothing to the controller and can take seconds, so it must not hold up
+ * jog, Frame or Start. Throws, with nothing sent, when the pointer cannot be
+ * reached.
+ */
+export async function prepareFalconPointer(): Promise<void> {
+  const bridge = registeredBridge;
+  if (bridge?.switchFalconPointer === undefined) throw new FalconPointerNotSentError(NEEDS_DESKTOP);
+  if (knownFalconHost() === null) await discoverFalconHost(bridge);
+}
+
 /** Switch the pointer on or off; throws with the operator-facing reason. */
 export async function switchFalconPointer(on: boolean): Promise<void> {
   const bridge = registeredBridge;
-  if (bridge?.switchFalconPointer === undefined)
-    throw new FalconPointerNotSentError(
-      'The Falcon red pointer needs KerfDesk Desktop: the web app cannot reach it.',
-    );
+  if (bridge?.switchFalconPointer === undefined) throw new FalconPointerNotSentError(NEEDS_DESKTOP);
   const host = knownFalconHost() ?? (await discoverFalconHost(bridge));
   const result = await bridge.switchFalconPointer(host, on);
   if (result.kind === 'ok') return;

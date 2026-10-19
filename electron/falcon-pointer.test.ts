@@ -27,6 +27,7 @@ describe('Falcon pointer request (ADR-635)', () => {
   let falconPort = 0;
   let status = 200;
   let silent = false;
+  let reply = '{"code":0}';
   const received: Received[] = [];
   let bridge: RtspCameraBridgeHandle;
 
@@ -42,7 +43,7 @@ describe('Falcon pointer request (ADR-635)', () => {
           body,
         });
         if (silent) return;
-        res.writeHead(status, { 'Content-Type': 'application/json' }).end('{"code":0}');
+        res.writeHead(status, { 'Content-Type': 'application/json' }).end(reply);
       });
     });
     falconPort = await new Promise((resolve) =>
@@ -79,6 +80,13 @@ describe('Falcon pointer request (ADR-635)', () => {
       '',
     ])
       expect(falconPointerHostIssue(host)).not.toBeNull();
+  });
+
+  it('refuses leading zeros, which the URL parser reads as octal', () => {
+    // fetch would connect to 8.8.8.8, 172.14.0.1 and 192.168.8.1.
+    for (const host of ['010.8.8.8', '172.016.0.1', '192.168.010.1', '010.0.0.1', '10.0.0.01'])
+      expect(falconPointerHostIssue(host)).not.toBeNull();
+    expect(falconPointerHostIssue('10.0.0.0')).toBeNull();
   });
 
   it('posts the switch as JSON and reports success', async () => {
@@ -120,6 +128,24 @@ describe('Falcon pointer request (ADR-635)', () => {
     }
   });
 
+  it('reports a non-zero code in a JSON reply as a failure', async () => {
+    status = 200;
+    reply = '{"code":-1}';
+    try {
+      expect(await switchFalconPointer('127.0.0.1', true, falconPort)).toEqual({
+        kind: 'failed',
+        reason: 'The Falcon refused the pointer switch (code -1).',
+      });
+      // Only a numeric code is read; other replies to a 2xx are accepted as before.
+      for (const accepted of ['', 'OK', '{"code":0}', '{"code":"1"}', '{"result":1}', '[1]']) {
+        reply = accepted;
+        expect(await switchFalconPointer('127.0.0.1', false, falconPort)).toEqual({ kind: 'ok' });
+      }
+    } finally {
+      reply = '{"code":0}';
+    }
+  });
+
   it('refuses a public host, a bad state and GET at the bridge without contacting anything', async () => {
     const before = received.length;
     const post = (query: string) =>
@@ -130,6 +156,7 @@ describe('Falcon pointer request (ADR-635)', () => {
     const publicHost = await post('host=8.8.8.8&state=on');
     expect(publicHost.status).toBe(400);
     expect(await publicHost.json()).toMatchObject({ kind: 'rejected' });
+    expect((await post('host=010.8.8.8&state=on')).status).toBe(400);
     expect((await post('host=192.168.10.1&state=blink')).status).toBe(400);
     const get = await fetch(
       `http://127.0.0.1:${bridge.port}/falcon/pointer?host=192.168.10.1&state=on`,
