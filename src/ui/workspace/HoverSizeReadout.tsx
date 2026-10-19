@@ -45,13 +45,17 @@ export function HoverSizeReadout(props: {
     props.project.device.bedHeight,
     props.viewState,
   );
-  const left = view.offsetX + hovered.point.x * view.scale + 14;
-  const top = view.offsetY + hovered.point.y * view.scale + 16;
+  const placement = readoutPlacement(
+    view.offsetX + hovered.point.x * view.scale,
+    view.offsetY + hovered.point.y * view.scale,
+    props.canvasSize,
+    settings,
+  );
   return (
     // aria-hidden like the drag readout: this fires on every hover, and a live
     // region that chatty is worse than silence. The same numbers are on the
     // status bar and in the numeric bar once the artwork is selected.
-    <div className="lf-chip" style={{ ...readoutStyle, left, top }} aria-hidden="true">
+    <div className="lf-chip" style={{ ...readoutStyle, ...placement }} aria-hidden="true">
       <strong style={nameStyle}>{artworkOperationName(object)}</strong>
       <span style={sizeStyle}>
         {formatMm(bbox.maxX - bbox.minX)} × {formatMm(bbox.maxY - bbox.minY)} mm
@@ -99,12 +103,50 @@ function useDwellHit(cursor: Vec2 | null, project: Project): Hover | null {
     if (x === null || y === null) return;
     const point = { x, y };
     const timer = setTimeout(() => {
-      const id = hitTest(project.scene, point);
+      // Locked artwork too, like the hover pulse (ADR-620): the piece under a
+      // locked one must not answer for it.
+      const id = hitTest(project.scene, point, { includeLocked: true });
       setHover(id === null ? null : { id, point });
     }, DWELL_MS);
     return () => clearTimeout(timer);
   }, [x, y, project.scene]);
   return hover;
+}
+
+const OFFSET_X_PX = 14;
+const OFFSET_Y_PX = 16;
+const MAX_WIDTH_PX = 320;
+// Name, size and position with the chip's padding, then one per settings line.
+const BASE_HEIGHT_PX = 62;
+const LINE_HEIGHT_PX = 16;
+
+/**
+ * Right of and below the pointer, flipped to the other side of it on an axis
+ * where the chip would hang off the canvas: with settings lines it is up to
+ * 320 px wide and seven lines tall. The flip uses the chip's largest size, so
+ * a short chip may flip a little early, never too late.
+ */
+function readoutPlacement(
+  x: number,
+  y: number,
+  canvas: CanvasBitmapSize,
+  settings: HoverOutputSettings | null,
+): React.CSSProperties {
+  const height = BASE_HEIGHT_PX + settingsLineCount(settings) * LINE_HEIGHT_PX;
+  const flipX = x + OFFSET_X_PX + MAX_WIDTH_PX > canvas.width && x - OFFSET_X_PX >= MAX_WIDTH_PX;
+  const flipY = y + OFFSET_Y_PX + height > canvas.height && y - OFFSET_Y_PX >= height;
+  if (!flipX && !flipY) return { left: x + OFFSET_X_PX, top: y + OFFSET_Y_PX };
+  return {
+    left: flipX ? x - OFFSET_X_PX : x + OFFSET_X_PX,
+    top: flipY ? y - OFFSET_Y_PX : y + OFFSET_Y_PX,
+    transform: `translate(${flipX ? '-100%' : '0'}, ${flipY ? '-100%' : '0'})`,
+  };
+}
+
+function settingsLineCount(settings: HoverOutputSettings | null): number {
+  if (settings === null) return 0;
+  if (settings.kind === 'note') return 1;
+  return settings.lines.length + (settings.more > 0 ? 1 : 0);
 }
 
 // Whole millimetres read as clutter-free at a glance; one decimal keeps a
@@ -118,7 +160,7 @@ const readoutStyle: React.CSSProperties = {
   zIndex: 6,
   display: 'grid',
   gap: 1,
-  maxWidth: 320,
+  maxWidth: MAX_WIDTH_PX,
   padding: '5px 8px',
   boxShadow: 'var(--lf-shadow)',
   pointerEvents: 'none',

@@ -35,6 +35,23 @@ function vector(colors: ReadonlyArray<string>, extra: Partial<SceneObject> = {})
   } as SceneObject;
 }
 
+function bitmap(extra: Partial<SceneObject> = {}): SceneObject {
+  return {
+    kind: 'raster-image',
+    id: 'B1',
+    source: 'photo.png',
+    dataUrl: 'data:,',
+    pixelWidth: 10,
+    pixelHeight: 10,
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+    transform: IDENTITY_TRANSFORM,
+    color: '#ff0000',
+    dither: 'grayscale',
+    linesPerMm: 10,
+    ...extra,
+  } as SceneObject;
+}
+
 function projectWith(layers: ReadonlyArray<Layer>, object: SceneObject): Project {
   const base = createProject();
   return { ...base, scene: { ...base.scene, layers: [...layers], objects: [object] } };
@@ -65,17 +82,64 @@ describe('hoverOutputSettings', () => {
     expect(settings).toMatchObject({ lines: [{ power: '40%', speed: '900 mm/min' }] });
   });
 
-  it('shows an Image as its power range, and a speed past Output max feed as capped', () => {
+  it('shows a Grayscale image as its power range, and a speed past Output max feed as capped', () => {
     const image = operation('red', '#ff0000', {
       mode: 'image',
+      ditherAlgorithm: 'grayscale',
       minPower: 10,
       power: 60,
       speed: 99_000,
     });
-    const object = vector(['#ff0000']);
+    const object = bitmap();
     const project = projectWith([image], object);
     expect(hoverOutputSettings(project, object)).toMatchObject({
       lines: [{ power: '10–60%', speed: `${project.device.maxFeed} mm/min (capped)` }],
+    });
+  });
+
+  it('shows a dithered image at its peak only, since a dither burns full power or none', () => {
+    const object = bitmap();
+    for (const ditherAlgorithm of ['threshold', 'ordered', 'floyd-steinberg'] as const) {
+      const image = operation('red', '#ff0000', {
+        mode: 'image',
+        ditherAlgorithm,
+        minPower: 10,
+        power: 60,
+      });
+      expect(hoverOutputSettings(projectWith([image], object), object)).toMatchObject({
+        lines: [{ power: '60%' }],
+      });
+    }
+    // "Use original pixels" burns as Grayscale whatever dither is stored.
+    const original = operation('red', '#ff0000', {
+      mode: 'image',
+      ditherAlgorithm: 'threshold',
+      passThrough: true,
+      minPower: 10,
+      power: 60,
+    });
+    expect(hoverOutputSettings(projectWith([original], object), object)).toMatchObject({
+      lines: [{ power: '10–60%' }],
+    });
+  });
+
+  it('says a piece on an operation of the wrong mode is not engraved', () => {
+    const vectorOnImage = vector(['#ff0000']);
+    const image = operation('red', '#ff0000', { mode: 'image', minPower: 10 });
+    expect(hoverOutputSettings(projectWith([image], vectorOnImage), vectorOnImage)).toEqual({
+      kind: 'note',
+      text: 'Not engraved: operation is in Image mode',
+    });
+    const bitmapOnFill = bitmap();
+    const fill = operation('red', '#ff0000', { mode: 'fill' });
+    expect(hoverOutputSettings(projectWith([fill], bitmapOnFill), bitmapOnFill)).toEqual({
+      kind: 'note',
+      text: 'Not engraved: operation is in Fill mode',
+    });
+    // An artwork override that switches the mode counts, as it does in compile.
+    const overridden = vector(['#ff0000'], { operationOverride: { mode: 'image' } });
+    expect(hoverOutputSettings(projectWith([RED], overridden), overridden)).toMatchObject({
+      kind: 'note',
     });
   });
 
