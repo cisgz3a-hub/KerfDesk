@@ -148,7 +148,7 @@ test('Save As immediately after operation edits persists all newly typed setting
   await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await panel.getByRole('spinbutton', { name: /^Power for/ }).fill('37');
@@ -173,7 +173,7 @@ test('actual autosave recovery restores job settings without replacing computer 
   await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await panel.getByRole('spinbutton', { name: /^Power for/ }).fill('43');

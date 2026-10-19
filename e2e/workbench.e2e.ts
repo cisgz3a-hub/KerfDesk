@@ -50,9 +50,7 @@ baseTest(
     await expect(page.getByRole('menubar', { name: 'Application menu' })).toBeVisible();
     await expect(page.getByLabel('KerfDesk workspace', { exact: true })).toBeVisible();
     await expect(page.getByRole('tablist', { name: 'Side panel' })).toBeVisible();
-    await expect(
-      page.getByRole('complementary', { name: 'Artwork / Operations panel' }),
-    ).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Artwork panel' })).toBeVisible();
     await expect(page.getByLabel('Laser controls')).toHaveCount(0);
 
     const file = page.getByRole('menuitem', { name: 'File' });
@@ -99,7 +97,7 @@ baseTest(
     await page.goto('/');
     await (await toolbarCommand(page, 'Import...')).click();
     await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();
-    await expect(page.getByText('Layers: 1 (1 output)', { exact: true })).toBeVisible();
+    await expect(page.getByText('Operations: 1 (1 output)', { exact: true })).toBeVisible();
     expect(workerUrls.length).toBeGreaterThan(0);
 
     await page.keyboard.press('Escape');

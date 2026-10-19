@@ -9,6 +9,7 @@ export function LayerSettingsClipboardButtons({ layer }: { readonly layer: Layer
     <>
       <button
         type="button"
+        className="lf-btn lf-btn--sm"
         onClick={() => copyLayerSettings(layer.id)}
         aria-label={`Copy settings from ${layer.color}`}
         title="Copy this layer's settings"
@@ -17,6 +18,7 @@ export function LayerSettingsClipboardButtons({ layer }: { readonly layer: Layer
       </button>
       <button
         type="button"
+        className="lf-btn lf-btn--sm"
         onClick={() => pasteLayerSettings(layer.id)}
         aria-label={`Paste settings to ${layer.color}`}
         title="Paste copied settings onto this layer"

@@ -141,6 +141,43 @@ describe('ArtworkRunOrderRow position box', () => {
     }
   });
 
+  it('says a laser step or operation only when it adds to the #N badge and title', async () => {
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    const renderRow = (model: ArtworkRunOrderRowModel) => (
+      <ArtworkRunOrderRow
+        row={model}
+        active={false}
+        machineKind="laser"
+        onFocus={() => undefined}
+        onMove={() => undefined}
+        onEditSettings={() => undefined}
+      />
+    );
+    const card = () => host.querySelector('article')!;
+    try {
+      await act(async () => root.render(renderRow(row(1))));
+      expect(host.textContent).not.toContain('Laser output step');
+      expect(card().classList.contains('lf-run-order-card--no-steps')).toBe(true);
+      expect(host.querySelector('.lf-run-order-summary strong')).toBeNull();
+      expect(host.querySelector('.lf-run-order-summary')?.hasAttribute('tabindex')).toBe(false);
+
+      await act(async () =>
+        root.render(renderRow({ ...row(1), effectiveSteps: [3], operationSummary: 'Cut' })),
+      );
+      expect(host.textContent).toContain('Laser output step: 3');
+      expect(host.querySelector('.lf-run-order-summary strong')?.textContent).toBe('Cut');
+      expect(card().classList.contains('lf-run-order-card--no-steps')).toBe(false);
+
+      await act(async () => root.render(renderRow({ ...row(1), effectiveSteps: [1, 2] })));
+      expect(host.textContent).toContain('Laser output steps: 1–2');
+      await act(async () => root.render(renderRow({ ...row(1), output: false })));
+      expect(host.textContent).toContain('Output off · This artwork will not run');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('focuses artwork through its button without moving its run position', async () => {
     const host = document.createElement('div');
     const root = createRoot(host);

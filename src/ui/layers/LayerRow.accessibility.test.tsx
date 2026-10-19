@@ -33,22 +33,32 @@ describe('LayerRow activation accessibility', () => {
   it('does not activate when a nested operation control is clicked', async () => {
     const mounted = await mountRow();
     try {
-      const show = mounted.row.querySelector<HTMLInputElement>('input[aria-label^="Show "]');
-      if (show === null) throw new Error('Show control missing');
-      await act(async () => show.click());
+      const hide = mounted.row.querySelector<HTMLButtonElement>(
+        'button[aria-label="Hide operation Keyboard operation"]',
+      );
+      if (hide === null) throw new Error('Visibility control missing');
+      await act(async () => hide.click());
       expect(useUiStore.getState().activeLayerColor).toBeNull();
     } finally {
       await mounted.unmount();
     }
   });
 
-  it('does not activate when Show or Output label text is clicked', async () => {
+  it('does not activate from any control in the row menu', async () => {
     const mounted = await mountRow();
     try {
-      const labels = mounted.row.querySelectorAll<HTMLLabelElement>('label');
-      expect(labels).toHaveLength(2);
-      for (const label of labels) {
-        await act(async () => label.click());
+      const menu = mounted.row.querySelector('details');
+      if (menu === null) throw new Error('row menu missing');
+      const controls: HTMLElement[] = [
+        ...menu.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button, input'),
+      ].filter(
+        (control) => !control.disabled && !control.getAttribute('aria-label')?.startsWith('Delete'),
+      );
+      // The Include in output label text, not only its checkbox.
+      controls.push(...menu.querySelectorAll<HTMLLabelElement>('label'));
+      expect(controls.length).toBeGreaterThan(1);
+      for (const control of controls) {
+        await act(async () => control.click());
         expect(useUiStore.getState().activeLayerColor).toBeNull();
       }
     } finally {

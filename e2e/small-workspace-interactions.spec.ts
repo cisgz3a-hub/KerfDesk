@@ -121,12 +121,8 @@ for (const viewport of [
     const before = await snapshot(page);
     await page.setViewportSize(viewport);
     await selectWorkspacePanel(page, 'Artwork');
-    await page
-      .getByRole('button', { name: 'Collapse Artwork / Operations panel', exact: true })
-      .click();
-    await page
-      .getByRole('button', { name: 'Expand Artwork / Operations panel', exact: true })
-      .click();
+    await page.getByRole('button', { name: 'Collapse Artwork panel', exact: true }).click();
+    await page.getByRole('button', { name: 'Expand Artwork panel', exact: true }).click();
     await selectWorkspacePanel(page, 'Machine');
     await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).click();
     await page.getByRole('button', { name: 'Expand Laser panel', exact: true }).click();

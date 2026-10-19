@@ -36,7 +36,7 @@ export async function expectMachineToolContainment(
     if (!rail || !nav)
       throw new Error('Tool panel is not inside the machine rail below navigation');
     const protectedRegions = [
-      '[aria-label="Artwork / Operations panel"]',
+      '[aria-label="Artwork panel"]',
       '[aria-label="Jog and positioning"]',
       '[aria-label="Job actions"]',
     ];
