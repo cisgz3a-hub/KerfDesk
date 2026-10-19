@@ -7,6 +7,15 @@ import { PURCHASE_STORAGE_KEY, prepareBrowserPurchase } from '../public/desktop-
 import { validBrowserOrder, validClaim } from '../public/desktop-checkout-api.mjs';
 
 const html = await readFile(new URL('../public/buy.html', import.meta.url), 'utf8');
+
+test('activation instructions send active-trial users whose workspace opens to Help → Licence', () => {
+  const window = new JSDOM(html).window;
+  assert.match(
+    window.document.body.textContent.replace(/\s+/g, ' '),
+    /workspace opens.*including during an active trial.*Help → Licence/,
+  );
+  window.close();
+});
 const transaction = `txn_${'a'.repeat(26)}`;
 // The server-created transaction, with no field for adding a discount code.
 const opened = { transactionId: transaction, settings: { showAddDiscounts: false } };

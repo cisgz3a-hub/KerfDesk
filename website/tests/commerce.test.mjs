@@ -6,6 +6,8 @@ import { describe, it } from 'node:test';
 import { commerce } from '../commerce.config.mjs';
 import { commerceErrors, formatPrice } from '../lib/commerce.mjs';
 import { page as pricing } from '../pages/pricing.mjs';
+import { page as about } from '../pages/about.mjs';
+import { page as license } from '../pages/license.mjs';
 import { site } from '../site.config.mjs';
 import { attrValues, buildToTemp, builtPages, textContent } from './helpers.mjs';
 
@@ -40,6 +42,15 @@ function checkoutLinks(html) {
 function renderPricing(store) {
   return String(pricing.render({ site, commerce: store, siteUrl: null, asset: (p) => `/${p}` }));
 }
+
+it('does not offer a currently available desktop trial on About or License when trials are closed', () => {
+  for (const page of [about, license]) {
+    const html = String(page.render({ site, commerce: CLOSED_STORE, asset: (p) => `/${p}` }));
+    const text = textContent(html);
+    assert.doesNotMatch(text, /opens with a free 30-day (?:Pro )?trial/);
+    assert.match(text, /Desktop trials are currently closed/);
+  }
+});
 
 describe('commerce configuration', () => {
   it('pins the settled Free and Pro offer (ADR-524 Amendment 1)', () => {

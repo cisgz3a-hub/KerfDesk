@@ -149,7 +149,10 @@ function maker(site, commerce) {
       <p>The app’s startup screen reads “Created by ${site.studio}”.</p>
       <p>
         KerfDesk comes in a Free edition with no time limit, in the browser, and a Pro edition with
-        a one-time license, in the desktop app, which opens with a free 30-day trial.
+        a one-time license, in the desktop app.
+        ${commerce.trialOpen
+          ? 'It opens with a free 30-day trial or a license.'
+          : 'Desktop trials are currently closed; a license is required.'}
         ${commerce.salesOpen
           ? html`Buy Pro through the <a href="${site.appUrl}/buy.html">purchase page</a>.`
           : 'Purchase opens soon.'}

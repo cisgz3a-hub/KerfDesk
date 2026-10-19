@@ -20,12 +20,12 @@ import {
 import { html } from '../lib/html.mjs';
 import { NOTICE_PARTS, THIRD_PARTY_ROWS, faqItems, proLicenseFacts } from './license-data.mjs';
 
-function todaySection() {
+function todaySection(commerce) {
   return section({
     id: 'today',
     eyebrow: 'Using KerfDesk',
     title: 'The notice that comes with the app',
-    lead: 'KerfDesk Free runs in the browser. The Windows desktop app runs Pro and opens with a free 30-day trial or a license. The app comes with a short License & Safety Notice about its license, machine safety and liability. The Windows installer shows it during setup, and Help > About KerfDesk in the app points to it.',
+    lead: `KerfDesk Free runs in the browser. The Windows desktop app runs Pro. ${commerce.trialOpen ? 'It opens with a free 30-day trial or a license.' : 'Desktop trials are currently closed; a license is required.'} The app comes with a short License & Safety Notice about its license, machine safety and liability. The Windows installer shows it during setup, and Help > About KerfDesk in the app points to it.`,
     content: html`${table({
       caption: 'What the five parts of the notice say',
       head: ['Part', 'In plain words'],
@@ -164,7 +164,7 @@ export const page = {
         button(site.noticesUrl, 'Third-party notices', { variant: 'secondary' }),
       ),
     })}
-    ${todaySection()} ${currentLicenseSection()} ${proLicenseSection(commerce)}
+    ${todaySection(commerce)} ${currentLicenseSection()} ${proLicenseSection(commerce)}
     ${thirdPartySection(site)} ${creditsSection()}
     ${section({
       id: 'questions',
@@ -176,7 +176,7 @@ export const page = {
     })}
     ${ctaBand({
       title: 'Start with KerfDesk Free',
-      body: 'Open KerfDesk in your browser: Free needs no account and has no time limit. The desktop app opens with a free 30-day Pro trial.',
+      body: `Open KerfDesk in your browser: Free needs no account and has no time limit. ${commerce.trialOpen ? 'The desktop app opens with a free 30-day Pro trial.' : 'Desktop trials are currently closed; a license is required for the desktop app.'}`,
       buttons: [
         button(site.appUrl, 'Open the app'),
         button('/download/', 'Download', { variant: 'ghost-dark' }),

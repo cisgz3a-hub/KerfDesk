@@ -39,7 +39,7 @@ export function proLicenseFacts(commerce) {
     {
       icon: 'gift',
       title: 'Free has no time limit',
-      body: 'KerfDesk Free runs in the browser, needs no account and doesn’t expire. The desktop app has no Free edition: it opens with a free 30-day Pro trial or a license.',
+      body: `KerfDesk Free runs in the browser, needs no account and doesn’t expire. The desktop app has no Free edition. ${commerce.trialOpen ? 'It opens with a free 30-day Pro trial or a license.' : 'Desktop trials are currently closed; a license is required.'}`,
     },
     plan && {
       icon: 'receipt',
@@ -79,7 +79,10 @@ export function faqItems(site, commerce) {
       question: 'Do I need to buy a license to use KerfDesk?',
       answer: html`<p>
         Not in the browser: KerfDesk Free has no time limit and needs no account. The desktop app
-        has no Free edition; after its free 30-day Pro trial it needs a Pro license.
+        has no Free edition.
+        ${commerce.trialOpen
+          ? 'After its free 30-day Pro trial it needs a Pro license.'
+          : 'Desktop trials are currently closed; a Pro license is required.'}
         ${commerce.salesOpen
           ? html`You can buy it through the <a href="${site.appUrl}/buy.html">purchase page</a>.`
           : 'Purchase opens soon.'}
