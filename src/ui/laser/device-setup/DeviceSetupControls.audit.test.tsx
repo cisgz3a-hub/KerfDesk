@@ -10,7 +10,6 @@ import { initialLaserState } from '../../state/laser-store-helpers';
 import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
 import { DeviceSetupCncJobStep } from './DeviceSetupCncJobStep';
-import { DeviceSetupCncPreset } from './DeviceSetupCncPreset';
 import { DeviceSetupCncProfiles } from './DeviceSetupCncProfiles';
 import { DeviceSetupCncTilingFields } from './DeviceSetupCncTilingFields';
 import { DeviceSetupConfirmStep } from './DeviceSetupConfirmStep';
@@ -18,10 +17,12 @@ import { DeviceSetupConnectStep } from './DeviceSetupConnectStep';
 import { DeviceSetupConnectionOptions } from './DeviceSetupConnectionOptions';
 import { DeviceSetupControls } from './DeviceSetupControls';
 import { DeviceSetupIdentifyStep } from './DeviceSetupIdentifyStep';
+import { DeviceSetupMachinePicker } from './DeviceSetupMachinePicker';
 import { DeviceSetupOptionsStep } from './DeviceSetupOptionsStep';
 import { DeviceSetupReviewStep } from './DeviceSetupReviewStep';
 import { DeviceSetupRotaryFields } from './DeviceSetupRotaryFields';
-import { initDeviceSetup } from './device-setup-flow';
+import { deviceSetupReducer, initDeviceSetup } from './device-setup-flow';
+import { chooseMachineEntryActions, machinePickerEntries } from './machine-picker-entries';
 import { useMachineSetupDialogStore } from './machine-setup-dialog-store';
 
 (
@@ -193,7 +194,7 @@ describe('Setup control audit', () => {
     };
     render(<DeviceSetupIdentifyStep state={state} dispatch={dispatch} />);
     toggles('Import or export a machine profile');
-    // The connection contract lives under Find my machine (ADR-420).
+    // The connection contract lives in the connection strip (ADR-420, ADR-637).
     render(<DeviceSetupConnectionOptions state={state} dispatch={dispatch} />);
     toggles('Advanced connection and streaming');
     const worker = host.querySelector<HTMLInputElement>(
@@ -355,26 +356,19 @@ describe('Setup control audit', () => {
     expect(details.open).toBe(false);
   });
 
-  it('CNC preset disclosure toggles and external references have explicit secure source destinations', () => {
+  it('a chosen CNC preset names its sources with explicit secure destinations', () => {
     const dispatch = vi.fn();
-    render(
-      <DeviceSetupCncPreset
-        state={initDeviceSetup(DEFAULT_DEVICE_PROFILE, null, {
-          machine: DEFAULT_CNC_MACHINE_CONFIG,
-        })}
-        dispatch={dispatch}
-      />,
-    );
-    const summary = host.querySelector('summary')!;
-    const details = summary.parentElement as HTMLDetailsElement;
-    const initialOpen = details.open;
-    act(() => summary.click());
-    expect(details.open).toBe(!initialOpen);
-    const select = host.querySelector('select')!;
-    act(() => {
-      select.value = 'onefinity-woodworker';
-      Simulate.change(select);
+    const initial = initDeviceSetup(DEFAULT_DEVICE_PROFILE, null, {
+      machine: DEFAULT_CNC_MACHINE_CONFIG,
     });
+    const onefinity = machinePickerEntries(initial).find(
+      (entry) => entry.kind === 'cnc-preset' && entry.preset.id === 'onefinity-woodworker',
+    )!;
+    const state = chooseMachineEntryActions(initial, onefinity).reduce(deviceSetupReducer, initial);
+    render(<DeviceSetupMachinePicker state={state} dispatch={dispatch} />);
+    expect(host.querySelector('section[aria-label="Chosen machine"]')?.textContent).toContain(
+      'Onefinity Woodworker',
+    );
     const links = [...host.querySelectorAll('a')];
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) {
@@ -382,8 +376,6 @@ describe('Setup control audit', () => {
       expect(link.target).toBe('_blank');
       expect(link.rel).toContain('noreferrer');
     }
-    act(() => summary.click());
-    expect(details.open).toBe(initialOpen);
     expect(dispatch).not.toHaveBeenCalled();
   });
 });
