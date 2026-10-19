@@ -2922,16 +2922,28 @@ authorization, Frame proof, controller command, or safety boundary.
   records, so a response suffix cannot become a false acknowledgement. The writer remains
   available for Stop; no missing reply is synthesized or replayed (ADR-600).
 - A reply lost that way leaves the last line of the job unacknowledged after the machine has
-  finished. Once every line has been sent, nothing else is owed a reply and the controller has
-  reported Idle for 1 s, KerfDesk sends one `$G` to GRBL, grblHAL and FluidNC controllers
-  (the Falcon included). They answer it only after every earlier line, so its `[GC:...]`
-  report proves the job was read and any reply still missing was lost. The job then finishes
-  through the ordinary post-job settle instead of the 90-second watchdog resetting the
-  controller, usually within about 2 s. A controller holding its own program answers only
-  after the held lines, so it is never finished early. Other controllers with a realtime
-  status (Smoothieware) wait for 15 s of Idle plus any G4 still in flight instead. The log
-  names how many replies were lost and that one may have been an error (ADR-610 and its
-  Amendment 1).
+  finished. Once every line has been sent and nothing else is owed a reply, KerfDesk sends one
+  `$G` to a GRBL, grblHAL or FluidNC profile (the Falcon profiles included). GRBL-family
+  firmware answers it only after every earlier line, so its `[GC:...]` report proves the job
+  was read and any reply still missing was lost. The job then finishes through the ordinary
+  post-job settle instead of the 90-second watchdog resetting the controller.
+  - When the firmware identified itself this session (its welcome banner, or a stock GRBL
+    `$I` reply), the `$G` goes after 1 s of Idle and the job usually finishes within about
+    2 s.
+  - A board that printed no banner (it did not reboot when the port opened, as native-USB
+    boards and boards reconnected after Disconnect may not) stays unidentified: grblHAL,
+    FluidNC and the Falcon have no `$I` KerfDesk reads as identity. The `$G` then waits for
+    15 s of Idle (three reports, plus any G4 still in flight), so the job finishes after about
+    15 s, and never earlier than that even if the firmware is not GRBL-family after all.
+  - A controller holding its own program answers the `$G` only after the held lines, so on
+    GRBL-family firmware the job is not finished while lines are still held. This is code and
+    simulator evidence; the Falcon's own firmware was not tested.
+  - Firmware identified as Smoothieware (or a banner naming other non-GRBL firmware) gets no
+    `$G`: the job finishes after 15 s of Idle plus any G4 still in flight. Smoothieware's
+    ordering is unverified, so a board holding its program at Idle for longer could still be
+    finished early.
+  The log names how many replies were lost and that one may have been an error (ADR-610 and
+  its Amendments 1 and 2).
 - After any page stall, the controller output that queued up meanwhile is handed to the app
   in slices of about 8 ms, with input, drawing and the status poll running in between,
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
@@ -3230,7 +3242,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    shows the brief "Controller is not responding" notice (ADR-611). A controller
    that answered and then goes quiet for 8 s, outside homing and other controller
    operations, turns the connection status to an amber **Not responding** until
-   its next reply (ADR-611 Amendment 1).
+   its next reply (ADR-611 Amendment 1). While a sent line is still owed its
+   reply (a Console `$H` is answered only when homing ends) the wait is as long
+   as the Home button would wait for that reply, not for the rest of the
+   session: a reply lost on the link never arrives (ADR-610 Amendment 2).
 4. A CNC Pause/Resume confirmation warning retains the paused job and its saved
    artifact. A later accepted Abort, actual Disconnect or controller fault
    records its own terminal cause. A reset-owned host freeze remains provisional.
