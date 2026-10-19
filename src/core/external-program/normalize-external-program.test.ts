@@ -89,14 +89,43 @@ describe('external G-code program normalization (ADR-630)', () => {
     expect(sent('G0\tX1\n')).toBe(`${BASE}G0X1\n`);
   });
 
-  it.each([' ', '\u000b', '\u000c', '﻿'])(
-    'refuses whitespace GRBL does not discard instead of dropping it: %j',
+  // Stock GRBL throws away every byte at or below a space while it collects a
+  // line (protocol.c), so a DOS end-of-file mark or a form feed changes nothing
+  // it runs. Bytes a GRBL-family controller acts on stay refused: Ctrl-X resets
+  // every one of them; grblHAL also takes Ctrl-C, Ctrl-T after ESC and Ctrl-Y
+  // as commands, and backspace or DEL as a line edit (grbl.h, protocol.c).
+  it.each(['\u001a', '\u000b', '\u000c', '\u0001', '\u001f'])(
+    'drops a control character GRBL discards: %j',
     (character) => {
-      expect(reasons(`${character}G0 X1\n`)[0]).toContain('control or non-ASCII');
-      expect(reasons(`G0 X1${character}\n`)[0]).toContain('control or non-ASCII');
-      expect(reasons(`${character}\nG0 X1\n`)[0]).toContain('Line 1');
+      expect(sent(`G0 X1${character}\n${character}\n`)).toBe(`${BASE}G0X1\n`);
+      expect(sent(`${character}G0 X1\n`)).toBe(`${BASE}G0X1\n`);
     },
   );
+
+  it('drops a trailing DOS end-of-file mark', () => {
+    expect(normalizeExternalProgram('G21\r\nG0 X1\r\n\u001a')).toMatchObject({
+      kind: 'ok',
+      program: { gcode: `${BASE}G21\nG0X1\n`, droppedLineCount: 1 },
+    });
+  });
+
+  it.each([
+    ['\u0003', 3],
+    ['\u0008', 8],
+    ['\u0014', 20],
+    ['\u0018', 24],
+    ['\u0019', 25],
+    ['\u001b', 27],
+    ['\u007f', 127],
+  ])('refuses a control character a controller acts on: %j', (character, code) => {
+    expect(reasons(`G0 X1${character}\n`)[0]).toContain(`code ${code}`);
+  });
+
+  it.each([' ', '﻿'])('refuses non-ASCII whitespace instead of dropping it: %j', (character) => {
+    expect(reasons(`${character}G0 X1\n`)[0]).toContain('control or non-ASCII');
+    expect(reasons(`G0 X1${character}\n`)[0]).toContain('control or non-ASCII');
+    expect(reasons(`${character}\nG0 X1\n`)[0]).toContain('Line 1');
+  });
 
   it('counts blank source lines', () => {
     const result = normalizeExternalProgram('\n \t\n\t G1 X1  Y2\t \n');

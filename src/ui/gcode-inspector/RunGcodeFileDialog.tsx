@@ -1,6 +1,7 @@
 // RunGcodeFileDialog — Frame, review and Start for a G-code file opened in the
 // Inspector (ADR-630, WORKFLOW.md F-M2). Frame is the only gate; findings are
-// warnings. Refusals are only what the controller cannot take as a job.
+// warnings. Refusals are what the controller cannot take as a job, and the
+// one policy refusal of $ commands (ADR-630 Amendment 1).
 
 import { useMemo, useState } from 'react';
 import { reviewExternalProgram, type ExternalProgram } from '../../core/external-program';
@@ -10,6 +11,7 @@ import { useStore } from '../state';
 import { deviceInspectionContext } from './gcode-inspection-source';
 import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
 import { useGcodeInspection } from './use-gcode-inspection';
+import type { ExternalFrame } from './external-run';
 import { prepareExternalRun } from './prepare-external-run';
 import { RunGcodeFileControls } from './RunGcodeFileControls';
 import { useLiveRunStart, useNormalizedProgram, type RunStart } from './use-external-program';
@@ -50,12 +52,14 @@ function InspectExternalRun(
   const project = useStore((state) => state.project);
   const live = useLiveRunStart();
   const [pinned, setPinned] = useState<RunStart | null>(null);
+  const [frame, setFrame] = useState<ExternalFrame | null>(null);
   const start = pinned ?? live;
   const source = useMemo(
     () => ({
       ...deviceInspectionContext(project.device, machineKindOf(project.machine)),
       kind: 'text' as const,
       text: props.program.gcode,
+      boundsFromStart: true,
       ...(start === null ? {} : { initialPositionMm: start }),
     }),
     [props.program, project.device, project.machine, start],
@@ -75,6 +79,7 @@ function InspectExternalRun(
       {
         machineKind: machineKindOf(project.machine),
         laserMaxPowerS: project.device.maxPowerS,
+        start: start ?? DRAWN_ORIGIN,
       },
       result.analysis.findings,
     ),
@@ -84,6 +89,7 @@ function InspectExternalRun(
   ) : (
     <RunGcodeFileControls
       prepared={prepared}
+      frameState={{ frame, onFramed: setFrame }}
       analysis={result.analysis}
       start={start}
       onPin={setPinned}
@@ -112,7 +118,7 @@ function RefusedRun(props: {
 }): JSX.Element {
   return (
     <>
-      <p role="alert">KerfDesk cannot send this file as a job:</p>
+      <p role="alert">KerfDesk will not send this file as a job:</p>
       <ul>
         {props.reasons.map((reason) => (
           <li key={reason}>{reason}</li>

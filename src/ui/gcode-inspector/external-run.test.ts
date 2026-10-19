@@ -101,6 +101,36 @@ describe('external run Start checks (ADR-630)', () => {
     expect(frame).not.toHaveBeenCalled();
   });
 
+  // A CNC Frame begun below work Z0 leaves the bit at safe Z rather than
+  // plunging back into the stock (ADR-192). Comparing Z with where the program
+  // was read from kept Start locked for good.
+  it('starts a CNC program from the height its Frame left the bit at', async () => {
+    const project = useStore.getState().project;
+    useStore.setState({
+      project: { ...project, machine: { kind: 'cnc', params: { safeZMm: 5 } } as never },
+    });
+    const at = (z: number) => parseStatusReport(`<Idle|MPos:0.000,0.000,${z.toFixed(3)}|FS:0,0>`);
+    useLaserStore.setState({ connection: { kind: 'connected' }, statusReport: at(-1) });
+    const frame = vi.fn(async (...args: ReadonlyArray<unknown>): Promise<void> => {
+      const external = args[5] as { verification: FrameVerification };
+      useLaserStore.setState({ motionOperation: { kind: 'frame' } as never });
+      useLaserStore.setState({
+        motionOperation: null,
+        statusReport: at(5),
+        frameVerification: external.verification,
+      });
+    });
+    useLaserStore.setState({ frame });
+    vi.spyOn(frameAction, 'prepareTransientFrameController').mockResolvedValue({
+      laser: useLaserStore.getState(),
+    } as never);
+    const run = { ...RUN, start: { x: 0, y: 0, z: -1 } };
+    const framed = await frameExternalProgram(run);
+    expect(framed?.run.start).toEqual({ x: 0, y: 0, z: 5 });
+    expect(framed?.run.gcode).toBe(RUN.gcode);
+    expect(externalStartIssue(framed)).toBeNull();
+  });
+
   it('streams exactly the framed program once, as a laser job', async () => {
     // Without a $32 reading the laser-mode acknowledgement asks first.
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);

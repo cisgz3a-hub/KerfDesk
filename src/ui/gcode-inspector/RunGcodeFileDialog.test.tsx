@@ -35,13 +35,13 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-async function show(text: string): Promise<HTMLElement> {
+async function show(text: string, onStarted: () => void = vi.fn()): Promise<HTMLElement> {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
   await act(async () =>
     root?.render(
-      <RunGcodeFileDialog name="part.nc" text={text} onClose={vi.fn()} onStarted={vi.fn()} />,
+      <RunGcodeFileDialog name="part.nc" text={text} onClose={vi.fn()} onStarted={onStarted} />,
     ),
   );
   return document.body;
@@ -99,6 +99,38 @@ describe('Run G-code file dialog (ADR-630)', () => {
     );
   });
 
+  // ADR-630 Verification: the dialog through Frame (its motion stubbed), the
+  // review, and Start against the store, which receives the exact bytes once.
+  it('unlocks Start after a clean Frame and streams the reviewed bytes', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>'),
+    });
+    const onStarted = vi.fn();
+    const body = await show('G21 G90\nG0 X0 Y0\nM4 S500\nG1 X10 F600\nM5\n', onStarted);
+    expect(button(body, 'Start').disabled).toBe(true);
+    vi.spyOn(externalRun, 'frameExternalProgram').mockImplementation(async (run) => {
+      const verification = {
+        boundsSignature: 'external:dialog',
+        wco: null,
+        workOriginActive: false,
+      };
+      useLaserStore.setState({ frameVerification: verification });
+      return { run, machineKind: 'laser', verification, controller: useLaserStore.getState() };
+    });
+    await act(async () => button(body, 'Frame').click());
+    expect(body.textContent).toContain('Ready to start');
+    expect(button(body, 'Start').disabled).toBe(false);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const startJob = vi.fn(async () => undefined);
+    useLaserStore.setState({ startJob });
+    await act(async () => button(body, 'Start').click());
+    expect(startJob).toHaveBeenCalledTimes(1);
+    const [gcode] = startJob.mock.calls[0] as unknown as [string];
+    expect(gcode).toBe('G21G90\nG21G90\nG0X0Y0\nM4S500\nG1X10F600\nM5\n');
+    expect(onStarted).toHaveBeenCalledTimes(1);
+  });
+
   it('lists warnings without blocking anything', async () => {
     const body = await show('G20 G90\nG0 X1 Y1\nM3 S500\nG1 X2 F20\n');
     expect(body.textContent).toContain('Warnings');
@@ -127,7 +159,7 @@ describe('Run G-code file dialog (ADR-630)', () => {
 
   it('explains a file it cannot send, with no Frame or Start', async () => {
     const body = await show('G21\n$H\nG0 X1\n');
-    expect(body.textContent).toContain('cannot send this file as a job');
+    expect(body.textContent).toContain('will not send this file as a job');
     expect(body.textContent).toContain('Line 2 is a $ controller command');
     expect([...body.querySelectorAll('button')].map((each) => each.textContent)).toEqual(['Close']);
   });

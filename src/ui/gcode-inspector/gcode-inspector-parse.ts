@@ -75,6 +75,7 @@ function createInspectionReader(context: GcodeInspectionContext, observer: Inspe
     ...(context.initialPositionMm === undefined
       ? {}
       : { initialPositionMm: context.initialPositionMm }),
+    ...(context.boundsFromStart === true ? { boundsFromStart: true } : {}),
     retainPreciseSegmentLengths: true,
     renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   };

@@ -22,6 +22,7 @@ import type { FrameVerification } from '../state/frame-verification';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { useLaserStore, type LaserState } from '../state/laser-store';
+import { jogFrameCommandBlockMessage } from '../state/laser-store-helpers';
 
 export type ExternalRun = {
   readonly name: string;
@@ -52,6 +53,15 @@ export const EXTERNAL_HEAD_MOVED =
 // Closer than this, two reported positions are the same spot (reports carry
 // three decimals of a millimetre).
 const SAME_SPOT_MM = 0.002;
+
+export const EXTERNAL_CONNECT_FIRST = 'Connect to the machine first.';
+
+/** Why an external run cannot begin now, or null: it needs a connected, Idle
+ * controller with no job, Frame, jog or other operation running. */
+export function externalRunMachineBlock(laser: LaserState): string | null {
+  if (laser.connection.kind !== 'connected') return EXTERNAL_CONNECT_FIRST;
+  return jogFrameCommandBlockMessage(laser);
+}
 
 /** True while the head stands where `run` was read from. */
 export function headAtRunStart(run: ExternalRun, laser: LaserState): boolean {
@@ -100,7 +110,32 @@ export async function frameExternalProgram(run: ExternalRun): Promise<ExternalFr
   }
   const settled = await completion.promise;
   if (settled === null) return null;
-  return { run, machineKind: machineKindOf(project.machine), verification, controller: settled };
+  const machineKind = machineKindOf(project.machine);
+  return {
+    run: startAfterFrame(run, machineKind, settled),
+    machineKind,
+    verification,
+    controller: settled,
+  };
+}
+
+// A CNC Frame that began below safe Z leaves the bit retracted: it does not
+// plunge back into the stock (ADR-192). The program then starts from there,
+// so it is read again from that height (ADR-630 Amendment 1). A head found
+// anywhere else keeps the start it was read from, and Start says it moved.
+function startAfterFrame(
+  run: ExternalRun,
+  machineKind: MachineKind,
+  settled: LaserState,
+): ExternalRun {
+  if (machineKind !== 'cnc') return run;
+  const here = reportedWorkPositionMm(settled, settled.controllerSettings?.reportInches === true);
+  if (here === null) return run;
+  const sameXy =
+    Math.abs(here.x - run.start.x) <= SAME_SPOT_MM &&
+    Math.abs(here.y - run.start.y) <= SAME_SPOT_MM;
+  if (!sameXy || here.z <= run.start.z + SAME_SPOT_MM) return run;
+  return { ...run, start: { x: run.start.x, y: run.start.y, z: here.z } };
 }
 
 /** Resolves with the controller state that recorded `verification`, or with

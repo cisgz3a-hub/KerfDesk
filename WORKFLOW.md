@@ -9036,20 +9036,27 @@ The G-code Inspector is free in every edition (ADR-627).
 #### Success
 
 1. Open a `.nc` / `.gcode` / `.tap` file in the Inspector (File → Open G-code…, or drop it on
-   the workspace). Once it is read, the footer offers **Run on machine...**. The project's own
-   program (Inspect G-code) does not offer it: it already has Frame and Start.
+   the workspace). Once it is read, the footer offers **Run on machine...**, enabled while
+   connected, Idle and with nothing else running; its tooltip says why otherwise. The project's
+   own program (Inspect G-code) does not offer it: it already has Frame and Start.
 2. **Run on machine...** opens **Run *file name***. It lists what is sent (lines and bytes:
-   `G21 G90` first, then each line as GRBL itself reads it, with comments, spaces, tabs, `/`
-   marks, `%` markers and blank lines left out and LF line endings), the estimated time, the
-   Frame outline (its size and lowest corner in work coordinates, travel moves included), where
-   it starts, the units the program declares and whether it runs as a laser or a CNC job (the
-   current machine mode). All of it comes from parsing those exact bytes from where the head
-   stands. A large file is prepared a slice at a time.
+   `G21 G90` first, then each line as GRBL itself reads it, with comments, spaces, tabs and the
+   other control characters GRBL discards, `/` marks, `%` markers and blank lines left out and
+   LF line endings), the estimated time, the Frame outline (its size and lowest corner in work
+   coordinates, travel moves included), where it starts, the units the program declares (an
+   undeclared program runs in millimetres: `G21` goes first) and whether it runs as a laser or a
+   CNC job (the current machine mode). All of it comes from parsing those exact bytes from where
+   the head stands. The outline holds only motion the program places in the work coordinates it
+   starts in: `G53` and probe moves, a move to the stored `G30` position, moves after the
+   program changes its origin (`G92`, or `G10 L2`/`L20` on `G54`) on the axes it changes, and
+   moves in `G55`-`G59` are left out and named in the warnings. A program that never moves
+   frames the point where the head stands. A large file is prepared a slice at a time.
 3. **Frame** is enabled while connected, Idle, with no other motion running, once the machine
    reports where the head is and every line fits the controller; its tooltip says why
    otherwise. It runs the ordinary Frame preparation (G54 selection, report units), traces the
    program's XY outline at the current work origin with the tool off and returns to where the
-   program starts.
+   program starts. A CNC Frame begun below work Z0 leaves the bit at safe Z (ADR-192); the
+   program is then read again from that height, and Start runs it from there.
 4. A clean Frame unlocks **Start**. The status reads **Ready to start**. A Jog, Home, origin
    or probe change, reset, alarm, reconnect, another Frame or a machine-mode switch locks it
    again with the reason; the program is then read again from wherever the head stands.
@@ -9070,17 +9077,23 @@ which leaves the controller in inches; one that switches back says so instead), 
 spindle still on at the end, a tool change (`M6`), program stops (`M0`/`M1`, sent unchanged, so
 the controller holds until the machine's own cycle start; KerfDesk's Resume does not release
 them), a program that looks like the other machine mode, zero XY extent (the Frame visits a
-point and proves no Z clearance or depth), and Program Health notices and warnings. Commands
-are found however they are spelt (`G+91`, `G91.0`, `G 91`).
+point and proves no Z clearance or depth), probing (`G38.2` to `G38.5`), `M3`/`M4` with no
+`S` anywhere (it runs at the S the controller already holds), the words the Inspector does not
+interpret, a Frame outline that leaves the configured machine bounds or overlaps an enabled
+no-go zone (or a note that the outline could not be placed on the bed), and Program Health
+notices and warnings. Commands are found however they are spelt (`G+91`, `G91.0`, `G 91`).
 
-#### Refusals (factual only)
+#### Refusals
 
 The dialog shows the reason and offers only **Close** when the file holds a NUL byte, has no
-line to send, holds a `$` controller command (also behind a `/` or spaces), a realtime
-character (`?`, `!`, `~`), a control or non-ASCII character outside a comment (spaces and
-tabs are dropped; other whitespace is refused), or the Inspector cannot construct a finite
-motion envelope. A line longer than the connected controller's line or receive buffer
-(ADR-375) is named before Frame and keeps Frame unavailable.
+line to send, holds a realtime character (`?`, `!`, `~`), a non-ASCII character or a control
+character a GRBL-family controller acts on (Ctrl-X; grblHAL's Ctrl-C, Ctrl-T, Ctrl-Y, ESC,
+backspace and DEL) outside a comment, or the Inspector cannot construct a finite motion
+envelope. Other control characters (a DOS end-of-file Ctrl-Z, a form feed) are dropped, as
+GRBL discards them. One refusal is policy, not fact: a `$` controller command (also behind a
+`/` or spaces) belongs in the Console, because GRBL runs it only while Idle and the Frame
+cannot trace what it moves (ADR-630 Amendment 1). A line longer than the connected
+controller's line or receive buffer (ADR-375) is named before Frame and keeps Frame unavailable.
 
 #### Not included
 

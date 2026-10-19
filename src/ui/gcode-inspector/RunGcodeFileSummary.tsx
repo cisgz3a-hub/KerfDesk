@@ -11,7 +11,7 @@ const UNITS_TEXT: Readonly<Record<ExternalProgramUnits, string>> = {
   mm: 'millimetres (G21)',
   inch: 'inches (G20)',
   both: 'millimetres and inches (G21 and G20)',
-  undeclared: 'not declared; the controller keeps its current units, usually millimetres',
+  undeclared: 'not declared; the G21 sent first sets millimetres',
 };
 
 export function RunGcodeFileSummary(props: {
@@ -20,11 +20,14 @@ export function RunGcodeFileSummary(props: {
   readonly machineKind: MachineKind;
   /** False until the machine reports the head position the outline starts from. */
   readonly startKnown: boolean;
+  /** Where the outline lands on the bed (external-run-bed.ts). */
+  readonly bedWarnings: ReadonlyArray<string>;
   readonly formatLength: (mm: number) => string;
   readonly formatSeconds: (seconds: number) => string;
 }): JSX.Element {
   const { program, review, run } = props.prepared;
   const { envelope, start } = run;
+  const warnings = [...review.warnings, ...props.bedWarnings];
   return (
     <div className="lf-run-gcode-summary">
       <dl>
@@ -32,8 +35,8 @@ export function RunGcodeFileSummary(props: {
         <dd>
           {program.lineCount} lines, {program.byteCount} bytes: G21 G90 first (millimetres and
           absolute moves, the modes the review reads the program in), then each line as GRBL itself
-          reads it, with comments, spaces, tabs, / marks, % markers and blank lines left out and LF
-          line endings. Nothing else is changed.
+          reads it, with comments, spaces, tabs and other control characters it discards, / marks, %
+          markers and blank lines left out and LF line endings. Nothing else is changed.
         </dd>
         <dt>Estimated time</dt>
         <dd>
@@ -60,11 +63,11 @@ export function RunGcodeFileSummary(props: {
         <dt>Runs as</dt>
         <dd>{props.machineKind === 'cnc' ? 'a CNC job' : 'a laser job'}</dd>
       </dl>
-      {review.warnings.length === 0 ? null : (
+      {warnings.length === 0 ? null : (
         <section aria-label="Warnings">
-          <h3 className="lf-run-gcode-warnings-title">Warnings ({review.warnings.length})</h3>
+          <h3 className="lf-run-gcode-warnings-title">Warnings ({warnings.length})</h3>
           <ul>
-            {review.warnings.map((warning) => (
+            {warnings.map((warning) => (
               <li key={warning}>{warning}</li>
             ))}
           </ul>

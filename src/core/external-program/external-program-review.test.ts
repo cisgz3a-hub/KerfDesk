@@ -24,6 +24,21 @@ function review(file: string, context = LASER) {
   return reviewExternalProgram(gcode, model(gcode, context.machineKind), context);
 }
 
+// As the Run dialog does: read from where the head stands, placing only what
+// the program moves in the coordinates it starts in.
+function reviewFrom(file: string, start: { x: number; y: number; z: number }, context = LASER) {
+  const gcode = sendable(file);
+  const result = buildGcodeRenderModel(gcode, {
+    machineKind: context.machineKind,
+    initialPositionMm: start,
+    boundsFromStart: true,
+  });
+  if (result.kind !== 'ok') throw new Error(result.reason);
+  return reviewExternalProgram(gcode, result.model, { ...context, start });
+}
+
+const HEAD = { x: 50, y: 50, z: 0 };
+
 describe('external G-code program review (ADR-630)', () => {
   it('measures the XY envelope in work millimetres', () => {
     const result = review('G21 G90\nG0 X10 Y5\nM4 S500\nG1 X60 Y5 F1000\nG1 X60 Y45\nM5\n');
@@ -183,5 +198,108 @@ describe('external program final units (ADR-630)', () => {
   it('does not count the baseline as the program declaring millimetres', () => {
     expect(review('G0 X1 Y1\nG1 X2 F100\n').units).toBe('undeclared');
     expect(review('G20\nG0 X1 Y1\n').units).toBe('inch');
+  });
+});
+
+// The Frame traces the program's outline in the work coordinates it starts in.
+// A move the program states in other coordinates, or that ends where it does
+// not say, is left out instead of framed somewhere the program never goes.
+describe('external program placement (ADR-630 Amendment 1)', () => {
+  it('leaves machine-coordinate moves (G53) out of the outline', () => {
+    const result = reviewFrom('G21 G90\nG1 X60 Y70 F600\nG53 G0 X-400 Y-5\n', HEAD);
+    expect(result.envelope).toEqual({ minX: 50, minY: 50, maxX: 60, maxY: 70 });
+    const warnings = result.warnings.join('\n');
+    expect(warnings).toContain('machine coordinates (G53)');
+    expect(warnings).toContain('not in the Frame outline');
+  });
+
+  it('places the axis again once the program sets it after a G53 move', () => {
+    const relative = reviewFrom('G21\nG53 G0 X-400\nG91 G1 X10 F600\n', HEAD);
+    expect(relative.envelope).toEqual({ minX: 50, minY: 50, maxX: 50, maxY: 50 });
+    const absolute = reviewFrom('G21\nG53 G0 X-400\nG1 X70 F600\nG91 G1 X5\n', HEAD);
+    expect(absolute.envelope).toEqual({ minX: 50, minY: 50, maxX: 75, maxY: 50 });
+  });
+
+  it.each(['G92 X0 Y0', 'G10 L20 P1 X0 Y0', 'G10 L2 P0 X0 Y0', 'G92.1'])(
+    'does not frame moves made from an origin the program changed: %s',
+    (line) => {
+      const result = reviewFrom(`G21 G90\nG1 X60 Y60 F600\n${line}\nG1 X100 Y100\n`, HEAD);
+      expect(result.envelope).toEqual({ minX: 50, minY: 50, maxX: 60, maxY: 60 });
+    },
+  );
+
+  it('keeps the axes an origin write leaves alone, and writes to another system', () => {
+    const zOnly = reviewFrom('G21 G90\nG92 Z0\nG1 X100 Y80 F600\n', HEAD);
+    expect(zOnly.envelope).toEqual({ minX: 50, minY: 50, maxX: 100, maxY: 80 });
+    const otherSystem = reviewFrom('G21 G90\nG10 L2 P2 X5\nG1 X100 F600\n', HEAD);
+    expect(otherSystem.envelope).toEqual({ minX: 50, minY: 50, maxX: 100, maxY: 50 });
+  });
+
+  it('draws no move to the values a G92 declares', () => {
+    const gcode = sendable('G21 G90\nG1 X60 Y60 F600\nG92 X0 Y0\nG1 X10 Y0\n');
+    const result = buildGcodeRenderModel(gcode, { initialPositionMm: HEAD, boundsFromStart: true });
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    // The start to X60 Y60, then X60 Y60 (now X0 Y0) to X10 Y0: two moves.
+    expect(result.model.segmentCount).toBe(2);
+  });
+
+  it('leaves probe moves and moves in another work coordinate system out', () => {
+    const probe = reviewFrom('G21 G90\nG38.2 X-50 F100\nG0 Y80\n', HEAD, CNC);
+    expect(probe.envelope).toEqual({ minX: 50, minY: 50, maxX: 50, maxY: 80 });
+    expect(probe.warnings.join('\n')).toContain('probes (G38');
+    const sticky = reviewFrom('G21 G90\nG38.2 X60 F100\nX-50\nG0 X70\n', HEAD, CNC);
+    expect(sticky.envelope).toEqual({ minX: 50, minY: 50, maxX: 70, maxY: 50 });
+    const fixture = reviewFrom('G21 G90\nG55\nG0 X200 Y200\nG54\nG0 X70 Y60\n', HEAD);
+    expect(fixture.envelope).toEqual({ minX: 50, minY: 50, maxX: 70, maxY: 60 });
+  });
+
+  it('leaves a move to the stored G30 position out, and frames G28.1 axis words as GRBL moves them', () => {
+    const stored = reviewFrom('G21\nG30\nG91 G1 X10 F600\n', HEAD);
+    expect(stored.envelope).toEqual({ minX: 50, minY: 50, maxX: 50, maxY: 50 });
+    // GRBL reads axis words beside G28.1 as an ordinary move (gcode.c).
+    const implicit = reviewFrom('G21 G90\nG1 F600\nG28.1 X70\n', HEAD);
+    expect(implicit.envelope).toEqual({ minX: 50, minY: 50, maxX: 70, maxY: 50 });
+  });
+
+  it('frames the spot the head stands on for a program that never moves', () => {
+    const result = reviewFrom('M3 S10000\nG4 P60\nM5\n', HEAD, CNC);
+    expect(result.envelope).toEqual({ minX: 50, minY: 50, maxX: 50, maxY: 50 });
+    expect(result.warnings.join('\n')).toContain('never moves');
+  });
+});
+
+describe('external program words the review cannot follow (ADR-630 Amendment 1)', () => {
+  it('names unsupported words the Program Health notes list as info', () => {
+    const gcode = sendable('G21\nG0 X1 Y1\nG43.1 Z1\nG1 X2 F600\n');
+    const built = model(gcode);
+    const result = reviewExternalProgram(gcode, built, LASER, [
+      {
+        id: 'unsupported-word:G43.1',
+        severity: 'info',
+        title: 'Unsupported word G43.1',
+        detail: 'G43.1 is not interpreted by the Inspector.',
+        line: 2,
+        count: 1,
+      },
+      {
+        id: 'unsupported-word:G53',
+        severity: 'info',
+        title: 'Unsupported word G53',
+        detail: 'G53 is not interpreted by the Inspector.',
+        line: 3,
+        count: 1,
+      },
+    ]);
+    const warnings = result.warnings.join('\n');
+    expect(warnings).toContain('does not interpret G43.1');
+    // G53 has its own warning, so it is not listed twice.
+    expect(warnings).not.toContain('interpret G43.1, G53');
+  });
+
+  it('says when the laser or spindle is switched on with no S anywhere', () => {
+    expect(review('G21\nM3\nG1 X10 F600\nM5\n').warnings.join()).toContain('never sets S');
+    expect(review('G21\nM4 S0\nG1 X10 F600 S300\nM5\n').warnings.join()).not.toContain(
+      'never sets S',
+    );
   });
 });

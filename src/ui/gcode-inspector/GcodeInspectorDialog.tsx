@@ -4,6 +4,8 @@
 
 import type { MachineKind } from '../../core/scene';
 import { Dialog } from '../kit/Dialog';
+import { useLaserStore } from '../state/laser-store';
+import { externalRunMachineBlock } from './external-run';
 import type { InspectorRenderModel } from './inspector-model';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 import { InspectionPressureNotice } from './InspectionPressureNotice';
@@ -12,13 +14,6 @@ import { InspectorView } from './InspectorView';
 import { MainThreadInspectionNotice } from './MainThreadInspectionNotice';
 import { loadingPreview, useGcodeInspection, type InspectionState } from './use-gcode-inspection';
 import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
-import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
-
-/** What the Run dialog reuses from a finished inspection (ADR-630). */
-export type InspectedProgram = {
-  readonly model: InspectorRenderModel;
-  readonly analysis: GcodeInspectorAnalysis;
-};
 
 export type GcodeInspectorDialogProps = {
   readonly programName: string;
@@ -27,7 +22,7 @@ export type GcodeInspectorDialogProps = {
   /** CNC-only handoff to the existing F-CNC10 2D simulator (flow retained). */
   readonly onOpen2dSimulator?: () => void;
   /** Opened files only: Frame, review and Start this program (ADR-630). */
-  readonly onRunOnMachine?: (program: InspectedProgram) => void;
+  readonly onRunOnMachine?: () => void;
   readonly onClose: () => void;
 };
 
@@ -88,10 +83,7 @@ function InspectorFooter(
   props: GcodeInspectorDialogProps & { readonly state: InspectionState },
 ): JSX.Element {
   const { state } = props;
-  const inspected =
-    state.kind === 'ready' && hasGcodeInspectorAnalysis(state.result)
-      ? { model: state.result.parsed.model, analysis: state.result.analysis }
-      : null;
+  const inspected = state.kind === 'ready' && hasGcodeInspectorAnalysis(state.result);
   return (
     <footer style={footerStyle}>
       {state.kind === 'ready' && state.result.parsed.kind === 'ok' ? (
@@ -99,8 +91,8 @@ function InspectorFooter(
       ) : (
         <span />
       )}
-      {props.onRunOnMachine !== undefined && inspected !== null ? (
-        <RunOnMachineButton program={inspected} onRun={props.onRunOnMachine} />
+      {props.onRunOnMachine !== undefined && inspected ? (
+        <RunOnMachineButton onRun={props.onRunOnMachine} />
       ) : null}
       {props.machineKind === 'cnc' && props.onOpen2dSimulator !== undefined ? (
         <button
@@ -116,16 +108,19 @@ function InspectorFooter(
   );
 }
 
-function RunOnMachineButton(props: {
-  readonly program: InspectedProgram;
-  readonly onRun: (program: InspectedProgram) => void;
-}): JSX.Element {
+// Enabled while connected, Idle and with nothing else running (ADR-630);
+// otherwise its tooltip says why.
+function RunOnMachineButton(props: { readonly onRun: () => void }): JSX.Element {
+  const block = useLaserStore(externalRunMachineBlock);
   return (
     <button
       type="button"
       className="lf-btn lf-btn--primary"
-      title="Frame this program over the material, review it, then send it to the machine."
-      onClick={() => props.onRun(props.program)}
+      disabled={block !== null}
+      title={
+        block ?? 'Frame this program over the material, review it, then send it to the machine.'
+      }
+      onClick={props.onRun}
     >
       Run on machine...
     </button>

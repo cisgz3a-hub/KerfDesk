@@ -31,7 +31,9 @@ export type GcodeInspectionContext = Pick<
   BuildRenderModelOptions,
   // initialPositionMm: an external run reads its program from where the head
   // stands (ADR-630); other inspections start at the drawn origin.
-  'machineKind' | 'laserPowerControl' | 'initialPositionMm'
+  // boundsFromStart: its Frame outline keeps only motion placed in the work
+  // coordinates the program starts in (ADR-630 Amendment 1).
+  'machineKind' | 'laserPowerControl' | 'initialPositionMm' | 'boundsFromStart'
 > & {
   readonly timing?: GcodeInspectionTiming;
   /** The machine bed in program coordinates, only when the program runs in
