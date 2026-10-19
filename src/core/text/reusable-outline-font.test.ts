@@ -35,18 +35,14 @@ function withSignature(font: ArrayBuffer, signature: string): ArrayBuffer {
 
 // A minimal TrueType file with head, maxp, loca and glyf. Each glyph is either
 // empty (a simple glyph with no contours) or composite over the given glyphs.
-// The `unterminated` glyph keeps asking for more components past its end.
-function syntheticFont(
-  glyphs: ReadonlyArray<ReadonlyArray<number> | null>,
-  unterminated?: number,
-): ArrayBuffer {
-  const glyphData = glyphs.map((components, glyph) => {
+function syntheticFont(glyphs: ReadonlyArray<ReadonlyArray<number> | null>): ArrayBuffer {
+  const glyphData = glyphs.map((components) => {
     if (components === null) return new Uint8Array(10);
     const data = new DataView(new ArrayBuffer(10 + components.length * 6));
     data.setInt16(0, -1);
     components.forEach((glyphIndex, index) => {
       const at = 10 + index * 6;
-      const more = index < components.length - 1 || glyph === unterminated ? 0x0020 : 0;
+      const more = index < components.length - 1 ? 0x0020 : 0;
       data.setUint16(at, 0x0002 | more); // byte x/y offsets
       data.setUint16(at + 2, glyphIndex);
     });
@@ -126,11 +122,17 @@ describe('reusableOutlineFont (ADR-631)', () => {
     expect(reusableOutlineFont(syntheticFont([null, [0], [1, 0], [2, 1]]))).toBe(true);
   });
 
-  it('never reads a composite record past its own glyph', () => {
-    // Glyph 1's last record asks for more; the bytes after it are glyph 2's.
-    expect(reusableOutlineFont(syntheticFont([null, [0], [0], [0]], 1))).toBe(false);
-    expect(reusableOutlineFont(syntheticFont([null, [0], [0], [0]], 3))).toBe(false);
-  });
+  it.each([0x0020, 0x0001, 0x0008, 0x0040, 0x0080])(
+    'refuses a component record crossing its glyph end (flag %s)',
+    (flag) => {
+      const font = syntheticFont([null, [0], null]);
+      // glyf is the first table; glyph 1 follows the 10-byte simple glyph.
+      const view = new DataView(font);
+      const glyf = view.getUint32(20);
+      view.setUint16(glyf + 10 + 10, 0x0002 | flag);
+      expect(reusableOutlineFont(font)).toBe(false);
+    },
+  );
 
   it.each([
     ['two glyphs that include each other', [null, [2], [1]]],

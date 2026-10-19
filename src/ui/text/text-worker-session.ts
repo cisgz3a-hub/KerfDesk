@@ -127,9 +127,15 @@ export async function renderTextGeometryOffThread(
   signal?: AbortSignal,
 ): Promise<TextRenderResult> {
   const session = createTextWorkerSession({ inThreadIfUnavailable: true });
+  // An explicit action owns this worker outright. Closing its dialog must
+  // terminate busy work immediately, rather than keeping a preview session warm.
+  const release = (): void => session.release();
+  signal?.addEventListener('abort', release, { once: true });
   try {
+    signal?.throwIfAborted();
     return await session.render(input, signal);
   } finally {
+    signal?.removeEventListener('abort', release);
     session.release();
   }
 }

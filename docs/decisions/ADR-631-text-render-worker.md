@@ -93,8 +93,9 @@ Two further findings shaped the decision.
 7. **The Add/Edit Text dialog locks while it renders.** The UI thread now stays responsive while
    Add or Save renders, but the submission commits the values it started with. The dialog's
    fields therefore sit in a disabled fieldset until the render settles, as the canvas editor's
-   fields already did while saving. Closing the dialog aborts the render: its one-shot worker is
-   released, and nothing after the layout (placement, styling, weld) runs.
+   fields already did while saving. Cancel stays available. Closing the dialog, by Cancel, Escape
+   or a new project, aborts the render: its one-shot worker is terminated at once, and nothing
+   after the layout (placement, styling, weld) runs. A second submission waits for the first.
 8. **Output keeps the UI-thread path.** `renderTextGeometry` is unchanged and still serves
    variable text at output, DXF export, remote control and the registration jig. No G-code,
    Frame, Start, machine output or licence behaviour changes.
@@ -160,7 +161,7 @@ thread after the layout; a 90° bend of 450 Roboto characters measured 16 ms.
   thread). `FontUsageHint.test.tsx` shows a failed missing-glyph check as unchecked and keeps
   font-load errors silent. `VariableRowsPreview.test.tsx` tries an unavailable worker once for a
   page of rows. `AddTextDialog.ownership.test.tsx` checks that every field is locked while the
-  dialog renders, and that closing it stops the work before the weld.
+  dialog renders, and that each way of closing it aborts the render.
 - `src/core/text/reusable-outline-font.test.ts` covers the bundled and fixture fonts, each
   excluded table, WOFF, WOFF2, CFF and collection signatures, truncated files, composite records
   that run past their own glyph, and synthetic fonts with acyclic composites, two- and three-glyph cycles, a self-reference and a missing

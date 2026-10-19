@@ -335,6 +335,21 @@ describe('text worker session (ADR-631)', () => {
     expect(rendered.paths[0]?.polylines.length).toBeGreaterThan(0);
   });
 
+  it('terminates a one-shot modal worker as soon as its owner aborts', async () => {
+    let worker!: FakeWorker;
+    vi.stubGlobal('Worker', function () {
+      worker = new FakeWorker(false);
+      return worker;
+    });
+    const controller = new AbortController();
+    const rendering = renderTextGeometryOffThread(input(), controller.signal);
+    await posted(() => worker, 1);
+    controller.abort();
+    expect(worker.terminated).toBe(true);
+    await expect(rendering).rejects.toMatchObject({ name: 'AbortError' });
+    expect(renderTextGeometry).not.toHaveBeenCalled();
+  });
+
   it('checks missing characters in the worker', async () => {
     const { session, workers } = harness({ auto: true });
     await expect(
