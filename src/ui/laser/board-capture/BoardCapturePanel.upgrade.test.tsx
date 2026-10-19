@@ -350,11 +350,13 @@ describe('Place board positioning light', () => {
       expect(setOriginAtMachinePoint).not.toHaveBeenCalled();
     } finally {
       // New Project keeps the machine kind, so put Laser mode back.
-      await act(async () =>
+      await act(async () => {
+        const { machine: _changed, ...current } = useStore.getState().project;
         useStore.setState({
-          project: { ...useStore.getState().project, machine: project.machine },
-        }),
-      );
+          project:
+            project.machine === undefined ? current : { ...current, machine: project.machine },
+        });
+      });
     }
   });
 
