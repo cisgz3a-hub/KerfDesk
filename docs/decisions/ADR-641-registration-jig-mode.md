@@ -1,4 +1,4 @@
-## ADR-638 - Registration jig mode: lay out, place and burn on one page (2026-10-19)
+## ADR-641 - Registration jig mode: lay out, place and burn on one page (2026-10-19)
 
 **Status:** Accepted. | **Date:** 2026-10-19
 

@@ -1,5 +1,5 @@
 // registration-command-family — the single Tools-menu / toolbar command for the
-// registration jig (ADR-057): a toggle that opens or closes jig mode (ADR-638).
+// registration jig (ADR-057): a toggle that opens or closes jig mode (ADR-641).
 // Every actual jig action (create box, center artwork, pick the burn run) lives in
 // jig mode itself, not in the command registry.
 

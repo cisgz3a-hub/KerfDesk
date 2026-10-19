@@ -9,7 +9,7 @@ import { handleJigEditorKey, useJigEditor, type JigEditorController } from './us
 import './registration-jig.css';
 
 /**
- * Jig mode (ADR-638): the jig page takes the place of the main canvas while the
+ * Jig mode (ADR-641): the jig page takes the place of the main canvas while the
  * machine panel stays docked beside it, so the whole job, from laying out the
  * outlines to the last artwork burn, happens here. Edits go straight into the
  * open project with the ordinary Undo; there is nothing to save or discard.
