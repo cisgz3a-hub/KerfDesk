@@ -68,7 +68,7 @@ export async function runConnectAction(
   // refusal is a factual transport inability, not a policy gate. It comes
   // before the picker and before any live connection or attempt is touched
   // (audit RU-6).
-  noteConnectIntent(options.portSelection);
+  clearAutoConnectSkipped();
   const driver = selectControllerDriver(options.controllerKind, options.controllerCommandSet);
   if (driver.capabilities.transport === 'file-only') {
     set((state) => ({ log: pushLog(state, FILE_ONLY_CONNECT_REFUSAL) }));
@@ -163,6 +163,7 @@ async function connectSerialController(
       return;
     }
     attachRememberedConnection(attachConnection, connection, baudRate, portRef);
+    liftAutoConnectPauseOnOpen(options.portSelection);
     reportBackgroundStreaming(set, connection, adapter.id);
   } catch (error) {
     if (!connectAttemptIsCurrent(refs, attempt)) {
@@ -173,11 +174,11 @@ async function connectSerialController(
   }
 }
 
-// Any Connect the operator asked for lifts the pause their Disconnect set; an
-// automatic attempt only clears the last attempt's hint (ADR-639).
-function noteConnectIntent(selection: ConnectControllerOptions['portSelection']): void {
-  if (selection === 'automatic') clearAutoConnectSkipped();
-  else resumeAutoConnect();
+// Any attempt clears the last automatic attempt's hint. Only a connect someone
+// asked for that opened its port lifts the pause their Disconnect set, so a
+// cancelled picker or a failed open leaves it set (ADR-639).
+function liftAutoConnectPauseOnOpen(selection: ConnectControllerOptions['portSelection']): void {
+  if (selection !== 'automatic') resumeAutoConnect();
 }
 
 // Nobody clicked, so a failed background open (the port held by LightBurn or
@@ -240,8 +241,9 @@ function selectedTransport(port: SerialPortRef, adapter: PlatformAdapter): 'seri
 
 // The machine's port opens without the picker when chooseGrantedPort finds it
 // among the ports the operator picked before (ADR-420). 'choose' always asks;
-// 'automatic' never does, because auto-connect has no click to show a picker
-// with, and a null result reads as a cancelled picker.
+// 'automatic' and 'remembered-only' never do, because auto-connect and a
+// remote Connect have no click on this PC to show a picker with, and a null
+// result reads as a cancelled picker.
 async function resolveSerialPort(
   adapter: PlatformAdapter,
   selection: ConnectControllerOptions['portSelection'] = 'remembered',
@@ -257,7 +259,7 @@ async function resolveSerialPort(
     // A cancelled attempt may retire its selected grant, never launch a picker.
     if (!isCurrent()) return null;
   }
-  if (selection === 'automatic') return null;
+  if (selection === 'automatic' || selection === 'remembered-only') return null;
   return adapter.serial.requestPort();
 }
 

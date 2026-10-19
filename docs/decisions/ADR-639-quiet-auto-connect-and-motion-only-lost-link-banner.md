@@ -30,21 +30,30 @@ the connection path:
    and publishes no incident. The rail stays "Not connected" and shows a muted one-line hint (not
    `role="alert"`) that the port is in use by another program, or the reason when it is something
    else. Any later connect attempt clears the hint. A Connect the operator clicked keeps the red
-   alert and the incident.
+   alert and the incident, and so does a remote-control Connect: it uses `'remembered-only'`,
+   which also never shows a picker but is a person's request, so the remote hears that the port
+   is busy instead of "No saved connection was found".
 2. **Disconnect and Forget Controller pause auto-connect for this run.** The pause lives in a
    small session-only store (`auto-connect-session.ts`), never in storage, so a restart starts
-   unpaused and the saved preference is untouched. Auto-connect does nothing while it is set. Any
-   connect other than `'automatic'` lifts it, and so does a remote-control Connect, which uses
-   `'automatic'` only to avoid a picker. While it is set and the preference is on, the menu reads
-   "Connect automatically (paused until you connect)".
+   unpaused and the saved preference is untouched. Auto-connect does nothing while it is set.
+   The operator's own handlers set it: the rail's Disconnect, the Disconnect command, Machine
+   setup's Disconnect, a remote Disconnect, Forget Controller, and "Use a different port…" when
+   it closes a connection. The store's disconnect does not, because Find my machine's baud scan
+   and Reconnect close the port on their way to opening one. Only a connect someone asked for
+   (anything but `'automatic'`) lifts it, and only once its port has opened, so a cancelled
+   picker or a failed open leaves it set. While it is set and the preference is on, the menu
+   reads "Connect automatically (paused until you connect)".
 3. **Only a link lost while the machine may move raises the banner.** The port-close patch raises
    a notice for a running job, Fire, a jog or Frame (`motionOperation`), and a controller
    operation that can move: Home, auto-focus, probe, the start mark, a post-job settle, the
    fence before Start, the stop a Disconnect writes, and any owned command not marked
-   `movesNothing`. Owned commands stay motion-capable by default because a console line or a
-   motion settlement can move. Settings and build-info reads, `$` setting writes, the firmware
-   report and the laser module check are marked `movesNothing`; with the handshake, a recovery
-   wait and the work-Z reads, they log the incident and land in the ordinary disconnected state.
+   `movesNothing`. Owned commands stay motion-capable by default because a motion settlement can
+   move. Settings and build-info reads, `$` setting writes, the firmware report, the laser module
+   check and a Console `$$` (typed, or the re-read after a Console setting write) are marked
+   `movesNothing`; with the handshake and the work-Z reads, they log the incident and land in the
+   ordinary disconnected state. A reset (Abort, Reset controller) counts as motion until the
+   controller reports from its far side at rest (Idle, Alarm or Sleep): until then the Ctrl-X is
+   not proven delivered and the motion it was stopping may still run.
 4. **A drop during motion has its own title.** It keeps the `disconnect-during-job` kind, so every
    physical-stop and recovery rule that reads that kind is unchanged, and adds `cause: 'motion'`.
    The banner titles it "Connection lost while moving", with a message naming jog, Frame, Home,

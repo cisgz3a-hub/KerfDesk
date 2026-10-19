@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter } from '../../platform/types';
-import { resetAutoConnectSession, useAutoConnectSession } from './auto-connect-session';
+import {
+  pauseAutoConnect,
+  resetAutoConnectSession,
+  useAutoConnectSession,
+} from './auto-connect-session';
 import { connectedControllerStatePatch } from './laser-connection-actions';
 import { useLaserStore } from './laser-store';
 
@@ -108,8 +112,11 @@ describe('connect port-picker failures', () => {
   });
 });
 
-// ADR-639: the operator's Disconnect or Forget pauses auto-connect for this
-// run; only a Connect they ask for lifts it, and the saved preference stays.
+// ADR-639: the operator's Disconnect and Forget Controller pause auto-connect
+// for this run from their own handlers. The store's disconnect does not:
+// Find my machine's baud scan and "Use a different port…" close the port on
+// their way to opening one. Only a connect someone asked for that opened its
+// port lifts the pause, so a cancelled picker leaves it set.
 describe('the auto-connect pause', () => {
   const openPort = adapterWithRequestPort(async () => ({
     open: async () => ({
@@ -119,6 +126,7 @@ describe('the auto-connect pause', () => {
       close: async () => undefined,
     }),
   }));
+  const cancelledPicker = adapterWithRequestPort(async () => null);
   const paused = (): boolean => useAutoConnectSession.getState().paused;
 
   beforeEach(() => resetAutoConnectSession());
@@ -130,20 +138,21 @@ describe('the auto-connect pause', () => {
     resetAutoConnectSession();
   });
 
-  it('is set by Disconnect and by Forget Controller', async () => {
+  it('is not set by the store disconnect that the baud scan uses', async () => {
     await useLaserStore.getState().connect(openPort);
-    expect(paused()).toBe(false);
     await useLaserStore.getState().disconnect();
-    expect(paused()).toBe(true);
+    expect(paused()).toBe(false);
 
-    resetAutoConnectSession();
     await useLaserStore.getState().connect(openPort);
     await useLaserStore.getState().forgetDevice?.();
-    expect(paused()).toBe(true);
+    expect(paused()).toBe(false);
   });
 
-  it('is lifted by an explicit Connect but not by an automatic one', async () => {
-    await useLaserStore.getState().disconnect();
+  it('is lifted only once a connect someone asked for opens its port', async () => {
+    pauseAutoConnect();
+
+    await useLaserStore.getState().connect(cancelledPicker, { portSelection: 'choose' });
+    expect(useLaserStore.getState().connection.kind).toBe('disconnected');
     expect(paused()).toBe(true);
 
     await useLaserStore.getState().connect(openPort, { portSelection: 'automatic' });

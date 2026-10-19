@@ -2,9 +2,10 @@
 // Never stored: the saved "Connect automatically" preference stays as the
 // operator set it, and a restart starts with auto-connect free to run.
 //
-//   paused   the operator clicked Disconnect or Forget Controller, so a plug-in
-//            or power-cycle must not reconnect and take the port from another
-//            program; an explicit Connect lifts it.
+//   paused   the operator's Disconnect or Forget Controller (set by those
+//            handlers, not by the store's disconnect), so a plug-in or power-cycle
+//            must not take the port from another program; a connect someone
+//            asked for lifts it once its port opens.
 //   skipped  why the last automatic open failed (usually another program
 //            holding the port), for the rail's quiet hint; any Connect clears it.
 
@@ -23,7 +24,7 @@ export function pauseAutoConnect(): void {
   useAutoConnectSession.setState({ paused: true, skippedReason: null });
 }
 
-/** An explicit Connect, from any surface: auto-connect may run again. */
+/** A connect someone asked for opened its port: auto-connect may run again. */
 export function resumeAutoConnect(): void {
   useAutoConnectSession.setState(INITIAL);
 }

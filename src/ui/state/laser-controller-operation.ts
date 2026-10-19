@@ -170,22 +170,40 @@ export function isUnsafeControllerOperation(operation: LaserControllerOperation 
 /** How a lost link could leave the machine moving (ADR-639). 'job': a job's
  * queue, its post-job tail or the fence just before Start; 'motion': Home,
  * auto-focus, probe, the start mark, the stop a Disconnect writes (it replaces
- * the jog or job it stops) or any owned command not marked movesNothing, since
- * a console line or a motion settlement can move. null: the operation reads or
- * waits and moves nothing (the handshake, settings, build-info, firmware and
- * module reads, recovery and work-Z reads). */
+ * the jog or job it stops), a reset not yet answered from its far side, or any
+ * owned command not marked movesNothing, since a motion settlement can move.
+ * null: the operation reads or waits and moves nothing (the handshake,
+ * settings, build-info, firmware and module reads, and work-Z reads).
+ * `latestReport` is the controller's last status report: a reset clears it. */
 export function controllerOperationMotion(
   operation: LaserControllerOperation | null,
+  latestReport: { readonly state: string } | null = null,
 ): 'job' | 'motion' | null {
   if (operation === null) return null;
   if (operation.kind === 'interactive-command') {
     return operation.movesNothing === true ? null : 'motion';
   }
+  if (operation.kind === 'recovery') {
+    return resetMayStillMove(operation.phase, latestReport) ? 'motion' : null;
+  }
   return OPERATION_MOTION[operation.kind];
 }
 
+// Abort and Reset controller write Ctrl-X to stop whatever was moving. The
+// reset is not proven delivered until the controller reports from its far
+// side, so until a fresh report shows it at rest the motion may still run.
+const AT_REST_AFTER_RESET: ReadonlySet<string> = new Set(['Idle', 'Alarm', 'Sleep']);
+
+function resetMayStillMove(
+  phase: 'reset' | 'awaiting-idle',
+  latestReport: { readonly state: string } | null,
+): boolean {
+  if (phase === 'reset') return true;
+  return latestReport === null || !AT_REST_AFTER_RESET.has(latestReport.state);
+}
+
 const OPERATION_MOTION: Record<
-  Exclude<LaserControllerOperation['kind'], 'interactive-command'>,
+  Exclude<LaserControllerOperation['kind'], 'interactive-command' | 'recovery'>,
   'job' | 'motion' | null
 > = {
   'post-job-settle': 'job',
@@ -196,7 +214,6 @@ const OPERATION_MOTION: Record<
   'job-start-mark': 'motion',
   disconnect: 'motion',
   'connection-handshake': null,
-  recovery: null,
   'work-z-recovery': null,
 };
 

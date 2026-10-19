@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createStreamer, step, type StatusReport } from '../../core/controllers/grbl';
+import {
+  createStreamer,
+  idleCollector,
+  step,
+  type StatusReport,
+} from '../../core/controllers/grbl';
 import {
   buildPortClosePatch,
   detectStreamStall,
@@ -13,6 +18,7 @@ import {
   readOnlyControllerOperation,
   type LaserControllerOperation,
 } from './laser-controller-operation';
+import { beginConsoleSettingsRead } from './laser-console-completion';
 import { startMotionOperation } from './laser-motion-operation';
 import { disconnectDuringJobNotice, disconnectDuringMotionNotice } from './laser-safety-notice';
 import { useLaserStore, type LaserState } from './laser-store';
@@ -197,16 +203,59 @@ describe('buildPortClosePatch safety notice', () => {
     ...patch,
   });
 
-  it.each<[string, LaserControllerOperation]>([
-    ['a settings read', readOnlyControllerOperation('Reading controller settings')],
-    ['a build-info read', readOnlyControllerOperation('Reading controller build information')],
-    ['a recovery wait', { kind: 'recovery', phase: 'awaiting-idle', idleReports: 0 }],
-    ['a work-Z read', { kind: 'work-z-recovery', phase: 'offsets' }],
-    ['the handshake', { kind: 'connection-handshake', phase: 'settings' }],
-  ])('raises no notice for %s', (_label, operation) => {
-    const patch = buildPortClosePatch(idle({ controllerOperation: operation }));
+  const awaitingIdle: LaserControllerOperation = {
+    kind: 'recovery',
+    phase: 'awaiting-idle',
+    idleReports: 0,
+  };
+
+  it.each<[string, Partial<LaserState>]>([
+    ['a settings read', { controllerOperation: readOnlyControllerOperation('Reading settings') }],
+    [
+      'a build-info read',
+      { controllerOperation: readOnlyControllerOperation('Reading controller build information') },
+    ],
+    [
+      'a reset the controller answered Idle',
+      { controllerOperation: awaitingIdle, statusReport: report('Idle') },
+    ],
+    [
+      'a reset the controller answered Alarm',
+      { controllerOperation: awaitingIdle, statusReport: report('Alarm') },
+    ],
+    ['a work-Z read', { controllerOperation: { kind: 'work-z-recovery', phase: 'offsets' } }],
+    ['the handshake', { controllerOperation: { kind: 'connection-handshake', phase: 'settings' } }],
+  ])('raises no notice for %s', (_label, state) => {
+    const patch = buildPortClosePatch(idle(state));
     expect(patch.connection).toEqual({ kind: 'disconnected' });
     expect(patch).not.toHaveProperty('safetyNotice');
+  });
+
+  // A typed `$$` owns the same read as the rail's Read button: it moves nothing.
+  it('raises no notice for a settings read typed in the Console', () => {
+    useLaserStore.setState(idle({}));
+    const refs = { settingsCollector: idleCollector(), settingsCollectorSessionEpoch: null };
+    beginConsoleSettingsRead(useLaserStore.setState, useLaserStore.getState, refs);
+    expect(useLaserStore.getState().controllerOperation?.kind).toBe('interactive-command');
+    expect(buildPortClosePatch(useLaserStore.getState())).not.toHaveProperty('safetyNotice');
+    useLaserStore.setState(initialLaserState());
+  });
+
+  // Abort and Reset controller write Ctrl-X; until the controller reports from
+  // the other side of it, the reset is not proven delivered and the motion it
+  // was stopping may still run.
+  it.each<[string, Partial<LaserState>]>([
+    [
+      'a reset being written',
+      { controllerOperation: { kind: 'recovery', phase: 'reset', idleReports: 0 } },
+    ],
+    ['a reset with no report since', { controllerOperation: awaitingIdle, statusReport: null }],
+    [
+      'a reset answered by a moving report',
+      { controllerOperation: awaitingIdle, statusReport: report('Run') },
+    ],
+  ])('raises the moving notice for %s', (_label, state) => {
+    expect(buildPortClosePatch(idle(state)).safetyNotice).toEqual(disconnectDuringMotionNotice());
   });
 
   it.each<[string, LaserControllerOperation]>([

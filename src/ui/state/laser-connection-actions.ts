@@ -63,7 +63,6 @@ import { recordStatusPollTick } from './laser-status-poll-schedule';
 import { cancelAttemptOwnsStatusBoundary } from './laser-motion-operation';
 import { browserLocalStorage } from './browser-local-storage';
 import { forgetRememberedSerialPort } from './serial-port-memory';
-import { pauseAutoConnect } from './auto-connect-session';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -302,9 +301,6 @@ async function runDisconnect(
   safeWrite: SafeWriteFn,
   forgetDevice: boolean,
 ): Promise<void> {
-  // The operator ended this connection: a plug-in or power-cycle must not
-  // reopen it by itself until they Connect again (ADR-639).
-  pauseAutoConnect();
   const connection = refs.connection;
   if (connection === null) {
     teardownConnectionRefs(refs);
