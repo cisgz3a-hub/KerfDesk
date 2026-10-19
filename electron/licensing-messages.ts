@@ -1,4 +1,5 @@
 import { LicenceServiceError } from './licensing-http.js';
+import { LinuxKeyringUnavailableError } from './licensing-store.js';
 
 // What the licence panel says for each service answer (ADR-523, ADR-540,
 // ADR-523 Amendment 2). Every code the service can send a device has a message
@@ -116,6 +117,9 @@ export const MESSAGES = {
     'The licence saved on this computer can’t be read, for example after a Windows account or password reset. Reset it, then enter your licence key again; this computer keeps its licence seat.',
   unavailable:
     'The licence service or this computer’s secure storage is unavailable. Check your connection and that you are signed in to your operating-system account, then try again.',
+  // Not a network fault: the app cannot use the keyring until it restarts.
+  linuxKeyring:
+    'KerfDesk keeps its licence in your desktop’s keyring, and no keyring is running here, so a trial or licence key cannot be saved. Your internet connection is not the problem. Install GNOME Keyring or KWallet (or another Secret Service, such as KeePassXC), make sure it starts and unlocks when you sign in, then restart KerfDesk.',
   unconfirmed:
     'The licence service could not confirm this licence. Your saved licence keeps working.',
   deactivated: 'This device has been deactivated and its licence seat is free for another device.',
@@ -129,6 +133,13 @@ export const MESSAGES = {
   paid: 'Payment confirmed and Pro is unlocked. Copy your licence key below and keep it safe: you need it to activate KerfDesk on your other computers.',
   orderForgotten: 'The saved order was removed from this computer. You can start a new checkout.',
 } as const;
+
+/** Why a licence read or action failed before any answer: a missing Linux keyring is no outage. */
+export function unavailableMessage(error: unknown): string {
+  return error instanceof LinuxKeyringUnavailableError
+    ? MESSAGES.linuxKeyring
+    : MESSAGES.unavailable;
+}
 
 /** After a key unlocks paid Pro, an unfinished purchase no longer hides Renew (ADR-523 Amendment 2). */
 export function staleOrderMessage(orderId: string | null): string {

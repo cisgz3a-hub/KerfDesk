@@ -16,6 +16,7 @@ import {
   refreshFailureMessage,
   requestFailureMessage,
   staleOrderMessage,
+  unavailableMessage,
 } from './licensing-messages.js';
 import {
   prepareLicenceCheckout,
@@ -171,7 +172,7 @@ class LicensingService {
           return this.summary('invalid-licence', null, MESSAGES.unreadable, {
             storeUnreadable: true,
           });
-        return this.summary('unavailable', null, MESSAGES.unavailable);
+        return this.summary('unavailable', null, unavailableMessage(error));
       } finally {
         if (mutation) this.updateCache.endMutation();
       }

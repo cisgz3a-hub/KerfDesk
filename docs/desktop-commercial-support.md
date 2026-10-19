@@ -96,6 +96,22 @@ status 503 when they are not. It answers even while licensing is switched off, b
 only after the Worker is redeployed with ADR-523 Amendment 3: the Worker deployed
 from 27855387e predates the route and answers 503 `service_unavailable`.
 
+### Linux: "no keyring is running here"
+
+KerfDesk for Linux keeps its licence only under a desktop keyring's key: GNOME
+Keyring, KWallet or another Secret Service such as KeePassXC (ADR-623). It never
+falls back to Electron's built-in key, which is the same on every computer. The
+licence window then says a keyring is missing and that the connection is fine.
+Neither Start trial nor Activate reaches the service until a keyring runs.
+
+Ask the customer to install GNOME Keyring (`sudo apt install gnome-keyring` on
+Ubuntu and Debian), or use their desktop's KWallet or KeePassXC with its Secret
+Service turned on. It must start and unlock when they sign in. Then they restart
+KerfDesk, which picks its key once at start. Ubuntu, Fedora and most GNOME and
+KDE desktops already have one. This usually comes up on tiling window managers,
+minimal installs and remote sessions. A licence saved before the keyring ran is
+kept and moves under the keyring's key on the next start.
+
 ### The trial was already used on this computer
 
 Trials belong to the Windows installation. Reinstalling KerfDesk, or starting the

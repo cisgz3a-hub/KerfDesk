@@ -5,6 +5,7 @@ import type { CommercialUpdateStatus, LicenceAdapter, LicenceStatus } from '../.
 import { EditionProvider, LICENCE_SETTINGS_EVENT } from './EditionProvider';
 import { proFeaturesUnlocked } from './edition';
 import { rendererCloseRequestScript } from '../../../electron/renderer-close-request';
+import { MESSAGES } from '../../../electron/licensing-messages';
 import { desktopCloseController } from '../app/desktop-close-runtime';
 
 // The window a commercial desktop build opens behind until a trial or licence is active (ADR-623).
@@ -169,6 +170,21 @@ it('opens the workspace as soon as a quiet confirmation restores the licence', a
   await act(async () => window.dispatchEvent(new CustomEvent('kerfdesk:licence-refreshed')));
   expect(licenceWindow()).toBeNull();
   expect(host.querySelector('[data-workspace]')).not.toBeNull();
+});
+it('tells a Linux user without a keyring what to install, and stays closed to the workspace', async () => {
+  const api = client({ ...free, state: 'unavailable', message: MESSAGES.linuxKeyring });
+  await act(async () =>
+    root.render(
+      <EditionProvider client={api}>
+        <div data-workspace>workspace</div>
+      </EditionProvider>,
+    ),
+  );
+  expect(licenceWindow()?.dataset.licenceState).toBe('unavailable');
+  expect(host.querySelector('[data-workspace]')).toBeNull();
+  const notice = [...document.querySelectorAll('[role="status"]')].map((n) => n.textContent);
+  expect(notice).toContain(MESSAGES.linuxKeyring);
+  expect(notice).not.toContain(MESSAGES.unavailable);
 });
 it('hands the modal role to the updates panel it opens, and takes it back', async () => {
   await act(async () =>

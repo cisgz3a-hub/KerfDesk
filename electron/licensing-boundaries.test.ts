@@ -5,9 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createLicensingStore,
   LicenceStoreUnreadableError,
+  LinuxKeyringUnavailableError,
   validLicenceKey,
   type LicenceRecord,
 } from './licensing-store';
+import { MESSAGES, requestFailureMessage } from './licensing-messages';
+import { harness, TEST_KEY } from './licensing-runtime.test-support';
 import {
   licensingDeviceId,
   licensingHardwareId,
@@ -26,18 +29,21 @@ afterEach(async () => {
     await rm(path, { recursive: true, force: true });
   }
 });
-async function storage(platform = 'win32', backend = 'gnome_libsecret') {
+/** `tag` is the key provider's ciphertext prefix: v11 a Secret Service, v10 the fallback key. */
+async function storage(platform = 'win32', tag = 'v11') {
   const userDataPath = await mkdtemp(join(tmpdir(), 'kerfdesk-licence-test-'));
   temporary.push(userDataPath);
   // Deliberately fake the OS boundary; this is not a claim about native crypto.
   const secureStorage = {
     isAsyncEncryptionAvailable: vi.fn(async () => true),
-    getSelectedStorageBackend: () => backend,
     encryptStringAsync: vi.fn(async (value: string) =>
-      Buffer.from(value).map((byte) => byte ^ 0x55),
+      Buffer.concat([Buffer.from(tag), Buffer.from(value).map((byte) => byte ^ 0x55)]),
     ),
     decryptStringAsync: vi.fn(async (value: Buffer) => ({
-      result: value.map((byte) => byte ^ 0x55).toString(),
+      result: value
+        .subarray(3)
+        .map((byte) => byte ^ 0x55)
+        .toString(),
       shouldReEncrypt: false,
     })),
   };
@@ -65,17 +71,70 @@ describe('main-process protected credential storage', () => {
     expect(await h.store.read()).toEqual(value);
     expect(h.secureStorage.encryptStringAsync).toHaveBeenCalledOnce();
   });
-  it.each(['basic_text', 'unknown'])(
-    'refuses the Linux %s backend instead of storing weakly protected secrets',
-    async (backend) => {
-      const h = await storage('linux', backend);
-      await expect(h.store.write({ schemaVersion: 1, lastSeenAt: 10 })).rejects.toThrow(
-        'Secure operating-system',
-      );
-      expect(h.secureStorage.encryptStringAsync).not.toHaveBeenCalled();
-      await expect(readFile(h.file)).rejects.toMatchObject({ code: 'ENOENT' });
+  it('refuses the Linux fallback key instead of storing weakly protected secrets', async () => {
+    // Electron reports gnome_libsecret on a GNOME desktop even with no keyring
+    // running, and then encrypts with the fallback key (v10): only the tag tells.
+    const h = await storage('linux', 'v10');
+    await expect(h.store.write({ schemaVersion: 1, lastSeenAt: 10 })).rejects.toBeInstanceOf(
+      LinuxKeyringUnavailableError,
+    );
+    await expect(h.store.read()).rejects.toBeInstanceOf(LinuxKeyringUnavailableError);
+    // Only the one probe was encrypted, never the record, and nothing was written.
+    expect(h.secureStorage.encryptStringAsync).toHaveBeenCalledOnce();
+    expect(h.secureStorage.encryptStringAsync).not.toHaveBeenCalledWith(
+      expect.stringContaining('schemaVersion'),
+    );
+    await expect(readFile(h.file)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+  it.each(['v11', 'v12'])(
+    'keeps a Linux licence under a %s keyring key on any desktop, probing once',
+    async (tag) => {
+      // A tiling window manager reports basic_text yet reaches a running Secret Service.
+      const h = await storage('linux', tag);
+      expect(await h.store.read()).toBeNull();
+      await h.store.write({ schemaVersion: 1, lastSeenAt: 10 });
+      expect(await h.store.read()).toEqual({ schemaVersion: 1, lastSeenAt: 10 });
+      expect((await readFile(h.file)).subarray(0, 3).toString()).toBe(tag);
+      // The probe and the record: the key cannot change within a process.
+      expect(h.secureStorage.encryptStringAsync).toHaveBeenCalledTimes(2);
     },
   );
+  it('asks the keyring again after a probe that failed outright', async () => {
+    const h = await storage('linux');
+    h.secureStorage.encryptStringAsync.mockRejectedValueOnce(new Error('bus closed'));
+    await expect(h.store.read()).rejects.toBeInstanceOf(LinuxKeyringUnavailableError);
+    expect(await h.store.read()).toBeNull();
+  });
+  it('names a missing keyring only on Linux, where the Secret Service is the cause', async () => {
+    const linux = await storage('linux');
+    linux.secureStorage.isAsyncEncryptionAvailable.mockResolvedValue(false);
+    await expect(linux.store.read()).rejects.toBeInstanceOf(LinuxKeyringUnavailableError);
+    const windows = await storage('win32', 'v10');
+    expect(await windows.store.read()).toBeNull();
+    windows.secureStorage.isAsyncEncryptionAvailable.mockResolvedValue(false);
+    const refused = windows.store.read();
+    await expect(refused).rejects.toThrow('Secure operating-system');
+    await expect(refused).rejects.not.toBeInstanceOf(LinuxKeyringUnavailableError);
+  });
+  it('tells a Linux user without a keyring what to install, not to check their connection', async () => {
+    const h = await storage('linux', 'v10');
+    const { options, fetch } = harness();
+    const runtime = createLicensingRuntime({ ...options, store: h.store });
+    const status = await runtime.status();
+    expect(status).toMatchObject({ state: 'unavailable', edition: 'free', tier: null });
+    expect(status.message).toBe(MESSAGES.linuxKeyring);
+    expect(status.message).not.toBe(MESSAGES.unavailable);
+    for (const remedy of ['GNOME Keyring', 'KWallet', 'Secret Service', 'restart KerfDesk'])
+      expect(status.message).toContain(remedy);
+    // Neither licence action reaches the service: the keyring, not the network, stops them.
+    expect((await runtime.startTrial()).message).toBe(MESSAGES.linuxKeyring);
+    expect((await runtime.activate(TEST_KEY)).message).toBe(MESSAGES.linuxKeyring);
+    expect(fetch).not.toHaveBeenCalled();
+    // With a keyring, an outage keeps its own message.
+    const online = harness();
+    online.fetch.mockRejectedValue(new TypeError('fetch failed'));
+    expect((await online.runtime.startTrial()).message).toBe(requestFailureMessage(new Error()));
+  });
   it('bounds stored data before decrypting and fails closed on corrupt encrypted data', async () => {
     const h = await storage();
     await writeFile(h.file, Buffer.alloc(131_073));
