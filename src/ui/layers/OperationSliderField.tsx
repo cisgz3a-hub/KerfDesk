@@ -2,6 +2,7 @@ import { useId, useRef, useState } from 'react';
 import { nearestSpeedStopIndex } from '../../core/devices/working-speed-range';
 import { useStore } from '../state/store';
 import { useMixedOperationNumber } from './mixed-operation-input';
+import { spinTextProps } from './spin-text-field';
 import './operation-slider-field.css';
 
 type OperationSliderFieldProps = {
@@ -87,7 +88,7 @@ function useSliderDraft(props: OperationSliderFieldProps) {
       gesture.current.awaitingFocus = false;
     }
   };
-  return { ...draft, onChange, onRangeChange, startDrag, finishDrag, focusSlider };
+  return { ...draft, change, onChange, onRangeChange, startDrag, finishDrag, focusSlider };
 }
 
 type SliderTrack = {
@@ -169,6 +170,14 @@ export function OperationSliderField(props: OperationSliderFieldProps): JSX.Elem
   );
   const track = sliderTrack(props, value);
   const reading = mixed ? undefined : props.describe?.(value);
+  // A box that takes units is text, kept a spin button (spin-text-field).
+  const spin =
+    props.inputType === 'text'
+      ? spinTextProps(
+          { current: props.parse, step: 1, min: props.min, max: props.max, change: draft.change },
+          draft.displayValue,
+        )
+      : {};
   return (
     <div className="lf-operation-slider" role="group" aria-labelledby={`${id}-label`}>
       <div className="lf-operation-slider__heading">
@@ -193,6 +202,7 @@ export function OperationSliderField(props: OperationSliderFieldProps): JSX.Elem
           max={props.max}
           value={draft.displayValue}
           {...draft.inputProps}
+          {...spin}
           onChange={draft.onChange}
           onBlur={draft.onBlur}
           aria-label={`${props.label} for ${props.ariaContext}`}

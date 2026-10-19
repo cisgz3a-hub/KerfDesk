@@ -4,10 +4,11 @@
 // and share one visual language.
 
 import type { Layer } from '../../core/scene';
-import { useDebouncedCommit } from './use-debounced-commit';
+import { useDebouncedCommit, type DebouncedCommit } from './use-debounced-commit';
 import { useLengthUnit } from '../state/display-units';
 import { MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
 import { dimensionEntry, dimensionEntryError } from './dimension-entry';
+import { spinTextProps } from './spin-text-field';
 
 export function Row(props: {
   readonly label: string;
@@ -79,10 +80,45 @@ function clampToRange(props: NumberFieldProps, value: number): number {
   return Math.max(props.min, Math.min(props.max, value));
 }
 
+/** The typed text as the saved value; the current value when it is not one. */
+function parseFieldText(props: NumberFieldProps, unit: DisplayLengthUnit, text: string): number {
+  const parsed = props.dimension === undefined ? null : dimensionEntry(text, unit, props.dimension);
+  const n = parsed === null ? Number.parseFloat(text) : parsed.kind === 'ok' ? parsed.value : NaN;
+  if (!Number.isFinite(n)) return props.value;
+  if (props.positiveOnly === true) return n > 0 ? n : props.value;
+  return clampToRange(props, n);
+}
+
+// The box's limits in its shown unit and, for a box that takes units, the
+// spin-button role and arrow stepping it keeps as text (spin-text-field).
+function fieldInputProps(
+  props: NumberFieldProps,
+  display: FieldDisplay,
+  parse: (text: string) => number,
+  draft: Pick<DebouncedCommit, 'changeText' | 'displayValue'>,
+) {
+  const min = props.positiveOnly === true ? undefined : props.min / display.scale;
+  const max = props.positiveOnly === true ? undefined : props.max / display.scale;
+  const range = min === undefined || max === undefined ? {} : { min, max };
+  if (props.dimension === undefined) return range;
+  const spin = spinTextProps(
+    {
+      current: (text) => display.show(parse(text)),
+      step: display.step,
+      min,
+      max,
+      change: draft.changeText,
+    },
+    draft.displayValue,
+  );
+  return { ...range, ...spin };
+}
+
 export function NumberField(props: NumberFieldProps): JSX.Element {
   const unit = useLengthUnit();
   const dimension = props.dimension;
   const display = fieldDisplay(props, unit);
+  const parse = (text: string): number => parseFieldText(props, unit, text);
   const debounced = useDebouncedCommit<number>({
     value: props.value,
     reconcileKey: unit,
@@ -91,15 +127,9 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
     ...(dimension === undefined
       ? {}
       : { validate: (text: string) => dimensionEntryError(text, unit, dimension) }),
-    parse: (s) => {
-      const parsed =
-        props.dimension === undefined ? null : dimensionEntry(s, unit, props.dimension);
-      const n = parsed === null ? Number.parseFloat(s) : parsed.kind === 'ok' ? parsed.value : NaN;
-      if (!Number.isFinite(n)) return props.value;
-      if (props.positiveOnly === true) return n > 0 ? n : props.value;
-      return clampToRange(props, n);
-    },
+    parse,
   });
+  const inputProps = fieldInputProps(props, display, parse, debounced);
   const unitBesideBox = props.stacked !== true && display.unit.length > 0;
   return (
     <Row label={props.label} {...(props.stacked ? { stacked: true, unit: display.unit } : {})}>
@@ -107,9 +137,7 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
         type={props.dimension === undefined ? 'number' : 'text'}
         inputMode="decimal"
         aria-invalid={debounced.errorMessage !== null}
-        {...(props.positiveOnly === true
-          ? {}
-          : { min: props.min / display.scale, max: props.max / display.scale })}
+        {...inputProps}
         step={display.step}
         value={debounced.displayValue}
         onChange={debounced.onChange}

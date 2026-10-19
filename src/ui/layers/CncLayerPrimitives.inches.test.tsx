@@ -90,6 +90,34 @@ describe('CNC depth and feed fields in inches (ADR-629)', () => {
     expect(onCommit).toHaveBeenLastCalledWith(12.7);
   });
 
+  it('stays a spin button whose arrows step the inch depth', async () => {
+    const onCommit = vi.fn();
+    const input = await render(
+      <NumberField
+        layer={layer}
+        label="Cut depth"
+        unit="mm"
+        dimension="length"
+        value={6.35}
+        min={0.05}
+        max={200}
+        step={0.5}
+        title="depth"
+        onCommit={onCommit}
+      />,
+    );
+    expect(input.type).toBe('text');
+    expect(input.getAttribute('role')).toBe('spinbutton');
+    expect(input.getAttribute('aria-valuenow')).toBe('0.25');
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    });
+    expect(input.value).toBe('0.24');
+    await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    // 0.24 in, exactly as if typed.
+    expect(onCommit.mock.lastCall?.[0]).toBeCloseTo(6.096, 9);
+  });
+
   it('shows a feed in in/min and commits nothing when left unedited', async () => {
     const onCommit = vi.fn();
     const input = await render(

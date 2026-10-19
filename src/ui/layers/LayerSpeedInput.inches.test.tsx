@@ -123,6 +123,17 @@ describe('laser Speed in inches (ADR-629)', () => {
     }
   });
 
+  it('stays a spin button whose arrows step the speed by 1 in/min', async () => {
+    const { number, commit } = await renderSpeed(1524);
+    expect(number.type).toBe('text');
+    expect(number.getAttribute('role')).toBe('spinbutton');
+    expect(number.getAttribute('aria-valuenow')).toBe('60');
+    await act(async () => Simulate.keyDown(number, { key: 'ArrowUp' }));
+    expect(number.value).toBe('61');
+    await act(async () => vi.advanceTimersByTime(400));
+    expect(commit).toHaveBeenLastCalledWith({ speed: 1549.4 });
+  });
+
   it('writes nothing back when a rounded speed is left unedited', async () => {
     const { number, commit } = await renderSpeed(1500);
     expect(number.value).toBe('59.1');
