@@ -7,6 +7,8 @@ import {
   type CanvasTextSession,
 } from './canvas-text-store';
 import type { DialogValues } from './use-text-dialog-fields';
+import type { TextGeometryRenderer } from './text-worker-session';
+import { useTextWorkerSession } from './use-text-worker-session';
 
 export type TextDraftResult = {
   readonly object: TextObject | null;
@@ -16,6 +18,8 @@ export type TextDraftResult = {
 
 export function useCanvasTextDraft(session: CanvasTextSession, values: DialogValues) {
   const stableValues = useStableTextValues(values);
+  // Layout runs in this draft's own text worker (ADR-643).
+  const textWorker = useTextWorkerSession();
   const [result, setResult] = useState<TextDraftResult>({
     object: null,
     pending: true,
@@ -38,7 +42,7 @@ export function useCanvasTextDraft(session: CanvasTextSession, values: DialogVal
     // Coalesce fast typing and IME updates; only the latest input can settle.
     const timer = window.setTimeout(() => {
       if (stableValues.content.trim() === '') return;
-      void buildCanvasTextObject(session, stableValues, controller.signal).then(
+      void buildCanvasTextObject(session, stableValues, controller.signal, textWorker.render).then(
         (object) => {
           if (!isCurrent()) return;
           useCanvasTextStore.getState().setDraft(session, object);
@@ -56,7 +60,7 @@ export function useCanvasTextDraft(session: CanvasTextSession, values: DialogVal
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [session, stableValues]);
+  }, [session, stableValues, textWorker]);
   return result;
 }
 
@@ -64,8 +68,9 @@ export async function buildCanvasTextObject(
   session: CanvasTextSession,
   values: DialogValues,
   signal?: AbortSignal,
+  render?: TextGeometryRenderer,
 ): Promise<TextObject> {
-  const object = await buildTextObject(session.state, values, signal);
+  const object = await buildTextObject(session.state, values, signal, render);
   const original = session.original;
   return {
     ...object,

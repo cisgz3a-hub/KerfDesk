@@ -303,7 +303,7 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
       'Discard the complete Machine Setup draft. Queued firmware settings are not sent on Cancel.',
   },
   'laser.device-setup.connect': {
-    label: 'Find my machine',
+    label: 'Connect',
     tooltip:
       'Connect on the port the machine used last time (the first time, choose it) and read its firmware, work area, speed and power range into the setup draft. Nothing moves and no controller setting changes. Connecting is optional during setup.',
   },

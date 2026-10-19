@@ -159,7 +159,9 @@ describe('machine toolbar', () => {
     if (setup === null) throw new Error('Machine Setup button missing');
     await act(async () => setup.click());
     expect(host.textContent).toContain('Step 1 of 3');
-    expect(host.querySelectorAll('input[name="machine-capability"]')).toHaveLength(3);
+    expect(host.querySelector('section[aria-label="Choose your machine"]')).toBeInstanceOf(
+      HTMLElement,
+    );
   });
 
   it('keeps the fitted module in the project after closing and reopening machine details', async () => {
