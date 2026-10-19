@@ -28,6 +28,7 @@ import {
 import { useStore } from '../../state';
 import {
   boardPolygonIssueMessage,
+  capturedOutlineTopLeft,
   currentRegistrationEpoch,
   errorMessage,
   registrationEpochMatches,
@@ -155,7 +156,7 @@ function createGeometryCommit(args: BoardCaptureHandlerArgs): GeometryCommit {
     if (!boardCaptureCanCommit(args.capture.state, geometry, registrationEpoch, originAdvance)) {
       throw new Error('Board coordinates changed during capture. Start over and capture it again.');
     }
-    args.addCapturedBoard(capturedBoardShape(geometry));
+    args.addCapturedBoard(capturedBoardShape(geometry), capturedOutlineTopLeft(geometry));
     const outline = findRegistrationBoxes(useStore.getState().project.scene).find(
       (box) => box.provenance === 'captured-board',
     );

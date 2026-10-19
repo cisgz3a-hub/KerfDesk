@@ -2,9 +2,7 @@ import { useState } from 'react';
 import { diameterFromCenterEdge, type Vec2 } from '../../../core/scene';
 import { bestFitCircleFromRimPoints } from '../../../core/scene/board-circle-fit';
 import { Button, NumberInput } from '../../kit';
-import { BoardFineJogControls } from './BoardFineJogControls';
 import type { BoardSightView } from './CaptureCard';
-import { CaptureMap } from './CaptureMap';
 import { CircleCenterConfirmation } from './CircleCenterConfirmation';
 import { CIRCLE_RIM_POINT_COUNT, type CircleCaptureMethod } from './use-board-capture';
 import { MIN_BOARD_DIMENSION_MM } from './constants';
@@ -58,8 +56,7 @@ function RimFitCapture(props: Parameters<typeof CircleCaptureSteps>[0]): JSX.Ele
   return (
     <div style={columnStyle}>
       <p style={stepStyle}>{rimGuidance(count)}</p>
-      <CircleCaptureMap points={props.corners} sight={props.sight} />
-      {!complete && <BoardFineJogControls disabled={props.disabled} />}
+      <CircleSightReadout sight={props.sight} />
       <div style={buttonRowStyle}>
         <Button
           variant="primary"
@@ -115,8 +112,7 @@ function MarkedCenterCapture(props: Parameters<typeof CircleCaptureSteps>[0]): J
   return (
     <div style={columnStyle}>
       <p style={stepStyle}>{markedCenterGuidance(count)}</p>
-      <CircleCaptureMap points={props.corners} sight={props.sight} />
-      {count < 2 && <BoardFineJogControls disabled={props.disabled} />}
+      <CircleSightReadout sight={props.sight} />
       <div style={buttonRowStyle}>
         <Button
           variant="primary"
@@ -215,27 +211,13 @@ function CircleDiameterForm(props: {
   );
 }
 
-function CircleCaptureMap(props: {
-  readonly points: ReadonlyArray<Vec2>;
-  readonly sight: BoardSightView;
-}): JSX.Element {
+function CircleSightReadout(props: { readonly sight: BoardSightView }): JSX.Element {
   const { point, aim } = props.sight;
   return (
-    <>
-      <CaptureMap
-        points={props.points}
-        sight={point}
-        signs={props.sight.signs}
-        outline="points"
-        label={`${props.points.length} circle points captured`}
-      />
-      <div style={liveStyle}>
-        <strong>{aim === 'pointer' ? 'Pointer' : 'Head'}:</strong>{' '}
-        {point === null
-          ? 'waiting for position…'
-          : `X ${point.x.toFixed(1)} Y ${point.y.toFixed(1)}`}
-      </div>
-    </>
+    <div style={liveStyle}>
+      <strong>{aim === 'pointer' ? 'Pointer' : 'Head'}:</strong>{' '}
+      {point === null ? 'waiting for position…' : `X ${point.x.toFixed(1)} Y ${point.y.toFixed(1)}`}
+    </div>
   );
 }
 

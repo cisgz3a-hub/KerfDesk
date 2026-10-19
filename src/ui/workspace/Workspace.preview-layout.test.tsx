@@ -3,11 +3,9 @@ import { act, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { savedCameraModel } from '../../core/camera/model/model-fixtures';
-import { findRegistrationBoxBounds } from '../../core/scene';
 import type { BedOverlayUniforms } from '../camera/overlay/bed-overlay-shader';
 import { WorkspaceCameraOverlay } from '../camera/WorkspaceCameraOverlay';
 import { CanvasViewSwitch } from '../gcode-inspector/CanvasViewSwitch';
-import { BoardAnchorOverlay } from '../laser/board-capture/BoardAnchorOverlay';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
@@ -118,7 +116,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-it('keeps artwork, camera and board coordinates on the resized stage while Preview reserves its dock', async () => {
+it('keeps artwork and camera coordinates on the resized stage while Preview reserves its dock', async () => {
   const draw = vi.spyOn(drawing, 'drawScene');
   const project = useStore.getState().project;
   await act(async () =>
@@ -128,12 +126,6 @@ it('keeps artwork, camera and board coordinates on the resized stage while Previ
         content={<Workspace />}
       >
         <WorkspaceCameraOverlay />
-        <BoardAnchorOverlay
-          geometry={{ kind: 'rect', origin: { x: 0, y: 0 }, widthMm: 120, heightMm: 80 }}
-          activeTarget={null}
-          disabled
-          onSelect={() => undefined}
-        />
       </WorkspaceViewport>,
     ),
   );
@@ -147,7 +139,6 @@ it('keeps artwork, camera and board coordinates on the resized stage while Previ
   expect(stage.closest('.lf-workspace-canvas-area')).toBe(viewport);
   expect(base.parentElement).toBe(stage);
   expect(cameraCanvas().parentElement?.parentElement).toBe(accessories);
-  expect(boardOverlay().parentElement).toBe(accessories);
   expect(selector.parentElement).toBe(controls);
   expect(controls.parentElement).toBe(viewport);
   expect(stage.contains(selector)).toBe(false);
@@ -174,7 +165,7 @@ it('keeps artwork, camera and board coordinates on the resized stage while Previ
   // stays above it instead of covering the fitted artwork, rulers or markers.
   await resizeStage(160);
   expect(controls.getBoundingClientRect().bottom).toBe(base.getBoundingClientRect().top);
-  assertSharedCoordinates(160, false);
+  assertSharedCoordinates(160);
   expect(draw.mock.calls.at(-1)?.slice(1, 3)).toEqual([WIDTH, 160]);
 
   await act(async () => useStore.setState({ previewMode: false }));
@@ -287,7 +278,7 @@ async function resizeStage(height: number): Promise<void> {
   });
 }
 
-function assertSharedCoordinates(height: number, boardHandlesVisible = true): void {
+function assertSharedCoordinates(height: number): void {
   const base = baseCanvas();
   expect([base.width, base.height]).toEqual([WIDTH, height]);
   // Independent fit calculation for a 400 mm square bed and its 30 px rulers/margin.
@@ -298,17 +289,6 @@ function assertSharedCoordinates(height: number, boardHandlesVisible = true): vo
   expect(drawn?.uViewScale).toBeCloseTo(scale, 8);
   expect(drawn?.uViewOffset[0]).toBeCloseTo(offsetX, 8);
   expect(drawn?.uViewOffset[1]).toBeCloseTo(offsetY, 8);
-  const corner = boardOverlay().querySelector<HTMLButtonElement>('[data-board-anchor="top-right"]');
-  const bounds = findRegistrationBoxBounds(useStore.getState().project.scene);
-  if (bounds === null) throw new Error('Missing board reference');
-  if (boardHandlesVisible) {
-    if (corner === null) throw new Error('Missing board reference corner');
-    expect(Number.parseFloat(corner.style.left)).toBeCloseTo(offsetX + bounds.maxX * scale, 8);
-    expect(Number.parseFloat(corner.style.top)).toBeCloseTo(offsetY + bounds.minY * scale, 8);
-  } else {
-    // Preserve the existing hiding policy when the board's 44px handles collide.
-    expect(corner).toBeNull();
-  }
   const scenePoint = canvasMouseToScene(
     {
       clientX: 10 + offsetX + 80 * scale,
@@ -331,12 +311,6 @@ function baseCanvas(): HTMLCanvasElement {
 function cameraCanvas(): HTMLCanvasElement {
   const overlay = host.querySelector<HTMLCanvasElement>('.lf-workspace-accessories canvas');
   if (overlay === null) throw new Error('Missing camera overlay');
-  return overlay;
-}
-
-function boardOverlay(): HTMLElement {
-  const overlay = host.querySelector<HTMLElement>('[aria-label="Board verification points"]');
-  if (overlay === null) throw new Error('Missing board overlay');
   return overlay;
 }
 

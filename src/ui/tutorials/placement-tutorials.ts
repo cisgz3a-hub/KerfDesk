@@ -123,15 +123,15 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 4,
-    location: 'Tools → Place Board',
+    location: 'Tools → Place Board (its own page, beside the machine panel)',
     prerequisites:
       'A connected machine with a current position and the actual board secured in place.',
     visual: 'board',
     steps: [
       {
-        title: 'Choose the board shape',
+        title: 'Step 1: choose the board shape',
         instruction:
-          'Choose Rectangle, Circle or Custom shape. If Machine Setup has a positioning light, it switches on so you can aim with the red dot. For a rectangle, capture the front-left corner first when you can; it sets the work origin. For a circle, choose Find center from rim or Center already marked.',
+          'Open Tools → Place Board; the page replaces the canvas and the machine panel stays on the right for jogging. Choose Rectangle, Circle or Custom shape. If Machine Setup has a positioning light, it switches on so you can aim with the red dot. For a rectangle, capture the front-left corner first when you can; it sets the work origin. For a circle, choose Find center from rim or Center already marked.',
         focus: 'Rectangle, circle or custom shape',
         result: 'The chosen capture method matches how you can locate the physical board.',
       },
@@ -144,17 +144,17 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
           'Create the board outline to obtain a locked placement reference excluded from the burn.',
       },
       {
-        title: 'Place or repeat the design',
+        title: 'Step 2: place or repeat the design',
         instruction:
-          'Select the artwork, set the edge margin and click one of the nine spots in the placement grid: a corner, the middle of an edge or the centre. Use Fit to board for one design, or Array on board with a row-and-column count or Fit as many as fit and the desired spacing.',
+          'Import artwork or select artwork already in the project, drag it on the canvas, or set the edge margin and click one of the nine spots in the placement grid: a corner, the middle of an edge or the centre. Use Fit to board for one design, or Array on board with a row-and-column count or Fit as many as fit and the desired spacing.',
         focus: 'Placement grid · Fit · Array',
         result: 'The design is positioned relative to the captured outline.',
         visual: 'array',
       },
       {
-        title: 'Check the captured board physically',
+        title: 'Check the board, then burn',
         instruction:
-          'Use Physically check board to move the head with the beam off to reference points. Confirm a correct point or adjust it and use the current head position to update the board. Then Preview and Frame the exact intended job before Start.',
+          'In step 1, Physically check board moves the head with the beam off to reference points. Confirm a correct point or adjust it and use the current head position to update the board. Then, in step 3, set power, speed and passes, Frame the exact intended job, and Start.',
         focus: 'Check board → Frame job',
         result:
           'Board measurements and the intended job placement receive separate physical checks.',

@@ -269,7 +269,7 @@ test('tools.place-board explains disconnected capture and closes without motion'
   await tool(page, 'Place Board');
   const panel = page.getByRole('region', { name: 'Place board', exact: true });
   await expect(panel).toContainText('Connect the machine to capture a board.');
-  await panel.getByRole('button', { name: 'Close board capture panel' }).click();
+  await panel.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(panel).toHaveCount(0);
   expect(await count(page)).toBe(0);
 });

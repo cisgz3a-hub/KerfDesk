@@ -46,8 +46,8 @@ const CAPTURED_CIRCLE_PLACEMENT: JobPlacementSettings = {
 export function boardCaptureActions(
   set: Setter,
 ): Pick<AppState, 'addCapturedBoard' | 'addCapturedBoardBox' | 'updateCapturedBoard'> {
-  const addCapturedBoard = (shape: BoardShape): void => {
-    set((s) => commitCapturedBoard(s, buildBoardOutline(s, shape), placementFor(shape)));
+  const addCapturedBoard = (shape: BoardShape, at?: { x: number; y: number }): void => {
+    set((s) => commitCapturedBoard(s, buildBoardOutline(s, shape, at), placementFor(shape)));
   };
   return {
     addCapturedBoard,
@@ -127,31 +127,55 @@ function resizedOutline(
   }
 }
 
-// Build the locked registration outline for the captured shape, centered fresh on
-// the bed (a capture is always a brand-new board, so no prior position is kept).
-// Locked so a stray drag can't shift it off registration — its canvas position
-// encodes the physical work origin.
-function buildBoardOutline(s: AppState, shape: BoardShape): ShapeObject {
-  const { bedWidth, bedHeight } = s.project.device;
+// Build the locked registration outline for the captured shape: where the board
+// sits on the bed when that is known and on the bed (ADR-636), else centred (a
+// capture is always a brand-new board, so no prior position is kept). Either
+// way the burn is anchored to the work origin, not to this canvas position.
+// Locked so a stray drag can't shift it off registration.
+function buildBoardOutline(
+  s: AppState,
+  shape: BoardShape,
+  requested?: { x: number; y: number },
+): ShapeObject {
   switch (shape.kind) {
     case 'rect': {
       const { widthMm, heightMm } = shape;
-      const at = registrationBoxDefaultPosition(bedWidth, bedHeight, widthMm, heightMm);
+      const at = outlinePosition(s, widthMm, heightMm, requested);
       return locked(createRegistrationBox({ widthMm, heightMm, x: at.x, y: at.y }));
     }
     case 'circle': {
       const { diameterMm } = shape;
-      const at = registrationBoxDefaultPosition(bedWidth, bedHeight, diameterMm, diameterMm);
+      const at = outlinePosition(s, diameterMm, diameterMm, requested);
       return locked(createRegistrationCircle({ diameterMm, x: at.x, y: at.y }));
     }
     case 'polygon': {
       const { widthMm, heightMm, outline } = shape;
-      const at = registrationBoxDefaultPosition(bedWidth, bedHeight, widthMm, heightMm);
+      const at = outlinePosition(s, widthMm, heightMm, requested);
       return locked(createRegistrationPolygon({ points: outline, x: at.x, y: at.y }));
     }
     default:
       return assertNever(shape, 'BoardShape');
   }
+}
+
+function outlinePosition(
+  s: AppState,
+  widthMm: number,
+  heightMm: number,
+  requested: { x: number; y: number } | undefined,
+): { readonly x: number; readonly y: number } {
+  const { bedWidth, bedHeight } = s.project.device;
+  const onBed =
+    requested !== undefined &&
+    Number.isFinite(requested.x) &&
+    Number.isFinite(requested.y) &&
+    requested.x >= 0 &&
+    requested.y >= 0 &&
+    requested.x + widthMm <= bedWidth &&
+    requested.y + heightMm <= bedHeight;
+  return onBed && requested !== undefined
+    ? requested
+    : registrationBoxDefaultPosition(bedWidth, bedHeight, widthMm, heightMm);
 }
 
 function placementFor(shape: BoardShape): JobPlacementSettings {

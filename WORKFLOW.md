@@ -4571,12 +4571,17 @@ preview and applied copies use the same plan; this is not optimal nesting (ADR-5
 offcut), aim with the machine's red-dot pointer instead of the beam, and put the
 artwork exactly where it belongs: a corner, the middle of an edge or the centre.
 
-**Where in the UI.** Place Board is a three-step card: **1 Shape** (Rectangle,
-Circle, Custom shape tiles), **2 Capture** (a live map of the captured points with
-a crosshair at the head or pointer, a beam-off jog pad, **Capture corner**, Undo
-last, Start over) and **3 Place** (the measured board, a 3x3 placement grid with
-an edge margin, Fit to board, Fill with copies, Check the board, Capture a new
-board, Remove board). A pointer bar shows whether the positioning light is on.
+**Where in the UI.** **Tools → Place Board** opens Place Board mode, a page
+built like jig mode: it takes the place of the tool strip and the main canvas,
+and the machine panel (connect, jog, positioning light) stays docked on the right.
+The left sidebar has three steps: **1 Capture board** (Rectangle, Circle, Custom
+shape tiles, the pointer bar, **Capture corner**, Undo last, Start over; then the
+measured board, its checks, Capture a new board, Remove board), **2 Place artwork**
+(Import artwork, the 3x3 placement grid with an edge margin, Fit to board, Fill
+with copies) and **3 Burn** (power, speed and passes for the artwork's operations,
+then Frame and Start). The canvas shows the captured points as they are taken, the
+outline they make and a red crosshair at the head or pointer; artwork is dragged,
+resized and rotated on it. **Done** returns to the main canvas.
 
 **The happy path.**
 1. Open Place Board and choose **Custom shape**.
@@ -4584,15 +4589,16 @@ board, Remove board). A pointer bar shows whether the positioning light is on.
    fresh Idle check) and the panel says **Pointer on**. Jog the red dot to any
    corner of the board and **Capture corner**; work round the edge, capturing each
    corner in order. The map draws the outline as it grows.
-3. From three corners the panel shows the shape's size and area. **Create board
+3. From three corners the page shows the shape's size and area. **Create board
    outline** sets the work origin at the front-left of the shape's bounding box
-   with one G92 (the head does not move), draws the locked outline and switches
-   placement to User Origin, front-left. The pointer switches off again.
-4. Add and select the artwork, choose an edge margin, and click a cell of the
-   placement grid. On a rectangle it aligns exactly; on a circle or custom shape it
-   slides from the centre toward that spot until it meets the margin, so it stays
-   on the material. Each click is one undo step.
-5. Frame and Start as usual.
+   with one G92 (the head does not move), draws the locked outline where the board
+   sits on the bed and switches placement to User Origin, front-left. The pointer
+   switches off again and the page moves on to step 2.
+4. **Import artwork…** (or select artwork already in the project), choose an edge
+   margin, and click a cell of the placement grid. On a rectangle it aligns exactly;
+   on a circle or custom shape it slides from the centre toward that spot until it
+   meets the margin, so it stays on the material. Each click is one undo step.
+5. In step 3, set power, speed and passes, then Frame and Start.
 
 **Rectangles captured from another corner.** If the first corner captured is more
 than 5 mm from the front-left corner, **Create board outline** moves the work

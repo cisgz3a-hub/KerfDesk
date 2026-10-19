@@ -45,7 +45,6 @@ export function BoardCaptureSteps(props: {
       progress={`${Math.min(count, BOARD_CORNER_COUNT)} of ${BOARD_CORNER_COUNT}`}
       guidance={stepGuidance(count, allCaptured, props.sight.aim)}
       points={props.corners}
-      outline={allCaptured ? 'box' : 'points'}
       sight={props.sight}
       captureLabel="Capture corner"
       captureTitle={

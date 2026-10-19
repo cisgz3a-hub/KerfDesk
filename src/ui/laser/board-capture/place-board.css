@@ -1,86 +1,16 @@
-/* Place board panel (ADR-636) — a three-step card floating over the canvas:
- * choose the board shape, capture it, then place artwork on it. Theme tokens
- * only, so light and dark both work. */
+/* Place Board page (ADR-636) — the sidebar widgets of the page that takes the
+ * main canvas's place in Place Board mode. The page shell (header, sidebar,
+ * canvas, footer) is jig mode's, from registration-jig.css. Theme tokens only,
+ * so light and dark both work. */
 .lf-place-board {
-  position: absolute;
-  z-index: 5;
-  top: 12px;
-  left: 12px;
-  width: 320px;
-  max-height: calc(100% - 24px);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--lf-space-3);
-  padding: var(--lf-space-4);
-  box-shadow: var(--lf-shadow);
-  pointer-events: auto;
   font-size: var(--lf-text-md);
-  border-radius: var(--lf-radius-lg);
 }
-
 .lf-place-board p {
   margin: 0;
   line-height: 1.35;
 }
-
-/* ---------- Header and progress ---------- */
-.lf-place-board__header {
-  display: flex;
-  align-items: center;
-  gap: var(--lf-space-2);
-}
-.lf-place-board__title {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: var(--lf-space-2);
-  font-size: var(--lf-text-lg);
-  font-weight: 600;
-}
-.lf-place-board__title-icon {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--lf-radius-md);
-  background: var(--lf-tint-accent);
-  color: var(--lf-accent-fg);
-}
-.lf-place-board__steps {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--lf-space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.lf-place-board__step {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: var(--lf-text-xs);
-  color: var(--lf-text-faint);
-}
-.lf-place-board__step::before {
-  content: '';
-  height: 3px;
-  border-radius: 2px;
-  background: var(--lf-border);
-}
-.lf-place-board__step[data-state='done'],
-.lf-place-board__step[data-state='current'] {
-  color: var(--lf-text);
-}
-.lf-place-board__step[data-state='done']::before {
-  background: var(--lf-accent);
-}
-.lf-place-board__step[data-state='current']::before {
-  background: var(--lf-accent);
-  opacity: 0.55;
-}
-.lf-place-board__step[data-state='current'] {
-  font-weight: 600;
+.lf-place-board .lf-jig-fields {
+  gap: var(--lf-space-3);
 }
 
 /* ---------- Messages ---------- */
@@ -226,46 +156,6 @@
   cursor: pointer;
 }
 
-/* ---------- Capture map ---------- */
-.lf-place-board__map {
-  display: block;
-  width: 100%;
-  height: 132px;
-  border-radius: var(--lf-radius-md);
-  background: var(--lf-bg-input);
-  border: 1px solid var(--lf-border);
-}
-.lf-place-board__map-outline {
-  fill: var(--lf-tint-accent);
-  stroke: var(--lf-accent);
-  stroke-width: 1.5;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-}
-.lf-place-board__map-open {
-  fill: none;
-  stroke: var(--lf-accent);
-  stroke-width: 1.5;
-  stroke-dasharray: 4 3;
-  vector-effect: non-scaling-stroke;
-}
-/* Sizes come from the SVG attributes, scaled to the map: CSS would override. */
-.lf-place-board__map-point {
-  fill: var(--lf-accent);
-  stroke: var(--lf-bg-1);
-}
-.lf-place-board__map-label {
-  fill: var(--lf-text);
-  font-weight: 600;
-}
-.lf-place-board__map-sight {
-  stroke: var(--lf-danger);
-  fill: none;
-}
-.lf-place-board__map-front {
-  fill: var(--lf-text-faint);
-}
-
 /* ---------- Anchor picker ---------- */
 .lf-place-board__anchors {
   display: grid;
@@ -349,4 +239,28 @@
   color: var(--lf-accent-fg);
   font-family: var(--lf-font-mono);
   font-size: var(--lf-text-xs);
+}
+
+/* ---------- Step 3 laser settings ---------- */
+.lf-place-board__layer {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--lf-space-2);
+  margin: 0;
+  padding: var(--lf-space-2) var(--lf-space-3) var(--lf-space-3);
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-md);
+}
+.lf-place-board__layer legend {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+  padding: 0 var(--lf-space-1);
+  font-weight: 600;
+}
+.lf-place-board__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--lf-border-strong);
 }

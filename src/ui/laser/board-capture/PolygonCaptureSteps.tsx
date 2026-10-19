@@ -38,7 +38,6 @@ export function PolygonCaptureSteps(props: {
       }
       guidance={guidance(count, props.sight.aim)}
       points={props.corners}
-      outline={count >= MIN_BOARD_POLYGON_POINTS ? 'closed' : 'path'}
       sight={props.sight}
       captureLabel="Capture corner"
       captureTitle={

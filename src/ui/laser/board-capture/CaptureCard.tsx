@@ -1,13 +1,12 @@
 // CaptureCard — the shared body of every board-capture step (ADR-636): what to
-// do next, a live map of the points so far, where the head or pointer is,
-// a beam-off jog pad to reach the next point, and the capture buttons.
+// do next, where the head or pointer is, and the capture buttons. The page's
+// canvas shows the points as they are captured, and the docked machine panel
+// holds the jog pad.
 
 import type { ReactNode } from 'react';
 import type { Vec2 } from '../../../core/scene';
 import type { BoardAxisSigns } from '../../../core/scene/board-polygon';
 import { Button } from '../../kit';
-import { BoardFineJogControls } from './BoardFineJogControls';
-import { CaptureMap, type CaptureMapOutline } from './CaptureMap';
 
 /** What the operator is aiming with right now, and where it is (machine mm). */
 export type BoardSightView = {
@@ -21,7 +20,6 @@ export function CaptureCard(props: {
   readonly progress: string;
   readonly guidance: ReactNode;
   readonly points: ReadonlyArray<Vec2>;
-  readonly outline: CaptureMapOutline;
   readonly sight: BoardSightView;
   readonly captureLabel: string;
   readonly captureTitle: string;
@@ -42,15 +40,7 @@ export function CaptureCard(props: {
         <span>{props.progress}</span>
       </div>
       <p>{props.guidance}</p>
-      <CaptureMap
-        points={props.points}
-        sight={props.sight.point}
-        signs={props.sight.signs}
-        outline={props.outline}
-        label={`${count} point${count === 1 ? '' : 's'} captured`}
-      />
       <SightReadout sight={props.sight} />
-      {!props.complete && <BoardFineJogControls disabled={props.disabled} />}
       <div className="lf-place-board__row">
         <button
           type="button"

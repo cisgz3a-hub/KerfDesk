@@ -202,7 +202,7 @@ function buttonByText(host: HTMLElement, text: string): HTMLButtonElement | null
 }
 
 function closeButton(host: HTMLElement): HTMLButtonElement | null {
-  return host.querySelector('[aria-label="Close board capture panel"]');
+  return buttonByText(host, 'Done');
 }
 
 async function clickButton(host: HTMLElement, text: string): Promise<void> {

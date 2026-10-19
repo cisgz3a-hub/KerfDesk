@@ -5,7 +5,9 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { BoardShape, Vec2 } from '../../../core/scene';
 import type { BoardPolygonIssue } from '../../../core/scene/board-polygon';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
+import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
 import { useLaserStore } from '../../state/laser-store';
+import { machinePointOnBed } from './board-sight';
 import type { BoardCapture, BoardRegistrationEpoch } from './use-board-capture';
 
 export type SetMessage = Dispatch<SetStateAction<string | null>>;
@@ -15,7 +17,7 @@ export type BoardCaptureHandlerArgs = {
   readonly livePosition: Vec2 | null;
   readonly setOriginHere: () => Promise<void>;
   readonly setOriginAtMachinePoint: (point: Vec2) => Promise<void>;
-  readonly addCapturedBoard: (shape: BoardShape) => void;
+  readonly addCapturedBoard: (shape: BoardShape, at?: Vec2) => void;
   readonly updateCapturedBoard: (shape: BoardShape) => void;
 };
 
@@ -84,4 +86,30 @@ export function registrationEpochMatches(
 
 export function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() !== '' ? error.message : fallback;
+}
+
+/**
+ * The outline's top-left on the canvas: where the board sits on the bed, from
+ * its front-left (or centre) machine point. Display only — the burn is anchored
+ * to the work origin — so the store falls back to centring it when off the bed.
+ */
+export function capturedOutlineTopLeft(geometry: CapturedBoardGeometry): Vec2 | undefined {
+  switch (geometry.kind) {
+    case 'rect': {
+      const frontLeft = machinePointOnBed(geometry.origin);
+      return frontLeft === null
+        ? undefined
+        : { x: frontLeft.x, y: frontLeft.y - geometry.heightMm };
+    }
+    case 'circle': {
+      const center = machinePointOnBed(geometry.center);
+      const r = geometry.radiusMm;
+      return center === null ? undefined : { x: center.x - r, y: center.y - r };
+    }
+    case 'polygon': {
+      const frontLeft = machinePointOnBed(geometry.polygon.origin);
+      const height = geometry.polygon.heightMm;
+      return frontLeft === null ? undefined : { x: frontLeft.x, y: frontLeft.y - height };
+    }
+  }
 }

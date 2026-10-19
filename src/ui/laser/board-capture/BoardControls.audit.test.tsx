@@ -6,7 +6,7 @@ import { useJogControlPreferences } from '../jog-control-preferences';
 import { BoardArrayForm } from './BoardArrayForm';
 import { BoardCaptureSteps } from './BoardCaptureSteps';
 import { BoardFineJogControls } from './BoardFineJogControls';
-import { BoardPlacementControls } from './BoardPlacementControls';
+import { BoardArtworkPlacement, BoardPlacementControls } from './BoardPlacementControls';
 import { BoardShapeToggle } from './BoardShapeToggle';
 import { BoardVerificationControls } from './BoardVerificationControls';
 import { CircleCaptureSteps } from './CircleCaptureSteps';
@@ -100,16 +100,7 @@ describe('Board control audit', () => {
 
   it('rectangle placement dispatches each distinct anchor, fit, array, recapture and removal', () => {
     const onReset = vi.fn();
-    act(() =>
-      root.render(
-        <BoardPlacementControls
-          geometry={rect}
-          disabled={false}
-          verification={verification()}
-          onReset={onReset}
-        />,
-      ),
-    );
+    act(() => root.render(<BoardArtworkPlacement shape="rect" />));
     const anchors = [
       ['top left', 'top-left'],
       ['top middle', 'top-center'],
@@ -127,6 +118,16 @@ describe('Board control audit', () => {
     expect(placement.fitToBoard).toHaveBeenCalledTimes(1);
     click('Array on board');
     expect(placement.arrayToBoard).toHaveBeenCalledWith({ kind: 'fill', gapXMm: 2, gapYMm: 2 });
+    act(() =>
+      root.render(
+        <BoardPlacementControls
+          geometry={rect}
+          disabled={false}
+          verification={verification()}
+          onReset={onReset}
+        />,
+      ),
+    );
     click('Capture a new board');
     expect(onReset).toHaveBeenCalledTimes(1);
     expect(placement.removeBoard).not.toHaveBeenCalled();
@@ -138,6 +139,9 @@ describe('Board control audit', () => {
   it('circle placement centers artwork, recaptures and removes only when the session is free', () => {
     const onReset = vi.fn();
     const controller = verification();
+    act(() => root.render(<BoardArtworkPlacement shape="circle" />));
+    clickLabel('Place artwork center');
+    expect(placement.placeOnBoard).toHaveBeenCalledWith('center', 5);
     act(() =>
       root.render(
         <BoardPlacementControls
@@ -148,8 +152,6 @@ describe('Board control audit', () => {
         />,
       ),
     );
-    clickLabel('Place artwork center');
-    expect(placement.placeOnBoard).toHaveBeenCalledWith('center', 5);
     click('Capture a new board');
     click('Remove board');
     expect(placement.removeBoard).toHaveBeenCalledTimes(1);

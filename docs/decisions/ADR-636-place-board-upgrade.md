@@ -1,7 +1,7 @@
 ## ADR-636 - Place board: custom shapes, the pointer, nine-point placement (2026-10-19)
 
 **Status:** Accepted. Extends ADR-124 (capture board corners), ADR-125 (fit and array on a board)
-and ADR-126 (board shapes); uses ADR-341 Amendment 5's offset G92. | **Date:** 2026-10-19
+and ADR-126 (board shapes); uses ADR-341 Amendment 5's offset G92 and ADR-638's jig-mode page. | **Date:** 2026-10-19
 
 ### Context
 
@@ -60,10 +60,23 @@ board.
 7. **Orientation.** Rectangle and circle checks, the first-corner test and custom-shape outlines
    use the device origin's axis directions, so they match the physical board on every origin
    corner. Front-left and centre origins behave exactly as before.
-8. **The panel.** Place board is a three-step card (Shape, Capture, Place): shape tiles, a pointer
-   bar, a live map of the captured points with a crosshair at the head or pointer, a beam-off
-   jog pad beside the capture button, and on the Place step the measured board, the placement
-   grid, Fit to board, Fill with copies and the board checks.
+8. **Place Board mode.** A floating card over the canvas covered the artwork it was meant to place,
+   so Place Board became a page, built like jig mode (ADR-638): it takes the place of the tool
+   strip and the main canvas while the machine panel (connect, jog, positioning light) stays
+   docked beside it, and the whole job happens there, from the first capture to the last burn.
+   Its three steps are **1 Capture board** (shape tiles, the pointer bar, the capture card, then
+   the measured board and its checks), **2 Place artwork** (Import artwork, the placement grid,
+   Fit to board, Fill with copies) and **3 Burn** (power, speed and passes for the operations the
+   artwork uses, then the workspace's own Frame and Start, which leave the machine panel while
+   the page is open). Creating the outline moves on to step 2. The page's canvas is jig mode's
+   editing canvas on the open project, so artwork is moved, resized and rotated on the board
+   with ordinary Undo; over it the page paints the points captured so far, the outline they
+   make, the live head or pointer crosshair and the board's check points. Done returns to the
+   main canvas; there is nothing to save. Opening Place Board closes jig mode and the reverse.
+9. **The outline where the board is.** The captured outline is drawn where the board sits on the
+   bed, from its machine position, so it lines up with the captured points and the head marker.
+   This is display only, since the burn is anchored to the work origin; when the position is
+   unknown or off the bed the outline is centred, as before.
 
 ### Alternatives
 

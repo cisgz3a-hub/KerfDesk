@@ -5,6 +5,7 @@
 // axes), so a corner sighted with it is the head position plus that offset,
 // and a move meant to put the light on a point targets the point minus it.
 
+import { nativeToHeadPosition } from '../../../core/devices/head-position-frames';
 import { jogAxisSignsForOrigin } from '../../../core/devices/jog-direction';
 import { toMachineCoords } from '../../../core/devices/origin-transform';
 import {
@@ -16,6 +17,7 @@ import type { Vec2 } from '../../../core/scene';
 import type { BoardAxisSigns } from '../../../core/scene/board-polygon';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
+import { headFrameContext } from '../head-move-dispatch';
 
 const ZERO: Vec2 = { x: 0, y: 0 };
 
@@ -65,4 +67,10 @@ export function boardAxisSigns(): BoardAxisSigns {
 
 export function isFrontLeftSigns(signs: BoardAxisSigns): boolean {
   return signs.x === 1 && signs.y === 1;
+}
+
+/** Where a machine point is on the canvas bed, for drawing it (ADR-636). */
+export function machinePointOnBed(point: Vec2): Vec2 | null {
+  const bed = nativeToHeadPosition(point, 'bed', headFrameContext(useLaserStore.getState()));
+  return bed === null ? null : { x: bed.xMm, y: bed.yMm };
 }

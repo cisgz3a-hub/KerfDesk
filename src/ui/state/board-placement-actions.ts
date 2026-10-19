@@ -9,6 +9,7 @@ import {
   combinedBBox,
   findRegistrationBoxes,
   sceneObjectHasVisibleLayer,
+  type Project,
   type SceneObject,
 } from '../../core/scene';
 import { boardRegionOf } from '../../core/scene/board-region';
@@ -22,6 +23,8 @@ import { useToastStore } from './toast-store';
 
 export type BoardPlacementActions = {
   readonly placeSelectionOnBoard: (anchor: BoardPlacementAnchor, marginMm: number) => void;
+  /** A drag, resize or rotate on the Place Board page's canvas: one Undo step. */
+  readonly commitBoardCanvasEdit: (project: Project) => void;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -30,6 +33,17 @@ export function boardPlacementActions(set: Setter): BoardPlacementActions {
   return {
     placeSelectionOnBoard: (anchor, marginMm) =>
       set((state) => applyPlaceSelectionOnBoard(state, anchor, marginMm)),
+    commitBoardCanvasEdit: (project) =>
+      set((state) =>
+        project === state.project
+          ? state
+          : {
+              project,
+              undoStack: pushUndo(state.project, state.undoStack),
+              redoStack: [],
+              dirty: true,
+            },
+      ),
   };
 }
 

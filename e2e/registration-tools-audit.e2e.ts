@@ -45,6 +45,8 @@ test('Place Board: four captures, outline, point correction and stale epoch refu
   await expect(panel).toContainText('100.0 × 60.0 mm');
   await panel.getByRole('button', { name: 'Create board outline', exact: true }).click();
   await expect(page.getByTestId('board-result')).toContainText('captured-board');
+  // Creating the outline moves on to step 2; the checks are in step 1.
+  await panel.getByRole('button', { name: '1 Capture board', exact: true }).click();
   const verification = panel.getByRole('region', { name: 'Physically check board', exact: true });
   await verification.getByRole('button', { name: 'Top-right', exact: true }).click();
   await panel.getByRole('button', { name: 'No, adjust it', exact: true }).click();

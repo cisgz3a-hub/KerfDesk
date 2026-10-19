@@ -153,16 +153,25 @@ function AppLifecycle(): null {
   return null;
 }
 
-// Jig mode (ADR-634) puts the registration jig page where the tool strip and
-// the main canvas are. The side panels stay, so the machine panel is docked
-// beside the jig while it is laid out, placed and burned.
+// Jig mode (ADR-634) and Place Board mode (ADR-636) put their page where the
+// tool strip and the main canvas are. The side panels stay, so the machine
+// panel is docked beside the page from the first capture to the last burn.
+// The Place Board host is always mounted: it owns the capture session, so
+// leaving and reopening the page resumes it.
 function WorkspaceCentre(): JSX.Element {
   const jigOpen = useUiStore((state) => state.registrationPanelOpen);
-  if (jigOpen) return <RegistrationJigWorkspace />;
+  const boardOpen = useUiStore((state) => state.boardCapturePanelOpen);
   return (
     <>
-      <ToolStrip />
-      <CanvasArea />
+      <BoardCapturePanel />
+      {jigOpen ? (
+        <RegistrationJigWorkspace />
+      ) : boardOpen ? null : (
+        <>
+          <ToolStrip />
+          <CanvasArea />
+        </>
+      )}
     </>
   );
 }
@@ -185,7 +194,6 @@ function CanvasArea(): JSX.Element {
     <>
       <WorkspaceCameraOverlay />
       <CameraPanel />
-      <BoardCapturePanel />
       {!showGcode ? <CncStockCanvasHud /> : null}
       <MachineSetupBanner />
       <UpdatePrompt />

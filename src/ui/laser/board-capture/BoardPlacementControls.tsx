@@ -1,7 +1,7 @@
-// BoardPlacementControls — step 3 of Place board (ADR-124/126/636): with the
-// board captured, place the artwork on it. One layout for every board shape:
-// what was measured, the nine-point placement grid, Fit to board, Array on
-// board, the physical corner checks, and starting over.
+// BoardPlacementControls — the Place Board page's post-capture pieces
+// (ADR-124/126/636). Step 1 keeps the measured board, its physical checks and
+// starting over; step 2 places the artwork: the nine-point grid, Fit to board
+// and Fill with copies.
 
 import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
 import { Button, Icon, type IconName } from '../../kit';
@@ -13,49 +13,24 @@ import { BoardVerificationControls } from './BoardVerificationControls';
 import { useBoardPlacement } from './use-board-placement';
 import type { BoardVerificationController } from './use-board-verification';
 
+/** Step 1 once the board exists: what was measured, its checks, start over. */
 export function BoardPlacementControls(props: {
   readonly geometry: CapturedBoardGeometry;
   readonly disabled: boolean;
   readonly verification: BoardVerificationController;
   readonly onReset: () => void;
 }): JSX.Element {
-  const { canAlign, canFit, placeOnBoard, fitToBoard, arrayToBoard, removeBoard } =
-    useBoardPlacement();
+  const { removeBoard } = useBoardPlacement();
   const locked = props.disabled || props.verification.activeTarget !== null;
   return (
     <>
       <BoardSummary geometry={props.geometry} />
-      <div className="lf-place-board__card">
-        <div className="lf-place-board__card-title">
-          <span>Position artwork</span>
-        </div>
-        <BoardAnchorPicker shape={props.geometry.kind} canPlace={canAlign} onPlace={placeOnBoard} />
-      </div>
-      <details className="lf-section" open>
-        <summary title="Scale or centre one design inside the board">Fit to board</summary>
-        <div className="lf-section-body">
-          <BoardFitControls disabled={!canFit} onFit={fitToBoard} />
-        </div>
-      </details>
-      <details className="lf-section">
-        <summary title="Tile copies of one design across the board">Fill with copies</summary>
-        <div className="lf-section-body">
-          <BoardArrayForm disabled={!canFit} onArray={arrayToBoard} />
-        </div>
-      </details>
-      <details className="lf-section" open>
-        <summary title="Move beam-off to board points and check them on the real board">
-          Check the board
-        </summary>
-        <div className="lf-section-body">
-          <BoardVerificationControls
-            geometry={props.geometry}
-            disabled={props.disabled}
-            controller={props.verification}
-          />
-        </div>
-      </details>
-      <div className="lf-place-board__row lf-place-board__row--end">
+      <BoardVerificationControls
+        geometry={props.geometry}
+        disabled={props.disabled}
+        controller={props.verification}
+      />
+      <div className="lf-place-board__row">
         <Button variant="ghost" disabled={locked} onClick={props.onReset}>
           Capture a new board
         </Button>
@@ -76,7 +51,40 @@ export function BoardPlacementControls(props: {
   );
 }
 
-function BoardSummary({ geometry }: { readonly geometry: CapturedBoardGeometry }): JSX.Element {
+/** Step 2: put the selected artwork on the board. */
+export function BoardArtworkPlacement(props: {
+  readonly shape: CapturedBoardGeometry['kind'];
+}): JSX.Element {
+  const { canAlign, canFit, placeOnBoard, fitToBoard, arrayToBoard } = useBoardPlacement();
+  return (
+    <>
+      <div className="lf-place-board__card">
+        <div className="lf-place-board__card-title">
+          <span>Position artwork</span>
+        </div>
+        <BoardAnchorPicker shape={props.shape} canPlace={canAlign} onPlace={placeOnBoard} />
+      </div>
+      <details className="lf-section" open>
+        <summary title="Scale or centre one design inside the board">Fit to board</summary>
+        <div className="lf-section-body">
+          <BoardFitControls disabled={!canFit} onFit={fitToBoard} />
+        </div>
+      </details>
+      <details className="lf-section">
+        <summary title="Tile copies of one design across the board">Fill with copies</summary>
+        <div className="lf-section-body">
+          <BoardArrayForm disabled={!canFit} onArray={arrayToBoard} />
+        </div>
+      </details>
+    </>
+  );
+}
+
+export function BoardSummary({
+  geometry,
+}: {
+  readonly geometry: CapturedBoardGeometry;
+}): JSX.Element {
   const { icon, name, size } = boardDescription(geometry);
   return (
     <div className="lf-place-board__card lf-place-board__card--accent">
@@ -88,9 +96,7 @@ function BoardSummary({ geometry }: { readonly geometry: CapturedBoardGeometry }
       <p>
         <strong>Measured: {size}</strong>
       </p>
-      <p className="lf-place-board__muted">
-        Check it against the physical board. Add your artwork, select it, then place it below.
-      </p>
+      <p className="lf-place-board__muted">Check it against the physical board.</p>
     </div>
   );
 }
