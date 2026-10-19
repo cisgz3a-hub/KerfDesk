@@ -47,6 +47,7 @@ import electronUpdater from 'electron-updater';
 import * as appMenu from './application-menu-policy.js';
 import { installDesktopArtcraftWindow, detachDesktopArtcraftWindows } from './desktop-artcraft.js';
 import { mainWindowWebPreferences } from './desktop-window-options.js';
+import { createStartupWindow } from './startup-window-visibility.js';
 import {
   PACKAGED_RENDERER_URL,
   resolveRendererRuntime,
@@ -208,10 +209,7 @@ const CSP_POLICY = [
   "frame-ancestors 'none'",
 ].join('; ');
 // Runs only while a workspace is admitted past the licence window (ADR-623).
-const cameraBridge = cameraBridgeLifecycle(
-  () => startLocalRtspCameraBridge(),
-  (message, error) => console.warn(message, error),
-);
+const cameraBridge = cameraBridgeLifecycle(() => startLocalRtspCameraBridge());
 app.on('before-quit', () => {
   prepareLicenceQuit?.();
   quitRequested = true;
@@ -268,7 +266,7 @@ function makeAppProtocolHandler(distRoot: string) {
 }
 
 function createMainWindow(bounds: ReturnType<typeof loadWindowPlacement>['bounds']): BrowserWindow {
-  return new BrowserWindow({
+  return createStartupWindow({
     ...bounds,
     show: false,
     autoHideMenuBar: true,

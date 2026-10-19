@@ -8,7 +8,8 @@ export type CameraBridgeHandle = { readonly close: () => Promise<void> };
  */
 export function cameraBridgeLifecycle(
   start: () => Promise<CameraBridgeHandle>,
-  report: (message: string, error: unknown) => void,
+  report: (message: string, error: unknown) => void = (message, error) =>
+    console.warn(message, error),
 ) {
   let handle: CameraBridgeHandle | null = null;
   let chain: Promise<void> = Promise.resolve();
