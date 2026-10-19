@@ -18,6 +18,28 @@ describe('laser lead warnings (ADR-626)', () => {
     ]);
   });
 
+  it('says which operation leaves the scrap side unknown, and how to settle it', () => {
+    const warnings = laserLeadWarnings([
+      {
+        kind: 'laser-leads-side-unknown',
+        layerId: 'cut',
+        layerName: 'Cut',
+        count: 1,
+        aroundName: 'Score',
+      },
+      {
+        kind: 'laser-leads-side-unknown',
+        layerId: 'cut',
+        layerName: 'Cut',
+        count: 2,
+        aroundName: 'Border',
+      },
+    ]);
+    expect(warnings).toEqual([
+      'Lead-in/lead-out on layer "Cut": 3 shapes inside a closed shape on layer "Score", which has no leads, get no leads. That shape may be a part, or only a score line or border, so which side is scrap is unknown. Turn on leads for "Score" if it cuts parts out, or set Lead side to Always outside or Always inside.',
+    ]);
+  });
+
   it('keeps two operations that share a name apart', () => {
     const warnings = laserLeadWarnings([
       { kind: 'laser-leads-tabbed', layerId: 'a:sub-1', layerName: 'Sub-layer 1', count: 1 },

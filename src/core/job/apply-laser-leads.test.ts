@@ -138,13 +138,39 @@ describe('applyLaserLeads (ADR-626)', () => {
     const hole = square(10, 10, 20);
     for (const job of [
       { groups: [group([hole, outer], { laserLeads: LEADS })] },
-      { groups: [group([hole], { laserLeads: LEADS }), group([outer])] },
+      {
+        groups: [
+          group([hole], { laserLeads: LEADS }),
+          group([outer], { laserLeads: { ...LEADS, operationName: 'Outline' } }),
+        ],
+      },
     ] satisfies Job[]) {
       const done = applyLaserLeads(job, NO_BED);
       const holeLead = lead(done, 0, 0);
+      expect(holeLead.closed).toBe(false);
       const first = holeLead.polyline[0] as Vec2;
       expect(pointInPolygon(first, hole.polyline)).toBe(true);
     }
+  });
+
+  it('gives a hole no lead when the outline round it is on an operation without leads', () => {
+    // That outline may be a part, or only a score line or border (ADR-626 Amd 1).
+    const outer = square(0, 0, 40);
+    const hole = square(10, 10, 20);
+    const done = applyLaserLeads(
+      { groups: [group([hole], { laserLeads: LEADS }), group([outer], { layerId: 'Score' })] },
+      NO_BED,
+    );
+    expect(lead(done, 0, 0)).toBe(hole);
+    expect(done.diagnostics).toEqual([
+      {
+        kind: 'laser-leads-side-unknown',
+        layerId: 'L',
+        layerName: 'Cut',
+        count: 1,
+        aroundName: 'Score',
+      },
+    ]);
   });
 
   it('reads a tabbed outline cut in pieces as the contour it still is', () => {
@@ -158,8 +184,14 @@ describe('applyLaserLeads (ADR-626)', () => {
       ...square(10, 10, 20),
       nesting: { forest: 'hole-run', depth: 0, topologyContour: '0' },
     };
+    // Compile keeps the whole outline (CutGroup.topologyRings); its operation
+    // asks for leads, though its tabbed contour gets none.
+    const outline = {
+      laserLeads: LEADS,
+      topologyRings: [{ forest: 'outline-run', contour: '0', polyline: outer }],
+    };
     const done = applyLaserLeads(
-      { groups: [group([hole], { laserLeads: LEADS }), group(pieces)] },
+      { groups: [group([hole], { laserLeads: LEADS }), group(pieces, outline)] },
       NO_BED,
     );
     expect(pointInPolygon(lead(done).polyline[0] as Vec2, hole.polyline)).toBe(true);

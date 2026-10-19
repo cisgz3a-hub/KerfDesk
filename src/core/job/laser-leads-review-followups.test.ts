@@ -52,10 +52,13 @@ describe('laser lead review follow-ups', () => {
     const job = {
       groups: [
         group(inner, { laserLeads: LEADS }),
-        ...[0, 0.006, 0.012, 0.018].map((shift) => group(square(shift, shift, 40))),
+        ...[0, 0.006, 0.012, 0.018].map((shift) =>
+          group(square(shift, shift, 40), { laserLeads: LEADS }),
+        ),
       ],
     };
-    expect(leadJobLines(job).depths[0]).toBe(2);
+    // Two outlines, so an even count: outside.
+    expect(leadJobLines(job).sides[0]?.side).toBe('outside');
     const led = applyLaserLeads(job, { bed: null }).groups[0];
     expect(led?.kind).toBe('cut');
     if (led?.kind !== 'cut') throw new Error('expected cut');
@@ -73,7 +76,12 @@ describe('laser lead review follow-ups', () => {
   it('counts an enclosing Ruida contour whose nonzero 14-bit power rounds to GRBL S0', () => {
     const inner = square(10, 10, 10);
     const led = applyLaserLeads(
-      { groups: [group(inner, { laserLeads: LEADS }), group(square(0, 0, 40), { power: 0.01 })] },
+      {
+        groups: [
+          group(inner, { laserLeads: LEADS }),
+          group(square(0, 0, 40), { power: 0.01, laserLeads: LEADS }),
+        ],
+      },
       { bed: null, device: { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'ruida' } },
     ).groups[0];
     if (led?.kind !== 'cut') throw new Error('expected cut');

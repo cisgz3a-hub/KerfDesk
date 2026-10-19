@@ -1,7 +1,7 @@
 // Laser leads against native arcs and many-piece outlines (ADR-626): a lead
 // joins a G2/G3 contour along the arc's own tangent, neighbours that go out as
 // arcs are measured by their sweep, and an outline cut as thousands of dashes
-// still counts as a container.
+// still counts as a container, through the whole outline compile keeps.
 
 import { describe, expect, it } from 'vitest';
 import type { ArcMove } from '../geometry/arc-fit';
@@ -132,9 +132,17 @@ describe('laser leads with arcs and many pieces (ADR-626)', () => {
     const hole = square(40, 40, 20, {
       nesting: { forest: 'hole-run', depth: 0, topologyContour: '0' },
     });
+    // Compile keeps the whole outline; its operation asks for leads, though
+    // its dashes get none.
+    const outline = {
+      laserLeads: LEADS,
+      topologyRings: [
+        { forest: 'outline-run', contour: '0', polyline: square(0, 0, 100).polyline },
+      ],
+    };
     const started = performance.now();
     const done = applyLaserLeads(
-      { groups: [group([hole], { laserLeads: LEADS }), group(pieces)] },
+      { groups: [group([hole], { laserLeads: LEADS }), group(pieces, outline)] },
       { bed: null },
     );
     expect(performance.now() - started).toBeLessThan(5000);

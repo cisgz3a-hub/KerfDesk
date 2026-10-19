@@ -284,11 +284,12 @@ export function completePreparedOutput(
     laserPowerScaleVersion: CURRENT_LASER_POWER_SCALE_VERSION,
     // ADR-626: leads join each contour where the beam really starts, so they
     // follow the planner and the job start point. A job without leads is
-    // returned as is.
-    job: applyLaserLeads(
-      started,
-      laserLeadOptions(input.project.device, input.project.machine, entryBounds),
-    ),
+    // returned as is. The scrap side is judged among the whole scene's
+    // contours, so the output scope cannot change it (Amendment 1).
+    job: applyLaserLeads(started, {
+      ...laserLeadOptions(input.project.device, input.project.machine, entryBounds),
+      scene: input.sourceProject.scene,
+    }),
     jobOriginOffset: offset,
     advisories: input.advisories,
   };

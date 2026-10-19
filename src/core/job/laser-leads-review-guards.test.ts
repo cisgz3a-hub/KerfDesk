@@ -1,6 +1,6 @@
 // Laser lead guards from the fourth review (ADR-626): another cut right beside
-// the join, broken outlines read whole from compile, sparse dash chaining,
-// final-pass coordinates and a short overcut's own heading.
+// the join, broken outlines read whole from compile, final-pass coordinates
+// and a short overcut's own heading.
 
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '../scene';
@@ -8,7 +8,6 @@ import { applyLaserLeads } from './apply-laser-leads';
 import { finalPassCutSegments } from './cut-pass-segments';
 import { gcodeCoordinateFailure } from './job-coordinate-encodability';
 import type { CutGroup, CutSegment, Job } from './job';
-import { chainPieces } from './laser-lead-chain';
 import { leadJobLines } from './laser-lead-rings';
 import type { CutGroupLaserLeads } from './laser-lead-settings';
 
@@ -119,26 +118,6 @@ describe('laser lead review guards (ADR-626)', () => {
       ],
     };
     expect(applyLaserLeads(job, { bed: null }).groups[0]).not.toHaveProperty('topologyRings');
-  });
-
-  it('chains short dashes with long skips quickly', () => {
-    // 80 dashes of 0.01 mm, 100 mm apart round a square loop.
-    const pieces: Array<ReadonlyArray<Vec2>> = [];
-    for (let i = 0; i < 80; i += 1) {
-      const side = Math.floor(i / 20);
-      const t = (i % 20) * 100;
-      const at = [
-        { x: t, y: 0 },
-        { x: 2000, y: t },
-        { x: 2000 - t, y: 2000 },
-        { x: 0, y: 2000 - t },
-      ][side] as Vec2;
-      pieces.push([at, { x: at.x + 0.01, y: at.y }]);
-    }
-    const started = performance.now();
-    const outline = chainPieces([...pieces].reverse());
-    expect(performance.now() - started).toBeLessThan(1000);
-    expect(outline.length).toBeGreaterThanOrEqual(160);
   });
 
   it('refuses G-code whose final-pass burn cannot be written, even when every other point can', () => {

@@ -108,7 +108,7 @@ describe('laser lead geometry guards (ADR-626)', () => {
     for (const point of first(done).polyline) expect(point.x - wall).toBeGreaterThanOrEqual(0.2);
   });
 
-  it('puts back the corner a tab gap skips, so a hole near that corner still leads inside', () => {
+  it('reads the whole outline where a tab gap skips a corner, so a hole there leads inside', () => {
     const nesting = { forest: 'outline-run', depth: 0, topologyContour: '0' };
     // The outline's corner at (40, 0) falls in a tab gap from (30, 0) to (40, 10).
     const pieces: CutSegment[] = [
@@ -134,8 +134,15 @@ describe('laser lead geometry guards (ADR-626)', () => {
     const hole = square(36, 1, 3, {
       nesting: { forest: 'hole-run', depth: 0, topologyContour: '0' },
     });
+    // Compile keeps the whole outline, corner and all (CutGroup.topologyRings).
+    const outline = {
+      laserLeads: LEADS,
+      topologyRings: [{ forest: 'outline-run', contour: '0', polyline: square(0, 0, 40).polyline }],
+    };
     const done = applyLaserLeads(
-      { groups: [group([hole], { laserLeads: { ...LEADS, lengthMm: 1 } }), group(pieces)] },
+      {
+        groups: [group([hole], { laserLeads: { ...LEADS, lengthMm: 1 } }), group(pieces, outline)],
+      },
       NO_BED,
     );
     expect(pointInPolygon(first(done).polyline[0] as Vec2, hole.polyline)).toBe(true);
@@ -295,8 +302,15 @@ describe('laser lead geometry guards (ADR-626)', () => {
       closed: true,
     };
     const leads = { ...LEADS, style: 'line' as const, angleDeg: 90, lengthMm: 3, leadOut: false };
+    const outline = closed([
+      { x: 10.6, y: 0 },
+      { x: 11.4, y: 0 },
+      { x: 11.4, y: 10 },
+      { x: 10.6, y: 10 },
+    ]).polyline;
+    const topologyRings = [{ forest: 'strip-run', contour: '0', polyline: outline }];
     const done = applyLaserLeads(
-      { groups: [group([part], { laserLeads: leads }), group(strip)] },
+      { groups: [group([part], { laserLeads: leads }), group(strip, { topologyRings })] },
       NO_BED,
     );
     const led = first(done);

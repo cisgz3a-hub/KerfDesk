@@ -21,6 +21,13 @@ type LeadDiagnostic =
       readonly layerName: string;
       readonly shortened: number;
       readonly omitted: number;
+    }
+  | {
+      readonly kind: 'laser-leads-side-unknown';
+      readonly layerId: string;
+      readonly layerName: string;
+      readonly count: number;
+      readonly aroundName: string;
     };
 
 export function isLaserLeadDiagnostic<T extends { readonly kind: string }>(
@@ -29,7 +36,8 @@ export function isLaserLeadDiagnostic<T extends { readonly kind: string }>(
   return (
     diagnostic.kind === 'laser-leads-perforated' ||
     diagnostic.kind === 'laser-leads-tabbed' ||
-    diagnostic.kind === 'laser-leads-adjusted'
+    diagnostic.kind === 'laser-leads-adjusted' ||
+    diagnostic.kind === 'laser-leads-side-unknown'
   );
 }
 
@@ -59,6 +67,8 @@ function mergedLeadDiagnostic(earlier: LeadDiagnostic, next: LeadDiagnostic): Le
       shortened: earlier.shortened + next.shortened,
       omitted: earlier.omitted + next.omitted,
     };
+  if (earlier.kind === 'laser-leads-side-unknown' && next.kind === 'laser-leads-side-unknown')
+    return { ...earlier, count: earlier.count + next.count };
   return earlier;
 }
 
@@ -71,6 +81,8 @@ function laserLeadWarning(diagnostic: LeadDiagnostic): string {
       return `${where}: ${shapes(diagnostic.count)} with tabs ${diagnostic.count === 1 ? 'gets' : 'get'} no leads. A tabbed shape starts and stops at its tabs, where the edge is broken anyway.`;
     case 'laser-leads-adjusted':
       return `${where}: ${adjustedParts(diagnostic.shortened, diagnostic.omitted)}, because a full lead there would leave the scrap side, come too close to another cut line or run off the bed. Check the preview.${diagnostic.omitted > 0 ? ' Where a lead is missing, that shape starts or stops on its edge, as with leads off.' : ''}`;
+    case 'laser-leads-side-unknown':
+      return `${where}: ${shapes(diagnostic.count)} inside a closed shape on layer "${diagnostic.aroundName}", which has no leads, ${diagnostic.count === 1 ? 'gets' : 'get'} no leads. That shape may be a part, or only a score line or border, so which side is scrap is unknown. Turn on leads for "${diagnostic.aroundName}" if it cuts parts out, or set Lead side to Always outside or Always inside.`;
   }
 }
 

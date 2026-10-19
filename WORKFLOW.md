@@ -1169,7 +1169,13 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    (10° to 90°, default 45°) is the angle a line meets the cut at, 90° coming straight in from the
    side.
 3. **Side**: **Scrap side (automatic)** puts the leads outside a shape and inside a hole, judged
-   across every Line operation in the job, so a hole cut by its own operation still counts as a hole.
+   among the closed shapes of every Line operation with leads in the project, so a hole cut by its
+   own operation still counts as a hole, and **Cut selected graphics**, an operation with output
+   off or a disabled sub-layer does not change the side. The same shape cut by several operations,
+   with or without a kerf offset, counts once. A closed shape on an operation without leads (a
+   score line, a sheet border, or a part whose operation has no leads) could be either, so the
+   shapes inside it get no leads, and Job Review names that operation: turn on its leads if it cuts
+   parts out, or choose a fixed side. One that burns nothing (0% power) does not count.
    **Always outside** and **Always inside** put every lead of the operation on that side.
 4. Leads join each closed shape where it really starts, so they follow **Start closed shapes**
    (F-A9e) and the job start point. Where no lead fits there (a hole that starts at a corner), the

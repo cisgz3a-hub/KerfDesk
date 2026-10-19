@@ -19,7 +19,13 @@ type AnyCompileDiagnostic = NonNullable<CompiledJob['diagnostics']>[number];
 // Laser lead diagnostics (ADR-626) have their own wording and merging.
 type CompileDiagnostic = Exclude<
   AnyCompileDiagnostic,
-  { readonly kind: 'laser-leads-perforated' | 'laser-leads-tabbed' | 'laser-leads-adjusted' }
+  {
+    readonly kind:
+      | 'laser-leads-perforated'
+      | 'laser-leads-tabbed'
+      | 'laser-leads-adjusted'
+      | 'laser-leads-side-unknown';
+  }
 >;
 
 const FILL_COLLAPSED_AT_PRECISION_WARNING = (layerName: string): string =>

@@ -22,7 +22,7 @@ export function lineTopologyCollections(
 ): ReadonlyMap<VectorProcessBucket, LineSegmentCollection> {
   const collected = buckets.map((bucket) => ({
     bucket,
-    source: collectLineSourcesForLayer(bucket.objects, bucket.layer, device),
+    source: collectLineSourcesForLayer(bucket.objects, bucket.layer, device, keepLeadRings),
   }));
   const all = collected.flatMap(({ source }) => [
     ...source.kerf.flatMap((path) => path.sources.map(asContour)),
@@ -97,9 +97,9 @@ function brokenContourRings(
   );
   return before.flatMap((segment) => {
     const contour = segment.nesting?.topologyContour;
-    return segment.closed && contour !== undefined && !whole.has(contour)
-      ? [{ forest, contour, polyline: segment.polyline }]
-      : [];
+    if (!segment.closed || contour === undefined || whole.has(contour)) return [];
+    const ring = { forest, contour, polyline: segment.polyline };
+    return [segment.leadSource === undefined ? ring : { ...ring, leadSource: segment.leadSource }];
   });
 }
 

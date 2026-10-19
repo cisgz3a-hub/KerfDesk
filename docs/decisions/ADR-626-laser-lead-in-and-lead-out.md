@@ -49,7 +49,8 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    along the cut; a lead-out leaves the end heading along it. Directions are read over 0.05 mm of path,
    or, for a contour that goes out as G2/G3, from its first and last moves, so an arc lead meets an arc
    move tangentially.
-3. **The scrap side is found** (`core/job/laser-lead-rings.ts`). Automatic puts a lead outside an outer
+3. **The scrap side is found** (`core/job/laser-lead-rings.ts`; Amendment 1 changes which contours
+   are counted and how copies are matched). Automatic puts a lead outside an outer
    contour and inside a hole, by containment parity judged as line topology judges it
    (`proper-contour-containment.ts`: the whole outline must lie inside, so a contour that crosses
    into a concave neighbour is not read as its hole), counted over every closed contour of every
@@ -60,10 +61,7 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    perforation broke into pieces still counts: compile keeps its whole outline on the cut group
    (`CutGroup.topologyRings`, matched to the pieces by their topology identity, ADR-486 Amd 2;
    translated with the job, dropped from the prepared job once leads are placed, and kept only when
-   some operation or artwork in the scene asks for leads). A job from before that rebuilds the outline
-   from its pieces (`core/job/laser-lead-chain.ts`, an endpoint grid sized to the outline, so
-   thousands of sparse dashes chain quickly); where a gap skips a corner, the corner is put back where
-   the edges on either side meet, so a hole in the corner is still inside. Copies of one outline, such
+   some operation or artwork in the scene asks for leads). Copies of one outline, such
    as an outline cut by two operations, count once, or a hole inside a twice-cut outline would read as
    an outer contour. A copy has the same bounds and length within 0.01 mm and is the same loop corner
    by corner within 0.01 mm, however it starts or runs; a vertex that only splits a straight edge (an
@@ -189,12 +187,12 @@ outline, the bed, open paths, overcut on the final pass with its own lead-out, a
 `core/job/laser-leads-edge-cases.test.ts` covers a hole inside an outline cut by two operations, an
 arc lead whose sweep bulges past its samples at the bed edge, and the final-pass burn through the
 rotary Y mapping and the Ruida export's range check. `core/job/laser-leads-geometry-guards.test.ts`
-covers an arc's sag near another cut, a corner skipped by a tab gap, mirrored shapes with equal bounds
+covers an arc's sag near another cut, a corner a tab gap skips, mirrored shapes with equal bounds
 and length, a 1 km cut line, the rotary bed, a one-pass overcut and the lead-out it never cuts;
 `layer-default-settings-leads.test.ts` covers saved defaults and recipe steps without leads.
 `core/job/laser-leads-arcs-and-pieces.test.ts` covers the arc tangent at a G2/G3 join, neighbours
 measured by their arcs and an outline cut as 3,000 dashes. `core/job/laser-leads-review-guards.test.ts`
-covers a cut beside the join, broken outlines read whole from compile, sparse dashes, final-pass
+covers a cut beside the join, broken outlines read whole from compile, final-pass
 coordinates in the G-code check and a very short overcut. `core/job/laser-leads-restart-and-rings.test.ts`
 covers a corner-started hole on finely divided sides, outlines kept only when leads are asked for,
 copies started elsewhere or run the other way, and an outline that burns nothing.
@@ -213,3 +211,75 @@ Ruida plans with leads off (set or absent) on GRBL, arc GRBL, Marlin and Smoothi
 passes and with and without overcut, and show leads on every pass, in Marlin, Smoothieware and Ruida
 output, in Frame bounds, the preview route and the time estimate, unchanged CNC output, and the
 settings surviving save and load. Not qualified on a machine: a scrap test cut is still needed.
+
+### Amendment 1 — the scrap side is judged among the scene's lead operations (2026-10-20)
+
+An audit of the open PR found two ways **Scrap side (automatic)** could burn a lead into the
+finished part, both reproduced end to end:
+
+1. The side was judged among the prepared job's contours only. **Cut selected graphics**, an
+   operation with output off and a disabled sub-layer take contours out of the scene before compile,
+   so a 10 mm hole selected alone, or whose plate's operation was off, had nothing round it, was read
+   as an outer contour, and both its leads went about 2 mm into the plate at cut power.
+2. Every closed contour of every burning Line operation counted as a container. A 10% score ring
+   between a plate and its hole, a sheet border round the plate, or the plate cut again by a second
+   operation with a 0.1 mm kerf offset (beyond the 0.01 mm copy tolerance) flipped the parity and
+   sent leads into the part, or dropped the plate's own.
+
+Decision:
+
+1. **Judged among the scene** (`core/job/laser-lead-sides.ts`). Preparation hands
+   `applyLaserLeads` the project's whole scene (`prepareOutput`'s source project, before the output
+   scope). Its contours are every closed polyline of every Line operation and sub-operation, read
+   with each artwork's own settings, output on or off, selected or not, in scene coordinates;
+   containment does not depend on the job origin. One whose power burns nothing (judged as the job
+   start mark judges it, `vectorPowerReachesController`) still holds no part. The bed, clearance and
+   free-end checks stay with the prepared job: they are about the lines actually cut.
+2. **Matched by identity.** Compile stamps each closed Line contour with the scene contour it comes
+   from (`CutSegment.leadSource`: artwork id, path index, polyline index), only when some operation
+   asks for leads (the same switch that keeps broken outlines). A kerf contour takes the source
+   contour of its path nearest to it (`kerfRingOwners`, sampled distance among the sources within
+   its mitre reach), and a broken contour's kept outline carries the stamp too. Preparation drops the
+   stamps with the kept outlines, so a prepared job never carries them and output with leads off is
+   unchanged. All rings of one scene contour are copies, whatever kerf offset each operation applies;
+   artworks drawn on top of each other are still matched by shape within 0.01 mm
+   (`laser-lead-copies.ts`, unchanged rule), now on their source outlines, so a kerf offset cannot
+   separate them. Two rings of one cut group from one scene contour that are not the same outline
+   are the pieces a kerf offset split it into: they are not copies, and each keeps clear of the
+   other.
+3. **Only operations with leads decide.** Asking for a lead says an operation cuts parts out, so its
+   closed shapes are part edges. A contour held only by such shapes is a hole when an odd number
+   hold it. A closed shape on an operation without leads may be a part (an outline whose operation
+   simply has no leads) or only a score line or sheet border, and parity cannot tell which: guessing
+   either way can lead into a part. So under **Scrap side (automatic)** a contour any such shape
+   holds gets no leads and is cut as with leads off, and Job Review warns
+   (`laser-leads-side-unknown`), naming the operation and saying to turn on its leads if it cuts
+   parts out, or to choose **Always outside** or **Always inside**. "A hole cut by its own operation
+   is therefore still a hole" now holds when the outline's operation has leads too. The fixed sides
+   are unchanged.
+4. **No outline rebuilt from pieces.** `laser-lead-chain.ts` rebuilt a broken outline from its
+   pieces for a job compiled before outlines were kept. Every job `applyLaserLeads` sees is compiled
+   in the same preparation, which keeps the outlines whenever the scene asks for leads
+   (`sceneAsksForLaserLeads`), the only case in which a group carries leads, so that path could not
+   run in the app. It and its two chain-only tests are removed; a broken contour with no kept outline
+   is not a ring.
+
+Consequences: a burning sheet border or score ring on an operation without leads costs the leads of
+the shapes inside it, with a warning, where it used to risk a lead into a part; a guide outline only
+stops counting at 0% power or when deleted. Line kerf compensation still judges a contour's side
+among its own operation's contours (`compile-line-topology.ts`), so a hole cut by its own
+operation with a kerf offset is offset as an outline, as before this ADR. Leads do not make that
+worse: they are fitted to the path actually cut and go only to the side the scene's lead operations
+say is scrap.
+
+Verification: `io/gcode/laser-leads-scrap-side.test.ts` prepares real projects and checks where
+every lead ends: a separate hole selected alone, the plate's operation output off (with and without
+leads on it), a score ring between plate and hole, a burning and a 0% sheet border, the plate cut
+again with a 0.1 mm kerf offset (with and without leads), a plate drawn with its hole under a
+±0.1 mm kerf offset, and a tabbed plate. The selected-hole, output-off, score-ring, sheet-border
+and kerf-copy cases failed before this amendment (leads in the part, or none on the plate).
+`core/job/laser-lead-sides.test.ts` covers parity among lead operations, the unknown side, copies
+by identity and by shape, and kerf pieces of one group. `io/gcode/laser-leads-output.test.ts` pins
+the G-code of an arc-capable GRBL disc with two passes and a 1 mm overcut: G2/G3 lead-in and
+lead-out on the first pass, and a chord final pass that runs past the start and leaves by its own
+lead-out. `ui/laser/laser-lead-warnings.test.ts` pins the new warning. Not qualified on a machine.

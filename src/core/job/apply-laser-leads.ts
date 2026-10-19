@@ -11,8 +11,9 @@
 // without knowing about them. A group without leads is returned as is, so a
 // job without leads is the same object and its output is byte-identical.
 //
-// - Scrap side: outside an outer contour, inside a hole (laser-lead-rings.ts),
-//   unless the operation puts every lead outside or inside.
+// - Scrap side: outside an outer contour, inside a hole, judged among the
+//   scene's contours (laser-lead-sides.ts), unless the operation puts every
+//   lead outside or inside. A contour whose side is unknown gets no leads.
 // - A lead that does not fit is shortened, down to a quarter of its length,
 //   or left out (laser-lead-fit.ts); Job Review says how many.
 // - Passes: every pass cuts lead-in, contour, lead-out. Overcut (ADR-415) still
@@ -26,7 +27,7 @@
 import type { DeviceProfile } from '../devices';
 import { sampleArcMoves } from '../geometry/arc-fit';
 import { overcutClosedPolyline } from '../geometry/overcut';
-import type { Vec2 } from '../scene';
+import type { Scene, Vec2 } from '../scene';
 import {
   emittedCutArcMoves,
   validCutArcMoves,
@@ -46,7 +47,13 @@ import {
   scrapNormal,
 } from './laser-lead-contour';
 import type { LeadJoin, LeadShape } from './laser-lead-path';
-import { leadJobLines, OBSTACLE_ARC_SAGITTA_MM, type LeadJobLines } from './laser-lead-rings';
+import {
+  leadJobLines,
+  OBSTACLE_ARC_SAGITTA_MM,
+  withoutLeadScaffolding,
+  type LeadJobLines,
+} from './laser-lead-rings';
+import { sceneLeadSideContours } from './laser-lead-sides';
 import {
   leadSpan,
   leadWrap,
@@ -66,6 +73,9 @@ export type LaserLeadOptions = {
   readonly wrapMm?: number | null;
   /** The machine, so a power that rounds to S0 counts as no burn. */
   readonly device?: DeviceProfile;
+  /** The whole scene, output scope aside, whose contours decide each
+   * contour's scrap side (ADR-626 Amd 1); absent, the job's own do. */
+  readonly scene?: Pick<Scene, 'layers' | 'objects'>;
 };
 
 type LeadWorld = LeadJobLines & {
@@ -78,16 +88,25 @@ type LeadWorld = LeadJobLines & {
   readonly leadLines: Map<number, number[]>;
 };
 
-type LeadCounts = { readonly layerName: string; shortened: number; omitted: number };
+type LeadCounts = {
+  readonly layerName: string;
+  shortened: number;
+  omitted: number;
+  /** Contours left without leads because their scrap side is unknown. */
+  sideUnknown: number;
+  aroundName: string;
+};
 
 export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   if (!job.groups.some((group) => group.kind === 'cut' && group.laserLeads !== undefined))
-    return withoutTopologyRings(job);
+    return withoutLeadScaffolding(job);
   // As the job start mark judges it: a power the controller rounds to S0
   // burns nothing, so it gets no leads and holds no part.
   const burns = (group: CutGroup): boolean =>
     isBurningLineGroup(group) && hasJobStartPower(group, options.device);
-  const lines = leadJobLines(job, burns);
+  const scene =
+    options.scene === undefined ? undefined : sceneLeadSideContours(options.scene, options.device);
+  const lines = leadJobLines(job, burns, scene);
   const obstacles = LeadObstacles.create(lines.lines, lines.rings);
   const wrap = leadWrap(options.wrapMm, lines.lines);
   for (const line of lines.lines) {
@@ -102,7 +121,7 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
     leadLines: new Map(),
   };
   const counts = new Map<string, LeadCounts>();
-  const groups = withoutTopologyRings(job).groups.map((group, groupIndex) => {
+  const groups = withoutLeadScaffolding(job).groups.map((group, groupIndex) => {
     // A group that burns nothing gets no leads: they would burn nothing too.
     if (group.kind !== 'cut' || group.laserLeads === undefined || !burns(group)) return group;
     const tally = countsFor(counts, group.layerId, group.laserLeads.operationName);
@@ -127,41 +146,40 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   };
 }
 
-// The broken-contour outlines compile kept for leads (CutGroup.topologyRings)
-// are spent once leads are placed: dropped, so no later transform of the job
-// can leave them stale. A job without them is the same object.
-function withoutTopologyRings(job: Job): Job {
-  if (!job.groups.some((group) => group.kind === 'cut' && group.topologyRings !== undefined))
-    return job;
-  return {
-    ...job,
-    groups: job.groups.map((group) => {
-      if (group.kind !== 'cut' || group.topologyRings === undefined) return group;
-      const { topologyRings: _spent, ...rest } = group;
-      return rest;
-    }),
-  };
-}
-
 // By operation id: two operations can share a name (each parent's Sub-layer 1).
 function countsFor(counts: Map<string, LeadCounts>, layerId: string, name: string): LeadCounts {
   const existing = counts.get(layerId);
   if (existing !== undefined) return existing;
-  const created = { layerName: name, shortened: 0, omitted: 0 };
+  const created = { layerName: name, shortened: 0, omitted: 0, sideUnknown: 0, aroundName: '' };
   counts.set(layerId, created);
   return created;
 }
 
 function leadDiagnostics(counts: ReadonlyMap<string, LeadCounts>): JobDiagnostic[] {
-  return [...counts.entries()]
-    .filter(([, tally]) => tally.shortened > 0 || tally.omitted > 0)
-    .map(([layerId, tally]) => ({
-      kind: 'laser-leads-adjusted',
-      layerId,
-      layerName: tally.layerName,
-      shortened: tally.shortened,
-      omitted: tally.omitted,
-    }));
+  return [...counts.entries()].flatMap(([layerId, tally]): JobDiagnostic[] => [
+    ...(tally.shortened > 0 || tally.omitted > 0
+      ? [
+          {
+            kind: 'laser-leads-adjusted' as const,
+            layerId,
+            layerName: tally.layerName,
+            shortened: tally.shortened,
+            omitted: tally.omitted,
+          },
+        ]
+      : []),
+    ...(tally.sideUnknown > 0
+      ? [
+          {
+            kind: 'laser-leads-side-unknown' as const,
+            layerId,
+            layerName: tally.layerName,
+            count: tally.sideUnknown,
+            aroundName: tally.aroundName,
+          },
+        ]
+      : []),
+  ]);
 }
 
 function leadSegment(
@@ -171,6 +189,14 @@ function leadSegment(
   world: LeadWorld,
   tally: LeadCounts,
 ): CutSegment {
+  // Automatic, and a closed shape on an operation without leads holds it: it
+  // may be a part, so no side is safe.
+  const unknown = unknownSide(group, key, world);
+  if (unknown !== null) {
+    tally.sideUnknown += 1;
+    if (tally.aroundName === '') tally.aroundName = unknown;
+    return segment;
+  }
   const planned = leadAttempt(segment, group, key, world);
   if (planned === null) {
     tally.omitted += 1;
@@ -188,6 +214,15 @@ function leadSegment(
   if (leadIn === null && leadOut === null && (finalPass?.fit ?? null) === null) return segment;
   recordLeads(world, attempt);
   return leadedSegment(attempt.segment, leadIn, leadOut, finalPass, group.passes);
+}
+
+/** The operation whose shape leaves the side unknown, or null when known. */
+function unknownSide(group: CutGroup, key: string, world: LeadWorld): string | null {
+  if (group.laserLeads?.side !== 'auto') return null;
+  const lineId = world.lineOf.get(key);
+  const ringId = lineId === undefined ? undefined : world.ringOfLine.get(lineId);
+  const verdict = ringId === undefined ? undefined : world.sides[ringId];
+  return verdict?.side === 'unknown' ? (verdict.aroundName ?? '') : null;
 }
 
 type LeadAttempt = {
@@ -304,7 +339,7 @@ function leadPlan(
   if (spec === undefined || lineId === undefined || ringId === undefined || joins === null)
     return null;
   const inside =
-    spec.side === 'auto' ? (world.depths[ringId] ?? 0) % 2 === 1 : spec.side === 'inside';
+    spec.side === 'auto' ? world.sides[ringId]?.side === 'inside' : spec.side === 'inside';
   const join = (at: Vec2, tangent: Vec2): LeadJoin => ({
     at,
     tangent,

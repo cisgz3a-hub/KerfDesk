@@ -18,6 +18,7 @@ import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
   IDENTITY_TRANSFORM,
+  type CurveSubpath,
   type Layer,
   type LayerOperationSettings,
   type Polyline,
@@ -73,6 +74,66 @@ function plate(device: DeviceProfile, settings: Partial<LayerOperationSettings> 
           bounds: { minX: 20, minY: 20, maxX: 60, maxY: 60 },
           transform: IDENTITY_TRANSFORM,
           paths: [{ color: '#ff0000', polylines: [square(20, 60), square(35, 45)] }],
+        },
+      ],
+    },
+  };
+}
+
+const K = (4 / 3) * Math.tan(Math.PI / 8);
+
+/** A circle as four cubic quarters, counter-clockwise from its right. */
+function circle(cx: number, cy: number, r: number): CurveSubpath {
+  const k = K * r;
+  const quarter = (to: Vec2, c1: Vec2, c2: Vec2) => ({
+    kind: 'cubic' as const,
+    control1: c1,
+    control2: c2,
+    to,
+  });
+  const right = { x: cx + r, y: cy };
+  const top = { x: cx, y: cy + r };
+  const left = { x: cx - r, y: cy };
+  const bottom = { x: cx, y: cy - r };
+  return {
+    start: right,
+    closed: true,
+    segments: [
+      quarter(top, { x: cx + r, y: cy + k }, { x: cx + k, y: cy + r }),
+      quarter(left, { x: cx - k, y: cy + r }, { x: cx - r, y: cy + k }),
+      quarter(bottom, { x: cx - r, y: cy - k }, { x: cx - k, y: cy - r }),
+      quarter(right, { x: cx + k, y: cy - r }, { x: cx + r, y: cy - k }),
+    ],
+  };
+}
+
+/** A 10 mm disc on an arc machine: two passes, a 1 mm overcut, leads on. */
+function disc(): Project {
+  const layer: Layer = {
+    ...createLayer({ id: 'cut', color: '#ff0000' }),
+    ...LEADS_ON,
+    passes: 2,
+    overcutMm: 1,
+  };
+  const outline = circle(40, 40, 5);
+  return {
+    ...createProject(ARC_DEVICE),
+    scene: {
+      layers: [layer],
+      objects: [
+        {
+          kind: 'imported-svg',
+          id: 'disc',
+          source: 'disc.svg',
+          bounds: { minX: 35, minY: 35, maxX: 45, maxY: 45 },
+          transform: IDENTITY_TRANSFORM,
+          paths: [
+            {
+              color: '#ff0000',
+              polylines: [{ points: [outline.start], closed: true }],
+              curves: [outline],
+            },
+          ],
         },
       ],
     },
@@ -164,6 +225,27 @@ describe('laser leads in prepared output (ADR-626)', () => {
     expect(estimateJobDuration(leaded, device).totalSeconds).toBeGreaterThan(
       estimateJobDuration(plain, device).totalSeconds,
     );
+  });
+
+  it('pins the G2/G3 leads of an arc contour and the lead-out after the final overcut', () => {
+    const lines = emitGcode(disc()).gcode.split('\n');
+    const passes = lines.flatMap((line, index) => (line.startsWith('; pass ') ? [index] : []));
+    const [first, second] = passes;
+    if (first === undefined || second === undefined) throw new Error('expected two passes');
+    const burns = (from: number, to?: number) =>
+      lines.slice(from + 1, to).filter((line) => /^G[123] /.test(line));
+    const pass1 = burns(first, second);
+    const pass2 = burns(second);
+    // Pass 1 goes out as G2/G3: an arc lead-in, the circle, an arc lead-out.
+    expect(pass1[0]).toMatch(/^G[23] /);
+    expect(pass1.at(-1)).toMatch(/^G[23] /);
+    // The final pass is chords (ADR-415): round once, on past the start by the
+    // overcut, then its own lead-out.
+    expect(pass2.some((line) => /^G[23] /.test(line))).toBe(false);
+    const start = pass1[0]?.match(/X\S+ Y\S+/)?.[0] ?? '';
+    expect(pass2.filter((line) => line.includes(start))).toHaveLength(2);
+    expect(pass2.at(-1)).not.toContain(start);
+    expect(lines.slice(first).join('\n')).toMatchSnapshot();
   });
 
   it('leaves CNC output alone', () => {

@@ -17,7 +17,8 @@ export type LeadRing = {
   readonly lengthMm: number;
   /** The lines that burn this ring. */
   readonly lineIds: ReadonlyArray<number>;
-  readonly nesting?: { readonly forest: string; readonly depth: number };
+  /** The scene contour it was cut from (CutSegment.leadSource), when known. */
+  readonly source?: string;
 };
 
 const CELL_MM = 1;

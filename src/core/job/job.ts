@@ -69,6 +69,11 @@ export type CutSegment = {
    * finalPassCutSegments; bounds, coordinate checks and the rotary mapping read
    * it too. Written as chords, as an overcut final pass always is (ADR-415). */
   readonly finalPassBurn?: { readonly polyline: ReadonlyArray<Vec2> };
+  /** ADR-626 Amd 1: the scene contour a closed Line contour was cut from
+   * (laserLeadSourceKey), so leads judge its scrap side among the whole
+   * scene's contours. Compile writes it only when some operation asks for
+   * leads; preparation drops it once leads are placed. */
+  readonly leadSource?: string;
 };
 
 /** Fitted line/arc moves for a CutSegment (ADR-432), with a fingerprint of
@@ -141,6 +146,8 @@ export type CutTopologyRing = {
   readonly forest: string;
   readonly contour: string;
   readonly polyline: ReadonlyArray<Vec2>;
+  /** As on CutSegment (ADR-626 Amd 1). */
+  readonly leadSource?: string;
 };
 
 export type FillGroup = Omit<
@@ -490,6 +497,16 @@ export type JobDiagnostic =
       readonly layerName: string;
       readonly shortened: number;
       readonly omitted: number;
+    }
+  // ADR-626 Amd 1: with Lead side automatic, `count` contours got no leads
+  // because a closed shape on an operation without leads (`aroundName`) holds
+  // them, and it may be a part or only a score line or border.
+  | {
+      readonly kind: 'laser-leads-side-unknown';
+      readonly layerId: string;
+      readonly layerName: string;
+      readonly count: number;
+      readonly aroundName: string;
     };
 
 /** Complete compile evidence for one scheduled V-carve operation. */
