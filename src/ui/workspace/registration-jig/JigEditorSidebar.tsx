@@ -30,7 +30,7 @@ const STEPS: ReadonlyArray<{
 ];
 
 /**
- * The three steps of a jig job (ADR-634). Each step stays mounted while hidden,
+ * The three steps of a jig job (ADR-638). Each step stays mounted while hidden,
  * so half-typed layout fields or a loaded trace survive a look at another step.
  * Editing pauses while the machine runs; Frame and Start stay in reach.
  */

@@ -1,4 +1,4 @@
-/* Jig mode (ADR-634): the jig page fills the place of the tool strip and the
+/* Jig mode (ADR-638): the jig page fills the place of the tool strip and the
    main canvas, beside the docked machine panel, so dialogs, alarms and the
    live motion bar stack above it as they do over the main canvas. */
 .lf-jig-editor {
