@@ -21,7 +21,11 @@ import { isLinuxDesktop } from '../common/operating-system';
 import type { ControllerQualification } from '../state/laser-controller-qualification';
 import type { ConnectionState } from '../state/laser-store';
 import { CompactConnectionControls } from './CompactConnectionControls';
-import { QualificationNotice, useControllerNotice, type ControllerNotice } from './controller-notice';
+import {
+  QualificationNotice,
+  useControllerNotice,
+  type ControllerNotice,
+} from './controller-notice';
 import './ConnectionBar.css';
 
 export type ConnectionBarProps = {
@@ -74,7 +78,7 @@ export function ConnectionBar(props: Props): JSX.Element {
     >
       <div className="lf-connection-toolbar-layout">
         {/* Keeps the controls at the trailing edge. A controller that needs
-            recovery says so over the canvas instead of here (ADR-636). */}
+            recovery says so over the canvas instead of here (ADR-637). */}
         <div className="lf-connection-toolbar-spacer" />
         <div className="lf-connection-toolbar-controls">
           <CompactConnectionControls

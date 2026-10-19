@@ -22,7 +22,7 @@ export function useControllerReconnect(): () => void {
   };
 }
 
-/** Retry shared by Controller info and the canvas recovery card (ADR-636). The
+/** Retry shared by Controller info and the canvas recovery card (ADR-637). The
  * store's read readiness is checked again at click time. */
 export function useControllerQualificationRetry(): () => void {
   const retryQualification = useLaserStore((state) => state.retryControllerQualification);

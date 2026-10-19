@@ -3,7 +3,7 @@
 // controller write pushed the whole workspace down. Here it takes no layout
 // space and stays clear of the rails' job controls, and it still stays until
 // the operator acknowledges it. The controller recovery card stacks under it
-// (ADR-636).
+// (ADR-637).
 
 import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';

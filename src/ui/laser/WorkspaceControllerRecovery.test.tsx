@@ -84,11 +84,12 @@ function card(): HTMLElement | null {
 function button(name: string): HTMLButtonElement | undefined {
   return [...canvasHost.querySelectorAll('button')].find(
     (candidate) =>
-      candidate.textContent?.includes(name) === true || candidate.getAttribute('aria-label') === name,
+      candidate.textContent?.includes(name) === true ||
+      candidate.getAttribute('aria-label') === name,
   );
 }
 
-// ADR-636: recovery used to wait behind a six-second line beside the
+// ADR-637: recovery used to wait behind a six-second line beside the
 // Laser/CNC switch, so a paused job showed only the safety notice.
 describe('WorkspaceControllerRecovery', () => {
   it('opens over the canvas by itself when the controller stops answering', () => {

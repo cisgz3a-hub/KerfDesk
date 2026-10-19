@@ -1,13 +1,16 @@
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 import { openMachineToolDropdown, selectWorkspacePanel } from './fixtures/workspace-ui';
 
-// ADR-636: a running job adds its safety line, overrides and progress to the
+// ADR-637: a running job adds its safety line, overrides and progress to the
 // machine rail. The utility tabs box was the one row allowed to shrink to
 // zero, so on a laptop-height window those rows were drawn over the Origin,
-// Placement and Console tabs. The rail now scrolls instead.
+// Placement and Console tabs. The rail now scrolls instead. At 1280x720 the
+// old rules left an 18 px box for 30 px tabs; below about 680 px the whole
+// rail already scrolled, and above about 760 px everything fit.
 for (const viewport of [
   { width: 1280, height: 800 },
-  { width: 1280, height: 640 },
+  { width: 1280, height: 720 },
+  { width: 1280, height: 700 },
   { width: 1024, height: 560 },
 ]) {
   test(`a live job never draws over the machine tool tabs at ${viewport.width}x${viewport.height}`, async ({

@@ -211,7 +211,7 @@ function badgeMessage(
 ): string | null {
   const run = overlay.run;
   const frame = overlay.plan.coordinateFrame;
-  // A User Origin job drawn over its artwork knows its bed position (ADR-636).
+  // A User Origin job drawn over its artwork knows its bed position (ADR-637).
   const relative = frame.kind === 'relative' && frame.bed === undefined;
   if (run === null) {
     const reason = relative

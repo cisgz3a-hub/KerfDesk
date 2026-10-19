@@ -1,4 +1,4 @@
-## ADR-636 - Controller recovery opens over the canvas, the machine rail never overlaps its tabs, and hand-set origins burn over the artwork (2026-10-19)
+## ADR-637 - Controller recovery opens over the canvas, the machine rail never overlaps its tabs, and hand-set origins burn over the artwork (2026-10-19)
 
 **Status:** Accepted at the maintainer's request. | **Date:** 2026-10-19
 
@@ -71,5 +71,10 @@ The maintainer reported three problems while running jobs:
   User Origin and Current Position jobs over the artwork with their bed frame and shift.
   `job-burn-route.test.ts` pins that the job watch looks at the same bed region and masks for
   both frames.
-- The rail floor was checked in a running dev build with a simulated streaming job. Rendered and
-  unit-tested only; no machine was operated.
+- `e2e/machine-rail-live-job.spec.ts` simulates a streaming job in the rail and checks, with the
+  Console utility closed and open, that the tabs box stays as tall as its tabs and that no row
+  starts inside the previous one. A height sweep with the old rules injected reproduced the bug
+  only where the rail neither fits nor falls back to whole-rail scrolling: at 1280x720 the tabs
+  box was 18 px for 30 px tabs, with or without the Console open. With this change it is 30 px
+  closed and 115 px open, and the rail scrolls. Rendered and unit-tested only; no machine was
+  operated.

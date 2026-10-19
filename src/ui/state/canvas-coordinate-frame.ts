@@ -20,7 +20,7 @@ export type CanvasCoordinateFrame =
       readonly kind: 'relative';
       readonly jobOriginOffset: Vec2;
       /** Where the job really burns on the bed, when that is known. A User
-       * Origin or Current Position job is drawn over its artwork (ADR-636);
+       * Origin or Current Position job is drawn over its artwork (ADR-637);
        * the camera job watch still looks at the bed through this frame. */
       readonly bed?: MachineCoordinateFrame;
     };
@@ -60,7 +60,7 @@ export function canvasCoordinateFrame(
   // A job placed from an origin the operator set burns the artwork relative
   // to that origin, not where the artwork sits on the canvas. Drawn at the bed
   // position, its route and burn appeared as a second copy beside the
-  // artwork, so it is drawn over the artwork the operator sees (ADR-636).
+  // artwork, so it is drawn over the artwork the operator sees (ADR-637).
   if (jobOrigin?.startFrom === 'user-origin' || jobOrigin?.startFrom === 'current-position') {
     return { ...relative, bed };
   }
@@ -92,7 +92,7 @@ function knownBedFrame(
 
 /**
  * The translation from a route drawn over its artwork to where it burns on
- * the bed (ADR-636): zero unless the plan carries a known bed frame. Both
+ * the bed (ADR-637): zero unless the plan carries a known bed frame. Both
  * frames map controller points through the same device transform, so they
  * differ by one constant offset.
  */
@@ -100,7 +100,10 @@ export function artworkToBedShift(plan: FrameMapping): Vec2 {
   const frame = plan.coordinateFrame;
   if (frame.kind !== 'relative' || frame.bed === undefined) return { x: 0, y: 0 };
   const zero = { x: 0, y: 0, z: 0 };
-  const onBed = mapControllerPointToScene(zero, { device: plan.device, coordinateFrame: frame.bed });
+  const onBed = mapControllerPointToScene(zero, {
+    device: plan.device,
+    coordinateFrame: frame.bed,
+  });
   const onArtwork = mapControllerPointToScene(zero, plan);
   return { x: onBed.x - onArtwork.x, y: onBed.y - onArtwork.y };
 }

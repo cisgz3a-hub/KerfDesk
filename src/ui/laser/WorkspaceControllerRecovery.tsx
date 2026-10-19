@@ -1,4 +1,4 @@
-// ADR-636: a controller that needs recovery opens its recovery card over the
+// ADR-637: a controller that needs recovery opens its recovery card over the
 // canvas by itself, under the safety notice (ADR-634). It used to wait behind a
 // six-second line beside the Laser/CNC switch, so a paused job showed the
 // safety notice while Retry and Reconnect, which fix the cause, stayed hidden.

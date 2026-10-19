@@ -14,7 +14,7 @@ type Props = {
   readonly disabled: boolean;
   /** Names a controller that stopped answering when no reconnect is offered. */
   readonly stoppedResponding?: boolean;
-  /** The canvas card collapses instead of closing (ADR-636). */
+  /** The canvas card collapses instead of closing (ADR-637). */
   readonly label?: string;
   readonly closeLabel?: string;
   readonly closeTitle?: string;

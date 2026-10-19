@@ -26,7 +26,7 @@ function plan(coordinateFrame: CanvasMotionPlan['coordinateFrame']): CanvasMotio
   };
 }
 
-// ADR-636: a User Origin job is drawn over its artwork, far from where its
+// ADR-637: a User Origin job is drawn over its artwork, far from where its
 // origin sits on the bed. The camera must still look where it burns.
 describe('job burn route on the bed', () => {
   it('watches where a job drawn over its artwork really burns', () => {

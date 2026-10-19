@@ -61,7 +61,7 @@
   min-width: 0;
   min-height: 80px;
   /* Its content does not set the tools' floor: only min-height does, so the
-     open utility scrolls inside itself rather than pushing the rail (ADR-636). */
+     open utility scrolls inside itself rather than pushing the rail (ADR-637). */
   contain: size;
   padding: 5px 8px 8px;
   overflow-x: hidden;

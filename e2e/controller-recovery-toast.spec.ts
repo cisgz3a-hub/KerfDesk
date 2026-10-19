@@ -34,13 +34,15 @@ for (const viewport of [
       await expect.poll(() => toolbar.boundingBox()).toEqual(toolbarBefore);
     };
 
-    // ADR-636: a controller that needs recovery opens the card by itself,
+    // ADR-637: a controller that needs recovery opens the card by itself,
     // over the canvas, and the toolbar does not move.
     await setQualification(page, 'failed');
     const card = page.getByRole('alert', { name: 'Controller recovery', exact: true });
     await expect(card).toBeVisible();
     await expect(card.getByRole('button', { name: 'Reconnect controller' })).toBeVisible();
-    await expect(card.getByRole('button', { name: 'Retry reading controller settings' })).toBeVisible();
+    await expect(
+      card.getByRole('button', { name: 'Retry reading controller settings' }),
+    ).toBeVisible();
     await unchanged();
     const bounds = await card.boundingBox();
     if (bounds === null || toolbarBefore === null) throw new Error('Card must have bounds');
