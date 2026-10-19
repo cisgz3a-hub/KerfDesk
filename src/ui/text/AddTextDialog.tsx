@@ -44,6 +44,8 @@ function DialogForm(props: {
   const fields = useTextDialogFields(state, project, selectedObjectId);
   const [submitting, setSubmitting] = useState(false);
   const request = useRef(0);
+  // The layout runs in a worker (ADR-631), so closing the dialog must stop it.
+  const submission = useRef<AbortController | null>(null);
   useEffect(() => {
     const unsubscribe = useStore.subscribe((next, previous) => {
       if (
@@ -54,6 +56,7 @@ function DialogForm(props: {
     });
     return () => {
       request.current += 1;
+      submission.current?.abort();
       unsubscribe();
     };
   }, [close, state]);
@@ -61,7 +64,10 @@ function DialogForm(props: {
     e.preventDefault();
     const token = ++request.current;
     const epoch = useStore.getState().projectDocumentEpoch;
-    void commitText(state, fields.values, {
+    submission.current?.abort();
+    const controller = new AbortController();
+    submission.current = controller;
+    void commitText(state, fields.values, controller.signal, {
       upsert,
       close,
       pushToast,
@@ -81,8 +87,12 @@ function DialogForm(props: {
       >
         <h2 className="lf-dialog-title">{state.mode === 'add' ? 'Add Text' : 'Edit Text'}</h2>
       </div>
-      <ContentField value={fields.values.content} onChange={fields.setContent} />
-      <TextFormattingFields fields={fields} disabled={submitting} />
+      {/* The fields lock while the text renders: Add or Save commits the values
+          it started with, so later edits would otherwise be lost. */}
+      <fieldset disabled={submitting} style={fieldsetStyle}>
+        <ContentField value={fields.values.content} onChange={fields.setContent} />
+        <TextFormattingFields fields={fields} disabled={submitting} />
+      </fieldset>
       <FormActions
         mode={state.mode}
         canSubmit={
@@ -98,9 +108,20 @@ function DialogForm(props: {
   );
 }
 
+const fieldsetStyle: React.CSSProperties = {
+  border: 0,
+  margin: 0,
+  padding: 0,
+  minWidth: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+};
+
 async function commitText(
   state: NonNullable<ReturnType<typeof useUiStore.getState>['textDialog']>,
   v: DialogValues,
+  signal: AbortSignal,
   ctx: {
     readonly upsert: ReturnType<typeof useStore.getState>['upsertTextObject'];
     readonly close: () => void;
@@ -111,7 +132,7 @@ async function commitText(
 ): Promise<void> {
   ctx.setSubmitting(true);
   try {
-    const obj = await buildTextObject(state, v);
+    const obj = await buildTextObject(state, v, signal);
     if (!ctx.isCurrent()) return;
     ctx.upsert(obj, v.importedFont);
     ctx.close();

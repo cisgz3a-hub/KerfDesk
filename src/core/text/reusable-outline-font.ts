@@ -109,27 +109,45 @@ function compositesAreAcyclic(
     if (start === end) continue;
     if (end < start || end > glyf.length) return false;
     if (data.getInt16(glyf.offset + start) >= 0) continue;
-    const indexes = componentIndexes(data, glyf.offset + start + GLYPH_HEADER_BYTES);
+    const indexes = componentIndexes(
+      data,
+      glyf.offset + start + GLYPH_HEADER_BYTES,
+      glyf.offset + end,
+    );
     // opentype.js cannot resolve a component that does not exist.
-    if (indexes.some((index) => index >= glyphCount)) return false;
+    if (indexes === null || indexes.some((index) => index >= glyphCount)) return false;
     components.set(glyph, indexes);
   }
   return !hasCycle(components);
 }
 
-function componentIndexes(data: DataView, start: number): ReadonlyArray<number> {
+// The component glyph indexes of one composite glyph, read only within that
+// glyph's own bytes. A record that would run past `end` (its flags never stop
+// asking for more components) is malformed: null, and the font is not reused.
+function componentIndexes(
+  data: DataView,
+  start: number,
+  end: number,
+): ReadonlyArray<number> | null {
   const indexes: number[] = [];
   let cursor = start;
   let flags = MORE_COMPONENTS;
   while ((flags & MORE_COMPONENTS) !== 0) {
+    if (cursor + 4 > end) return null;
     flags = data.getUint16(cursor);
     indexes.push(data.getUint16(cursor + 2));
-    cursor += 4 + ((flags & ARG_1_AND_2_ARE_WORDS) !== 0 ? 4 : 2);
-    if ((flags & WE_HAVE_A_SCALE) !== 0) cursor += 2;
-    else if ((flags & WE_HAVE_AN_X_AND_Y_SCALE) !== 0) cursor += 4;
-    else if ((flags & WE_HAVE_A_TWO_BY_TWO) !== 0) cursor += 8;
+    cursor += 4 + componentArgumentBytes(flags);
+    if (cursor > end) return null;
   }
   return indexes;
+}
+
+function componentArgumentBytes(flags: number): number {
+  const offsets = (flags & ARG_1_AND_2_ARE_WORDS) !== 0 ? 4 : 2;
+  if ((flags & WE_HAVE_A_SCALE) !== 0) return offsets + 2;
+  if ((flags & WE_HAVE_AN_X_AND_Y_SCALE) !== 0) return offsets + 4;
+  if ((flags & WE_HAVE_A_TWO_BY_TWO) !== 0) return offsets + 8;
+  return offsets;
 }
 
 // Depth-first search without recursion; a glyph that includes itself counts.

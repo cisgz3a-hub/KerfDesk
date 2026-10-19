@@ -87,11 +87,18 @@ Two further findings shaped the decision.
    operator chose, lay the text out on the UI thread as they did before. Work that started and
    failed is reported and never rerun in thread. Every failure retires the worker. When the
    missing-glyph check's worker fails, the hint says the check did not run rather than reporting
-   full coverage. A font that cannot load stays with the dialog's own font check, as before.
-7. **Output keeps the UI-thread path.** `renderTextGeometry` is unchanged and still serves
+   full coverage. A font that cannot load stays with the dialog's own font check, as before. The
+   variable-row preview stops at the first `unavailable` row and shows that message on the rest,
+   instead of starting and retiring a worker for every row.
+7. **The Add/Edit Text dialog locks while it renders.** The UI thread now stays responsive while
+   Add or Save renders, but the submission commits the values it started with. The dialog's
+   fields therefore sit in a disabled fieldset until the render settles, as the canvas editor's
+   fields already did while saving. Closing the dialog aborts the render: its one-shot worker is
+   released, and nothing after the layout (placement, styling, weld) runs.
+8. **Output keeps the UI-thread path.** `renderTextGeometry` is unchanged and still serves
    variable text at output, DXF export, remote control and the registration jig. No G-code,
    Frame, Start, machine output or licence behaviour changes.
-8. **Desktop.** The worker is a same-origin Vite module worker. HarfBuzz loads its WASM with
+9. **Desktop.** The worker is a same-origin Vite module worker. HarfBuzz loads its WASM with
    `fetch(new URL('harfbuzz.wasm', import.meta.url))` and `WebAssembly.instantiateStreaming`, both
    allowed in the worker by the renderer CSP that main applies to every app:// response
    (`worker-src 'self' data: blob:`, `script-src 'self' 'wasm-unsafe-eval'`, `connect-src 'self'`).
@@ -151,10 +158,12 @@ thread after the layout; a 90° bend of 450 Roboto characters measured 16 ms.
   or mismatched replies (never rerun in thread), an unpostable request, a worker whose script
   never loads, and a browser without workers (previews report it; explicit actions lay out in
   thread). `FontUsageHint.test.tsx` shows a failed missing-glyph check as unchecked and keeps
-  font-load errors silent.
+  font-load errors silent. `VariableRowsPreview.test.tsx` tries an unavailable worker once for a
+  page of rows. `AddTextDialog.ownership.test.tsx` checks that every field is locked while the
+  dialog renders, and that closing it stops the work before the weld.
 - `src/core/text/reusable-outline-font.test.ts` covers the bundled and fixture fonts, each
-  excluded table, WOFF, WOFF2, CFF and collection signatures, truncated files, and synthetic
-  fonts with acyclic composites, two- and three-glyph cycles, a self-reference and a missing
+  excluded table, WOFF, WOFF2, CFF and collection signatures, truncated files, composite records
+  that run past their own glyph, and synthetic fonts with acyclic composites, two- and three-glyph cycles, a self-reference and a missing
   component.
 - `src/ui/text/text-render-result-transfer.test.ts` checks the packed round trip and that paths of
   any other shape travel unchanged.

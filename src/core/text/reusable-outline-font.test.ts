@@ -35,14 +35,18 @@ function withSignature(font: ArrayBuffer, signature: string): ArrayBuffer {
 
 // A minimal TrueType file with head, maxp, loca and glyf. Each glyph is either
 // empty (a simple glyph with no contours) or composite over the given glyphs.
-function syntheticFont(glyphs: ReadonlyArray<ReadonlyArray<number> | null>): ArrayBuffer {
-  const glyphData = glyphs.map((components) => {
+// The `unterminated` glyph keeps asking for more components past its end.
+function syntheticFont(
+  glyphs: ReadonlyArray<ReadonlyArray<number> | null>,
+  unterminated?: number,
+): ArrayBuffer {
+  const glyphData = glyphs.map((components, glyph) => {
     if (components === null) return new Uint8Array(10);
     const data = new DataView(new ArrayBuffer(10 + components.length * 6));
     data.setInt16(0, -1);
     components.forEach((glyphIndex, index) => {
       const at = 10 + index * 6;
-      const more = index < components.length - 1 ? 0x0020 : 0;
+      const more = index < components.length - 1 || glyph === unterminated ? 0x0020 : 0;
       data.setUint16(at, 0x0002 | more); // byte x/y offsets
       data.setUint16(at + 2, glyphIndex);
     });
@@ -120,6 +124,12 @@ describe('reusableOutlineFont (ADR-631)', () => {
 
   it('reuses composite glyphs that form no cycle', () => {
     expect(reusableOutlineFont(syntheticFont([null, [0], [1, 0], [2, 1]]))).toBe(true);
+  });
+
+  it('never reads a composite record past its own glyph', () => {
+    // Glyph 1's last record asks for more; the bytes after it are glyph 2's.
+    expect(reusableOutlineFont(syntheticFont([null, [0], [0], [0]], 1))).toBe(false);
+    expect(reusableOutlineFont(syntheticFont([null, [0], [0], [0]], 3))).toBe(false);
   });
 
   it.each([

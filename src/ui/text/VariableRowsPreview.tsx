@@ -7,7 +7,8 @@ import {
 } from '../../core/variables';
 import { Button } from '../kit';
 import { useStore } from '../state';
-import { DEFAULT_TEXT_COLOR } from '../../core/text';
+import { DEFAULT_TEXT_COLOR, type TextRenderResult } from '../../core/text';
+import { TextWorkerError } from './text-worker-session';
 import { useTextWorkerSession } from './use-text-worker-session';
 import type { DialogValues } from './use-text-dialog-fields';
 
@@ -123,13 +124,15 @@ function useRowLayout(
         if (!row.valid) continue;
         try {
           const rendered = await textWorker.render({ ...values, content: row.value });
-          const layout = rendered.textBoxLayout;
-          result[row.index] =
-            layout === undefined
-              ? 'Natural text size'
-              : `${layout.overflow ? 'Overflow' : 'Fits'} · ${layout.sizeMm.toFixed(2)} mm · ${layout.lineCount} lines`;
+          result[row.index] = rowLayoutLabel(rendered.textBoxLayout);
         } catch (error) {
           result[row.index] = error instanceof Error ? error.message : String(error);
+          // A worker that cannot start fails the same way for every later row,
+          // and each attempt would start and retire another one.
+          if (error instanceof TextWorkerError && error.outcome === 'unavailable') {
+            for (const rest of rows) if (rest.valid) result[rest.index] ??= error.message;
+            break;
+          }
         }
       }
       if (current) setLayouts(result);
@@ -143,6 +146,12 @@ function useRowLayout(
     };
   }, [rows, values, textWorker]);
   return layouts;
+}
+
+function rowLayoutLabel(layout: TextRenderResult['textBoxLayout']): string {
+  if (layout === undefined) return 'Natural text size';
+  const fit = layout.overflow ? 'Overflow' : 'Fits';
+  return `${fit} · ${layout.sizeMm.toFixed(2)} mm · ${layout.lineCount} lines`;
 }
 
 function previewTextObject(content: string, values: DialogValues | undefined): TextObject {

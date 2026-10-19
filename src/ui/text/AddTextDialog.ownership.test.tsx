@@ -8,8 +8,12 @@ import { resetStore, svgObj } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 
-const mocks = vi.hoisted(() => ({ render: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  render: vi.fn(),
+  weld: vi.fn(async (rendered: unknown) => rendered),
+}));
 vi.mock('./render-text-geometry', () => ({ renderTextGeometry: mocks.render }));
+vi.mock('./text-weld-worker-client', () => ({ applyTextWeldInWorker: mocks.weld }));
 vi.mock('./font-loader', () => ({
   cssFamilyForFont: (key: string) => `lf2-${key}`,
   ensureFontCss: vi.fn(async () => undefined),
@@ -42,6 +46,7 @@ const rendered: TextRenderResult = {
 beforeEach(() => {
   resetStore();
   mocks.render.mockReset();
+  mocks.weld.mockClear();
   useUiStore.setState({ textDialog: null });
 });
 
@@ -101,11 +106,30 @@ it.each(['escape', 'new-project', 'unmount'] as const)(
       await act(async () => h.resolve(rendered));
       expect(useStore.getState().project).toBe(project);
       expect(useStore.getState().project.scene.objects).toHaveLength(0);
+      // Closing aborted the render, so nothing after the layout ran.
+      expect(mocks.weld).not.toHaveBeenCalled();
     } finally {
       await h.dispose();
     }
   },
 );
+
+it('locks every field while the text renders, and unlocks them after a failure', async () => {
+  const h = await startRender();
+  try {
+    const fieldset = h.host.querySelector('fieldset')!;
+    expect(fieldset.disabled).toBe(true);
+    expect(h.host.querySelector('textarea')!.matches(':disabled')).toBe(true);
+    const controls = [...fieldset.querySelectorAll('input, select, textarea, button')];
+    expect(controls.length).toBeGreaterThan(3);
+    expect(controls.every((control) => control.matches(':disabled'))).toBe(true);
+    await act(async () => h.reject(new Error('Bad font.')));
+    expect(fieldset.disabled).toBe(false);
+    expect(h.host.querySelector('textarea')!.matches(':disabled')).toBe(false);
+  } finally {
+    await h.dispose();
+  }
+});
 
 it('keeps unrelated same-document edits and inserts one current text after StrictMode replay', async () => {
   const h = await startRender();
