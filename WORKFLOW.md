@@ -783,14 +783,15 @@ the linked artwork.
    tabs; text and drawn shapes that change become paths in the same step, and locked artwork is
    left as it is. The notice says what changed. Settings are remembered for the session.
 
-### F-A6j. Operation colours on the canvas (ADR-620)
+### F-A6j. Operation colours on the canvas (ADR-620, ADR-632)
 
 1. Artwork rests in plain ink on the workspace, so the canvas shows the design itself. Every
    operation still has its own colour, shown on its row in the Artwork panel.
-2. With the Select tool, rest the pointer on a piece of artwork: it pulses once in its operation
-   colour, and every other piece whose operation has the same settings pulses in that same
-   colour, rippling out from the piece under the pointer. A soft colour edge stays while the
-   pointer rests there. Resting on an operation row does the same for that operation's artwork.
+2. With the Select tool, rest the pointer on a piece of artwork: it swells once into a soft tint
+   of its operation colour with a faint halo, then ebbs back to ink. Every other piece whose
+   operation has the same settings does the same in that colour, rippling out from the piece
+   under the pointer. A soft colour edge stays while the pointer rests there. Resting on an
+   operation row does the same for that operation's artwork.
 3. Hold **Alt** (Option on a Mac) to show every operation colour at once; let go to return to ink.
    Alt shortcuts such as `Alt+W` do not trigger it.
 4. With reduced motion turned on in the operating system, the colour shows while the pointer
@@ -2696,6 +2697,8 @@ authorization, Frame proof, controller command, or safety boundary.
    what the box encloses, right to left what it touches. Shift-drag or Shift-click adds
    to the selection, and Ctrl+A selects all the artwork (not the outlines) unless a field
    has focus. Locked or hidden objects, including locked outlines, are never selected.
+   As on the main canvas, drag with the right or middle mouse button, or hold Space and
+   drag, to pan; the wheel zooms.
 2. In **Jig layout**, choose Rectangle or Circle, enter the outline size, then enter
    rows, columns, and horizontal/vertical spacing. Apply the layout before saving;
    until then the tab reads **Jig layout •**. A 1 x 5 grid creates five independently
