@@ -1,0 +1,47 @@
+/* ADR-634: the safety notice floats over the top centre of the canvas. The
+   anchor spans the canvas stage, lets clicks through to the drawing, and sits
+   above the update card that shares the top centre. */
+.lf-safety-notice-anchor {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  container: safety-notice / inline-size;
+}
+
+/* Outranks the accessories layer, which gives its children pointer input. */
+.lf-workspace-accessories > .lf-safety-notice-anchor {
+  pointer-events: none;
+}
+
+.lf-safety-notice-toast {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  width: 420px;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  border-radius: 4px;
+  box-shadow: var(--lf-shadow);
+  pointer-events: auto;
+}
+
+/* A canvas narrower than the card (a phone with a side panel open) would
+   squeeze it into an unreadable column. It spans the window instead, still
+   starting at the top of the canvas: with top left auto, a fixed box keeps
+   that position and escapes the canvas's clipping. */
+@container safety-notice (width < 444px) {
+  .lf-safety-notice-toast {
+    position: fixed;
+    top: auto;
+    left: 12px;
+    right: 12px;
+    transform: none;
+    width: auto;
+    max-width: none;
+    max-height: 50vh;
+    margin-top: 12px;
+  }
+}

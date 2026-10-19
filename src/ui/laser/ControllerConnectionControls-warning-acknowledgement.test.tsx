@@ -9,7 +9,7 @@ import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { makeConnection } from '../state/laser-store-motion-operation.test-support';
 import { settleTestGrblHandshake, startTestLaserJob } from '../state/laser-test-start-helpers';
-import { ControllerConnectionControls } from './ControllerConnectionControls';
+import { CurrentControllerControls } from './controller-connection-controls.test-support';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -88,21 +88,6 @@ function fixture() {
   return { original, replacement, platform };
 }
 
-function CurrentControls(): JSX.Element {
-  const autofocusBusy = useLaserStore((state) => state.autofocusBusy);
-  const motionOperation = useLaserStore((state) => state.motionOperation);
-  const controllerOperation = useLaserStore((state) => state.controllerOperation);
-  return (
-    <ControllerConnectionControls
-      machineKind="laser"
-      autofocusBusy={autofocusBusy}
-      motionOperation={motionOperation}
-      controllerOperation={controllerOperation}
-      onForget={() => undefined}
-    />
-  );
-}
-
 function button(label: string): HTMLButtonElement {
   const result = [...document.body.querySelectorAll('button')].find(
     (candidate) => candidate.textContent === label,
@@ -157,7 +142,7 @@ it.each([false, true])(
       root = createRoot(host!);
       root.render(
         <PlatformProvider adapter={f.platform}>
-          <CurrentControls />
+          <CurrentControllerControls />
         </PlatformProvider>,
       );
     });
