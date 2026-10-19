@@ -36,11 +36,12 @@ describe('Cut 3D offscreen worker client', () => {
 
     expect(transfer).toHaveBeenCalledOnce();
     expect(worker.requests.filter((request) => request.kind === 'init')).toHaveLength(1);
+    const init = requestOfKind(worker, 'init');
     expect(worker.transfers[0]).toEqual([
       expect.any(Object),
-      MESH.positions.buffer,
-      MESH.indices.buffer,
-      MESH.normals.buffer,
+      init.mesh.positions.buffer,
+      init.mesh.indices.buffer,
+      init.mesh.normals.buffer,
     ]);
     expect(worker.terminate).not.toHaveBeenCalled();
 
@@ -119,6 +120,68 @@ describe('Cut 3D offscreen worker client', () => {
     expect(reportFailure).toHaveBeenCalledWith('context lost');
     expect(readyCanvas.dataset.sceneState).toBe('unavailable');
     expect(readyWorker.terminate).toHaveBeenCalledOnce();
+  });
+
+  // Audit 2026-10-18: the init transferred the caller's own mesh buffers, which
+  // detached them. A failed renderer gets a fresh canvas and session for the
+  // same mesh (thickness-only change), and re-posting detached buffers threw
+  // DataCloneError, so the preview stayed unavailable for that surface.
+  it('builds a replacement session for the same mesh after a failed renderer', async () => {
+    // Detaches transferred buffers exactly as a real worker port does.
+    class DetachingWorker extends FakeWorker {
+      readonly received: Array<{ readonly mesh?: { readonly positions: Float32Array } | null }> =
+        [];
+      override postMessage(
+        message: unknown,
+        transfer?: Transferable[] | StructuredSerializeOptions,
+      ): void {
+        const buffers = (Array.isArray(transfer) ? transfer : []).filter(
+          (item) => item instanceof ArrayBuffer,
+        );
+        const { canvas: _canvas, ...rest } = message as {
+          canvas?: unknown;
+          mesh?: { readonly positions: Float32Array } | null;
+        };
+        this.received.push(structuredClone(rest, { transfer: buffers }));
+        super.postMessage(message, transfer);
+      }
+    }
+    const first = new DetachingWorker();
+    const second = new DetachingWorker();
+    const workers: DetachingWorker[] = [first, second];
+    const mesh = {
+      ...MESH,
+      positions: new Float32Array(MESH.positions),
+      normals: new Float32Array(MESH.normals),
+      indices: new Uint32Array(MESH.indices),
+    };
+    const deps = {
+      canCreateWorker: () => true,
+      createWorker: () => workers.shift() ?? new DetachingWorker(),
+      scheduleMicrotask: (callback: () => void) => callback(),
+    };
+    const failed = createCut3DOffscreenCoordinator(mesh, 6, deps).buildScene(
+      transferableCanvas(() => offscreen()),
+      new AbortController().signal,
+      vi.fn(),
+    );
+    first.error();
+    expect((await failed).kind).toBe('no-webgl');
+    expect(mesh.positions.byteLength).toBeGreaterThan(0);
+
+    const replacement = createCut3DOffscreenCoordinator(mesh, 12, deps).buildScene(
+      transferableCanvas(() => offscreen()),
+      new AbortController().signal,
+      vi.fn(),
+    );
+    // The shared runtime numbers this replacement session 2.
+    second.emit({ kind: 'presented', sessionId: 2, revision: 1, source: 'initial', inputId: 0 });
+    second.emit({ kind: 'ready', sessionId: 2 });
+    expect((await replacement).kind).toBe('ok');
+    expect(Array.from(second.received[0]?.mesh?.positions ?? [])).toEqual(
+      Array.from(MESH.positions),
+    );
+    expect(mesh.positions.byteLength).toBeGreaterThan(0);
   });
 
   it('settles unavailable and terminates on mismatched or invalid response identity', async () => {
@@ -297,9 +360,9 @@ describe('Cut 3D offscreen worker client', () => {
     const surface = requestOfKind(worker, 'surface');
     expect(surface).toMatchObject({ sessionId: 1, surfaceId: 1, mesh: next, stockThicknessMm: 6 });
     expect(worker.transfers.at(-1)).toEqual([
-      next.positions.buffer,
-      next.indices.buffer,
-      next.normals.buffer,
+      surface.mesh?.positions.buffer,
+      surface.mesh?.indices.buffer,
+      surface.mesh?.normals.buffer,
     ]);
 
     worker.emit({ kind: 'presented', sessionId: 1, revision: 3, source: 'surface', inputId: 1 });
