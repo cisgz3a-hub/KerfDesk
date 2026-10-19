@@ -57,6 +57,26 @@ describe('artwork run order view model', () => {
     ]);
   });
 
+  it('gives a composed shared-run name its run number when another run has the same name', () => {
+    const base = projectWithJobs('laser');
+    const project: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        objects: [
+          object('a', 'profile', 10, 'Foo'),
+          object('b', 'profile', 30, 'Foo'),
+          object('c', 'pocket', 50, 'Foo (1) + 1 more'),
+        ],
+        artworkOrder: ['a', 'b', 'c'],
+      },
+    };
+
+    const names = artworkRunOrderRows(project).map((row) => row.name);
+    expect(names).toEqual(['Foo (1) + 1 more (run 1)', 'Foo (1) + 1 more (run 2)']);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
   it('shows requested CNC positions alongside clearing-before-profile steps', () => {
     const project = projectWithJobs('cnc');
 

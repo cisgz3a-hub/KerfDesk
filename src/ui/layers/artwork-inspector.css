@@ -125,7 +125,6 @@
 
 .lf-artwork-context strong {
   display: block;
-  overflow-wrap: anywhere;
   font-size: 14px;
   line-height: 1.4;
   white-space: nowrap;

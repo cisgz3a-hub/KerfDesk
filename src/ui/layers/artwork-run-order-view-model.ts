@@ -33,7 +33,7 @@ export function artworkRunOrderRows(project: Project): ReadonlyArray<ArtworkRunO
   const layerById = new Map(project.scene.layers.map((layer) => [layer.id, layer]));
   const effectiveSteps = effectiveStepsByObject(project);
   const names = artworkDisplayNames(project.scene.objects);
-  return artworkRunUnits(project.scene).map((unit, index) => {
+  const rows = artworkRunUnits(project.scene).map((unit, index) => {
     const objects = unit.objectIds.flatMap((id) => {
       const object = objectById.get(id);
       return object === undefined ? [] : [object];
@@ -62,6 +62,20 @@ export function artworkRunOrderRows(project: Project): ReadonlyArray<ArtworkRunO
       shared: objects.length > 1,
     };
   });
+  return withUniqueNames(rows);
+}
+
+// A composed name ("Foo (1) + 1 more") can still match another run's name.
+// Any name two runs share gets its run number, so every row's Select and Run
+// position controls keep their own accessible name (ADR-631).
+function withUniqueNames(
+  rows: ReadonlyArray<ArtworkRunOrderRowModel>,
+): ReadonlyArray<ArtworkRunOrderRowModel> {
+  const totals = new Map<string, number>();
+  rows.forEach((row) => totals.set(row.name, (totals.get(row.name) ?? 0) + 1));
+  return rows.map((row) =>
+    (totals.get(row.name) ?? 0) < 2 ? row : { ...row, name: `${row.name} (run ${row.position})` },
+  );
 }
 
 // This render-path helper preserves main's existing V-carve exception until
