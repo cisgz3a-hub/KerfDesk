@@ -8,6 +8,7 @@ import { selectControllerDriver } from '../../../core/controllers';
 import type { ControllerKind, DeviceProfile } from '../../../core/devices';
 import type { MachineKind } from '../../../core/scene';
 import type { DeviceSetupAction, DeviceSetupState } from './device-setup-flow';
+import { draftIsListedMachine, machinePickerEntries } from './machine-picker-entries';
 
 export type DeviceSetupAutoFillSummary = {
   /** Firmware the controller's banner named, when it differed from the draft. */
@@ -132,7 +133,11 @@ function adoptedBaudRate(
 }
 
 // GRBL's $32 is the one reported fact about the tool: laser mode on is how a
-// laser runs, off is how a spindle runs. A two-tool machine keeps both.
+// laser runs, off is how a spindle runs. A two-tool machine keeps both. A
+// machine chosen from the list already says what it is, and $32 is a setting
+// of its controller, not a measurement of the machine (ADR-240 #2), so it keeps
+// its type; the reported laser mode still reaches the draft (ADR-637
+// Amendment 1).
 function machineKindFromLaserMode(
   state: DeviceSetupState,
   detected: Partial<DeviceProfile>,
@@ -141,5 +146,6 @@ function machineKindFromLaserMode(
   const laserMode: DeviceProfile['laserModeEnabled'] | undefined = detected.laserModeEnabled;
   if (laserMode === undefined) return null;
   const reported: MachineKind = laserMode ? 'laser' : 'cnc';
-  return state.machineKinds[0] === reported ? null : reported;
+  if (state.machineKinds[0] === reported) return null;
+  return draftIsListedMachine(state, machinePickerEntries(state)) ? null : reported;
 }
