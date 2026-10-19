@@ -40,3 +40,13 @@ describe('camera bridge runs only behind an admitted workspace (ADR-623)', () =>
     expect(start).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('the main window losing its workspace stops the camera (ADR-623)', () => {
+  it('clears admission on a renderer crash and on a closed window', async () => {
+    const { readFileSync } = await import('node:fs');
+    const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    // macOS keeps KerfDesk running with no window, so close must count too.
+    expect(main).toMatch(/webContents\.on\('render-process-gone', \(\) => rendererGone\?\.\(\)\)/);
+    expect(main).toMatch(/window\.on\('closed', \(\) => rendererGone\?\.\(\)\)/);
+  });
+});

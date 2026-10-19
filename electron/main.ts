@@ -410,7 +410,10 @@ async function createWindow(): Promise<void> {
   // and the taskbar button shows the job's progress (ADR-553).
   installSessionEndGuard(window);
   installTaskbarJobProgress(window);
+  // A crashed renderer, or a window closed on macOS where the app keeps running,
+  // leaves no workspace behind it.
   window.webContents.on('render-process-gone', () => rendererGone?.());
+  window.on('closed', () => rendererGone?.());
   installRendererCrashRecovery(window, {
     isClosing: () => closeGuard.isClosing(),
     askToReload: async (prompt) => {

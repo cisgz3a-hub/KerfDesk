@@ -249,11 +249,12 @@ export async function qualifyDesktopLicence(input) {
     packageModified: false,
     nativeAppExecuted: false,
     paidTierQualified: false,
-    screenshotScope: 'Only the exact Free/Pro edition button, never the licence panel.',
+    screenshotScope:
+      'Only the exact Pro or Licence needed edition button, never the licence panel (ADR-623).',
     limitations: [
       'One real Windows machine identity; no three-seat or device-transfer qualification.',
       'Developer licence only; paid and trial lifecycle evidence remains separate.',
-      'Native Pro-to-Free deactivation is observed; backend seat inventory is verified separately.',
+      'Native deactivation from Pro to Licence needed is observed; backend seat inventory is verified separately.',
       'The shipped smoke uses stubbed file pickers and an in-memory project save.',
       'A same-version reinstall is tested; no new-version credential migration is claimed.',
       'UIA screenshot crops are best effort; receipts assert the actual shipped native helper outcomes.',
