@@ -324,7 +324,8 @@ test('layout preference survives reload, constrains narrow windows and resets fr
   await expect(layout).toContainText('Spacious');
   await page.setViewportSize({ width: 1536, height: 864 });
   await expect(panels).toHaveAttribute('data-layout', 'spacious');
-  await page.getByRole('button', { name: 'Machine', exact: true }).click();
+  await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).click();
+  await expect(page.getByLabel('Laser controls collapsed', { exact: true })).toBeVisible();
   await page.getByRole('menuitem', { name: 'Window', exact: true }).click();
   // Anchored at the start of the label, the same way the rest of the suite
   // anchors /^Connect/ and friends.
