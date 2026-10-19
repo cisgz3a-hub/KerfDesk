@@ -10,7 +10,6 @@ import {
   changeJigDraft,
   createJigEditorSession,
   selectJigObjects,
-  undoJigDraft,
   type JigEditorSession,
 } from './jig-editor-session';
 
@@ -71,7 +70,7 @@ function edit(label: string, value: string): void {
 }
 
 describe('jig artwork settings', () => {
-  it('changes Line to Fill locally, exposes fill controls, and supports draft undo', () => {
+  it('changes Line to Fill locally and exposes fill controls', () => {
     const main = useStore.getState().project;
     expect(host.querySelector('[aria-label="Jig Line interval (mm)"]')).toBeNull();
     chooseFill();
@@ -83,11 +82,6 @@ describe('jig artwork settings', () => {
       hatchAngleDeg: 45,
     });
     expect(useStore.getState().project).toBe(main);
-    act(() => {
-      session = undoJigDraft(session);
-      render();
-    });
-    expect(jigArtworkOperations(session.draft)[0]!.hatchAngleDeg).toBe(0);
   });
 
   it('commits power, speed and passes on blur and rejects invalid values', () => {

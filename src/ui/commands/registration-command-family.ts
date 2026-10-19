@@ -1,7 +1,7 @@
 // registration-command-family — the single Tools-menu / toolbar command for the
-// registration jig (ADR-057): a toggle that opens or closes the dedicated jig editor.
+// registration jig (ADR-057): a toggle that opens or closes jig mode (ADR-634).
 // Every actual jig action (create box, center artwork, pick the burn run) lives in
-// the panel itself (RegistrationJigPanel), not in the command registry.
+// jig mode itself, not in the command registry.
 
 import { enabled, type AppCommand, type AppCommandContext } from './command-types';
 
@@ -12,8 +12,8 @@ export function registrationJigCommand(ctx: AppCommandContext): AppCommand {
       'tools',
       'Registration Jig',
       ctx.registrationPanelOpen
-        ? 'Close the registration jig editor'
-        : 'Open the registration jig editor — lay out outlines and artwork',
+        ? 'Leave jig mode and return to the main canvas'
+        : 'Open jig mode: lay out, place and burn the jig with the machine panel beside it',
       ctx.toggleRegistrationPanel,
     ),
     active: ctx.registrationPanelOpen,

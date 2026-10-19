@@ -2681,32 +2681,37 @@ authorization, Frame proof, controller command, or safety boundary.
 
 ### F-B15a. Burn a multi-outline registration jig set (ADR-057 amendment)
 
-1. Open **Registration Jig** or **Edit jig** to enter its dedicated editor. Its own
-   canvas opens fitted to the jig, with **Fit jig** and **Fit bed** available. A new
-   jig opens on **Jig layout**; an existing jig opens on **Artwork**. Draft edits and
-   Undo/Redo stay in the editor until **Save to canvas**, and the footer shows
-   **Unsaved changes** while the draft differs. Escape in a field only leaves the
-   field; otherwise Escape first clears the selection.
-   Escape with nothing selected, or **Close without saving**, closes at once when
-   nothing changed; otherwise it asks **Save jig changes?** with **Save to canvas**,
-   **Discard changes** and **Keep editing**. Discarding leaves the main canvas unchanged.
+1. Open **Registration Jig** or **Edit jig** to enter jig mode (ADR-634). The jig page
+   takes the place of the tool strip and the main canvas; the machine panel stays docked
+   beside it, and dialogs, alarms and the live motion bar appear above it as usual. Its
+   canvas opens fitted to the jig, with **Fit jig** and **Fit bed** available. The page
+   has three steps: **1 Burn outlines**, **2 Place pieces & artwork** and **3 Burn
+   artwork**. A new jig opens on step 1; one whose outlines are burned opens on step 2.
+   Opening jig mode without a jig creates its first outline, in **Outline only**, as one
+   undoable edit. Every edit goes straight into the project with the ordinary Undo
+   (Ctrl+Z, Ctrl+Shift+Z, or Ctrl+Y on the jig page); there is nothing to save or
+   discard. **Done** returns to the main canvas. Escape in a field only leaves the
+   field; otherwise Escape clears the selection and never leaves jig mode. While the
+   machine runs a job, Frames or moves, the page says editing is paused: the canvas only
+   pans and zooms and the step fields are disabled.
    On the jig canvas, drag a selection to move it. Drag a corner handle to resize it
    proportionally (Shift resizes freely), an edge handle to stretch one side, or the
    round handle above it to rotate it about its centre (Shift snaps to 15°). Each drag
-   is one undoable draft edit. Drag on empty canvas to box-select: left to right selects
+   is one undoable edit. Drag on empty canvas to box-select: left to right selects
    what the box encloses, right to left what it touches. Shift-drag or Shift-click adds
    to the selection, and Ctrl+A selects all the artwork (not the outlines) unless a field
    has focus. Locked or hidden objects, including locked outlines, are never selected.
    As on the main canvas, drag with the right or middle mouse button, or hold Space and
    drag, to pan; the wheel zooms.
-2. In **Jig layout**, choose Rectangle or Circle, enter the outline size, then enter
-   rows, columns, and horizontal/vertical spacing. Apply the layout before saving;
-   until then the tab reads **Jig layout •**. A 1 x 5 grid creates five independently
-   visible outlines as one fixture set, and the canvas refits to the new grid. A jig
-   that was never saved stays centred where it was; a saved jig keeps its first
-   outline in place. Either way, a grid that would cross the bed edge is moved back
-   just far enough to stay on the bed.
-3. In **Artwork**, click **Import artwork…**, drop SVG or image files onto an outline
+2. In **1 Burn outlines**, choose Rectangle or Circle, enter the outline size, then enter
+   rows, columns, and horizontal/vertical spacing, and click **Apply layout**. Until
+   then the step reads **1 Burn outlines •** and its burn panel asks for the layout to
+   be applied first. A 1 x 5 grid creates five independently visible outlines as one
+   fixture set, and the canvas refits to the new grid. A jig created in this visit of
+   jig mode stays centred where it was; an existing jig keeps its first outline in
+   place. Either way, a grid that would cross the bed edge is moved back just far
+   enough to stay on the bed. The outline laser settings sit below the layout.
+3. In **2 Place pieces & artwork**, click **Import artwork…**, drop SVG or image files onto an outline
    on the jig canvas, use the existing writing styles for text, or use the existing
    tracers directly in the editor under **Trace an image**, which starts open. Imported
    artwork and traces of uploaded images fit inside the outline the files were dropped
@@ -2718,9 +2723,9 @@ authorization, Frame proof, controller command, or safety boundary.
    the image and removes the image (ADR-633). If Centre + copy already copied that
    image to the other outlines, the button reads **Replace all N images with trace**
    and every copy is replaced the same way.
-   **Line / Fill settings** controls the selected artwork's operation, power, speed and
-   passes; Fill also exposes line interval, scan angle, fill style and cross-hatch.
-   Use Line for open traced paths. These edits remain in the draft until saved.
+   In **3 Burn artwork**, **Line / Fill settings** controls the selected artwork's
+   operation, power, speed and passes; Fill also exposes line interval, scan angle, fill
+   style and cross-hatch. Use Line for open traced paths.
 4. Select one artwork or artwork group and click **Centre + copy artwork to all N**.
    The original is proportionally fitted into 90% of the first outline's usable
    region, preserving aspect ratio, and one identical operation-preserving copy is
@@ -2734,19 +2739,22 @@ authorization, Frame proof, controller command, or safety boundary.
    grid spacing does not scale. For rotated artwork, W and H follow the artwork's
    rotated local axes; the rotation is preserved and the shared resize remains
    available without inventing shear or asking the operator to relock AR.
-6. Click **Save to canvas** to apply the draft as one undoable edit. A new jig starts
-   in **Outline only**; editing an existing jig retains its output mode. Saving an
-   existing jig with no edits just closes the editor, adding no undo step. Outlines
-   lock on the main canvas. The compact bar keeps **Edit jig**, **Outline only** and
-   **Artwork only** available without covering the canvas.
+6. Frame and Start sit in the burn panels of steps 1 and 3, and only in the step whose
+   run is next; while jig mode is open the machine panel does not show its own copy.
+   With the outlines next, step 3 says to burn them in step 1 first and offers
+   **Outlines are already burned**; with the artwork next, step 1 offers **Burn
+   outlines again**. If both are set to burn in one run, each step offers to burn only
+   its own run. The main canvas bar keeps **Edit jig** and says which run burns next.
+   Outlines stay locked on the main canvas whatever jig mode does.
 7. With **Outline only**, every registration outline is enabled and every artwork
    operation is disabled. Burn the complete outline set on the jig base before
-   placing the pieces. After an accepted, successful complete outline run has
-   physically settled, the unchanged project automatically selects **Artwork only**.
-   Frame, interrupted/failed runs and selected-only outline runs do not switch it.
+   placing the pieces: in step 1, Frame, then Start. After an accepted, successful
+   complete outline run has physically settled, the unchanged project automatically
+   selects **Artwork only** and jig mode moves to step 2. Frame, interrupted/failed
+   runs and selected-only outline runs do not switch it.
 8. Put one blank inside each burned outline and focus on the blank's **top surface**,
    which is higher than the outline surface. Keep X/Y placement and work origin
-   unchanged. Confirm **Artwork only** before burning the artwork. Every
+   unchanged. In step 3, check the artwork settings, then Frame and Start. Every
    registration outline is disabled and every artwork copy on an enabled source
    operation is included in the second run. Output completes all enabled operations
    for one physical jig instance before starting the next instance in grid order;
@@ -2765,10 +2773,10 @@ authorization, Frame proof, controller command, or safety boundary.
 
 1. A 1 x 1 grid preserves the original single-jig workflow and button wording.
 2. **Remove all outlines** deletes the complete set and its reserved operation.
-3. Outlines remain editable in the dedicated editor and lock when saved to the main canvas.
-   With **Artwork only** selected the outlines may already be burned, so the editor
-   opens them locked. **Unlock outlines** in **Jig layout** makes them movable again
-   as an undoable draft edit.
+3. Outlines are always locked in the project, so the main canvas cannot move them; jig
+   mode shows them movable until they are burned. With **Artwork only** selected the
+   outlines may already be burned, so jig mode shows them locked. **Unlock outlines**
+   in step 1 makes them movable again until **Done**.
 4. A captured-board outline remains owned by **Place Board** and is not replaced
    from Registration Jig; the existing provenance explanation remains in the panel.
 5. Repeating **Centre + copy artwork to all N** replaces the generated copies
@@ -2786,16 +2794,9 @@ authorization, Frame proof, controller command, or safety boundary.
    artwork stays in place and can still output; removed artwork and group/order edits
    are restored together by Undo. A retained relief's linked source cannot be silently
    removed. Exact artwork-size controls also appear for a single fitted jig (ADR-599).
-9. The draft survives changes the main project makes while the editor is open, such as
-   variable text advancing after a job (ADR-606 Amendment 1). **Save to canvas** carries
-   over main-project changes to artwork, operations and project settings the draft did
-   not touch, and the draft's own edits win for what it changed. A finished outline run
-   that selects **Artwork only** meanwhile is still adopted. Saving is refused, with a
-   message naming the cause, only when another project was opened, the main project
-   gained a captured board, the jig outlines changed there, artwork the draft changed
-   was also changed or removed there, or the same operation setting was changed
-   differently on both sides. Then choose **Close without saving**, **Discard changes**,
-   and reopen the editor.
+9. Jig mode edits the open project, so changes the project makes meanwhile, such as
+   variable text advancing after a job, simply appear on the jig page. Opening another
+   project leaves jig mode.
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 

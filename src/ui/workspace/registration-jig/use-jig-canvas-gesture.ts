@@ -43,6 +43,7 @@ export type JigGestureArgs = {
   readonly setView: (view: ViewState) => void;
   readonly setPreview: Dispatch<SetStateAction<Project | null>>;
   readonly spaceHeld: MutableRefObject<boolean>;
+  readonly readOnly?: boolean;
 };
 
 type GestureContext = JigGestureArgs & {
@@ -116,7 +117,9 @@ function beginJigGesture(context: GestureContext, event: PointerEvent<HTMLCanvas
   const started = { pointerId: event.pointerId, start: point, base: project, view };
   const next = pan
     ? { ...started, kind: 'pan' as const, selectedIds: context.selectedIds }
-    : pickJigGesture(context, point, event.shiftKey);
+    : context.readOnly === true
+      ? null
+      : pickJigGesture(context, point, event.shiftKey);
   if (next === null) return;
   context.gesture.current = { ...started, ...next };
   event.currentTarget.setPointerCapture(event.pointerId);

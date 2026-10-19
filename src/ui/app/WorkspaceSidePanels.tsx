@@ -18,6 +18,9 @@ export function WorkspaceSidePanels(): JSX.Element {
   const [machineOpen, setMachineOpen] = useState(true);
   const layersExpanded = useUiStore((state) => state.railPanelVisibility.layers);
   const machinePanel = useMachineRailVisibility();
+  // Jig mode (ADR-634) shows only the machine panel: the jig page has its own
+  // artwork and laser settings, and its burn steps hold Frame and Start.
+  const jigOpen = useUiStore((state) => state.registrationPanelOpen);
   const panelId = useId();
   useWorkspacePanelFocus(setActive, setCutsOpen, setMachineOpen);
 
@@ -27,32 +30,15 @@ export function WorkspaceSidePanels(): JSX.Element {
   }
 
   if (layout === 'compact') {
-    const collapsed = active === 'layers' ? !layersExpanded : !machinePanel.isExpanded;
+    const shown: RailPanelId = jigOpen ? 'machine' : active;
     return (
-      <section
-        aria-label="Workspace side panels"
-        data-layout="compact"
-        data-collapsed={collapsed}
-        data-active-panel={active}
-        className="lf-workspace-panels lf-workspace-panels--compact"
-        style={collapsed ? collapsedCompactPanelStyle : undefined}
-      >
-        <CompactPanelTabs
-          panelId={panelId}
-          active={active}
-          collapsed={collapsed}
-          onSelect={selectPanel}
-        />
-        <div
-          id={panelId}
-          role="tabpanel"
-          aria-labelledby={`${panelId}-${active}`}
-          className="lf-workspace-panel-body"
-        >
-          {active === 'layers' ? <CutsLayersPanel /> : <LaserWindow dockedJobActions />}
-        </div>
-        {!collapsed ? <WorkspaceJobActions /> : null}
-      </section>
+      <CompactWorkspacePanels
+        panelId={panelId}
+        shown={shown}
+        jigOpen={jigOpen}
+        collapsed={shown === 'layers' ? !layersExpanded : !machinePanel.isExpanded}
+        onSelect={selectPanel}
+      />
     );
   }
 
@@ -63,12 +49,14 @@ export function WorkspaceSidePanels(): JSX.Element {
       className="lf-workspace-panels"
     >
       <div className="lf-workspace-panel-toggles">
-        <PanelToggle
-          label="Artwork"
-          icon="panel-left"
-          expanded={cutsOpen}
-          onToggle={() => setCutsOpen((open) => !open)}
-        />
+        {!jigOpen && (
+          <PanelToggle
+            label="Artwork"
+            icon="panel-left"
+            expanded={cutsOpen}
+            onToggle={() => setCutsOpen((open) => !open)}
+          />
+        )}
         <PanelToggle
           label="Machine"
           icon="panel-right"
@@ -77,7 +65,7 @@ export function WorkspaceSidePanels(): JSX.Element {
         />
       </div>
       <div className="lf-workspace-desktop-panels">
-        {cutsOpen ? (
+        {cutsOpen && !jigOpen ? (
           <ResizablePanel label="Artwork" collapsed={!layersExpanded}>
             <CutsLayersPanel />
           </ResizablePanel>
@@ -87,7 +75,7 @@ export function WorkspaceSidePanels(): JSX.Element {
             <div className="lf-workspace-machine-body">
               <LaserWindow dockedJobActions />
             </div>
-            {machinePanel.isExpanded ? <WorkspaceJobActions /> : null}
+            {machinePanel.isExpanded && !jigOpen ? <WorkspaceJobActions /> : null}
           </ResizablePanel>
         ) : null}
       </div>
@@ -95,9 +83,47 @@ export function WorkspaceSidePanels(): JSX.Element {
   );
 }
 
+function CompactWorkspacePanels(props: {
+  readonly panelId: string;
+  readonly shown: RailPanelId;
+  readonly jigOpen: boolean;
+  readonly collapsed: boolean;
+  readonly onSelect: (panel: RailPanelId) => void;
+}): JSX.Element {
+  const { panelId, shown, collapsed } = props;
+  return (
+    <section
+      aria-label="Workspace side panels"
+      data-layout="compact"
+      data-collapsed={collapsed}
+      data-active-panel={shown}
+      className="lf-workspace-panels lf-workspace-panels--compact"
+      style={collapsed ? collapsedCompactPanelStyle : undefined}
+    >
+      <CompactPanelTabs
+        panelId={panelId}
+        active={shown}
+        jigOpen={props.jigOpen}
+        collapsed={collapsed}
+        onSelect={props.onSelect}
+      />
+      <div
+        id={panelId}
+        role="tabpanel"
+        aria-labelledby={`${panelId}-${shown}`}
+        className="lf-workspace-panel-body"
+      >
+        {shown === 'layers' ? <CutsLayersPanel /> : <LaserWindow dockedJobActions />}
+      </div>
+      {!collapsed && !props.jigOpen ? <WorkspaceJobActions /> : null}
+    </section>
+  );
+}
+
 function CompactPanelTabs(props: {
   readonly panelId: string;
   readonly active: RailPanelId;
+  readonly jigOpen: boolean;
   readonly collapsed: boolean;
   readonly onSelect: (panel: RailPanelId) => void;
 }): JSX.Element {
@@ -109,15 +135,17 @@ function CompactPanelTabs(props: {
       aria-orientation={props.collapsed ? 'vertical' : 'horizontal'}
       className={`lf-workspace-panel-tabs${props.collapsed ? ' lf-workspace-panel-tabs--collapsed' : ''}`}
     >
-      <PanelTab
-        id={`${props.panelId}-layers`}
-        controls={props.panelId}
-        label="Artwork"
-        icon="layers"
-        selected={props.active === 'layers'}
-        expanded={visibility.layers}
-        onSelect={() => props.onSelect('layers')}
-      />
+      {!props.jigOpen && (
+        <PanelTab
+          id={`${props.panelId}-layers`}
+          controls={props.panelId}
+          label="Artwork"
+          icon="layers"
+          selected={props.active === 'layers'}
+          expanded={visibility.layers}
+          onSelect={() => props.onSelect('layers')}
+        />
+      )}
       <PanelTab
         id={`${props.panelId}-machine`}
         controls={props.panelId}

@@ -125,7 +125,7 @@ describe('tracing an image already on the jig', () => {
       expect(replacement.transform).toEqual(positionTraceOverRasterSource(copy, traced).transform);
       expect(operationId(result, replacement.id)).toBe(operationId(result, traced.id));
     }
-    expect(after.past).toHaveLength(before.past.length + 1);
+    expect(after.draft.project).not.toBe(before.draft.project);
   });
 
   it('keeps the traced copies linked, so Centre + copy refreshes them instead of adding more', () => {

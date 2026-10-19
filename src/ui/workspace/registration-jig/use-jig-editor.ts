@@ -1,26 +1,29 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   findRegistrationBoxes,
+  isRegistrationBox,
   type Project,
   type SceneObject,
   type TextObject,
   type TracedImage,
 } from '../../../core/scene';
+import { keyboardOwnedElsewhere } from '../../common/keyboard-owner';
 import { useStore } from '../../state';
+import { useLaserStore } from '../../state/laser-store';
+import { jobControlsBusy } from '../../laser/job-controls-busy';
 import { reportDependencyRepairs } from '../../state/object-delete-actions';
 import type { RegistrationJigSetSpec } from '../../state/registration-jig-set-actions';
 import {
   changeJigDraft,
-  commitJigEditorSession,
   createJigEditorSession,
-  jigDraftDirty,
+  jigSessionView,
+  jigStoreChange,
   removeJigLayout,
   replaceJigLayout,
   selectedJigIds,
   selectJigObjects,
-  undoJigDraft,
-  type JigCommitRefusal,
   type JigEditorSession,
+  type JigViewOptions,
 } from './jig-editor-session';
 import {
   deleteJigArtworkWithRepairs,
@@ -31,65 +34,103 @@ import {
   type JigImportPlacement,
 } from './jig-editor-artwork';
 import { useJigArtworkImport } from './JigArtworkImport';
+import { jigRunPhase, type JigRunPhase } from './jig-run-phase';
 import { jigSelectAll } from './jig-canvas-selection';
 
+/** The three steps of a jig job, in the order the operator does them. */
+export type JigStep = 'outlines' | 'artwork' | 'burn-artwork';
+
+export type JigEdit = (session: JigEditorSession) => JigEditorSession;
+
 export function useJigEditor(onClose: () => void) {
-  const [session, setSession] = useState(() => createJigEditorSession(useStore.getState()));
-  const [pendingLayout, setPendingLayout] = useState(false);
+  const [fresh] = useState(
+    () => findRegistrationBoxes(useStore.getState().project.scene).length === 0,
+  );
+  const [outlinesUnlocked, setOutlinesUnlocked] = useState(false);
+  const unlockedRef = useRef(outlinesUnlocked);
+  unlockedRef.current = outlinesUnlocked;
+  const draft = useJigStoreSlice();
+  const runPhase = jigRunPhase(draft.project.scene);
+  const session = useMemo(
+    () => jigSessionView(draft, { fresh, outlinesUnlocked }),
+    [draft, fresh, outlinesUnlocked],
+  );
+  const setSession = useCallback(
+    (edit: JigEdit, undoName?: string) =>
+      applyJigEdit(edit, { fresh, outlinesUnlocked: unlockedRef.current }, undoName),
+    [fresh],
+  );
+  const [step, setStep] = useJigStep(runPhase);
+  useJigOpening(fresh, onClose);
   const working = useJigWorking();
+  const [pendingLayout, setPendingLayout] = useState(false);
+  const edits = useJigEditCallbacks(setSession);
+  const artworkImport = useJigArtworkImport(edits.onImport, working.onImportBusy);
+  return {
+    ...edits,
+    session,
+    setSession,
+    runPhase,
+    step,
+    setStep,
+    readOnly: useMachineMoving(),
+    outlinesUnlocked,
+    unlockOutlines: () => setOutlinesUnlocked(true),
+    pendingLayout,
+    setPendingLayout,
+    busy: working.busy,
+    captured: findRegistrationBoxes(draft.project.scene).some(
+      (box) => box.provenance === 'captured-board',
+    ),
+    importing: artworkImport.busy,
+    importFiles: artworkImport.importFiles,
+    ids: selectedJigIds(session.draft),
+    onTextBusy: working.onTextBusy,
+    onTraceBusy: working.onTraceBusy,
+    // Escape drops the selection, as on the main canvas. Leaving jig mode is
+    // always the explicit Done, so a stray Escape never moves the operator.
+    onEscape: () => edits.onSelect(new Set()),
+    done: () => finishJigMode(onClose),
+  };
+}
+
+export type JigEditorController = ReturnType<typeof useJigEditor>;
+
+function useJigEditCallbacks(setSession: (edit: JigEdit) => JigEditorSession) {
   // Bumped when the outline layout is rebuilt, so the canvas refits to the new grid.
   const [fitRequest, setFitRequest] = useState(0);
   const onCommit = useCallback(
     (project: Project) => setSession((current) => changeJigDraft(current, { project })),
-    [],
+    [setSession],
   );
   const onSelect = useCallback(
     (ids: ReadonlySet<string>) => setSession((current) => selectJigObjects(current, ids)),
-    [],
+    [setSession],
   );
   const onImport = useCallback(
     (object: SceneObject, placement?: JigImportPlacement) =>
       setSession((current) => importJigArtwork(current, object, placement)),
-    [],
+    [setSession],
   );
   const onUpsert = useCallback(
     (object: TextObject) => setSession((current) => upsertJigText(current, object)),
-    [],
+    [setSession],
   );
   const onTraceImage = useCallback(
     (imageId: string, traced: TracedImage) =>
       setSession((current) => traceJigImage(current, imageId, traced)),
-    [],
+    [setSession],
   );
-  const artworkImport = useJigArtworkImport(onImport, working.onImportBusy);
-  const onReplaceLayout = useCallback((spec: RegistrationJigSetSpec) => {
-    setSession((current) => replaceJigLayout(current, spec));
-    setFitRequest((request) => request + 1);
-  }, []);
-  const onRemoveLayout = useCallback(() => setSession(removeJigLayout), []);
-  const captured = findRegistrationBoxes(session.baseProject.scene).some(
-    (box) => box.provenance === 'captured-board',
+  const onReplaceLayout = useCallback(
+    (spec: RegistrationJigSetSpec) => {
+      setSession((current) => replaceJigLayout(current, spec));
+      setFitRequest((request) => request + 1);
+    },
+    [setSession],
   );
-  const closing = useJigEditorClose({
-    session,
-    pendingLayout,
-    busy: working.busy,
-    captured,
-    onClose,
-    onSelect,
-  });
+  const onRemoveLayout = useCallback(() => setSession(removeJigLayout), [setSession]);
   return {
-    ...closing,
-    session,
-    setSession,
-    pendingLayout,
-    setPendingLayout,
-    busy: working.busy,
-    captured,
     fitRequest,
-    importing: artworkImport.busy,
-    importFiles: artworkImport.importFiles,
-    ids: selectedJigIds(session.draft),
     onCommit,
     onSelect,
     onImport,
@@ -97,9 +138,106 @@ export function useJigEditor(onClose: () => void) {
     onTraceImage,
     onReplaceLayout,
     onRemoveLayout,
-    onTextBusy: working.onTextBusy,
-    onTraceBusy: working.onTraceBusy,
   };
+}
+
+/**
+ * Applies one jig edit to the open project. Nothing changes while the machine
+ * is running a job or moving: the run was prepared from the project as it was,
+ * and the outline-run completion that selects Artwork only needs it unchanged.
+ */
+export function applyJigEdit(
+  edit: JigEdit,
+  options: JigViewOptions,
+  undoName?: string,
+): JigEditorSession {
+  const state = useStore.getState();
+  const before = jigSessionView(state, options);
+  const after = edit(before);
+  const change = jigStoreChange(state, before, after, undoName);
+  if (change === null) return after;
+  if (change.project !== undefined && machineMovingNow()) return before;
+  useStore.setState(change);
+  return after;
+}
+
+function useJigStoreSlice() {
+  const project = useStore((state) => state.project);
+  const selectedObjectId = useStore((state) => state.selectedObjectId);
+  const additionalSelectedIds = useStore((state) => state.additionalSelectedIds);
+  const registrationArtworkOutputSnapshot = useStore(
+    (state) => state.registrationArtworkOutputSnapshot,
+  );
+  return useMemo(
+    () => ({ project, selectedObjectId, additionalSelectedIds, registrationArtworkOutputSnapshot }),
+    [project, selectedObjectId, additionalSelectedIds, registrationArtworkOutputSnapshot],
+  );
+}
+
+function machineMovingNow(): boolean {
+  const laser = useLaserStore.getState();
+  return jobControlsBusy(laser.streamer?.status, laser.motionOperation, laser.controllerOperation);
+}
+
+function useMachineMoving(): boolean {
+  return useLaserStore((laser) =>
+    jobControlsBusy(laser.streamer?.status, laser.motionOperation, laser.controllerOperation),
+  );
+}
+
+// A new jig opens on its outlines; one whose outlines are burned opens on the
+// artwork. A clean outline run selects Artwork only, and the page follows it
+// to placing the pieces.
+function useJigStep(runPhase: JigRunPhase) {
+  const [step, setStep] = useState<JigStep>(() =>
+    runPhase === 'artwork' ? 'artwork' : 'outlines',
+  );
+  const previous = useRef(runPhase);
+  useEffect(() => {
+    if (previous.current === 'outlines' && runPhase === 'artwork') {
+      setStep((current) => (current === 'outlines' ? 'artwork' : current));
+    }
+    previous.current = runPhase;
+  }, [runPhase]);
+  return [step, setStep] as const;
+}
+
+// Opening jig mode on a project without a jig creates its first outline, as one
+// undoable edit. Opening another project leaves jig mode.
+function useJigOpening(fresh: boolean, onClose: () => void): void {
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    if (!fresh || machineMovingNow()) return;
+    const state = useStore.getState();
+    const before = jigSessionView(state, { fresh });
+    const created = createJigEditorSession(state, { fresh });
+    const change = jigStoreChange(state, before, created, 'Create registration jig');
+    if (change !== null) useStore.setState(change);
+  }, [fresh]);
+  useEffect(() => {
+    const epoch = useStore.getState().projectDocumentEpoch;
+    return useStore.subscribe((state) => {
+      if (state.projectDocumentEpoch !== epoch) close.current();
+    });
+  }, []);
+}
+
+// Outlines stay locked on the main canvas, so Done drops them from the
+// selection rather than leave a selection the main canvas cannot edit.
+function finishJigMode(onClose: () => void): void {
+  const state = useStore.getState();
+  const ids = [...selectedJigIds(state)].filter((id) => {
+    const object = state.project.scene.objects.find((candidate) => candidate.id === id);
+    return object !== undefined && !isRegistrationBox(object);
+  });
+  if (ids.length !== selectedJigIds(state).size) {
+    useStore.setState({
+      selectedObjectId: ids[0] ?? null,
+      additionalSelectedIds: new Set(ids.slice(1)),
+    });
+  }
+  onClose();
 }
 
 function useJigWorking() {
@@ -120,85 +258,6 @@ function useJigWorking() {
   return { busy, onImportBusy, onTextBusy, onTraceBusy };
 }
 
-// Saving, closing and Escape. Closing with unsaved edits asks first: Escape or
-// one stray click must not throw away a whole jig.
-function useJigEditorClose(args: {
-  readonly session: JigEditorSession;
-  readonly pendingLayout: boolean;
-  readonly busy: boolean;
-  readonly captured: boolean;
-  readonly onClose: () => void;
-  readonly onSelect: (ids: ReadonlySet<string>) => void;
-}) {
-  const { session, pendingLayout, busy, captured, onClose, onSelect } = args;
-  const [error, setError] = useState('');
-  const [confirmingClose, setConfirmingClose] = useState(false);
-  const dirty = jigDraftDirty(session) || pendingLayout;
-  const canSave = !busy && !pendingLayout && !captured;
-  const save = (): boolean => {
-    if (!canSave) return false;
-    // Nothing to publish: closing must not add an undo step or dirty the project.
-    if (!jigDraftDirty(session) && !session.firstSave) {
-      onClose();
-      return true;
-    }
-    const result = commitJigEditorSession(useStore.getState(), session);
-    if (result.kind === 'refused') {
-      setConfirmingClose(false);
-      setError(refusalMessage(result.reason));
-      return false;
-    }
-    useStore.setState(result.change);
-    onClose();
-    return true;
-  };
-  const requestClose = (): void => {
-    if (dirty && !captured) setConfirmingClose(true);
-    else onClose();
-  };
-  // Escape first drops the selection, as on the main canvas; only an Escape
-  // with nothing selected asks to leave the editor.
-  const onEscape = (): void => {
-    if (confirmingClose) return;
-    if (selectedJigIds(session.draft).size > 0) onSelect(new Set());
-    else requestClose();
-  };
-  return {
-    error,
-    dirty,
-    canSave,
-    save,
-    requestClose,
-    onEscape,
-    confirmingClose,
-    keepEditing: () => setConfirmingClose(false),
-    discard: onClose,
-  };
-}
-
-const REOPEN = 'Choose Close without saving, then Discard changes, and reopen the editor';
-
-// Changes the draft did not overlap are merged on save, so each refusal names
-// what actually collided.
-function refusalMessage(reason: JigCommitRefusal): string {
-  switch (reason) {
-    case 'new-document':
-      return `A different project was opened while this editor was open, so these jig edits belong to the previous one. ${REOPEN} to edit the jig in this project.`;
-    case 'captured-board':
-      return `The main project now holds a captured board outline, which this editor cannot replace. ${REOPEN}; Place Board owns that outline.`;
-    case 'outlines':
-      return `The jig outlines changed on the main canvas while this editor was open, and this draft holds the whole layout. ${REOPEN} to start from the current outlines.`;
-    case 'artwork':
-      return `Artwork you changed here was also changed in the main project while this editor was open. ${REOPEN} to start from the current artwork.`;
-    case 'operations':
-      return `An operation setting you changed here was also changed in the main project, or artwork here uses an operation the main project removed. ${REOPEN} to start from the current operations.`;
-    case 'project':
-      return `A project setting changed in the main project overlaps this editor's changes. ${REOPEN} to start from the current project.`;
-  }
-}
-
-export type JigEditorController = ReturnType<typeof useJigEditor>;
-
 export function isTextInput(target: EventTarget): boolean {
   return (
     target instanceof HTMLElement &&
@@ -213,42 +272,59 @@ const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
   arrowdown: [0, 1],
 };
 
-export function handleJigEditorKey(
-  event: React.KeyboardEvent,
-  session: JigEditorSession,
-  setSession: React.Dispatch<React.SetStateAction<JigEditorSession>>,
-): void {
-  if (isTextInput(event.target) || handleJigCommandKey(event, setSession)) return;
+/** Jig-page keys. The window's canvas shortcuts stand down in jig mode, so
+ *  these are the only canvas keys; machine and file shortcuts still work. */
+export function handleJigEditorKey(event: React.KeyboardEvent, editor: JigEditorController): void {
+  // A dialog the page opens (Cut Settings) owns the keyboard, as it does over
+  // the main canvas; its keys bubble here and must not edit the jig.
+  if (keyboardOwnedElsewhere()) return;
+  if (isTextInput(event.target)) {
+    if (event.key === 'Escape') (event.currentTarget as HTMLElement).focus();
+    return;
+  }
+  if (handleJigCommandKey(event, editor)) return;
   const key = event.key.toLowerCase();
-  if (key === 'delete' || key === 'backspace') {
+  if (key === 'escape') {
     event.preventDefault();
-    const deletion = deleteJigArtworkWithRepairs(session);
-    if (deletion.session === session) return;
-    setSession(deletion.session);
-    if (deletion.repairs !== null) reportDependencyRepairs(deletion.repairs);
+    editor.onEscape();
+  } else if (editor.readOnly) {
+    return;
+  } else if (key === 'delete' || key === 'backspace') {
+    event.preventDefault();
+    let repairs: ReturnType<typeof deleteJigArtworkWithRepairs>['repairs'] = null;
+    editor.setSession((current) => {
+      const deletion = deleteJigArtworkWithRepairs(current);
+      repairs = deletion.repairs;
+      return deletion.session;
+    });
+    if (repairs !== null) reportDependencyRepairs(repairs);
   } else {
     const direction = ARROWS[key];
     if (direction === undefined) return;
     const step = event.shiftKey ? 10 : 1;
     event.preventDefault();
-    setSession((current) => nudgeJigSelection(current, direction[0] * step, direction[1] * step));
+    editor.setSession((current) =>
+      nudgeJigSelection(current, direction[0] * step, direction[1] * step),
+    );
   }
 }
 
-// Ctrl/Cmd+Z and +Y undo and redo; Ctrl/Cmd+A selects everything the canvas can select.
-function handleJigCommandKey(
-  event: React.KeyboardEvent,
-  setSession: React.Dispatch<React.SetStateAction<JigEditorSession>>,
-): boolean {
+// Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z stay the window's project-wide Undo and Redo
+// (use-shortcuts.ts); the jig page adds Ctrl/Cmd+Y for Redo, as the jig editor
+// had, and Ctrl/Cmd+A selects everything the canvas can select.
+function handleJigCommandKey(event: React.KeyboardEvent, editor: JigEditorController): boolean {
   if (!event.ctrlKey && !event.metaKey) return false;
   const key = event.key.toLowerCase();
-  if (key === 'z' || key === 'y') {
+  if (key === 'z') return true;
+  if (key === 'y' && !event.shiftKey) {
     event.preventDefault();
-    setSession((current) => undoJigDraft(current, event.shiftKey || key === 'y'));
+    useStore.getState().redo();
     return true;
   }
   if (key !== 'a' || event.shiftKey) return false;
   event.preventDefault();
-  setSession((current) => selectJigObjects(current, jigSelectAll(current.draft.project.scene)));
+  editor.setSession((current) =>
+    selectJigObjects(current, jigSelectAll(current.draft.project.scene)),
+  );
   return true;
 }

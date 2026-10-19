@@ -2,7 +2,6 @@ import {
   findRegistrationBoxes,
   isRegistrationBox,
   REGISTRATION_LAYER_ID,
-  registrationRunState,
   type Project,
 } from '../../../core/scene';
 import type { AppState } from '../../state/store';
@@ -14,7 +13,14 @@ import { applyCenterArtworkInRegistrationJigSet } from '../../state/registration
 import { applyRemoveRegistrationBox } from '../../state/registration-box-actions';
 import { applyRegistrationOutput } from '../../state/registration-output-actions';
 import { pushUndo } from '../../state/scene-mutations';
-import { rebaseJigDraft, type JigRebaseConflict } from './jig-editor-rebase';
+import { jigRunPhase } from './jig-run-phase';
+
+// Jig mode edits the open project itself (ADR-634): there is no draft to save
+// or discard, so what the jig page shows is always what Frame and Start burn.
+// The helpers here stay pure. They work on a view of the project in which the
+// outlines are unlocked while they may still be moved, and `jigStoreChange`
+// locks them again before anything reaches the store, so a stray drag on the
+// main canvas can never move an outline.
 
 export type JigDraft = Pick<
   AppState,
@@ -22,90 +28,169 @@ export type JigDraft = Pick<
 >;
 
 export type JigEditorSession = {
-  readonly baseProject: Project;
-  readonly documentEpoch: number;
-  readonly firstSave: boolean;
+  /** True when this jig-mode visit created the jig: its outlines cannot have
+   *  been burned, so a resized grid stays centred where it was. */
+  readonly fresh: boolean;
   readonly draft: JigDraft;
-  readonly past: ReadonlyArray<JigDraft>;
-  readonly future: ReadonlyArray<JigDraft>;
 };
 
-export function createJigEditorSession(state: AppState): JigEditorSession {
-  const boxes = findRegistrationBoxes(state.project.scene);
-  // Artwork only follows the outline burn. Moving outlines then would leave the
-  // artwork registered to outlines that no longer match the board, so they stay
-  // locked until the operator unlocks them on purpose.
-  const burned = registrationRunState(state.project.scene) === 'artwork';
-  let draft: JigDraft = {
-    project: burned ? lockOutlines(state.project) : editableProject(state.project),
-    selectedObjectId: state.selectedObjectId,
-    additionalSelectedIds: state.additionalSelectedIds,
-    registrationArtworkOutputSnapshot:
-      state.project.registrationArtworkOutputSnapshot ?? state.registrationArtworkOutputSnapshot,
-  };
-  if (boxes.length === 0) {
-    const created = applyReplaceRegistrationJigSet(
-      { ...draft, undoStack: [] },
-      {
-        outline: { kind: 'rectangle', widthMm: 80, heightMm: 40 },
-        rows: 1,
-        columns: 1,
-        spacingX: 5,
-        spacingY: 5,
-      },
-      () => crypto.randomUUID(),
-    );
-    draft = { ...draft, ...created };
-    if (state.selectedObjectId !== null) {
-      draft = {
-        ...draft,
-        selectedObjectId: state.selectedObjectId,
-        additionalSelectedIds: state.additionalSelectedIds,
-      };
-    }
-  }
-  return {
-    baseProject: state.project,
-    documentEpoch: state.projectDocumentEpoch,
-    firstSave: boxes.length === 0,
-    draft,
-    past: [],
-    future: [],
-  };
-}
+export type JigViewOptions = {
+  readonly fresh?: boolean;
+  /** The operator unlocked burned outlines on purpose (Artwork only). */
+  readonly outlinesUnlocked?: boolean;
+};
 
-function editableProject(project: Project): Project {
+type JigStoreState = JigDraft & Pick<AppState, 'undoStack'>;
+
+/** The jig page's view of the store. Outlines are editable until they are
+ *  burned (Artwork only), or after an explicit Unlock. */
+export function jigSessionView(state: JigDraft, options: JigViewOptions = {}): JigEditorSession {
+  const editable =
+    options.outlinesUnlocked === true || jigRunPhase(state.project.scene) !== 'artwork';
   return {
-    ...project,
-    scene: {
-      ...project.scene,
-      objects: project.scene.objects.map((object) =>
-        isRegistrationBox(object) &&
-        object.kind === 'shape' &&
-        object.provenance !== 'captured-board'
-          ? { ...object, locked: false }
-          : object,
-      ),
+    fresh: options.fresh === true,
+    draft: {
+      project: editable ? editableProject(state.project) : lockOutlines(state.project),
+      selectedObjectId: state.selectedObjectId,
+      additionalSelectedIds: state.additionalSelectedIds,
+      registrationArtworkOutputSnapshot:
+        state.project.registrationArtworkOutputSnapshot ?? state.registrationArtworkOutputSnapshot,
     },
   };
 }
 
-/** True while the draft's outlines are locked against moving. */
+/** The view, plus a starting outline when the project has no jig yet. A new jig
+ *  starts in Outline only: its outlines are burned first. */
+export function createJigEditorSession(
+  state: JigDraft,
+  options: JigViewOptions = {},
+): JigEditorSession {
+  const fresh = findRegistrationBoxes(state.project.scene).length === 0;
+  const session = jigSessionView(state, { ...options, fresh: options.fresh ?? fresh });
+  return fresh ? createDefaultJig(session) : session;
+}
+
+function createDefaultJig(session: JigEditorSession): JigEditorSession {
+  const { draft } = session;
+  const created = applyReplaceRegistrationJigSet(
+    { ...draft, undoStack: [] },
+    {
+      outline: { kind: 'rectangle', widthMm: 80, heightMm: 40 },
+      rows: 1,
+      columns: 1,
+      spacingX: 5,
+      spacingY: 5,
+    },
+    () => crypto.randomUUID(),
+  );
+  let next: JigDraft = { ...draft, ...created };
+  next = { ...next, ...applyRegistrationOutput({ ...next, undoStack: [] }, 'box') };
+  return changeJigDraft(session, {
+    project: editableProject(next.project),
+    registrationArtworkOutputSnapshot: next.registrationArtworkOutputSnapshot,
+    selectedObjectId: draft.selectedObjectId,
+    additionalSelectedIds: draft.additionalSelectedIds,
+  });
+}
+
+/**
+ * The store change that publishes a jig edit, or null when the edit changed
+ * nothing. A selection-only change adds no undo step; anything else is one
+ * undoable edit with the outlines locked again.
+ */
+export function jigStoreChange(
+  state: JigStoreState,
+  before: JigEditorSession,
+  after: JigEditorSession,
+  undoName?: string,
+): Partial<AppState> | null {
+  if (after === before) return null;
+  const selection = {
+    selectedObjectId: after.draft.selectedObjectId,
+    additionalSelectedIds: after.draft.additionalSelectedIds,
+  };
+  if (
+    after.draft.project === before.draft.project &&
+    after.draft.registrationArtworkOutputSnapshot === before.draft.registrationArtworkOutputSnapshot
+  ) {
+    return sameSelection(before.draft, after.draft) ? null : selection;
+  }
+  const project = lockOutlines(after.draft.project);
+  return {
+    project,
+    ...selection,
+    registrationArtworkOutputSnapshot: project.scene.layers.some(
+      (layer) => layer.id === REGISTRATION_LAYER_ID,
+    )
+      ? after.draft.registrationArtworkOutputSnapshot
+      : null,
+    undoStack: pushUndo(state.project, state.undoStack, undoName),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
+function sameSelection(left: JigDraft, right: JigDraft): boolean {
+  return (
+    left.selectedObjectId === right.selectedObjectId &&
+    left.additionalSelectedIds.size === right.additionalSelectedIds.size &&
+    [...left.additionalSelectedIds].every((id) => right.additionalSelectedIds.has(id))
+  );
+}
+
+// Memoised per project so the canvas receives the same view object until the
+// project really changes; a new object would cancel a drag in progress.
+const editableViews = new WeakMap<Project, Project>();
+const lockedViews = new WeakMap<Project, Project>();
+
+function editableProject(project: Project): Project {
+  return withOutlineLock(project, false, editableViews);
+}
+
+function lockOutlines(project: Project): Project {
+  return withOutlineLock(project, true, lockedViews);
+}
+
+function withOutlineLock(
+  project: Project,
+  locked: boolean,
+  cache: WeakMap<Project, Project>,
+): Project {
+  const cached = cache.get(project);
+  if (cached !== undefined) return cached;
+  const needsChange = project.scene.objects.some(
+    (object) => movableOutline(object) && (object.locked === true) !== locked,
+  );
+  const result = needsChange
+    ? {
+        ...project,
+        scene: {
+          ...project.scene,
+          objects: project.scene.objects.map((object) =>
+            movableOutline(object) && (object.locked === true) !== locked
+              ? { ...object, locked }
+              : object,
+          ),
+        },
+      }
+    : project;
+  cache.set(project, result);
+  cache.set(result, result);
+  return result;
+}
+
+// A captured board belongs to Place Board and always stays locked (ADR-130).
+function movableOutline(object: Project['scene']['objects'][number]): boolean {
+  return (
+    isRegistrationBox(object) && object.kind === 'shape' && object.provenance !== 'captured-board'
+  );
+}
+
+/** True while the jig page shows the outlines locked against moving. */
 export function jigOutlinesLocked(project: Project): boolean {
   return findRegistrationBoxes(project.scene).some(
     (box) => box.locked === true && box.provenance !== 'captured-board',
   );
-}
-
-/** Explicit, undoable opt-in to move outlines that may already be burned. */
-export function unlockJigOutlines(session: JigEditorSession): JigEditorSession {
-  if (!jigOutlinesLocked(session.draft.project)) return session;
-  return changeJigDraft(session, { project: editableProject(session.draft.project) });
-}
-
-/** True once the draft holds an edit the main project does not have. */
-export function jigDraftDirty(session: JigEditorSession): boolean {
-  return session.past.length > 0;
 }
 
 export function selectedJigIds(draft: JigDraft): ReadonlySet<string> {
@@ -137,10 +222,11 @@ export function changeJigDraft(
   const draft = { ...session.draft, ...patch };
   if (
     draft.project === session.draft.project &&
-    draft.registrationArtworkOutputSnapshot === session.draft.registrationArtworkOutputSnapshot
+    draft.registrationArtworkOutputSnapshot === session.draft.registrationArtworkOutputSnapshot &&
+    sameSelection(draft, session.draft)
   )
     return session;
-  return { ...session, draft, past: [...session.past, session.draft].slice(-50), future: [] };
+  return { ...session, draft };
 }
 
 export function replaceJigLayout(
@@ -148,18 +234,18 @@ export function replaceJigLayout(
   spec: RegistrationJigSetSpec,
 ): JigEditorSession {
   const previous = session.draft.project.scene.layers;
-  // Outlines that never reached the main canvas cannot have been burned, so a
-  // resized grid stays centred where it was instead of growing from one corner.
+  // Outlines this visit created cannot have been burned, so a resized grid
+  // stays centred where it was instead of growing from one corner.
   const result = applyReplaceRegistrationJigSet(
     { ...session.draft, undoStack: [] },
     spec,
     () => crypto.randomUUID(),
-    session.firstSave ? 'centre' : 'corner',
+    session.fresh ? 'centre' : 'corner',
   );
   const project = result.project;
   if (project === undefined || project === session.draft.project) return session;
-  // The legacy creation action selects Artwork only. Rebuilding a draft must
-  // preserve the operator's current run and its saved artwork output intent.
+  // The legacy creation action selects Artwork only. Rebuilding the layout must
+  // keep the operator's current run and its saved artwork output intent.
   const scene = {
     ...project.scene,
     layers: project.scene.layers.map((layer) => {
@@ -167,7 +253,10 @@ export function replaceJigLayout(
       return existing === undefined ? layer : { ...layer, output: existing.output };
     }),
   };
-  return changeJigDraft(session, { ...result, project: { ...project, scene } });
+  return changeJigDraft(session, {
+    ...result,
+    project: editableProject({ ...project, scene }),
+  });
 }
 
 export function centerJigArtwork(session: JigEditorSession): JigEditorSession {
@@ -184,97 +273,4 @@ export function removeJigLayout(session: JigEditorSession): JigEditorSession {
   return result === null
     ? session
     : changeJigDraft(session, { ...result, registrationArtworkOutputSnapshot: null });
-}
-
-export function undoJigDraft(session: JigEditorSession, redo = false): JigEditorSession {
-  const source = redo ? session.future : session.past;
-  const draft = source.at(-1);
-  if (draft === undefined) return session;
-  return {
-    ...session,
-    draft,
-    past: redo ? [...session.past, session.draft] : source.slice(0, -1),
-    future: redo ? source.slice(0, -1) : [...session.future, session.draft],
-  };
-}
-
-/** Why a draft cannot be saved: another document was opened, the main project
- *  gained a captured board, or the main project changed what the draft changed. */
-export type JigCommitRefusal = 'new-document' | 'captured-board' | JigRebaseConflict;
-
-export type JigCommitResult =
-  | { readonly kind: 'saved'; readonly change: Partial<AppState> }
-  | { readonly kind: 'refused'; readonly reason: JigCommitRefusal };
-
-export function commitJigEditorSession(
-  state: AppState,
-  session: JigEditorSession,
-): JigCommitResult {
-  if (state.projectDocumentEpoch !== session.documentEpoch)
-    return { kind: 'refused', reason: 'new-document' };
-  if (findRegistrationBoxes(state.project.scene).some((box) => box.provenance === 'captured-board'))
-    return { kind: 'refused', reason: 'captured-board' };
-  const rebased = rebaseJigDraftOnto(state.project, session);
-  if (rebased.kind === 'refused') return rebased;
-  let draft = rebased.draft;
-  if (session.firstSave && findRegistrationBoxes(draft.project.scene).length > 0) {
-    draft = { ...draft, ...applyRegistrationOutput({ ...draft, undoStack: [] }, 'box') };
-  }
-  const project = lockOutlines(draft.project);
-  // Publish one edit, never the editor's intermediate history or machine state.
-  const change: Partial<AppState> = {
-    project,
-    selectedObjectId: draft.selectedObjectId,
-    additionalSelectedIds: draft.additionalSelectedIds,
-    registrationArtworkOutputSnapshot: project.scene.layers.some(
-      (layer) => layer.id === REGISTRATION_LAYER_ID,
-    )
-      ? draft.registrationArtworkOutputSnapshot
-      : null,
-    undoStack: pushUndo(state.project, state.undoStack),
-    redoStack: [],
-    dirty: true,
-  };
-  return { kind: 'saved', change };
-}
-
-// The main project may have changed while the editor was open. Carry those
-// changes into the draft, or refuse when they overlap the draft's own edits.
-function rebaseJigDraftOnto(
-  current: Project,
-  session: JigEditorSession,
-):
-  | { readonly kind: 'rebased'; readonly draft: JigDraft }
-  | { readonly kind: 'refused'; readonly reason: JigRebaseConflict } {
-  const base = session.baseProject;
-  if (current === base) return { kind: 'rebased', draft: session.draft };
-  const rebased = rebaseJigDraft(base, current, session.draft.project);
-  if (rebased.kind === 'conflict') return { kind: 'refused', reason: rebased.conflict };
-  const project = rebased.project;
-  const live = new Set(project.scene.objects.map((object) => object.id));
-  const selected = [...selectedJigIds(session.draft)].filter((id) => live.has(id));
-  let draft: JigDraft = {
-    ...session.draft,
-    project,
-    selectedObjectId: selected[0] ?? null,
-    additionalSelectedIds: new Set(selected.slice(1)),
-  };
-  // A completed outline run may select Artwork only while the editor is open.
-  // Keep the draft and adopt that output mode instead of discarding the edits.
-  const mode = registrationRunState(current.scene);
-  if (mode !== registrationRunState(base.scene) && (mode === 'box' || mode === 'artwork'))
-    draft = { ...draft, ...applyRegistrationOutput({ ...draft, undoStack: [] }, mode) };
-  return { kind: 'rebased', draft };
-}
-
-function lockOutlines(project: Project): Project {
-  return {
-    ...project,
-    scene: {
-      ...project.scene,
-      objects: project.scene.objects.map((object) =>
-        isRegistrationBox(object) && object.locked !== true ? { ...object, locked: true } : object,
-      ),
-    },
-  };
 }

@@ -301,15 +301,15 @@ describe('viewport and preview individual outcomes', () => {
 });
 
 describe('registration jig remaining actions', () => {
-  // The jig controls live in the dedicated editor; edits are draft-only until
-  // Save to canvas, so each action is checked in the draft and after saving.
+  // Jig mode edits the open project directly (ADR-634), so each action is
+  // checked in the project as soon as it is used.
   function outlineAir(): boolean | undefined {
     return useStore
       .getState()
       .project.scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID)?.airAssist;
   }
 
-  it('air assist updates the outline operation on save and Advanced settings opens that operation', async () => {
+  it('air assist updates the outline operation and Advanced settings opens that operation', async () => {
     useStore.getState().addRegistrationBox(80, 40);
     const before = outlineAir();
     await mount(<RegistrationJigEditor onClose={vi.fn()} />);
@@ -319,18 +319,16 @@ describe('registration jig remaining actions', () => {
     if (air === null) throw new Error('Missing jig air');
     expect(air.checked).toBe(before === true);
     await act(async () => air.click());
-    expect(outlineAir()).toBe(before);
+    expect(outlineAir()).toBe(before !== true);
     await click('Advanced outline settings');
     expect(
       [...document.querySelectorAll('[role="dialog"]')].some((dialog) =>
         dialog.textContent?.includes('Cut Settings'),
       ),
     ).toBe(true);
-    await click('Save to canvas');
-    expect(outlineAir()).toBe(before !== true);
   });
 
-  it('Remove outline preserves artwork, tutorial opens the jig lesson, and Close without saving keeps the project', async () => {
+  it('Remove outline preserves artwork, tutorial opens the jig lesson, and Done returns', async () => {
     useStore.getState().addRegistrationBox(80, 40);
     addRectangle();
     const project = useStore.getState().project;
@@ -339,22 +337,13 @@ describe('registration jig remaining actions', () => {
     await click('Tutorial: Registration jig');
     expect(useTutorialStore.getState().tutorialId).toBe('registration');
     await click('Remove outline');
-    expect(useStore.getState().project).toBe(project);
-    await click('Close without saving');
-    expect(onClose).not.toHaveBeenCalled();
-    await click('Discard changes');
-    expect(onClose).toHaveBeenCalledOnce();
-    expect(useStore.getState().project).toBe(project);
-
-    // Reopen with a fresh editor session, as Edit jig does after closing.
-    await act(async () => root.unmount());
-    root = createRoot(host);
-    await mount(<RegistrationJigEditor onClose={onClose} />);
-    await click('Remove outline');
-    await click('Save to canvas');
     expect(useStore.getState().project.scene.objects.some(isRegistrationBox)).toBe(false);
     expect(useStore.getState().project.scene.objects.some((object) => object.id === 'art')).toBe(
       true,
     );
+    await act(async () => useStore.getState().undo());
+    expect(useStore.getState().project).toBe(project);
+    await click('Done');
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });

@@ -1,16 +1,14 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { findRegistrationBoxes, registrationRunState } from '../../core/scene';
-import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
-import { RegistrationJigPanel } from './RegistrationJigPanel';
+import { RegistrationJigPanel, RegistrationJigWorkspace } from './RegistrationJigPanel';
 
 vi.mock('./registration-jig/RegistrationJigEditor', () => ({
   RegistrationJigEditor: () => (
-    <div role="dialog" aria-label="Registration Jig editor">
-      Dedicated jig canvas
+    <div role="region" aria-label="Registration Jig">
+      Jig page
     </div>
   ),
 }));
@@ -46,50 +44,34 @@ describe('Registration Jig main canvas bar', () => {
     render();
     expect(container.textContent).toBe('');
   });
-  it('shows the compact bar whenever a jig exists even with the editor closed', () => {
+  it('offers only Edit jig and says which run burns next', () => {
     useStore.getState().addRegistrationBox(80, 40);
+    useStore.getState().setRegistrationOutput('box');
     render();
     expect([...container.querySelectorAll('button')].map((item) => item.textContent)).toEqual([
       'Edit jig',
-      'Outline only',
-      'Artwork only',
     ]);
-    expect(button('Artwork only').disabled).toBe(true);
-  });
-  it('switches complete-set output without changing outline geometry', () => {
-    useStore.getState().replaceRegistrationJigSet({
-      outline: { kind: 'circle', diameterMm: 40 },
-      rows: 2,
-      columns: 3,
-      spacingX: 5,
-      spacingY: 5,
-    });
-    useStore.getState().drawShape(
-      createRectangle({
-        id: 'art',
-        color: '#0000ff',
-        spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
-      }),
+    expect(container.querySelector('[role="status"]')?.textContent).toContain(
+      'Next burn: outlines',
     );
-    const boxes = findRegistrationBoxes(useStore.getState().project.scene);
-    render();
-    act(() => button('Outline only').click());
-    expect(registrationRunState(useStore.getState().project.scene)).toBe('box');
-    act(() => button('Outline only').click());
-    act(() => button('Artwork only').click());
-    expect(registrationRunState(useStore.getState().project.scene)).toBe('artwork');
-    expect(findRegistrationBoxes(useStore.getState().project.scene)).toEqual(boxes);
+    act(() => useStore.getState().setRegistrationOutput('artwork'));
+    expect(container.querySelector('[role="status"]')?.textContent).toContain('Next burn: artwork');
   });
-  it('opens the dedicated editor through Edit jig', async () => {
+  it('opens jig mode through Edit jig', async () => {
     useStore.getState().addRegistrationBox(80, 40);
     render();
     await act(async () => {
       button('Edit jig').click();
     });
     expect(useUiStore.getState().registrationPanelOpen).toBe(true);
-    expect(document.querySelector('[aria-label="Registration Jig editor"]')).not.toBeNull();
   });
-  it('does not expose jig output switches for a captured board', () => {
+  it('mounts the lazily loaded jig page', async () => {
+    await act(async () => {
+      root.render(<RegistrationJigWorkspace />);
+    });
+    expect(container.querySelector('[aria-label="Registration Jig"]')).not.toBeNull();
+  });
+  it('shows nothing for a captured board', () => {
     useStore.getState().addRegistrationBox(80, 40);
     const project = useStore.getState().project;
     useStore.setState({

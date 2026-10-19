@@ -234,11 +234,14 @@ test('tools.add-text renders text, adds artwork and undoes', async ({ page }) =>
   await insertedAndUndo(page);
 });
 
-test('tools.registration-jig saves an outline from the editor and undoes', async ({ page }) => {
+test('tools.registration-jig creates an outline in jig mode and undoes', async ({ page }) => {
   await tool(page, 'Registration Jig');
-  const editor = page.getByRole('dialog', { name: 'Registration Jig editor', exact: true });
-  await editor.getByRole('button', { name: 'Save to canvas', exact: true }).click();
-  await expect(editor).toHaveCount(0);
+  const jig = page.getByRole('region', { name: 'Registration Jig', exact: true });
+  await expect(jig.getByRole('button', { name: '1 Burn outlines', exact: true })).toBeVisible();
+  // The machine panel stays docked beside the jig page.
+  await expect(page.getByLabel('Workspace side panels', { exact: true })).toBeVisible();
+  await jig.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(jig).toHaveCount(0);
   await expect(
     page.getByRole('region', { name: 'Registration jig controls', exact: true }),
   ).toBeVisible();

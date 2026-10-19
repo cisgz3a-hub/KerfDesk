@@ -12,7 +12,7 @@
 // isEditableTarget, kind-of-event).
 
 import { useEffect, useRef } from 'react';
-import { keyboardOwnedElsewhere } from '../common/keyboard-owner';
+import { canvasKeysOwnedByJig, keyboardOwnedElsewhere } from '../common/keyboard-owner';
 import { usePlatform } from './platform-context';
 import { editingToolShortcutContext, handleEditingToolShortcut } from './editing-tool-shortcuts';
 import { arrangeShortcutContext, handleArrangeShortcut } from './arrange-shortcuts';
@@ -30,6 +30,7 @@ import {
 import {
   handleEditShortcut,
   handleFileShortcut,
+  handleHistoryShortcut,
   handleToolShortcut,
   handleTransformShortcut,
   handleViewShortcut,
@@ -46,11 +47,15 @@ export function useShortcuts(): void {
       if (handleSettingsShortcut(e, openSettings)) return;
       if (handleCommandSearchShortcut(e, openCommandSearch)) return;
       if (handleFileShortcut(e, fileShortcutContext(platformRef.current))) return;
+      if (canvasKeysOwnedByJig()) {
+        handleHistoryShortcut(e, editShortcutContext());
+        return;
+      }
       if (handleToolShortcut(e, TOOL_SHORTCUT_CONTEXT)) return;
       handleEditShortcut(e, editShortcutContext());
     };
     const onTransformViewKey = (e: KeyboardEvent): void => {
-      if (keyboardOwnedElsewhere()) return;
+      if (keyboardOwnedElsewhere() || canvasKeysOwnedByJig()) return;
       if (handleArrangeShortcut(e, arrangeShortcutContext)) return;
       if (handleEditingToolShortcut(e, editingToolShortcutContext())) return;
       if (handleTransformShortcut(e, transformShortcutContext())) return;
