@@ -101,7 +101,6 @@ export function useBoardPointer(active: boolean): BoardPointer {
     tried.current = true;
     run(true, true);
     // run is recreated every render; the inputs that matter are listed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, auto, configured, enabled, ready]);
 
   return {

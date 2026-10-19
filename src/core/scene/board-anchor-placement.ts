@@ -202,10 +202,11 @@ function slide(
     inside = t;
   }
   if (outside === null) return at(inside);
+  let blocked: number = outside;
   for (let round = 0; round < BISECTION_ROUNDS; round += 1) {
-    const middle = (inside + outside) / 2;
+    const middle: number = (inside + blocked) / 2;
     if (fitsAt(at(middle))) inside = middle;
-    else outside = middle;
+    else blocked = middle;
   }
   return at(inside);
 }

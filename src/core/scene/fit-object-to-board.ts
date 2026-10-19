@@ -40,12 +40,11 @@ export function fitObjectToBoard(
   if (options.mode === 'fit' && Math.min(width, height) <= 0) {
     return { kind: 'error', message: 'The edge margin leaves no room for artwork.' };
   }
-  const footprint = transformedBounds(object.bounds, { ...object.transform, x: 0, y: 0 });
-  const objectWidth = footprint.maxX - footprint.minX;
-  const objectHeight = footprint.maxY - footprint.minY;
-  if (!(objectWidth > 0) || !(objectHeight > 0)) {
+  const footprint = measurableFootprint(object);
+  if (footprint === null) {
     return { kind: 'error', message: 'The selected artwork needs a measurable width and height.' };
   }
+  const { width: objectWidth, height: objectHeight } = footprint;
   const shape = boardRegionOf(board);
   if (shape.kind === 'polygon') {
     return fitObjectToPolygonBoard(object, shape, options, objectWidth, objectHeight);
@@ -150,6 +149,16 @@ function fitObjectToPolygonBoard(
     scale,
     fits: options.mode === 'fit' || low >= 1,
   };
+}
+
+// The artwork's unplaced footprint, or null when it has no area to fit.
+function measurableFootprint(
+  object: SceneObject,
+): { readonly width: number; readonly height: number } | null {
+  const footprint = transformedBounds(object.bounds, { ...object.transform, x: 0, y: 0 });
+  const width = footprint.maxX - footprint.minX;
+  const height = footprint.maxY - footprint.minY;
+  return width > 0 && height > 0 ? { width, height } : null;
 }
 
 function boardSize(board: ShapeObject): { readonly width: number; readonly height: number } {

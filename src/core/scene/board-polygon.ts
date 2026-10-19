@@ -154,15 +154,19 @@ function segmentsIntersect(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
   const d2 = cross(c, d, b);
   const d3 = cross(a, b, c);
   const d4 = cross(a, b, d);
-  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
-    return true;
-  }
+  if (straddles(d1, d2) && straddles(d3, d4)) return true;
+  // Collinear touches: an endpoint lying on the other segment.
   return (
-    (d1 === 0 && onSegment(c, d, a)) ||
-    (d2 === 0 && onSegment(c, d, b)) ||
-    (d3 === 0 && onSegment(a, b, c)) ||
-    (d4 === 0 && onSegment(a, b, d))
+    touches(d1, c, d, a) || touches(d2, c, d, b) || touches(d3, a, b, c) || touches(d4, a, b, d)
   );
+}
+
+function straddles(p: number, q: number): boolean {
+  return (p > 0 && q < 0) || (p < 0 && q > 0);
+}
+
+function touches(side: number, a: Vec2, b: Vec2, p: Vec2): boolean {
+  return side === 0 && onSegment(a, b, p);
 }
 
 function cross(a: Vec2, b: Vec2, p: Vec2): number {

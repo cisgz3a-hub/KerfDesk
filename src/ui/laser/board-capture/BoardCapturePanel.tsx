@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deviceForActiveHead } from '../../../core/cnc/cnc-head-feeds';
+import type { Origin } from '../../../core/devices/device-profile';
 import { jogAxisSignsForOrigin } from '../../../core/devices/jog-direction';
 import { useStore } from '../../state';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
@@ -63,27 +64,14 @@ function BoardCapturePanelBody({
   const livePosition = useLiveMachinePosition();
   const currentEpoch = useCurrentRegistrationEpoch();
   const motionActive = useLaserStore((state) => state.motionOperation !== null);
-  const setOriginHere = useLaserStore((state) => state.setOriginHere);
-  const setOriginAtMachinePoint = useLaserStore((state) => state.setOriginAtMachinePoint);
-  const jogToMachinePosition = useLaserStore((state) => state.jogToMachinePosition);
-  const device = useStore((state) => state.project.device);
-  const machine = useStore((state) => state.project.machine);
-  const addCapturedBoard = useStore((state) => state.addCapturedBoard);
-  const updateCapturedBoard = useStore((state) => state.updateCapturedBoard);
+  const actions = useBoardCaptureStoreActions();
+  const { feed, origin } = useBoardJogSetup();
   const { connected, disabled } = useCaptureGating();
-  const feed = Math.min(deviceForActiveHead(device, machine).maxFeed, BOARD_JOG_FEED_MM_PER_MIN);
   const { geometry, registrationEpoch, outlineId, committed } = capture.state;
   const outlineValid = useStore((state) =>
     capturedBoardOutlineMatches(state.project.scene, outlineId, geometry),
   );
-  const handlers = useBoardCaptureHandlers({
-    capture,
-    livePosition,
-    setOriginHere,
-    setOriginAtMachinePoint,
-    addCapturedBoard,
-    updateCapturedBoard,
-  });
+  const handlers = useBoardCaptureHandlers({ capture, livePosition, ...actions });
   const interactionDisabled = disabled || handlers.busy || pointer.switching;
   const sessionDisabled = handlers.busy || motionActive;
   const verification = useBoardVerification({
@@ -102,11 +90,7 @@ function BoardCapturePanelBody({
     verification.cancel();
     capture.reset();
   };
-  const sight: BoardSightView = {
-    point: livePosition === null ? null : sightedPoint(livePosition, pointerOffset(pointer)),
-    aim: pointer.configured && pointer.enabled ? 'pointer' : 'head',
-    signs: jogAxisSignsForOrigin(device.origin),
-  };
+  const sight = boardSightView(livePosition, pointer, origin);
 
   if (!open) return null;
   return (
@@ -124,7 +108,7 @@ function BoardCapturePanelBody({
           sessionDisabled={sessionDisabled}
           verification={verification}
           feed={feed}
-          jogToMachinePosition={jogToMachinePosition}
+          jogToMachinePosition={actions.jogToMachinePosition}
           onReset={reset}
         />
       </section>
@@ -144,8 +128,35 @@ function panelStep(capture: BoardCapture): PlaceBoardStep {
   return capture.state.corners.length > 0 ? 'capture' : 'shape';
 }
 
-function pointerOffset(pointer: BoardPointer): { readonly x: number; readonly y: number } {
-  return pointer.configured && pointer.enabled ? pointer.offset : { x: 0, y: 0 };
+function boardSightView(
+  livePosition: ReturnType<typeof inferCurrentMachinePosition>,
+  pointer: BoardPointer,
+  origin: Origin,
+): BoardSightView {
+  const aimsWithPointer = pointer.configured && pointer.enabled;
+  const offset = aimsWithPointer ? pointer.offset : { x: 0, y: 0 };
+  return {
+    point: livePosition === null ? null : sightedPoint(livePosition, offset),
+    aim: aimsWithPointer ? 'pointer' : 'head',
+    signs: jogAxisSignsForOrigin(origin),
+  };
+}
+
+function useBoardCaptureStoreActions() {
+  return {
+    setOriginHere: useLaserStore((state) => state.setOriginHere),
+    setOriginAtMachinePoint: useLaserStore((state) => state.setOriginAtMachinePoint),
+    jogToMachinePosition: useLaserStore((state) => state.jogToMachinePosition),
+    addCapturedBoard: useStore((state) => state.addCapturedBoard),
+    updateCapturedBoard: useStore((state) => state.updateCapturedBoard),
+  };
+}
+
+function useBoardJogSetup(): { readonly feed: number; readonly origin: Origin } {
+  const device = useStore((state) => state.project.device);
+  const machine = useStore((state) => state.project.machine);
+  const feed = Math.min(deviceForActiveHead(device, machine).maxFeed, BOARD_JOG_FEED_MM_PER_MIN);
+  return { feed, origin: device.origin };
 }
 
 function useLiveMachinePosition(): ReturnType<typeof inferCurrentMachinePosition> {
