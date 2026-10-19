@@ -100,6 +100,11 @@ release before it is tagged.
   after KerfDesk restarts, so Connect automatically connects when the app opens, as it does in
   Chrome. Forget Controller removes it
   ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Calmer connecting.** When another program holds the port, the automatic connect shows a
+  quiet note instead of a red error. After you click Disconnect, KerfDesk waits for your next
+  Connect instead of reconnecting when the machine is power-cycled. The red "Connection lost"
+  banner now appears only when the machine may still be moving, and a drop during a jog or Frame
+  says "Connection lost while moving" (ADR-633).
 
 ### All changes
 

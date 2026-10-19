@@ -2,7 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialPortIdentity, SerialPortRef } from '../../platform/types';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import { rememberSerialPort, saveAutoConnectPreference } from '../state/serial-port-memory';
+import {
+  pauseAutoConnect,
+  resetAutoConnectSession,
+  resumeAutoConnect,
+} from '../state/auto-connect-session';
+import {
+  loadAutoConnectPreference,
+  rememberSerialPort,
+  saveAutoConnectPreference,
+} from '../state/serial-port-memory';
 import { installAutoConnect } from './use-auto-connect-controller';
 
 const CH340: SerialPortIdentity = { usbVendorId: 0x1a86, usbProductId: 0x7523 };
@@ -43,6 +52,7 @@ const connect = vi.fn(async () => undefined);
 
 beforeEach(() => {
   localStorage.clear();
+  resetAutoConnectSession();
   useLaserStore.setState({ ...initialLaserState(), connect });
   connect.mockClear();
 });
@@ -117,5 +127,27 @@ describe('auto-connect', () => {
     expect(listeners.size).toBe(1);
     dispose();
     expect(listeners.size).toBe(0);
+  });
+
+  // ADR-633: after the operator's Disconnect, a power-cycle or reseated cable
+  // must not reconnect by itself and take the port from another program.
+  it('waits after Disconnect until the operator connects again', async () => {
+    rememberSerialPort(localStorage, CH340);
+    let attached: ReadonlyArray<SerialPortRef> = [];
+    const { platform, plugIn } = platformWith(() => attached);
+    pauseAutoConnect();
+
+    const dispose = installAutoConnect(platform);
+    attached = [port(CH340)];
+    plugIn();
+    await settle();
+    expect(connect).not.toHaveBeenCalled();
+    expect(loadAutoConnectPreference(localStorage)).toBe(true);
+
+    resumeAutoConnect();
+    plugIn();
+    await settle();
+    expect(connect).toHaveBeenCalledTimes(1);
+    dispose();
   });
 });

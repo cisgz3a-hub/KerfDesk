@@ -49,6 +49,9 @@ export type LaserSafetyNotice =
   | {
       readonly kind: 'disconnect-during-job';
       readonly message: string;
+      /** The link dropped during a jog, Frame, Home, probe or auto-focus rather
+       * than a job (ADR-633). Absent on job notices, and on stored ones. */
+      readonly cause?: 'motion';
     }
   | {
       readonly kind: 'disconnect-during-fire';
@@ -166,6 +169,21 @@ export const DISCONNECT_DURING_JOB_MESSAGE =
 
 export function disconnectDuringJobNotice(): LaserSafetyNotice {
   return { kind: 'disconnect-during-job', message: DISCONNECT_DURING_JOB_MESSAGE };
+}
+
+export const DISCONNECT_DURING_MOTION_MESSAGE =
+  'USB connection was lost while the machine was moving (a jog, Frame, Home, probe or ' +
+  'auto-focus). It may still be finishing buffered motion. Use physical E-stop or power ' +
+  'cutoff now if unsafe. Reconnect and home before continuing.';
+
+// The same kind as a job's notice, so every physical-stop and recovery rule
+// that reads it is unchanged; only the banner's title differs (ADR-633).
+export function disconnectDuringMotionNotice(): LaserSafetyNotice {
+  return {
+    kind: 'disconnect-during-job',
+    cause: 'motion',
+    message: DISCONNECT_DURING_MOTION_MESSAGE,
+  };
 }
 
 export const DISCONNECT_DURING_FIRE_MESSAGE =

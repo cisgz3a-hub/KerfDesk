@@ -1,4 +1,5 @@
 import { connectOptionsForDevice } from '../commands/connect-options';
+import { resumeAutoConnect } from '../state/auto-connect-session';
 import { isActiveJob, setupCommandBlockMessage } from '../state/laser-store-helpers';
 import { hasPendingControllerWrite } from '../state/laser-start-queue-fence';
 import { useLaserStore } from '../state/laser-store';
@@ -55,6 +56,8 @@ export async function executeConnect(
     return;
   }
   const device = (context.options.store ?? useStore).getState().project.device;
+  // Asked for by a person, so it lifts the pause a Disconnect set (ADR-633).
+  resumeAutoConnect();
   await settle(
     operation,
     // 'automatic' never opens a port picker: it reuses the port the operator chose on this PC.

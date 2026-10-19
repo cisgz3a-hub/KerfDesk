@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { createStreamer, step, type StatusReport } from '../../core/controllers/grbl';
 import {
+  buildPortClosePatch,
   detectStreamStall,
+  initialLaserState,
   STREAM_STALL_RUNNING_TIMEOUT_MS,
   STREAM_STALL_TIMEOUT_MS,
   type StallProbe,
 } from './laser-store-helpers';
+import {
+  interactiveControllerOperation,
+  readOnlyControllerOperation,
+  type LaserControllerOperation,
+} from './laser-controller-operation';
+import { startMotionOperation } from './laser-motion-operation';
+import { disconnectDuringJobNotice, disconnectDuringMotionNotice } from './laser-safety-notice';
+import { useLaserStore, type LaserState } from './laser-store';
 import { HOST_SCHEDULING_GAP_MS } from './laser-stream-heartbeat';
 
 const POLL_MS = 250;
@@ -174,5 +184,69 @@ describe('detectStreamStall (M13)', () => {
 
     expect(result.probe?.at).toBe(1_000);
     expect(result.stalled).toBe(true);
+  });
+});
+
+// ADR-633 (amending P0-B): only a link lost while the machine may still move
+// raises the E-stop banner; a read or a recovery wait lands disconnected.
+describe('buildPortClosePatch safety notice', () => {
+  const idle = (patch: Partial<LaserState>): LaserState => ({
+    ...useLaserStore.getState(),
+    ...initialLaserState(),
+    connection: { kind: 'connected' },
+    ...patch,
+  });
+
+  it.each<[string, LaserControllerOperation]>([
+    ['a settings read', readOnlyControllerOperation('Reading controller settings')],
+    ['a build-info read', readOnlyControllerOperation('Reading controller build information')],
+    ['a recovery wait', { kind: 'recovery', phase: 'awaiting-idle', idleReports: 0 }],
+    ['a work-Z read', { kind: 'work-z-recovery', phase: 'offsets' }],
+    ['the handshake', { kind: 'connection-handshake', phase: 'settings' }],
+  ])('raises no notice for %s', (_label, operation) => {
+    const patch = buildPortClosePatch(idle({ controllerOperation: operation }));
+    expect(patch.connection).toEqual({ kind: 'disconnected' });
+    expect(patch).not.toHaveProperty('safetyNotice');
+  });
+
+  it.each<[string, LaserControllerOperation]>([
+    ['Home', { kind: 'home', phase: 'command', idleReports: 0, operationId: 1 }],
+    ['auto-focus', { kind: 'autofocus', phase: 'command', idleReports: 0 }],
+    [
+      'a probe',
+      { kind: 'probe', phase: 'sequence', idleReports: 0, transactionId: 1, affectsXy: false },
+    ],
+    ['a console command', interactiveControllerOperation('G0 X10')],
+  ])('raises the moving notice for %s', (_label, operation) => {
+    expect(buildPortClosePatch(idle({ controllerOperation: operation })).safetyNotice).toEqual(
+      disconnectDuringMotionNotice(),
+    );
+  });
+
+  it('raises the moving notice for a jog or Frame', () => {
+    const motionOperation = startMotionOperation('jog', ['$J=G91 X1 F600\n']);
+    expect(buildPortClosePatch(idle({ motionOperation })).safetyNotice).toEqual(
+      disconnectDuringMotionNotice(),
+    );
+  });
+
+  it('keeps the job notice for a job and its post-job settle', () => {
+    expect(buildPortClosePatch(idle({ streamer: streamingState() })).safetyNotice).toEqual(
+      disconnectDuringJobNotice(),
+    );
+    const settle: LaserControllerOperation = {
+      kind: 'post-job-settle',
+      phase: 'awaiting-idle',
+      idleReports: 0,
+    };
+    expect(buildPortClosePatch(idle({ controllerOperation: settle })).safetyNotice).toEqual(
+      disconnectDuringJobNotice(),
+    );
+  });
+
+  it('keeps an earlier notice when nothing was moving', () => {
+    const earlier = disconnectDuringJobNotice();
+    const patch = buildPortClosePatch(idle({ safetyNotice: earlier }));
+    expect(patch).not.toHaveProperty('safetyNotice');
   });
 });

@@ -24,6 +24,15 @@ const SAFETY_NOTICE_TITLES: Record<LaserSafetyNotice['kind'], string> = {
   'cnc-pause-lift-failed': 'Pause and lift stopped',
 };
 
+// A drop during a jog, Frame, Home, probe or auto-focus shares the job notice's
+// kind, so stored and replayed notices still read "mid-job" (ADR-633).
+function safetyNoticeTitle(notice: LaserSafetyNotice): string {
+  if (notice.kind === 'disconnect-during-job' && notice.cause === 'motion') {
+    return 'Connection lost while moving';
+  }
+  return SAFETY_NOTICE_TITLES[notice.kind];
+}
+
 type Props = {
   /** Reconnects the controller. Calling connect also tears down a stale link. */
   readonly onReconnect?: () => void;
@@ -40,7 +49,7 @@ export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
   const clear = useLaserStore((s) => s.clearSafetyNotice);
   const wakeController = useLaserStore((s) => s.wakeController);
   if (notice === null) return null;
-  const title = SAFETY_NOTICE_TITLES[notice.kind];
+  const title = safetyNoticeTitle(notice);
   const resetAvailable = connection.kind === 'connected' && statusState === 'Sleep';
   const reconnectRecommended =
     (props.reconnectRecommended ?? connection.kind !== 'connected') &&

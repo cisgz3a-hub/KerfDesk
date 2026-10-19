@@ -5,6 +5,8 @@ import { JOB_CHECKPOINT_STORAGE_KEY } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import {
   CNC_PAUSE_RESUME_STALLED_MESSAGE,
+  disconnectDuringJobNotice,
+  disconnectDuringMotionNotice,
   STREAM_STALLED_MESSAGE,
 } from '../state/laser-safety-notice';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
@@ -240,6 +242,26 @@ describe('SafetyNoticeBanner', () => {
       await act(async () => reconnectButton?.click());
       expect(reconnect).toHaveBeenCalledOnce();
       expect(useLaserStore.getState().safetyNotice?.kind).toBe('stream-stalled');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  // ADR-633: a drop during a jog or Frame reads as moving, while a job notice,
+  // including one stored before the cause existed, still reads mid-job.
+  it.each([
+    [disconnectDuringMotionNotice(), 'Connection lost while moving'],
+    [disconnectDuringJobNotice(), 'Connection lost mid-job'],
+    [
+      { kind: 'disconnect-during-job', message: 'Stored notice.' } as const,
+      'Connection lost mid-job',
+    ],
+  ])('titles a lost-connection notice (%#)', async (notice, title) => {
+    useLaserStore.setState({ safetyNotice: notice });
+    const { host, root } = await renderBanner();
+    try {
+      expect(host.querySelector('[role="alert"] strong')?.textContent).toBe(title);
     } finally {
       await act(async () => root.unmount());
       host.remove();

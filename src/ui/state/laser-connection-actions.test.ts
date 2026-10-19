@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter } from '../../platform/types';
+import { resetAutoConnectSession, useAutoConnectSession } from './auto-connect-session';
 import { connectedControllerStatePatch } from './laser-connection-actions';
 import { useLaserStore } from './laser-store';
 
@@ -104,5 +105,52 @@ describe('connect port-picker failures', () => {
     });
 
     expect(patch.safetyNotice).toBe(safetyNotice);
+  });
+});
+
+// ADR-633: the operator's Disconnect or Forget pauses auto-connect for this
+// run; only a Connect they ask for lifts it, and the saved preference stays.
+describe('the auto-connect pause', () => {
+  const openPort = adapterWithRequestPort(async () => ({
+    open: async () => ({
+      write: async () => undefined,
+      onLine: () => () => undefined,
+      onClose: () => () => undefined,
+      close: async () => undefined,
+    }),
+  }));
+  const paused = (): boolean => useAutoConnectSession.getState().paused;
+
+  beforeEach(() => resetAutoConnectSession());
+  afterEach(async () => {
+    await useLaserStore
+      .getState()
+      .disconnect()
+      .catch(() => undefined);
+    resetAutoConnectSession();
+  });
+
+  it('is set by Disconnect and by Forget Controller', async () => {
+    await useLaserStore.getState().connect(openPort);
+    expect(paused()).toBe(false);
+    await useLaserStore.getState().disconnect();
+    expect(paused()).toBe(true);
+
+    resetAutoConnectSession();
+    await useLaserStore.getState().connect(openPort);
+    await useLaserStore.getState().forgetDevice?.();
+    expect(paused()).toBe(true);
+  });
+
+  it('is lifted by an explicit Connect but not by an automatic one', async () => {
+    await useLaserStore.getState().disconnect();
+    expect(paused()).toBe(true);
+
+    await useLaserStore.getState().connect(openPort, { portSelection: 'automatic' });
+    expect(paused()).toBe(true);
+
+    await useLaserStore.getState().connect(openPort, { portSelection: 'choose' });
+    expect(useLaserStore.getState().connection.kind).toBe('connected');
+    expect(paused()).toBe(false);
   });
 });

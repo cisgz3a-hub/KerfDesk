@@ -49,6 +49,9 @@ export type LaserControllerOperation =
       readonly pollingOwnership?: 'terminal-exchange';
       /** This owned exchange may have dispatched a move; Disconnect must stop it. */
       readonly mayMove?: true;
+      /** A read (settings, build info, firmware or module report) that cannot
+       * move the machine, so a lost link raises no E-stop banner (ADR-633). */
+      readonly movesNothing?: true;
     }
   | {
       readonly kind: 'recovery';
@@ -147,6 +150,13 @@ export function interactiveControllerOperation(
   };
 }
 
+/** An owned exchange that only reads from the controller (ADR-633). */
+export function readOnlyControllerOperation(
+  label: string,
+): Extract<LaserControllerOperation, { readonly kind: 'interactive-command' }> {
+  return { ...interactiveControllerOperation(label, 'terminal-exchange'), movesNothing: true };
+}
+
 export function controllerOperationCommandBlockMessage(
   operation: LaserControllerOperation | null,
 ): string | null {
@@ -156,6 +166,39 @@ export function controllerOperationCommandBlockMessage(
 export function isUnsafeControllerOperation(operation: LaserControllerOperation | null): boolean {
   return operation !== null && operation.kind !== 'connection-handshake';
 }
+
+/** How a lost link could leave the machine moving (ADR-633). 'job': a job's
+ * queue, its post-job tail or the fence just before Start; 'motion': Home,
+ * auto-focus, probe, the start mark, the stop a Disconnect writes (it replaces
+ * the jog or job it stops) or any owned command not marked movesNothing, since
+ * a console line or a motion settlement can move. null: the operation reads or
+ * waits and moves nothing (the handshake, settings, build-info, firmware and
+ * module reads, recovery and work-Z reads). */
+export function controllerOperationMotion(
+  operation: LaserControllerOperation | null,
+): 'job' | 'motion' | null {
+  if (operation === null) return null;
+  if (operation.kind === 'interactive-command') {
+    return operation.movesNothing === true ? null : 'motion';
+  }
+  return OPERATION_MOTION[operation.kind];
+}
+
+const OPERATION_MOTION: Record<
+  Exclude<LaserControllerOperation['kind'], 'interactive-command'>,
+  'job' | 'motion' | null
+> = {
+  'post-job-settle': 'job',
+  'start-arming': 'job',
+  home: 'motion',
+  autofocus: 'motion',
+  probe: 'motion',
+  'job-start-mark': 'motion',
+  disconnect: 'motion',
+  'connection-handshake': null,
+  recovery: null,
+  'work-z-recovery': null,
+};
 
 export function describeControllerOperation(operation: LaserControllerOperation | null): string {
   if (operation?.kind === 'connection-handshake') {

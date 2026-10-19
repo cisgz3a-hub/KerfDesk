@@ -11,7 +11,8 @@ import { controllerStoppedResponding } from '../state/controller-recovery-status
 import { useLaserStore } from '../state/laser-store';
 import type { ConnectControllerOptions } from '../state/laser-store';
 import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
-import { ConnectionBar } from './ConnectionBar';
+import { useAutoConnectSession } from '../state/auto-connect-session';
+import { ConnectionBar, type ConnectionBarProps } from './ConnectionBar';
 import { connectMachine } from './connect-machine';
 import { ConnectedMachineProfile } from './ConnectedMachineProfile';
 import { LaserModuleRow } from './LaserModuleRow';
@@ -86,8 +87,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         details={<MachineDetailsContent />}
         setup={<DeviceSetupControls />}
         onChoosePort={() => void choosePort().catch(controllerActionFailureHandler('Connect'))}
-        autoConnect={autoConnect.enabled}
-        onAutoConnectChange={autoConnect.change}
+        {...autoConnect}
         portChoiceEndsOnRestart={platform.serial.picksEndOnRestart === true}
         portMemoryNeedsSerialNumber={isApplePlatform() || isLinuxDesktop()}
         connection={connection}
@@ -123,16 +123,23 @@ function MachineDetailsContent(): JSX.Element {
   );
 }
 
-function useAutoConnectPreference(): {
-  readonly enabled: boolean;
-  readonly change: (enabled: boolean) => void;
-} {
+// The saved preference, plus this run's pause and skipped hint (ADR-633).
+function useAutoConnectPreference(): Pick<
+  ConnectionBarProps,
+  'autoConnect' | 'onAutoConnectChange' | 'autoConnectPaused' | 'autoConnectSkipped'
+> {
   const [enabled, setEnabled] = useState(() => loadAutoConnectPreference(browserLocalStorage()));
+  const session = useAutoConnectSession();
   const change = (next: boolean): void => {
     saveAutoConnectPreference(browserLocalStorage(), next);
     setEnabled(next);
   };
-  return { enabled, change };
+  return {
+    autoConnect: enabled,
+    onAutoConnectChange: change,
+    autoConnectPaused: session.paused,
+    autoConnectSkipped: session.skippedReason,
+  };
 }
 
 function ConnectionHints(props: {

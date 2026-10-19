@@ -24,6 +24,11 @@ import { useToastStore } from './toast-store';
 import { browserLocalStorage } from './browser-local-storage';
 import { clearCncLiveCaps } from './detected-settings-action';
 import {
+  clearAutoConnectSkipped,
+  noteAutoConnectSkipped,
+  resumeAutoConnect,
+} from './auto-connect-session';
+import {
   chooseGrantedPort,
   loadRememberedSerialPort,
   rememberSerialPort,
@@ -63,6 +68,7 @@ export async function runConnectAction(
   // refusal is a factual transport inability, not a policy gate. It comes
   // before the picker and before any live connection or attempt is touched
   // (audit RU-6).
+  noteConnectIntent(options.portSelection);
   const driver = selectControllerDriver(options.controllerKind, options.controllerCommandSet);
   if (driver.capabilities.transport === 'file-only') {
     set((state) => ({ log: pushLog(state, FILE_ONLY_CONNECT_REFUSAL) }));
@@ -163,17 +169,43 @@ async function connectSerialController(
       await releaseCancelledPermission().catch(() => undefined);
       return;
     }
-    reportConnectionFailure(set, refs, attemptedBaudRate, requestedPort?.info ?? null, error);
+    reportConnectionFailure(set, refs, options, attemptedBaudRate, requestedPort, error);
   }
+}
+
+// Any Connect the operator asked for lifts the pause their Disconnect set; an
+// automatic attempt only clears the last attempt's hint (ADR-633).
+function noteConnectIntent(selection: ConnectControllerOptions['portSelection']): void {
+  if (selection === 'automatic') clearAutoConnectSkipped();
+  else resumeAutoConnect();
+}
+
+// Nobody clicked, so a failed background open (the port held by LightBurn or
+// LaserGRBL, or unplugged mid-open) is no alert and no incident: one log line,
+// the ordinary disconnected state and the rail's quiet hint (ADR-633).
+function reportAutomaticConnectSkipped(set: SetFn, error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  set((state) => ({
+    log: pushLog(state, `[lf2] Automatic connect skipped: ${message}`),
+    connection: { kind: 'disconnected' },
+    controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch),
+  }));
+  noteAutoConnectSkipped(message);
 }
 
 function reportConnectionFailure(
   set: SetFn,
   refs: LiveRefs,
+  options: ConnectControllerOptions,
   baudRate: number,
-  portInfo: SerialPortIdentity | null,
+  port: SerialPortRef | null,
   error: unknown,
 ): void {
+  if (options.portSelection === 'automatic') {
+    reportAutomaticConnectSkipped(set, error);
+    return;
+  }
+  const portInfo: SerialPortIdentity | null = port?.info ?? null;
   const message = error instanceof Error ? error.message : String(error);
   set((state) => ({
     ...publishControllerIncident(
