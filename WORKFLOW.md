@@ -2740,7 +2740,8 @@ authorization, Frame proof, controller command, or safety boundary.
    operation is disabled. Burn the complete outline set on the jig base before
    placing the pieces. After an accepted, successful complete outline run has
    physically settled, the unchanged project automatically selects **Artwork only**.
-   Frame, interrupted/failed runs and selected-only outline runs do not switch it.
+   Frame, interrupted/failed runs and selected-only outline runs do not switch it. If the switch
+   is refused (run numbering is open), a warning says **Outline only** stays selected.
 8. Put one blank inside each burned outline and focus on the blank's **top surface**,
    which is higher than the outline surface. Keep X/Y placement and work origin
    unchanged. Confirm **Artwork only** before burning the artwork. Every
