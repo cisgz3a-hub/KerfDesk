@@ -173,6 +173,27 @@ describe('laser lead scope and wrap (ADR-626)', () => {
     }
   });
 
+  it('keeps a rotary job, its leads included, within one turn', () => {
+    // A 10 mm square on an object 11 mm round: a full 2 mm corner lead would
+    // reach 1.27 mm past it, and the job would no longer fit one turn.
+    const job: Job = { groups: [group([square(0, 0, 10)], { laserLeads: LEADS })] };
+    const span = (done: Job) => {
+      const ys = segmentOf(done, 0).polyline.map((point) => point.y);
+      return Math.max(...ys) - Math.min(...ys);
+    };
+    const flat = applyLaserLeads(job, NO_BED);
+    expect(span(flat)).toBeGreaterThan(11);
+    const wrapped = applyLaserLeads(job, { bed: null, wrapMm: 11 });
+    expect(span(wrapped)).toBeLessThanOrEqual(11);
+    expect(segmentOf(wrapped, 0).closed).toBe(false);
+    // Moving the artwork on the flat canvas changes nothing on the rotary.
+    const moved = applyLaserLeads(
+      { groups: [group([square(0, 140, 10)], { laserLeads: LEADS })] },
+      { bed: null, wrapMm: 11 },
+    );
+    expect(span(moved)).toBeCloseTo(span(wrapped), 9);
+  });
+
   it('wraps leads round the object only on an active rotary', () => {
     const bed = { minX: 0, minY: 0, maxX: 400, maxY: 300 };
     expect(laserLeadOptions(DEFAULT_DEVICE_PROFILE, undefined, bed)).toEqual({

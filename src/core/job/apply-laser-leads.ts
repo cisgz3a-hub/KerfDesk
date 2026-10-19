@@ -33,6 +33,7 @@ import {
   withCutArcMoves,
   withoutArcMoves,
 } from './cut-arc-moves';
+import { isEmittableCutSegment } from './cut-emission-resolution';
 import type { CutGroup, CutSegment, Job, JobDiagnostic } from './job';
 import type { CutGroupLaserLeads } from './laser-lead-settings';
 import type { JobBounds } from './job-bounds';
@@ -46,7 +47,15 @@ import {
 } from './laser-lead-contour';
 import type { LeadJoin, LeadShape } from './laser-lead-path';
 import { leadJobLines, OBSTACLE_ARC_SAGITTA_MM, type LeadJobLines } from './laser-lead-rings';
-import { leadWrap, wrappedCopies, type LeadWrap } from './laser-lead-rotary';
+import {
+  leadSpan,
+  leadWrap,
+  rotaryLeadBed,
+  widenLeadSpan,
+  wrappedCopies,
+  type LeadSpan,
+  type LeadWrap,
+} from './laser-lead-rotary';
 import { hasJobStartPower } from './job-start-power';
 import { isBurningLineGroup } from './line-start-region';
 
@@ -63,6 +72,8 @@ type LeadWorld = LeadJobLines & {
   readonly obstacles: LeadObstacles;
   readonly bed: JobBounds | null;
   readonly wrap: LeadWrap | null;
+  /** On an active rotary, the Y the job and its leads so far span. */
+  readonly span: LeadSpan | null;
   /** Line ids of the leads placed on each ring so far. */
   readonly leadLines: Map<number, number[]>;
 };
@@ -82,7 +93,14 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   for (const line of lines.lines) {
     for (const copy of wrappedCopies(line, wrap)) obstacles.addLine(copy);
   }
-  const world: LeadWorld = { ...lines, obstacles, bed: options.bed, wrap, leadLines: new Map() };
+  const world: LeadWorld = {
+    ...lines,
+    obstacles,
+    bed: options.bed,
+    wrap,
+    span: leadSpan(job, wrap),
+    leadLines: new Map(),
+  };
   const counts = new Map<string, LeadCounts>();
   const groups = withoutTopologyRings(job).groups.map((group, groupIndex) => {
     // A group that burns nothing gets no leads: they would burn nothing too.
@@ -91,7 +109,9 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
     return {
       ...group,
       segments: group.segments.map((segment, segmentIndex) =>
-        segment.closed
+        // A contour that rounds to one written point is left out of the
+        // output; a lead on it would burn on its own.
+        segment.closed && isEmittableCutSegment(segment)
           ? leadSegment(segment, group, `${groupIndex}:${segmentIndex}`, world, tally)
           : segment,
       ),
@@ -229,6 +249,7 @@ function recordLeads(world: LeadWorld, attempt: LeadAttempt): void {
   for (const points of burned) {
     for (const copy of wrappedCopies(points, world.wrap)) world.obstacles.addLine(copy);
   }
+  widenLeadSpan(world.span, burned);
   world.leadLines.set(attempt.ringId, [...(world.leadLines.get(attempt.ringId) ?? []), ...placed]);
 }
 
@@ -421,7 +442,7 @@ function fitContext(
     ignoredRings,
     inside,
     clearanceMm,
-    bed: world.bed,
+    bed: rotaryLeadBed(world.bed, world.wrap, world.span),
     ringHoldsContour: (index) => holders?.has(index) === true,
   };
 }

@@ -81,11 +81,15 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    leads). On an active rotary the job wraps round the object, so every cut line and placed lead
    within a lead's reach of either end of the job is also checked one circumference (π × the object
    diameter, in surface Y) up and down (`core/job/laser-lead-rotary.ts`): a lead near one end keeps
-   clear of a cut near the other, across the seam. Walking out from the join it may never come nearer its own contour than it already was
+   clear of a cut near the other, across the seam. The rotary rebases the job and allows it one
+   turn, so a lead there also keeps the job, with every lead placed so far, within one circumference
+   (less 0.01 mm), measured from the job's own Y extent rather than its place on the flat bed; a lead
+   that would push it past is shortened or left out like any other. Walking out from the join it may never come nearer its own contour than it already was
    (within 0.03 mm, up to the clearance), and its free end, where the mark lands, must be on the scrap
    side and at least the clearance from the contour, or, for a lead too short to reach that far, 90%
    of the way its own shape takes it into the scrap, so every length the setting allows can fit. From
-   its very first step it must keep the clearance from every other cut line, including the bridged
+   its very first step, measured along the whole walk between its samples and not only at them, it
+   must keep the clearance from every other cut line, including the bridged
    gaps of a tabbed or perforated outline (a lead slipping through two tab gaps would burn across that
    part) and the leads already placed for earlier contours, so two leads aimed into the same scrap
    cannot burn over each other (a placed lead that goes out as G2/G3 is indexed as its arcs); copies
@@ -145,12 +149,17 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    per artwork group, so perforation on some artwork of an operation is not reported for all of it),
    and how many shapes got a shorter lead or lost one, per operation (by its id, since two
    operations can share a name). Those shapes are cut exactly as
-   without leads.
+   without leads. A contour so small that every point rounds to one written coordinate (0.001 mm
+   in G-code, a micrometre in Ruida; `isEmittableCutSegment`) is left out of the output, so it gets
+   no lead and is not counted, or the lead would burn on its own.
 10. **Other settings.** Leads follow the kerf-offset path, the path the beam really cuts. The ADR-239
     laser-off contour entry (4040-safe profile) runs up collinear with the lead's first chord, before
     the lead. Job origin placement still anchors on the artwork, not on the leads; Frame traces the
     leads, so a lead outside the bed shows there and in the existing bounds checks. CNC jobs have no
-    Line cut groups and never change; CNC keeps its own ADR-250 leads.
+    Line cut groups and never change; CNC keeps its own ADR-250 leads. Preparation is routed to the
+    background worker when a scene's work units reach the budget (`preparation-complexity.ts`); each
+    asked-for lead on a closed contour adds one unit per 0.25 mm of lead, so thousands of contours
+    with long leads are not fitted on the UI thread.
 
 ### Why this is better than LightBurn
 
@@ -190,8 +199,12 @@ coordinates in the G-code check and a very short overcut. `core/job/laser-leads-
 covers a corner-started hole on finely divided sides, outlines kept only when leads are asked for,
 copies started elsewhere or run the other way, and an outline that burns nothing.
 `core/job/laser-leads-scope-and-wrap.test.ts` covers a contour crossing a concave neighbour, the
-one-pass overcut lead-out beside a blocked seam, a cut across the rotary seam, artwork that stores
-lead shape with leads off, and perforation on one artwork only.
+one-pass overcut lead-out beside a blocked seam, a cut across the rotary seam, a rotary job kept
+within one turn, artwork that stores lead shape with leads off, and perforation on one artwork only.
+`core/job/laser-lead-clearance.test.ts` covers a short cut between two samples of a lead, and
+`core/job/laser-leads-review-followups.test.ts` copies that drift a little each and a power Ruida
+still writes. `core/job/laser-leads-routing.test.ts` covers a contour that rounds to one written
+point and lead-heavy jobs routed to the worker.
 `core/job/laser-leads-copies-and-power.test.ts` covers a copy started mid-edge, a power that rounds
 to S0, the chord-only final pass beside another cut, and recipe steps with leads off.
 `laser-lead-override-angle.test.ts` covers a bulk angle edit across arc and line leads.

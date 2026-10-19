@@ -7,9 +7,11 @@
 
 import { rotaryCircumferenceMm, type DeviceProfile } from '../devices';
 import type { MachineConfig, Vec2 } from '../scene';
+import type { Job } from './job';
 import type { JobBounds } from './job-bounds';
 import { MAX_LEAD_CLEARANCE_MM, MAX_LEAD_LENGTH_MM } from './laser-lead-settings';
 import { rotaryAppliesTo } from './rotary-job';
+import { jobYRange } from './rotary-transform';
 import { polylineBounds } from './segment-bounds';
 
 // The farthest a lead or its clearance can reach from the cut it joins, with
@@ -45,6 +47,51 @@ export function laserLeadBed(bed: JobBounds | null, rotary: boolean): JobBounds 
     minY: Number.NEGATIVE_INFINITY,
     maxY: Number.POSITIVE_INFINITY,
   };
+}
+
+// Kept clear of one full turn, so rounding in the output cannot tip a job that
+// fits exactly over the wrap limit.
+const TURN_MARGIN_MM = 0.01;
+
+/** The Y the job spans as the rotary rebases it, widened as leads are placed. */
+export type LeadSpan = { min: number; max: number };
+
+export function leadSpan(job: Job, wrap: LeadWrap | null): LeadSpan | null {
+  const range = wrap === null ? null : jobYRange(job);
+  return range === null ? null : { min: range.min, max: range.max };
+}
+
+/** Where a lead may go on an active rotary: within the bed's X limits, and
+ * near enough the job's ends that the job, its leads so far included, still
+ * spans no more than one turn, the wrap limit the output is checked against.
+ * Measured from the job itself, not from where it sits on the flat bed. */
+export function rotaryLeadBed(
+  bed: JobBounds | null,
+  wrap: LeadWrap | null,
+  span: LeadSpan | null,
+): JobBounds | null {
+  if (wrap === null || span === null) return bed;
+  const turn = wrap.circumferenceMm - TURN_MARGIN_MM;
+  return {
+    minX: bed?.minX ?? Number.NEGATIVE_INFINITY,
+    maxX: bed?.maxX ?? Number.POSITIVE_INFINITY,
+    minY: span.max - turn,
+    maxY: span.min + turn,
+  };
+}
+
+/** Widens the span by placed leads, as they will burn. */
+export function widenLeadSpan(
+  span: LeadSpan | null,
+  lines: ReadonlyArray<ReadonlyArray<Vec2>>,
+): void {
+  if (span === null) return;
+  for (const line of lines) {
+    for (const point of line) {
+      span.min = Math.min(span.min, point.y);
+      span.max = Math.max(span.max, point.y);
+    }
+  }
 }
 
 export type LeadWrap = {

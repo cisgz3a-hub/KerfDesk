@@ -73,7 +73,8 @@ function rotaryEntryBounds(
   return { ...bounds, minY: reverse ? extent - high : low, maxY: reverse ? extent - low : high };
 }
 
-function jobYRange(job: Job): { readonly min: number; readonly max: number } | null {
+/** The Y the rotary rebases and wraps: every burn's points, final passes included. */
+export function jobYRange(job: Job): { readonly min: number; readonly max: number } | null {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
   for (const group of job.groups) {
