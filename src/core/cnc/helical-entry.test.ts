@@ -162,4 +162,21 @@ describe('planHelicalPocketPasses', () => {
       }),
     ).toMatchObject({ ok: false, reason: 'Helix minimum diameter exceeds its maximum diameter.' });
   });
+
+  // Audit 2026-10-18: an angle below the planner floor was silently raised to
+  // 0.5°, so the emitted helix descended steeper than the operator entered.
+  it('discloses an entry angle below the planner floor instead of steepening it', () => {
+    expect(
+      planHelicalPocketPasses([square], [-2], {
+        maxDiameterMm: 10,
+        minDiameterMm: 2,
+        angleDeg: 0.2,
+      }),
+    ).toMatchObject({
+      ok: false,
+      reason:
+        'Helix entry angle must be at least 0.5 degrees. This pocket keeps its ordinary entry.',
+      fallback: 'ordinary-pocket',
+    });
+  });
 });
