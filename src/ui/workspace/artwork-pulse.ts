@@ -1,42 +1,55 @@
-// Timing and grouping for the operation colour pulse (ADR-620). The workspace
-// draws artwork in plain ink; pointing at artwork, or at an operation row,
-// plays one pulse in that operation's colour across every piece that shares
-// its settings, rippling out from the piece under the pointer. A soft colour
-// edge stays while the pointer rests there. Pure: no DOM, no canvas.
+// Timing and grouping for the operation colour pulse (ADR-620, ADR-632). The
+// workspace draws artwork in plain ink; pointing at artwork, or at an
+// operation row, swells one soft tint of that operation's colour across every
+// piece that shares its settings, rippling out from the piece under the
+// pointer. A soft colour edge stays while the pointer rests there. Pure: no
+// DOM, no canvas.
 
 import { operationIdsForObject, type Layer, type SceneObject } from '../../core/scene';
 import { sameOperationSettings, type MachineKind } from './pulse-settings-match';
 
 export type { MachineKind } from './pulse-settings-match';
 
-export const PULSE_DURATION_MS = 1400;
+export const PULSE_DURATION_MS = 1900;
 /** The pointer must settle this long before a hover counts, so a sweep across the bed stays calm. */
 export const PULSE_HOVER_DWELL_MS = 90;
+/** Peak colour strength: the tint lets the ink line show through rather than repainting it. */
+export const PULSE_PEAK_STRENGTH = 0.78;
 /** Strength of the soft colour edge while the pointer rests on the artwork. */
-export const PULSE_EDGE_ALPHA = 0.85;
-export const PULSE_EDGE_BLUR_PX = 5;
+export const PULSE_EDGE_ALPHA = 0.5;
+export const PULSE_EDGE_BLUR_PX = 8;
 
-const RISE_END = 0.16;
-const HOLD_END = 0.3;
-const RIPPLE_BASE_MS = 80;
-const RIPPLE_MS_PER_PX = 0.6;
-const SWEEP_STEP_MS = 70;
-const MAX_STAGGER_MS = 420;
-const EDGE_TIME_CONSTANT_MS = 90;
+/** The swell peaks a third of the way in, then ebbs slowly: no flash, no flat hold. */
+const SWELL_PEAK = 0.34;
+const GLOW_PEAK_ALPHA = 0.34;
+const GLOW_START_BLUR_PX = 6;
+const GLOW_GROWTH_BLUR_PX = 16;
+const RIPPLE_BASE_MS = 110;
+const RIPPLE_MS_PER_PX = 0.8;
+const SWEEP_STEP_MS = 90;
+const MAX_STAGGER_MS = 560;
+const EDGE_TIME_CONSTANT_MS = 180;
 const EDGE_SETTLED = 0.01;
 
-/** Colour strength through one pulse, 0..1: a quick rise, a short hold, a long fade. */
-export function pulseStrength(t: number): number {
+/** One breath through the pulse, 0..1: an eased swell, then a long, eased ebb. */
+function swell(t: number): number {
   if (!(t > 0 && t < 1)) return 0;
-  if (t < RISE_END) return easeOutCubic(t / RISE_END);
-  if (t < HOLD_END) return 1;
-  return 1 - easeInOutCubic((t - HOLD_END) / (1 - HOLD_END));
+  if (t < SWELL_PEAK) return easeInOutSine(t / SWELL_PEAK);
+  return 1 - easeInOutSine((t - SWELL_PEAK) / (1 - SWELL_PEAK));
 }
 
-/** The glow that blooms outward and fades as the pulse runs. */
+/** Colour strength through one pulse: it swells gently to a soft tint and ebbs back to ink. */
+export function pulseStrength(t: number): number {
+  return PULSE_PEAK_STRENGTH * swell(t);
+}
+
+/** A faint halo that breathes with the colour and drifts outward as it fades. */
 export function pulseGlow(t: number): { readonly blurPx: number; readonly alpha: number } | null {
   if (!(t > 0 && t < 1)) return null;
-  return { blurPx: 4 + 22 * easeOutCubic(t), alpha: 0.6 * (1 - t) ** 1.5 };
+  return {
+    blurPx: GLOW_START_BLUR_PX + GLOW_GROWTH_BLUR_PX * easeOutSine(t),
+    alpha: GLOW_PEAK_ALPHA * swell(t),
+  };
 }
 
 /**
@@ -214,7 +227,7 @@ function stepEntry(
   entry.edge = nextEdge(entry.edge, edgeTarget, dt, reducedMotion);
   const busy = (running && !reducedMotion) || entry.edge !== edgeTarget;
   // Reduced motion: no pulse, the colour simply shows while the pointer rests.
-  const strength = reducedMotion ? (hovered ? 1 : 0) : pulseStrength(t);
+  const strength = reducedMotion ? (hovered ? PULSE_PEAK_STRENGTH : 0) : pulseStrength(t);
   const glow = reducedMotion ? null : pulseGlow(t);
   if (strength === 0 && glow === null && entry.edge === 0) return { busy, piece: null };
   return { busy, piece: { strength, glow, edgeAlpha: entry.edge } };
@@ -230,10 +243,10 @@ function nextEdge(current: number, target: number, dt: number, reducedMotion: bo
   return Math.abs(target - next) < EDGE_SETTLED ? target : next;
 }
 
-function easeOutCubic(x: number): number {
-  return 1 - (1 - x) ** 3;
+function easeInOutSine(x: number): number {
+  return (1 - Math.cos(Math.PI * x)) / 2;
 }
 
-function easeInOutCubic(x: number): number {
-  return x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2;
+function easeOutSine(x: number): number {
+  return Math.sin((Math.PI * x) / 2);
 }

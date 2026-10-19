@@ -12,6 +12,7 @@ import {
   pulseColorSources,
   PULSE_DURATION_MS,
   PULSE_EDGE_ALPHA,
+  PULSE_PEAK_STRENGTH,
   pulseGlow,
   pulseStartOffsets,
   pulseStrength,
@@ -38,20 +39,29 @@ function artwork(id: string, operationId: string, x: number): TracedImage {
 }
 
 describe('pulse shape', () => {
-  it('rises quickly, holds full colour, then fades back to ink', () => {
+  it('swells gently to a soft tint, never full colour, then ebbs back to ink', () => {
     expect(pulseStrength(0)).toBe(0);
-    expect(pulseStrength(0.08)).toBeGreaterThan(0.5);
-    expect(pulseStrength(0.2)).toBe(1);
+    // An eased start: no flash in the first frames.
+    expect(pulseStrength(0.04)).toBeLessThan(0.1);
+    expect(pulseStrength(0.17)).toBeGreaterThan(pulseStrength(0.08));
+    const samples = Array.from({ length: 101 }, (_, index) => pulseStrength(index / 100));
+    expect(Math.max(...samples)).toBeCloseTo(PULSE_PEAK_STRENGTH, 2);
+    expect(PULSE_PEAK_STRENGTH).toBeLessThan(1);
+    // No flat hold: the peak is a moment, and the ebb is longer than the swell.
+    expect(samples.filter((value) => value > 0.99 * PULSE_PEAK_STRENGTH).length).toBeLessThan(10);
     expect(pulseStrength(0.6)).toBeGreaterThan(pulseStrength(0.8));
     expect(pulseStrength(1)).toBe(0);
     expect(pulseStrength(-0.1)).toBe(0);
   });
 
-  it('blooms the glow outward while it fades', () => {
-    const early = pulseGlow(0.1);
+  it('breathes a faint halo with the colour that drifts outward as it fades', () => {
+    const start = pulseGlow(0.02);
+    const peak = pulseGlow(0.34);
     const late = pulseGlow(0.8);
-    expect(late?.blurPx).toBeGreaterThan(early?.blurPx ?? Infinity);
-    expect(late?.alpha).toBeLessThan(early?.alpha ?? 0);
+    expect(start?.alpha).toBeLessThan(peak?.alpha ?? 0);
+    expect(late?.alpha).toBeLessThan(peak?.alpha ?? 0);
+    expect(peak?.alpha).toBeLessThan(0.4);
+    expect(late?.blurPx).toBeGreaterThan(start?.blurPx ?? Infinity);
     expect(pulseGlow(0)).toBeNull();
     expect(pulseGlow(1)).toBeNull();
   });
@@ -193,7 +203,7 @@ describe('which artwork pulses together', () => {
     const pieces = Array.from({ length: 40 }, (_, index) => ({ id: `p${index}`, x: -index, y: 0 }));
     const offsets = pulseStartOffsets(pieces, null);
     expect(offsets.get('p39')).toBe(0);
-    expect(offsets.get('p0')).toBeLessThanOrEqual(420);
+    expect(offsets.get('p0')).toBeLessThanOrEqual(560);
     expect(offsets.get('p0')).toBeGreaterThan(offsets.get('p1') ?? Infinity);
   });
 });
@@ -209,7 +219,9 @@ describe('pulse clock', () => {
     const clock = new ArtworkPulseClock();
     clock.hover(target, 0);
     expect(clock.frame(0, false).busy).toBe(true);
-    expect(clock.frame(0.2 * PULSE_DURATION_MS, false).pieces[0]?.strength).toBe(1);
+    expect(clock.frame(0.34 * PULSE_DURATION_MS, false).pieces[0]?.strength).toBeCloseTo(
+      PULSE_PEAK_STRENGTH,
+    );
     // Hovering again mid-pulse does not restart it.
     clock.hover(target, 0.5 * PULSE_DURATION_MS);
     const done = clock.frame(PULSE_DURATION_MS + 1000, false);
@@ -249,7 +261,11 @@ describe('pulse clock', () => {
     const clock = new ArtworkPulseClock();
     clock.hover(target, 0);
     const shown = clock.frame(10, true);
-    expect(shown.pieces[0]).toMatchObject({ strength: 1, glow: null, edgeAlpha: PULSE_EDGE_ALPHA });
+    expect(shown.pieces[0]).toMatchObject({
+      strength: PULSE_PEAK_STRENGTH,
+      glow: null,
+      edgeAlpha: PULSE_EDGE_ALPHA,
+    });
     expect(shown.busy).toBe(false);
     clock.leave();
     expect(clock.frame(20, true).pieces).toEqual([]);
