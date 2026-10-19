@@ -1,10 +1,14 @@
 /* ADR-634: the safety notice floats over the top centre of the canvas. The
-   anchor spans the canvas stage, lets clicks through to the drawing, and sits
-   above the update card that shares the top centre. */
+   anchor spans the canvas stage and lets clicks through to the drawing. No
+   stacking context sits between it and the canvas overlays, so it is drawn
+   above the update card that shares the top centre and above the in-canvas
+   hints (the run-order prompt there, the tool hints at the bottom left, all
+   z-index 8). The menu bar, popovers, modal dialogs and the Live Motion popup
+   stay above it. */
 .lf-safety-notice-anchor {
   position: absolute;
   inset: 0;
-  z-index: 7;
+  z-index: 9;
   container: safety-notice / inline-size;
 }
 
@@ -21,7 +25,9 @@
   box-sizing: border-box;
   width: 420px;
   max-width: calc(100% - 24px);
-  max-height: calc(100% - 24px);
+  /* --lf-safety-notice-room is set while the Live Motion popup is up, so the
+     notice ends above it instead of hiding its buttons underneath. */
+  max-height: min(calc(100% - 24px), var(--lf-safety-notice-room, 100vh));
   overflow-y: auto;
   border-radius: 4px;
   box-shadow: var(--lf-shadow);
@@ -41,7 +47,7 @@
     transform: none;
     width: auto;
     max-width: none;
-    max-height: 50vh;
+    max-height: min(50vh, var(--lf-safety-notice-room, 50vh));
     margin-top: 12px;
   }
 }
