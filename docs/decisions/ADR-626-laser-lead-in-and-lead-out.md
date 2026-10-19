@@ -54,7 +54,8 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    (`proper-contour-containment.ts`: the whole outline must lie inside, so a contour that crosses
    into a concave neighbour is not read as its hole), counted over every closed contour of every
    Line cut group in the job that burns. A group at zero power, artwork at 0% power, or a power the
-   controller rounds to S0 (judged as the job start mark judges it, `hasJobStartPower`) cuts nothing
+   controller rounds to zero emitted power (judged as the job start mark judges it,
+   `hasJobStartPower`, including Ruida's 14-bit power scale) cuts nothing
    and holds no part, so it is neither an obstacle nor a container, and gets no leads. A hole cut by its own operation is therefore still a hole. A contour that tabs or
    perforation broke into pieces still counts: compile keeps its whole outline on the cut group
    (`CutGroup.topologyRings`, matched to the pieces by their topology identity, ADR-486 Amd 2;
@@ -67,7 +68,8 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    an outer contour. A copy has the same bounds and length within 0.01 mm and is the same loop corner
    by corner within 0.01 mm, however it starts or runs; a vertex that only splits a straight edge (an
    outline started mid-edge has one) does not count, and shapes that only share bounds and length
-   stay apart.
+   stay apart. Every copy directly matches its representative; a chain of approximate matches
+   cannot widen that tolerance.
    Containment is judged from the outlines here, not from the depth compile carries, because that
    depth already counts a container on the same path that may also have a copy. The same judgement
    says which contours hold a contour for the free-end check below. **Always outside**
@@ -116,7 +118,8 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    byte-identical. Lead shape or side stored with both lead switches off changes nothing either: it
    does not split artwork into separate process groups, and an artwork override that holds only
    such fields does not count as an override (no requested-override comment); recipe steps leave
-   such fields out, so reapplying a recipe does not copy an operation over them. The GRBL layer
+   such fields out, as do captured and applied saved defaults, so reapplying a recipe or default
+   does not revive inactive lead geometry. The GRBL layer
    comment adds `leads in+out arc 2.000 mm at 90 deg` only when the operation asks for leads.
 7. **Passes and overcut.** Every pass cuts lead-in, contour, lead-out, because every pass starts and
    stops. Overcut stays on the final pass only (ADR-415): that pass runs past the start first and
@@ -124,6 +127,7 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
    passes' lead-out fits. Preparation stores that pass's
    burn on the segment (`finalPassBurn`); `finalPassCutSegments` hands it to every pass walker, and
    bounds, coordinate checks, the Ruida export's range check and the rotary Y mapping read it too.
+   Compiled-work advisories count ordinary passes and that final-pass burn separately.
    The overcut's lead-out takes its heading from the overcut run alone, so a run shorter than the
    tangent window keeps its own direction. With one pass the final pass is the only one, so its burn
    is the segment's own and no reader can count a path that never runs; the ordinary lead-out, which

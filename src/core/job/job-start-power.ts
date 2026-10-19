@@ -1,4 +1,5 @@
 import type { DeviceProfile } from '../devices';
+import { encodePower14 } from '../controllers/ruida/rd-numbers';
 import { scaleS } from '../output/grbl-laser-lines';
 import { powerScaleVersionForDevice } from '../output/laser-power-scale-version';
 import { rasterCompilationPowerScale } from '../raster/controller-power-scale';
@@ -10,6 +11,8 @@ export function hasJobStartPower(group: Group, device?: DeviceProfile): boolean 
   if (group.kind === 'cnc') return true;
   if (!(group.power > 0)) return false;
   if (group.kind === 'raster' || device === undefined) return true;
+  if (device.controllerKind === 'ruida')
+    return encodePower14(group.power).some((byte) => byte !== 0);
   // Smoothie and Marlin fan emission use their raster compilation ranges;
   // GRBL's canonical scaleS retains its own fractional-range rounding.
   const scale =

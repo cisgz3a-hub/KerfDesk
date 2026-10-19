@@ -135,8 +135,8 @@ function ringHolders(
   };
 }
 
-/** For each ring, the first ring in job order it is a copy of, through any
- * chain of copies; the ring itself when it is the first. */
+/** For each ring, the first representative it directly matches. Approximate
+ * copy matching is not transitive: a chain must not widen COPY_MM. */
 function copyRepresentatives(rings: ReadonlyArray<LeadRing>): number[] {
   const cells = new Map<string, number[]>();
   const representatives: number[] = [];
@@ -145,7 +145,10 @@ function copyRepresentatives(rings: ReadonlyArray<LeadRing>): number[] {
     const cx = cellOf(ring.bounds.minX);
     const cy = cellOf(ring.bounds.minY);
     const copy = earlierCopy(ring, rings, cells, cx, cy);
-    representatives.push(copy === null ? index : (representatives[copy] ?? copy));
+    representatives.push(copy ?? index);
+    // Only representatives are candidates, so every member stays within the
+    // tolerance of the outline used to decide containment.
+    if (copy !== null) return;
     const key = `${cx},${cy}`;
     const list = cells.get(key);
     if (list === undefined) cells.set(key, [index]);
