@@ -59,6 +59,7 @@ describe('separate positioning light transaction', () => {
     }));
     const written = h.writes.length;
     await expect(h.actions.switchPositioningLightOff()).rejects.toThrow(/fan-mosfet/);
+    await expect(h.actions.switchPositioningLightOn()).rejects.toThrow(/fan-mosfet/);
     await expect(h.actions.centrePositioningLight(30, 10, 1200)).rejects.toThrow(/fan-mosfet/);
     expect(h.writes).toHaveLength(written);
     expect(positioningLightDisconnectOff(h.get(), h.refs)).toBeNull();
@@ -353,7 +354,7 @@ describe('Frame evidence across a positioning-light move (ADR-605)', () => {
     expect(h.get().positioningLightEnabled).toBe(true);
   });
 
-  it('voids a Current Position Frame, whose placement follows the head', async () => {
+  it('voids an incomplete Current Position Frame without a captured origin', async () => {
     const h = harness();
     completeFrame(h, 'current-position');
     await h.actions.centrePositioningLight(40, 45, 1200);
@@ -361,7 +362,35 @@ describe('Frame evidence across a positioning-light move (ADR-605)', () => {
     expect(h.get().framedRun).toBeNull();
   });
 
-  it('voids the Frame when the canvas changes during the move, even if changed back', async () => {
+  it('keeps the captured Current Position origin after verified light travel', async () => {
+    const h = harness();
+    const initial = completeFrame(h, 'current-position');
+    const permit = {
+      ...initial,
+      candidate: {
+        ...initial.candidate,
+        preparedStart: {
+          ...initial.candidate.preparedStart,
+          jobOrigin: {
+            startFrom: 'current-position' as const,
+            anchor: 'front-left' as const,
+            currentPosition: { x: 0, y: 0 },
+          },
+        },
+      },
+    };
+    h.set({ framedRun: permit, completedFrame: permit });
+    await h.actions.centrePositioningLight(40, 45, 1200);
+    const kept = h.get().completedFrame!;
+    expect(kept.candidate).toBe(permit.candidate);
+    expect(kept.candidate.preparedStart.jobOrigin).toMatchObject({
+      currentPosition: { x: 0, y: 0 },
+    });
+    expect(framedRunStartHandoffIssue(kept, h.get())).toBeNull();
+    expect(framedRunStartHandoffIssue(permit, h.get())).not.toBeNull();
+  });
+
+  it('keeps Frame when only the project reference changes during the move', async () => {
     const h = harness();
     completeFrame(h, 'absolute');
     const project = useStore.getState().project;
@@ -370,8 +399,9 @@ describe('Frame evidence across a positioning-light move (ADR-605)', () => {
       useStore.setState({ project: { ...project } });
     });
     await h.actions.centrePositioningLight(40, 45, 1200);
-    expect(h.get().completedFrame).toBeNull();
-    expect(h.get().framedRun).toBeNull();
+    expect(h.get().completedFrame).not.toBeNull();
+    expect(h.get().framedRun).toBe(h.get().completedFrame);
+    expect(h.get().positioningLightEnabled).toBe(true);
   });
 
   it('voids the Frame when the light travel fails', async () => {
