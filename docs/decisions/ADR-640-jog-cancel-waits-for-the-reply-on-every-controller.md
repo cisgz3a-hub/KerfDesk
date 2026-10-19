@@ -1,4 +1,4 @@
-## ADR-638 - Jog cancel waits for the reply on every controller (2026-10-19)
+## ADR-640 - Jog cancel waits for the reply on every controller (2026-10-19)
 
 **Status:** Accepted. Amends ADR-375 finding 6 (M-6): the wait before the jog-cancel byte applies
 to every driver, not only grblHAL. | **Date:** 2026-10-19

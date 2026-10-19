@@ -33,7 +33,7 @@ export type ControllerRealtime = {
   readonly softReset: string | null;
   /** Cancel the in-flight jog only (GRBL \x85). grblHAL also discards,
    *  unanswered, every line it has received but not parsed yet, so Cancel
-   *  waits briefly for owed replies before writing it (ADR-638). */
+   *  waits briefly for owed replies before writing it (ADR-640). */
   readonly jogCancel: string | null;
 };
 

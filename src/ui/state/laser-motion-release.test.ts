@@ -221,7 +221,7 @@ describe('a Cancel that gives up does not wedge the motion owner', () => {
     // grblHAL greets as "Grbl 1.1f" at COMPATIBILITY_LEVEL 1 and up (audit
     // HF-8), so a board set up with a GRBL profile meets the same flush: a
     // Falcon on the Falcon-compatible profile showed Cancel's failure after a
-    // held arrow was let go just as its jog went out (ADR-638).
+    // held arrow was let go just as its jog went out (ADR-640).
     ['A board that greets as GRBL', {}, {}],
   ])(
     '%s: a Cancel right after the jog write waits for the jog reply before 0x85',
@@ -314,7 +314,7 @@ describe('a Cancel that gives up does not wedge the motion owner', () => {
 
     // The reply may still come, so the owner stays; but on an Idle machine
     // Disconnect, which the failure names, is the way out rather than a lock
-    // only ABORT MOTION opens (ADR-638).
+    // only ABORT MOTION opens (ADR-640).
     expect(useLaserStore.getState().motionOperation).toMatchObject({ cancelRequested: true });
     expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
     expect(motionOwnerAwaitsMissingReply(useLaserStore.getState())).toBe(true);

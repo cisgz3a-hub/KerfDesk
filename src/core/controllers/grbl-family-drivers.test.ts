@@ -25,7 +25,7 @@ describe('GRBL-family variant drivers', () => {
     expect(grblHalDriver.label).toBe('grblHAL');
     // Same realtime bytes. grblHAL's 0x85 also flushes unparsed input in every
     // state, but grblHAL can greet as stock GRBL, so Cancel handles that on
-    // every driver rather than by driver kind (ADR-638, see the next test).
+    // every driver rather than by driver kind (ADR-640, see the next test).
     expect(grblHalDriver.realtime).toEqual(grblDriver.realtime);
     expect(grblHalDriver.commands).toEqual(nonStockGrblCommands);
     // Neither stock GRBL's homing loop nor grblHAL's at its default settings
@@ -59,7 +59,7 @@ describe('GRBL-family variant drivers', () => {
     // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899),
     // yet greets as "Grbl 1.1f" at COMPATIBILITY_LEVEL 1 and up (audit HF-8),
     // so no driver kind can promise the byte flushes nothing; Cancel waits for
-    // owed replies on all of them (ADR-638). The Falcon command set never
+    // owed replies on all of them (ADR-640). The Falcon command set never
     // sends 0x85 (controller audit M-6).
     expect(grblDriver.realtime.jogCancel).toBe('\x85');
     expect(grblHalDriver.realtime.jogCancel).toBe('\x85');

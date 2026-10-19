@@ -30,7 +30,7 @@ const MOTION_STOP_TIMEOUT_MESSAGE =
   'Timed out waiting for motion to stop after Cancel. KerfDesk releases motion control when the controller next reports Idle; use ABORT MOTION to stop the machine now.';
 // A reply that never came keeps the owner: it may still arrive, and only a
 // new serial session proves it will not. Once the controller reports Idle,
-// Disconnect and Connect stay available for that (ADR-638).
+// Disconnect and Connect stay available for that (ADR-640).
 const MISSING_MOTION_REPLY_MESSAGE =
   'The controller did not answer the last motion command within 8 seconds. Once the machine has stopped, Disconnect and connect again to clear it; use ABORT MOTION to stop it now.';
 const AUTOMATIC_RELEASE_FAILURE_HEADING = 'Releasing the stopped motion needs attention';
@@ -164,7 +164,7 @@ async function waitForCancelledMotionQueue(
 }
 
 // The jog-cancel byte first waits briefly for every owed reply, on every
-// driver that has the byte (ADR-638). grblHAL answers it, in any state, by
+// driver that has the byte (ADR-640). grblHAL answers it, in any state, by
 // discarding every line it has received but not parsed, and never answers
 // those lines
 // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899).

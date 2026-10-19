@@ -163,7 +163,7 @@ function isFileOnlyController(
 }
 
 // A motion owner locks Reconnect and the connection controls, except one that
-// only a missing reply holds on an Idle machine (ADR-638).
+// only a missing reply holds on an Idle machine (ADR-640).
 function useConnectionLocks(props: Props): {
   readonly reconnect: boolean;
   readonly controls: boolean;
@@ -183,7 +183,7 @@ function useConnectionLocks(props: Props): {
 // handshake. Keep Disconnect/Reconnect available for those controller-owned
 // operations while motion and autofocus retain their stricter lockout. A motion
 // owner that only a missing reply holds on an Idle machine is the exception:
-// a new session is the only way to clear it (ADR-638).
+// a new session is the only way to clear it (ADR-640).
 export function connectionControlsBusy(
   motionOperation: unknown,
   controllerOperation: ReturnType<typeof useLaserStore.getState>['controllerOperation'],

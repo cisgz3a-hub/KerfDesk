@@ -422,7 +422,7 @@ describe('laser-store motion operation lifecycle', () => {
     write.mockClear();
     const cancel = useLaserStore.getState().cancelJog();
 
-    // The byte follows a check that no reply is owed (ADR-638), so it is not
+    // The byte follows a check that no reply is owed (ADR-640), so it is not
     // written in the same tick.
     await vi.waitFor(() => expect(write).toHaveBeenCalledWith(RT_JOG_CANCEL));
     expect(getMotionOperation()).toMatchObject({ cancelRequested: true });

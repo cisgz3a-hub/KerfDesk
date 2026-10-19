@@ -35,7 +35,7 @@ describe('visible cancellation settlement failures', () => {
     vi.useFakeTimers();
 
     // The byte waits up to 250 ms for the jog's reply, then Cancel waits 8 s
-    // for it before giving up (ADR-638).
+    // for it before giving up (ADR-640).
     const cancel = useLaserStore.getState().cancelJog();
     const rejection = expect(cancel).rejects.toThrow(/did not answer the last motion command/);
     await vi.advanceTimersByTimeAsync(8_300);

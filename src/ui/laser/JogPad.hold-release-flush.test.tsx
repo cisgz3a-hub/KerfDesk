@@ -1,4 +1,4 @@
-// Regression test for ADR-638, driven through the real JogPad and laser store:
+// Regression test for ADR-640, driven through the real JogPad and laser store:
 // a Falcon on the Falcon-compatible (GRBL) profile showed "Stop jog: Cancel is
 // waiting for the previous motion command acknowledgement" when an arrow was
 // let go just after its hold jog went out, and the pad stayed locked. Creality's
@@ -111,7 +111,7 @@ describe('JogPad hold released just after its jog went out', () => {
         right.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }));
         right.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
       });
-      // Before ADR-638 the reply wait ran its full 8 s here and then failed.
+      // Before ADR-640 the reply wait ran its full 8 s here and then failed.
       await pump(3_000);
 
       const written = sim.outbound().slice(before);

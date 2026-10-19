@@ -67,7 +67,7 @@ export const grblHalDriver: ControllerDriver = {
   // flushes the input buffer, so a line not parsed yet is never answered
   // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899;
   // stream.h#L287-L291). Cancel waits briefly for owed replies before the
-  // byte on every driver, because grblHAL can greet as stock GRBL (ADR-638).
+  // byte on every driver, because grblHAL can greet as stock GRBL (ADR-640).
   capabilities: {
     ...grblDriver.capabilities,
     // grblHAL's homing loop serves status requests only with "report when

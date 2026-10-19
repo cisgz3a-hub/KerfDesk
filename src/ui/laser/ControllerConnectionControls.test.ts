@@ -23,7 +23,7 @@ describe('connection controls during auto-focus', () => {
     expect(connectionControlsBusy({ kind: 'jog' }, null)).toBe(true);
   });
 
-  it('frees them for a stopped owner that only a missing reply holds (ADR-638)', () => {
+  it('frees them for a stopped owner that only a missing reply holds (ADR-640)', () => {
     expect(connectionControlsBusy({ kind: 'jog' }, null, true)).toBe(false);
   });
 });
