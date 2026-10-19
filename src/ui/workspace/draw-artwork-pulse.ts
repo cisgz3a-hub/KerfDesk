@@ -1,118 +1,233 @@
-// Paints the operation colour pulse (ADR-620) on its own pointer-transparent
-// canvas above the workspace, so a pulse never redraws the scene. Each piece's
-// colour geometry is rendered once into a small bitmap; every frame then only
-// blits it at the pulse strength, and blits a blurred outline copy for the
-// glow and the soft edge. The outline is grown from the bitmap itself, so its
-// cost follows the piece's pixels, not its segment count: a dense trace is
-// painted once per hover, never stroked again for the glow.
+// Paints the operation colour pulse (ADR-620, ADR-632 Amendment 1) on its own
+// pointer-transparent canvas above the workspace, so a pulse never redraws the
+// scene. Each piece's bitmaps (pulse-piece-bitmap.ts) are rendered once per
+// hover; a frame only blits them at an alpha, with no blur. While the view
+// zooms or pans they are drawn scaled, and re-render once it has settled.
+// Missing bitmaps render within a per-frame budget, the most visible first, so
+// pointing at one of many same-settings pieces never stalls a frame.
 
 import {
-  applyTransform,
   operationIdsForObject,
-  pathUsesOperation,
   sceneLayerVisibility,
-  sceneObjectUsesOperation,
-  transformedBBox,
   type Layer,
   type Project,
   type SceneObject,
-  type Vec2,
 } from '../../core/scene';
 import { getCanvasColorScheme } from '../theme/canvas-color-scheme';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
-import { PULSE_EDGE_BLUR_PX, type PulsePieceFrame } from './artwork-pulse';
-import { createDisplayPolylineCache, type DisplayPolylineCache } from './display-polylines';
+import type { PulsePieceFrame } from './artwork-pulse';
+import { createDisplayPolylineCache } from './display-polylines';
+import type { ObjectDisplayMode } from './object-display';
 import {
-  isVectorSceneObject,
-  paintObjectDisplay,
-  resolveObjectDisplay,
-  type VectorSceneObject,
-} from './object-display';
+  pieceBitmapPixels,
+  releasePieceBitmap,
+  renderPieceBitmap,
+  type PieceBitmap,
+  type PlacedBitmap,
+} from './pulse-piece-bitmap';
 import type { ViewTransform } from './view-transform';
 
-/** How far the glow outline is grown out from the artwork, in pixels. */
-const GLOW_OUTLINE_GROW_PX = 2.5;
-const GLOW_GROW_OFFSETS: ReadonlyArray<readonly [number, number]> = Array.from(
-  { length: 8 },
-  (_, index) => {
-    const angle = (index * Math.PI) / 4;
-    return [GLOW_OUTLINE_GROW_PX * Math.cos(angle), GLOW_OUTLINE_GROW_PX * Math.sin(angle)];
-  },
-);
-/** Room around a piece for that outline and the antialiased edge. */
-const BITMAP_PAD_PX = 8;
 /** Recent pieces kept after their pulse ends, so pointing again is instant. */
 const RETAINED_PIECES = 8;
-/** Raster and relief artwork pulse as a tinted frame: tint strength and outline width. */
-const FRAME_TINT_ALPHA = 0.28;
-const FRAME_LINE_PX = 2;
+/** About 64 MB of RGBA pixels; live pieces are kept even above this budget. */
+const RETAINED_PIXELS = 16_000_000;
+/** Rendering stops for the frame after this long; at least one piece always renders. */
+const RENDER_BUDGET_MS = 6;
+/** Bitmaps drawn scaled during a zoom or pan re-render once the view is still this long. */
+const VIEW_SETTLE_MS = 140;
 
-type PieceBitmap = {
-  readonly color: string;
-  readonly left: number;
-  readonly top: number;
-  readonly flood: HTMLCanvasElement;
-  readonly glow: HTMLCanvasElement;
-};
-
-type CacheEntry = {
+type Identity = {
   readonly object: SceneObject;
   /** The operation whose artwork is drawn… */
   readonly layer: Layer;
   /** …in this operation's colour (the one the pointer is on). */
   readonly colorLayer: Layer;
+  /** Other bound operations can change the path's visible fill/stroke style. */
+  readonly lookup: ReadonlyMap<string, Layer>;
+  readonly displayMode: ObjectDisplayMode;
+  readonly colorScheme: string;
+};
+
+type CacheEntry = Identity & {
+  /** The view and overlay size the bitmap was rendered for. */
   readonly viewKey: string;
   readonly bitmap: PieceBitmap | null;
 };
 
-type Region = {
-  readonly left: number;
-  readonly top: number;
-  readonly width: number;
-  readonly height: number;
+/** One frame's shared inputs and what it collects while drawing. */
+type FrameWork = {
+  readonly layers: ReadonlyArray<Layer>;
+  readonly displayMode: ObjectDisplayMode;
+  readonly colorScheme: string;
+  readonly live: Set<string>;
+  readonly jobs: RenderJob[];
+};
+
+type RenderJob = {
+  readonly key: string;
+  readonly identity: Identity;
+  readonly piece: PulsePieceFrame;
+  /** The right artwork rendered for another view: drawn scaled until it re-renders. */
+  readonly stale: PieceBitmap | null;
 };
 
 export class ArtworkPulsePainter {
   private readonly entries = new Map<string, CacheEntry>();
+  private layers: ReadonlyArray<Layer> | undefined;
+  private objects: ReadonlyArray<SceneObject> | undefined;
+  private layerById = new Map<string, Layer>();
+  private objectById = new Map<string, SceneObject>();
+  private lookup: ReadonlyMap<string, Layer> = new Map();
   private readonly displayCache = createDisplayPolylineCache();
   private readonly objectOperations = new WeakMap<
     SceneObject,
     { readonly layers: ReadonlyArray<Layer>; readonly ids: ReadonlyArray<string> }
   >();
+  private readonly renderBudgetMs: number;
+  private viewKey = '';
+  private viewChangedAt = Number.NEGATIVE_INFINITY;
 
+  constructor(options: { readonly renderBudgetMs?: number } = {}) {
+    this.renderBudgetMs = options.renderBudgetMs ?? RENDER_BUDGET_MS;
+  }
+
+  /**
+   * Paints one frame. Returns true while a piece still waits for its bitmap,
+   * or for the view to settle, so the caller schedules another frame.
+   */
   draw(
     ctx: CanvasRenderingContext2D,
     project: Project,
     view: ViewTransform,
     pieces: ReadonlyArray<PulsePieceFrame>,
-  ): void {
+    displayMode: ObjectDisplayMode = 'design',
+    now: number = performance.now(),
+  ): boolean {
     const { width, height } = ctx.canvas;
     ctx.clearRect(0, 0, width, height);
-    const layers = project.scene.layers;
-    const layerById = new Map(layers.map((layer) => [layer.id, layer]));
-    const objectById = new Map(project.scene.objects.map((object) => [object.id, object]));
-    const lookup = sceneLayerVisibility.lookup(layers);
-    const viewKey = `${view.scale}|${view.offsetX}|${view.offsetY}|${width}x${height}|${getCanvasColorScheme()}`;
-    const live = new Set<string>();
-    for (const piece of pieces) {
-      const object = objectById.get(piece.objectId);
-      if (object === undefined) continue;
-      // Only the piece's own operations: a group of N same-settings imports
-      // carries N operations, and pairing every piece with every one of them
-      // would render N² empty bitmaps.
-      for (const operationId of this.operationsOf(object, layers)) {
-        const sourceId = piece.colorSources.get(operationId);
-        const layer = layerById.get(operationId);
-        if (sourceId === undefined || layer === undefined || !layer.visible) continue;
-        const colorLayer = layerById.get(sourceId) ?? layer;
-        const key = `${object.id}\u0000${operationId}`;
-        live.add(key);
-        const identity = { object, layer, colorLayer, viewKey };
-        const bitmap = this.bitmapFor(key, identity, lookup, view, ctx.canvas);
-        if (bitmap !== null) drawPiece(ctx, bitmap, piece);
+    this.indexScene(project);
+    const viewKey = `${view.scale}|${view.offsetX}|${view.offsetY}|${width}x${height}`;
+    if (viewKey !== this.viewKey) {
+      this.viewKey = viewKey;
+      this.viewChangedAt = now;
+    }
+    const frame: FrameWork = {
+      layers: project.scene.layers,
+      displayMode,
+      colorScheme: getCanvasColorScheme(),
+      live: new Set<string>(),
+      jobs: [],
+    };
+    for (const piece of pieces) this.drawCurrent(ctx, piece, view, frame);
+    const pending = this.render(ctx, frame.jobs, view, now - this.viewChangedAt >= VIEW_SETTLE_MS);
+    this.retain(frame.live);
+    return pending;
+  }
+
+  /** Draws the piece's bitmaps that are current for this view; queues the rest to render. */
+  private drawCurrent(
+    ctx: CanvasRenderingContext2D,
+    piece: PulsePieceFrame,
+    view: ViewTransform,
+    frame: FrameWork,
+  ): void {
+    const object = this.objectById.get(piece.objectId);
+    if (object === undefined) return;
+    // Only the piece's own operations: a group of N same-settings imports
+    // carries N operations, and pairing every piece with every one of them
+    // would render N² empty bitmaps.
+    for (const operationId of this.operationsOf(object, frame.layers)) {
+      const sourceId = piece.colorSources.get(operationId);
+      const layer = this.layerById.get(operationId);
+      if (sourceId === undefined || layer === undefined || !layer.visible) continue;
+      const key = `${object.id}\u0000${operationId}`;
+      frame.live.add(key);
+      const identity: Identity = {
+        object,
+        layer,
+        colorLayer: this.layerById.get(sourceId) ?? layer,
+        lookup: this.lookup,
+        displayMode: frame.displayMode,
+        colorScheme: frame.colorScheme,
+      };
+      const cached = this.touch(key);
+      const current = cached !== undefined && sameIdentity(cached, identity);
+      if (current && cached.viewKey === this.viewKey) {
+        if (cached.bitmap !== null) drawPiece(ctx, cached.bitmap, piece, view);
+      } else {
+        frame.jobs.push({ key, identity, piece, stale: current ? cached.bitmap : null });
       }
     }
-    this.retain(live);
+  }
+
+  /**
+   * Renders what is missing, the most visible piece first, until the frame's
+   * budget runs out. A piece that only needs the current view keeps drawing
+   * its scaled bitmap until the view has settled.
+   */
+  private render(
+    ctx: CanvasRenderingContext2D,
+    jobs: ReadonlyArray<RenderJob>,
+    view: ViewTransform,
+    settled: boolean,
+  ): boolean {
+    const ordered = [...jobs].sort(
+      (a, b) =>
+        Number(a.stale !== null) - Number(b.stale !== null) ||
+        visibility(b.piece) - visibility(a.piece),
+    );
+    const deadline = performance.now() + this.renderBudgetMs;
+    let rendered = 0;
+    let pending = false;
+    for (const job of ordered) {
+      const inBudget = rendered === 0 || performance.now() < deadline;
+      if (!inBudget || (job.stale !== null && !settled)) {
+        pending = true;
+        if (job.stale !== null) drawPiece(ctx, job.stale, job.piece, view);
+        continue;
+      }
+      const { identity } = job;
+      const bitmap = renderPieceBitmap({
+        object: identity.object,
+        layer: identity.layer,
+        color: canvasVectorDisplayColor(identity.colorLayer.color),
+        lookup: identity.lookup,
+        view,
+        canvas: ctx.canvas,
+        displayCache: this.displayCache,
+        displayMode: identity.displayMode,
+      });
+      rendered += 1;
+      const replaced = this.entries.get(job.key)?.bitmap;
+      this.entries.set(job.key, { ...identity, viewKey: this.viewKey, bitmap });
+      if (replaced !== bitmap) releasePieceBitmap(replaced);
+      if (bitmap !== null) drawPiece(ctx, bitmap, job.piece, view);
+    }
+    return pending;
+  }
+
+  /** The cached entry, re-inserted so `retain` sees it as most recently used. */
+  private touch(key: string): CacheEntry | undefined {
+    const cached = this.entries.get(key);
+    if (cached !== undefined) {
+      this.entries.delete(key);
+      this.entries.set(key, cached);
+    }
+    return cached;
+  }
+
+  /** Immutable scene arrays let animation frames reuse their scene-wide indexes. */
+  private indexScene(project: Project): void {
+    const { layers, objects } = project.scene;
+    if (layers !== this.layers) {
+      this.layers = layers;
+      this.layerById = new Map(layers.map((layer) => [layer.id, layer]));
+      this.lookup = sceneLayerVisibility.lookup(layers);
+    }
+    if (objects !== this.objects) {
+      this.objects = objects;
+      this.objectById = new Map(objects.map((object) => [object.id, object]));
+    }
   }
 
   /** The operations an object's artwork uses, kept until the object or the operations change. */
@@ -127,220 +242,73 @@ export class ArtworkPulsePainter {
   /** Keep every live piece and the most recently used others, oldest out first. */
   private retain(live: ReadonlySet<string>): void {
     let spare = RETAINED_PIECES;
+    let pixels = RETAINED_PIXELS;
+    for (const key of live) pixels -= pieceBitmapPixels(this.entries.get(key)?.bitmap);
     for (const key of [...this.entries.keys()].reverse()) {
       if (live.has(key)) continue;
-      if (spare > 0) spare -= 1;
-      else this.entries.delete(key);
+      const bitmap = this.entries.get(key)?.bitmap;
+      const size = pieceBitmapPixels(bitmap);
+      if (spare > 0 && size <= pixels) {
+        spare -= 1;
+        pixels -= size;
+      } else {
+        this.entries.delete(key);
+        releasePieceBitmap(bitmap);
+      }
     }
-  }
-
-  private bitmapFor(
-    key: string,
-    identity: Omit<CacheEntry, 'bitmap'>,
-    lookup: ReadonlyMap<string, Layer>,
-    view: ViewTransform,
-    canvas: HTMLCanvasElement,
-  ): PieceBitmap | null {
-    const cached = this.entries.get(key);
-    // Re-inserting marks the entry most recently used for `retain`.
-    this.entries.delete(key);
-    if (
-      cached !== undefined &&
-      cached.object === identity.object &&
-      cached.layer === identity.layer &&
-      cached.colorLayer === identity.colorLayer &&
-      cached.viewKey === identity.viewKey
-    ) {
-      this.entries.set(key, cached);
-      return cached.bitmap;
-    }
-    const color = canvasVectorDisplayColor(identity.colorLayer.color);
-    const bitmap = renderPiece(
-      identity.object,
-      identity.layer,
-      color,
-      lookup,
-      view,
-      canvas,
-      this.displayCache,
-    );
-    this.entries.set(key, { ...identity, bitmap });
-    return bitmap;
   }
 }
 
+function sameIdentity(cached: CacheEntry, identity: Identity): boolean {
+  return (
+    cached.object === identity.object &&
+    cached.layer === identity.layer &&
+    cached.colorLayer === identity.colorLayer &&
+    cached.lookup === identity.lookup &&
+    cached.displayMode === identity.displayMode &&
+    cached.colorScheme === identity.colorScheme
+  );
+}
+
+/** How much of a piece shows this frame: the hovered piece, already rising, renders first. */
+function visibility(piece: PulsePieceFrame): number {
+  return piece.strength + piece.glowAlpha + piece.edgeAlpha;
+}
+
+/** The bloom, the resting edge and the colour, each a plain blit at its alpha. */
 function drawPiece(
   ctx: CanvasRenderingContext2D,
   bitmap: PieceBitmap,
   piece: PulsePieceFrame,
+  view: ViewTransform,
 ): void {
-  ctx.save();
-  const edge = piece.edgeAlpha > 0 ? { blurPx: PULSE_EDGE_BLUR_PX, alpha: piece.edgeAlpha } : null;
-  // Draw the outline far off to the left and let only its shadow land on the
-  // piece: the shadow is the blurred glow, without a hard copy of the outline.
-  const shift = ctx.canvas.width + bitmap.glow.width + 64;
-  for (const glow of [piece.glow, edge]) {
-    if (glow === null) continue;
-    ctx.globalAlpha = glow.alpha;
-    ctx.shadowColor = bitmap.color;
-    ctx.shadowBlur = glow.blurPx;
-    ctx.shadowOffsetX = shift;
-    ctx.shadowOffsetY = 0;
-    ctx.drawImage(bitmap.glow, bitmap.left - shift, bitmap.top);
+  blit(ctx, bitmap, bitmap.bloom, piece.glowAlpha, view);
+  blit(ctx, bitmap, bitmap.edge, piece.edgeAlpha, view);
+  blit(ctx, bitmap, bitmap.flood, piece.strength, view);
+  ctx.globalAlpha = 1;
+}
+
+/** Draws a bitmap where it belongs in `view`, scaled when it was rendered for another view. */
+function blit(
+  ctx: CanvasRenderingContext2D,
+  bitmap: PieceBitmap,
+  placed: PlacedBitmap,
+  alpha: number,
+  view: ViewTransform,
+): void {
+  if (!(alpha > 0)) return;
+  ctx.globalAlpha = Math.min(1, alpha);
+  const from = bitmap.view;
+  if (from.scale === view.scale && from.offsetX === view.offsetX && from.offsetY === view.offsetY) {
+    ctx.drawImage(placed.canvas, placed.left, placed.top);
+    return;
   }
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetX = 0;
-  if (piece.strength > 0) {
-    ctx.globalAlpha = piece.strength;
-    ctx.drawImage(bitmap.flood, bitmap.left, bitmap.top);
-  }
-  ctx.restore();
-}
-
-function renderPiece(
-  object: SceneObject,
-  layer: Layer,
-  color: string,
-  lookup: ReadonlyMap<string, Layer>,
-  view: ViewTransform,
-  canvas: HTMLCanvasElement,
-  displayCache: DisplayPolylineCache,
-): PieceBitmap | null {
-  const region = screenRegion(object, view, canvas);
-  if (region === null) return null;
-  const local: ViewTransform = {
-    scale: view.scale,
-    offsetX: view.offsetX - region.left,
-    offsetY: view.offsetY - region.top,
-  };
-  const flood = createBitmap(region);
-  const glow = createBitmap(region);
-  if (flood === null || glow === null) return null;
-  if (isVectorSceneObject(object)) {
-    if (!paintVectorPiece(object, layer, color, lookup, local, displayCache, flood.ctx)) {
-      return null;
-    }
-    growOutline(glow.ctx, flood.canvas);
-  } else if (!paintFramePiece(object, layer, local, color, flood.ctx, glow.ctx)) {
-    return null;
-  }
-  return { color, left: region.left, top: region.top, flood: flood.canvas, glow: glow.canvas };
-}
-
-function paintVectorPiece(
-  object: VectorSceneObject,
-  layer: Layer,
-  color: string,
-  lookup: ReadonlyMap<string, Layer>,
-  view: ViewTransform,
-  displayCache: DisplayPolylineCache,
-  flood: CanvasRenderingContext2D,
-): boolean {
-  const resolved = resolveObjectDisplay(object, lookup, view, displayCache, 'design', 'operation');
-  // Every operation bound to a path, not only the one that styles it on the
-  // canvas, so each operation's row can reveal the artwork it processes.
-  const paths = resolved.paths
-    .filter((display) => pathUsesOperation(object, display.path, layer))
-    .map((display) => ({ ...display, paint: { ...display.paint, color } }));
-  if (paths.length === 0) return false;
-  paintObjectDisplay(flood, object, { ...resolved, paths }, view);
-  return true;
-}
-
-/**
- * The band just outside and inside the artwork's edge: the colour bitmap
- * smeared a few pixels in every direction, less the bitmap itself. A filled
- * shape's interior drops out, so its edge glows without tinting the fill.
- */
-function growOutline(glow: CanvasRenderingContext2D, flood: HTMLCanvasElement): void {
-  for (const [dx, dy] of GLOW_GROW_OFFSETS) glow.drawImage(flood, dx, dy);
-  glow.globalCompositeOperation = 'destination-out';
-  glow.drawImage(flood, 0, 0);
-  glow.globalCompositeOperation = 'source-over';
-}
-
-function paintFramePiece(
-  object: SceneObject,
-  layer: Layer,
-  view: ViewTransform,
-  color: string,
-  flood: CanvasRenderingContext2D,
-  glow: CanvasRenderingContext2D,
-): boolean {
-  if (!sceneObjectUsesOperation(object, layer)) return false;
-  const corners = objectCorners(object).map((point) => ({
-    x: view.offsetX + point.x * view.scale,
-    y: view.offsetY + point.y * view.scale,
-  }));
-  traceClosed(flood, corners);
-  flood.fillStyle = color;
-  flood.globalAlpha = FRAME_TINT_ALPHA;
-  flood.fill();
-  flood.globalAlpha = 1;
-  flood.strokeStyle = color;
-  flood.lineWidth = FRAME_LINE_PX;
-  flood.stroke();
-  traceClosed(glow, corners);
-  glow.strokeStyle = color;
-  glow.lineJoin = 'round';
-  glow.lineWidth = FRAME_LINE_PX + 2 * GLOW_OUTLINE_GROW_PX;
-  glow.stroke();
-  return true;
-}
-
-function objectCorners(object: SceneObject): ReadonlyArray<Vec2> {
-  const { minX, minY, maxX, maxY } = object.bounds;
-  return [
-    { x: minX, y: minY },
-    { x: maxX, y: minY },
-    { x: maxX, y: maxY },
-    { x: minX, y: maxY },
-  ].map((point) => applyTransform(point, object.transform));
-}
-
-function traceClosed(ctx: CanvasRenderingContext2D, points: ReadonlyArray<Vec2>): void {
-  ctx.beginPath();
-  points.forEach((point, index) => {
-    if (index === 0) ctx.moveTo(point.x, point.y);
-    else ctx.lineTo(point.x, point.y);
-  });
-  ctx.closePath();
-}
-
-/** The piece's on-screen box plus padding, clipped to the visible canvas. */
-function screenRegion(
-  object: SceneObject,
-  view: ViewTransform,
-  canvas: HTMLCanvasElement,
-): Region | null {
-  const box = transformedBBox(object);
-  const left = Math.max(
-    -BITMAP_PAD_PX,
-    Math.floor(view.offsetX + box.minX * view.scale) - BITMAP_PAD_PX,
+  const k = view.scale / from.scale;
+  ctx.drawImage(
+    placed.canvas,
+    view.offsetX + (placed.left - from.offsetX) * k,
+    view.offsetY + (placed.top - from.offsetY) * k,
+    placed.canvas.width * k,
+    placed.canvas.height * k,
   );
-  const top = Math.max(
-    -BITMAP_PAD_PX,
-    Math.floor(view.offsetY + box.minY * view.scale) - BITMAP_PAD_PX,
-  );
-  const right = Math.min(
-    canvas.width + BITMAP_PAD_PX,
-    Math.ceil(view.offsetX + box.maxX * view.scale) + BITMAP_PAD_PX,
-  );
-  const bottom = Math.min(
-    canvas.height + BITMAP_PAD_PX,
-    Math.ceil(view.offsetY + box.maxY * view.scale) + BITMAP_PAD_PX,
-  );
-  if (!(right > left && bottom > top)) return null;
-  return { left, top, width: right - left, height: bottom - top };
-}
-
-function createBitmap(
-  region: Region,
-): { readonly canvas: HTMLCanvasElement; readonly ctx: CanvasRenderingContext2D } | null {
-  const canvas = document.createElement('canvas');
-  canvas.width = region.width;
-  canvas.height = region.height;
-  const ctx = canvas.getContext('2d');
-  return ctx === null ? null : { canvas, ctx };
 }

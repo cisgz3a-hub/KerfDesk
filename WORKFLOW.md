@@ -783,14 +783,15 @@ the linked artwork.
    tabs; text and drawn shapes that change become paths in the same step, and locked artwork is
    left as it is. The notice says what changed. Settings are remembered for the session.
 
-### F-A6j. Operation colours on the canvas (ADR-620)
+### F-A6j. Operation colours on the canvas (ADR-620, ADR-632)
 
 1. Artwork rests in plain ink on the workspace, so the canvas shows the design itself. Every
    operation still has its own colour, shown on its row in the Artwork panel.
-2. With the Select tool, rest the pointer on a piece of artwork: it pulses once in its operation
-   colour, and every other piece whose operation has the same settings pulses in that same
-   colour, rippling out from the piece under the pointer. A soft colour edge stays while the
-   pointer rests there. Resting on an operation row does the same for that operation's artwork.
+2. With the Select tool, rest the pointer on a piece of artwork: it swells once into a soft tint
+   of its operation colour with a faint halo, then ebbs back to ink. Every other piece whose
+   operation has the same settings does the same in that colour, rippling out from the piece
+   under the pointer. A soft colour edge stays while the pointer rests there. Resting on an
+   operation row does the same for that operation's artwork.
 3. Hold **Alt** (Option on a Mac) to show every operation colour at once; let go to return to ink.
    Alt shortcuts such as `Alt+W` do not trigger it.
 4. With reduced motion turned on in the operating system, the colour shows while the pointer
@@ -2696,6 +2697,8 @@ authorization, Frame proof, controller command, or safety boundary.
    what the box encloses, right to left what it touches. Shift-drag or Shift-click adds
    to the selection, and Ctrl+A selects all the artwork (not the outlines) unless a field
    has focus. Locked or hidden objects, including locked outlines, are never selected.
+   As on the main canvas, drag with the right or middle mouse button, or hold Space and
+   drag, to pan; the wheel zooms.
 2. In **Jig layout**, choose Rectangle or Circle, enter the outline size, then enter
    rows, columns, and horizontal/vertical spacing. Apply the layout before saving;
    until then the tab reads **Jig layout •**. A 1 x 5 grid creates five independently
@@ -3938,9 +3941,10 @@ or traced image) with at least one closed polyline.
 ### F-F2. Image-engrave a raster (Phase F.2 — code shipped through F.2.e; hardware burn pending)
 
 For portraits, import a sharp photograph, set its physical size, select it and choose
-**Photo engraving...** in the toolbar or Tools → Image (ADR-581). Compare Jarvis and
-Stucki, select whether the material marks dark or light, then adjust midtones before
-brightness and contrast. Higher gamma lightens midtones in KerfDesk. The preview
+**Photo engraving...** in the toolbar or Tools → Image (ADR-581). Compare the Jarvis and
+Stucki swatches under Photo processing, select whether the material marks dark or
+light, then adjust midtones before brightness and contrast. Higher gamma lightens
+midtones in KerfDesk. The preview
 uses the selected engraving grid and reports when its display has been reduced;
 it simulates relative marks, not material colour or beam/heat spread. **Apply photo
 settings** preserves original pixels and writes only that photo's settings in one
@@ -3986,7 +3990,13 @@ correct M4-mode raster G-code from Compile.
      dark-to-light ramp run through that mode's real `dither()`; Grayscale shows a
      smooth ramp. A caption names the chosen mode and says what it is for, the
      arrow keys move and select like radios, and artwork with different dithers
-     shows **Mixed** with no swatch chosen. Default `floyd-steinberg`.
+     shows **Mixed** with no swatch chosen. Default `floyd-steinberg`. **More cut
+     settings → Image detail**, the material preset wizard's Image details and
+     **Adjust Image** show the same swatches, and the checked swatch is the Dither
+     they save; the **Photo engraving** dialog shows only Jarvis, Stucki and
+     Floyd-Steinberg. While Use original pixels (Pass-through in Adjust Image) is
+     on and a binary swatch is chosen, a note under the swatches says the image
+     burns as Grayscale until that box is off.
    - **Lines/mm**: number input, 5..25, default 10.
 6. Workspace shows the image where it will burn; no separate "preview
    the dither" overlay in v1 — the image itself is the preview.
@@ -4794,7 +4804,7 @@ on the final Save, so Cancel/Escape at any step discards it.
    speed, passes, air assist.
 3. **Mode details.** Only the chosen mode's fields — Line (kerf,
    tabs/bridges), Fill (interval/LPI, angle, overscan, cross-hatch,
-   direction, style), or Image (dither, DPI/interval, dot width,
+   direction, style), or Image (dither swatches, DPI/interval, dot width,
    negative, pass-through, image direction, uncalibrated-direction intent,
    and optional local scan-offset override). Saving a recipe records those
    effective image fields; applying a recipe without a local offset clears a
