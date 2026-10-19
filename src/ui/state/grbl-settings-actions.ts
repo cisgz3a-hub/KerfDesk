@@ -43,7 +43,7 @@ type SettingsWriteFn = (
 
 const BUILD_INFO_READ_OPERATION_LABEL = 'Reading controller build information';
 
-// Settings and build-info reads and $-setting writes move nothing (ADR-633).
+// Settings and build-info reads and $-setting writes move nothing (ADR-639).
 function settingsControllerOperation(label: string) {
   return readOnlyControllerOperation(label);
 }

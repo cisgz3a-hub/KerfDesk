@@ -123,7 +123,7 @@ function MachineDetailsContent(): JSX.Element {
   );
 }
 
-// The saved preference, plus this run's pause and skipped hint (ADR-633).
+// The saved preference, plus this run's pause and skipped hint (ADR-639).
 function useAutoConnectPreference(): Pick<
   ConnectionBarProps,
   'autoConnect' | 'onAutoConnectChange' | 'autoConnectPaused' | 'autoConnectSkipped'

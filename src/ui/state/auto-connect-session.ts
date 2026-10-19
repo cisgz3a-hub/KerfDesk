@@ -1,4 +1,4 @@
-// What auto-connect (ADR-420) knows for this run of KerfDesk only (ADR-633).
+// What auto-connect (ADR-420) knows for this run of KerfDesk only (ADR-639).
 // Never stored: the saved "Connect automatically" preference stays as the
 // operator set it, and a restart starts with auto-connect free to run.
 //

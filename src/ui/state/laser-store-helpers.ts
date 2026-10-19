@@ -472,7 +472,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
 }
 
 // Only a link lost while the machine may still move raises the E-stop banner
-// (ADR-633, amending P0-B). A settings or build-info read, a recovery wait or
+// (ADR-639, amending P0-B). A settings or build-info read, a recovery wait or
 // the handshake moves nothing: its incident is logged and the rail shows the
 // ordinary disconnected state.
 function portCloseSafetyNotice(state: LaserState, wasActiveJob: boolean): LaserSafetyNotice | null {

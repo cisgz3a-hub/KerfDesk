@@ -4,7 +4,7 @@
 // never shows a picker, and does nothing while any connection, job or
 // controller operation exists. Connecting reads the controller's settings and
 // moves nothing. The Connect menu's "Connect automatically" turns it off, and
-// the operator's Disconnect or Forget pauses it until they Connect (ADR-633).
+// the operator's Disconnect or Forget pauses it until they Connect (ADR-639).
 
 import { useEffect } from 'react';
 import type { PlatformAdapter } from '../../platform/types';
@@ -48,7 +48,7 @@ export function installAutoConnect(platform: PlatformAdapter): () => void {
         .connect(platform, { ...connectOptionsForDevice(device), portSelection: 'automatic' });
     } catch {
       // A port another program holds, or one unplugged mid-open, ends as a
-      // log line and the rail's quiet hint (ADR-633); the operator's Connect
+      // log line and the rail's quiet hint (ADR-639); the operator's Connect
       // retries it.
     } finally {
       running = false;

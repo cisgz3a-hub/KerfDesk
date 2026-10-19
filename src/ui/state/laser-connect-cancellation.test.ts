@@ -37,7 +37,7 @@ function connection(): SerialConnection {
 beforeEach(() => {
   localStorage.clear();
   useLaserStore.setState(initialLaserState());
-  // Each test's Disconnect pauses auto-connect for the run (ADR-633).
+  // Each test's Disconnect pauses auto-connect for the run (ADR-639).
   resetAutoConnectSession();
 });
 

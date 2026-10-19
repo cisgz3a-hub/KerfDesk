@@ -50,7 +50,7 @@ export type LaserSafetyNotice =
       readonly kind: 'disconnect-during-job';
       readonly message: string;
       /** The link dropped during a jog, Frame, Home, probe or auto-focus rather
-       * than a job (ADR-633). Absent on job notices, and on stored ones. */
+       * than a job (ADR-639). Absent on job notices, and on stored ones. */
       readonly cause?: 'motion';
     }
   | {
@@ -177,7 +177,7 @@ export const DISCONNECT_DURING_MOTION_MESSAGE =
   'cutoff now if unsafe. Reconnect and home before continuing.';
 
 // The same kind as a job's notice, so every physical-stop and recovery rule
-// that reads it is unchanged; only the banner's title differs (ADR-633).
+// that reads it is unchanged; only the banner's title differs (ADR-639).
 export function disconnectDuringMotionNotice(): LaserSafetyNotice {
   return {
     kind: 'disconnect-during-job',

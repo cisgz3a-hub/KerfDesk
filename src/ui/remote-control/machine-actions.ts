@@ -56,7 +56,7 @@ export async function executeConnect(
     return;
   }
   const device = (context.options.store ?? useStore).getState().project.device;
-  // Asked for by a person, so it lifts the pause a Disconnect set (ADR-633).
+  // Asked for by a person, so it lifts the pause a Disconnect set (ADR-639).
   resumeAutoConnect();
   await settle(
     operation,

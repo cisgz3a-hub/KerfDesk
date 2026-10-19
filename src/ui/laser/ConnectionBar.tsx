@@ -8,7 +8,7 @@
 //   failed       → "Couldn't connect" with the reason, "Connect" to retry
 //
 // A background auto-connect that could not open the port stays "Not
-// connected" with a quiet hint instead of the alert (ADR-633).
+// connected" with a quiet hint instead of the alert (ADR-639).
 //
 // Connect reuses the port the machine was on last time and asks for one only
 // the first time; "Use a different port…" always asks. "Forget Controller"
@@ -52,9 +52,9 @@ export type ConnectionBarProps = {
   readonly onChoosePort?: () => void;
   readonly autoConnect?: boolean;
   readonly onAutoConnectChange?: (enabled: boolean) => void;
-  /** The operator's Disconnect paused auto-connect until they Connect (ADR-633). */
+  /** The operator's Disconnect paused auto-connect until they Connect (ADR-639). */
   readonly autoConnectPaused?: boolean;
-  /** Why the last automatic connect did not open the port, for a quiet hint (ADR-633). */
+  /** Why the last automatic connect did not open the port, for a quiet hint (ADR-639). */
   readonly autoConnectSkipped?: string | null;
   /** Chosen ports last only until KerfDesk closes (ADR-366). */
   readonly portChoiceEndsOnRestart?: boolean;
@@ -335,7 +335,7 @@ export function connectionFailureText(
 }
 
 // The usual reason is the same busy port connectionFailureText explains, held
-// by LightBurn, LaserGRBL or a serial monitor (ADR-633).
+// by LightBurn, LaserGRBL or a serial monitor (ADR-639).
 export function autoConnectSkippedText(reason: string, machineNoun: string): string {
   if (/failed to open serial port/i.test(reason)) {
     return `Didn’t connect by itself: the ${machineNoun}’s port is in use by another program. Close it, then Connect.`;

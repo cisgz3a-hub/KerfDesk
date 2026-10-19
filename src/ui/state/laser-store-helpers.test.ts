@@ -187,7 +187,7 @@ describe('detectStreamStall (M13)', () => {
   });
 });
 
-// ADR-633 (amending P0-B): only a link lost while the machine may still move
+// ADR-639 (amending P0-B): only a link lost while the machine may still move
 // raises the E-stop banner; a read or a recovery wait lands disconnected.
 describe('buildPortClosePatch safety notice', () => {
   const idle = (patch: Partial<LaserState>): LaserState => ({

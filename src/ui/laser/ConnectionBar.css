@@ -199,7 +199,7 @@
   overflow-wrap: anywhere;
 }
 
-/* A background auto-connect that did not open the port (ADR-633): a quiet
+/* A background auto-connect that did not open the port (ADR-639): a quiet
    note, not an alert, because nobody clicked Connect. */
 .lf-connection-auto-hint {
   margin: 0;

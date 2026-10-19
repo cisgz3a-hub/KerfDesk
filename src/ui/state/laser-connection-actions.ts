@@ -303,7 +303,7 @@ async function runDisconnect(
   forgetDevice: boolean,
 ): Promise<void> {
   // The operator ended this connection: a plug-in or power-cycle must not
-  // reopen it by itself until they Connect again (ADR-633).
+  // reopen it by itself until they Connect again (ADR-639).
   pauseAutoConnect();
   const connection = refs.connection;
   if (connection === null) {

@@ -174,7 +174,7 @@ async function connectSerialController(
 }
 
 // Any Connect the operator asked for lifts the pause their Disconnect set; an
-// automatic attempt only clears the last attempt's hint (ADR-633).
+// automatic attempt only clears the last attempt's hint (ADR-639).
 function noteConnectIntent(selection: ConnectControllerOptions['portSelection']): void {
   if (selection === 'automatic') clearAutoConnectSkipped();
   else resumeAutoConnect();
@@ -182,7 +182,7 @@ function noteConnectIntent(selection: ConnectControllerOptions['portSelection'])
 
 // Nobody clicked, so a failed background open (the port held by LightBurn or
 // LaserGRBL, or unplugged mid-open) is no alert and no incident: one log line,
-// the ordinary disconnected state and the rail's quiet hint (ADR-633).
+// the ordinary disconnected state and the rail's quiet hint (ADR-639).
 function reportAutomaticConnectSkipped(set: SetFn, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   set((state) => ({

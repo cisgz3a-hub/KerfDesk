@@ -1,4 +1,4 @@
-// A failed open reads differently by who asked (ADR-633): the operator's
+// A failed open reads differently by who asked (ADR-639): the operator's
 // Connect keeps the red "Couldn't connect" and its incident; a background
 // auto-connect ends disconnected with one log line and a quiet hint.
 

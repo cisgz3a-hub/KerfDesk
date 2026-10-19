@@ -25,7 +25,7 @@ const SAFETY_NOTICE_TITLES: Record<LaserSafetyNotice['kind'], string> = {
 };
 
 // A drop during a jog, Frame, Home, probe or auto-focus shares the job notice's
-// kind, so stored and replayed notices still read "mid-job" (ADR-633).
+// kind, so stored and replayed notices still read "mid-job" (ADR-639).
 function safetyNoticeTitle(notice: LaserSafetyNotice): string {
   if (notice.kind === 'disconnect-during-job' && notice.cause === 'motion') {
     return 'Connection lost while moving';

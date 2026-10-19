@@ -1,4 +1,4 @@
-## ADR-633 - Auto-connect stays quiet and respects Disconnect; the lost-link banner needs motion (2026-10-19)
+## ADR-639 - Auto-connect stays quiet and respects Disconnect; the lost-link banner needs motion (2026-10-19)
 
 **Status:** Accepted. | **Date:** 2026-10-19
 

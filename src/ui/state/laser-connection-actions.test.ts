@@ -108,7 +108,7 @@ describe('connect port-picker failures', () => {
   });
 });
 
-// ADR-633: the operator's Disconnect or Forget pauses auto-connect for this
+// ADR-639: the operator's Disconnect or Forget pauses auto-connect for this
 // run; only a Connect they ask for lifts it, and the saved preference stays.
 describe('the auto-connect pause', () => {
   const openPort = adapterWithRequestPort(async () => ({

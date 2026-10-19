@@ -133,7 +133,7 @@ describe('ConnectionBar device permission actions', () => {
     );
   });
 
-  // ADR-633: nobody clicked, so a skipped automatic connect is a quiet note,
+  // ADR-639: nobody clicked, so a skipped automatic connect is a quiet note,
   // and the rail stays "Not connected" with no alert.
   it('shows a skipped automatic connect as a quiet hint, not an alert', async () => {
     const host = await renderBar({

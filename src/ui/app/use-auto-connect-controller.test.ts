@@ -129,7 +129,7 @@ describe('auto-connect', () => {
     expect(listeners.size).toBe(0);
   });
 
-  // ADR-633: after the operator's Disconnect, a power-cycle or reseated cable
+  // ADR-639: after the operator's Disconnect, a power-cycle or reseated cable
   // must not reconnect by itself and take the port from another program.
   it('waits after Disconnect until the operator connects again', async () => {
     rememberSerialPort(localStorage, CH340);

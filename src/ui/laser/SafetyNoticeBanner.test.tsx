@@ -248,7 +248,7 @@ describe('SafetyNoticeBanner', () => {
     }
   });
 
-  // ADR-633: a drop during a jog or Frame reads as moving, while a job notice,
+  // ADR-639: a drop during a jog or Frame reads as moving, while a job notice,
   // including one stored before the cause existed, still reads mid-job.
   it.each([
     [disconnectDuringMotionNotice(), 'Connection lost while moving'],
