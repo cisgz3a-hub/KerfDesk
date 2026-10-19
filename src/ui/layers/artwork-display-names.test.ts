@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { type SceneObject } from '../../core/scene';
+import { REGISTRATION_LAYER_ID, type SceneObject } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
-import { artworkDisplayNames } from './artwork-display-names';
+import { artworkDisplayNames, REGISTRATION_JIG_NAME } from './artwork-display-names';
 
 function artwork(id: string, name: string): SceneObject {
   return {
@@ -25,6 +25,26 @@ describe('shared artwork display names', () => {
     objects.forEach((object) => {
       if (object.name === 'Rectangle (1)') expect(labels.get(object.id)).toBe(object.name);
     });
+  });
+
+  it('keeps the registration jig named apart from artwork of the same shape', () => {
+    const jig: SceneObject = {
+      ...createRectangle({
+        id: 'jig',
+        color: '#000000',
+        spec: { widthMm: 50, heightMm: 50, cornerRadiusMm: 0 },
+      }),
+      operationIds: [REGISTRATION_LAYER_ID],
+    };
+    const plain = createRectangle({
+      id: 'plain',
+      color: '#000000',
+      spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+    });
+    const labels = artworkDisplayNames([jig, plain, artwork('alias', REGISTRATION_JIG_NAME)]);
+    expect(labels.get('jig')).toBe(REGISTRATION_JIG_NAME);
+    expect(labels.get('plain')).toBe('Rectangle');
+    expect(labels.get('alias')).toBe(`${REGISTRATION_JIG_NAME} (1)`);
   });
 
   it('avoids collisions with nested suffixes and duplicate natural aliases', () => {
