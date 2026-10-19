@@ -417,6 +417,9 @@ try {
       Install-Candidate 'historical-same-version-reinstall' $UpgradeInstaller $UpgradeVersion $UpgradeSourceCommit
       Assert-DataRetained $projectHash $sentinelHash
       Invoke-HistoricalProfile 'historical-reinstall-reopen' 'reopen' $UpgradeVersion $UpgradeSourceCommit
+      # The executable is absent across the following uninstall gap. Free its
+      # developer seat first, even if retained-data checks or reinstall fail.
+      Invoke-HistoricalProfile 'historical-licence-release-before-uninstall' 'release' $UpgradeVersion $UpgradeSourceCommit
       Uninstall-Candidate 'historical-uninstall-retaining-data'
       Assert-DataRetained $projectHash $sentinelHash
       Install-Candidate 'historical-install-after-uninstall' $UpgradeInstaller $UpgradeVersion $UpgradeSourceCommit

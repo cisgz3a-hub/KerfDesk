@@ -18,11 +18,11 @@ qualified professional in the relevant country before launch.
 | Included | Perpetual use of eligible versions, three active computers, one year of updates |
 | Renewal | Optional US$20 for another year of updates; never automatic |
 | Trial | Every Pro tool for 30 days from the first online registration |
-| Editions | KerfDesk Free on the web and desktop; Pro only in the Windows desktop app (ADR-540, owner's choice 2026-09-29). The app always opens; only Pro tools need a licence |
+| Editions | KerfDesk Free stays in the browser. A commercial desktop build opens behind its licence window until an active trial or licence admits the workspace (ADR-623, owner's choice 2026-10-18, replacing desktop Free under ADR-540). Rights ending never unmount an admitted workspace or stop a job |
 | Developer access | Separate free licences for Johann and Father, three computers each, unlimited updates |
 | Seller | South Africa; customers expected mainly in the USA |
 | Payment provider | Paddle (subject to its own seller approval) |
-| Free editions | The web app and free Preview builds keep working without a licence |
+| Free editions | The web app and Preview, source or development builds without commercial metadata keep working without a licence |
 
 ## 1. Seller identity and provider approval
 
@@ -39,9 +39,12 @@ The installer requires an explicit terms file; the free License & Safety Notice 
 reused for the commercial edition. The terms must match these facts:
 
 - A licence permits Pro in every version released on or before its update
-  cutoff, forever. After the cutoff, newer versions open as KerfDesk Free with the
-  Pro tools locked until the licence is renewed; older eligible versions keep Pro
-  and stay downloadable.
+  cutoff, forever. A newer uncovered version opens behind the licence window,
+  which offers renewal or an older eligible version; it does not open a Free
+  commercial desktop workspace. Older eligible versions keep Pro and stay
+  downloadable. If rights end during an admitted session, the workspace and
+  existing work stay open, while new Pro tool choices ask for a licence; the
+  licence window returns at the next launch (ADR-623).
 - Three computers can be active at once. Customers move a seat by deactivating a
   computer in Help > Licence. Offline use continues after activation.
 - The trial lasts 30 days from the first online registration and is tied to the

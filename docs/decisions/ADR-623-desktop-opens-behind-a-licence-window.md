@@ -56,6 +56,15 @@ link, and LightBurn has no free tier.
 
 ### Consequences
 
+- Project-asset reconciliation and the page-backed raster ownership subscription
+  start only with the admitted workspace, rather than during entry-module import.
+  Reconciliation starts once per mounted workspace, including StrictMode effect
+  replay; the ownership subscription is removed on unmount. An admitted session
+  keeps these services when rights end, like the workspace itself.
+- Historical installer qualification releases its developer seat before the
+  uninstall-retaining-data gap, so failed retention checks or reinstall cannot
+  strand a seat while no executable exists. Reopening after reinstall may
+  activate again and retains the ordinary final-release and failure-cleanup paths.
 - `EditionProvider` renders `DesktopLicenceGate` in place of the app until the
   first Pro status in a commercial build, and latches the session in after that.
   The main process holds its own services the same way: the RTSP camera bridge
