@@ -40,6 +40,24 @@ describe('external G-code program review (ADR-630)', () => {
     expect(review('G21\nM5\n').envelope).toBeNull();
   });
 
+  it('discloses the synthetic XY origin and point Frame for a Z-only program', () => {
+    const result = review('G21 G90\nG1 Z-1 F100\n', CNC);
+    expect(result.envelope).toEqual({ minX: 0, minY: 0, maxX: 0, maxY: 0 });
+    expect(result.warnings.join()).toContain('zero XY extent');
+    expect(result.warnings.join()).toContain('assumes X0 Y0');
+    expect(result.warnings.join()).toContain('does not prove Z clearance or cutting depth');
+  });
+
+  it('keeps a declared point and a one-axis outline distinct from unknown XY', () => {
+    const point = review('G21 G90\nG0 X10 Y5\nG1 Z-1 F100\n', CNC);
+    expect(point.envelope).toEqual({ minX: 10, minY: 5, maxX: 10, maxY: 5 });
+    expect(point.warnings.join()).toContain('zero XY extent');
+    expect(point.warnings.join()).not.toContain('assumes X0 Y0');
+    const line = review('G21 G90\nG0 X10 Y5\nG1 X20 F100\n', CNC);
+    expect(line.envelope).toEqual({ minX: 10, minY: 5, maxX: 20, maxY: 5 });
+    expect(line.warnings.join()).not.toContain('zero XY extent');
+  });
+
   it('warns about moves the Frame cannot trace', () => {
     const warnings = review(
       'G21 G90\nG0 X1 Y1\nG53 G0 X0 Y0\nG55\nG92 X0 Y0\nG28\nM6 T2\nM5\n',
@@ -92,7 +110,7 @@ describe('external G-code program review (ADR-630)', () => {
   });
 
   it('adds Program Health findings above info severity', () => {
-    const gcode = 'G21\nG0 X1 Y1\n';
+    const gcode = 'G21\nG0 X1 Y1\nG1 X2 F600\n';
     const result = reviewExternalProgram(gcode, model(gcode), LASER, [
       { id: 'a', severity: 'warning', title: 'Odd', detail: 'Something odd.', line: 1, count: 1 },
       { id: 'b', severity: 'info', title: 'Note', detail: 'Just a note.', line: null, count: 1 },

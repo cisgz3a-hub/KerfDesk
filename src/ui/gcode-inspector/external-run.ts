@@ -165,6 +165,9 @@ export async function startExternalProgram(frame: ExternalFrame): Promise<boolea
     ),
     rxBufferBytes: project.device.rxBufferBytes,
     machineKind: frame.machineKind,
+    // M0/M1 in an external CNC program are controller program stops, not
+    // KerfDesk's emitted multi-bit plan boundaries. Preserve the exact bytes.
+    toolChangePause: false,
     // Start clears the Frame record before this runs, so it checks the
     // controller evidence the record was bound to.
     assertFinalStartAuthorized: () => {

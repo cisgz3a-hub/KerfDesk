@@ -30,7 +30,7 @@ describe('external G-code program normalization (ADR-630)', () => {
     expect(result.program).toMatchObject({
       lineCount: 2,
       byteCount: 'G0 X1\nG1 X2 F100\n'.length,
-      droppedLineCount: 2,
+      droppedLineCount: 3,
       commentsRemoved: true,
     });
   });
@@ -65,6 +65,23 @@ describe('external G-code program normalization (ADR-630)', () => {
     expect(reasons('G0 X1\u0018\n')[0]).toContain('code 24');
     expect(reasons('G0 X1 Y°2\n')[0]).toContain('non-ASCII');
     expect(sent('G0\tX1\n')).toBe('G0\tX1\n');
+  });
+
+  it.each(['\u00a0', '\u000b', '\u000c', '\ufeff'])(
+    'validates boundary whitespace instead of silently trimming it: %j',
+    (character) => {
+      expect(reasons(`${character}G0 X1\n`)[0]).toContain('control or non-ASCII');
+      expect(reasons(`G0 X1${character}\n`)[0]).toContain('control or non-ASCII');
+      expect(reasons(`${character}\nG0 X1\n`)[0]).toContain('Line 1');
+    },
+  );
+
+  it('counts blank source lines and trims only surrounding ASCII spaces and tabs', () => {
+    const result = normalizeExternalProgram('\n \t\n\t G1 X1  Y2\t \n');
+    expect(result).toMatchObject({
+      kind: 'ok',
+      program: { droppedLineCount: 2, commentsRemoved: false, gcode: 'G1 X1  Y2\n' },
+    });
   });
 
   it('refuses binary files and files with nothing to send', () => {

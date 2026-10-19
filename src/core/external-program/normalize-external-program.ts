@@ -1,6 +1,6 @@
 // normalize-external-program — turns an opened G-code file into the exact
 // bytes an external run streams (ADR-630). Comments, '%' tape markers, blank
-// lines and the spaces around each line are removed; nothing else changes.
+// lines and ASCII spaces/tabs around each line are removed; nothing else changes.
 // Refusals are factual only: what the controller cannot take as a job line.
 //
 // GRBL treats '?', '!', '~' and every byte above 0x7F as realtime commands
@@ -35,12 +35,17 @@ export function normalizeExternalProgram(text: string): ExternalProgramResult {
   const lines: string[] = [];
   let droppedLineCount = 0;
   let commentsRemoved = false;
-  text.split(/\r\n|\r|\n/).forEach((raw, index) => {
+  const sourceLines = text.split(/\r\n|\r|\n/);
+  // A final line terminator ends the last source line; it is not a blank line.
+  if (sourceLines.at(-1) === '') sourceLines.pop();
+  sourceLines.forEach((raw, index) => {
     const stripped = stripComments(raw);
     if (stripped !== raw) commentsRemoved = true;
-    const line = stripped.trim();
+    // Other whitespace is controller input, not permitted normalization.
+    // Leave it present so validation cannot silently erase invalid bytes.
+    const line = stripped.replace(/^[ \t]+|[ \t]+$/g, '');
     if (line === '' || line === '%') {
-      if (raw.trim() !== '') droppedLineCount += 1;
+      droppedLineCount += 1;
       return;
     }
     const reason = lineRefusal(line, index + 1);

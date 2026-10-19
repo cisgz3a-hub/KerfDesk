@@ -71,6 +71,7 @@ export function reviewExternalProgram(
     ...WORD_WARNINGS.filter((check) => check.pattern.test(gcode)).map((check) => check.warning),
     ...coordinateSystemWarnings(model),
     ...coordinateWriteWarnings(gcode),
+    ...pointEnvelopeWarnings(gcode, model),
     ...(units === 'inch' || units === 'both' ? [INCH_WARNING] : []),
     ...toolLeftOnWarnings(model),
     ...machineModeWarnings(model, context),
@@ -83,6 +84,24 @@ export function reviewExternalProgram(
 
 const INCH_WARNING =
   'The program is in inches (G20). It also leaves the controller in inches until a program sends G21.';
+
+function pointEnvelopeWarnings(gcode: string, model: ReviewModel): ReadonlyArray<string> {
+  const bounds = model.stats.programBounds;
+  if (bounds === null || bounds.minX !== bounds.maxX || bounds.minY !== bounds.maxY) return [];
+  const axes = new Set(
+    gcode
+      .split('\n')
+      .flatMap((line) => scanGcodeWords(stripComments(line).replace(/[ \t]/g, '')))
+      .map((word) => word.letter),
+  );
+  const unknown = ['X', 'Y'].filter((axis) => !axes.has(axis));
+  return [
+    'The program has zero XY extent: its Frame visits a point, with no XY outline to trace. The Frame does not prove Z clearance or cutting depth.' +
+      (unknown.length === 0
+        ? ''
+        : ` The Inspector assumes ${unknown.map((axis) => `${axis}0`).join(' ')} for undeclared axes, while the program keeps the controller’s current position on those axes.`),
+  ];
+}
 
 function coordinateWriteWarnings(gcode: string): ReadonlyArray<string> {
   const modes = new Set<number>();

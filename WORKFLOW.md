@@ -9018,7 +9018,7 @@ The G-code Inspector is free in every edition (ADR-627).
    the workspace). Once it is read, the footer offers **Run on machine...**. The project's own
    program (Inspect G-code) does not offer it: it already has Frame and Start.
 2. **Run on machine...** opens **Run *file name***. It lists what is sent (lines and bytes; the
-   file's comments, `%` markers and blank lines are left out and nothing else changes), the
+   file's comments, `%` markers and blank lines are left out, surrounding ASCII spaces/tabs are trimmed and line endings become LF), the
    estimated time from a fresh parse of those exact sendable bytes, the Frame outline (its size and lowest corner in work
    coordinates, travel moves included), the units the program declares and whether it runs as a laser or a CNC job
    (the current machine mode).
@@ -9039,13 +9039,13 @@ Moves in machine coordinates (`G53`), a work coordinate switch away from `G54`, 
 `G28`/`G30`, work-offset writes (`G10 L2`/`G10 L20`, explicitly warning that later moves may
 be displaced from the traced outline), relative moves (`G91`), inches (`G20`, which also leaves the controller in
 inches), the laser or spindle still on at the end, a tool change (`M6`), a program that looks
-like the other machine mode, and the Inspector's Program Health notices and warnings.
+like the other machine mode, zero XY extent (Frame visits a point and does not prove Z clearance or depth; without X/Y words the Inspector assumes X0 Y0 while the real program keeps current XY), and the Inspector's Program Health notices and warnings.
 
 #### Refusals (factual only)
 
 The dialog shows the reason and offers only **Close** when the file holds a NUL byte, has no
 line to send, holds a `$` controller command, a realtime character (`?`, `!`, `~`), a
-control or non-ASCII character outside a comment, or never moves in X or Y. Start itself
+control or non-ASCII character outside a comment, or the Inspector cannot construct a finite motion envelope. Start itself
 still refuses a line longer than the controller's line or receive buffer (ADR-375).
 
 #### Not included

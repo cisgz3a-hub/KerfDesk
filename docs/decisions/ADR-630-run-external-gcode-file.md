@@ -16,7 +16,7 @@ The G-code Inspector shows **Run on machine...** for a file the operator opened 
 
 ### What is sent
 
-The program the controller receives is the opened file with comments (`(...)` and `;` to the end of the line), `%` tape markers, blank lines and surrounding spaces removed. Nothing else is changed: no line is added, reordered, rescaled or rewritten. The normalized bytes are parsed and timed again by the cancellable Inspector worker; the Run review, Frame envelope and Start all use that executable, rather than the original file's model. Removing a comment can join numeric fragments, so the original model is not interchangeable. The dialog shows the number of lines and bytes that will be sent, and the run streams exactly those bytes. Comments are removed because the controller would still receive them, they use buffer space, and characters such as `!`, `~` and `?` inside a comment are realtime commands to GRBL.
+The program the controller receives is the opened file with comments (`(...)` and `;` to the end of the line), `%` tape markers, blank lines and surrounding ASCII spaces and tabs removed. Nothing else is changed: no line is added, reordered, rescaled or rewritten. The normalized bytes are parsed and timed again by the cancellable Inspector worker; the Run review, Frame envelope and Start all use that executable, rather than the original file's model. Removing a comment can join numeric fragments, so the original model is not interchangeable. The dialog shows the number of lines and bytes that will be sent, and the run streams exactly those bytes. Comments are removed because the controller would still receive them, they use buffer space, and characters such as `!`, `~` and `?` inside a comment are realtime commands to GRBL.
 
 Factual refusals, because the program cannot be streamed as written (no policy refusal is added):
 
@@ -25,7 +25,7 @@ Factual refusals, because the program cannot be streamed as written (no policy r
 - a line holds a byte the controller treats as a realtime command (`?`, `!`, `~`, Ctrl-X, or any byte at or above 0x80);
 - a line is a `$` controller command (`$H`, `$X`, `$J=`, a `$` setting). GRBL runs those only while Idle and answers `error:8` mid-job, and the Frame cannot trace what they move. They belong in the Console.
 - the file is not text (it holds a NUL byte);
-- the program never moves in X or Y, so the Frame has no outline to trace.
+- the Inspector cannot construct a finite motion envelope for the Frame to visit.
 
 ### The Frame
 
@@ -43,9 +43,10 @@ The **Run** dialog is the one review for the file: name, lines and bytes to send
 - the laser or spindle still on at the end of the program (no `M5`);
 - a program that looks like the other machine mode (spindle speeds above the laser's S range in Laser mode, or no Z motion in CNC mode);
 - tool changes (`M6`), which stock GRBL does not support;
+- zero XY extent: Frame visits a point rather than tracing an XY outline and does not prove Z clearance or cutting depth. When no X/Y position is declared, the Inspector assumes X0 Y0 while the real program keeps the current XY position;
 - the Inspector's Program Health notices and warnings.
 
-In CNC mode the existing workholding and exclusive-access attestation applies; in Laser mode the existing `$32` laser-mode acknowledgement applies when the controller reports `$32=0`. Confirming **Start** checks the Frame is still the current one for this exact program, consumes it, and streams the program with the ordinary streamer. The Live Motion bar's Pause, Resume and **ABORT JOB** work as for any job (non-negotiable 9).
+In CNC mode the existing workholding and exclusive-access attestation applies; in Laser mode the existing `$32` laser-mode acknowledgement applies when the controller reports `$32=0`. Confirming **Start** checks the Frame is still the current one for this exact program, consumes it, and streams the program with the ordinary streamer. External M0/M1 pauses are sent unchanged to the controller; they are not intercepted as KerfDesk project bit changes. The Live Motion bar's Pause, Resume and **ABORT JOB** work as for any job (non-negotiable 9).
 
 ### Not in this decision
 
@@ -57,8 +58,10 @@ In CNC mode the existing workholding and exclusive-access attestation applies; i
 
 - KerfDesk can be the sender for programs made in other CAM software, behind the same physical Frame as its own jobs.
 - The canvas and project are untouched by an external run.
-- The streamed bytes differ from the file only by removed comments and blank lines, which the dialog states.
+- The streamed bytes differ from the file only by removed comments, tape markers, blank lines and surrounding ASCII spaces/tabs, with line endings normalized to LF. The dialog always states those transformations.
 
 ## Verification
 
 Unit tests cover program normalization (comments, `%`, blank lines, spaces), each factual refusal, the envelope across absolute and relative moves, arcs and `G20`, each warning, the Frame record's invalidation by a changed program, moved head or changed origin, and that Start streams exactly the normalized bytes once and refuses without a current Frame. A component test drives the dialog through Frame, review and Start against the store. No hardware qualification is claimed.
+
+A point envelope is constructable by the ordinary Frame builder. Zero XY extent is therefore a warning, not an additional Start refusal (PROJECT.md non-negotiable 21). Completing that point Frame still satisfies the ordinary Frame requirement; it does not qualify physical Z motion.
