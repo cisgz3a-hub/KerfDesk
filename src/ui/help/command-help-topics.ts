@@ -101,7 +101,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'tools.registration-jig': {
     family: 'tools',
     tooltip:
-      'Open the registration jig panel: create a burn-alignment box, center artwork, and pick the burn run.',
+      'Open jig mode: lay out the outlines, place the pieces and artwork, and burn both runs from its steps.',
   },
   'tools.camera': {
     family: 'tools',

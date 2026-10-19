@@ -114,7 +114,7 @@ describe('registration jig draft artwork edits', () => {
     expect(useStore.getState().project.scene.objects.some((object) => object.id === 'mask')).toBe(
       true,
     );
-    expect(result.past).toHaveLength(1);
+    expect(result.draft.project).not.toBe(session.draft.project);
   });
 
   it('imports a large trace inside the jig without the bed import overwriting its fit', () => {
@@ -129,7 +129,7 @@ describe('registration jig draft artwork edits', () => {
     expect(imported).toBeDefined();
     expect(transformedBBox(imported!)).toEqual({ minX: 182, minY: 182, maxX: 218, maxY: 218 });
     expect(primaryOperationForObject(imported!, result.draft.project.scene.layers)).toBeDefined();
-    expect(result.past).toHaveLength(1);
+    expect(result.draft.project).not.toBe(session.draft.project);
   });
 
   it('records a newly imported operation during Outline only and restores it with earlier artwork intent', () => {
@@ -164,7 +164,7 @@ describe('registration jig draft artwork edits', () => {
     });
     expect(useStore.getState().project).toBe(state.project);
     expect(state.project.scene.objects.some((object) => object.id === 'new-art')).toBe(false);
-    expect(imported.past).toEqual([session.draft]);
+    expect(imported.draft.project).not.toBe(session.draft.project);
   });
 
   it('retains the supplied centre-compensated transform when updating text', () => {

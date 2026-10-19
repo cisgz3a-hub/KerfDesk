@@ -1,20 +1,17 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  findRegistrationBoxes,
-  IDENTITY_TRANSFORM,
-  registrationRunState,
-  type Project,
-} from '../../../core/scene';
+import { findRegistrationBoxes, IDENTITY_TRANSFORM, type Project } from '../../../core/scene';
 import { createRectangle } from '../../../core/shapes/primitives';
 import { useStore } from '../../state';
+import { useLaserStore } from '../../state/laser-store';
 import { useUiStore } from '../../state/ui-store';
+import { jigRunPhase } from './jig-run-phase';
 import { RegistrationJigEditor } from './RegistrationJigEditor';
 
 vi.mock('./RegistrationJigCanvas', () => ({
-  RegistrationJigCanvas: (props: { project: Project }) => (
-    <div aria-label="Registration jig editing canvas">
+  RegistrationJigCanvas: (props: { project: Project; readOnly?: boolean }) => (
+    <div aria-label="Registration jig editing canvas" data-read-only={props.readOnly === true}>
       {findRegistrationBoxes(props.project.scene).length} outlines
     </div>
   ),
@@ -22,6 +19,9 @@ vi.mock('./RegistrationJigCanvas', () => ({
 vi.mock('./JigArtworkImport', () => ({
   JigArtworkImport: () => <div>Import artwork</div>,
   useJigArtworkImport: () => ({ busy: false, importFiles: async () => undefined }),
+}));
+vi.mock('../../laser/WorkspaceJobActions', () => ({
+  WorkspaceJobActions: () => <section aria-label="Job actions">Frame job</section>,
 }));
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -31,6 +31,7 @@ let root: Root;
 const close = vi.fn();
 beforeEach(() => {
   useStore.getState().newProject();
+  useLaserStore.setState({ motionOperation: null });
   close.mockClear();
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -39,6 +40,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  useLaserStore.setState({ motionOperation: null });
 });
 function render(): void {
   act(() => root.render(<RegistrationJigEditor onClose={close} />));
@@ -52,18 +54,23 @@ function click(label: string): void {
   act(() => found.click());
 }
 function press(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
-  const editor = container.querySelector('[aria-label="Registration Jig editor"]');
-  if (editor === null) throw new Error('Missing editor');
+  const page = container.querySelector('[aria-label="Registration Jig"]');
+  if (page === null) throw new Error('Missing jig page');
   const event = new KeyboardEvent('keydown', { ...init, key, bubbles: true, cancelable: true });
   act(() => {
-    editor.dispatchEvent(event);
+    page.dispatchEvent(event);
   });
   return event;
 }
-function confirmDialog(): Element | undefined {
-  return [...document.querySelectorAll('[role="dialog"]')].find((dialog) =>
-    dialog.textContent?.includes('Save jig changes?'),
+function visibleStep(): string | undefined {
+  return (
+    [...container.querySelectorAll<HTMLElement>('.lf-jig-sidebar > section')]
+      .find((section) => !section.hidden)
+      ?.getAttribute('aria-label') ?? undefined
   );
+}
+function jobActions(): number {
+  return container.querySelectorAll('[aria-label="Job actions"]').length;
 }
 function savedJigWithArtwork(): void {
   useStore.getState().addRegistrationBox(80, 40);
@@ -76,78 +83,103 @@ function savedJigWithArtwork(): void {
     }),
   );
   useStore.getState().setRegistrationBoxLocked(true);
+  useStore.getState().setRegistrationOutput('box');
 }
-describe('Registration Jig dedicated editor', () => {
-  it('starts with an editable draft and isolates application shortcuts', () => {
-    const project = useStore.getState().project;
+function artX(): number | undefined {
+  return useStore.getState().project.scene.objects.find((object) => object.id === 'art')?.transform
+    .x;
+}
+describe('Registration Jig mode', () => {
+  it('creates the first outline in the project as one undo step, ready to burn', () => {
     const depth = useUiStore.getState().modalDepth;
     render();
-    expect(
-      container.querySelector('[aria-label="Registration jig editing canvas"]')?.textContent,
-    ).toBe('1 outlines');
-    expect(useStore.getState().project).toBe(project);
-    expect(useUiStore.getState().modalDepth).toBe(depth + 1);
+    const { project, undoStack } = useStore.getState();
+    expect(findRegistrationBoxes(project.scene)).toHaveLength(1);
+    expect(findRegistrationBoxes(project.scene)[0]?.locked).toBe(true);
+    expect(jigRunPhase(project.scene)).toBe('outlines');
+    expect(undoStack).toHaveLength(1);
+    expect(visibleStep()).toBe('Burn outlines');
+    // Not a modal: the machine panel, dialogs and shortcuts stay live.
+    expect(useUiStore.getState().modalDepth).toBe(depth);
   });
-  it('opens on the editor surface so Enter cannot press Close or Save', () => {
+  it('has no Save or Close without saving; Done returns to the main canvas', () => {
     render();
-    expect(document.activeElement?.getAttribute('aria-label')).toBe('Registration Jig editor');
-  });
-  it('saves the first outline job in one undo step and locks the main guides', () => {
-    render();
-    click('Save to canvas');
-    expect(registrationRunState(useStore.getState().project.scene)).toBe('box');
-    expect(findRegistrationBoxes(useStore.getState().project.scene)[0]?.locked).toBe(true);
-    expect(useStore.getState().undoStack).toHaveLength(1);
-    expect(close).toHaveBeenCalledOnce();
-  });
-  it('close without saving leaves the project unchanged', () => {
     const project = useStore.getState().project;
-    render();
-    click('Close without saving');
-    expect(useStore.getState().project).toBe(project);
-    expect(close).toHaveBeenCalledOnce();
-  });
-  it('asks before discarding unsaved edits, and Keep editing keeps them', () => {
-    savedJigWithArtwork();
-    const project = useStore.getState().project;
-    render();
-    click('Remove outline');
-    click('Close without saving');
-    expect(confirmDialog()).toBeDefined();
-    expect(close).not.toHaveBeenCalled();
-    click('Keep editing');
-    expect(confirmDialog()).toBeUndefined();
-    expect(container.textContent).toContain('Unsaved changes');
-    click('Close without saving');
-    click('Discard changes');
+    expect(button('Save to canvas')).toBeUndefined();
+    expect(button('Close without saving')).toBeUndefined();
+    click('Done');
     expect(close).toHaveBeenCalledOnce();
     expect(useStore.getState().project).toBe(project);
   });
-  it('saves from the close prompt', () => {
-    savedJigWithArtwork();
+  it('opens on the page itself so canvas keys reach it', () => {
     render();
-    click('Remove outline');
-    click('Close without saving');
-    const dialog = confirmDialog();
-    const save = [...(dialog?.querySelectorAll('button') ?? [])].find(
-      (item) => item.textContent === 'Save to canvas',
-    );
-    act(() => save?.click());
-    expect(close).toHaveBeenCalledOnce();
-    expect(findRegistrationBoxes(useStore.getState().project.scene)).toHaveLength(0);
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Registration Jig');
   });
-  it('Escape clears the selection first, then asks before discarding edits', () => {
+  it('shows Frame and Start only in the step whose run is next', () => {
+    render();
+    expect(jobActions()).toBe(1);
+    click('3 Burn artwork');
+    expect(visibleStep()).toBe('Burn artwork');
+    expect(container.textContent).toContain('Burn the outlines in step 1 first');
+    expect(jobActions()).toBe(1);
+    click('Outlines are already burned');
+    expect(jigRunPhase(useStore.getState().project.scene)).toBe('artwork');
+    // Marking the outlines burned keeps the operator on the artwork burn.
+    expect(visibleStep()).toBe('Burn artwork');
+    expect(jobActions()).toBe(1);
+    expect(button('Burn outlines again')).toBeDefined();
+  });
+  it('moves on to placing the pieces when the outline run selects Artwork only', () => {
+    render();
+    expect(visibleStep()).toBe('Burn outlines');
+    act(() => useStore.getState().setRegistrationOutput('artwork'));
+    expect(visibleStep()).toBe('Place pieces and artwork');
+  });
+  it('opens a jig whose outlines are burned on placing the pieces, with them locked', () => {
+    savedJigWithArtwork();
+    useStore.getState().setRegistrationOutput('artwork');
+    render();
+    expect(visibleStep()).toBe('Place pieces and artwork');
+    click('1 Burn outlines');
+    expect(container.querySelector('.lf-jig-lock')?.textContent).toContain('locked');
+    expect(button('Select all outlines')?.disabled).toBe(true);
+    click('Unlock outlines');
+    expect(container.querySelector('.lf-jig-lock')).toBeNull();
+    expect(button('Select all outlines')?.disabled).toBe(false);
+  });
+  it('puts edits straight into the project, where Undo reverts them', () => {
+    savedJigWithArtwork();
+    useStore.getState().selectObject('art');
+    const before = artX();
+    const undo = useStore.getState().undoStack.length;
+    render();
+    press('ArrowRight');
+    expect(artX()).toBe(before! + 1);
+    expect(useStore.getState().undoStack).toHaveLength(undo + 1);
+    act(() => useStore.getState().undo());
+    expect(artX()).toBe(before);
+  });
+  it('Escape clears the selection and never leaves jig mode', () => {
     savedJigWithArtwork();
     useStore.getState().selectObject('art');
     render();
-    press('ArrowRight');
-    expect(container.textContent).toContain('Unsaved changes');
     press('Escape');
-    expect(confirmDialog()).toBeUndefined();
-    expect(close).not.toHaveBeenCalled();
+    expect(useStore.getState().selectedObjectId).toBeNull();
     press('Escape');
-    expect(confirmDialog()).toBeDefined();
     expect(close).not.toHaveBeenCalled();
+  });
+  it('Escape in a field only leaves the field', () => {
+    savedJigWithArtwork();
+    useStore.getState().selectObject('art');
+    render();
+    const field = container.querySelector<HTMLInputElement>('[aria-label="X (mm)"]');
+    if (field === null) throw new Error('Missing selection field');
+    act(() => field.focus());
+    act(() => {
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Registration Jig');
+    expect(useStore.getState().selectedObjectId).toBe('art');
   });
   it('Ctrl+A selects all the artwork but no outline, and not from a field', () => {
     savedJigWithArtwork();
@@ -169,66 +201,40 @@ describe('Registration Jig dedicated editor', () => {
     });
     expect(container.textContent).toContain('1 selected');
     expect(press('a', { ctrlKey: true }).defaultPrevented).toBe(true);
-    // The outline has not been burned, so it is editable, but Ctrl+A leaves it out.
     expect(container.textContent).toContain('2 selected');
   });
-  it('Escape in a field only leaves the field', () => {
+  it('ignores keys pressed in a dialog the page opens', () => {
     savedJigWithArtwork();
     useStore.getState().selectObject('art');
     render();
-    const field = container.querySelector<HTMLInputElement>('[aria-label="X (mm)"]');
-    if (field === null) throw new Error('Missing selection field');
-    act(() => field.focus());
+    click('Advanced outline settings');
+    const inside = [...document.querySelectorAll('[role="dialog"] button')][0];
+    if (!(inside instanceof HTMLButtonElement)) throw new Error('Missing Cut Settings dialog');
     act(() => {
-      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      inside.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }),
+      );
     });
-    expect(document.activeElement?.getAttribute('aria-label')).toBe('Registration Jig editor');
-    expect(container.textContent).toContain('1 selected');
-    expect(confirmDialog()).toBeUndefined();
-    expect(close).not.toHaveBeenCalled();
+    expect(artX()).toBeDefined();
   });
-  it('closes without a new undo step when nothing changed', () => {
+  it('pauses editing while the machine is moving', () => {
     savedJigWithArtwork();
-    const project = useStore.getState().project;
-    const undo = useStore.getState().undoStack.length;
+    useStore.getState().selectObject('art');
+    const before = artX();
     render();
-    click('Save to canvas');
-    expect(close).toHaveBeenCalledOnce();
-    expect(useStore.getState().project).toBe(project);
-    expect(useStore.getState().undoStack).toHaveLength(undo);
+    act(() => useLaserStore.setState({ motionOperation: { kind: 'frame' } as never }));
+    expect(container.textContent).toContain('Editing is paused while the machine runs.');
+    expect(
+      container
+        .querySelector('[aria-label="Registration jig editing canvas"]')
+        ?.getAttribute('data-read-only'),
+    ).toBe('true');
+    press('ArrowRight');
+    expect(artX()).toBe(before);
   });
-  it('keeps burned outlines locked in Artwork only until they are unlocked', () => {
-    savedJigWithArtwork();
-    useStore.getState().setRegistrationOutput('artwork');
-    expect(registrationRunState(useStore.getState().project.scene)).toBe('artwork');
-    render();
-    click('Jig layout');
-    expect(container.querySelector('.lf-jig-lock')?.textContent).toContain('locked');
-    expect(button('Select all outlines')?.disabled).toBe(true);
-    click('Unlock outlines');
-    expect(container.querySelector('.lf-jig-lock')).toBeNull();
-    expect(button('Select all outlines')?.disabled).toBe(false);
-    click('Undo');
-    expect(container.querySelector('.lf-jig-lock')).not.toBeNull();
-  });
-  it('does not overwrite a different project opened behind the editor', () => {
+  it('leaves jig mode when another project is opened', () => {
     render();
     act(() => useStore.getState().newProject());
-    const project = useStore.getState().project;
-    click('Save to canvas');
-    expect(useStore.getState().project).toBe(project);
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
-      'A different project was opened',
-    );
-    expect(close).not.toHaveBeenCalled();
-  });
-  it('saves the draft over an unrelated change made behind the editor', () => {
-    render();
-    act(() => useStore.getState().setVariableSettings({ serialValue: 5 }));
-    click('Save to canvas');
-    const { project } = useStore.getState();
-    expect(close).toHaveBeenCalledOnce();
-    expect(findRegistrationBoxes(project.scene)).toHaveLength(1);
-    expect(project.variables?.serialValue).toBe(5);
+    expect(close).toHaveBeenCalled();
   });
 });

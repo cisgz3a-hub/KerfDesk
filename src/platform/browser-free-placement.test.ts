@@ -7,14 +7,19 @@ import { describe, expect, it } from 'vitest';
 import { browserFreeBuild, replaceProEntryBodies } from '../../scripts/browser-free-build';
 
 const hosts = [
-  ['src/ui/workspace/RegistrationJigPanel.tsx', 'RegistrationJigPanel'],
-  ['src/ui/laser/board-capture/BoardCapturePanel.tsx', 'BoardCapturePanel'],
+  [
+    'src/ui/workspace/RegistrationJigPanel.tsx',
+    ['RegistrationJigPanel', 'RegistrationJigWorkspace'],
+  ],
+  ['src/ui/laser/board-capture/BoardCapturePanel.tsx', ['BoardCapturePanel']],
 ] as const;
 
 describe('browser Free placement tool boundary', () => {
-  it.each(hosts)('replaces the %s host and all implementation imports', (path, name) => {
+  it.each(hosts)('replaces the %s hosts and all implementation imports', (path, names) => {
     const transformed = replaceProEntryBodies(readFileSync(resolve(path), 'utf8'), path);
-    expect(transformed).toBe(`export function ${name}() { return null; }`);
+    expect(transformed).toBe(
+      names.map((name) => `export function ${name}() { return null; }`).join('\n'),
+    );
     expect(transformed).not.toContain('import');
   });
 
@@ -22,7 +27,9 @@ describe('browser Free placement tool boundary', () => {
     const { api, modules } = await placementBundle();
     // No React provider, store state or edition mock can reactivate these hosts.
     expect(api.RegistrationJigPanel()).toBeNull();
+    expect(api.RegistrationJigWorkspace()).toBeNull();
     expect(api.BoardCapturePanel()).toBeNull();
+    expect(modules.some((path) => path.endsWith('/jig-editor-session.ts'))).toBe(false);
     expect(modules.some((path) => path.endsWith('/RegistrationJigOutlineControls.tsx'))).toBe(
       false,
     );
@@ -34,6 +41,7 @@ describe('browser Free placement tool boundary', () => {
 
 type PlacementProbe = {
   RegistrationJigPanel: () => null;
+  RegistrationJigWorkspace: () => null;
   BoardCapturePanel: () => null;
   existingJigOutput: () => number;
   savedBoardCenter: () => { x: number; y: number };
@@ -56,7 +64,7 @@ async function placementBundle(): Promise<{ api: PlacementProbe; modules: string
         load(id) {
           if (id !== '\0placement-build-probe') return undefined;
           return `
-            export { RegistrationJigPanel } from ${modulePath(hosts[0][0])};
+            export { RegistrationJigPanel, RegistrationJigWorkspace } from ${modulePath(hosts[0][0])};
             export { BoardCapturePanel } from ${modulePath(hosts[1][0])};
             import { createRegistrationBox } from ${modulePath('src/core/shapes/registration-box.ts')};
             import { createRegistrationLayer } from ${modulePath('src/core/scene/registration-layer.ts')};

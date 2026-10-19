@@ -9,6 +9,7 @@ import { ProjectSheetsBar } from '../commands/ProjectSheetsBar';
 import { CommandShell } from '../commands';
 import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
+import { useUiStore } from '../state/ui-store';
 import { useEdition } from '../licensing/edition';
 import { UpdatePrompt } from '../licensing/UpdatePrompt';
 import { LiveMotionBar, useJobShortcuts } from '../laser';
@@ -23,7 +24,13 @@ import { PagedImportDialog } from '../import/PagedImportDialog';
 import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
 import { DesignStudioHost } from '../design-studio';
 import { ImageEditorHost } from '../image-editor/ImageEditorHost';
-import { CncStockCanvasHud, RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
+import {
+  CncStockCanvasHud,
+  RegistrationJigPanel,
+  RegistrationJigWorkspace,
+  ToolStrip,
+  Workspace,
+} from '../workspace';
 import { WorkspaceViewport } from '../workspace/WorkspaceViewport';
 import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
 import { useAutosave } from './use-autosave';
@@ -71,8 +78,7 @@ export function App(): JSX.Element {
       <ExternalGcodePreviewBanner />
       <RecentProjectsHost />
       <main style={mainStyle}>
-        <ToolStrip />
-        <CanvasArea />
+        <WorkspaceCentre />
         {/*
           The 3D result pane is deliberately not mounted (maintainer, 2026-08-03).
           It is a separate, continuously updating design-scene consumer rather
@@ -145,6 +151,20 @@ function AppLifecycle(): null {
   useUnsavedChangesGuard();
   useWindowTitle();
   return null;
+}
+
+// Jig mode (ADR-634) puts the registration jig page where the tool strip and
+// the main canvas are. The side panels stay, so the machine panel is docked
+// beside the jig while it is laid out, placed and burned.
+function WorkspaceCentre(): JSX.Element {
+  const jigOpen = useUiStore((state) => state.registrationPanelOpen);
+  if (jigOpen) return <RegistrationJigWorkspace />;
+  return (
+    <>
+      <ToolStrip />
+      <CanvasArea />
+    </>
+  );
 }
 
 // The main canvas has two modes (ADR-255): the design view, and a G-code 3D

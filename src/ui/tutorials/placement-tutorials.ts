@@ -66,7 +66,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Create a rectangle for the keychain’s bounds',
         examplePhase: 0,
         instruction:
-          'Registration Jig opens its own editor on Jig layout. For this rounded rectangular leather blank, choose Rectangle and enter its measured overall W and H. Keep one row and one column, then click Apply layout. Drag the outline over the fixed wood if needed, then click Save to canvas. Establish the job’s placement and origin before either run.',
+          'Registration Jig opens jig mode on 1 Burn outlines, with the machine panel beside it. For this rounded rectangular leather blank, choose Rectangle and enter its measured overall W and H. Keep one row and one column, then click Apply layout. Drag the outline over the fixed wood if needed. Establish the job’s placement and origin before either run.',
         focus: 'Rectangle = the leather blank’s overall bounds',
         result:
           'The rectangle locates the blank’s outside edges; it does not copy its rounded corners.',
@@ -75,7 +75,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Burn the outline onto the wood first',
         examplePhase: 0,
         instruction:
-          'Leave the leather keychain off the wood. Choose Outline only and set Jig outline laser settings for marking this wood. Inspect Preview, complete Frame for this exact outline job, then choose Start and Start job in Job Review.',
+          'Leave the leather keychain off the wood. Set the outline laser settings in 1 Burn outlines for marking this wood. Inspect Preview, then in the step’s burn panel complete Frame for this exact outline job, choose Start and Start job in Job Review.',
         focus: 'Run 1: burn the outline on empty wood',
         result:
           'The wood now carries a physical outline at the same known coordinates as the canvas rectangle.',
@@ -84,7 +84,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Place the real keychain on the burned outline',
         examplePhase: 1,
         instruction:
-          'Place the leather blank inside the burned rectangle, lining up its outside edges and intended hole orientation. Keep the wood, canvas outline and work origin fixed. Add and select the design, choose Centre artwork in outline, then check clearance from the rounded edges and hole.',
+          'Place the leather blank inside the burned rectangle, lining up its outside edges and intended hole orientation. Keep the wood, canvas outline and work origin fixed. In 2 Place pieces & artwork, add and select the design, choose Centre artwork in outline, then check clearance from the rounded edges and hole.',
         focus: 'Place the leather; keep the wood and origin fixed',
         result:
           'Known coordinates locate the artwork on the placed leather. The machine does not detect the keychain.',
@@ -93,7 +93,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Burn the artwork onto the keychain',
         examplePhase: 2,
         instruction:
-          'Choose Artwork only, check the artwork’s settings for the leather, and inspect Preview with the jig outline excluded. Focus for the leather surface. With the blank in place, complete a new Frame for the exact artwork job, then Start, review the warnings, and Start job.',
+          'In 3 Burn artwork, check the artwork’s settings for the leather, and inspect Preview with the jig outline excluded. Focus for the leather surface. With the blank in place, complete a new Frame for the exact artwork job in the step’s burn panel, then Start, review the warnings, and Start job.',
         focus: 'Run 2: burn the artwork on the leather',
         result:
           'The artwork is engraved on the leather keychain; the locating outline remains on the wood underneath.',

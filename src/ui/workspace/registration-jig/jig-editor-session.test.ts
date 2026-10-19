@@ -1,35 +1,29 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  addObject,
   findRegistrationBoxBounds,
   findRegistrationBoxes,
   IDENTITY_TRANSFORM,
   primaryOperationForObject,
   REGISTRATION_LAYER_ID,
-  updateLayer,
-  type Layer,
   type Project,
-  type TextObject,
 } from '../../../core/scene';
 import { createRectangle } from '../../../core/shapes/primitives';
 import { applyRegistrationOutput } from '../../state/registration-output-actions';
-import { useStore, type AppState } from '../../state/store';
+import { useLaserStore } from '../../state/laser-store';
+import { useStore } from '../../state/store';
 import { resetStore } from '../../state/test-helpers';
 import {
   centerJigArtwork,
-  changeJigDraft,
-  commitJigEditorSession,
   createJigEditorSession,
-  jigDraftDirty,
   jigOutlinesLocked,
+  jigSessionView,
+  jigStoreChange,
   removeJigLayout,
   replaceJigLayout,
   selectJigObjects,
-  undoJigDraft,
-  unlockJigOutlines,
-  type JigEditorSession,
 } from './jig-editor-session';
-import { nudgeJigSelection } from './jig-editor-artwork';
+import { jigRunPhase } from './jig-run-phase';
+import { applyJigEdit } from './use-jig-editor';
 
 const GRID = {
   outline: { kind: 'rectangle' as const, widthMm: 50, heightMm: 30 },
@@ -62,62 +56,18 @@ function outputs(project: Project): Record<string, boolean> {
   return Object.fromEntries(project.scene.layers.map((layer) => [layer.id, layer.output]));
 }
 
-function commit(state: AppState, session: JigEditorSession): AppState {
-  const result = commitJigEditorSession(state, session);
-  if (result.kind === 'refused')
-    throw new Error(`Expected a valid editor commit: ${result.reason}`);
-  return { ...state, ...result.change };
+/** Open jig mode on the store's project, as the jig page does on mount. */
+function openJig(): void {
+  const state = useStore.getState();
+  const change = jigStoreChange(state, jigSessionView(state), createJigEditorSession(state));
+  if (change !== null) useStore.setState(change);
 }
 
-/** Save the first jig to the main canvas and leave it in the store. */
-function saveFirstJig(): AppState {
-  const initial = useStore.getState();
-  useStore.setState(commit(initial, createJigEditorSession(initial)));
-  return useStore.getState();
+function burnOutlines(): void {
+  useStore.setState(applyRegistrationOutput(useStore.getState(), 'artwork'));
 }
 
-/** A change made on the main canvas, outside the editor's draft. */
-function moveInMain(id: string, dx: number): void {
-  const { project } = useStore.getState();
-  const objects = project.scene.objects.map((object) =>
-    object.id === id
-      ? { ...object, transform: { ...object.transform, x: object.transform.x + dx } }
-      : object,
-  );
-  useStore.setState({ project: { ...project, scene: { ...project.scene, objects } } });
-}
-
-/** Serial-number text on an artwork operation: variable data that advances. */
-function addSerialText(operationId: string): void {
-  const { project } = useStore.getState();
-  const text: TextObject = {
-    kind: 'text',
-    id: 'serial-text',
-    content: '001',
-    fontKey: 'roboto-regular',
-    sizeMm: 5,
-    alignment: 'left',
-    lineHeight: 1,
-    letterSpacing: 0,
-    color: operation(project, operationId)!.color,
-    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
-    paths: [],
-    transform: { ...IDENTITY_TRANSFORM, x: 30, y: 30 },
-    operationIds: [operationId],
-    variableTemplate: { tokens: [{ kind: 'serial', prefix: '', width: 3 }] },
-  };
-  useStore.setState({ project: { ...project, scene: addObject(project.scene, text) } });
-}
-
-function objectX(project: Project, id: string): number | undefined {
-  return project.scene.objects.find((object) => object.id === id)?.transform.x;
-}
-
-function operation(project: Project, id: string): Layer | undefined {
-  return project.scene.layers.find((layer) => layer.id === id);
-}
-
-describe('registration jig editor session', () => {
+describe('registration jig mode session', () => {
   beforeEach(() => {
     resetStore();
     useStore.setState({ registrationArtworkOutputSnapshot: null });
@@ -125,273 +75,161 @@ describe('registration jig editor session', () => {
     addArtwork('disabled-art', '#00aa00');
     useStore.getState().setLayerParam(artworkOperation('disabled-art'), { output: false });
   });
-
-  it('keeps creation, layout changes and artwork copies isolated from the main project', () => {
-    const state = useStore.getState();
-    const before = structuredClone(state.project);
-    let session = createJigEditorSession(state);
-    session = replaceJigLayout(session, GRID);
-    session = selectJigObjects(session, new Set(['enabled-art']));
-    session = centerJigArtwork(session);
-
-    expect(findRegistrationBoxes(session.draft.project.scene)).toHaveLength(6);
-    expect(session.draft.project.scene.objects.length).toBeGreaterThan(before.scene.objects.length);
-    expect(useStore.getState().project).toBe(state.project);
-    expect(state.project).toEqual(before);
-    expect(findRegistrationBoxes(state.project.scene)).toHaveLength(0);
-    expect(useStore.getState().undoStack).toBe(state.undoStack);
+  afterEach(() => {
+    useLaserStore.setState({ motionOperation: null });
   });
 
-  it('saves the first layout as Outline only with one undo entry and restores artwork intent', () => {
-    const state = useStore.getState();
+  it('creates a new jig as one undoable edit in Outline only and keeps artwork intent', () => {
+    const before = useStore.getState();
     const enabledId = artworkOperation('enabled-art');
     const disabledId = artworkOperation('disabled-art');
-    const session = replaceJigLayout(createJigEditorSession(state), GRID);
-    const saved = commit(state, session);
+    openJig();
+    const opened = useStore.getState();
 
-    expect(outputs(saved.project)).toMatchObject({
-      [REGISTRATION_LAYER_ID]: true,
-      [enabledId]: false,
-      [disabledId]: false,
-    });
-    expect(saved.undoStack).toEqual([...state.undoStack, state.project]);
-    expect(saved.redoStack).toEqual([]);
-    expect(saved.registrationArtworkOutputSnapshot).toMatchObject({
+    expect(findRegistrationBoxes(opened.project.scene)).toHaveLength(1);
+    expect(jigRunPhase(opened.project.scene)).toBe('outlines');
+    expect(opened.undoStack).toEqual([...before.undoStack, before.project]);
+    expect(opened.dirty).toBe(true);
+    expect(opened.registrationArtworkOutputSnapshot).toMatchObject({
       [enabledId]: true,
       [disabledId]: false,
     });
-    const artwork = applyRegistrationOutput(saved, 'artwork');
+    const artwork = applyRegistrationOutput(opened, 'artwork');
     expect(outputs(artwork.project)).toMatchObject({
       [REGISTRATION_LAYER_ID]: false,
       [enabledId]: true,
       [disabledId]: false,
     });
+    openJig();
+    expect(useStore.getState()).toBe(opened);
   });
 
-  it('locks saved outlines on the main canvas and unlocks only the editor copy', () => {
+  it('edits the open project directly, with the outlines kept locked in it', () => {
+    openJig();
+    applyJigEdit((session) => replaceJigLayout(session, GRID), { fresh: true });
+    applyJigEdit((session) => selectJigObjects(session, new Set(['enabled-art'])), {});
+    applyJigEdit(centerJigArtwork, {});
+    const { project } = useStore.getState();
+
+    expect(findRegistrationBoxes(project.scene)).toHaveLength(6);
+    expect(findRegistrationBoxes(project.scene).every((box) => box.locked)).toBe(true);
+    expect(jigOutlinesLocked(jigSessionView(useStore.getState()).draft.project)).toBe(false);
+    expect(project.scene.objects.length).toBeGreaterThan(8);
+  });
+
+  it('shows burned outlines locked until the operator unlocks them on purpose', () => {
+    openJig();
+    burnOutlines();
     const state = useStore.getState();
-    const saved = commit(state, replaceJigLayout(createJigEditorSession(state), GRID));
-    const reopened = createJigEditorSession(saved);
 
-    expect(findRegistrationBoxes(saved.project.scene).every((box) => box.locked)).toBe(true);
-    expect(findRegistrationBoxes(reopened.draft.project.scene).every((box) => !box.locked)).toBe(
-      true,
-    );
-    expect(findRegistrationBoxes(saved.project.scene).every((box) => box.locked)).toBe(true);
-  });
-
-  it('opens burned outlines locked and unlocks them only as an undoable edit', () => {
-    const initial = useStore.getState();
-    const saved = commit(initial, createJigEditorSession(initial));
-    const artworkState = { ...saved, ...applyRegistrationOutput(saved, 'artwork') };
-    const reopened = createJigEditorSession(artworkState);
-
-    expect(jigOutlinesLocked(reopened.draft.project)).toBe(true);
-    expect(jigDraftDirty(reopened)).toBe(false);
-    const unlocked = unlockJigOutlines(reopened);
+    expect(jigRunPhase(state.project.scene)).toBe('artwork');
+    expect(jigOutlinesLocked(jigSessionView(state).draft.project)).toBe(true);
+    const unlocked = jigSessionView(state, { outlinesUnlocked: true });
     expect(jigOutlinesLocked(unlocked.draft.project)).toBe(false);
-    expect(jigDraftDirty(unlocked)).toBe(true);
-    expect(unlockJigOutlines(unlocked)).toBe(unlocked);
-    expect(jigOutlinesLocked(undoJigDraft(unlocked).draft.project)).toBe(true);
-    expect(jigOutlinesLocked(createJigEditorSession(saved).draft.project)).toBe(false);
+    applyJigEdit((session) => replaceJigLayout(session, GRID), { outlinesUnlocked: true });
+    expect(
+      findRegistrationBoxes(useStore.getState().project.scene).every((box) => box.locked),
+    ).toBe(true);
   });
 
   it('keeps a new jig centred on the bed when its grid grows', () => {
-    const state = useStore.getState();
-    const { bedWidth, bedHeight } = state.project.device;
-    const session = replaceJigLayout(createJigEditorSession(state), { ...GRID, columns: 6 });
-    const bounds = findRegistrationBoxBounds(session.draft.project.scene)!;
+    openJig();
+    const { bedWidth, bedHeight } = useStore.getState().project.device;
+    applyJigEdit((session) => replaceJigLayout(session, { ...GRID, columns: 6 }), { fresh: true });
+    const bounds = findRegistrationBoxBounds(useStore.getState().project.scene)!;
 
     expect((bounds.minX + bounds.maxX) / 2).toBeCloseTo(bedWidth / 2);
     expect((bounds.minY + bounds.maxY) / 2).toBeCloseTo(bedHeight / 2);
   });
 
-  it('retains Artwork only when an existing jig is reopened and saved', () => {
-    const initial = useStore.getState();
-    const saved = commit(initial, createJigEditorSession(initial));
-    const artworkState = { ...saved, ...applyRegistrationOutput(saved, 'artwork') };
-    const reopened = createJigEditorSession(artworkState);
-    const resaved = commit(artworkState, replaceJigLayout(reopened, GRID));
+  it('keeps the first outline corner of an existing jig, whose outlines may be burned', () => {
+    openJig();
+    const before = findRegistrationBoxBounds(useStore.getState().project.scene)!;
+    applyJigEdit((session) => replaceJigLayout(session, GRID), {});
+    const after = findRegistrationBoxBounds(useStore.getState().project.scene)!;
 
-    expect(reopened.firstSave).toBe(false);
-    expect(outputs(resaved.project)).toEqual(outputs(artworkState.project));
-    expect(resaved.registrationArtworkOutputSnapshot).toBeNull();
+    expect(after.minX).toBeCloseTo(before.minX);
+    expect(after.minY).toBeCloseTo(before.minY);
   });
 
-  it('preserves Outline only and its artwork snapshot when the layout is regenerated', () => {
-    const initial = useStore.getState();
-    const saved = commit(initial, createJigEditorSession(initial));
-    const changed = replaceJigLayout(createJigEditorSession(saved), GRID);
-
-    expect(outputs(changed.draft.project)).toEqual(outputs(saved.project));
-    expect(changed.draft.registrationArtworkOutputSnapshot).toBe(
-      saved.registrationArtworkOutputSnapshot,
+  it('keeps the current run and artwork intent when the layout is rebuilt', () => {
+    openJig();
+    const outlineRun = useStore.getState();
+    applyJigEdit((session) => replaceJigLayout(session, GRID), {});
+    const rebuilt = useStore.getState();
+    expect(outputs(rebuilt.project)).toEqual(outputs(outlineRun.project));
+    expect(rebuilt.registrationArtworkOutputSnapshot).toEqual(
+      outlineRun.registrationArtworkOutputSnapshot,
     );
-    const restored = applyRegistrationOutput({ ...changed.draft, undoStack: [] }, 'artwork');
-    expect(outputs(restored.project)[artworkOperation('enabled-art')]).toBe(true);
-    expect(outputs(restored.project)[artworkOperation('disabled-art')]).toBe(false);
+
+    burnOutlines();
+    const artworkRun = useStore.getState();
+    applyJigEdit((session) => replaceJigLayout(session, { ...GRID, rows: 1 }), {
+      outlinesUnlocked: true,
+    });
+    expect(outputs(useStore.getState().project)).toEqual(outputs(artworkRun.project));
   });
 
-  it('keeps undo and redo inside the draft and drops redo history after a new edit', () => {
-    const initial = createJigEditorSession(useStore.getState());
-    const changed = replaceJigLayout(initial, GRID);
-    const undone = undoJigDraft(changed);
-    const redone = undoJigDraft(undone, true);
+  it('adds no undo step for a selection change or an edit that changes nothing', () => {
+    openJig();
+    const opened = useStore.getState();
+    applyJigEdit((session) => selectJigObjects(session, new Set(['enabled-art'])), {});
+    applyJigEdit((session) => session, {});
 
-    expect(undone.draft).toBe(initial.draft);
-    expect(redone.draft).toBe(changed.draft);
-    expect(undoJigDraft(initial)).toBe(initial);
-    const branched = replaceJigLayout(undone, { ...GRID, columns: 2 });
-    expect(branched.future).toHaveLength(0);
-    expect(undoJigDraft(branched, true)).toBe(branched);
+    expect(useStore.getState().selectedObjectId).toBe('enabled-art');
+    expect(useStore.getState().project).toBe(opened.project);
+    expect(useStore.getState().undoStack).toBe(opened.undoStack);
+  });
+
+  it('undoes a jig edit with the project Undo', () => {
+    openJig();
+    const opened = useStore.getState().project;
+    applyJigEdit((session) => replaceJigLayout(session, GRID), {});
+    useStore.getState().undo();
+
+    expect(useStore.getState().project).toBe(opened);
+  });
+
+  it('changes only the selection while the machine is moving', () => {
+    openJig();
+    const opened = useStore.getState().project;
+    useLaserStore.setState({ motionOperation: { kind: 'frame' } as never });
+    applyJigEdit((session) => replaceJigLayout(session, GRID), {});
+    applyJigEdit((session) => selectJigObjects(session, new Set(['enabled-art'])), {});
+
+    expect(useStore.getState().project).toBe(opened);
+    expect(useStore.getState().selectedObjectId).toBe('enabled-art');
   });
 
   it('restores enabled artwork before removing an outline-mode jig', () => {
-    const initial = useStore.getState();
-    const saved = commit(initial, createJigEditorSession(initial));
-    const removed = removeJigLayout(createJigEditorSession(saved));
+    openJig();
+    applyJigEdit(removeJigLayout, {});
+    const { project, registrationArtworkOutputSnapshot } = useStore.getState();
 
-    expect(findRegistrationBoxes(removed.draft.project.scene)).toHaveLength(0);
-    expect(removed.draft.registrationArtworkOutputSnapshot).toBeNull();
-    expect(outputs(removed.draft.project)[artworkOperation('enabled-art')]).toBe(true);
-    expect(outputs(removed.draft.project)[artworkOperation('disabled-art')]).toBe(false);
+    expect(findRegistrationBoxes(project.scene)).toHaveLength(0);
+    expect(registrationArtworkOutputSnapshot).toBeNull();
+    expect(outputs(project)[artworkOperation('enabled-art')]).toBe(true);
+    expect(outputs(project)[artworkOperation('disabled-art')]).toBe(false);
   });
 
-  it('saves over an unchanged copy of the project but refuses a replaced document', () => {
-    const state = useStore.getState();
-    const session = replaceJigLayout(createJigEditorSession(state), GRID);
-
-    const copied = commit({ ...state, project: { ...state.project } }, session);
-    expect(findRegistrationBoxes(copied.project.scene)).toHaveLength(6);
-    expect(
-      commitJigEditorSession(
-        { ...state, projectDocumentEpoch: state.projectDocumentEpoch + 1 },
-        session,
-      ),
-    ).toEqual({ kind: 'refused', reason: 'new-document' });
-  });
-
-  it('carries an unrelated object added in the main project into the saved draft', () => {
-    const saved = saveFirstJig();
-    const session = replaceJigLayout(createJigEditorSession(saved), GRID);
-    addArtwork('late-art', '#ff0000');
-    const main = useStore.getState();
-    const lateOperation = artworkOperation('late-art');
-    const resaved = commit(main, session);
-
-    expect(findRegistrationBoxes(resaved.project.scene)).toHaveLength(6);
-    expect(resaved.project.scene.objects.map((object) => object.id)).toEqual(
-      expect.arrayContaining(['enabled-art', 'disabled-art', 'late-art']),
-    );
-    expect(operation(resaved.project, lateOperation)).toBe(operation(main.project, lateOperation));
-    expect(resaved.project.scene.artworkOrder).toEqual([
-      ...(session.draft.project.scene.artworkOrder ?? []),
-      'late-art',
-    ]);
-    expect(resaved.undoStack).toEqual([...main.undoStack, main.project]);
-  });
-
-  it('keeps the draft through a variable-text advance after a job', () => {
-    useStore.getState().setVariableSettings({ advancement: 'after-successful-stream' });
-    addSerialText(artworkOperation('enabled-art'));
-    const saved = saveFirstJig();
-    // The artwork run outputs the serial text, so its completion advances it.
-    useStore.setState(applyRegistrationOutput(saved, 'artwork'));
-    const running = useStore.getState();
-    const opened = selectJigObjects(createJigEditorSession(running), new Set(['enabled-art']));
-    const session = nudgeJigSelection(opened, 1, 0);
-    useStore.getState().advanceVariablesAfter(running.project, 'successful-stream');
-    const main = useStore.getState();
-    const resaved = commit(main, session);
-
-    expect(running.project.variables?.serialValue).toBe(1);
-    expect(main.project.variables?.serialValue).toBe(2);
-    expect(resaved.project.variables).toBe(main.project.variables);
-    expect(objectX(resaved.project, 'enabled-art')).toBe(
-      objectX(running.project, 'enabled-art')! + 1,
-    );
-    expect(outputs(resaved.project)).toEqual(outputs(running.project));
-  });
-
-  it('refuses when an outline moved in the main project while the editor was open', () => {
-    const saved = saveFirstJig();
-    const opened = selectJigObjects(createJigEditorSession(saved), new Set(['enabled-art']));
-    const session = nudgeJigSelection(opened, 1, 0);
-    const [outline] = findRegistrationBoxes(saved.project.scene);
-    moveInMain(outline!.id, 5);
-
-    expect(commitJigEditorSession(useStore.getState(), session)).toEqual({
-      kind: 'refused',
-      reason: 'outlines',
-    });
-  });
-
-  it('refuses the same artwork edited in both, but merges edits to different artwork', () => {
-    const saved = saveFirstJig();
-    const opened = selectJigObjects(createJigEditorSession(saved), new Set(['enabled-art']));
-    const session = nudgeJigSelection(opened, 1, 0);
-    moveInMain('disabled-art', 5);
-    const merged = commit(useStore.getState(), session);
-
-    expect(objectX(merged.project, 'enabled-art')).toBe(objectX(saved.project, 'enabled-art')! + 1);
-    expect(objectX(merged.project, 'disabled-art')).toBe(
-      objectX(saved.project, 'disabled-art')! + 5,
-    );
-    moveInMain('enabled-art', 5);
-    expect(commitJigEditorSession(useStore.getState(), session)).toEqual({
-      kind: 'refused',
-      reason: 'artwork',
-    });
-  });
-
-  it('merges operation settings changed on different fields and refuses the same field', () => {
-    const saved = saveFirstJig();
-    const id = artworkOperation('enabled-art');
-    const opened = createJigEditorSession(saved);
-    const { project } = opened.draft;
-    const session = changeJigDraft(opened, {
-      project: { ...project, scene: updateLayer(project.scene, id, { speed: 1234 }) },
-    });
-    useStore.getState().setLayerParam(id, { passes: 3 });
-    const merged = commit(useStore.getState(), session);
-
-    expect(operation(merged.project, id)).toMatchObject({ speed: 1234, passes: 3 });
-    const scene = updateLayer(saved.project.scene, id, { speed: 99 });
-    expect(
-      commitJigEditorSession({ ...saved, project: { ...saved.project, scene } }, session),
-    ).toEqual({ kind: 'refused', reason: 'operations' });
-  });
-
-  it('keeps the draft when an outline run selects Artwork only while the editor is open', () => {
-    const initial = useStore.getState();
-    const saved = commit(initial, createJigEditorSession(initial));
-    const session = replaceJigLayout(createJigEditorSession(saved), GRID);
-    const switched = { ...saved, ...applyRegistrationOutput(saved, 'artwork') };
-    const resaved = commit(switched, session);
-
-    expect(findRegistrationBoxes(resaved.project.scene)).toHaveLength(6);
-    expect(outputs(resaved.project)).toMatchObject({
-      [REGISTRATION_LAYER_ID]: false,
-      [artworkOperation('enabled-art')]: true,
-      [artworkOperation('disabled-art')]: false,
-    });
-    expect(resaved.registrationArtworkOutputSnapshot).toBeNull();
-    expect(resaved.undoStack).toEqual([...switched.undoStack, switched.project]);
-  });
-
-  it('refuses to replace a captured board and keeps its geometry and lock untouched', () => {
+  it('leaves a captured board untouched', () => {
     useStore.getState().addCapturedBoardBox(120, 80);
     const state = useStore.getState();
     const before = findRegistrationBoxes(state.project.scene);
-    const session = createJigEditorSession(state);
-    const changed = replaceJigLayout(session, GRID);
+    openJig();
+    applyJigEdit((session) => replaceJigLayout(session, GRID), {});
 
-    expect(findRegistrationBoxes(session.draft.project.scene)).toEqual(before);
-    expect(changed).toBe(session);
-    expect(commitJigEditorSession(state, session)).toEqual({
-      kind: 'refused',
-      reason: 'captured-board',
-    });
-    expect(findRegistrationBoxes(state.project.scene)).toEqual(before);
+    expect(findRegistrationBoxes(useStore.getState().project.scene)).toEqual(before);
+    expect(useStore.getState().project).toBe(state.project);
+  });
+
+  it('names the next run, including the one-pass mix the jig must avoid', () => {
+    expect(jigRunPhase(useStore.getState().project.scene)).toBe('none');
+    openJig();
+    expect(jigRunPhase(useStore.getState().project.scene)).toBe('outlines');
+    burnOutlines();
+    expect(jigRunPhase(useStore.getState().project.scene)).toBe('artwork');
+    useStore.getState().setLayerParam(REGISTRATION_LAYER_ID, { output: true });
+    expect(jigRunPhase(useStore.getState().project.scene)).toBe('both');
   });
 });

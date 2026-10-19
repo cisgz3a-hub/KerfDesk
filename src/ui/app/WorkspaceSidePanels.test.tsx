@@ -335,6 +335,31 @@ describe('WorkspaceSidePanels', () => {
   });
 });
 
+describe('WorkspaceSidePanels in jig mode', () => {
+  afterEach(() => useUiStore.getState().closeRegistrationPanel());
+
+  it.each([false, true])(
+    'shows only the machine panel and leaves Frame and Start to the jig steps (compact: %s)',
+    async (compact) => {
+      media.compact = compact;
+      useUiStore.getState().openRegistrationPanel();
+      const { host, root } = await renderPanels();
+      try {
+        expect(host.textContent).toContain('Machine rail');
+        expect(host.textContent).not.toContain('Layer rail');
+        expect(host.querySelector('[aria-label="Job actions"]')).toBeNull();
+        expect(
+          [...host.querySelectorAll('button')].some(
+            (button) => button.textContent?.trim() === 'Artwork',
+          ),
+        ).toBe(false);
+      } finally {
+        await act(async () => root.unmount());
+      }
+    },
+  );
+});
+
 function requiredPanel(host: HTMLElement, label: string): HTMLElement {
   const panel = host.querySelector(`[aria-label="${label}"]`);
   if (!(panel instanceof HTMLElement)) throw new Error(`Panel not rendered: ${label}`);

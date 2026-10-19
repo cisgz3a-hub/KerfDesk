@@ -24,6 +24,7 @@ import { installFramedRunPermitForCurrentState } from './framed-run-testing';
 import { cancelRegistrationJigCompletion } from './registration-jig-stream-completion';
 import { hashOnSimulatedClock } from './host-sha256-testing';
 import { runStartJobFlow } from './start-job-flow';
+import { jigRunPhase } from '../workspace/registration-jig/jig-run-phase';
 
 let untrack: (() => void) | null = null;
 let uninstallReview: (() => void) | null = null;
@@ -160,6 +161,8 @@ describe('registration jig completion through the real Start flow', () => {
     expect(useLaserStore.getState()).toMatchObject({ streamer: null, controllerOperation: null });
     expect(repository.getSnapshot().lastCompletedReceipt).not.toBeNull();
     expect(registrationRunState(useStore.getState().project.scene)).toBe('artwork');
+    // Jig mode follows the same switch, from burning outlines to placing pieces.
+    expect(jigRunPhase(useStore.getState().project.scene)).toBe('artwork');
     expect(outputFlags()).toMatchObject({
       [REGISTRATION_LAYER_ID]: false,
       [enabled]: true,
@@ -189,6 +192,7 @@ describe('registration jig completion through the real Start flow', () => {
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(repository.getSnapshot().lastCompletedReceipt).toBeNull();
     expect(registrationRunState(useStore.getState().project.scene)).toBe('box');
+    expect(jigRunPhase(useStore.getState().project.scene)).toBe('outlines');
     expect(outputFlags()).toMatchObject({
       [REGISTRATION_LAYER_ID]: true,
       [enabled]: false,

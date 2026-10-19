@@ -1,7 +1,10 @@
+/* Jig mode (ADR-634): the jig page fills the place of the tool strip and the
+   main canvas, beside the docked machine panel, so dialogs, alarms and the
+   live motion bar stack above it as they do over the main canvas. */
 .lf-jig-editor {
-  position: fixed;
-  inset: 0;
-  z-index: 1010;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--lf-bg-0);
@@ -13,7 +16,7 @@
 .lf-jig-editor * {
   box-sizing: border-box;
 }
-/* The editor takes focus on open so keys reach it; ring its controls, not the page. */
+/* The page takes focus on open so keys reach it; ring its controls, not the page. */
 .lf-jig-editor:focus-visible {
   outline: none;
 }
@@ -120,8 +123,7 @@
   border-radius: 6px;
   background: var(--lf-bg-0);
 }
-.lf-jig-lock p,
-.lf-jig-confirm-text {
+.lf-jig-lock p {
   margin: 0;
 }
 .lf-jig-trace > summary {
@@ -143,10 +145,6 @@
   color: var(--lf-text-muted);
   margin-left: auto;
 }
-.lf-jig-sequence {
-  flex-basis: 100%;
-  color: var(--lf-text-muted);
-}
 @media (max-width: 700px) {
   .lf-jig-body {
     flex-direction: column-reverse;
@@ -161,10 +159,29 @@
     gap: 6px;
     padding: 8px;
   }
-  .lf-jig-header > .lf-jig-muted {
-    display: none;
-  }
   .lf-jig-actions {
     margin-left: 0;
   }
+}
+.lf-jig-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.lf-jig-burn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--lf-border);
+}
+.lf-jig-burn p {
+  margin: 0;
+}
+.lf-jig-tabs {
+  flex-wrap: wrap;
 }

@@ -9,7 +9,7 @@ import type { Plugin } from 'vite';
 export const PRO_BUILD_ENTRIES: Readonly<Record<string, readonly string[]>> = {
   'src/ui/design-studio/DesignStudioHost.tsx': ['DesignStudioHost'],
   'src/ui/box/BoxGeneratorHost.tsx': ['BoxGeneratorHost'],
-  'src/ui/workspace/RegistrationJigPanel.tsx': ['RegistrationJigPanel'],
+  'src/ui/workspace/RegistrationJigPanel.tsx': ['RegistrationJigPanel', 'RegistrationJigWorkspace'],
   'src/ui/laser/board-capture/BoardCapturePanel.tsx': ['BoardCapturePanel'],
   'src/ui/gcode-inspector/InspectorView.tsx': ['InspectorView'],
   'src/ui/gcode-inspector/CanvasGcodeView.tsx': ['CanvasGcodeView'],

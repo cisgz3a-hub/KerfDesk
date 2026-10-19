@@ -27,6 +27,8 @@ export type RegistrationJigCanvasProps = {
   readonly selectedIds: ReadonlySet<string>;
   /** Changes when the outline layout is rebuilt; the view then refits to it. */
   readonly fitRequest?: number;
+  /** Pan and zoom only: the machine is running a job prepared from this project. */
+  readonly readOnly?: boolean;
   readonly onSelectionChange: (ids: ReadonlySet<string>) => void;
   readonly onCommit: (project: Project) => void;
   /** Artwork files dropped on the canvas, with the outline under the drop point. */
@@ -96,7 +98,12 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
             event.preventDefault();
           }
         }}
-        {...jigCanvasDropHandlers(props.onDropFiles, project, view, setDropOutlineId)}
+        {...jigCanvasDropHandlers(
+          props.readOnly === true ? undefined : props.onDropFiles,
+          project,
+          view,
+          setDropOutlineId,
+        )}
       />
       <div style={footerStyle}>
         <span id="registration-jig-canvas-help" role="status">

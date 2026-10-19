@@ -6,3 +6,9 @@ import { useCanvasTextStore } from '../text/canvas-text-store';
 export function keyboardOwnedElsewhere(): boolean {
   return isModalOpen(useUiStore.getState()) || useCanvasTextStore.getState().session !== null;
 }
+
+/** Jig mode (ADR-634) replaces the main canvas, and its page handles the canvas
+ *  keys itself; the main canvas's tool, edit and view shortcuts stand down. */
+export function canvasKeysOwnedByJig(): boolean {
+  return useUiStore.getState().registrationPanelOpen;
+}

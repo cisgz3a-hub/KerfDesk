@@ -345,15 +345,25 @@ export function handleEditShortcut(e: KeyboardEvent, ctx: EditCtx): boolean {
   // Cmd+A (selects every scene object), making text dialogs and
   // number inputs unusable. Mirrors the same check on
   // handleTransformShortcut / handleViewShortcut.
-  if (isEditableTarget(e)) return false;
-  for (const binding of EDIT_BINDINGS) {
-    if (binding.match(e)) {
-      e.preventDefault();
-      binding.invoke(ctx);
-      return true;
-    }
-  }
-  return false;
+  return !isEditableTarget(e) && invokeFirstBinding(e, EDIT_BINDINGS, ctx);
+}
+
+/** Undo and Redo only: jig mode (ADR-634) handles every other canvas key on
+ *  its own page, while history stays one project-wide Ctrl/Cmd+Z. */
+export function handleHistoryShortcut(e: KeyboardEvent, ctx: EditCtx): boolean {
+  return !isEditableTarget(e) && invokeFirstBinding(e, EDIT_BINDINGS.slice(0, 2), ctx);
+}
+
+function invokeFirstBinding<Ctx>(
+  e: KeyboardEvent,
+  bindings: ReadonlyArray<KeyBinding<Ctx>>,
+  ctx: Ctx,
+): boolean {
+  const binding = bindings.find((candidate) => candidate.match(e));
+  if (binding === undefined) return false;
+  e.preventDefault();
+  binding.invoke(ctx);
+  return true;
 }
 
 export type ToolCtx = {
@@ -412,12 +422,7 @@ const TOOL_CHORDS: ReadonlyArray<KeyBinding<ToolCtx>> = [
 
 export function handleToolShortcut(e: KeyboardEvent, ctx: ToolCtx): boolean {
   if (isEditableTarget(e)) return false;
-  for (const chord of TOOL_CHORDS) {
-    if (!chord.match(e)) continue;
-    e.preventDefault();
-    chord.invoke(ctx);
-    return true;
-  }
+  if (invokeFirstBinding(e, TOOL_CHORDS, ctx)) return true;
   if (!hasMeta(e) || e.shiftKey || e.altKey) return false;
   const mode = TOOL_BINDINGS[e.key.toLowerCase()];
   if (mode === undefined) return false;

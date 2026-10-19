@@ -1,56 +1,37 @@
-import { useRef } from 'react';
-import { Button, Dialog, DialogActions } from '../../kit';
+import { useEffect, useRef } from 'react';
+import { Button } from '../../kit';
 import { TutorialButton } from '../../tutorials/TutorialButton';
-import { useDialogA11y } from '../../common/use-dialog-a11y';
-import { useRegisterModal } from '../../common/use-register-modal';
 import { RegistrationJigCanvas } from './RegistrationJigCanvas';
 import { JigEditorSidebar } from './JigEditorSidebar';
-import { undoJigDraft } from './jig-editor-session';
-import {
-  handleJigEditorKey,
-  isTextInput,
-  useJigEditor,
-  type JigEditorController,
-} from './use-jig-editor';
+import { handleJigEditorKey, useJigEditor, type JigEditorController } from './use-jig-editor';
 import './registration-jig.css';
 
+/**
+ * Jig mode (ADR-634): the jig page takes the place of the main canvas while the
+ * machine panel stays docked beside it, so the whole job, from laying out the
+ * outlines to the last artwork burn, happens here. Edits go straight into the
+ * open project with the ordinary Undo; there is nothing to save or discard.
+ */
 export function RegistrationJigEditor(props: { readonly onClose: () => void }): JSX.Element {
   const editor = useJigEditor(props.onClose);
   const root = useRef<HTMLDivElement>(null);
-  useRegisterModal();
-  // Open on the editor itself: an Enter or Space pressed on arrival must not
-  // land on Close or Save. Escape in a field only leaves that field, so a
-  // half-typed value or text is never lost to a selection change.
-  useDialogA11y(
-    root,
-    () => {
-      const active = document.activeElement;
-      if (active instanceof HTMLElement && active !== root.current && isTextInput(active)) {
-        root.current?.focus();
-        return;
-      }
-      editor.onEscape();
-    },
-    { initialFocus: 'surface' },
-  );
+  // Open on the page itself, so canvas keys reach it straight away.
+  useEffect(() => root.current?.focus(), []);
   return (
     <div
       ref={root}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Registration Jig editor"
+      role="region"
+      aria-label="Registration Jig"
       tabIndex={-1}
       className="lf-jig-editor"
-      onKeyDown={(event) => {
-        if (!editor.confirmingClose) handleJigEditorKey(event, editor.session, editor.setSession);
-      }}
+      onKeyDown={(event) => handleJigEditorKey(event, editor)}
       onDragOver={stopDrop}
       onDrop={stopDrop}
     >
       <JigEditorHeader editor={editor} />
       {editor.captured ? (
         <p className="lf-jig-notice">
-          This outline belongs to Place Board. Close this editor and use Place Board to change the
+          This outline belongs to Place Board. Choose Done and use Place Board to change the
           captured board.
         </p>
       ) : (
@@ -60,6 +41,7 @@ export function RegistrationJigEditor(props: { readonly onClose: () => void }): 
             project={editor.session.draft.project}
             selectedIds={editor.ids}
             fitRequest={editor.fitRequest}
+            readOnly={editor.readOnly}
             onSelectionChange={editor.onSelect}
             onCommit={editor.onCommit}
             onDropFiles={(files, outlineId) =>
@@ -69,9 +51,8 @@ export function RegistrationJigEditor(props: { readonly onClose: () => void }): 
         </div>
       )}
       <footer className="lf-jig-footer" role="status">
-        {editor.error !== '' ? <span role="alert">{editor.error}</span> : editorStatus(editor)}
+        {editorStatus(editor)}
       </footer>
-      {editor.confirmingClose && <JigCloseConfirm editor={editor} />}
     </div>
   );
 }
@@ -82,84 +63,34 @@ function stopDrop(event: React.DragEvent): void {
 }
 
 function JigEditorHeader(props: { readonly editor: JigEditorController }): JSX.Element {
-  const { editor } = props;
   return (
     <header className="lf-jig-header">
       <strong>Registration Jig</strong>
       <TutorialButton tutorialId="registration" compact label="Registration jig" />
-      <span className="lf-jig-muted">Edit the layout and artwork on the jig canvas</span>
       <div className="lf-jig-actions">
         <Button
-          title="Undo the last jig edit (Ctrl+Z)"
-          onClick={() => editor.setSession((current) => undoJigDraft(current))}
-          disabled={editor.session.past.length === 0}
-        >
-          Undo
-        </Button>
-        <Button
-          title="Redo the last undone jig edit (Ctrl+Y)"
-          onClick={() => editor.setSession((current) => undoJigDraft(current, true))}
-          disabled={editor.session.future.length === 0}
-        >
-          Redo
-        </Button>
-        <Button
-          title={
-            editor.dirty
-              ? 'Leave the editor; asks before discarding unsaved jig edits'
-              : 'Leave the editor without changing the main canvas'
-          }
-          onClick={editor.requestClose}
-        >
-          Close without saving
-        </Button>
-        <Button
           variant="primary"
-          title={saveTitle(editor)}
-          onClick={editor.save}
-          disabled={!editor.canSave}
+          title="Go back to the main canvas. Your jig is already part of the project."
+          onClick={props.editor.done}
         >
-          Save to canvas
+          Done
         </Button>
       </div>
     </header>
   );
 }
 
-function JigCloseConfirm(props: { readonly editor: JigEditorController }): JSX.Element {
-  const { editor } = props;
-  return (
-    <Dialog size="sm" title="Save jig changes?" onClose={editor.keepEditing}>
-      <p className="lf-jig-confirm-text">
-        Your jig edits are only in this editor. Save them to the canvas, or discard them and leave
-        the main canvas unchanged.
-      </p>
-      {!editor.canSave && <p className="lf-jig-muted">{saveTitle(editor)}</p>}
-      <DialogActions>
-        <Button variant="primary" disabled={!editor.canSave} onClick={editor.save}>
-          Save to canvas
-        </Button>
-        <Button variant="danger" onClick={editor.discard}>
-          Discard changes
-        </Button>
-        <Button onClick={editor.keepEditing}>Keep editing</Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-function saveTitle(editor: JigEditorController): string {
-  if (editor.busy) return 'Wait for the artwork to finish preparing before saving.';
-  if (editor.pendingLayout)
-    return 'Apply layout in Jig layout before saving to canvas, or discard the changes.';
-  return 'Put this jig on the main canvas as one undoable edit and lock its outlines';
-}
-
 function editorStatus(editor: JigEditorController): string {
   if (editor.busy) return 'Preparing artwork…';
-  if (editor.pendingLayout) return 'Apply layout changes before saving to canvas.';
-  const unsaved = editor.dirty ? 'Unsaved changes · ' : '';
-  return editor.session.firstSave
-    ? `${unsaved}First save prepares Outline only. Burn outlines, place pieces, focus on their top surface, then burn artwork. Frame and Start from the main canvas.`
-    : `${unsaved}Draft only · saving keeps the current output mode. Outlines lock on the main canvas.`;
+  if (editor.readOnly) return 'The machine is running. Editing resumes when it stops.';
+  switch (editor.runPhase) {
+    case 'outlines':
+      return 'Next burn: the outlines, on the empty base.';
+    case 'artwork':
+      return 'Next burn: the artwork, on the pieces placed in the burned outlines.';
+    case 'both':
+      return 'The outlines and the artwork are both set to burn. Choose one run in step 1 or 3.';
+    case 'none':
+      return 'Add an outline in step 1.';
+  }
 }
