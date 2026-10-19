@@ -210,7 +210,9 @@ function badgeMessage(
   nowMs: number,
 ): string | null {
   const run = overlay.run;
-  const relative = overlay.plan.coordinateFrame.kind === 'relative';
+  const frame = overlay.plan.coordinateFrame;
+  // A User Origin job drawn over its artwork knows its bed position (ADR-636).
+  const relative = frame.kind === 'relative' && frame.bed === undefined;
   if (run === null) {
     const reason = relative
       ? 'Relative view — physical bed position unverified'

@@ -5,11 +5,9 @@ import type { ControllerQualification } from '../state/laser-controller-qualific
 import type { ConnectionState } from '../state/laser-store';
 import type { ConnectionBarProps as Props } from './ConnectionBar';
 import { ControllerRecoveryToast } from './ControllerRecoveryToast';
-import { ControllerToolbarNotice } from './ControllerToolbarNotice';
 
 export type ControllerNotice = {
   readonly key: string | null;
-  readonly briefHidden: boolean;
   readonly triggerRef: RefObject<HTMLButtonElement>;
   readonly toastCloseRef: RefObject<HTMLButtonElement>;
   readonly open: boolean;
@@ -31,8 +29,6 @@ export function useControllerNotice(props: Props): ControllerNotice {
         ])
       : null;
   const [notice, setNotice] = useState({ key, dismissed: true, focusOnOpen: false });
-  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
-  if (dismissedKey !== null && dismissedKey !== key) setDismissedKey(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const toastCloseRef = useRef<HTMLButtonElement>(null);
   // A new failure or a completed retry starts a fresh notice; readiness updates
@@ -42,13 +38,11 @@ export function useControllerNotice(props: Props): ControllerNotice {
     setNotice({ key, dismissed: true, focusOnOpen: false });
   }, [key]);
   const dismiss = useCallback(() => {
-    setDismissedKey(key);
     close();
     triggerRef.current?.focus();
-  }, [close, key]);
+  }, [close]);
   return {
     key,
-    briefHidden: dismissedKey === key,
     triggerRef,
     toastCloseRef,
     open: key !== null && !notice.dismissed,
@@ -76,31 +70,23 @@ type QualificationNoticeProps = {
   readonly disabled: boolean;
 };
 
-export function BriefQualificationNotice(
-  props: Props & { readonly notice: ControllerNotice },
-): JSX.Element | null {
-  const qualification = props.qualification;
-  // Reading settings after a reset, and a read that failed while the
-  // controller still answers, stay in Controller info: the machine works
-  // without them. Only a controller that stopped answering announces itself
-  // (ADR-611).
-  if (
-    props.notice.key === null ||
-    props.notice.briefHidden ||
-    props.notice.show === undefined ||
-    qualification?.kind !== 'failed' ||
-    props.controllerStoppedResponding !== true
-  )
-    return null;
-  return (
-    <ControllerToolbarNotice
-      key={props.notice.key}
-      focusFallbackRef={props.notice.triggerRef}
-      message="Controller is not responding"
-      detail={qualification.message}
-      onShow={props.notice.show}
-    />
-  );
+/**
+ * The failed settings read the operator has to act on: Reconnect is
+ * recommended, or the controller stopped answering. It opens the recovery card
+ * over the canvas by itself (ADR-636). Reading settings after a reset, and a
+ * read that failed while the controller still answers, stay in Controller info:
+ * the machine works without them (ADR-611).
+ */
+export function controllerRecoveryKey(input: {
+  readonly connection: ConnectionState;
+  readonly qualification: ControllerQualification | undefined;
+  readonly reconnectRecommended: boolean;
+  readonly stoppedResponding: boolean;
+}): string | null {
+  const qualification = input.qualification;
+  if (input.connection.kind !== 'connected' || qualification?.kind !== 'failed') return null;
+  if (!input.reconnectRecommended && !input.stoppedResponding) return null;
+  return JSON.stringify([qualification.epoch, qualification.message]);
 }
 
 export function QualificationNotice(props: QualificationNoticeProps): JSX.Element | null {

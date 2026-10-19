@@ -1,6 +1,8 @@
 // The job's burn path on the bed (ADR-490), read from the started plan the
 // canvas already draws its live trail from: every lit move, mapped from
-// controller to bed millimetres by the same walker, at the beam's width.
+// controller to bed millimetres by the same walker, at the beam's width. A
+// User Origin job is drawn over its artwork, so its lines are shifted back to
+// where they burn (ADR-636).
 
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import {
@@ -10,8 +12,8 @@ import {
 } from '../../../core/camera/job-watch/route-mask';
 import { jobWatchRegion } from '../../../core/camera/job-watch/job-area';
 import { BURN_TOLERANCE_MM } from '../../../core/camera/job-watch/burn-comparison';
-import type { CanvasMotionPlan } from '../../state/canvas-motion-plan';
-import { walkRouteLines } from '../../workspace/route-range-walk';
+import { artworkToBedShift, type CanvasMotionPlan } from '../../state/canvas-motion-plan';
+import { walkRouteLines, type RouteLineVisitor } from '../../workspace/route-range-walk';
 
 // The canvas trail's nominal beam when the machine does not say (draw-burn-trail).
 const NOMINAL_LASER_KERF_MM = 0.2;
@@ -29,9 +31,16 @@ export function planPlacesOnBed(plan: CanvasMotionPlan): boolean {
  */
 export function burnRegion(plan: CanvasMotionPlan): BedArea | null {
   const bed = { width: plan.device.bedWidth, height: plan.device.bedHeight };
-  if (plan.framePerimeter.length >= 2) return jobWatchRegion(plan.framePerimeter, bed);
+  const shift = artworkToBedShift(plan);
+  if (plan.framePerimeter.length >= 2) {
+    const perimeter = plan.framePerimeter.map((point) => ({
+      x: point.x + shift.x,
+      y: point.y + shift.y,
+    }));
+    return jobWatchRegion(perimeter, bed);
+  }
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-  walkRouteLines(plan, 0, Number.POSITIVE_INFINITY, (x0, y0, x1, y1, intent) => {
+  walkBedLines(plan, 0, Number.POSITIVE_INFINITY, (x0, y0, x1, y1, intent) => {
     if (intent !== 'process') return true;
     bounds.minX = Math.min(bounds.minX, x0, x1);
     bounds.minY = Math.min(bounds.minY, y0, y1);
@@ -65,15 +74,32 @@ export function burnRouteMasks(
   const kerfMm = spot === undefined ? NOMINAL_LASER_KERF_MM : Math.max(spot.x, spot.y);
   const builder = routeMaskBuilder(grid, kerfMm, BURN_TOLERANCE_MM);
   const split = Math.max(0, checkFromRouteMm);
-  walkRouteLines(plan, 0, split, (x0, y0, x1, y1, intent) => {
+  walkBedLines(plan, 0, split, (x0, y0, x1, y1, intent) => {
     if (intent === 'process') builder.addLine(x0, y0, x1, y1, true);
     return true;
   });
-  walkRouteLines(plan, split, Number.POSITIVE_INFINITY, (x0, y0, x1, y1, intent) => {
+  walkBedLines(plan, split, Number.POSITIVE_INFINITY, (x0, y0, x1, y1, intent) => {
     if (intent === 'process') builder.addLine(x0, y0, x1, y1);
     return true;
   });
   return builder.masks();
+}
+
+/** walkRouteLines in bed millimetres. */
+function walkBedLines(
+  plan: CanvasMotionPlan,
+  fromRouteMm: number,
+  toRouteMm: number,
+  visit: RouteLineVisitor,
+): void {
+  const shift = artworkToBedShift(plan);
+  if (shift.x === 0 && shift.y === 0) {
+    walkRouteLines(plan, fromRouteMm, toRouteMm, visit);
+    return;
+  }
+  walkRouteLines(plan, fromRouteMm, toRouteMm, (x0, y0, x1, y1, intent) =>
+    visit(x0 + shift.x, y0 + shift.y, x1 + shift.x, y1 + shift.y, intent),
+  );
 }
 
 /** Where the first lit move starts along the route, mm; null when nothing burns. */

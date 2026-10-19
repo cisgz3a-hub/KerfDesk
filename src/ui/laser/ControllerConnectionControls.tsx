@@ -5,12 +5,15 @@ import { machineNoun } from '../machine/machine-labels';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { browserLocalStorage } from '../state/browser-local-storage';
-import { controllerStoppedResponding } from '../state/controller-recovery-status';
 import { useLaserStore } from '../state/laser-store';
 import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
 import { ConnectionBar } from './ConnectionBar';
 import { connectMachine } from './connect-machine';
-import { isFileOnlyController, useControllerReconnect } from './controller-reconnect';
+import {
+  isFileOnlyController,
+  useControllerQualificationRetry,
+  useControllerReconnect,
+} from './controller-reconnect';
 import { ConnectedMachineProfile } from './ConnectedMachineProfile';
 import { LaserModuleRow } from './LaserModuleRow';
 import { DeviceSetupControls } from './device-setup';
@@ -35,10 +38,8 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
     state.getMachineSettingsReadBlockReason(),
   );
   const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
-  const stoppedResponding = useLaserStore((state) => controllerStoppedResponding(state));
   const wentSilent = useControllerWentSilent(connection.kind === 'connected');
   const disconnectController = useLaserStore((state) => state.disconnect);
-  const retryQualification = useLaserStore((state) => state.retryControllerQualification);
   const controllerKind = useStore((state) => state.project.device.controllerKind);
   const machineName = useStore((state) => state.project.device.name || 'Unnamed machine');
   const supportsSerial = platform.serial.isSupported();
@@ -47,10 +48,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
     void connectMachine(platform).catch(controllerActionFailureHandler('Connect'));
   };
   const reconnect = useControllerReconnect();
-  const retryControllerInformation = (): void => {
-    if (useLaserStore.getState().getMachineSettingsReadBlockReason() !== null) return;
-    void retryQualification().catch(controllerActionFailureHandler('Check controller'));
-  };
+  const retryControllerInformation = useControllerQualificationRetry();
   // A connected machine is closed first, so the chosen port replaces it.
   const choosePort = async (): Promise<void> => {
     if (useLaserStore.getState().connection.kind === 'connected') await disconnectController();
@@ -82,7 +80,6 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         qualification={qualification}
         qualificationReadBlockReason={qualificationReadBlockReason}
         reconnectRecommended={reconnectRecommended}
-        controllerStoppedResponding={stoppedResponding}
         controllerWentSilent={wentSilent}
         onRetryQualification={retryControllerInformation}
         onReconnectQualification={reconnect}
