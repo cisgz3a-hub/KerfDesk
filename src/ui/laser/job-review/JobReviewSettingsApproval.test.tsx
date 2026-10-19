@@ -128,9 +128,9 @@ async function exerciseApprovalSettingsCase(
   const changed = nextKey !== state.approvedKey;
   expect(host.textContent).toContain(
     changed
-      ? 'Changes are synced to the main Artwork / Operations'
+      ? 'Changes are synced to the Artwork panel'
       : state.expectedRebuilds === 0
-        ? 'Main Artwork / Operations settings match this review.'
+        ? 'Artwork panel settings match this review.'
         : 'Approved — current values are synced',
   );
 
@@ -190,12 +190,12 @@ describe('JobReviewSettingsApproval', () => {
         .getState()
         .setObjectsOperationOverrideForOperation(['artwork'], 'red', { power: 33 }),
     );
-    expect(host.textContent).toContain('Changes are synced to the main Artwork / Operations');
+    expect(host.textContent).toContain('Changes are synced to the Artwork panel');
     await act(async () => approveButton().click());
     expect(onApprove).toHaveBeenCalledTimes(1);
 
     await act(async () => useStore.getState().setObjectsPowerScale(['artwork'], 50));
-    expect(host.textContent).toContain('Changes are synced to the main Artwork / Operations');
+    expect(host.textContent).toContain('Changes are synced to the Artwork panel');
     await act(async () => approveButton().click());
     expect(onApprove).toHaveBeenCalledTimes(2);
     await act(async () => approveButton().click());
@@ -207,7 +207,7 @@ describe('JobReviewSettingsApproval', () => {
     await render(onApprove);
 
     expect(approveButton().disabled).toBe(false);
-    expect(host.textContent).toContain('Main Artwork / Operations settings match this review.');
+    expect(host.textContent).toContain('Artwork panel settings match this review.');
 
     await act(async () => approveButton().click());
     expect(onApprove).not.toHaveBeenCalled();
@@ -217,20 +217,20 @@ describe('JobReviewSettingsApproval', () => {
 
     expect(useStore.getState().project.scene.layers[0]?.power).toBe(55);
     expect(approveButton().disabled).toBe(false);
-    expect(host.textContent).toContain('Changes are synced to the main Artwork / Operations');
+    expect(host.textContent).toContain('Changes are synced to the Artwork panel');
 
     await act(async () => approveButton().click());
 
     expect(approveButton().disabled).toBe(false);
     expect(host.textContent).toContain(
-      'Approved — current values are synced to the main Artwork / Operations settings.',
+      'Approved — current values are synced to the Artwork panel settings.',
     );
     expect(onApprove).toHaveBeenCalledTimes(1);
 
     await act(async () => useStore.getState().setLayerParam('red', { power: 60 }));
 
     expect(approveButton().disabled).toBe(false);
-    expect(host.textContent).toContain('Changes are synced to the main Artwork / Operations');
+    expect(host.textContent).toContain('Changes are synced to the Artwork panel');
   });
 
   it('detects and approves CNC operation settings from the same main store', async () => {
@@ -243,7 +243,7 @@ describe('JobReviewSettingsApproval', () => {
       }),
     );
 
-    expect(host.textContent).toContain('Changes are synced to the main Artwork / Operations');
+    expect(host.textContent).toContain('Changes are synced to the Artwork panel');
     await act(async () => approveButton().click());
     expect(onApprove).toHaveBeenCalledTimes(1);
     expect(host.textContent).toContain('Approved — current values are synced');

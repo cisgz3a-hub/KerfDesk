@@ -151,7 +151,7 @@ it('runs a free desktop build as KerfDesk Free by default', async () => {
   await expectDesktopDialog(open);
 });
 
-it('does not open a Pro tool asked for before a free desktop build reports', async () => {
+it('mounts no Pro tool before a free desktop build reports, then only explains it', async () => {
   let report: (status: LicenceStatus) => void = () => undefined;
   const slow = {
     ...client(freeBuild),
@@ -165,8 +165,10 @@ it('does not open a Pro tool asked for before a free desktop build reports', asy
       </EditionProvider>,
     ),
   );
-  await act(async () => openButton().click());
+  // Until the first status, the build might take a licence (ADR-623).
+  expect(document.body.textContent).not.toContain('Open V-carve');
   await act(async () => report(freeBuild));
+  await act(async () => openButton().click());
   expect(open).not.toHaveBeenCalled();
   expect(document.body.textContent).toContain('V-carve is a Pro tool');
   expectEveryProFeatureListed();

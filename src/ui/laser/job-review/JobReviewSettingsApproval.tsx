@@ -31,7 +31,7 @@ export function JobReviewSettingsApproval(props: { readonly onApprove: () => voi
         title={
           hasChanges
             ? 'Approve the changed main settings and refresh the exact job review.'
-            : 'Approve the current main Artwork / Operations settings.'
+            : 'Approve the current Artwork panel settings.'
         }
         onClick={handleApprove}
       >
@@ -43,11 +43,11 @@ export function JobReviewSettingsApproval(props: { readonly onApprove: () => voi
 
 function approvalStatus(hasChanges: boolean, hasApproved: boolean): string {
   if (hasChanges) {
-    return 'Changes are synced to the main Artwork / Operations settings. Approve them here, or Start job to approve the full review.';
+    return 'Changes are synced to the Artwork panel settings. Approve them here, or Start job to approve the full review.';
   }
   return hasApproved
-    ? 'Approved — current values are synced to the main Artwork / Operations settings.'
-    : 'Main Artwork / Operations settings match this review.';
+    ? 'Approved — current values are synced to the Artwork panel settings.'
+    : 'Artwork panel settings match this review.';
 }
 
 function settingsSignature(scene: Scene): string {

@@ -170,7 +170,7 @@ export async function importTopologyProject(
   await selectWorkspacePanel(page, 'Artwork');
   await runMenuCommand(page, 'Edit', 'Select All');
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await expect(

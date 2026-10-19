@@ -96,20 +96,10 @@ it('can explicitly use an unrestricted development context', async () => {
   expect(requestProFeature('box-generator')).toBe(true);
   expect(document.querySelector('[role="dialog"]')).toBeNull();
 });
-it('mounts the workspace at once in a Free commercial build', async () => {
-  const api = client();
-  await act(async () =>
-    root.render(
-      <EditionProvider client={api}>
-        <div data-workspace>workspace</div>
-      </EditionProvider>,
-    ),
-  );
-  expect(host.querySelector('[data-workspace]')).not.toBeNull();
-  expect(proFeaturesUnlocked()).toBe(false);
-});
-it('explains a locked Pro tool and opens it once the trial unlocks Pro', async () => {
-  const api = client();
+const licenceWindow = () =>
+  document.querySelector<HTMLElement>('[role="dialog"][aria-label="Activate KerfDesk"]');
+it('explains a locked Pro tool after rights end mid-session and opens it once a trial starts', async () => {
+  const api = client({ ...trial, tier: 'paid', accessExpiresAt: null });
   const open = vi.fn();
   await act(async () =>
     root.render(
@@ -118,6 +108,12 @@ it('explains a locked Pro tool and opens it once the trial unlocks Pro', async (
       </EditionProvider>,
     ),
   );
+  // The owner signs this device out: the workspace stays for the session.
+  await act(async () => window.dispatchEvent(new Event(LICENCE_SETTINGS_EVENT)));
+  vi.mocked(api.status).mockResolvedValue(free);
+  await act(async () => button('Deactivate this device').click());
+  await act(async () => button('Close').click());
+  expect(licenceWindow()).toBeNull();
   await act(async () => button('Open V-carve').click());
   expect(open).not.toHaveBeenCalled();
   expect(document.body.textContent).toContain('V-carve is a Pro tool');
@@ -129,7 +125,7 @@ it('explains a locked Pro tool and opens it once the trial unlocks Pro', async (
   expect(open).toHaveBeenCalledTimes(2);
 });
 it('lets the operator decline without opening the tool', async () => {
-  const api = client({ ...free, state: 'trial-expired', tier: 'trial' });
+  const api = client(trial);
   const open = vi.fn();
   await act(async () =>
     root.render(
@@ -138,6 +134,10 @@ it('lets the operator decline without opening the tool', async () => {
       </EditionProvider>,
     ),
   );
+  // The trial ends while KerfDesk is open; the next status read reports it.
+  vi.mocked(api.status).mockResolvedValue({ ...free, state: 'trial-expired', tier: 'trial' });
+  await act(async () => window.dispatchEvent(new Event('focus')));
+  expect(licenceWindow()).toBeNull();
   await act(async () => button('Open V-carve').click());
   expect(document.body.textContent).toContain('Pro trial on this device has ended');
   expect(document.body.textContent).not.toContain('Start free 30-day trial');
@@ -212,7 +212,8 @@ it('keeps the workspace mounted while the licence is managed or deactivated', as
   expect(host.textContent).toContain('Your KerfDesk licence');
   expect(host.textContent).toContain('KerfDesk Pro');
   await act(async () => button('Deactivate this device').click());
-  expect(host.textContent).toContain('KerfDesk Free');
+  expect(host.textContent).toContain('Licence needed');
+  expect(licenceWindow()).toBeNull();
   expect(unmount).not.toHaveBeenCalled();
   await act(async () => button('Close').click());
   expect(host.textContent).toBe('workspace');
@@ -306,42 +307,43 @@ it('shows developer rights with no purchase or renewal prompt', async () => {
   expect(host.textContent).not.toContain('Buy Pro');
   expect(host.textContent).not.toContain('Renew updates');
 });
-it('names the edition in the status bar', () => {
-  expect(editionLabel(free, 0)).toBe('Free · Try Pro');
-  expect(editionLabel({ ...free, state: 'trial-expired', tier: 'trial' }, 0)).toBe('Free');
+it('names the licence in the status bar, with no desktop Free edition', () => {
+  expect(editionLabel(free, 0)).toBe('Licence needed');
+  expect(editionLabel({ ...free, state: 'trial-expired', tier: 'trial' }, 0)).toBe(
+    'Licence needed',
+  );
   expect(editionLabel(trial, 2_000_000_000 - 86_400 * 3 + 10)).toBe('Pro trial · 3 days left');
   expect(editionLabel({ ...trial, tier: 'paid', accessExpiresAt: null }, 0)).toBe('Pro');
 });
-it.each([free, trial])(
-  'opens Help > Licence with a purchase-link key from $state / $tier',
-  async (status) => {
-    const key = `KD1.0f8fad5b-d9cb-469f-a165-70867728950e.${'a'.repeat(43)}`;
-    const licenceLink = vi
-      .fn()
-      .mockResolvedValueOnce({ open: true, licenseKey: key })
-      .mockResolvedValue({ open: false, licenseKey: null });
-    const api = { ...client(status), licenceLink };
-    await act(async () =>
-      root.render(
-        <EditionProvider client={api}>
-          <div>workspace</div>
-        </EditionProvider>,
-      ),
-    );
-    const field = () => document.querySelector<HTMLInputElement>('#kerfdesk-licence-key');
-    expect(field()?.value).toBe(key);
-    await act(async () =>
-      document.querySelector<HTMLButtonElement>('[aria-label="Close licence settings"]')?.click(),
-    );
-    expect(field()).toBeNull();
-    // A later link reaching the running app opens the panel again, once.
-    licenceLink.mockResolvedValueOnce({ open: true, licenseKey: null });
-    await act(async () => window.dispatchEvent(new Event('kerfdesk:licence-link')));
-    expect(field()?.value).toBe('');
-    expect(licenceLink).toHaveBeenCalledTimes(2);
-  },
-);
-
+const LINKED_KEY = `KD1.0f8fad5b-d9cb-469f-a165-70867728950e.${'a'.repeat(43)}`;
+function linkedClient(status: LicenceStatus) {
+  const licenceLink = vi
+    .fn()
+    .mockResolvedValueOnce({ open: true, licenseKey: LINKED_KEY })
+    .mockResolvedValue({ open: false, licenseKey: null });
+  return { api: { ...client(status), licenceLink }, licenceLink };
+}
+const keyField = () => document.querySelector<HTMLInputElement>('#kerfdesk-licence-key');
+it('opens Help > Licence with a purchase-link key in a licensed session', async () => {
+  const { api, licenceLink } = linkedClient(trial);
+  await act(async () =>
+    root.render(
+      <EditionProvider client={api}>
+        <div>workspace</div>
+      </EditionProvider>,
+    ),
+  );
+  expect(keyField()?.value).toBe(LINKED_KEY);
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[aria-label="Close licence settings"]')?.click(),
+  );
+  expect(keyField()).toBeNull();
+  // A later link reaching the running app opens the panel again, once.
+  licenceLink.mockResolvedValueOnce({ open: true, licenseKey: null });
+  await act(async () => window.dispatchEvent(new Event('kerfdesk:licence-link')));
+  expect(keyField()?.value).toBe('');
+  expect(licenceLink).toHaveBeenCalledTimes(2);
+});
 it('activates a purchase during an active trial without signing the trial out first', async () => {
   const key = `KD1.0f8fad5b-d9cb-469f-a165-70867728950e.${'a'.repeat(43)}`;
   const api = client(trial);

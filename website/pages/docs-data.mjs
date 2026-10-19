@@ -123,7 +123,7 @@ export const STEP_COPY = {
     html`<p>
         Each piece of artwork gets a named operation that says what happens to it. Operations attach
         to the artwork itself, not to a color. Select the artwork, open
-        <strong>Settings → Operation</strong> and choose one:
+        <strong>Properties → Operation</strong> in the Artwork panel and choose one:
       </p>
       <ul>
         <li>

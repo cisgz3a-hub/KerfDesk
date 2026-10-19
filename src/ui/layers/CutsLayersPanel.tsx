@@ -32,17 +32,14 @@ export function CutsLayersPanel(): JSX.Element {
   if (!panelVisible) {
     return (
       <CollapsedRail
-        title="Artwork / Operations"
-        ariaLabel="Artwork / Operations panel collapsed"
+        title="Artwork"
+        ariaLabel="Artwork panel collapsed"
         onExpand={() => togglePanel('layers')}
       />
     );
   }
   return (
-    <aside
-      aria-label="Artwork / Operations panel"
-      className="lf-rail lf-pane-form lf-artwork-panel"
-    >
+    <aside aria-label="Artwork panel" className="lf-rail lf-pane-form lf-artwork-panel">
       <header className="lf-artwork-panel-heading">
         <h2>Artwork</h2>
         <Button
@@ -55,8 +52,7 @@ export function CutsLayersPanel(): JSX.Element {
         </Button>
         <IconButton
           icon="chevron-right"
-          size="sm"
-          label="Collapse Artwork / Operations panel"
+          label="Collapse Artwork panel"
           onClick={() => togglePanel('layers')}
         />
       </header>

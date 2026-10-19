@@ -57,6 +57,8 @@ export type LaserStoreActions = {
   readonly retryControllerQualification: () => Promise<void>;
   readonly getMachineSettingsReadBlockReason: () => string | null;
   readonly getControllerReconnectRecommended: () => boolean;
+  /** "Not responding": a controller that answered went quiet while the poll ran (ADR-611 A1). */
+  readonly getControllerWentSilent: () => boolean;
   readonly writeGrblSetting: (id: number, value: string) => Promise<void>;
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   /** Owned G54 selection used before preparing Frame so Frame and emitted
@@ -77,7 +79,14 @@ export type LaserStoreActions = {
   readonly clearIncidentHistory: () => void;
   readonly jog: (params: JogParams, owner?: MachineExecutionOwner) => Promise<void>;
   readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
-  readonly centrePositioningLight: (x: number, y: number, feed: number) => Promise<void>;
+  readonly centrePositioningLight: (
+    x: number,
+    y: number,
+    feed: number,
+    assertTargetCurrent?: () => void,
+    coordinateFrame?: 'machine' | 'work',
+  ) => Promise<void>;
+  readonly switchPositioningLightOn: () => Promise<void>;
   readonly switchPositioningLightOff: () => Promise<void>;
   readonly setAirAssistEnabled: (enabled: boolean) => Promise<void>;
   readonly setFireActive: (active: boolean, requestedPercent?: number) => Promise<void>;

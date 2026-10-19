@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import { createDesktopBackgroundStartup, createDesktopStartup } from './desktop-startup';
+import { createStartupSignals } from './licensing-startup-signals';
 
 const request = (path: string, init: RequestInit = {}) =>
   new Request(`app://app${path}`, {
@@ -42,6 +43,42 @@ describe('native background startup after the workspace opening gates', () => {
     expect(startCamera).toHaveBeenCalledOnce();
     expect(updater.checkForUpdatesAndNotify).toHaveBeenCalledTimes(channel === 'free' ? 1 : 0);
     expect(updater.autoDownload).toBe(channel === 'free');
+  });
+
+  it('runs the camera bridge only while a workspace is admitted, per renderer', async () => {
+    const signals = createStartupSignals(false);
+    const licence = {
+      config: { channel: 'commercial' },
+      start: vi.fn(),
+      admission: signals.admission,
+    };
+    const startCamera = vi.fn();
+    const stopCamera = vi.fn();
+    const updater = {
+      autoDownload: false,
+      autoInstallOnAppQuit: false,
+      disableWebInstaller: false,
+      checkForUpdatesAndNotify: vi.fn(async () => null),
+    };
+    const startup = createDesktopBackgroundStartup(licence, updater, {
+      isPackaged: true,
+      trustedUpdates: true,
+      startCamera,
+      stopCamera,
+    });
+    const handle = startup.routes(async () => new Response('app route'));
+    await handle(request('/api/desktop/workspace-ready'));
+    expect(licence.start).toHaveBeenCalledOnce();
+    expect(startCamera).not.toHaveBeenCalled();
+    signals.admitWorkspace(signals.observeRequest()({ edition: 'pro' })!);
+    expect(startCamera).toHaveBeenCalledOnce();
+    // A reopened macOS window or a reload opens behind the licence window again.
+    await handle(request('/api/desktop/workspace-ready'));
+    expect(stopCamera).toHaveBeenCalled();
+    expect(startCamera).toHaveBeenCalledOnce();
+    signals.admitWorkspace(signals.observeRequest()({ edition: 'pro' })!);
+    expect(startCamera).toHaveBeenCalledTimes(2);
+    expect(licence.start).toHaveBeenCalledOnce();
   });
 
   it('serves the agreement UI, but starts no licence or update work before readiness', async () => {
