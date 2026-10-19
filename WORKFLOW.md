@@ -3362,7 +3362,8 @@ again) or **Discard changes**.
    - For a machine not set up before in this browser, or after the operator presses **Connect** in
      the strip, the reported values are filled into the draft by themselves: the firmware the
      banner names (when the driver can connect to it), the baud rate that answered, the machine
-     type from `$32` (laser mode on or off; a Laser + CNC draft keeps both), and the mapped `$$`
+     type from `$32` (laser mode on or off; a Laser + CNC draft keeps both, and a machine chosen
+     from the list keeps the type the list gives it, ADR-637 Amendment 1), and the mapped `$$`
      values. The strip lists each change
      as old → new with one **Undo** that restores the draft as it was. A machine already set up
      that the operator only opens setup for keeps its values and offers **Use detected values**
@@ -3384,15 +3385,30 @@ again) or **Discard changes**.
      pointer anywhere on it chooses that machine and copies it into the draft. A row shows the
      model, work area, laser power and type; once a controller has named its firmware, laser rows
      add **Same firmware** or **Other firmware** as a hint. Under the list the chosen machine shows
-     its facts, evidence label, warnings and **Profile details**, which sit outside the choice so
-     reading the evidence selects nothing; a Laser + CNC machine also asks which toolhead is fitted.
+     the draft's work area, power and type with its controller, the evidence label, warnings and
+     **Profile details**, which sit outside the choice so reading the evidence selects nothing; a
+     Laser + CNC machine also asks which toolhead is fitted. A listed machine that an earlier setup
+     saved as another type says so and shows the type question (ADR-637 Amendment 1).
+   - A choice that would replace values someone set does not apply at once (ADR-637 Amendment 1):
+     the max feed, S range, origin and homing, frame speed, no-go zones, scan-offset, camera or
+     rotary calibration, saved positions, or a Laser + CNC machine's CNC values, where they differ
+     from the listed profile or firmware starter the draft came from and from what the controller
+     reported. A notice after the list names what would be replaced, with **Replace settings** and
+     **Keep current settings**. The radios keep the draft's choice meanwhile, so arrowing through
+     the list over such a draft asks for each row in turn instead of applying it. The name and work
+     area are not counted: every machine brings its own.
    - Choosing a CNC preset makes the draft a CNC-only machine with the preset's name, work area and
      spindle ceiling, and leaves the controller unchanged; over a listed laser profile it starts
-     from the generic starter for the same controller, so no laser brand's values stay behind.
+     from the generic starter for the same controller, and a Laser + CNC machine's CNC values go
+     back to the defaults, so no laser brand's values stay behind.
    - **My machine isn’t listed**, after the list, asks four things: name, type (**Laser only**,
      **CNC only** or **Laser + CNC**, with the active toolhead for a hybrid, chosen after Save with
      the toolbar's Laser / CNC), work area and firmware (the same draft value as Connection
-     options' controller). Chosen while a listed machine is in the draft, it starts again from the
+     options' controller). On a draft that is still a firmware starter apart from its name, type
+     and work area, the firmware choice starts from that firmware's generic starter (Ruida's
+     rear-right origin and 900 × 600 mm, Marlin's S 0-255), keeping the name, the type and a work
+     area the operator typed; otherwise it changes the controller only. Chosen while a listed
+     machine is in the draft, it starts again from the
      generic starter for the same controller, named **My machine**, keeping the work area; chosen on
      the untouched starter it only names it **My machine**. A draft that is neither listed nor the
      untouched starter (imported, filled in from the controller, or set up earlier) opens with this

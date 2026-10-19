@@ -3,11 +3,15 @@
 // The whole row is the control (ADR-347): one radio group, so choosing a
 // machine never depends on hitting a small button. Choosing one only changes
 // the draft; Save on Review is still the only thing that changes the project.
+// A choice that would replace values someone set asks first (ADR-637
+// Amendment 1), so arrowing through the radios never discards them unseen.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '../../kit';
 import type { DeviceSetupAction, DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupCustomMachine } from './DeviceSetupCustomMachine';
 import { DeviceSetupMachineDetails, machineFacts } from './DeviceSetupMachineDetails';
+import { joinSettingLabels, machineChoiceReplaces } from './machine-choice-replaces';
 import {
   chooseCustomMachineActions,
   chooseMachineEntryActions,
@@ -33,15 +37,17 @@ const KIND_FILTERS: ReadonlyArray<{
   { value: 'cnc', label: 'CNC', title: 'Show CNC machines, including Laser + CNC machines.' },
 ];
 
+/** A machine row, or "My machine isn't listed". */
+type MachineChoice = MachinePickerEntry | 'custom';
+
 export function DeviceSetupMachinePicker({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<MachineKindFilter>('all');
-  const [customOpen, setCustomOpen] = useState(false);
   const entries = useMemo(() => machinePickerEntries(state), [state]);
+  const { customOpen, choose, replaceNotice } = useMachineChoice(state, dispatch, entries);
   const selected = selectedMachineEntry(state, entries);
   const custom = selected === undefined && (customOpen || draftIsCustomMachine(state, entries));
   const groups = groupMachinePickerEntries(filterMachinePickerEntries(entries, query, kind));
-  const run = (actions: ReadonlyArray<DeviceSetupAction>): void => actions.forEach(dispatch);
   const list = useScrollChosenIntoView();
   return (
     <section className="lf-setup-picker" aria-label="Choose your machine">
@@ -78,10 +84,7 @@ export function DeviceSetupMachinePicker({ state, dispatch }: DeviceSetupStepPro
                 key={entry.id}
                 entry={entry}
                 state={state}
-                onChoose={() => {
-                  setCustomOpen(false);
-                  run(chooseMachineEntryActions(state, entry));
-                }}
+                onChoose={() => choose(entry)}
               />
             ))}
           </div>
@@ -93,15 +96,13 @@ export function DeviceSetupMachinePicker({ state, dispatch }: DeviceSetupStepPro
           </p>
         ) : null}
       </div>
+      {replaceNotice}
       <label className="lf-setup-picker-row lf-setup-picker-custom" data-selected={custom}>
         <input
           type="radio"
           name="setup-machine"
           checked={custom}
-          onChange={() => {
-            setCustomOpen(true);
-            run(chooseCustomMachineActions(state, entries));
-          }}
+          onChange={() => choose('custom')}
           aria-label="My machine isn’t listed"
           title="Enter your machine's type, work area and firmware yourself."
         />
@@ -113,6 +114,70 @@ export function DeviceSetupMachinePicker({ state, dispatch }: DeviceSetupStepPro
       ) : null}
       {custom ? <DeviceSetupCustomMachine state={state} dispatch={dispatch} /> : null}
     </section>
+  );
+}
+
+// A choice applies at once unless it would replace values someone set; then
+// it waits for Replace settings (ADR-637 Amendment 1).
+function useMachineChoice(
+  state: DeviceSetupStepProps['state'],
+  dispatch: DeviceSetupStepProps['dispatch'],
+  entries: ReadonlyArray<MachinePickerEntry>,
+): {
+  readonly customOpen: boolean;
+  readonly choose: (choice: MachineChoice) => void;
+  readonly replaceNotice: JSX.Element | null;
+} {
+  const [customOpen, setCustomOpen] = useState(false);
+  const [pending, setPending] = useState<MachineChoice | null>(null);
+  const actionsFor = (choice: MachineChoice): ReadonlyArray<DeviceSetupAction> =>
+    choice === 'custom'
+      ? chooseCustomMachineActions(state, entries)
+      : chooseMachineEntryActions(state, choice);
+  const apply = (choice: MachineChoice): void => {
+    setPending(null);
+    setCustomOpen(choice === 'custom');
+    actionsFor(choice).forEach(dispatch);
+  };
+  const choose = (choice: MachineChoice): void => {
+    if (machineChoiceReplaces(state, entries, actionsFor(choice)).length > 0) setPending(choice);
+    else apply(choice);
+  };
+  const replaceNotice =
+    pending === null ? null : (
+      <ReplaceConfirm
+        choice={pending}
+        replaces={machineChoiceReplaces(state, entries, actionsFor(pending))}
+        onReplace={() => apply(pending)}
+        onKeep={() => setPending(null)}
+      />
+    );
+  return { customOpen, choose, replaceNotice };
+}
+
+// Asked in place, after the list: the next Tab from the radios reaches it, and
+// arrowing on to another row moves the question to that row.
+function ReplaceConfirm(props: {
+  readonly choice: MachineChoice;
+  readonly replaces: ReadonlyArray<string>;
+  readonly onReplace: () => void;
+  readonly onKeep: () => void;
+}): JSX.Element {
+  const name = props.choice === 'custom' ? 'My machine isn’t listed' : props.choice.name;
+  const what = props.replaces.length === 0 ? 'its values' : joinSettingLabels(props.replaces);
+  return (
+    <div className="lf-setup-picker-confirm" role="alert">
+      <p>
+        <strong>Replace this machine’s settings?</strong> Choosing {name} replaces the {what} set
+        for the machine in this draft. Nothing is saved until you save setup.
+      </p>
+      <div>
+        <Button variant="danger" onClick={props.onReplace}>
+          Replace settings
+        </Button>
+        <Button onClick={props.onKeep}>Keep current settings</Button>
+      </div>
+    </div>
   );
 }
 

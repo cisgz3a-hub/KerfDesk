@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CNC_MACHINE_CATALOG } from '../../../core/cnc';
 import { DEFAULT_DEVICE_PROFILE, GRBL_MACHINE_PROFILE_CATALOG } from '../../../core/devices';
-import { LASER_MACHINE_CONFIG } from '../../../core/scene';
+import { DEFAULT_CNC_MACHINE_CONFIG, LASER_MACHINE_CONFIG } from '../../../core/scene';
 import { deviceSetupReducer, initDeviceSetup, type DeviceSetupState } from './device-setup-flow';
 import {
   CUSTOM_MACHINE_NAME,
@@ -92,6 +92,21 @@ describe('machine list (ADR-637)', () => {
     expect(entries.filter((item) => selectedMachineEntry(cnc, [item]) !== undefined)).toHaveLength(
       1,
     );
+  });
+
+  it('leaves none of a Laser + CNC machine’s CNC values behind under a CNC preset', () => {
+    const hybrid = choose(starter(), 'Neotronics 4040 Max / LT-4LDS-V2 20W');
+    const tuned = deviceSetupReducer(hybrid, {
+      kind: 'edit-machine',
+      machine: { ...hybrid.cncDraft, params: { ...hybrid.cncDraft.params, safeZMm: 9 } },
+    });
+    const cnc = choose(tuned, 'Genmitsu 3018-PRO');
+    expect(cnc.cncDraft.params).toEqual({
+      ...DEFAULT_CNC_MACHINE_CONFIG.params,
+      spindleMaxRpm: 10000,
+    });
+    // Tools and stock are the project's, not the listed machine's.
+    expect(cnc.cncDraft.tools).toBe(tuned.cncDraft.tools);
   });
 
   it('turns a listed machine into a custom one that keeps its work area and controller', () => {

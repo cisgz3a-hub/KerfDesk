@@ -126,6 +126,25 @@
 .lf-setup-picker-row .lf-setup-profile-warning {
   grid-column: 2 / -1;
 }
+/* A choice that would replace values someone set waits here (ADR-637 Am. 1). */
+.lf-setup-picker-confirm {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--lf-border);
+  border-radius: 8px;
+  background: var(--lf-tint-warning);
+  font-size: 12px;
+}
+.lf-setup-picker-confirm p {
+  margin: 0;
+  line-height: 1.5;
+}
+.lf-setup-picker-confirm div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .lf-setup-picker-custom {
   border: 1px dashed var(--lf-border-strong);
   border-radius: 8px;

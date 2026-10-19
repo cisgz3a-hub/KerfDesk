@@ -1,7 +1,9 @@
 // "My machine isn't listed" (ADR-637): the four things KerfDesk needs to know
 // first, on the Machine stage, so a machine outside the list is as quick to set
 // up as one in it. Everything else is on Essentials. The firmware choice is the
-// same draft value as Connection options' controller, with the same effects.
+// same draft value as Connection options' controller; on a draft that is still
+// a firmware starter it also brings that firmware's own starter values, such as
+// Ruida's origin and work area (ADR-637 Amendment 1).
 
 import type { ControllerKind } from '../../../core/devices';
 import { NumberField } from '../../common/NumberField';
@@ -9,6 +11,7 @@ import { MAX_BED_MM } from '../DeviceProfileFields';
 import { controllerOptionLabel } from './DeviceSetupConnectionOptions';
 import { DeviceSetupMachineCapability } from './DeviceSetupMachineCapability';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
+import { chooseCustomFirmwareActions } from './machine-picker-entries';
 import { machineSetupControllerGuides } from './machine-setup-controller-guide';
 
 export function DeviceSetupCustomMachine({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
@@ -58,10 +61,9 @@ export function DeviceSetupCustomMachine({ state, dispatch }: DeviceSetupStepPro
           title="The controller firmware. Connecting reads it for you; most diode lasers run GRBL."
           value={state.draft.controllerKind ?? 'grbl-v1.1'}
           onChange={(event) =>
-            dispatch({
-              kind: 'select-controller',
-              controllerKind: event.target.value as ControllerKind,
-            })
+            chooseCustomFirmwareActions(state, event.target.value as ControllerKind).forEach(
+              dispatch,
+            )
           }
         >
           {machineSetupControllerGuides().map((guide) => (

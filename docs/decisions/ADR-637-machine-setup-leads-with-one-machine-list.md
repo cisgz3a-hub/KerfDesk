@@ -97,3 +97,44 @@ below the fold of the dialog. Then:
 - `DeviceSetupWizard.catalog.test.tsx`, `DeviceSetupMachinePicker.*.test.tsx` and the updated
   wizard, audit and LaserWindow tests cover the stage in the rendered wizard; the e2e specs follow
   the new controls.
+
+### Amendment 1 - A listed machine keeps its type, and a choice asks before it replaces values (2026-10-20)
+
+An audit of this decision found four gaps; each is closed here.
+
+1. **A listed machine keeps its type.** ADR-420 rule 5's fill set the machine type from `$32`
+   after a machine had been chosen from the list, so an Ortur Laser Master 3 whose controller had
+   laser mode off became a CNC-only draft while its row stayed chosen and its facts still said
+   Laser. `$32` is a setting of the controller, not a measurement of the machine, and ADR-240 #2
+   already keeps `$$` values from establishing identity, so a draft that is a listed machine (a
+   chosen row, or a listed laser profile however edited) keeps the type the list gives it. The
+   reported laser mode still reaches the draft, where Review shows it. A machine that is not listed
+   still takes its type from `$32`, with the type question in view. The chosen machine's facts now
+   describe the draft (its work area, power and type), and a listed machine that an earlier setup
+   saved as another type says so and shows the type question, so the draft can be seen and set.
+2. **A choice asks before it replaces values someone set.** Rows are one native radio group, so
+   arrowing through the list chose each row in turn, and a CNC preset or **My machine isn't
+   listed** reset a tuned listed profile to the starter. A choice now applies at once only when it
+   would replace nothing that differs both from the listed profile or firmware starter the draft
+   came from and from what the controller reported: the max feed, S range, origin and homing,
+   frame speed, no-go zones, scan-offset, camera or rotary calibration, saved positions, and a
+   Laser + CNC machine's CNC values (not the spindle ceiling each CNC choice brings). Otherwise a
+   notice after the list names what would be replaced, with **Replace settings** and **Keep
+   current settings**. The radios keep the draft's choice meanwhile, so arrowing over such a draft
+   asks for each row in turn instead of applying it. Values from the controller are not counted,
+   because connecting brings them back, so the first-connect fill followed by a choice from the
+   list asks nothing; nor are the name and work area, which every machine brings.
+3. **The generic starters' values stay reachable.** In **My machine isn't listed**, choosing the
+   firmware on a draft that is still a firmware starter (apart from its name, type and work area)
+   starts from that firmware's generic starter: Ruida's rear-right origin and 900 × 600 mm,
+   Marlin's S 0-255 and capabilities, grblHAL's receive window. It keeps the name, the type asked
+   in the form and a work area the operator typed. Any other draft changes its controller only,
+   as Connection options does.
+4. **A CNC preset over a Laser + CNC machine** also returns the CNC values (safe Z, spin-up,
+   coolant, park) to the defaults before applying the preset's spindle ceiling, so the listed
+   machine's CNC sub-profile does not stay behind under the preset's name.
+
+Verification: `device-setup-auto-fill.test.ts` (a listed laser and a CNC preset keep their type),
+`machine-picker-entries.test.ts` (the CNC reset), and `DeviceSetupMachinePicker.customised.test.tsx`
+(the draft's facts and type question, the replace notice for a CNC preset, **My machine isn't
+listed** and another listed laser, no notice for an untouched profile, and the firmware starters).
