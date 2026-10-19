@@ -19,6 +19,7 @@ import { useStore } from '../../state';
 import { useToastStore } from '../../state/toast-store';
 import { WorkspaceJobActions } from '../WorkspaceJobActions';
 import { BoardArtworkPlacement } from './BoardPlacementControls';
+import { sceneHasCapturedBoard } from './captured-board-outline';
 
 export function PlaceBoardArtworkStep(props: {
   readonly geometry: CapturedBoardGeometry | null;
@@ -61,13 +62,17 @@ export function PlaceBoardArtworkStep(props: {
   );
 }
 
+// Frame and Start follow the board in the project, not this capture session,
+// so a saved board reopened later can still be burned (and the machine panel
+// gives them up exactly when this step can show them).
 export function PlaceBoardBurnStep(props: {
   readonly geometry: CapturedBoardGeometry | null;
   readonly onGoToBoard: () => void;
 }): JSX.Element {
-  if (props.geometry === null) return <NeedsBoard onGoToBoard={props.onGoToBoard} />;
+  const hasBoard = useStore((state) => sceneHasCapturedBoard(state.project.scene));
+  if (!hasBoard) return <NeedsBoard onGoToBoard={props.onGoToBoard} />;
   const origin =
-    props.geometry.kind === 'circle'
+    props.geometry?.kind === 'circle'
       ? 'the centre of the board'
       : 'the front-left corner of the board';
   return (

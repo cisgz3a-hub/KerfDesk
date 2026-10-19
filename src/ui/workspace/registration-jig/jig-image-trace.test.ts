@@ -16,11 +16,14 @@ import { importJigArtwork, traceJigImage } from './jig-editor-artwork';
 import {
   centerJigArtwork,
   createJigEditorSession,
+  jigSessionView,
+  jigStoreChange,
   replaceJigLayout,
   selectJigObjects,
   type JigEditorSession,
 } from './jig-editor-session';
 import { jigImageTraceTargets, jigTraceableImage } from './jig-image-trace';
+import { applyJigEdit } from './use-jig-editor';
 
 const GRID = {
   outline: { kind: 'rectangle' as const, widthMm: 50, heightMm: 30 },
@@ -125,7 +128,16 @@ describe('tracing an image already on the jig', () => {
       expect(replacement.transform).toEqual(positionTraceOverRasterSource(copy, traced).transform);
       expect(operationId(result, replacement.id)).toBe(operationId(result, traced.id));
     }
-    expect(after.draft.project).not.toBe(before.draft.project);
+
+    // Published to the open project, the trace is exactly one undo step.
+    const state = useStore.getState();
+    useStore.setState(jigStoreChange(state, jigSessionView(state), before)!);
+    const untraced = useStore.getState().project;
+    const depth = useStore.getState().undoStack.length;
+    applyJigEdit((session) => traceJigImage(session, image.id, traced), {});
+    expect(useStore.getState().undoStack).toHaveLength(depth + 1);
+    useStore.getState().undo();
+    expect(useStore.getState().project).toBe(untraced);
   });
 
   it('keeps the traced copies linked, so Centre + copy refreshes them instead of adding more', () => {

@@ -152,6 +152,49 @@ describe('registration jig mode session', () => {
     expect(after.minY).toBeCloseTo(before.minY);
   });
 
+  it('keeps burned outlines where they were burned, even ones this visit created', () => {
+    openJig();
+    burnOutlines();
+    const burned = useStore.getState().project;
+    // The new jig's 80 x 40 outline, grown to two columns.
+    const outline = { ...GRID.outline, widthMm: 80, heightMm: 40 };
+    const grow = { ...GRID, outline, rows: 1, columns: 2 };
+    applyJigEdit((session) => replaceJigLayout(session, grow), { fresh: true });
+    applyJigEdit(removeJigLayout, { fresh: true });
+    expect(useStore.getState().project).toBe(burned);
+
+    const before = findRegistrationBoxBounds(burned.scene)!;
+    applyJigEdit((session) => replaceJigLayout(session, grow), {
+      fresh: true,
+      outlinesUnlocked: true,
+    });
+    const after = findRegistrationBoxBounds(useStore.getState().project.scene)!;
+    expect(findRegistrationBoxes(useStore.getState().project.scene)).toHaveLength(2);
+    expect(after.minX).toBeCloseTo(before.minX);
+    expect(after.minY).toBeCloseTo(before.minY);
+  });
+
+  it('creates a jig in Outline only when a layout is applied to a project without one', () => {
+    const enabledId = artworkOperation('enabled-art');
+    const disabledId = artworkOperation('disabled-art');
+    // No outline yet: jig mode opened while the machine moved, or after Remove.
+    applyJigEdit((session) => replaceJigLayout(session, GRID), { fresh: true });
+    expect(jigRunPhase(useStore.getState().project.scene)).toBe('outlines');
+    applyJigEdit(removeJigLayout, {});
+    applyJigEdit((session) => replaceJigLayout(session, GRID), {});
+    const { project } = useStore.getState();
+
+    expect(jigRunPhase(project.scene)).toBe('outlines');
+    expect(jigOutlinesLocked(jigSessionView(useStore.getState()).draft.project)).toBe(false);
+    expect(outputs(project)).toMatchObject({ [enabledId]: false, [disabledId]: false });
+    burnOutlines();
+    expect(outputs(useStore.getState().project)).toMatchObject({
+      [REGISTRATION_LAYER_ID]: false,
+      [enabledId]: true,
+      [disabledId]: false,
+    });
+  });
+
   it('keeps the current run and artwork intent when the layout is rebuilt', () => {
     openJig();
     const outlineRun = useStore.getState();

@@ -28,8 +28,8 @@ export type JigDraft = Pick<
 >;
 
 export type JigEditorSession = {
-  /** True when this jig-mode visit created the jig: its outlines cannot have
-   *  been burned, so a resized grid stays centred where it was. */
+  /** True when this jig-mode visit created the jig and has not burned it: its
+   *  outlines are not on the base yet, so a resized grid stays centred. */
   readonly fresh: boolean;
   readonly draft: JigDraft;
 };
@@ -45,10 +45,10 @@ type JigStoreState = JigDraft & Pick<AppState, 'undoStack'>;
 /** The jig page's view of the store. Outlines are editable until they are
  *  burned (Artwork only), or after an explicit Unlock. */
 export function jigSessionView(state: JigDraft, options: JigViewOptions = {}): JigEditorSession {
-  const editable =
-    options.outlinesUnlocked === true || jigRunPhase(state.project.scene) !== 'artwork';
+  const burned = jigRunPhase(state.project.scene) === 'artwork';
+  const editable = options.outlinesUnlocked === true || !burned;
   return {
-    fresh: options.fresh === true,
+    fresh: options.fresh === true && !burned,
     draft: {
       project: editable ? editableProject(state.project) : lockOutlines(state.project),
       selectedObjectId: state.selectedObjectId,
@@ -233,9 +233,13 @@ export function replaceJigLayout(
   session: JigEditorSession,
   spec: RegistrationJigSetSpec,
 ): JigEditorSession {
+  // Burned outlines stay where they were burned: the grid is rebuilt only
+  // after the operator unlocks them on purpose.
+  if (jigOutlinesLocked(session.draft.project)) return session;
   const previous = session.draft.project.scene.layers;
-  // Outlines this visit created cannot have been burned, so a resized grid
-  // stays centred where it was instead of growing from one corner.
+  const created = findRegistrationBoxes(session.draft.project.scene).length === 0;
+  // Outlines this visit created and has not burned are not on the base yet, so
+  // a resized grid stays centred where it was instead of growing from one corner.
   const result = applyReplaceRegistrationJigSet(
     { ...session.draft, undoStack: [] },
     spec,
@@ -253,10 +257,11 @@ export function replaceJigLayout(
       return existing === undefined ? layer : { ...layer, output: existing.output };
     }),
   };
-  return changeJigDraft(session, {
-    ...result,
-    project: editableProject({ ...project, scene }),
-  });
+  let next: JigDraft = { ...session.draft, ...result, project: { ...project, scene } };
+  // A jig created here starts in Outline only, as one created on opening does:
+  // its outlines have not been burned.
+  if (created) next = { ...next, ...applyRegistrationOutput({ ...next, undoStack: [] }, 'box') };
+  return changeJigDraft(session, { ...next, project: editableProject(next.project) });
 }
 
 export function centerJigArtwork(session: JigEditorSession): JigEditorSession {
@@ -267,6 +272,7 @@ export function centerJigArtwork(session: JigEditorSession): JigEditorSession {
 }
 
 export function removeJigLayout(session: JigEditorSession): JigEditorSession {
+  if (jigOutlinesLocked(session.draft.project)) return session;
   // Restore artwork intent before removing the layer that owns the two-run mode.
   const restored = applyRegistrationOutput({ ...session.draft, undoStack: [] }, 'artwork');
   const result = applyRemoveRegistrationBox({ ...session.draft, ...restored, undoStack: [] });

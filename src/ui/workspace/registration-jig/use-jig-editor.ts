@@ -10,7 +10,8 @@ import {
 import { keyboardOwnedElsewhere } from '../../common/keyboard-owner';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
-import { jobControlsBusy } from '../../laser/job-controls-busy';
+import { useUiStore } from '../../state/ui-store';
+import { jobControlsBusy, jobNeedsRecovery } from '../../laser/job-controls-busy';
 import { reportDependencyRepairs } from '../../state/object-delete-actions';
 import type { RegistrationJigSetSpec } from '../../state/registration-jig-set-actions';
 import {
@@ -42,8 +43,11 @@ export type JigStep = 'outlines' | 'artwork' | 'burn-artwork';
 
 export type JigEdit = (session: JigEditorSession) => JigEditorSession;
 
+const JIG_EDIT_PAUSED =
+  'The machine is moving, so the jig was not changed. Try again when it stops.';
+
 export function useJigEditor(onClose: () => void) {
-  const [fresh] = useState(
+  const [created] = useState(
     () => findRegistrationBoxes(useStore.getState().project.scene).length === 0,
   );
   const [outlinesUnlocked, setOutlinesUnlocked] = useState(false);
@@ -51,6 +55,7 @@ export function useJigEditor(onClose: () => void) {
   unlockedRef.current = outlinesUnlocked;
   const draft = useJigStoreSlice();
   const runPhase = jigRunPhase(draft.project.scene);
+  const fresh = useJigFresh(created, runPhase);
   const session = useMemo(
     () => jigSessionView(draft, { fresh, outlinesUnlocked }),
     [draft, fresh, outlinesUnlocked],
@@ -61,7 +66,7 @@ export function useJigEditor(onClose: () => void) {
     [fresh],
   );
   const [step, setStep] = useJigStep(runPhase);
-  useJigOpening(fresh, onClose);
+  useJigOpening(created, onClose);
   const working = useJigWorking();
   const [pendingLayout, setPendingLayout] = useState(false);
   const edits = useJigEditCallbacks(setSession);
@@ -107,19 +112,29 @@ function useJigEditCallbacks(setSession: (edit: JigEdit) => JigEditorSession) {
     (ids: ReadonlySet<string>) => setSession((current) => selectJigObjects(current, ids)),
     [setSession],
   );
-  const onImport = useCallback(
-    (object: SceneObject, placement?: JigImportPlacement) =>
-      setSession((current) => importJigArtwork(current, object, placement)),
+  // An import, a trace or new text lands after async work, possibly once the
+  // machine has started moving. It is then refused with an error, which the
+  // importer (a toast), the tracer and the text form show instead of a success.
+  const settle = useCallback(
+    (edit: JigEdit): void => {
+      if (machineMovingNow()) throw new Error(JIG_EDIT_PAUSED);
+      setSession(edit);
+    },
     [setSession],
   );
+  const onImport = useCallback(
+    (object: SceneObject, placement?: JigImportPlacement) =>
+      settle((current) => importJigArtwork(current, object, placement)),
+    [settle],
+  );
   const onUpsert = useCallback(
-    (object: TextObject) => setSession((current) => upsertJigText(current, object)),
-    [setSession],
+    (object: TextObject) => settle((current) => upsertJigText(current, object)),
+    [settle],
   );
   const onTraceImage = useCallback(
     (imageId: string, traced: TracedImage) =>
-      setSession((current) => traceJigImage(current, imageId, traced)),
-    [setSession],
+      settle((current) => traceJigImage(current, imageId, traced)),
+    [settle],
   );
   const onReplaceLayout = useCallback(
     (spec: RegistrationJigSetSpec) => {
@@ -202,30 +217,54 @@ function useJigStep(runPhase: JigRunPhase) {
   return [step, setStep] as const;
 }
 
+// A jig this visit created grows centred until it is burned. Once a job has run
+// or the outlines are marked burned (Artwork only), they may be on the base, so
+// for the rest of the visit the grid keeps its first outline's corner, even
+// after Burn outlines again.
+function useJigFresh(created: boolean, runPhase: JigRunPhase): boolean {
+  const [burned, setBurned] = useState(false);
+  const jobRan = useLaserStore((laser) => jobNeedsRecovery(laser.streamer?.status));
+  if (!burned && (jobRan || runPhase === 'artwork')) setBurned(true);
+  return created && !burned;
+}
+
 // Opening jig mode on a project without a jig creates its first outline, as one
 // undoable edit. Opening another project leaves jig mode.
-function useJigOpening(fresh: boolean, onClose: () => void): void {
+function useJigOpening(created: boolean, onClose: () => void): void {
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
-    if (!fresh || machineMovingNow()) return;
+    if (!created || machineMovingNow()) return;
     const state = useStore.getState();
-    const before = jigSessionView(state, { fresh });
-    const created = createJigEditorSession(state, { fresh });
-    const change = jigStoreChange(state, before, created, 'Create registration jig');
+    const before = jigSessionView(state, { fresh: true });
+    const opened = createJigEditorSession(state, { fresh: true });
+    const change = jigStoreChange(state, before, opened, 'Create registration jig');
     if (change !== null) useStore.setState(change);
-  }, [fresh]);
+  }, [created]);
   useEffect(() => {
     const epoch = useStore.getState().projectDocumentEpoch;
     return useStore.subscribe((state) => {
       if (state.projectDocumentEpoch !== epoch) close.current();
     });
   }, []);
+  // Leaving by the Tools menu's Registration Jig toggle gets Done's clean-up.
+  useEffect(
+    () =>
+      useUiStore.subscribe((state, previous) => {
+        if (previous.registrationPanelOpen && !state.registrationPanelOpen) dropOutlineSelection();
+      }),
+    [],
+  );
 }
 
-// Outlines stay locked on the main canvas, so Done drops them from the
-// selection rather than leave a selection the main canvas cannot edit.
 function finishJigMode(onClose: () => void): void {
+  dropOutlineSelection();
+  onClose();
+}
+
+// Outlines stay locked on the main canvas, so leaving jig mode drops them from
+// the selection rather than leave a selection the main canvas cannot edit.
+function dropOutlineSelection(): void {
   const state = useStore.getState();
   const ids = [...selectedJigIds(state)].filter((id) => {
     const object = state.project.scene.objects.find((candidate) => candidate.id === id);
@@ -237,7 +276,6 @@ function finishJigMode(onClose: () => void): void {
       additionalSelectedIds: new Set(ids.slice(1)),
     });
   }
-  onClose();
 }
 
 function useJigWorking() {

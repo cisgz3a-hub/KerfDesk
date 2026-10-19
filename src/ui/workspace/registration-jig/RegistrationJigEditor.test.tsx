@@ -1,11 +1,18 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { findRegistrationBoxes, IDENTITY_TRANSFORM, type Project } from '../../../core/scene';
+import {
+  findRegistrationBoxBounds,
+  findRegistrationBoxes,
+  IDENTITY_TRANSFORM,
+  type Project,
+  type SceneObject,
+} from '../../../core/scene';
 import { createRectangle } from '../../../core/shapes/primitives';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { useUiStore } from '../../state/ui-store';
+import type { JigImportPlacement } from './jig-editor-artwork';
 import { jigRunPhase } from './jig-run-phase';
 import { RegistrationJigEditor } from './RegistrationJigEditor';
 
@@ -16,9 +23,14 @@ vi.mock('./RegistrationJigCanvas', () => ({
     </div>
   ),
 }));
+type JigImport = (object: SceneObject, placement: JigImportPlacement) => void;
+const importer = vi.hoisted(() => ({ onImport: null as JigImport | null }));
 vi.mock('./JigArtworkImport', () => ({
   JigArtworkImport: () => <div>Import artwork</div>,
-  useJigArtworkImport: () => ({ busy: false, importFiles: async () => undefined }),
+  useJigArtworkImport: (onImport: JigImport) => {
+    importer.onImport = onImport;
+    return { busy: false, importFiles: async () => undefined };
+  },
 }));
 vi.mock('../../laser/WorkspaceJobActions', () => ({
   WorkspaceJobActions: () => <section aria-label="Job actions">Frame job</section>,
@@ -41,6 +53,7 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   useLaserStore.setState({ motionOperation: null });
+  useUiStore.getState().closeRegistrationPanel();
 });
 function render(): void {
   act(() => root.render(<RegistrationJigEditor onClose={close} />));
@@ -61,6 +74,14 @@ function press(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
     page.dispatchEvent(event);
   });
   return event;
+}
+function setField(label: string, value: string): void {
+  const field = container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`);
+  if (field === null) throw new Error(`Missing ${label}`);
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, value);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 function visibleStep(): string | undefined {
   return (
@@ -236,5 +257,52 @@ describe('Registration Jig mode', () => {
     render();
     act(() => useStore.getState().newProject());
     expect(close).toHaveBeenCalled();
+  });
+  it('keeps outlines this visit burned in place when the grid changes', () => {
+    render();
+    const before = findRegistrationBoxBounds(useStore.getState().project.scene)!;
+    // A clean outline run selects Artwork only: the layout locks with the outlines.
+    act(() => useStore.getState().setRegistrationOutput('artwork'));
+    click('1 Burn outlines');
+    expect(button('Apply layout')?.matches(':disabled')).toBe(true);
+    // Burning them again on purpose still grows the grid from the burned outline.
+    click('Burn outlines again');
+    setField('Jig columns', '2');
+    click('Apply layout');
+    const { scene } = useStore.getState().project;
+    expect(findRegistrationBoxes(scene)).toHaveLength(2);
+    expect(findRegistrationBoxBounds(scene)!.minX).toBeCloseTo(before.minX);
+  });
+  it('says when artwork lands after the machine started moving, and leaves the jig alone', () => {
+    savedJigWithArtwork();
+    render();
+    const project = useStore.getState().project;
+    const late = createRectangle({
+      id: 'late',
+      color: '#0000ff',
+      spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+      transform: IDENTITY_TRANSFORM,
+    });
+    const placement = { anchorIds: new Set<string>(), batchIndex: 0 };
+    act(() => useLaserStore.setState({ motionOperation: { kind: 'frame' } as never }));
+    // The error is what the importer's toast, the tracer and the text form show.
+    expect(() => importer.onImport?.(late, placement)).toThrow('The machine is moving');
+    expect(useStore.getState().project).toBe(project);
+    act(() => useLaserStore.setState({ motionOperation: null }));
+    act(() => importer.onImport?.(late, placement));
+    expect(useStore.getState().project.scene.objects.some((object) => object.id === 'late')).toBe(
+      true,
+    );
+  });
+  it('drops the outlines from the selection when the Tools menu leaves jig mode', () => {
+    savedJigWithArtwork();
+    const outline = findRegistrationBoxes(useStore.getState().project.scene)[0]!.id;
+    useStore.setState({ selectedObjectId: outline, additionalSelectedIds: new Set(['art']) });
+    act(() => useUiStore.getState().openRegistrationPanel());
+    render();
+    // The Tools menu's Registration Jig command toggles jig mode off.
+    act(() => useUiStore.getState().toggleRegistrationPanel());
+    expect(useStore.getState().selectedObjectId).toBe('art');
+    expect(useStore.getState().additionalSelectedIds.size).toBe(0);
   });
 });

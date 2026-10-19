@@ -56,3 +56,9 @@ function outlineKindMatches(
 function closeEnough(actual: number, expected: number): boolean {
   return Number.isFinite(actual) && Math.abs(actual - expected) <= OUTLINE_SIZE_TOLERANCE_MM;
 }
+
+/** The project holds a Place Board outline (ADR-636): its burn step then holds
+ *  Frame and Start while the Place Board page is open. */
+export function sceneHasCapturedBoard(scene: Scene): boolean {
+  return findRegistrationBoxes(scene).some((box) => box.provenance === 'captured-board');
+}

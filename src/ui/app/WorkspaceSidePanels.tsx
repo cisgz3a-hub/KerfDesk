@@ -4,7 +4,10 @@ import { CutsLayersPanel } from '../layers';
 import { LaserWindow } from '../laser';
 import { WorkspaceJobActions } from '../laser/WorkspaceJobActions';
 import { Icon, type IconName } from '../kit';
+import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { jigPageHoldsJobActions } from '../workspace/registration-jig/jig-run-phase';
+import { sceneHasCapturedBoard } from '../laser/board-capture/captured-board-outline';
 import { useWorkspaceLayoutStore } from '../state/workspace-layout-store';
 import { useMachineRailVisibility } from '../state/use-machine-rail-visibility';
 import type { RailPanelId } from '../state/ui-rail-panel';
@@ -19,10 +22,18 @@ export function WorkspaceSidePanels(): JSX.Element {
   const layersExpanded = useUiStore((state) => state.railPanelVisibility.layers);
   const machinePanel = useMachineRailVisibility();
   // Jig mode (ADR-641) shows only the machine panel: the jig page has its own
-  // artwork and laser settings, and its burn steps hold Frame and Start.
-  // Place Board mode (ADR-636) is a page like the jig's, with Frame and Start
-  // in its burn step, so it shows the machine panel alone too.
-  const jigOpen = useUiStore((state) => state.registrationPanelOpen || state.boardCapturePanelOpen);
+  // artwork and laser settings, and its burn steps hold Frame and Start. When
+  // the page has no burn panel to hold them, the machine panel keeps its own.
+  // Place Board mode (ADR-636) is a page like the jig's: the machine panel
+  // alone, with Frame and Start in its burn step once a board is captured.
+  const jigPage = useUiStore((state) => state.registrationPanelOpen);
+  const boardPage = useUiStore((state) => state.boardCapturePanelOpen);
+  const jigOpen = jigPage || boardPage;
+  const jigHoldsJobActions = useStore(
+    (state) =>
+      (jigPage && jigPageHoldsJobActions(state.project.scene)) ||
+      (boardPage && sceneHasCapturedBoard(state.project.scene)),
+  );
   const panelId = useId();
   useWorkspacePanelFocus(setActive, setCutsOpen, setMachineOpen);
 
@@ -38,6 +49,7 @@ export function WorkspaceSidePanels(): JSX.Element {
         panelId={panelId}
         shown={shown}
         jigOpen={jigOpen}
+        jobActions={!jigHoldsJobActions}
         collapsed={shown === 'layers' ? !layersExpanded : !machinePanel.isExpanded}
         onSelect={selectPanel}
       />
@@ -77,7 +89,7 @@ export function WorkspaceSidePanels(): JSX.Element {
             <div className="lf-workspace-machine-body">
               <LaserWindow dockedJobActions />
             </div>
-            {machinePanel.isExpanded && !jigOpen ? <WorkspaceJobActions /> : null}
+            {machinePanel.isExpanded && !jigHoldsJobActions ? <WorkspaceJobActions /> : null}
           </ResizablePanel>
         ) : null}
       </div>
@@ -89,6 +101,7 @@ function CompactWorkspacePanels(props: {
   readonly panelId: string;
   readonly shown: RailPanelId;
   readonly jigOpen: boolean;
+  readonly jobActions: boolean;
   readonly collapsed: boolean;
   readonly onSelect: (panel: RailPanelId) => void;
 }): JSX.Element {
@@ -117,7 +130,7 @@ function CompactWorkspacePanels(props: {
       >
         {shown === 'layers' ? <CutsLayersPanel /> : <LaserWindow dockedJobActions />}
       </div>
-      {!collapsed && !props.jigOpen ? <WorkspaceJobActions /> : null}
+      {!collapsed && props.jobActions ? <WorkspaceJobActions /> : null}
     </section>
   );
 }
