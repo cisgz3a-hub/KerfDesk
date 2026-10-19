@@ -18,6 +18,8 @@ export function showWorkspaceStartupError(document: Document, reload: () => void
   retry.addEventListener('click', reload);
   alert.append(heading, message, retry);
   root.replaceChildren(alert);
+  // index.html ships the root inert behind the splash; the retry must be usable.
+  root.removeAttribute('inert');
   document.getElementById('app-splash')?.remove();
   retry.focus();
 }

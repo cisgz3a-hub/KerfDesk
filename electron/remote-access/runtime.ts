@@ -1,4 +1,8 @@
-import type { RemoteCredentialStore, RemoteIdentity } from './credential-store.js';
+import {
+  RemoteStorageUnavailableError,
+  type RemoteCredentialStore,
+  type RemoteIdentity,
+} from './credential-store.js';
 import {
   createRemoteRelayClient,
   validRemoteScopes,
@@ -261,13 +265,18 @@ class RemoteAccessRuntime {
   opened(): Promise<void> {
     return this.enqueue(async () => {
       if (!this.initialized) {
-        this.initialized = true;
         try {
           this.identity = await this.store.read();
+          this.initialized = true;
+          this.available = true;
+          this.error = null;
           for (const id of this.identity?.pendingRevocations ?? [])
             this.blockedClients.set(id, ++this.clientRevocationEpoch);
           this.revoking = this.identity?.revokeOnConnect === true;
-        } catch {
+        } catch (error) {
+          // Refused storage is asked again at the next attach (a keyring probe
+          // may answer then); a saved record that cannot be opened stays shut.
+          this.initialized = !(error instanceof RemoteStorageUnavailableError);
           this.available = false;
           this.error = 'Saved remote settings could not be opened securely.';
         }
