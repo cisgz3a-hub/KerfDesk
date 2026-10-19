@@ -130,10 +130,10 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Top command toolbar**: Open, Import, Import Image, Save and Preview lead with readable labels when space permits. Selecting an image brings Trace image into the row; Image Studio remains in **More**. Other commands remain in **More** and the application menus, with their existing shortcuts, disabled reasons, tooltips and actions. The row measures available width and moves commands into More instead of scrolling horizontally. Utility controls share the row down to 520 px. The project name includes an unsaved-change indicator.
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Machine connection toolbar**: the machine name and connection status sit beside the numeric transforms, with Connect/Disconnect, the Machine Setup icon and the connection-options menu. The machine-name dropdown shows the full profile, bed size, controller, connected port, fitted Laser module selector and supported FluidNC or grblHAL network connection form. Tab moves between its fields; Escape closes it and returns focus to the machine name. Field input stays inside the dropdown while the existing Abort shortcut remains available. Connection failures and qualification/recovery notices remain visible outside the dropdown. On narrow windows the machine controls wrap onto a second top row, and remain available when either sidebar is collapsed. Detected-settings notifications also remain active with the sidebar closed.
-- **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
-- **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power and Speed each pair a full-width slider with exact numeric entry; Passes remains a numeric field; Fill adds Line spacing and Angle, and Image adds Dither (swatches that preview each mode on a grey ramp), Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
+- **Artwork panel**: docked right with **Properties**, **Run order**, and **Materials** views in Laser mode (**Recipes** in CNC). Properties is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
+- **Laser artwork settings (ADR-430)**: one line names the selected artwork at the top of the Properties view, with a light Operation | Artwork tab row under it (ADR-631). The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power and Speed each pair a full-width slider with exact numeric entry; Passes remains a numeric field; Fill adds Line spacing and Angle, and Image adds Dither (swatches that preview each mode on a grey ramp), Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
 - **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). An adaptive pocket's Entry & travel names its own helix ("Climb · Adaptive helix"), and names the Ramp entry angle only as the entry of reliefs on the same operation ("Relief ramp 5°", ADR-481 Amendment 1). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only. Closed-only operations also show the exact count of omitted open contours, including mixed closed/open artwork; all-open vector operations without assigned relief retain the no-toolpath explanation (ADR-481 Amendment 2).
-- **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
+- **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, Include in output, artwork selection, settings clipboard, and delete controls; Delete sits apart in danger style. Visibility lives on the card's eye, not in the disclosure (ADR-631).
 - **Machine controls panel (ADR-593 Amendment 1)**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. The current machine state shares the heading, and the existing jog group stays above three softly glowing utility buttons: **Origin**, **Placement** and **Console**. Each expands its section directly below the buttons inside Machine, leaving Artwork and the canvas unobscured. Escape, the close button or clicking the selected button collapses it; working in neighbouring settings leaves it open. Typed positions, unsent commands, filters and disclosures survive closing or switching tools. Full coordinates, work-origin identity and feed/power details are in Origin. The positioning group has no separate scroller; Step and Speed follow the arrow grid. The open utility uses the remaining panel height and scrolls only when needed. When the fixed controls and an open utility cannot fit, short bodies use one full rail scroller; expanded recovery notices also retain that fallback. Frame and Start remain outside it. Both panels can be resized or hidden independently. The machine panel may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
 - **Placement & output**: the **Placement** utility button opens the existing placement and output settings, plus CNC maintenance tools when applicable. Mouse, Space, Enter and Arrow Down open it without activating canvas or job shortcuts. Tab moves through its fields and Escape closes it.
@@ -148,7 +148,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **After a job completes (ADR-340, ADR-603)**: the job dock shows **Job complete** and **Done** after controller settlement. Pausing during final settlement retains that run's completion owner and Resume requires fresh Idle evidence. Missing acknowledgements say **Waiting for controller replies**, without asserting a controller hold; a new acknowledgement clears the stale wait immediately. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains offered while its receipt still matches the job, and like Start it needs a fresh Frame (ADR-372 Amendment 1). Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
 - **Workspace colours**: panels, drawing bed, grid, rulers and controls use the application appearance preference, defaulting to Light. Window > Appearance offers Light, Dark and Match System (ADR-339). Dark mode uses the approved charcoal drawing surface and light, readable vector ink. Contrast adjustments happen only while drawing the workspace; saved artwork, raster pixels, exported files and machine output retain their original colours and settings. The layout menu uses the same themed surface as the rest of the workspace.
 - **Notifications**: transient messages stay within the available canvas area, clear of the job dock, Live Motion bar, and zoom controls. An open modal gives notifications a reserved scrolling row so they do not cover its actions. Message lifetimes and dismissal controls are unchanged.
-- **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores Auto and opens both panels. Compact still displays one tab at a time. Panel visibility does not affect the Live Motion bar.
+- **Window menu**: checked `Artwork Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores Auto and opens both panels. Compact still displays one tab at a time. Panel visibility does not affect the Live Motion bar.
 - **Studio keyboard ownership**: native form and activation controls retain their browser keys. Focusable resize separators and sliders retain their arrow keys, and a Studio root never reuses a key already handled by a nested control.
 
 #### Disabled controls
@@ -156,7 +156,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - `File → Save Project As`
 - `File → Save G-code`
 - All transform controls
-- Cuts/Layers row controls
+- Artwork operation row controls
 
 #### Enabled controls
 - `File → New` (no-op when already empty)
@@ -938,23 +938,24 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 1. Click Output checkbox.
 2. Layer's paths immediately hidden from preview render.
 3. Layer's paths *excluded* from generated G-code.
-4. Cuts/Layers row appears dimmed.
+4. The Artwork operation row appears dimmed.
 
 #### Success - reorder a layer
 1. Click a layer's up or down order control.
-2. The row moves one position in the Cuts/Layers list.
+2. The row moves one position in the operations list.
 3. Generated output processes operations in that order inside each artwork run.
 4. Undo restores the previous layer order.
 
 #### Success - choose which artwork runs first
-1. Open **Run order** in the docked Artwork / Operations rail.
+1. Open **Run order** in the docked Artwork panel.
 2. Enter a one-based **Run** number on any row. The complete run unit moves to that position and all
    other rows renumber automatically.
 3. For large jobs, search by artwork/operation/settings or enter **Jump to run**; the windowed list
    scrolls directly to that row without rendering the whole project at once.
 4. The displayed position updates without changing canvas stacking, geometry, operation settings,
    visibility, output flags, or automatic colours.
-5. Laser output follows the numbered run-unit order exactly. Each row reports its output step(s).
+5. Laser output follows the numbered run-unit order exactly. Each row reports its output step(s)
+   whenever they differ from its run number (ADR-631).
 6. CNC preserves global clearing-before-profile order and contiguous tool sections within each
    clearing/profile phase. Each row shows both
    its requested run number and the exact effective CNC step(s), so any necessary difference is
@@ -1046,7 +1047,7 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 ### F-A7b. Operations list tools and Sort cuts last (ADR-480)
 
-1. The **•••** button on the Cuts / Layers header opens **Turn output on for all**, **Turn output
+1. The **•••** button in the Artwork panel's **All operations** section opens **Turn output on for all**, **Turn output
    off for all**, **Invert output**, **Show all**, **Hide all**, **Invert visibility** and **Sort
    cuts last**. Each row's **Show only this** hides every other operation.
 2. Each is one undo step. Hidden artwork leaves the selection. The registration jig's output is
@@ -1707,7 +1708,7 @@ Left to right:
 - **Cursor position** — `X 124.3, Y 87.0 mm`
 - **Selection summary** — `1 selected · 50.0 × 30.0 mm` (or `Nothing selected`)
 - **Object count** — `Objects: 3`
-- **Layer count** — `Layers: 2 (1 output)`
+- **Operation count** — `Operations: 2 (1 output)`
 - **Device** — `Default 400×400`
 - **Zoom** — `100%`
 - **Job estimate** — Phase C feature; not in Phase A.
@@ -2921,13 +2922,16 @@ authorization, Frame proof, controller command, or safety boundary.
   records, so a response suffix cannot become a false acknowledgement. The writer remains
   available for Stop; no missing reply is synthesized or replayed (ADR-600).
 - A reply lost that way leaves the last line of the job unacknowledged after the machine has
-  finished. Once every line has been sent and nothing else is owed a reply, fresh Idle status
-  reports finish the job instead of the 90-second watchdog resetting the controller: an empty
-  `Bf` receive buffer and planner for 8 s, or, when the controller reports no `Bf`, Idle for
-  15 s, plus the time of any G4 still in flight. A `Bf` showing unread input keeps waiting, so
-  a controller holding its own program is not finished early. The ordinary post-job settle
-  then confirms completion, and the log names how many replies were lost and that one may
-  have been an error (ADR-610).
+  finished. Once every line has been sent, nothing else is owed a reply and the controller has
+  reported Idle for 1 s, KerfDesk sends one `$G` to GRBL, grblHAL and FluidNC controllers
+  (the Falcon included). They answer it only after every earlier line, so its `[GC:...]`
+  report proves the job was read and any reply still missing was lost. The job then finishes
+  through the ordinary post-job settle instead of the 90-second watchdog resetting the
+  controller, usually within about 2 s. A controller holding its own program answers only
+  after the held lines, so it is never finished early. Other controllers with a realtime
+  status (Smoothieware) wait for 15 s of Idle plus any G4 still in flight instead. The log
+  names how many replies were lost and that one may have been an error (ADR-610 and its
+  Amendment 1).
 - After any page stall, the controller output that queued up meanwhile is handed to the app
   in slices of about 8 ms, with input, drawing and the status poll running in between,
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
@@ -3223,7 +3227,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    after a reset, and a read that failed while the controller still answers
    status queries, do not pop up a toolbar notice: the machine runs without
    them, as in other senders. Only a controller that has stopped answering
-   shows the brief "Controller is not responding" notice (ADR-611).
+   shows the brief "Controller is not responding" notice (ADR-611). A controller
+   that answered and then goes quiet for 8 s, outside homing and other controller
+   operations, turns the connection status to an amber **Not responding** until
+   its next reply (ADR-611 Amendment 1).
 4. A CNC Pause/Resume confirmation warning retains the paused job and its saved
    artifact. A later accepted Abort, actual Disconnect or controller fault
    records its own terminal cause. A reset-owned host freeze remains provisional.
@@ -3884,7 +3891,7 @@ or traced image) with at least one closed polyline.
 
 **Empty**:
 - *No SceneObjects yet* — the Mode dropdown still works, but no
-  geometry exists to fill. The Cuts/Layers panel shows its "Import a
+  geometry exists to fill. The Artwork panel shows its "Import a
   design to populate layers" hint.
 
 **Edge cases**:
@@ -4776,7 +4783,7 @@ share them as files.
 details directly — name, thickness, then cut settings — without first
 editing a layer.
 
-**Entry.** Cuts / Layers rail → **Materials** → **New material...** (or **Edit** on a
+**Entry.** Artwork panel → **Materials** → **New material...** (or **Edit** on a
 preset row) opens a multi-step `Dialog` wizard. The draft commits only
 on the final Save, so Cancel/Escape at any step discards it.
 
@@ -4826,7 +4833,7 @@ of the active library auto-saves. The legacy single-library slot
 (`laserforge.material-library.v1`, F-ML1) is migrated in once, then
 removed.
 
-**Entry.** Cuts / Layers rail → **Materials** → **Saved Libraries...** opens a
+**Entry.** Artwork panel → **Materials** → **Saved Libraries...** opens a
 `Dialog` listing every saved library: name, device hint, preset count,
 last updated.
 

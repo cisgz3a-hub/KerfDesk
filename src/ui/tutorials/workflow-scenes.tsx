@@ -110,7 +110,7 @@ export function LayersScene({ phase }: SceneProps): JSX.Element {
         x={288}
         y={40}
         width={200}
-        title="Artwork / Operations"
+        title="Artwork"
         rows={[
           'Artwork and selection',
           'Process & cutting values',
