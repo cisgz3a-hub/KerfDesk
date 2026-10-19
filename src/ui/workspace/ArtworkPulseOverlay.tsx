@@ -17,6 +17,7 @@ import {
 import { usePrefersReducedMotion } from '../common/use-prefers-reduced-motion';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { useCanvasColorScheme } from '../theme/use-canvas-color-scheme';
 import {
   ArtworkPulseClock,
   PULSE_HOVER_DWELL_MS,
@@ -24,6 +25,7 @@ import {
   type PulseSeed,
 } from './artwork-pulse';
 import { ArtworkPulsePainter } from './draw-artwork-pulse';
+import type { ObjectDisplayMode } from './object-display';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
 
@@ -32,11 +34,14 @@ const LEAVE_TOLERANCE_MM = 2;
 const LEAVE_TOLERANCE_PX = 6;
 
 export function ArtworkPulseOverlay(props: {
+  readonly canvasRef: React.RefObject<HTMLCanvasElement | null>;
   readonly project: Project;
   readonly canvasSize: CanvasBitmapSize;
   readonly viewState: ViewState;
   /** Pointing at artwork counts only for the select tool at rest; operation rows always count. */
   readonly canvasHoverEnabled: boolean;
+  /** Only a pointer gesture may retain its hover until the pointer reports again. */
+  readonly canvasHoverPaused?: boolean;
 }): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const { width, height } = props.canvasSize;
@@ -48,10 +53,12 @@ export function ArtworkPulseOverlay(props: {
   const cursor = useStore((state) => state.cursorMm);
   const rowOperationId = useUiStore((state) => state.hoveredOperationId);
   const hoveredObjectId = useCanvasHoverObject(
+    props.canvasRef,
     cursor,
     props.project.scene,
     view.scale,
     props.canvasHoverEnabled,
+    props.canvasHoverPaused ?? false,
   );
   const seed: PulseSeed | null =
     rowOperationId !== null
@@ -77,20 +84,38 @@ export function ArtworkPulseOverlay(props: {
 
 /** The artwork under a settled pointer; cleared as soon as the pointer leaves it. */
 function useCanvasHoverObject(
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
   cursor: Vec2 | null,
   scene: Scene,
   scale: number,
   enabled: boolean,
+  pauseHover: boolean,
 ): string | null {
   const [hovered, setHovered] = useState<string | null>(null);
   // Set while a click or drag owns the pointer, until the pointer reports again.
   const paused = useRef(false);
+  const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas === null) return;
+    // Cursor null also means an ordinary click finished. Physical leave and
+    // cancellation must independently end a paused hover, even if cursor null
+    // has already been reported by pointer-up.
+    const leave = (): void => {
+      if (dwellTimer.current !== null) clearTimeout(dwellTimer.current);
+      dwellTimer.current = null;
+      paused.current = false;
+      setHovered(null);
+    };
+    return listenForHoverBoundary(canvas, leave);
+  }, [canvasRef]);
   const x = cursor?.x ?? null;
   const y = cursor?.y ?? null;
   useEffect(() => {
-    // A click or drag owns the pointer: keep what was hovered and wait.
+    // Only a click or drag keeps its hover. Another tool ends it outright.
     if (!enabled) {
-      paused.current = true;
+      paused.current = pauseHover;
+      if (!pauseHover) setHovered(null);
       return;
     }
     if (x === null || y === null) {
@@ -109,13 +134,56 @@ function useCanvasHoverObject(
     // pointer to settle rather than running on every move.
     // Locked artwork still shows its settings, and must not let the piece
     // beneath it answer for it.
-    const timer = setTimeout(
+    dwellTimer.current = setTimeout(
       () => setHovered(hitTest(scene, point, { includeLocked: true })),
       PULSE_HOVER_DWELL_MS,
     );
-    return () => clearTimeout(timer);
-  }, [x, y, scene, scale, enabled]);
+    return () => {
+      if (dwellTimer.current !== null) clearTimeout(dwellTimer.current);
+      dwellTimer.current = null;
+    };
+  }, [x, y, scene, scale, enabled, pauseHover]);
   return hovered;
+}
+
+/** Capture release follows ordinary pointer-up as well as cancellation. */
+function listenForHoverBoundary(canvas: HTMLCanvasElement, leave: () => void): () => void {
+  const releasedPointers = new Set<number>();
+  const begin = (event: PointerEvent): void => {
+    releasedPointers.delete(event.pointerId);
+  };
+  const release = (event: PointerEvent): void => {
+    // Capture is implicitly released after pointer-up dispatch. Uncaptured
+    // clicks have no subsequent capture-loss event and need no marker.
+    if (canvas.hasPointerCapture?.(event.pointerId)) releasedPointers.add(event.pointerId);
+    const bounds = canvas.getBoundingClientRect();
+    if (
+      event.clientX < bounds.left ||
+      event.clientX >= bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY >= bounds.bottom
+    )
+      leave();
+  };
+  const lostCapture = (event: PointerEvent): void => {
+    // Only an unexpected loss ends the hover; a normal click resumes it.
+    if (!releasedPointers.delete(event.pointerId)) leave();
+  };
+  const cancel = (event: PointerEvent): void => {
+    releasedPointers.delete(event.pointerId);
+    leave();
+  };
+  const listeners = [
+    ['pointerdown', begin],
+    ['pointerleave', leave],
+    ['pointercancel', cancel],
+    ['pointerup', release],
+    ['lostpointercapture', lostCapture],
+  ] as const;
+  for (const [type, handler] of listeners) canvas.addEventListener(type, handler);
+  return () => {
+    for (const [type, handler] of listeners) canvas.removeEventListener(type, handler);
+  };
 }
 
 function pointNearObject(scene: Scene, id: string, point: Vec2, toleranceMm: number): boolean {
@@ -138,9 +206,12 @@ function usePulseLoop(
   canvasObjectId: string | null,
 ): void {
   const reducedMotion = usePrefersReducedMotion();
+  const colorScheme = useCanvasColorScheme();
+  const wireframe = useUiStore((state) => state.wireframeView);
+  const displayMode = wireframe ? 'wireframe' : 'design';
   const pulsedObjectId = useRef<string | null>(null);
-  const latest = useRef<PulseLoopState>({ project, view, reducedMotion });
-  latest.current = { project, view, reducedMotion };
+  const latest = useRef<PulseLoopState>({ project, view, reducedMotion, displayMode });
+  latest.current = { project, view, reducedMotion, displayMode };
   const [loop] = useState(() =>
     createPulseLoop(() => ({
       ctx: ref.current?.getContext('2d') ?? null,
@@ -151,6 +222,7 @@ function usePulseLoop(
     seed === null ? '' : seed.kind === 'object' ? `o:${seed.objectId}` : `r:${seed.operationId}`;
   const lastSeedKey = useRef('');
   const scene = project.scene;
+  const machineKind = machineKindOf(project.machine);
   useEffect(() => {
     // An edit during the hover (Paste settings on the hovered row, say) can
     // change which operations share its settings: regroup without pulsing again.
@@ -165,23 +237,19 @@ function usePulseLoop(
     const target =
       seed === null
         ? null
-        : pulseTargetFor(
-            project.scene.objects,
-            project.scene.layers,
-            machineKindOf(project.machine),
-            seed,
-            (object) => screenCenter(object, view),
+        : pulseTargetFor(project.scene.objects, project.scene.layers, machineKind, seed, (object) =>
+            screenCenter(object, view),
           );
     if (target === null) loop.clock.leave();
     else loop.clock.hover(target, performance.now(), { pulse: !resumed });
     loop.kick();
-    // Keyed on the hover and the scene only: a view change repaints through
+    // Keyed on the hover, scene and machine kind: a view change repaints through
     // the effect below and must not regroup or restart anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seedKey, scene]);
+  }, [seedKey, scene, machineKind, canvasObjectId]);
   useEffect(() => {
     loop.kick();
-  }, [project, view, reducedMotion, loop]);
+  }, [project, view, reducedMotion, colorScheme, displayMode, loop]);
   useEffect(() => () => loop.dispose(), [loop]);
 }
 
@@ -189,9 +257,13 @@ type PulseLoopState = {
   readonly project: Project;
   readonly view: ViewTransform;
   readonly reducedMotion: boolean;
+  readonly displayMode: ObjectDisplayMode;
 };
 
-/** Runs animation frames only while a pulse or an edge fade is in flight. */
+/**
+ * Runs animation frames only while a pulse or an edge fade is in flight, or
+ * while the painter still has bitmaps to render or a moved view to settle.
+ */
 function createPulseLoop(
   read: () => { readonly ctx: CanvasRenderingContext2D | null; readonly state: PulseLoopState },
 ) {
@@ -203,8 +275,8 @@ function createPulseLoop(
     const { ctx, state } = read();
     if (ctx === null) return;
     const frame = clock.frame(now, state.reducedMotion);
-    painter.draw(ctx, state.project, state.view, frame.pieces);
-    if (frame.busy) kick();
+    const pending = painter.draw(ctx, state.project, state.view, frame.pieces, state.displayMode);
+    if (frame.busy || pending) kick();
   }
   function kick(): void {
     if (frameId === null) frameId = requestAnimationFrame(tick);

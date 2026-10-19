@@ -76,7 +76,7 @@ describe('WorkspaceSidePanels', () => {
       expect(host.textContent).toContain('Machine rail');
       expect(host.querySelectorAll('[aria-label$="resizable panel"]')).toHaveLength(2);
       const layersToggle = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent?.trim() === 'Layers',
+        (button) => button.textContent?.trim() === 'Artwork',
       );
       // Constant label; the shown/hidden state is carried by aria-pressed (the
       // accent-fill toggle) and the title, not by flipping the label text.
@@ -84,7 +84,7 @@ describe('WorkspaceSidePanels', () => {
       await act(async () => layersToggle?.click());
       expect(host.textContent).not.toContain('Layer rail');
       expect(layersToggle?.getAttribute('aria-pressed')).toBe('false');
-      expect(layersToggle?.getAttribute('title')).toBe('Show Layers panel');
+      expect(layersToggle?.getAttribute('title')).toBe('Show Artwork panel');
       expect(layersToggle?.classList.contains('lf-panel-expand-hint')).toBe(true);
       const machineToggle = [...host.querySelectorAll('button')].find(
         (button) => button.textContent?.trim() === 'Machine',
@@ -111,7 +111,7 @@ describe('WorkspaceSidePanels', () => {
     useUiStore.getState().setRailPanelVisible('machine', false);
     const { host, root } = await renderPanels();
     try {
-      const layers = requiredPanel(host, 'Cuts / Layers resizable panel');
+      const layers = requiredPanel(host, 'Artwork resizable panel');
       const machine = requiredPanel(host, 'Machine controls resizable panel');
 
       expect(layers.style.width).toBe(COLLAPSED_PANEL_WIDTH_CSS);
@@ -193,7 +193,7 @@ describe('WorkspaceSidePanels', () => {
     const { host, root } = await renderPanels();
     try {
       const layersToggle = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent?.trim() === 'Layers',
+        (button) => button.textContent?.trim() === 'Artwork',
       );
       await act(async () => layersToggle?.click());
       expect(host.textContent).not.toContain('Layer rail');
@@ -323,7 +323,7 @@ describe('WorkspaceSidePanels', () => {
   it('reset layout reopens hidden desktop panels and restores automatic sizing', async () => {
     const { host, root } = await renderPanels();
     try {
-      const layers = host.querySelector<HTMLButtonElement>('[title="Hide Layers panel"]');
+      const layers = host.querySelector<HTMLButtonElement>('[title="Hide Artwork panel"]');
       await act(async () => layers?.click());
       expect(host.textContent).not.toContain('Layer rail');
       await act(async () => resetWorkspaceLayout(useUiStore.getState()));

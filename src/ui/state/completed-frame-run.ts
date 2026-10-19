@@ -52,10 +52,9 @@ export type StashedFrameProof = Pick<
   'framedRun' | 'frameVerification' | 'completedFrame'
 >;
 
-/** A verified, beam-off positioning-light move keeps an Absolute footprint
- * (ADR-605): it observes the new head exactly as owned-run settlement does.
- * Current Position, transient permits, a split trace awaiting its program, or
- * any newer Frame evidence stay void. */
+/** Verified positioning-light travel retains the framed footprint and captured
+ * origin (ADR-605 Amendment 1). Start prepares from that captured origin, never
+ * from the pointer's new position. Transient or incomplete evidence stays void. */
 export function rebasedLightMoveFramePatch(
   stash: StashedFrameProof,
   state: LaserState,
@@ -66,7 +65,7 @@ export function rebasedLightMoveFramePatch(
   if (
     frame === null ||
     frame.candidate.authorizationContext !== undefined ||
-    frame.candidate.preparedStart.jobOrigin?.startFrom === 'current-position' ||
+    !hasCapturedLightPlacement(frame) ||
     state.framedRun !== null ||
     (state.completedFrame ?? null) !== null ||
     !sameSpatialControllerAfterRun(frame, state)
@@ -79,6 +78,14 @@ export function rebasedLightMoveFramePatch(
     framedRun: stash.framedRun === frame ? rebased : null,
     frameVerification: stash.frameVerification,
   };
+}
+
+function hasCapturedLightPlacement(frame: FramedRunPermit): boolean {
+  const origin = frame.candidate.preparedStart.jobOrigin;
+  return (
+    origin?.startFrom !== 'current-position' ||
+    (Number.isFinite(origin.currentPosition?.x) && Number.isFinite(origin.currentPosition?.y))
+  );
 }
 
 function sameSpatialControllerAfterRun(frame: FramedRunPermit, state: LaserState): boolean {

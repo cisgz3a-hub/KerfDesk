@@ -76,7 +76,7 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
     // Setup-only lines (GRBL `$` commands) are blocked while a job is active;
     // the active driver decides what counts as setup-only for its firmware.
     const blockedMessage = refs.driver.isSetupOnlyPayload(line)
-      ? setupPayloadBlockMessage(get(), action)
+      ? setupPayloadBlockMessage(get(), action, line)
       : null;
     if (blockedMessage !== null) {
       set({
@@ -186,7 +186,10 @@ function settleObsoleteWakeWrite(set: SetFn, refs: SafeWriteRefs, writeEpoch: nu
 function setupPayloadBlockMessage(
   state: LaserState,
   action: LaserSafetyAction | undefined,
+  line: string,
 ): string | null {
+  // Only after the last job line, so no job reply can be credited to it.
+  if (action === 'stream-probe' && line === '$G\n') return null;
   if (action === 'jog') return setupBlockingJobCommandBlockMessage(state);
   if (action === 'unlock' && isProbeAlarmedToolChangeHold(state)) return null;
   return activeJobCommandBlockMessage(state);

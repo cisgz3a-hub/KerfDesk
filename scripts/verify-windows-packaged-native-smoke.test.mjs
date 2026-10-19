@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { validResult } from './native-smoke-test-support.mjs';
 import {
   nativeSmokeLaunchOptions,
+  parseNativeSmokeArgs,
   validateNativeSmokeResult,
 } from './verify-windows-packaged-native-smoke.mjs';
 
@@ -40,9 +41,27 @@ test('accepts an observed available manual update without treating it as downloa
   assert.throws(() => validateNativeSmokeResult(result, userData), /local licensing status/);
 });
 
+/** A fresh commercial build settles behind its licence window, with no workspace (ADR-623). */
+function licenceWindowResult(userData) {
+  const result = validResult(userData);
+  const renderer = { ...result.renderer, licenceWindow: true, imported: false, saved: false };
+  delete renderer.fileAccess;
+  delete renderer.savedBytes;
+  renderer.licensing = {
+    kind: 'observed',
+    channel: 'commercial',
+    state: 'activation-required',
+    edition: 'free',
+    proEnabled: false,
+    updateState: 'up-to-date',
+  };
+  result.renderer = renderer;
+  return result;
+}
+
 test('fresh-sandbox expectation requires the commercial Free state and unavailable updates', () => {
   const userData = resolve('tmp', 'native-smoke');
-  const result = validResult(userData);
+  const result = licenceWindowResult(userData);
   const expected = {
     kind: 'observed',
     channel: 'commercial',
@@ -63,6 +82,61 @@ test('fresh-sandbox expectation requires the commercial Free state and unavailab
   ]) {
     result.renderer.licensing = { ...expected, ...patch };
     assert.throws(() => validateNativeSmokeResult(result, userData, options), /fresh sandbox/);
+  }
+});
+
+test('fresh-sandbox and default workspace smoke retain their distinct expectations', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  const sandboxLicensing = {
+    kind: 'observed',
+    channel: 'commercial',
+    state: 'activation-required',
+    edition: 'free',
+    proEnabled: false,
+    updateState: 'unavailable',
+  };
+  const workspace = validResult(userData);
+  workspace.renderer.licensing = sandboxLicensing;
+  assert.throws(
+    () => validateNativeSmokeResult(workspace, userData, { expectFreshSandbox: true }),
+    /behind the licence window/,
+  );
+  // Ordinary workspace smoke still requires import and save.
+  const gated = licenceWindowResult(userData);
+  assert.throws(() => validateNativeSmokeResult(gated, userData), /SVG import was not observed/);
+});
+
+test('every licence-window expectation rejects workspace I/O reported behind the window', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  const sandboxLicensing = {
+    kind: 'observed',
+    channel: 'commercial',
+    state: 'activation-required',
+    edition: 'free',
+    proEnabled: false,
+    updateState: 'unavailable',
+  };
+  for (const options of [
+    { expectFreshSandbox: true },
+    { expectLicenceWindow: true },
+    { acceptLicenceWindow: true },
+  ]) {
+    const clean = licenceWindowResult(userData);
+    clean.renderer.licensing = sandboxLicensing;
+    assert.equal(validateNativeSmokeResult(clean, userData, options), clean);
+    for (const patch of [
+      { imported: true },
+      { saved: true },
+      { savedBytes: 10 },
+      { fileAccess: { openPicker: 'stubbed', savePicker: 'stubbed', writeTarget: 'memory' } },
+    ]) {
+      const leaked = licenceWindowResult(userData);
+      leaked.renderer = { ...leaked.renderer, licensing: sandboxLicensing, ...patch };
+      assert.throws(
+        () => validateNativeSmokeResult(leaked, userData, options),
+        /licence window reported workspace|no workspace I\/O/,
+      );
+    }
   }
 });
 
@@ -138,5 +212,89 @@ test('rejects a legacy or mismatched profile before accepting UI evidence', () =
         resolve('disposable-profile'),
       ),
     /profile was not isolated/,
+  );
+});
+
+test('commercial licence-window expectation accepts a settled unlicensed gate without workspace I/O', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  const result = licenceWindowResult(userData);
+  const options = { expectLicenceWindow: true };
+  assert.equal(validateNativeSmokeResult(result, userData, options), result);
+  assert.throws(() => validateNativeSmokeResult(result, userData), /SVG import was not observed/);
+  assert.throws(
+    () => validateNativeSmokeResult(result, userData, { expectFreshSandbox: true }),
+    /fresh sandbox/,
+  );
+});
+
+test('a commercial package must be one a trial or key can open', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  const options = { expectLicenceWindow: true };
+  const fresh = licenceWindowResult(userData);
+  assert.equal(validateNativeSmokeResult(fresh, userData, options), fresh);
+  // Unavailable: an unusable release identity, keychain or Linux keyring could never
+  // admit anyone. The Linux rehearsal runs with an unlocked GNOME Keyring, so it too
+  // must reach activation-required.
+  for (const state of ['unavailable', 'trial-expired']) {
+    const result = licenceWindowResult(userData);
+    result.renderer.licensing.state = state;
+    assert.throws(
+      () => validateNativeSmokeResult(result, userData, options),
+      /commercial licence window/,
+    );
+  }
+});
+
+test('commercial licence-window expectation rejects wrong licensing and workspace evidence', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  const options = { expectLicenceWindow: true };
+  for (const patch of [
+    { channel: 'free' },
+    { edition: 'pro', proEnabled: true },
+    { state: 'ready' },
+  ]) {
+    const result = licenceWindowResult(userData);
+    Object.assign(result.renderer.licensing, patch);
+    assert.throws(
+      () => validateNativeSmokeResult(result, userData, options),
+      /commercial licence window/,
+    );
+  }
+  for (const patch of [
+    { licenceWindow: false },
+    { licenceWindow: undefined },
+    { imported: true },
+    { imported: undefined },
+    { saved: true },
+    { saved: undefined },
+    { savedBytes: 100 },
+    { fileAccess: { openPicker: 'stubbed', savePicker: 'stubbed', writeTarget: 'memory' } },
+  ]) {
+    const result = licenceWindowResult(userData);
+    Object.assign(result.renderer, patch);
+    assert.throws(
+      () => validateNativeSmokeResult(result, userData, options),
+      /commercial licence window/,
+    );
+  }
+  assert.throws(
+    () => validateNativeSmokeResult(validResult(userData), userData, options),
+    /commercial licence window/,
+  );
+});
+
+test('CLI parsing selects an explicit licence-window expectation without weakening defaults', () => {
+  const executable = resolve('release', 'linux-unpacked', 'kerfdesk');
+  const args = parseNativeSmokeArgs([executable, '--expect-licence-window']);
+  assert.equal(args.executable, executable);
+  assert.equal(args.expectLicenceWindow, true);
+  assert.equal(args.expectFreshSandbox, false);
+  assert.equal(parseNativeSmokeArgs([executable]).expectLicenceWindow, false);
+  const sandbox = parseNativeSmokeArgs([executable, '--expect-fresh-sandbox']);
+  assert.equal(sandbox.expectFreshSandbox, true);
+  assert.equal(sandbox.expectLicenceWindow, false);
+  assert.throws(
+    () => parseNativeSmokeArgs([executable, '--expect-fresh-sandbox', '--expect-licence-window']),
+    /choose one licensing expectation/,
   );
 });

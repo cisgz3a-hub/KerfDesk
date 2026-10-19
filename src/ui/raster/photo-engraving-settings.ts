@@ -1,14 +1,15 @@
 import { effectiveOperationForObject } from '../../core/effective-output';
-import type { Layer, RasterImage } from '../../core/scene';
+import type { DitherAlgorithm, Layer, RasterImage } from '../../core/scene';
 import type { PhotoEngravingApply } from './photo-engraving-apply';
 
-export const PHOTO_DITHER_CHOICES = [
-  { value: 'jarvis', label: 'Jarvis · smooth photographic shading' },
-  { value: 'stucki', label: 'Stucki · fine photographic texture' },
-  { value: 'floyd-steinberg', label: 'Floyd–Steinberg · classic dot pattern' },
-] as const;
+/** The dithers that suit photographs, smoothest first. */
+export const PHOTO_DITHERS = [
+  'jarvis',
+  'stucki',
+  'floyd-steinberg',
+] as const satisfies ReadonlyArray<DitherAlgorithm>;
 
-export type PhotoDither = (typeof PHOTO_DITHER_CHOICES)[number]['value'];
+export type PhotoDither = (typeof PHOTO_DITHERS)[number];
 export type PhotoEngravingDraft = {
   readonly brightness: number;
   readonly contrast: number;

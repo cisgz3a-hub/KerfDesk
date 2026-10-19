@@ -6,6 +6,7 @@ export function DeleteLayerButton({ layer }: { readonly layer: Layer }): JSX.Ele
   return (
     <button
       type="button"
+      className="lf-btn lf-btn--sm lf-btn--danger"
       onClick={() => deleteLayerAndObjects(layer.id)}
       aria-label={`Delete operation ${layer.name}`}
       title="Delete this operation; artwork with no other operation is also removed"

@@ -55,11 +55,12 @@ type ArtworkRunOrderRowProps = {
 export function ArtworkRunOrderRow(props: ArtworkRunOrderRowProps): JSX.Element {
   const accent = props.row.colors[0] ?? 'var(--lf-accent)';
   const numberingActive = props.numberingActive ?? false;
+  const steps = effectiveOrderText(props.row, props.machineKind);
   return (
     <article
       aria-label={`Run ${props.row.position}: ${props.row.name}`}
       aria-current={props.active ? 'true' : undefined}
-      className={`lf-run-order-card${props.active ? ' lf-run-order-card--active' : ''}${props.showSettings ? ' lf-run-order-card--detailed' : ''}`}
+      className={runCardClassName(props.active, props.showSettings ?? false, steps !== null)}
       style={{ borderLeftColor: accent }}
       onClick={props.onFocus}
     >
@@ -85,18 +86,12 @@ export function ArtworkRunOrderRow(props: ArtworkRunOrderRowProps): JSX.Element 
           </span>
         </button>
       </div>
-      <div
-        className="lf-run-order-summary"
-        tabIndex={0}
-        aria-label={`Settings summary for ${props.row.name}`}
-      >
-        <strong>{props.row.operationSummary}</strong>
-        {props.showSettings ? <span>{props.row.settingsSummary}</span> : null}
-        {props.row.shared ? <span>Shared by {props.row.objectIds.length} artworks</span> : null}
-      </div>
-      <div className="lf-run-order-effective" tabIndex={0}>
-        {effectiveOrderText(props.row.effectiveSteps, props.machineKind, props.row.output)}
-      </div>
+      <RunCardSummary row={props.row} showSettings={props.showSettings ?? false} />
+      {steps === null ? null : (
+        <div className="lf-run-order-effective" tabIndex={0}>
+          {steps}
+        </div>
+      )}
       <div className="lf-run-order-card-actions" onClick={stopPropagation}>
         <label className="lf-run-order-position">
           <span>Move to</span>
@@ -127,13 +122,47 @@ export function ArtworkRunOrderRow(props: ArtworkRunOrderRowProps): JSX.Element 
   );
 }
 
+function runCardClassName(active: boolean, detailed: boolean, hasSteps: boolean): string {
+  return [
+    'lf-run-order-card',
+    ...(active ? ['lf-run-order-card--active'] : []),
+    ...(detailed ? ['lf-run-order-card--detailed'] : []),
+    ...(hasSteps ? [] : ['lf-run-order-card--no-steps']),
+  ].join(' ');
+}
+
+// The title already names an artwork whose operation shares its name, so the
+// operation line appears only when it says something new (ADR-631).
+function RunCardSummary(props: {
+  readonly row: ArtworkRunOrderRowModel;
+  readonly showSettings: boolean;
+}): JSX.Element {
+  const { row } = props;
+  const operation = row.operationSummary === row.name ? null : row.operationSummary;
+  const empty = operation === null && !props.showSettings && !row.shared;
+  return (
+    <div
+      className="lf-run-order-summary"
+      {...(empty ? {} : { tabIndex: 0, 'aria-label': `Settings summary for ${row.name}` })}
+    >
+      {operation === null ? null : <strong>{operation}</strong>}
+      {props.showSettings ? <span>{row.settingsSummary}</span> : null}
+      {row.shared ? <span>Shared by {row.objectIds.length} artworks</span> : null}
+    </div>
+  );
+}
+
+// A laser run whose one output step is its own run number says nothing the #N
+// badge does not (ADR-631). CNC always shows its steps: clearing before
+// profiles can move them away from the requested number (ADR-211).
 function effectiveOrderText(
-  steps: ReadonlyArray<number>,
+  row: Pick<ArtworkRunOrderRowModel, 'effectiveSteps' | 'output' | 'position'>,
   machineKind: 'laser' | 'cnc',
-  output: boolean,
-): string {
-  if (!output) return 'Output off · This artwork will not run';
+): string | null {
+  const steps = row.effectiveSteps;
+  if (!row.output) return 'Output off · This artwork will not run';
   if (steps.length === 0) return 'Output on · Output steps are unavailable';
+  if (machineKind === 'laser' && steps.length === 1 && steps[0] === row.position) return null;
   const label = stepRanges(steps);
   return machineKind === 'cnc'
     ? `Actual CNC step${steps.length === 1 ? '' : 's'}: ${label}`

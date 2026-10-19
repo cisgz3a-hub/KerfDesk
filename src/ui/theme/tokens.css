@@ -396,6 +396,18 @@ body {
 .lf-field-label {
   color: var(--lf-text-muted);
 }
+/* A control taller than one line (the Dither swatches) fills the row, and its
+   name stays level with the control's first line. */
+.lf-field--top {
+  align-items: flex-start;
+}
+.lf-field--top > .lf-field-label {
+  padding-top: 10px;
+}
+.lf-field__control {
+  flex: 1;
+  min-width: 0;
+}
 .lf-field-label--sm {
   width: 90px;
 }

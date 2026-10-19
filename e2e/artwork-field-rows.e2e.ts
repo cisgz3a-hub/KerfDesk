@@ -50,7 +50,7 @@ async function addTextArtwork(page: Page): Promise<Locator> {
   await page.getByRole('textbox', { name: 'Text content on canvas' }).fill('Even rows');
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Text formatting' })).not.toBeVisible();
-  return page.getByRole('complementary', { name: 'Artwork / Operations panel' });
+  return page.getByRole('complementary', { name: 'Artwork panel' });
 }
 
 test('laser settings keep stacked sliders and exact entries aligned at every panel width', async ({

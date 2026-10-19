@@ -1,0 +1,149 @@
+{
+  "note": "Measured by a Playwright script in the desktop-mode dev server; before = origin/main at aeea09d, after = this branch merged with it. Pixel values are CSS px from the top of the window.",
+  "before": {
+    "1600x960": {
+      "powerSpeed": {
+        "viewTop": 206,
+        "viewBottom": 934,
+        "powerBottom": 423,
+        "speedBottom": 500,
+        "powerVisible": true,
+        "speedVisible": true,
+        "firstFieldTop": 353
+      },
+      "statusBar": "Cursor: —\n1 selected · 80.0 × 80.0 mm · X 20.0, Y 20.0\nObjects: 3\nLayers: 3 (3 output)\nDevice: E2E GRBL 300x300\nBed: 300 × 300 mm\nZoom: 100%\nRelative view — physical bed position unverified\nPricing\nTerms\nPrivacy\nRefunds",
+      "panelToggles": ["Layers", "Machine"],
+      "viewTabs": ["Settings", "Run order", "Materials"],
+      "imageSwitchShift": {
+        "before": 353.21875,
+        "after": 398.8125,
+        "shift": 45.59375
+      },
+      "pickerOptions": ["Operation 1", "Operation 2", "Operation 3"],
+      "headerName": "cut-outline",
+      "orderButtons": ["22x24", "22x24"],
+      "collapseChevron": "22x22",
+      "firstRunCard": "#\n1\nOperation 1\nVector artwork · 80 × 80 mm\nOperation 1\nLaser output step: 1\nMove to\nEdit settings",
+      "numberOnCanvasClass": "lf-btn lf-btn--primary",
+      "tabTruncation": {
+        "240": ["Settings:ok", "Run order:ok", "Materials:ok", "Operation:ok", "Artwork:ok"],
+        "300": ["Settings:ok", "Run order:ok", "Materials:ok", "Operation:ok", "Artwork:ok"],
+        "480": ["Settings:ok", "Run order:ok", "Materials:ok", "Operation:ok", "Artwork:ok"]
+      },
+      "collapsedRail": "Artwork / Operations"
+    },
+    "1280x720": {
+      "powerSpeed": {
+        "viewTop": 209,
+        "viewBottom": 626,
+        "powerBottom": 427,
+        "speedBottom": 504,
+        "powerVisible": true,
+        "speedVisible": true,
+        "firstFieldTop": 357
+      },
+      "statusBar": "Cursor: —\n1 selected · 80.0 × 80.0 mm · X 20.0, Y 20.0\nObjects: 3\nLayers: 3 (3 output)\nDevice: E2E GRBL 300x300\nBed: 300 × 300 mm\nZoom: 100%\nRelative view — physical bed position unverified\nPricing\nTerms\nPrivacy\nRefunds",
+      "panelToggles": ["Artwork", "Machine"],
+      "viewTabs": ["Settings", "Run order", "Materials"],
+      "imageSwitchShift": {
+        "before": 357.03125,
+        "after": 402.625,
+        "shift": 45.59375
+      },
+      "pickerOptions": ["Operation 1", "Operation 2", "Operation 3"],
+      "headerName": "cut-outline",
+      "orderButtons": ["22x24", "22x24"],
+      "collapseChevron": "22x22",
+      "firstRunCard": "#\n1\nOperation 1\nVector artwork · 80 × 80 mm\nOperation 1\nLaser output step: 1\nMove to\nEdit settings",
+      "numberOnCanvasClass": "lf-btn lf-btn--primary",
+      "collapsedRail": "Artwork / Operations"
+    },
+    "1366x768": {
+      "powerSpeed": {
+        "viewTop": 209,
+        "viewBottom": 674,
+        "powerBottom": 427,
+        "speedBottom": 504,
+        "powerVisible": true,
+        "speedVisible": true,
+        "firstFieldTop": 357
+      },
+      "statusBar": "Cursor: —\n1 selected · 80.0 × 80.0 mm · X 20.0, Y 20.0\nObjects: 3\nLayers: 3 (3 output)\nDevice: E2E GRBL 300x300\nBed: 300 × 300 mm\nZoom: 100%\nRelative view — physical bed position unverified\nPricing\nTerms\nPrivacy\nRefunds",
+      "panelToggles": ["Artwork", "Machine"],
+      "viewTabs": ["Settings", "Run order", "Materials"]
+    }
+  },
+  "after": {
+    "1600x960": {
+      "powerSpeed": {
+        "viewTop": 206,
+        "viewBottom": 934,
+        "powerBottom": 386,
+        "speedBottom": 463,
+        "powerVisible": true,
+        "speedVisible": true,
+        "firstFieldTop": 316
+      },
+      "statusBar": "Cursor: —\n1 selected · 80.0 × 80.0 mm · X 20.0, Y 20.0\nObjects: 3\nOperations: 3 (3 output)\nDevice: E2E GRBL 300x300\nBed: 300 × 300 mm\nZoom: 100%\nRelative view — physical bed position unverified\nPricing\nTerms\nPrivacy\nRefunds",
+      "panelToggles": ["Artwork", "Machine"],
+      "viewTabs": ["Properties", "Run order", "Materials"],
+      "imageSwitchShift": {
+        "before": 316.21875,
+        "after": 316.21875,
+        "shift": 0
+      },
+      "pickerOptions": ["cut-outline", "logo-engrave", "score-marks"],
+      "headerName": "cut-outline",
+      "orderButtons": ["28x28", "28x28"],
+      "collapseChevron": "28x28",
+      "firstRunCard": "#\n1\ncut-outline\nVector artwork · 80 × 80 mm\nOperation 1\nMove to\nEdit settings",
+      "numberOnCanvasClass": "lf-btn",
+      "tabTruncation": {
+        "240": ["Properties:ok", "Run order:ok", "Materials:ok", "Operation:ok", "Artwork:ok"],
+        "300": ["Properties:ok", "Run order:ok", "Materials:ok", "Operation:ok", "Artwork:ok"],
+        "480": ["Properties:ok", "Run order:ok", "Materials:ok", "Operation:ok", "Artwork:ok"]
+      },
+      "collapsedRail": "Artwork"
+    },
+    "1280x720": {
+      "powerSpeed": {
+        "viewTop": 209,
+        "viewBottom": 626,
+        "powerBottom": 390,
+        "speedBottom": 467,
+        "powerVisible": true,
+        "speedVisible": true,
+        "firstFieldTop": 320
+      },
+      "statusBar": "Cursor: —\n1 selected · 80.0 × 80.0 mm · X 20.0, Y 20.0\nObjects: 3\nOperations: 3 (3 output)\nDevice: E2E GRBL 300x300\nBed: 300 × 300 mm\nZoom: 100%\nRelative view — physical bed position unverified\nPricing\nTerms\nPrivacy\nRefunds",
+      "panelToggles": ["Artwork", "Machine"],
+      "viewTabs": ["Properties", "Run order", "Materials"],
+      "imageSwitchShift": {
+        "before": 320.03125,
+        "after": 320.03125,
+        "shift": 0
+      },
+      "pickerOptions": ["cut-outline", "logo-engrave", "score-marks"],
+      "headerName": "cut-outline",
+      "orderButtons": ["28x28", "28x28"],
+      "collapseChevron": "28x28",
+      "firstRunCard": "#\n1\ncut-outline\nVector artwork · 80 × 80 mm\nOperation 1\nMove to\nEdit settings",
+      "numberOnCanvasClass": "lf-btn",
+      "collapsedRail": "Artwork"
+    },
+    "1366x768": {
+      "powerSpeed": {
+        "viewTop": 209,
+        "viewBottom": 674,
+        "powerBottom": 390,
+        "speedBottom": 467,
+        "powerVisible": true,
+        "speedVisible": true,
+        "firstFieldTop": 320
+      },
+      "statusBar": "Cursor: —\n1 selected · 80.0 × 80.0 mm · X 20.0, Y 20.0\nObjects: 3\nOperations: 3 (3 output)\nDevice: E2E GRBL 300x300\nBed: 300 × 300 mm\nZoom: 100%\nRelative view — physical bed position unverified\nPricing\nTerms\nPrivacy\nRefunds",
+      "panelToggles": ["Artwork", "Machine"],
+      "viewTabs": ["Properties", "Run order", "Materials"]
+    }
+  }
+}

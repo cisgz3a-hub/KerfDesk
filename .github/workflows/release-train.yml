@@ -379,7 +379,8 @@ jobs:
         shell: pwsh
         run: |
           $unpacked = (Resolve-Path "release/commercial/$env:VERSION/win-unpacked").Path
-          node scripts/verify-asar-integrity-enforced.mjs "$unpacked\KerfDesk.exe" "$unpacked\resources\app.asar"
+          # The unlicensed commercial baseline opens behind its licence window (ADR-623).
+          node scripts/verify-asar-integrity-enforced.mjs "$unpacked\KerfDesk.exe" "$unpacked\resources\app.asar" --expect-licence-window
           if ($LASTEXITCODE -ne 0) { throw 'A modified app.asar did not stop the app.' }
 
       # Reserves the version, uploads the three files and the signed update

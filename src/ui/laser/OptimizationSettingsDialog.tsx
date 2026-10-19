@@ -172,7 +172,7 @@ function LayerPriorityField(props: {
 }): JSX.Element {
   return (
     <PlannerSelect
-      label="Layer priority"
+      label="Operation priority"
       name="layerPriority"
       value={props.value}
       onChange={(layerPriority) =>
@@ -181,8 +181,8 @@ function LayerPriorityField(props: {
         })
       }
       options={[
-        ['project-order', 'Cuts / Layers order'],
-        ['reverse-project-order', 'Reverse layer order'],
+        ['project-order', 'Operation order'],
+        ['reverse-project-order', 'Reverse operation order'],
       ]}
     />
   );
@@ -253,7 +253,7 @@ function SourceOrderPrecedenceNote(props: {
       <p style={precedenceNoteStyle} role="status">
         The Line burn start choice orders Line contours near that region, respecting Inside paths
         first and Path direction. Other operations keep source order and use the saved Planning
-        start where applicable. Layer priority and enabled Overlap removal still apply.
+        start where applicable. Operation priority and enabled Overlap removal still apply.
       </p>
     );
   }
@@ -262,15 +262,15 @@ function SourceOrderPrecedenceNote(props: {
       <p style={precedenceNoteStyle} role="status">
         Keep source order preserves path sequence and direction inside each operation. Inside paths
         first and Path direction are saved but bypassed. Start closed shapes still applies,
-        beginning from Planning start. Layer priority still applies. Overlap removal, when enabled,
-        also applies.
+        beginning from Planning start. Operation priority still applies. Overlap removal, when
+        enabled, also applies.
       </p>
     );
   }
   return (
     <p style={precedenceNoteStyle} role="status">
       Keep source order preserves path sequence and direction inside each operation. Inside paths
-      first, Path direction, and Planning start are saved but bypassed. Layer priority still
+      first, Path direction, and Planning start are saved but bypassed. Operation priority still
       applies. Overlap removal, when enabled, also applies.
     </p>
   );

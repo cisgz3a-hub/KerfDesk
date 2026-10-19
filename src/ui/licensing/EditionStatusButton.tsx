@@ -1,6 +1,6 @@
-// The status bar's edition chip (ADR-540). A build that sells licences names
-// its edition and opens Help > Licence. Once sales open, a build that cannot take
-// a licence says that Pro is in the desktop app (ADR-544). It never gates work.
+// The status bar's edition chip (ADR-540, ADR-623). A build that sells licences
+// names its licence and opens Help > Licence. Once sales open, a build that cannot
+// take a licence says that Pro is in the desktop app (ADR-544). It never gates work.
 
 import type { LicenceStatus } from '../../platform/types';
 import { useEdition } from './edition';
@@ -18,7 +18,8 @@ export function editionLabel(status: LicenceStatus, nowSeconds: number): string 
     }
     return 'Pro';
   }
-  return status.state === 'activation-required' && status.tier === null ? 'Free · Try Pro' : 'Free';
+  // Only rights that ended in this session reach here: the app opened with them (ADR-623).
+  return 'Licence needed';
 }
 
 export const PRO_IN_DESKTOP_LABEL = 'Free · Pro in the desktop app';

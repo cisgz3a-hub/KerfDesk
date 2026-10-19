@@ -1,3 +1,5 @@
+import { Icon } from '../kit';
+
 type ArtworkRunOrderToolbarProps = {
   readonly search: string;
   readonly total: number;
@@ -87,7 +89,7 @@ function RunOrderTools(
         <button
           type="button"
           title="Assign run numbers by clicking artwork on the canvas"
-          className="lf-btn lf-btn--primary"
+          className="lf-btn"
           onClick={props.onStartNumbering}
         >
           Number on canvas
@@ -113,56 +115,64 @@ function RunOrderNavigation(
   const jump = Number(props.jumpPosition);
   const canJump = Number.isInteger(jump) && jump >= 1 && jump <= props.total;
   return (
-    <details className="lf-run-order-navigation" open={props.search.length > 0 ? true : undefined}>
+    <details
+      className="lf-artwork-disclosure lf-run-order-navigation"
+      open={props.search.length > 0 ? true : undefined}
+    >
       <summary title="Expand search and navigation controls for the run sequence.">
-        Find or jump to a run
+        <span>
+          <strong>Find or jump to a run</strong>
+        </span>
+        <Icon name="chevron-down" size={16} />
       </summary>
-      <label className="lf-run-order-search">
-        <span>Find artwork</span>
-        <input
-          type="search"
-          value={props.search}
-          aria-label="Search artwork jobs"
-          title="Find runs by artwork name, operation or setting"
-          placeholder="Name, operation or setting"
-          onChange={(event) => props.onSearch(event.currentTarget.value)}
-        />
-      </label>
-      <div className="lf-run-order-jump">
-        <label>
-          <span>Jump to run</span>
+      <div className="lf-artwork-disclosure__body">
+        <label className="lf-run-order-search">
+          <span>Find artwork</span>
           <input
-            type="number"
-            min={1}
-            max={Math.max(1, props.total)}
-            step={1}
-            value={props.jumpPosition}
-            aria-label="Jump to run number"
-            title={`Enter a whole run number from 1 to ${props.total}`}
-            onChange={(event) => props.onJumpPosition(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && canJump) props.onJump();
-            }}
+            type="search"
+            value={props.search}
+            aria-label="Search artwork jobs"
+            title="Find runs by artwork name, operation or setting"
+            placeholder="Name, operation or setting"
+            onChange={(event) => props.onSearch(event.currentTarget.value)}
           />
         </label>
-        <button
-          type="button"
-          title="Reveal the entered run number"
-          disabled={!canJump}
-          onClick={props.onJump}
-        >
-          Go
-        </button>
-        {props.search.length > 0 ? (
+        <div className="lf-run-order-jump">
+          <label>
+            <span>Jump to run</span>
+            <input
+              type="number"
+              min={1}
+              max={Math.max(1, props.total)}
+              step={1}
+              value={props.jumpPosition}
+              aria-label="Jump to run number"
+              title={`Enter a whole run number from 1 to ${props.total}`}
+              onChange={(event) => props.onJumpPosition(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && canJump) props.onJump();
+              }}
+            />
+          </label>
           <button
             type="button"
-            className="lf-btn lf-btn--ghost"
-            title="Clear the search to show every artwork run"
-            onClick={() => props.onSearch('')}
+            title="Reveal the entered run number"
+            disabled={!canJump}
+            onClick={props.onJump}
           >
-            Clear search
+            Go
           </button>
-        ) : null}
+          {props.search.length > 0 ? (
+            <button
+              type="button"
+              className="lf-btn lf-btn--ghost"
+              title="Clear the search to show every artwork run"
+              onClick={() => props.onSearch('')}
+            >
+              Clear search
+            </button>
+          ) : null}
+        </div>
       </div>
     </details>
   );

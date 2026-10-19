@@ -28,7 +28,7 @@ export function LineBurnStartField(props: {
           style={selectStyle}
           value={props.value ?? ''}
           disabled={props.disabled === true}
-          title="Choose a physical region of the artwork. This orders Line paths and chooses nearby existing closed-shape starts, even with Keep source order or Where drawn. Layer priority, Inside paths first, and Nearest corner still apply."
+          title="Choose a physical region of the artwork. This orders Line paths and chooses nearby existing closed-shape starts, even with Keep source order or Where drawn. Operation priority, Inside paths first, and Nearest corner still apply."
           onChange={(event) => {
             const value = event.currentTarget.value;
             props.onChange(isLineStartRegion(value) ? value : undefined);
