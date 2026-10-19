@@ -4,14 +4,10 @@ import {
   linesPerMmToDpi,
   linesPerMmToLineIntervalMm,
 } from '../../core/raster';
-import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
+import type { Layer } from '../../core/scene';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
-import {
-  algorithmLabel,
-  dotWidthCorrectionMax,
-  numberValueOr,
-  parseDither,
-} from './AdjustImageDialog.form-utils';
+import { DitherSwatchPicker, originalPixelsNotice } from '../layers/DitherSwatchPicker';
+import { dotWidthCorrectionMax, numberValueOr } from './AdjustImageDialog.form-utils';
 import { type ImagePresetId, PresetField } from './AdjustImageDialog.presets';
 import * as styles from './AdjustImageDialog.styles';
 import type { AdjustImageDraft } from './AdjustImageDialog.types';
@@ -98,8 +94,9 @@ function RasterSettingsFields(props: {
   const densityBounds = imageDensityBounds(props.storedLinesPerMm);
   return (
     <>
-      <SelectField
+      <DitherField
         value={draft.ditherAlgorithm}
+        passThrough={draft.passThrough}
         onChange={(ditherAlgorithm) => update({ ditherAlgorithm })}
       />
       <NumberField
@@ -242,29 +239,25 @@ function NumberField(props: {
   );
 }
 
-function SelectField(props: {
+// A div, not a label: a label would hand a click on "Dither" to the first swatch.
+function DitherField(props: {
   readonly value: Layer['ditherAlgorithm'];
+  readonly passThrough: boolean;
   readonly onChange: (value: Layer['ditherAlgorithm']) => void;
 }): JSX.Element {
+  const notice = originalPixelsNotice('Pass-through', props.passThrough, props.value);
   return (
-    <label style={styles.fieldStyle}>
-      <span style={styles.labelStyle}>Dither</span>
-      <select
+    <div style={styles.ditherFieldStyle}>
+      <span style={styles.ditherLabelStyle}>Dither</span>
+      <DitherSwatchPicker
         name="ditherAlgorithm"
         value={props.value}
-        onChange={(event) => props.onChange(parseDither(event.target.value))}
-        className="lf-select"
-        style={styles.inputStyle}
-        aria-label="Adjust image dither"
+        ariaLabel="Adjust image dither"
         title="Choose how image brightness is converted into laser dots or grayscale power."
-      >
-        {DITHER_ALGORITHMS.map((algorithm) => (
-          <option key={algorithm} value={algorithm}>
-            {algorithmLabel(algorithm)}
-          </option>
-        ))}
-      </select>
-    </label>
+        {...(notice === undefined ? {} : { notice })}
+        onChange={props.onChange}
+      />
+    </div>
   );
 }
 
