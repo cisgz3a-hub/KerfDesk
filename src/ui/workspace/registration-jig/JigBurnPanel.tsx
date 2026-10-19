@@ -22,22 +22,12 @@ export function JigBurnPanel(props: {
   return (
     <section className="lf-jig-burn" aria-label={label}>
       <strong>{label}</strong>
-      {phase === run ? <JigReadyToBurn editor={editor} run={run} /> : <JigRunSwitch {...props} />}
+      {phase === run ? <JigReadyToBurn run={run} /> : <JigRunSwitch {...props} />}
     </section>
   );
 }
 
-function JigReadyToBurn(props: {
-  readonly editor: JigEditorController;
-  readonly run: JigRun;
-}): JSX.Element {
-  if (props.run === 'outlines' && props.editor.pendingLayout) {
-    return (
-      <p className="lf-jig-muted" role="status">
-        Apply layout first, so Frame and Start burn the outlines you see.
-      </p>
-    );
-  }
+function JigReadyToBurn(props: { readonly run: JigRun }): JSX.Element {
   return (
     <>
       <p className="lf-jig-muted">

@@ -5,6 +5,7 @@ import {
   type DragEvent,
   type RefObject,
   type MutableRefObject,
+  type ReactNode,
 } from 'react';
 import { findRegistrationBoxes, type Project } from '../../../core/scene';
 import { Button } from '../../kit';
@@ -33,10 +34,15 @@ export type RegistrationJigCanvasProps = {
   readonly onCommit: (project: Project) => void;
   /** Artwork files dropped on the canvas, with the outline under the drop point. */
   readonly onDropFiles?: (files: ReadonlyArray<File>, outlineId: string | null) => void;
+  /** Position and size of the selection, shown above the footer (ADR-634). */
+  readonly selectionBar?: ReactNode;
+  /** How much jig artwork Clear canvas would remove, and the action itself. */
+  readonly clearCount?: number;
+  readonly onClear?: () => void;
 };
 
 const CANVAS_HELP =
-  'Drag to move · Handles resize (Shift: free) and rotate (Shift: 15°) · Drag empty space to box-select · Shift-click to select more · Ctrl+A selects all artwork · Wheel to zoom · Right-drag or Space-drag to pan · Drop artwork files on an outline';
+  'Drag to move · Handles resize (Shift: free) and rotate (Shift: 15°) · Drag empty space to box-select · Shift-click to select more · Ctrl+A selects all artwork (all outlines in step 1) · Wheel to zoom · Right-drag or Space-drag to pan · Drop artwork files on an outline';
 
 export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.Element {
   const { project, selectedIds } = props;
@@ -105,13 +111,45 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
           setDropOutlineId,
         )}
       />
-      <div style={footerStyle}>
-        <span id="registration-jig-canvas-help" role="status">
-          {notice === '' ? CANVAS_HELP : notice}
-        </span>
-        <Button onClick={() => setView(fitJigCanvasView(project, size))}>Fit jig</Button>
-        <Button onClick={() => setView(JIG_BED_VIEW)}>Fit bed</Button>
-      </div>
+      {props.selectionBar}
+      <JigCanvasFooter
+        notice={notice}
+        clearDisabled={props.readOnly === true || (props.clearCount ?? 0) === 0}
+        onFitJig={() => setView(fitJigCanvasView(project, size))}
+        onFitBed={() => setView(JIG_BED_VIEW)}
+        {...(props.onClear === undefined ? {} : { onClear: props.onClear })}
+      />
+    </div>
+  );
+}
+
+function JigCanvasFooter(props: {
+  readonly notice: string;
+  readonly clearDisabled: boolean;
+  readonly onFitJig: () => void;
+  readonly onFitBed: () => void;
+  readonly onClear?: () => void;
+}): JSX.Element {
+  return (
+    <div style={footerStyle}>
+      <span id="registration-jig-canvas-help" role="status">
+        {props.notice === '' ? CANVAS_HELP : props.notice}
+      </span>
+      <Button title="Fit the view to the jig outlines" onClick={props.onFitJig}>
+        Fit jig
+      </Button>
+      <Button title="Fit the view to the whole bed" onClick={props.onFitBed}>
+        Fit bed
+      </Button>
+      {props.onClear !== undefined && (
+        <Button
+          disabled={props.clearDisabled}
+          title="Remove all artwork from the jig pieces; the outlines stay. Undo brings it back."
+          onClick={props.onClear}
+        >
+          Clear canvas
+        </Button>
+      )}
     </div>
   );
 }

@@ -1,20 +1,27 @@
 import {
+  findRegistrationBoxes,
   isRegistrationBox,
   removeObject,
   sceneObjectHasVisibleLayer,
+  transformedBBox,
+  type Scene,
   type SceneObject,
   type TextObject,
   type TracedImage,
 } from '../../../core/scene';
+import { reliefAuthoringLinkIds } from '../../../core/relief/relief-authoring-link-ids';
+import { registrationJigArtworkInstances } from '../../../core/scene/registration-jig-artwork';
 import { applyFreshImport, applyUpsertText, pruneOrphanLayers } from '../../state/scene-mutations';
 import { removeObjectIdsFromGroups } from '../../state/scene-group-actions';
 import { repairDanglingObjectDependencies } from '../../state/object-delete-actions';
+import { applyCenterArtworkInRegistrationJigSet } from '../../state/registration-jig-artwork-actions';
 import { applyRegistrationOutput } from '../../state/registration-output-actions';
-import { fitJigArtwork } from './fit-jig-artwork';
+import { fitJigArtwork, jigOutlineAt } from './fit-jig-artwork';
 import { replaceJigImageWithTrace } from './jig-image-trace';
 import {
   changeJigDraft,
   selectedJigIds,
+  selectJigObjects,
   type JigDraft,
   type JigEditorSession,
 } from './jig-editor-session';
@@ -24,12 +31,19 @@ import {
 export type JigImportPlacement = {
   readonly anchorIds: ReadonlySet<string>;
   readonly batchIndex: number;
+  /** One design for the whole jig (ADR-634): after fitting, it is centred in
+   *  the first outline and copied into every other one, in the same edit. */
+  readonly copyToEveryOutline?: boolean;
 };
 
 export function importJigArtwork(
   session: JigEditorSession,
   object: SceneObject,
-  placement: JigImportPlacement = { anchorIds: selectedJigIds(session.draft), batchIndex: 0 },
+  placement: JigImportPlacement = {
+    anchorIds: selectedJigIds(session.draft),
+    batchIndex: 0,
+    copyToEveryOutline: true,
+  },
 ): JigEditorSession {
   let draft: JigDraft = {
     ...session.draft,
@@ -55,9 +69,23 @@ export function importJigArtwork(
       },
     };
   }
-  return finishArtworkEdit(session, draft);
+  const imported = finishArtworkEdit(session, draft);
+  return placement.copyToEveryOutline === true ? copyToEveryOutline(imported, object.id) : imported;
 }
 
+// The artwork already fits its outline, so the copies keep its size; a design
+// larger than the outline still shrinks to fit inside it.
+function copyToEveryOutline(session: JigEditorSession, id: string): JigEditorSession {
+  if (findRegistrationBoxes(session.draft.project.scene).length < 2) return session;
+  const selected = selectJigObjects(session, new Set([id]));
+  return changeJigDraft(
+    selected,
+    applyCenterArtworkInRegistrationJigSet({ ...selected.draft, undoStack: [] }, { grow: false }),
+  );
+}
+
+/** New text is copied to every piece at its own size; updating one copy's text
+ *  changes only that copy, so each piece can carry its own name. */
 export function upsertJigText(session: JigEditorSession, object: TextObject): JigEditorSession {
   const project = session.draft.project;
   const exists = project.scene.objects.some((item) => item.id === object.id);
@@ -81,13 +109,14 @@ export function upsertJigText(session: JigEditorSession, object: TextObject): Ji
       ),
     },
   };
-  return finishArtworkEdit(session, {
+  const upserted = finishArtworkEdit(session, {
     ...session.draft,
     ...patch,
     project: positioned,
     selectedObjectId: object.id,
     additionalSelectedIds: new Set(),
   });
+  return exists ? upserted : copyToEveryOutline(upserted, object.id);
 }
 
 /** Replaces a jig image and its outline copies with a trace of it (ADR-633). */
@@ -152,12 +181,64 @@ export type JigArtworkDeletion = {
 // Pure: the caller reports the dependency repairs after updating its state,
 // never from inside a React state updater.
 export function deleteJigArtworkWithRepairs(session: JigEditorSession): JigArtworkDeletion {
-  const ids = selectedJigIds(session.draft);
+  return deleteJigArtworkIds(session, selectedJigIds(session.draft));
+}
+
+/** Clear canvas (ADR-634): removes the artwork in the jig's pieces and keeps
+ *  the outlines and every design outside them. */
+export function clearJigArtwork(session: JigEditorSession): JigArtworkDeletion {
+  return deleteJigArtworkIds(session, jigArtworkIds(session.draft.project.scene));
+}
+
+/** The artwork Clear canvas removes: every copy that belongs to a jig piece,
+ *  and any other unlocked, visible artwork whose centre sits inside an outline
+ *  (artwork fitted into one outline but not yet copied, say). */
+export function jigArtworkIds(scene: Scene): ReadonlySet<string> {
+  const outlines = findRegistrationBoxes(scene);
+  const members = new Set(
+    registrationJigArtworkInstances(scene).flatMap((instance) =>
+      instance.objects.map((object) => object.id),
+    ),
+  );
+  const ids = scene.objects
+    .filter(
+      (object) =>
+        !isRegistrationBox(object) &&
+        object.locked !== true &&
+        sceneObjectHasVisibleLayer(scene, object) &&
+        (members.has(object.id) || jigOutlineAt(outlines, boundsCentre(object)) >= 0),
+    )
+    .map((object) => object.id);
+  return new Set(ids);
+}
+
+function boundsCentre(object: SceneObject): { readonly x: number; readonly y: number } {
+  const bounds = transformedBBox(object);
+  return { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
+}
+
+/** Deletes the given unlocked, visible artwork; outlines are never deleted, and
+ *  neither is artwork a kept relief still uses as its source. */
+export function deleteJigArtworkIds(
+  session: JigEditorSession,
+  ids: ReadonlySet<string>,
+): JigArtworkDeletion {
   let scene = session.draft.project.scene;
+  const usedByKeptRelief = new Set(
+    scene.objects.flatMap((object) =>
+      !ids.has(object.id) &&
+      object.kind === 'relief' &&
+      'reliefAuthoring' in object &&
+      object.reliefAuthoring !== undefined
+        ? reliefAuthoringLinkIds(object.reliefAuthoring)
+        : [],
+    ),
+  );
   const removed = new Set<string>();
   for (const object of scene.objects) {
     if (
       ids.has(object.id) &&
+      !usedByKeptRelief.has(object.id) &&
       !isRegistrationBox(object) &&
       object.locked !== true &&
       sceneObjectHasVisibleLayer(scene, object)

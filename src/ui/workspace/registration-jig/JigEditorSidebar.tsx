@@ -1,5 +1,4 @@
 import { Button } from '../../kit';
-import { JigSelectionFields } from './JigSelectionFields';
 import { JigArtworkSettings } from './JigArtworkSettings';
 import { JigArtworkStep } from './JigArtworkStep';
 import { JigBurnPanel } from './JigBurnPanel';
@@ -32,14 +31,14 @@ const STEPS: ReadonlyArray<{
 /**
  * The three steps of a jig job (ADR-634). Each step stays mounted while hidden,
  * so half-typed layout fields or a loaded trace survive a look at another step.
- * Editing pauses while the machine runs; Frame and Start stay in reach.
+ * Editing pauses while the machine runs; Frame and Start stay in reach. The
+ * selection's position and size sit on a bar above the jig canvas.
  */
 export function JigEditorSidebar({
   editor,
 }: {
   readonly editor: JigEditorController;
 }): JSX.Element {
-  const project = editor.session.draft.project;
   const step = editor.step;
   return (
     <aside className="lf-jig-sidebar">
@@ -73,15 +72,6 @@ export function JigEditorSidebar({
         </fieldset>
         <JigBurnPanel editor={editor} run="artwork" />
       </section>
-      {step !== 'burn-artwork' && (
-        <fieldset className="lf-jig-edit" disabled={editor.readOnly}>
-          <JigSelectionFields
-            project={project}
-            selectedIds={editor.ids}
-            onCommit={editor.onCommit}
-          />
-        </fieldset>
-      )}
     </aside>
   );
 }
@@ -89,19 +79,16 @@ export function JigEditorSidebar({
 function JigStepTabs({ editor }: { readonly editor: JigEditorController }): JSX.Element {
   return (
     <div className="lf-jig-tabs" role="group" aria-label="Jig steps">
-      {STEPS.map((step) => {
-        const pending = step.id === 'outlines' && editor.pendingLayout;
-        return (
-          <Button
-            key={step.id}
-            pressed={editor.step === step.id}
-            title={pending ? 'The layout has field changes that are not applied yet' : step.title}
-            onClick={() => editor.setStep(step.id)}
-          >
-            {pending ? `${step.label} •` : step.label}
-          </Button>
-        );
-      })}
+      {STEPS.map((step) => (
+        <Button
+          key={step.id}
+          pressed={editor.step === step.id}
+          title={step.title}
+          onClick={() => editor.setStep(step.id)}
+        >
+          {step.label}
+        </Button>
+      ))}
     </div>
   );
 }

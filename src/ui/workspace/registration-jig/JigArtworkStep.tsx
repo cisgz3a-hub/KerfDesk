@@ -1,39 +1,64 @@
-import {
-  findRegistrationBoxes,
-  isRegistrationBox,
-  sceneObjectHasVisibleLayer,
-} from '../../../core/scene';
+import { useState } from 'react';
 import { Button } from '../../kit';
 import { RegistrationJigArtworkSizeEditor } from '../RegistrationJigArtworkSizeControls';
 import { applyRegistrationJigArtworkSize } from '../../state/registration-jig-artwork-actions';
 import { JigArtworkImport } from './JigArtworkImport';
 import { JigTextControls } from './JigTextControls';
 import { JigTraceControls } from './JigTraceControls';
-import { centerJigArtwork, changeJigDraft } from './jig-editor-session';
+import { changeJigDraft } from './jig-editor-session';
 import type { JigEditorController } from './use-jig-editor';
 
-/** Step 2: put the pieces in the burned outlines, then add and place the
- *  artwork. Ways to add artwork come first, then placing it across the jig. */
+type JigAddPanel = 'text' | 'trace' | null;
+
+/** Step 2: put the pieces in the burned outlines, then add the artwork. One
+ *  row adds it (ADR-634): a single design goes on every piece by itself. */
 export function JigArtworkStep({ editor }: { readonly editor: JigEditorController }): JSX.Element {
+  const [panel, setPanel] = useState<JigAddPanel>(null);
   const project = editor.session.draft.project;
+  const toggle = (next: Exclude<JigAddPanel, null>): void =>
+    setPanel((current) => (current === next ? null : next));
+  // Selecting text opens its form for editing; the tracer stays mounted while
+  // hidden, so a loaded image survives a look at the text form.
+  const textOpen = panel === 'text' || selectedText(editor);
   return (
     <>
       <p className="lf-jig-muted">
         Put a blank in each burned outline and focus on the top of the pieces. Keep the base where
         it was for the outline run.
       </p>
-      <JigArtworkImport
-        busy={editor.importing}
-        onFiles={(files) => void editor.importFiles(files, editor.ids)}
-      />
-      <JigTextControls
-        project={project}
-        selectedIds={editor.ids}
-        onUpsert={editor.onUpsert}
-        onBusyChange={editor.onTextBusy}
-      />
-      <details className="lf-jig-trace" open>
-        <summary title="Show or hide image tracing">Trace an image</summary>
+      <div className="lf-jig-add" role="group" aria-label="Add artwork">
+        <JigArtworkImport
+          busy={editor.importing}
+          onFiles={(files) => void editor.importFiles(files, editor.ids)}
+        />
+        <Button
+          pressed={textOpen}
+          title="Write text for the pieces; new text goes on every piece"
+          onClick={() => toggle('text')}
+        >
+          Text
+        </Button>
+        <Button
+          pressed={panel === 'trace'}
+          title="Trace an image into lines for the pieces"
+          onClick={() => toggle('trace')}
+        >
+          Trace image
+        </Button>
+      </div>
+      <p className="lf-jig-muted">
+        One design goes on every piece. Several files fill one piece each; you can also drop files
+        on an outline.
+      </p>
+      {textOpen && (
+        <JigTextControls
+          project={project}
+          selectedIds={editor.ids}
+          onUpsert={editor.onUpsert}
+          onBusyChange={editor.onTextBusy}
+        />
+      )}
+      <div className="lf-jig-trace" hidden={panel !== 'trace'}>
         <JigTraceControls
           project={project}
           selectedIds={editor.ids}
@@ -41,53 +66,17 @@ export function JigArtworkStep({ editor }: { readonly editor: JigEditorControlle
           onTraceImage={editor.onTraceImage}
           onBusyChange={editor.onTraceBusy}
         />
-      </details>
-      <JigCentreArtwork
-        editor={editor}
-        outlineCount={findRegistrationBoxes(project.scene).length}
-      />
+      </div>
       <JigSharedArtworkSize editor={editor} />
     </>
   );
 }
 
-function JigCentreArtwork(props: {
-  readonly editor: JigEditorController;
-  readonly outlineCount: number;
-}): JSX.Element {
-  const { editor, outlineCount } = props;
-  const canCenter = outlineCount > 0 && hasEditableArtworkSelection(editor);
-  return (
-    <div className="lf-jig-fields">
-      <Button
-        disabled={!canCenter}
-        title={
-          canCenter
-            ? 'Fit the selected artwork into the first outline and copy it into every outline'
-            : 'Select artwork on the jig canvas first'
-        }
-        onClick={() => editor.setSession(centerJigArtwork)}
-      >
-        {outlineCount > 1
-          ? `Centre + copy artwork to all ${outlineCount}`
-          : 'Centre artwork in outline'}
-      </Button>
-      <p className="lf-jig-muted">
-        Select artwork, then centre and copy it across the jig. Shift-click selects multiple
-        objects.
-      </p>
-    </div>
-  );
-}
-
-function hasEditableArtworkSelection(editor: JigEditorController): boolean {
-  const scene = editor.session.draft.project.scene;
-  return scene.objects.some(
-    (object) =>
-      editor.ids.has(object.id) &&
-      !isRegistrationBox(object) &&
-      object.locked !== true &&
-      sceneObjectHasVisibleLayer(scene, object),
+function selectedText(editor: JigEditorController): boolean {
+  if (editor.ids.size !== 1) return false;
+  const [id] = editor.ids;
+  return editor.session.draft.project.scene.objects.some(
+    (object) => object.id === id && object.kind === 'text',
   );
 }
 

@@ -10,9 +10,19 @@ import { jigRunPhase } from './jig-run-phase';
 import { RegistrationJigEditor } from './RegistrationJigEditor';
 
 vi.mock('./RegistrationJigCanvas', () => ({
-  RegistrationJigCanvas: (props: { project: Project; readOnly?: boolean }) => (
+  RegistrationJigCanvas: (props: {
+    project: Project;
+    readOnly?: boolean;
+    selectionBar?: React.ReactNode;
+    clearCount?: number;
+    onClear?: () => void;
+  }) => (
     <div aria-label="Registration jig editing canvas" data-read-only={props.readOnly === true}>
       {findRegistrationBoxes(props.project.scene).length} outlines
+      {props.selectionBar}
+      <button type="button" disabled={(props.clearCount ?? 0) === 0} onClick={props.onClear}>
+        Clear canvas
+      </button>
     </div>
   ),
 }));
@@ -142,10 +152,53 @@ describe('Registration Jig mode', () => {
     expect(visibleStep()).toBe('Place pieces and artwork');
     click('1 Burn outlines');
     expect(container.querySelector('.lf-jig-lock')?.textContent).toContain('locked');
-    expect(button('Select all outlines')?.disabled).toBe(true);
+    press('a', { ctrlKey: true });
+    expect(useStore.getState().selectedObjectId).toBeNull();
     click('Unlock outlines');
     expect(container.querySelector('.lf-jig-lock')).toBeNull();
-    expect(button('Select all outlines')?.disabled).toBe(false);
+    // In the outline step Ctrl+A selects the movable outlines.
+    press('a', { ctrlKey: true });
+    const outline = findRegistrationBoxes(useStore.getState().project.scene)[0];
+    expect(useStore.getState().selectedObjectId).toBe(outline?.id);
+  });
+  it('Clear canvas empties the pieces but keeps the outlines and other designs', () => {
+    savedJigWithArtwork();
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'outside',
+        color: '#0000ff',
+        spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: 390, y: 390 },
+      }),
+    );
+    const [outline] = findRegistrationBoxes(useStore.getState().project.scene);
+    const centre = outline!.transform;
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'inside',
+        color: '#0000ff',
+        spec: { widthMm: 4, heightMm: 4, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: centre.x, y: centre.y },
+      }),
+    );
+    const before = useStore.getState().project;
+    render();
+    click('Clear canvas');
+    const ids = useStore.getState().project.scene.objects.map((object) => object.id);
+    expect(ids).toContain('outside');
+    expect(ids).not.toContain('inside');
+    expect(findRegistrationBoxes(useStore.getState().project.scene)).toHaveLength(1);
+    act(() => useStore.getState().undo());
+    expect(useStore.getState().project).toBe(before);
+  });
+  it('shows the selection bar only while something is selected', () => {
+    savedJigWithArtwork();
+    useStore.setState({ selectedObjectId: null, additionalSelectedIds: new Set() });
+    render();
+    expect(container.querySelector('[aria-label="Jig selection properties"]')).toBeNull();
+    act(() => useStore.getState().selectObject('art'));
+    expect(container.querySelector('[aria-label="Jig selection properties"]')).not.toBeNull();
+    expect(button('Centre in outline')).toBeDefined();
   });
   it('puts edits straight into the project, where Undo reverts them', () => {
     savedJigWithArtwork();
@@ -181,7 +234,7 @@ describe('Registration Jig mode', () => {
     expect(document.activeElement?.getAttribute('aria-label')).toBe('Registration Jig');
     expect(useStore.getState().selectedObjectId).toBe('art');
   });
-  it('Ctrl+A selects all the artwork but no outline, and not from a field', () => {
+  it('Ctrl+A selects all the artwork outside the outline step, and not from a field', () => {
     savedJigWithArtwork();
     useStore.getState().drawShape(
       createRectangle({
@@ -193,6 +246,7 @@ describe('Registration Jig mode', () => {
     );
     useStore.getState().selectObject('art');
     render();
+    click('2 Place pieces & artwork');
     const field = container.querySelector<HTMLInputElement>('[aria-label="X (mm)"]');
     if (field === null) throw new Error('Missing selection field');
     act(() => field.focus());

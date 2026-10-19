@@ -71,10 +71,15 @@ export function jigSelectionForHit(
 
 /** Ctrl+A: all the artwork the canvas could select. Outlines are left out;
  * Jig layout has its own Select all outlines. */
-export function jigSelectAll(scene: Scene): ReadonlySet<string> {
+/** Ctrl+A: every selectable artwork object, or in the outline step every
+ *  movable outline (ADR-634). */
+export function jigSelectAll(
+  scene: Scene,
+  target: 'artwork' | 'outlines' = 'artwork',
+): ReadonlySet<string> {
   return new Set(
     jigSelectableObjects(scene)
-      .filter((object) => !isRegistrationBox(object))
+      .filter((object) => isRegistrationBox(object) === (target === 'outlines'))
       .map((object) => object.id),
   );
 }

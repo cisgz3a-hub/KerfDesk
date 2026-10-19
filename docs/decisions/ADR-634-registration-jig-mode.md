@@ -88,3 +88,62 @@ machine moves, and leaving jig mode for another project. The side panels test sh
 machine panel without its job actions in jig mode; the shortcut test shows the canvas keys
 standing down while Undo still works. The completion simulator test checks the run phase after a
 clean and a rejected outline run. No hardware was run.
+
+### Amendment 1 - Fewer controls, and Clear canvas (2026-10-19)
+
+#### Context
+
+Even in jig mode, each step still showed about 30 controls. Several did the same job twice: two
+size editors with two proportion locks (**AR locked** and **Keep proportions**), three Apply
+steps (**Apply layout**, **Apply size to all N**, **Add text**), a **Centre + copy** after every
+import, and a **Select all outlines** button beside Ctrl+A and box selection. The maintainer also
+asked for a way to clear the jig canvas.
+
+#### Decision
+
+1. **One design goes on every piece by itself.** A single imported file, a trace and new text are
+   centred in the first outline and copied into every other one, in the same undoable edit. The
+   copies keep the artwork's size; a design larger than an outline still shrinks to fit. Several
+   files imported together still fill one outline each (ADR-606), and editing one copy of text
+   changes only that copy, so each piece can carry its own name. The sidebar's **Centre + copy**
+   becomes **Centre on every piece** (**Centre in outline** for one outline), shown with the
+   selection, to re-centre artwork that was moved.
+2. **Layout applies without Apply layout.** Shape, size, grid and gap apply on Enter, when the
+   shape is picked, or when focus leaves the fields, so values typed together rebuild the grid
+   once. Escape returns the fields to the outlines as they are. An invalid value says why and goes
+   back. The "layout not applied" marker and the burn panel's wait for it are removed. Shrinking
+   the grid keeps the artwork of removed pieces as ordinary artwork (the old default) and offers
+   **Remove them** instead of asking beforehand. A jig with no outlines shows **Create outlines**.
+3. **One size control, applied on Enter or leave.** **Size on every piece** has no Apply button.
+   The ADR-057 (2026-08-25) aspect lock stays an explicit toggle, now the same lock icon,
+   **Keep proportions**, that the selection fields use.
+4. **The selection's position and size sit on a bar above the jig canvas.** It shows only while
+   something is selected and carries X, Y, W, H, the proportions lock, rotation and **Centre on
+   every piece**.
+5. **Settings fold away.** Step 2 adds artwork from one row: **Import…**, **Text** and **Trace
+   image**. The text form opens on **Text** or when a text is selected, and the tracer stays loaded
+   while hidden. The outline and artwork laser settings keep power, speed and passes in view.
+   Air assist and **Advanced outline settings**, and the Fill-only spacing, angle, style and
+   cross-hatch, sit under **More outline settings** and **More settings**.
+6. **Ctrl+A follows the step.** In step 1 it selects the movable outlines; elsewhere it selects
+   the artwork. **Select all outlines** is removed.
+7. **Clear canvas.** The jig canvas footer, beside **Fit jig** and **Fit bed**, offers **Clear
+   canvas**. It removes the artwork in the jig's pieces: every copy that belongs to an outline, and
+   any other unlocked, visible artwork whose centre sits inside one. The outlines and every design
+   outside them stay. It is one undoable edit, disabled when there is nothing to clear or while
+   the machine runs, and a notice says how many objects went.
+
+#### Consequences
+
+With nothing selected, step 2 shows about ten controls instead of about thirty, and the Apply,
+Centre + copy and Save to canvas clicks are gone from the job. Nothing about output, Frame, Start,
+compilation or machine authorization changes.
+
+#### Verification
+
+Unit tests cover a single import and new text copied to every outline (text at its own size),
+several files filling one outline each, editing one text copy, and Clear canvas keeping the
+outlines and an outside design. Layout tests cover applying on leave and Enter, Escape, invalid
+grids, leftover artwork and Create outlines. Size tests cover applying on leave and Enter, the
+lock, and no undo step for an unchanged size. Jig page tests cover Ctrl+A per step, Clear canvas
+with Undo, and the selection bar appearing only with a selection.

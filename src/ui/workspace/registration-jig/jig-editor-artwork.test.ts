@@ -11,8 +11,16 @@ import { applyRegistrationOutput } from '../../state/registration-output-actions
 import { useStore } from '../../state/store';
 import { resetStore, svgObj } from '../../state/test-helpers';
 import { useToastStore } from '../../state/toast-store';
-import { deleteJigArtworkWithRepairs, importJigArtwork, upsertJigText } from './jig-editor-artwork';
-import { createJigEditorSession } from './jig-editor-session';
+import {
+  clearJigArtwork,
+  deleteJigArtworkWithRepairs,
+  importJigArtwork,
+  jigArtworkIds,
+  upsertJigText,
+} from './jig-editor-artwork';
+import { createJigEditorSession, type JigEditorSession } from './jig-editor-session';
+import { createRectangle } from '../../../core/shapes/primitives';
+import { findRegistrationBoxes, isRegistrationBox } from '../../../core/scene';
 
 function operationFor(scene: Scene, objectId: string) {
   const object = scene.objects.find((candidate) => candidate.id === objectId);
@@ -205,5 +213,91 @@ describe('registration jig draft artwork edits', () => {
 
     expect(operationFor(session.draft.project.scene, 'writing').cnc?.cutType).toBe(cutType);
     expect(useStore.getState().project).toBe(initial.project);
+  });
+});
+
+describe('one design on every piece (ADR-634)', () => {
+  function gridSession(): JigEditorSession {
+    resetStore();
+    useStore.setState({ registrationArtworkOutputSnapshot: null });
+    useStore.getState().replaceRegistrationJigSet({
+      outline: { kind: 'rectangle', widthMm: 40, heightMm: 30 },
+      rows: 1,
+      columns: 3,
+      spacingX: 5,
+      spacingY: 0,
+    });
+    return createJigEditorSession(useStore.getState());
+  }
+  function artwork(session: JigEditorSession) {
+    return session.draft.project.scene.objects.filter((object) => !isRegistrationBox(object));
+  }
+  function outlinesHolding(session: JigEditorSession): ReadonlySet<number> {
+    const outlines = findRegistrationBoxes(session.draft.project.scene).map(transformedBBox);
+    return new Set(
+      artwork(session).map((object) => {
+        const bounds = transformedBBox(object);
+        const x = (bounds.minX + bounds.maxX) / 2;
+        const y = (bounds.minY + bounds.maxY) / 2;
+        return outlines.findIndex(
+          (outline) =>
+            x >= outline.minX && x <= outline.maxX && y >= outline.minY && y <= outline.maxY,
+        );
+      }),
+    );
+  }
+
+  it('copies a single import into every outline', () => {
+    const imported = importJigArtwork(gridSession(), svgObj('logo', ['#112233']));
+    expect(artwork(imported)).toHaveLength(3);
+    expect(outlinesHolding(imported)).toEqual(new Set([0, 1, 2]));
+  });
+
+  it('fills one outline per file when several are imported together', () => {
+    let session = gridSession();
+    const anchorIds = new Set<string>();
+    session = importJigArtwork(session, svgObj('a', ['#112233']), { anchorIds, batchIndex: 0 });
+    session = importJigArtwork(session, svgObj('b', ['#445566']), { anchorIds, batchIndex: 1 });
+    expect(artwork(session)).toHaveLength(2);
+    expect(outlinesHolding(session).size).toBe(2);
+  });
+
+  it('copies new text at its own size, and editing one copy changes only that copy', () => {
+    const added = upsertJigText(gridSession(), textObject());
+    const texts = artwork(added).filter((object) => object.kind === 'text');
+    expect(texts).toHaveLength(3);
+    for (const text of texts) {
+      const bounds = transformedBBox(text);
+      expect(bounds.maxX - bounds.minX).toBeCloseTo(20);
+    }
+    const copy = texts.find((text) => text.id !== 'writing');
+    if (copy?.kind !== 'text') throw new Error('Missing text copy');
+    const edited = upsertJigText(added, { ...copy, content: 'Other name' });
+    const contents = artwork(edited).map((object) =>
+      object.kind === 'text' ? object.content : '',
+    );
+    expect(contents.filter((content) => content === 'Other name')).toHaveLength(1);
+    expect(artwork(edited)).toHaveLength(3);
+  });
+
+  it('Clear canvas removes the artwork in the pieces and keeps the outlines and other designs', () => {
+    gridSession();
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'outside',
+        color: '#0000ff',
+        spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: 390, y: 390 },
+      }),
+    );
+    const session = importJigArtwork(
+      createJigEditorSession(useStore.getState()),
+      svgObj('logo', ['#112233']),
+    );
+    expect(jigArtworkIds(session.draft.project.scene).size).toBe(3);
+    const cleared = clearJigArtwork(session).session;
+    expect(artwork(cleared).map((object) => object.id)).toEqual(['outside']);
+    expect(findRegistrationBoxes(cleared.draft.project.scene)).toHaveLength(3);
+    expect(jigArtworkIds(cleared.draft.project.scene).size).toBe(0);
   });
 });

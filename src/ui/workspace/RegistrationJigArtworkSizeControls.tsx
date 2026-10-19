@@ -56,10 +56,19 @@ export function RegistrationJigArtworkSizeEditor(props: {
       setWidthDraft(formatDimension(height * ratio));
     }
   };
+  // Applied when a field is left or on Enter (ADR-634): an unchanged size adds
+  // no undo step, and an invalid one returns to the current size.
   const apply = (): void => {
+    if (
+      widthDraft === formatDimension(dimensions.width) &&
+      heightDraft === formatDimension(dimensions.height)
+    )
+      return;
     const widthMm = Number(widthDraft);
     const heightMm = Number(heightDraft);
     if (!Number.isFinite(widthMm) || !Number.isFinite(heightMm) || widthMm <= 0 || heightMm <= 0) {
+      setWidthDraft(formatDimension(dimensions.width));
+      setHeightDraft(formatDimension(dimensions.height));
       pushToast('Enter positive artwork width and height values.', 'warning');
       return;
     }
