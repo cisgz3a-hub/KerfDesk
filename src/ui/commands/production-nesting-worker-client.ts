@@ -93,6 +93,36 @@ export function startProductionNestingSearch(
   return { result, cancel: () => close(true) };
 }
 
+// The solver host terminates its own pthread workers and replies once each of
+// their termination notices can have reached it (public/packing-solver-worker.js).
+// Terminating the host while those notices are still in flight can make Chromium
+// keep its thread and Wasm memory forever. A host that never replies is
+// terminated at this bound, which exceeds the host's own wait. Errors while it
+// retires (such as a pthread stopped mid-load) do not end that wait.
+const ENGINE_RETIRE_LIMIT_MS = 5_000;
+
+function retireEngine(engine: Worker): void {
+  const terminate = (): void => {
+    clearTimeout(limit);
+    engine.onmessage = null;
+    engine.onerror = null;
+    engine.onmessageerror = null;
+    engine.terminate();
+  };
+  const limit = setTimeout(terminate, ENGINE_RETIRE_LIMIT_MS);
+  engine.onmessage = (event: MessageEvent<unknown>): void => {
+    const data = event.data as { kind?: unknown } | null;
+    if (data?.kind === 'retired') terminate();
+  };
+  engine.onerror = (event: ErrorEvent): void => event.preventDefault();
+  engine.onmessageerror = null;
+  try {
+    engine.postMessage({ kind: 'retire' });
+  } catch {
+    terminate();
+  }
+}
+
 function advancedEngine(
   worker: Worker,
   settled: () => boolean,
@@ -102,7 +132,7 @@ function advancedEngine(
   let engine: Worker | null = null;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const stopEngine = (message?: string): void => {
-    engine?.terminate();
+    if (engine !== null) retireEngine(engine);
     engine = null;
     // Keep the deadline until the validation worker has consumed its queued
     // certificates too; a completed solver must not leave validation unbounded.
@@ -150,7 +180,7 @@ function advancedEngine(
   return {
     start: startEngine,
     shutdown(): void {
-      engine?.terminate();
+      if (engine !== null) retireEngine(engine);
       engine = null;
       clearTimeout(timeout);
     },
