@@ -32,19 +32,21 @@ export function BoardPlacementControls(props: {
         <BoardAnchorPicker shape={props.geometry.kind} canPlace={canAlign} onPlace={placeOnBoard} />
       </div>
       <details className="lf-section" open>
-        <summary>Fit to board</summary>
+        <summary title="Scale or centre one design inside the board">Fit to board</summary>
         <div className="lf-section-body">
           <BoardFitControls disabled={!canFit} onFit={fitToBoard} />
         </div>
       </details>
       <details className="lf-section">
-        <summary>Fill with copies</summary>
+        <summary title="Tile copies of one design across the board">Fill with copies</summary>
         <div className="lf-section-body">
           <BoardArrayForm disabled={!canFit} onArray={arrayToBoard} />
         </div>
       </details>
       <details className="lf-section" open>
-        <summary>Check the board</summary>
+        <summary title="Move beam-off to board points and check them on the real board">
+          Check the board
+        </summary>
         <div className="lf-section-body">
           <BoardVerificationControls
             geometry={props.geometry}

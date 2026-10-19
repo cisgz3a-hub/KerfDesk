@@ -26,6 +26,7 @@ export function BoardPointerBar(props: {
         <button
           type="button"
           className="lf-place-board__link"
+          title="Open Machine Setup to configure the positioning light and its offset"
           onClick={() =>
             openMachineSetup({ kind: 'step', step: 'options', highlight: 'positioning-light' })
           }
@@ -63,6 +64,7 @@ export function BoardPointerBar(props: {
       <label>
         <input
           type="checkbox"
+          title="Switch the pointer on when capture starts and off when the board is created"
           checked={pointer.auto}
           onChange={(event) => pointer.setAuto(event.target.checked)}
         />

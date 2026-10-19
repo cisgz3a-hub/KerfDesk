@@ -71,7 +71,9 @@ export function BoardCaptureSteps(props: {
       )}
       {count >= 1 && !allCaptured && (
         <details className="lf-section">
-          <summary>Know the size? Type it instead</summary>
+          <summary title="Type the board width and height instead of capturing the other corners">
+            Know the size? Type it instead
+          </summary>
           <div className="lf-section-body">
             <ManualSizeForm disabled={props.disabled} onDraw={props.onManualSize} />
           </div>
