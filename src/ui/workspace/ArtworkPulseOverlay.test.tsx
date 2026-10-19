@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import {
   createLayer,
   createProject,
-  DEFAULT_CNC_MACHINE_CONFIG,
   IDENTITY_TRANSFORM,
   type ImportedSvg,
   type Project,
@@ -355,71 +354,56 @@ describe('ArtworkPulseOverlay (ADR-620)', () => {
     expect(pulses()).toEqual([]);
   });
 
-  it('regroups when the machine changes while the scene stays identical', async () => {
+  // Two hearts whose operations share every setting but colour (ADR-632).
+  function twinHearts(): Project {
     const base = project();
     const heart = base.scene.objects[0];
     const engrave = base.scene.layers[0];
     if (heart === undefined || engrave === undefined) throw new Error('missing artwork fixture');
-    const scene = {
-      ...base.scene,
-      layers: [
-        { ...engrave, parkedOutput: engrave.output },
-        { ...engrave, id: 'sibling', power: engrave.power / 2, parkedOutput: engrave.output },
-      ],
-      objects: [heart, { ...heart, id: 'other-heart', operationIds: ['sibling'] }],
+    const twin = {
+      ...heart,
+      id: 'other-heart',
+      transform: { ...IDENTITY_TRANSFORM, x: 50 },
+      operationIds: ['sibling'],
     };
-    useStore.setState({ project: { ...base, scene, machine: DEFAULT_CNC_MACHINE_CONFIG } });
-    useUiStore.getState().setHoveredOperationId('engrave');
-    await render(true);
-    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
-    const highlighted = (): ReadonlyArray<string> =>
-      clock.frame(performance.now(), true).pieces.map((piece) => piece.objectId);
-    expect(highlighted()).toEqual(['heart', 'other-heart']);
+    const sibling = { ...engrave, id: 'sibling', color: '#dc2626' };
+    return {
+      ...base,
+      scene: { ...base.scene, layers: [engrave, sibling], objects: [heart, twin] },
+    };
+  }
 
-    await act(async () => useStore.getState().setMachineKind('laser'));
-    expect(useStore.getState().project.scene).toBe(scene);
+  it('pulses only the hovered piece, not other artwork with the same settings', async () => {
+    useStore.setState({ project: twinHearts() });
     await render(true);
-    expect(highlighted()).toEqual(['heart']);
-    expect(pulses()).toEqual([true, false]);
+    await pointAt({ x: 5, y: 5 });
+    const clock = hover.mock.contexts[0] as ArtworkPulseClock;
+    const frame = clock.frame(performance.now(), true);
+    expect(frame.pieces.map((piece) => piece.objectId)).toEqual(['heart']);
+    expect([...(frame.pieces[0]?.operationIds ?? [])]).toEqual(['engrave']);
   });
 
-  it('regroups after Paste settings on the hovered row without another pulse', async () => {
-    const base = project();
-    const heart = base.scene.objects[0];
-    const engrave = base.scene.layers[0];
-    if (heart === undefined || engrave === undefined) throw new Error('missing artwork fixture');
-    const sibling = { ...engrave, id: 'sibling', color: '#dc2626' };
-    const source = { ...engrave, id: 'source', color: '#16a34a', power: engrave.power / 2 };
-    useStore.setState({
-      project: {
-        ...base,
-        scene: {
-          ...base.scene,
-          layers: [engrave, sibling, source],
-          objects: [heart, { ...heart, id: 'other-heart', operationIds: ['sibling'] }],
-        },
-      },
-    });
-    useStore.getState().copyLayerSettings('source');
+  it("pulses an operation row's own artwork, then retargets an edit without another pulse", async () => {
+    useStore.setState({ project: twinHearts() });
     useUiStore.getState().setHoveredOperationId('engrave');
     await render(true);
     const clock = hover.mock.contexts[0] as ArtworkPulseClock;
     const highlighted = (): ReadonlyArray<string> =>
       clock.frame(performance.now(), true).pieces.map((piece) => piece.objectId);
-    expect(highlighted()).toEqual(['heart', 'other-heart']);
-
-    // Paste lives inside the row, so its hover identity remains unchanged.
-    await act(async () => useStore.getState().pasteLayerSettings('engrave'));
-    await render(true);
-    expect(useUiStore.getState().hoveredOperationId).toBe('engrave');
     expect(highlighted()).toEqual(['heart']);
-    expect(pulses()).toEqual([true, false]);
 
-    // Matching the sibling again restores its edge without restarting a pulse.
-    useStore.getState().copyLayerSettings('sibling');
-    await act(async () => useStore.getState().pasteLayerSettings('engrave'));
+    // Moving the twin into the hovered row's operation adds it to the hover.
+    const scene = useStore.getState().project.scene;
+    const objects = scene.objects.map((object) =>
+      object.id === 'other-heart' ? { ...object, operationIds: ['engrave'] } : object,
+    );
+    await act(async () =>
+      useStore.setState({
+        project: { ...useStore.getState().project, scene: { ...scene, objects } },
+      }),
+    );
     await render(true);
     expect(highlighted()).toEqual(['heart', 'other-heart']);
-    expect(pulses()).toEqual([true, false, false]);
+    expect(pulses()).toEqual([true, false]);
   });
 });

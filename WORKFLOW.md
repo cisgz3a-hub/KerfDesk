@@ -779,14 +779,15 @@ the linked artwork.
    tabs; text and drawn shapes that change become paths in the same step, and locked artwork is
    left as it is. The notice says what changed. Settings are remembered for the session.
 
-### F-A6j. Operation colours on the canvas (ADR-620)
+### F-A6j. Operation colours on the canvas (ADR-620, ADR-632)
 
 1. Artwork rests in plain ink on the workspace, so the canvas shows the design itself. Every
    operation still has its own colour, shown on its row in the Artwork panel.
-2. With the Select tool, rest the pointer on a piece of artwork: it pulses once in its operation
-   colour, and every other piece whose operation has the same settings pulses in that same
-   colour, rippling out from the piece under the pointer. A soft colour edge stays while the
-   pointer rests there. Resting on an operation row does the same for that operation's artwork.
+2. With the Select tool, rest the pointer on a piece of artwork: that piece alone pulses once in
+   its own operation colour (a piece with two operations shows each in its own colour). Other
+   artwork stays in ink, even when its settings match. A soft colour edge stays while the
+   pointer rests there. Resting on an operation row pulses that operation's artwork in the
+   row's colour, sweeping left to right.
 3. Hold **Alt** (Option on a Mac) to show every operation colour at once; let go to return to ink.
    Alt shortcuts such as `Alt+W` do not trigger it.
 4. With reduced motion turned on in the operating system, the colour shows while the pointer

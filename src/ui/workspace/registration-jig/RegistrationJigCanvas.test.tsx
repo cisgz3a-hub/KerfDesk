@@ -251,9 +251,7 @@ describe('registration jig canvas drag transactions', () => {
     expect(commit).not.toHaveBeenCalled();
     expect(selection).not.toHaveBeenCalled();
     const menu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 });
-    act(() => {
-      host.querySelector('canvas')!.dispatchEvent(menu);
-    });
+    act(() => void host.querySelector('canvas')!.dispatchEvent(menu));
     expect(menu.defaultPrevented).toBe(true);
   });
 
