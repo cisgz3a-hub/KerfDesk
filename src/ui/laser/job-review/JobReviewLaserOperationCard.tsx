@@ -184,6 +184,7 @@ function LaserDraftFields(props: {
             <input
               type="checkbox"
               aria-label={`Air assist for ${props.ariaContext}`}
+              title="Turn air assist on or off for this operation"
               checked={draft.airAssist}
               onChange={(event) => props.onChange({ ...draft, airAssist: event.target.checked })}
             />
