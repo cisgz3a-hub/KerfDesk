@@ -59,12 +59,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
-  useLaserStore.setState({
-    connection: original.connection,
-    connect: original.connect,
-    disconnect: original.disconnect,
-    forgetDevice: original.forgetDevice,
-  });
+  useLaserStore.setState(original, true);
   resetAutoConnectSession();
 });
 
