@@ -6,7 +6,7 @@ import type { JigEditorController } from './use-jig-editor';
 type JigRun = 'outlines' | 'artwork';
 
 /**
- * Frame and Start for one of the two jig runs (ADR-634). They are the
+ * Frame and Start for one of the two jig runs (ADR-638). They are the
  * workspace's own job actions, mounted here instead of under the machine panel
  * while jig mode is open, so there is still one Frame and one Start. They only
  * appear in the step whose run is next, so a step can never burn the other

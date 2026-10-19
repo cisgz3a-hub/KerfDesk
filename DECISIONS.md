@@ -3571,7 +3571,7 @@ authorization.
 
 ### Amendment (2026-10-17) — dedicated jig editor and guided two-run output
 
-*Amended by ADR-634: the editor became jig mode, which edits the open project and burns from its own steps.*
+*Amended by ADR-638: the editor became jig mode, which edits the open project and burns from its own steps.*
 
 The floating jig panel is replaced by a dedicated editor with its own editable
 canvas, fitted to the jig on opening. Layout, selection transforms, text with the
