@@ -13,7 +13,7 @@ import {
   PULSE_DURATION_MS,
   PULSE_EDGE_ALPHA,
   PULSE_PEAK_STRENGTH,
-  pulseGlow,
+  pulseGlowAlpha,
   pulseStartOffsets,
   pulseStrength,
   pulseTargetFor,
@@ -54,16 +54,15 @@ describe('pulse shape', () => {
     expect(pulseStrength(-0.1)).toBe(0);
   });
 
-  it('breathes a faint halo with the colour that drifts outward as it fades', () => {
-    const start = pulseGlow(0.02);
-    const peak = pulseGlow(0.34);
-    const late = pulseGlow(0.8);
-    expect(start?.alpha).toBeLessThan(peak?.alpha ?? 0);
-    expect(late?.alpha).toBeLessThan(peak?.alpha ?? 0);
-    expect(peak?.alpha).toBeLessThan(0.4);
-    expect(late?.blurPx).toBeGreaterThan(start?.blurPx ?? Infinity);
-    expect(pulseGlow(0)).toBeNull();
-    expect(pulseGlow(1)).toBeNull();
+  it('breathes a faint halo with the colour', () => {
+    const start = pulseGlowAlpha(0.02);
+    const peak = pulseGlowAlpha(0.34);
+    const late = pulseGlowAlpha(0.8);
+    expect(start).toBeLessThan(peak);
+    expect(late).toBeLessThan(peak);
+    expect(peak).toBeLessThan(0.4);
+    expect(pulseGlowAlpha(0)).toBe(0);
+    expect(pulseGlowAlpha(1)).toBe(0);
   });
 });
 
@@ -225,7 +224,11 @@ describe('pulse clock', () => {
     // Hovering again mid-pulse does not restart it.
     clock.hover(target, 0.5 * PULSE_DURATION_MS);
     const done = clock.frame(PULSE_DURATION_MS + 1000, false);
-    expect(done.pieces[0]).toMatchObject({ strength: 0, glow: null, edgeAlpha: PULSE_EDGE_ALPHA });
+    expect(done.pieces[0]).toMatchObject({
+      strength: 0,
+      glowAlpha: 0,
+      edgeAlpha: PULSE_EDGE_ALPHA,
+    });
     expect(done.busy).toBe(false);
   });
 
@@ -253,7 +256,7 @@ describe('pulse clock', () => {
     clock.frame(PULSE_DURATION_MS + 1016, false);
     clock.hover(target, PULSE_DURATION_MS + 1100, { pulse: false });
     const resumed = clock.frame(PULSE_DURATION_MS + 1200, false);
-    expect(resumed.pieces[0]).toMatchObject({ strength: 0, glow: null });
+    expect(resumed.pieces[0]).toMatchObject({ strength: 0, glowAlpha: 0 });
     expect(resumed.pieces[0]?.edgeAlpha).toBeGreaterThan(0);
   });
 
@@ -263,7 +266,7 @@ describe('pulse clock', () => {
     const shown = clock.frame(10, true);
     expect(shown.pieces[0]).toMatchObject({
       strength: PULSE_PEAK_STRENGTH,
-      glow: null,
+      glowAlpha: 0,
       edgeAlpha: PULSE_EDGE_ALPHA,
     });
     expect(shown.busy).toBe(false);

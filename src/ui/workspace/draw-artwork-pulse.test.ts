@@ -183,18 +183,66 @@ describe('ArtworkPulsePainter (ADR-620)', () => {
       objectId: object.id,
       colorSources,
       strength: 1,
-      glow: null,
+      glowAlpha: 0,
       edgeAlpha: 0,
     }));
     const ctx = canvas2d();
     const created = vi.spyOn(document, 'createElement');
 
-    new ArtworkPulsePainter().draw(ctx, project, view, pieces);
+    new ArtworkPulsePainter({ renderBudgetMs: Infinity }).draw(ctx, project, view, pieces);
 
     const canvases = created.mock.calls.filter(([tag]) => tag === 'canvas').length;
-    // A colour bitmap and a glow bitmap per piece: 2N, where pairing every
-    // piece with every same-settings operation would make 2N².
-    expect(canvases).toBe(2 * count);
+    // Colour, outline and two halos per piece: 4N, where pairing every piece
+    // with every same-settings operation would make 4N².
+    expect(canvases).toBe(4 * count);
+  });
+
+  it('blits each piece at an alpha on every frame, with no blur on the overlay', () => {
+    const { project } = repeatedImports(3);
+    const { ctx, drawImages, shadowBlurs } = recordingContext();
+    const painter = new ArtworkPulsePainter();
+    const pieces = project.scene.objects.map((object, index) => glowing(object.id, `op-${index}`));
+    for (let frame = 0; frame < 6; frame += 1) painter.draw(ctx, project, view, pieces);
+    // Bloom, edge and colour: three plain blits per piece per frame.
+    expect(drawImages()).toBe(3 * 3 * 6);
+    expect(shadowBlurs()).toEqual([]);
+  });
+
+  it('draws its bitmaps scaled while the view moves, and re-renders once it settles', () => {
+    const { project } = repeatedImports(2);
+    const { ctx, drawArgs } = recordingContext();
+    const created = vi.spyOn(document, 'createElement');
+    const painter = new ArtworkPulsePainter();
+    const pieces = [pulse('piece-0', 'op-0'), pulse('piece-1', 'op-1')];
+    painter.draw(ctx, project, view, pieces, 'design', 0);
+    created.mockClear();
+    const zoomed = { scale: 1.5, offsetX: -20, offsetY: 4 };
+    // Zooming: the cached bitmaps stretch into place and nothing re-renders.
+    expect(painter.draw(ctx, project, zoomed, pieces, 'design', 16)).toBe(true);
+    expect(painter.draw(ctx, project, zoomed, pieces, 'design', 100)).toBe(true);
+    expect(created).not.toHaveBeenCalled();
+    expect(drawArgs().slice(-2)).toEqual([5, 5]);
+    // Once the view has been still long enough, both re-render sharp.
+    expect(painter.draw(ctx, project, zoomed, pieces, 'design', 400)).toBe(false);
+    expect(created.mock.calls.filter(([tag]) => tag === 'canvas')).toHaveLength(8);
+    expect(drawArgs().slice(-2)).toEqual([3, 3]);
+  });
+
+  it('renders new pieces within the frame budget, the most visible first', () => {
+    const { project } = repeatedImports(4);
+    const { ctx } = recordingContext();
+    const painted = vi.spyOn(objectDisplay, 'paintObjectDisplay');
+    const painter = new ArtworkPulsePainter({ renderBudgetMs: 0 });
+    const pieces = project.scene.objects.map((object, index) => ({
+      ...pulse(object.id, `op-${index}`),
+      strength: index === 2 ? 0.7 : 0.1,
+    }));
+    expect(painter.draw(ctx, project, view, pieces)).toBe(true);
+    expect(painted.mock.calls.map(([, object]) => object.id)).toEqual(['piece-2']);
+    expect(painter.draw(ctx, project, view, pieces)).toBe(true);
+    expect(painter.draw(ctx, project, view, pieces)).toBe(true);
+    expect(painter.draw(ctx, project, view, pieces)).toBe(false);
+    expect(painted).toHaveBeenCalledTimes(4);
   });
 
   it.each(['object', 'path'] as const)(
@@ -222,7 +270,7 @@ describe('ArtworkPulsePainter (ADR-620)', () => {
           // The second operation: the canvas styles the path with the first.
           colorSources: new Map([['fill', 'fill']]),
           strength: 1,
-          glow: null,
+          glowAlpha: 0,
           edgeAlpha: 0,
         },
       ]);
@@ -237,28 +285,42 @@ function pulse(objectId: string, operationId: string): PulsePieceFrame {
     objectId,
     colorSources: new Map([[operationId, operationId]]),
     strength: 1,
-    glow: null,
+    glowAlpha: 0,
     edgeAlpha: 0,
   };
 }
 
-// Counts the blits the painter makes onto the overlay itself.
+function glowing(objectId: string, operationId: string): PulsePieceFrame {
+  return { ...pulse(objectId, operationId), glowAlpha: 0.3, edgeAlpha: 0.5 };
+}
+
+// Counts the blits the painter makes onto the overlay itself, their argument
+// counts (5 means scaled) and every shadow blur set on the overlay.
 function recordingContext(): {
   ctx: CanvasRenderingContext2D;
   drawImages: () => number;
+  drawArgs: () => ReadonlyArray<number>;
+  shadowBlurs: () => ReadonlyArray<unknown>;
 } {
-  let count = 0;
+  const args: number[] = [];
+  const blurs: unknown[] = [];
   const state: Record<string, unknown> = { canvas: { width: 800, height: 200 } };
   const ctx = new Proxy(state, {
     get(target, property) {
-      if (property === 'drawImage') return () => (count += 1);
+      if (property === 'drawImage') return (...call: unknown[]) => args.push(call.length);
       if (property in target) return target[String(property)];
       return () => undefined;
     },
     set(target, property, value) {
+      if (property === 'shadowBlur') blurs.push(value);
       target[String(property)] = value;
       return true;
     },
   }) as unknown as CanvasRenderingContext2D;
-  return { ctx, drawImages: () => count };
+  return {
+    ctx,
+    drawImages: () => args.length,
+    drawArgs: () => args,
+    shadowBlurs: () => blurs,
+  };
 }
