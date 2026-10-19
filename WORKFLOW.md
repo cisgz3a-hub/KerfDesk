@@ -791,9 +791,10 @@ the linked artwork.
    of its operation colour with a faint halo, then ebbs back to ink. Every other piece whose
    operation has the same settings does the same in that colour, rippling out from the piece
    under the pointer. A soft colour edge stays while the pointer rests there. Resting on an
-   operation row does the same for that operation's artwork.
+   operation row, or moving keyboard focus into one, does the same for that operation's artwork.
 3. Hold **Alt** (Option on a Mac) to show every operation colour at once; let go to return to ink.
-   Alt shortcuts such as `Alt+W` do not trigger it.
+   Alt shortcuts such as `Alt+W` do not trigger it, and neither does holding Alt while typing in a
+   text field.
 4. With reduced motion turned on in the operating system, the colour shows while the pointer
    rests instead of pulsing.
 5. Display only: Preview, output and saved projects are unchanged. New operations start at blue;
