@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createLayer,
+  createLayerSubLayer,
   DEFAULT_CNC_LAYER_SETTINGS,
   IDENTITY_TRANSFORM,
   type Layer,
@@ -17,6 +18,7 @@ import {
   pulseTargetFor,
   type PulseTarget,
 } from './artwork-pulse';
+import { sameOperationSettings } from './pulse-settings-match';
 
 function layer(id: string, color: string, overrides: Partial<Layer> = {}): Layer {
   return { ...createLayer({ id, color }), ...overrides };
@@ -75,6 +77,73 @@ describe('which artwork pulses together', () => {
     expect(group.get('cut')).toBe('cut');
     expect(group.get('engrave-2')).toBe('engrave-2');
     expect(group.get('engrave')).toBe('engrave-2');
+  });
+
+  it('groups equal sub-operations independently of their ids and labels', () => {
+    const a = {
+      ...engrave,
+      subLayers: [createLayerSubLayer(cut, { id: 'first-cut', label: 'Outline' })],
+    };
+    const b = {
+      ...sameEngrave,
+      subLayers: [createLayerSubLayer(cut, { id: 'second-cut', label: 'Finish' })],
+    };
+    expect([...pulseColorSources([a, b], [a.id], 'laser').keys()]).toEqual([a.id, b.id]);
+    expect(sameOperationSettings(a, { ...b, subLayers: [] }, 'laser')).toBe(false);
+    expect(
+      sameOperationSettings(
+        a,
+        { ...b, subLayers: [createLayerSubLayer(cut, { id: 'cut', label: '', enabled: false })] },
+        'laser',
+      ),
+    ).toBe(false);
+    expect(
+      sameOperationSettings(
+        a,
+        { ...b, subLayers: [createLayerSubLayer(engrave, { id: 'cut', label: '' })] },
+        'laser',
+      ),
+    ).toBe(false);
+  });
+
+  it('groups absent laser options with their explicit legacy defaults, including sub-operations', () => {
+    const explicit = {
+      ...sameEngrave,
+      allowUncalibratedBidirectionalScan: false,
+      perforationEnabled: false,
+      perforationCutMm: 3,
+      perforationSkipMm: 1,
+      overcutMm: 0,
+      imageOverscanMm: 5,
+      tabLayout: 'count' as const,
+      tabSpacingMm: 50,
+      tabMaxPerShape: 0,
+      tabCutPowerPercent: 0,
+      imageScanAngleDeg: 0,
+      imageCrossHatch: false,
+      passAngleStepDeg: 0,
+      autoOverscan: false,
+    };
+    expect(sameOperationSettings(engrave, explicit, 'laser')).toBe(true);
+    expect(
+      sameOperationSettings(
+        { ...engrave, subLayers: [createLayerSubLayer(engrave, { id: 'sub', label: '' })] },
+        { ...explicit, subLayers: [createLayerSubLayer(explicit, { id: 'sub', label: '' })] },
+        'laser',
+      ),
+    ).toBe(true);
+    for (const changed of [
+      { perforationEnabled: true },
+      { tabLayout: 'spacing' as const },
+      { autoOverscan: true },
+      { imageOverscanMm: 0 },
+      { imageScanAngleDeg: 45 },
+      { powerMode: 'dynamic' as const },
+      // Absence uses the device's calibration; explicit zero disables that offset.
+      { bidirectionalScanOffsetMm: 0 },
+    ]) {
+      expect(sameOperationSettings(engrave, { ...explicit, ...changed }, 'laser')).toBe(false);
+    }
   });
 
   it('treats an operation with no CNC block as the CNC defaults', () => {

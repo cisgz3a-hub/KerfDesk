@@ -22,7 +22,8 @@ name: Desktop package check
 # - Every launch is the packaged native smoke: launch, SVG import, project
 #   save, on a throwaway profile.
 #
-# Kept out of ci.yml so a desktop packaging failure never holds a web deploy.
+# Kept out of ci.yml so packaging runs independently of the web build. Its
+# aggregate gate is required for merging and fails unless all applicable jobs pass.
 on:
   push:
     branches: [main]
@@ -489,3 +490,32 @@ jobs:
           path: artifacts/native-smoke/
           if-no-files-found: warn
           retention-days: 14
+
+  desktop-packaging-gate:
+    name: Desktop packaging gate
+    needs:
+      - linux-package
+      - linux-installers
+      - commercial-linux
+      - commercial-macos
+      - windows-package
+      - macos-package
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+
+      - name: Require every applicable desktop package check
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          NATIVE_REQUIRED: ${{ inputs.native == true }}
+        run: node scripts/check-desktop-package-gate.mjs
