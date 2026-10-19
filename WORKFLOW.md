@@ -2057,8 +2057,11 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
    facts describe requested/compiled settings and controller scaling, not measured spindle RPM.
 7. **Edit** on a laser card turns its values into fields; **Save** writes them to the main
    settings through the normal store actions and re-runs preparation, and **Discard** or Escape
-   drops the draft. Start waits while a card is mid-edit, so the job never runs values other than
-   the ones shown. The stat tiles dim behind **Recomputing…** while synchronized evidence
+   drops the draft. Save writes only the values whose fields were changed, so a speed nobody
+   touched stays as stored even above Output max feed. Start waits while a card is mid-edit, so
+   the job never runs values other than the ones shown; a phone or MCP client sees the review
+   withdrawn with "A setting is being edited in the Job Review on the PC" and gets a new one to
+   approve once the edit is saved or discarded (ADR-638 Amendment 1). The stat tiles dim behind **Recomputing…** while synchronized evidence
    refreshes. CNC cards stay read-only. A power/speed edit retains
    Frame when the new motion envelope and placement are unchanged. Changed coordinates require
    another Frame; changed executable settings require fresh displayed review and approval before

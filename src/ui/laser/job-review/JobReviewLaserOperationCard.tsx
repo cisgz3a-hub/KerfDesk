@@ -243,6 +243,8 @@ function CardActions(props: {
 
 function useCardEditor(props: LaserOperationCardProps) {
   const [draft, setDraft] = useState<LaserOperationDraft | null>(null);
+  // The fields as Edit showed them: Save writes only the ones changed since.
+  const shown = useRef<LaserOperationDraft | null>(null);
   const [invalid, setInvalid] = useState<ReadonlyArray<DraftNumberField>>([]);
   const [showSaved, setShowSaved] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
@@ -252,13 +254,19 @@ function useCardEditor(props: LaserOperationCardProps) {
     setInvalid([]);
   };
   const begin = (): void => {
-    setDraft(draftFromSettings(props.settings));
+    shown.current = draftFromSettings(props.settings);
+    setDraft(shown.current);
     setInvalid([]);
     setShowSaved(false);
   };
   const save = (): void => {
     if (draft === null) return;
-    const result = saveLaserOperationDraft(draft, props.settings, props.maxFeedMmPerMin);
+    const result = saveLaserOperationDraft(
+      draft,
+      props.settings,
+      props.maxFeedMmPerMin,
+      shown.current ?? undefined,
+    );
     if (!result.ok) {
       setInvalid(result.invalid);
       return;

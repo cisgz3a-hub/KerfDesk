@@ -9,7 +9,7 @@ import { JobReviewRegistrationJig, registrationJigConfirmLabel } from './JobRevi
 // review gate. Placement is read-only here (v2): the origin tile and the
 // footer fact echo it, editing stays on the machine rail.
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { Button, Dialog, Icon } from '../../kit';
 import { useJobReviewStore, type JobReviewPurpose, type JobReviewState } from './job-review-store';
 import {
@@ -48,14 +48,18 @@ function OpenJobReview(props: {
   const copy = reviewCopy(purpose);
   const topAnchorRef = useRef<HTMLSpanElement>(null);
   const requestReviewRebuild = useJobReviewRebuildTrigger();
-  const editing = useEditingOperations();
+  // Operation cards report Edit/Save; Start waits while any card holds an
+  // unsaved draft, so the job never runs values other than the ones shown.
+  // The store holds it, so a remote approval waits too (ADR-638 Amendment 1).
+  const isEditing = useJobReviewStore((s) => s.editingOperationIds.size > 0);
+  const reportEditing = useJobReviewStore((s) => s.reportEditing);
   useReviewInitialFocus(topAnchorRef);
   const handleCancel = (): void => useJobReviewStore.getState().cancel();
   const startDisabledReason = isPreparing
     ? copy.preparingTitle
     : blocker !== null
       ? blocker.join('\n')
-      : editing.isEditing
+      : isEditing
         ? SAVE_EDIT_BEFORE_START_TITLE
         : null;
   const handleConfirm = (): void => {
@@ -90,7 +94,7 @@ function OpenJobReview(props: {
         model={model}
         purpose={purpose}
         onSaved={requestReviewRebuild}
-        onEditingChange={editing.report}
+        onEditingChange={reportEditing}
       />
       <ReviewMachineFacts model={model} purpose={purpose} />
       <JobReviewAcknowledgement acknowledgement={model.acknowledgement} purpose={purpose} />
@@ -173,25 +177,6 @@ function ReviewMachineFacts({
       />
     </section>
   );
-}
-
-// Operation cards report Edit/Save; Start waits while any card holds an
-// unsaved draft, so the job never runs values other than the ones shown.
-function useEditingOperations(): {
-  readonly isEditing: boolean;
-  readonly report: (operationId: string, isEditing: boolean) => void;
-} {
-  const [editingIds, setEditingIds] = useState<ReadonlySet<string>>(() => new Set());
-  const report = useCallback((operationId: string, isEditing: boolean): void => {
-    setEditingIds((current) => {
-      if (current.has(operationId) === isEditing) return current;
-      const next = new Set(current);
-      if (isEditing) next.add(operationId);
-      else next.delete(operationId);
-      return next;
-    });
-  }, []);
-  return { isEditing: editingIds.size > 0, report };
 }
 
 // The kit's dialog a11y focuses the first focusable child — here that is a

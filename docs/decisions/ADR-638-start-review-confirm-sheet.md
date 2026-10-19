@@ -1,4 +1,4 @@
-# ADR-638 - Start review becomes a compact confirm sheet with in-place Edit and Save
+## ADR-638 - Start review becomes a compact confirm sheet with in-place Edit and Save
 
 **Status:** Accepted | **Date:** 2026-10-19 | **Amends:** ADR-224 (v2 revision, settings-approval
 amendment)
@@ -39,7 +39,8 @@ The Job Review keeps its gate, its stats and its facts, and changes how they are
   sentence, cut at a word past 110 characters. The rest of its text is one click away. Warnings
   whose detail the review opened before (controller identity, router laser mode, Focus Test Z)
   open it by default. The list is always visible with a count; warnings still never block Start.
-- **Quieter facts.** Stat tiles keep one line of detail, with the full detail as their hover title.
+- **Quieter facts.** Stat tiles keep one line of detail, with the full detail as their hover title
+  (Amendment 1: the detail now wraps, with no hover title).
   Controller and Machine facts sit side by side, folded, without the "Before you start" heading. A
   verified laser session shows a "Laser mode verified" chip in the header instead of a paragraph.
   The unverified-laser and CNC acknowledgements keep their exact prompt text, with the footnote
@@ -55,3 +56,28 @@ The Job Review keeps its gate, its stats and its facts, and changes how they are
   read-only.
 - The settings-approval amendment's Approve action and its test are retired; the card editing tests
   cover Save, clamping, invalid input, Discard, Escape, Enter and sub-operations.
+
+### Amendment 1 - Save writes only changed fields, remote approval waits for an edit, tile details wrap (2026-10-20)
+
+An audit of this decision found three gaps; each is closed here.
+
+1. **Save writes only the fields that were changed.** Save re-clamped every field, so an operation
+   stored at 12 000 mm/min with an Output max feed of 10 000 had `speed: 10000` written, artwork
+   that owns its speed included, when only Power was edited. A field whose text is as Edit showed
+   it now keeps its stored value untouched; only edited fields are parsed, clamped with the panels'
+   limits and written, and the Output max feed notice appears only for an edited speed.
+2. **Start waits for an open edit wherever it is approved.** The editing state moved from the
+   dialog into the Job Review store. The store's Confirm does nothing while a card holds an
+   unsaved draft, and a remote client (phone or MCP) sees its review withdrawn: the operation
+   reads `preparing` with "A setting is being edited in the Job Review on the PC. Save or discard
+   it there, then approve the new review.", an approval naming the withdrawn review is refused,
+   and a fresh review is offered once the edit is saved or discarded. This is the same display
+   consistency hold as before, not a policy gate.
+3. **Stat tiles show their whole detail.** The one-line detail with the rest in a hover title
+   could not be read by keyboard or touch; the detail now wraps under the value and the tile has
+   no title.
+
+Verification: `JobReviewOperations.editing.test.tsx` (an untouched speed above Output max feed
+stays as stored), `job-review-store.test.ts` (Confirm held while a card edits) and
+`machine-review.test.ts` (a remote review is withdrawn and refused during an edit, and a fresh one
+starts the job once).
