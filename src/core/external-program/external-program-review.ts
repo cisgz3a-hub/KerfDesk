@@ -58,6 +58,12 @@ const WORD_WARNINGS: ReadonlyArray<{ readonly pattern: RegExp; readonly warning:
     warning:
       'The program asks for a tool change (M6). Stock GRBL does not support M6 and stops with an error there.',
   },
+  {
+    // An external run sends M0/M1 unchanged; the hold is the controller's own.
+    pattern: /M0*[01](?![0-9.])/i,
+    warning:
+      "The program stops with M0 or M1. The controller holds there until the machine's own cycle start is pressed; KerfDesk's Resume does not release a stop the program asked for.",
+  },
 ];
 
 export function reviewExternalProgram(

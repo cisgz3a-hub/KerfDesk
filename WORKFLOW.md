@@ -9039,7 +9039,8 @@ Moves in machine coordinates (`G53`), a work coordinate switch away from `G54`, 
 `G28`/`G30`, work-offset writes (`G10 L2`/`G10 L20`, explicitly warning that later moves may
 be displaced from the traced outline), relative moves (`G91`), inches (`G20`, which also leaves the controller in
 inches), the laser or spindle still on at the end, a tool change (`M6`), a program that looks
-like the other machine mode, zero XY extent (Frame visits a point and does not prove Z clearance or depth; without X/Y words the Inspector assumes X0 Y0 while the real program keeps current XY), and the Inspector's Program Health notices and warnings.
+like the other machine mode, program stops (`M0`/`M1`, sent unchanged, so the controller
+holds until the machine's own cycle start; KerfDesk's Resume does not release them), zero XY extent (Frame visits a point and does not prove Z clearance or depth; without X/Y words the Inspector assumes X0 Y0 while the real program keeps current XY), and the Inspector's Program Health notices and warnings.
 
 #### Refusals (factual only)
 

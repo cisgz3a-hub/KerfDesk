@@ -46,7 +46,7 @@ The **Run** dialog is the one review for the file: name, lines and bytes to send
 - zero XY extent: Frame visits a point rather than tracing an XY outline and does not prove Z clearance or cutting depth. When no X/Y position is declared, the Inspector assumes X0 Y0 while the real program keeps the current XY position;
 - the Inspector's Program Health notices and warnings.
 
-In CNC mode the existing workholding and exclusive-access attestation applies; in Laser mode the existing `$32` laser-mode acknowledgement applies when the controller reports `$32=0`. Confirming **Start** checks the Frame is still the current one for this exact program, consumes it, and streams the program with the ordinary streamer. External M0/M1 pauses are sent unchanged to the controller; they are not intercepted as KerfDesk project bit changes. The Live Motion bar's Pause, Resume and **ABORT JOB** work as for any job (non-negotiable 9).
+In CNC mode the existing workholding and exclusive-access attestation applies; in Laser mode the existing `$32` laser-mode acknowledgement applies when the controller reports `$32=0`. Confirming **Start** checks the Frame is still the current one for this exact program, consumes it, and streams the program with the ordinary streamer. External M0/M1 pauses are sent unchanged to the controller; they are not intercepted as KerfDesk project bit changes. The controller then holds until the machine's own cycle start, which KerfDesk's Resume does not replace, so the review warns about them. The Live Motion bar's Pause, Resume and **ABORT JOB** work as for any job (non-negotiable 9).
 
 ### Not in this decision
 
