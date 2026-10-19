@@ -109,6 +109,33 @@ describe('WorkspaceControllerRecovery', () => {
     expect(canvasHost.childElementCount).toBe(0);
   });
 
+  // One `ok` lost on a settings read leaves a reply owed, so Controller info
+  // recommends Reconnect, which ends any paused job. While status replies keep
+  // arriving that stays in Controller info and nothing pops up (ADR-611).
+  it('stays quiet when a reply is still owed but the controller answers', () => {
+    failRead({ answering: true });
+    act(() => useLaserStore.setState({ pendingUntrackedAcks: 1 }));
+    expect(useLaserStore.getState().getControllerReconnectRecommended()).toBe(true);
+    expect(canvasHost.childElementCount).toBe(0);
+    expect(toolbarHost.textContent).not.toContain('needs recovery');
+  });
+
+  // A status write stuck in a wedged transport stops the poll from writing to
+  // the store, so the silence deadline has to be re-read on a timer.
+  it('opens once the controller has been silent long enough, with no store writes', () => {
+    vi.useFakeTimers();
+    try {
+      failRead({ answering: true });
+      expect(card()).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(9_000);
+      });
+      expect(card()?.textContent).toContain('Controller connection needs recovery');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('stays quiet while settings are read after a reset', () => {
     act(() =>
       useLaserStore.setState({

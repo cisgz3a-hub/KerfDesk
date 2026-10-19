@@ -71,21 +71,20 @@ type QualificationNoticeProps = {
 };
 
 /**
- * The failed settings read the operator has to act on: Reconnect is
- * recommended, or the controller stopped answering. It opens the recovery card
- * over the canvas by itself (ADR-642). Reading settings after a reset, and a
- * read that failed while the controller still answers, stay in Controller info:
- * the machine works without them (ADR-611).
+ * The failed settings read the operator has to act on: the controller stopped
+ * answering. It opens the recovery card over the canvas by itself (ADR-642).
+ * Reading settings after a reset, and a read that failed while the controller
+ * still answers, stay in Controller info, even when a reply still owed makes
+ * Reconnect the recommendation there: the machine works without them (ADR-611).
  */
 export function controllerRecoveryKey(input: {
   readonly connection: ConnectionState;
   readonly qualification: ControllerQualification | undefined;
-  readonly reconnectRecommended: boolean;
   readonly stoppedResponding: boolean;
 }): string | null {
   const qualification = input.qualification;
   if (input.connection.kind !== 'connected' || qualification?.kind !== 'failed') return null;
-  if (!input.reconnectRecommended && !input.stoppedResponding) return null;
+  if (!input.stoppedResponding) return null;
   return JSON.stringify([qualification.epoch, qualification.message]);
 }
 

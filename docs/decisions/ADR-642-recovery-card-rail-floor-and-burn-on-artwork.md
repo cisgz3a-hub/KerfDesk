@@ -30,11 +30,16 @@ The maintainer reported three problems while running jobs:
 
 ### Decision
 
-1. **Recovery opens by itself.** A failed settings read that needs recovery opens the
-   recovery card at the top centre of the canvas, in the same floating stack as the safety notice
-   and below it. A failed read needs recovery when the store recommends Reconnect or when the
-   controller stopped answering status queries (`controllerRecoveryKey`). The card has Retry and
-   Reconnect, and it does not take keyboard focus. Its close button folds it into one
+1. **Recovery opens by itself.** A failed settings read on a controller that stopped answering
+   status queries opens the recovery card at the top centre of the canvas, in the same floating
+   stack as the safety notice and below it (`controllerRecoveryKey`). That rule is re-read on
+   every store write and once a second, as the connection bar's **Not responding** is (ADR-611
+   Amendment 1), because a status write stuck in a wedged transport stops the store writes. A
+   read that failed while status replies keep arriving stays in Controller info, even when a
+   reply still owed (one `ok` lost on a settings read) makes Reconnect the recommendation there:
+   Reconnect ends any paused job, and ADR-611 and #1235 keep such reads from popping up. The
+   card has Retry and Reconnect, and it does not take keyboard focus. Its close button folds it
+   into one
    **Controller needs recovery** row. That row stays at the top of the canvas until the
    controller recovers. A new failure (new epoch or message) opens the card again. The six-second
    toolbar line is removed, and the toolbar keeps an empty spacer so its controls do not move.
@@ -52,16 +57,19 @@ The maintainer reported three problems while running jobs:
    artwork-relative frame on every machine. The planned route, live burn, head marker, approach
    line, Frame outline and start markers all land on the artwork the operator sees. When the bed
    position is known, the frame keeps it (`bed`). The idle badge does not call such a plan
-   "bed position unverified", and the camera job watch (ADR-490) shifts the route back by the
-   constant offset between the two frames (`artworkToBedShift`), so it still photographs where
-   the job really burns. Absolute Coords jobs keep the machine frame, which matches the canvas.
+   "bed position unverified". With the camera overlay on, whose picture shows the real bed, the
+   idle badge says **Drawn over artwork — burns at your origin** instead, because the route on
+   that picture is not where the job burns. The camera job watch (ADR-490) shifts the route back
+   by the constant offset between the two frames (`artworkToBedShift`), so it still photographs
+   where the job really burns. Absolute Coords jobs keep the machine frame, which matches the canvas.
    Verified Origin and unknown bed positions keep their existing relative view and label.
 
 ### Evidence and limits
 
 - `WorkspaceControllerRecovery.test.tsx`: the card opens over the canvas when the controller
-  stops answering and does not take focus. It stays quiet for a read that failed while the
-  controller answers and during post-reset reads. It folds into a row that keeps the same
+  stops answering, including when only the one-second re-check sees the silence, and does not
+  take focus. It stays quiet for a read that failed while the controller answers, also when a
+  reply is still owed and Reconnect is recommended, and during post-reset reads. It folds into a row that keeps the same
   failure folded, reopens for a new failure, stacks under the safety notice, and reconnects
   through the store. `ConnectionBar-info-recovery.test.tsx` now pins that the toolbar never
   announces a failed read, and that Controller info still works from the menu.
@@ -69,6 +77,7 @@ The maintainer reported three problems while running jobs:
   the canvas without moving the toolbar.
 - `canvas-motion-plan.test.ts` pins Absolute on a homed machine in the machine frame, and homed
   User Origin and Current Position jobs over the artwork with their bed frame and shift.
+  `canvas-motion-badge-camera.test.tsx` pins the idle label with the camera overlay on and off.
   `job-burn-route.test.ts` pins that the job watch looks at the same bed region and masks for
   both frames.
 - `e2e/machine-rail-live-job.spec.ts` simulates a streaming job in the rail and checks, with the

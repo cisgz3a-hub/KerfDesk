@@ -1,4 +1,4 @@
-// ADR-642: a controller that needs recovery opens its recovery card over the
+// ADR-642: a controller that stopped answering opens its recovery card over the
 // canvas by itself, under the safety notice (ADR-634). It used to wait behind a
 // six-second line beside the Laser/CNC switch, so a paused job showed the
 // safety notice while Retry and Reconnect, which fix the cause, stayed hidden.
@@ -8,7 +8,6 @@ import { useRef, useState } from 'react';
 import { usePlatform } from '../app/platform-context';
 import { Icon } from '../kit/icons';
 import { useStore } from '../state';
-import { controllerStoppedResponding } from '../state/controller-recovery-status';
 import { useLaserStore } from '../state/laser-store';
 import { connectionControlsBusy } from './ControllerConnectionControls';
 import { ControllerRecoveryToast } from './ControllerRecoveryToast';
@@ -18,6 +17,7 @@ import {
   useControllerQualificationRetry,
   useControllerReconnect,
 } from './controller-reconnect';
+import { useControllerStoppedResponding } from './use-controller-went-silent';
 
 export type ControllerRecovery = {
   readonly key: string;
@@ -39,7 +39,7 @@ export function useControllerRecovery(): ControllerRecovery | null {
   const connection = useLaserStore((state) => state.connection);
   const qualification = useLaserStore((state) => state.controllerQualification);
   const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
-  const stoppedResponding = useLaserStore((state) => controllerStoppedResponding(state));
+  const stoppedResponding = useControllerStoppedResponding(connection.kind === 'connected');
   const readBlockReason = useLaserStore((state) => state.getMachineSettingsReadBlockReason());
   const busy = useLaserStore((state) =>
     connectionControlsBusy(state.motionOperation, state.controllerOperation),
@@ -52,7 +52,6 @@ export function useControllerRecovery(): ControllerRecovery | null {
   const key = controllerRecoveryKey({
     connection,
     qualification,
-    reconnectRecommended,
     stoppedResponding,
   });
   if (key === null || qualification.kind !== 'failed') return null;
