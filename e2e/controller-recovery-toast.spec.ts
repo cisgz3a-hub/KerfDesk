@@ -34,7 +34,7 @@ for (const viewport of [
       await expect.poll(() => toolbar.boundingBox()).toEqual(toolbarBefore);
     };
 
-    // ADR-637: a controller that needs recovery opens the card by itself,
+    // ADR-642: a controller that needs recovery opens the card by itself,
     // over the canvas, and the toolbar does not move.
     await setQualification(page, 'failed');
     const card = page.getByRole('alert', { name: 'Controller recovery', exact: true });

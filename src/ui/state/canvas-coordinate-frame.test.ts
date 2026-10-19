@@ -85,7 +85,7 @@ describe('canvas coordinate frame on a homed machine', () => {
     expect(artworkToBedShift(absolute)).toEqual({ x: 0, y: 0 });
   });
 
-  // ADR-637: a User Origin job was drawn where its origin sits on the bed, a
+  // ADR-642: a User Origin job was drawn where its origin sits on the bed, a
   // second copy beside the artwork it burns.
   it.each<JobOriginPlacement>([
     { startFrom: 'user-origin', anchor: 'front-left' },

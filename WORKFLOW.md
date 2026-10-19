@@ -2395,7 +2395,7 @@ one straight cut into smaller G-code moves does not change its cooling pattern.
 A User Origin or Current Position job draws its route, burn, head marker and start markers over
 the artwork it burns, not where its origin sits on the bed, so a job started from a hand-set
 origin shows one picture. Absolute Coords jobs draw at their bed position, which is where the
-artwork sits on the canvas. The camera job watch still compares the real bed position (ADR-637).
+artwork sits on the canvas. The camera job watch still compares the real bed position (ADR-642).
 
 The in-memory sidecar carries the emitted-program fingerprint plus initial position, connection
 session, position epoch, active driver, and current-session detected-family evidence. If any of that
@@ -3235,7 +3235,7 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    or the controller stopped answering), the recovery card with Retry and
    Reconnect opens by itself at the top of the canvas, under any safety notice.
    Closing it folds it into a **Controller needs recovery** button that stays
-   until the controller recovers; a new failure opens the card again (ADR-637,
+   until the controller recovers; a new failure opens the card again (ADR-642,
    replacing ADR-611's brief toolbar notice). A controller
    that answered and then goes quiet for 8 s, outside homing and other controller
    operations, turns the connection status to an amber **Not responding** until

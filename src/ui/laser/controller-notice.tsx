@@ -73,7 +73,7 @@ type QualificationNoticeProps = {
 /**
  * The failed settings read the operator has to act on: Reconnect is
  * recommended, or the controller stopped answering. It opens the recovery card
- * over the canvas by itself (ADR-637). Reading settings after a reset, and a
+ * over the canvas by itself (ADR-642). Reading settings after a reset, and a
  * read that failed while the controller still answers, stay in Controller info:
  * the machine works without them (ADR-611).
  */

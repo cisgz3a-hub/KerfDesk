@@ -1,7 +1,7 @@
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 import { openMachineToolDropdown, selectWorkspacePanel } from './fixtures/workspace-ui';
 
-// ADR-637: a running job adds its safety line, overrides and progress to the
+// ADR-642: a running job adds its safety line, overrides and progress to the
 // machine rail. The utility tabs box was the one row allowed to shrink to
 // zero, so on a laptop-height window those rows were drawn over the Origin,
 // Placement and Console tabs. The rail now scrolls instead. At 1280x720 the

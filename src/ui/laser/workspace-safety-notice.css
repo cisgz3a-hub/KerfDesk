@@ -32,7 +32,7 @@
   border-radius: 4px;
   box-shadow: var(--lf-shadow);
   pointer-events: auto;
-  /* The safety notice, then the controller recovery card (ADR-637). */
+  /* The safety notice, then the controller recovery card (ADR-642). */
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -43,7 +43,7 @@
 }
 
 /* The folded recovery card: one full-width row that stays while recovery is
-   needed (ADR-637). */
+   needed (ADR-642). */
 .lf-btn.lf-controller-recovery-pill {
   display: flex;
   align-items: center;

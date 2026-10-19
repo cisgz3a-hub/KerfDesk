@@ -47,7 +47,7 @@
    (min-height: auto). Allowed to shrink to zero, the tabs box collapsed when a
    running job added its safety line and overrides, and those rows were drawn
    over the Origin, Placement and Console tabs. Now the rail scrolls instead
-   (ADR-637). An open utility still yields down to its own floor, because the
+   (ADR-642). An open utility still yields down to its own floor, because the
    dropdown's size containment keeps its content out of that floor. */
 .lf-machine-details > .lf-job-controls {
   flex: 1 1 auto;

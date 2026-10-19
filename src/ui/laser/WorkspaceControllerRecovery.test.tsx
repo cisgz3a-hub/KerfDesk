@@ -89,7 +89,7 @@ function button(name: string): HTMLButtonElement | undefined {
   );
 }
 
-// ADR-637: recovery used to wait behind a six-second line beside the
+// ADR-642: recovery used to wait behind a six-second line beside the
 // Laser/CNC switch, so a paused job showed only the safety notice.
 describe('WorkspaceControllerRecovery', () => {
   it('opens over the canvas by itself when the controller stops answering', () => {

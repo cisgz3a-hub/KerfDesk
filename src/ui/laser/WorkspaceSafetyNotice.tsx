@@ -3,7 +3,7 @@
 // controller write pushed the whole workspace down. Here it takes no layout
 // space and stays clear of the rails' job controls and the Live Motion popup,
 // and it still stays until the operator acknowledges it. The controller
-// recovery card stacks under it (ADR-637).
+// recovery card stacks under it (ADR-642).
 
 import { useRef, type CSSProperties } from 'react';
 import { usePlatform } from '../app/platform-context';

@@ -2,7 +2,7 @@
 // canvas already draws its live trail from: every lit move, mapped from
 // controller to bed millimetres by the same walker, at the beam's width. A
 // User Origin job is drawn over its artwork, so its lines are shifted back to
-// where they burn (ADR-637).
+// where they burn (ADR-642).
 
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import {

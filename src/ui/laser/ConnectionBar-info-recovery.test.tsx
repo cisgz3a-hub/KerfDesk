@@ -58,7 +58,7 @@ async function openDetails(): Promise<void> {
 }
 
 describe('ConnectionBar controller information recovery', () => {
-  // A controller that needs recovery says so over the canvas (ADR-637), not in
+  // A controller that needs recovery says so over the canvas (ADR-642), not in
   // the toolbar; Controller info stays reachable from the menu.
   it('never announces a failed read in the toolbar', async () => {
     const container = await render({ reconnectRecommended: true });

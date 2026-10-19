@@ -78,7 +78,7 @@ export function ConnectionBar(props: Props): JSX.Element {
     >
       <div className="lf-connection-toolbar-layout">
         {/* Keeps the controls at the trailing edge. A controller that needs
-            recovery says so over the canvas instead of here (ADR-637). */}
+            recovery says so over the canvas instead of here (ADR-642). */}
         <div className="lf-connection-toolbar-spacer" />
         <div className="lf-connection-toolbar-controls">
           <CompactConnectionControls

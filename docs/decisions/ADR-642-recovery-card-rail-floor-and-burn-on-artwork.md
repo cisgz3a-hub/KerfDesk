@@ -1,4 +1,4 @@
-## ADR-637 - Controller recovery opens over the canvas, the machine rail never overlaps its tabs, and hand-set origins burn over the artwork (2026-10-19)
+## ADR-642 - Controller recovery opens over the canvas, the machine rail never overlaps its tabs, and hand-set origins burn over the artwork (2026-10-19)
 
 **Status:** Accepted at the maintainer's request. | **Date:** 2026-10-19
 
