@@ -104,7 +104,7 @@ test('Cancel machine draft keeps committed settings and one Save can be undone a
   const width = dialog.getByRole('spinbutton', { name: 'Bed width (mm)', exact: true });
   await width.fill('321');
   await width.press('Tab');
-  await dialog.getByRole('button', { name: 'Review setup', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
   await dialog.getByRole('button', { name: 'Save machine setup', exact: true }).click();
   await expect(dialog).toBeHidden();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -218,7 +218,7 @@ async function requestNew(page: Page): Promise<void> {
 async function machineEssentials(page: Page) {
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Machine Setup', exact: true });
-  await dialog.getByRole('button', { name: 'Check essentials', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Next', exact: true }).click();
   return dialog;
 }
 

@@ -1,0 +1,218 @@
+/* Which machine do you have? (ADR-637): search and type filter, one scrolling
+   list grouped by brand, then "My machine isn't listed" and what was chosen. */
+.lf-setup-picker {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.lf-setup-picker-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lf-setup-picker-bar input[type='search'] {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.lf-setup-picker-kinds {
+  display: inline-flex;
+  border: 1px solid var(--lf-border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.lf-setup-picker-kinds label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.lf-setup-picker-kinds label + label {
+  border-left: 1px solid var(--lf-border);
+}
+.lf-setup-picker-kinds label[data-selected='true'] {
+  background: var(--lf-tint-accent);
+  color: var(--lf-accent-fg);
+  font-weight: 600;
+}
+/* The radio is still the control and keeps its focus ring; only its dot hides. */
+.lf-setup-picker-kinds input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.lf-setup-picker-kinds label:has(input:focus-visible) {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: -2px;
+}
+.lf-setup-picker-list {
+  position: relative;
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  border: 1px solid var(--lf-border);
+  border-radius: 8px;
+  background: var(--lf-bg-1);
+}
+.lf-setup-picker-list h5 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 6px 12px;
+  background: var(--lf-bg-0);
+  border-bottom: 1px solid var(--lf-border);
+  color: var(--lf-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.lf-setup-picker-list .lf-setup-empty {
+  margin: 12px;
+}
+/* A row is the whole control (ADR-347): name, size, type and any notice. */
+.lf-setup-picker-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 2px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.lf-setup-picker-list .lf-setup-picker-row + .lf-setup-picker-row {
+  border-top: 1px solid var(--lf-border);
+}
+.lf-setup-picker-row:hover {
+  background: var(--lf-bg-0);
+}
+.lf-setup-picker-row[data-selected='true'] {
+  background: var(--lf-tint-accent);
+}
+.lf-setup-picker-row:has(> input:focus-visible) {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: -2px;
+}
+.lf-setup-picker-row > input {
+  grid-row: span 2;
+  margin: 0;
+  accent-color: var(--lf-accent);
+}
+.lf-setup-picker-name {
+  font-weight: 600;
+  min-width: 0;
+}
+.lf-setup-picker-meta {
+  grid-column: 2;
+  color: var(--lf-text-muted);
+  font-size: 11px;
+}
+.lf-setup-picker-tag {
+  grid-column: 3;
+  grid-row: 1;
+  padding: 1px 7px;
+  border: 1px solid var(--lf-success);
+  border-radius: 999px;
+  color: var(--lf-success-fg);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.lf-setup-picker-tag--muted {
+  border-color: var(--lf-border);
+  color: var(--lf-text-muted);
+}
+.lf-setup-picker-row .lf-setup-profile-warning {
+  grid-column: 2 / -1;
+}
+/* A choice that would replace values someone set waits here (ADR-637 Am. 1). */
+.lf-setup-picker-confirm {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--lf-border);
+  border-radius: 8px;
+  background: var(--lf-tint-warning);
+  font-size: 12px;
+}
+.lf-setup-picker-confirm p {
+  margin: 0;
+  line-height: 1.5;
+}
+.lf-setup-picker-confirm div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.lf-setup-picker-custom {
+  border: 1px dashed var(--lf-border-strong);
+  border-radius: 8px;
+}
+.lf-setup-picker-custom[data-selected='true'] {
+  border-style: solid;
+  border-color: var(--lf-accent);
+}
+.lf-setup-picker-details,
+.lf-setup-custom {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--lf-border);
+  border-radius: 8px;
+  background: var(--lf-bg-1);
+  font-size: 12px;
+  min-width: 0;
+}
+.lf-setup-picker-details-facts {
+  color: var(--lf-text-muted);
+  font-size: 11px;
+}
+.lf-setup-picker-cnc-notes p {
+  margin: 0 0 4px;
+  color: var(--lf-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.lf-setup-picker-cnc-notes p[role='alert'] {
+  color: var(--lf-warning-fg);
+}
+.lf-setup-custom-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+.lf-setup-custom-row > span:first-child {
+  color: var(--lf-text-muted);
+}
+.lf-setup-custom-row input[type='text'],
+.lf-setup-custom-row select {
+  max-width: 280px;
+}
+.lf-setup-custom-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lf-setup-custom-size input {
+  width: 76px;
+}
+.lf-setup-custom > .lf-setup-muted {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+@media (max-width: 480px) {
+  .lf-setup-custom-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .lf-setup-picker-kinds {
+    flex: 1 1 100%;
+  }
+  .lf-setup-picker-kinds label {
+    flex: 1;
+    justify-content: center;
+  }
+}
