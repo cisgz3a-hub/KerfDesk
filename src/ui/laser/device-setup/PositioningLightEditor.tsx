@@ -91,7 +91,12 @@ function ForeignFalconPointer(props: {
   return (
     <div style={{ display: 'grid', gap: 8, fontSize: 12 }}>
       <IssueText issue={props.issue} />
-      <button type="button" className="lf-btn" onClick={() => props.onChange(undefined)}>
+      <button
+        type="button"
+        className="lf-btn"
+        title="Remove the Falcon red pointer from this profile; it only works on the Falcon A1 Pro profile."
+        onClick={() => props.onChange(undefined)}
+      >
         Remove the Falcon pointer
       </button>
     </div>
