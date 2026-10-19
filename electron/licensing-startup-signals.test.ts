@@ -46,6 +46,15 @@ describe('startup signals for the licence window (ADR-623)', () => {
     expect(createStartupSignals(false).sessionAdmitted()).toBe(false);
   });
 
+  it('never latches the session on an acknowledgement its window could not have given', () => {
+    // The licence window admits only on a Pro status; an acknowledgement after
+    // nothing but Free must not let a later reload past the window.
+    const signals = createStartupSignals(false);
+    signals.admitWorkspace(signals.observeRequest()({ edition: 'free' })!);
+    signals.admission.rendererOpening();
+    expect(signals.sessionAdmitted()).toBe(false);
+  });
+
   it('ignores a Pro reply to a renderer that reloaded before it arrived', () => {
     const signals = createStartupSignals(false);
     const seen: boolean[] = [];

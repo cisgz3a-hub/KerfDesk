@@ -21,6 +21,9 @@ export function createStartupSignals(alwaysAdmitted: boolean) {
   // Once a mounted workspace acknowledges, the window has let this app session
   // in until KerfDesk quits (ADR-623 Amendment 1). Services still follow each renderer.
   let sessionAdmitted = false;
+  // Whether the current renderer was sent a Pro status, the only status its
+  // licence window admits on. Its acknowledgement latches the session only then.
+  let proSent = false;
   const listeners = new Set<(admitted: boolean) => void>();
   const setAdmitted = (next: boolean): void => {
     if (admitted === next) return;
@@ -33,6 +36,7 @@ export function createStartupSignals(alwaysAdmitted: boolean) {
   });
   const resetRenderer = (): void => {
     generation += 1;
+    proSent = false;
     if (!alwaysAdmitted) setAdmitted(false);
   };
   const admission: WorkspaceAdmission = {
@@ -52,8 +56,9 @@ export function createStartupSignals(alwaysAdmitted: boolean) {
      */
     observeRequest: (): ((status: { readonly edition: string }) => number | null) => {
       const requested = generation;
-      return () => {
+      return (status) => {
         if (requested !== generation) return null;
+        if (status.edition === 'pro') proSent = true;
         markStatusRead();
         return requested;
       };
@@ -62,7 +67,7 @@ export function createStartupSignals(alwaysAdmitted: boolean) {
      * normalization. A status sent before expiry alone never starts services. */
     admitWorkspace: (acknowledged: number): void => {
       if (acknowledged !== generation) return;
-      sessionAdmitted = true;
+      if (proSent) sessionAdmitted = true;
       setAdmitted(true);
     },
     /**
