@@ -231,7 +231,7 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
       'Use + to add a transparent layer above the active one, or duplicate a layer. Paint on the active layer, change its opacity and toggle visibility to compare the effect.',
     finish:
       'Drag rows or use the up and down controls to change stacking. Merge down only when you want to combine layers. Apply commits the visible composite to the project image.',
-    tip: 'Studio image layers organise pixels. Artwork / Operations in the main workspace controls machine processes.',
+    tip: 'Studio image layers organise pixels. The Artwork panel in the main workspace controls machine processes.',
     keywords: ['layers', 'opacity', 'blend', 'history', 'stack', 'merge'],
   }),
   imageToolLesson({

@@ -2,7 +2,6 @@ import { artworkRunUnits } from '../../core/artwork-run-units';
 import { compileCncJob } from '../../core/cnc';
 import { compileJob } from '../../core/job';
 import {
-  artworkOperationName,
   cutTypeLabel,
   DEFAULT_CNC_LAYER_SETTINGS,
   layerCncTool,
@@ -12,6 +11,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { artworkDisplayName, artworkDisplayNames } from './artwork-display-names';
 
 export type ArtworkRunOrderRowModel = {
   readonly key: string;
@@ -32,7 +32,8 @@ export function artworkRunOrderRows(project: Project): ReadonlyArray<ArtworkRunO
   const objectById = new Map(project.scene.objects.map((object) => [object.id, object]));
   const layerById = new Map(project.scene.layers.map((layer) => [layer.id, layer]));
   const effectiveSteps = effectiveStepsByObject(project);
-  return artworkRunUnits(project.scene).map((unit, index) => {
+  const names = artworkDisplayNames(project.scene.objects);
+  const rows = artworkRunUnits(project.scene).map((unit, index) => {
     const objects = unit.objectIds.flatMap((id) => {
       const object = objectById.get(id);
       return object === undefined ? [] : [object];
@@ -41,8 +42,11 @@ export function artworkRunOrderRows(project: Project): ReadonlyArray<ArtworkRunO
       const layer = layerById.get(id);
       return layer === undefined ? [] : [layer];
     });
+    // A run is artwork, so it carries the artwork's name, numbered like the
+    // Properties header and artwork picker; operationSummary names the operation.
     const first = objects[0];
-    const name = layers[0]?.name ?? (first === undefined ? 'Artwork' : artworkOperationName(first));
+    const name =
+      first === undefined ? (layers[0]?.name ?? 'Artwork') : artworkDisplayName(names, first);
     return {
       key: unit.key,
       objectIds: unit.objectIds,
@@ -58,6 +62,20 @@ export function artworkRunOrderRows(project: Project): ReadonlyArray<ArtworkRunO
       shared: objects.length > 1,
     };
   });
+  return withUniqueNames(rows);
+}
+
+// A composed name ("Foo (1) + 1 more") can still match another run's name.
+// Any name two runs share gets its run number, so every row's Select and Run
+// position controls keep their own accessible name (ADR-631).
+function withUniqueNames(
+  rows: ReadonlyArray<ArtworkRunOrderRowModel>,
+): ReadonlyArray<ArtworkRunOrderRowModel> {
+  const totals = new Map<string, number>();
+  rows.forEach((row) => totals.set(row.name, (totals.get(row.name) ?? 0) + 1));
+  return rows.map((row) =>
+    (totals.get(row.name) ?? 0) < 2 ? row : { ...row, name: `${row.name} (run ${row.position})` },
+  );
 }
 
 // This render-path helper preserves main's existing V-carve exception until

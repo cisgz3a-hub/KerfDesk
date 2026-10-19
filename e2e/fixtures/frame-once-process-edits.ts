@@ -75,7 +75,7 @@ export async function clearAndRetype(input: Locator, value: string): Promise<voi
 export async function editProcessValues(page: Page, power: string, speed: string): Promise<void> {
   await selectWorkspacePanel(page, 'Artwork');
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await panel

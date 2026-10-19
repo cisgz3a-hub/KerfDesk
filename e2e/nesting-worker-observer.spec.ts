@@ -2,56 +2,65 @@ import { EventEmitter } from 'node:events';
 import { expect, test, type CDPSession } from '@playwright/test';
 import { RuntimeObserver } from './fixtures/nesting-worker-lifecycle';
 
-class DelayedWorkerAttachment extends EventEmitter {
-  readonly attached: string[] = [];
-  readonly detached: string[] = [];
-  private finish: (value: { sessionId: string }) => void = () => undefined;
-  private readonly attachment = new Promise<{ sessionId: string }>((resolve) => {
-    this.finish = resolve;
-  });
+class BrowserDiscovery extends EventEmitter {
+  readonly commands: string[] = [];
 
-  async send(method: string, params: { targetId?: string; sessionId?: string } = {}) {
-    if (method === 'Target.attachToTarget') {
-      this.attached.push(params.targetId ?? 'missing-target');
-      return this.attachment;
-    }
-    if (method === 'Target.detachFromTarget')
-      this.detached.push(params.sessionId ?? 'missing-session');
+  async send(method: string) {
+    this.commands.push(method);
     return {};
   }
 
-  created(targetId: string): void {
+  created(
+    targetId: string,
+    parentId?: string,
+    browserContextId = 'context',
+    type = 'worker',
+  ): void {
     this.emit('Target.targetCreated', {
-      targetInfo: { type: 'worker', browserContextId: 'context', targetId, url: '' },
+      targetInfo: { type, browserContextId, targetId, parentId, url: '' },
     });
-  }
-
-  finishAttachment(): void {
-    this.finish({ sessionId: 'late-session' });
   }
 }
 
-test('worker lifetime observer releases an attachment that finishes during teardown', async () => {
-  const cdp = new DelayedWorkerAttachment();
+test('worker lifetime observer requires target destruction without attaching debugger sessions', async () => {
+  const cdp = new BrowserDiscovery();
   const observer = new RuntimeObserver(cdp as unknown as CDPSession, 'context');
   cdp.created('root');
-  const releasing = observer.releaseAttachments();
-  cdp.finishAttachment();
-  await releasing;
-  expect(cdp.detached).toEqual(['late-session']);
-  // Releasing a debugger session still proves nothing about worker destruction.
+  expect(cdp.commands).toEqual([]);
+  // Neither debugger detachment nor context loss proves the target was released.
+  cdp.emit('Target.detachedFromTarget', { sessionId: 'session', targetId: 'root' });
+  cdp.emit('Target.receivedMessageFromTarget', {
+    sessionId: 'session',
+    message: JSON.stringify({ method: 'Runtime.executionContextsCleared' }),
+  });
   expect(observer.pending()).toHaveLength(1);
   cdp.emit('Target.targetDestroyed', { targetId: 'root' });
-  expect(observer.pending()).toEqual([]);
+  expect(await observer.destruction()).toEqual([]);
+  expect(cdp.commands).toEqual([]);
 });
 
-test('worker lifetime observer keeps late targets pending without attaching after teardown', async () => {
-  const cdp = new DelayedWorkerAttachment();
+test('worker lifetime observer tracks late children until their own destruction', async () => {
+  const cdp = new BrowserDiscovery();
   const observer = new RuntimeObserver(cdp as unknown as CDPSession, 'context');
-  await observer.releaseAttachments();
-  cdp.created('late-child');
-  expect(cdp.attached).toEqual([]);
-  expect(observer.pending()).toHaveLength(1);
+  cdp.created('root');
+  const destruction = observer.destruction();
+  cdp.created('late-child', 'root');
+  cdp.emit('Target.targetDestroyed', { targetId: 'root' });
+  expect(observer.pending()).toEqual(['late-child (): target not destroyed']);
   cdp.emit('Target.targetDestroyed', { targetId: 'late-child' });
-  expect(observer.pending()).toEqual([]);
+  expect(await destruction).toEqual([]);
+  expect(cdp.commands).toEqual([]);
+});
+
+test('worker lifetime observer ignores other browser contexts and non-worker targets', async () => {
+  const cdp = new BrowserDiscovery();
+  const observer = new RuntimeObserver(cdp as unknown as CDPSession, 'context');
+  cdp.created('other-worker', undefined, 'other-context');
+  cdp.created('page', undefined, 'context', 'page');
+  cdp.created('owned-worker');
+  expect([...observer.workers.keys()]).toEqual(['owned-worker']);
+  cdp.emit('Target.targetDestroyed', { targetId: 'other-worker' });
+  expect(observer.pending()).toHaveLength(1);
+  cdp.emit('Target.targetDestroyed', { targetId: 'owned-worker' });
+  expect(await observer.destruction()).toEqual([]);
 });
