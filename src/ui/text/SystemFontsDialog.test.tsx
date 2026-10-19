@@ -123,6 +123,26 @@ it('shows why embedding failed and stays open', async () => {
   expect(onClose).not.toHaveBeenCalled();
 });
 
+it('never embeds a face that finished reading after the dialog closed', async () => {
+  const importFont = vi.fn(async (_file: File) => undefined);
+  const onClose = vi.fn();
+  let finishRead: (blob: Blob) => void = () => undefined;
+  const slow: SystemFontFace = {
+    ...face('Slow', 'Regular'),
+    blob: () =>
+      new Promise<Blob>((resolve) => {
+        finishRead = resolve;
+      }),
+  };
+  const body = await show({ kind: 'ok', families: groupSystemFonts([slow]) }, importFont, onClose);
+  await act(async () => button(body, 'Use Slow Regular').click());
+  await act(async () => button(body, 'Close').click());
+  expect(onClose).toHaveBeenCalledTimes(1);
+  await act(async () => finishRead({ arrayBuffer: async () => roboto.slice().buffer } as Blob));
+  expect(importFont).not.toHaveBeenCalled();
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
 function withRestrictedFsType(font: Uint8Array): Uint8Array {
   const copy = font.slice();
   const data = new DataView(copy.buffer);

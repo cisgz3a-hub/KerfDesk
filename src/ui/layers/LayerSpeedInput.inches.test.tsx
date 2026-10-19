@@ -2,7 +2,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { speedSliderRange, speedSliderStops } from '../../core/devices/working-speed-range';
 import { createLayer } from '../../core/scene';
+import { useStore } from '../state';
 import { useDisplayUnitsStore } from '../state/display-units';
 import { resetStore } from '../state/test-helpers';
 import type { FeedCeiling } from './feed-ceiling';
@@ -97,6 +99,28 @@ describe('laser Speed in inches (ADR-629)', () => {
     await act(async () => vi.advanceTimersByTime(400));
     expect(commit).toHaveBeenLastCalledWith({ speed: 2540 });
     expect(observe).toHaveBeenLastCalledWith('2540');
+  });
+
+  it('commits each slider stop as the exact mm/min speed it names', async () => {
+    const { device } = useStore.getState().project;
+    const stops = speedSliderStops(
+      speedSliderRange({
+        profileId: device.profileId,
+        laserSubProfile: device.laserSubProfile,
+        maxFeed: 6000,
+      }),
+    );
+    const { commit } = await renderSpeed(1524);
+    const slider = host.querySelector('input[aria-label="Speed slider for Engrave"]');
+    if (!(slider instanceof HTMLInputElement)) throw new Error('Speed slider missing');
+    for (const [index, stop] of stops.entries()) {
+      await act(async () => {
+        slider.value = String(index);
+        Simulate.change(slider);
+      });
+      await act(async () => vi.advanceTimersByTime(400));
+      expect(commit).toHaveBeenLastCalledWith({ speed: stop });
+    }
   });
 
   it('writes nothing back when a rounded speed is left unedited', async () => {

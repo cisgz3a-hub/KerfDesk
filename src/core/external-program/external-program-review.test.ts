@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../gcode-view';
 import { reviewExternalProgram, type ExternalProgramContext } from './external-program-review';
+import { normalizeExternalProgram } from './normalize-external-program';
 
 const LASER: ExternalProgramContext = { machineKind: 'laser', laserMaxPowerS: 1000 };
 const CNC: ExternalProgramContext = { machineKind: 'cnc', laserMaxPowerS: 1000 };
@@ -11,7 +12,15 @@ function model(gcode: string, machineKind: 'laser' | 'cnc' = 'laser'): GcodeRend
   return result.model;
 }
 
-function review(gcode: string, context = LASER) {
+// As the Run dialog does: review the exact canonical bytes, baseline first.
+function sendable(file: string): string {
+  const normalized = normalizeExternalProgram(file);
+  if (normalized.kind !== 'ok') throw new Error(normalized.reasons.join('\n'));
+  return normalized.program.gcode;
+}
+
+function review(file: string, context = LASER) {
+  const gcode = sendable(file);
   return reviewExternalProgram(gcode, model(gcode, context.machineKind), context);
 }
 
@@ -44,7 +53,7 @@ describe('external G-code program review (ADR-630)', () => {
     const result = review('G21 G90\nG1 Z-1 F100\n', CNC);
     expect(result.envelope).toEqual({ minX: 0, minY: 0, maxX: 0, maxY: 0 });
     expect(result.warnings.join()).toContain('zero XY extent');
-    expect(result.warnings.join()).toContain('assumes X0 Y0');
+    expect(result.warnings.join()).toContain('never sets X or Y, so it runs where the head stands');
     expect(result.warnings.join()).toContain('does not prove Z clearance or cutting depth');
   });
 
@@ -52,7 +61,7 @@ describe('external G-code program review (ADR-630)', () => {
     const point = review('G21 G90\nG0 X10 Y5\nG1 Z-1 F100\n', CNC);
     expect(point.envelope).toEqual({ minX: 10, minY: 5, maxX: 10, maxY: 5 });
     expect(point.warnings.join()).toContain('zero XY extent');
-    expect(point.warnings.join()).not.toContain('assumes X0 Y0');
+    expect(point.warnings.join()).not.toContain('never sets');
     const line = review('G21 G90\nG0 X10 Y5\nG1 X20 F100\n', CNC);
     expect(line.envelope).toEqual({ minX: 10, minY: 5, maxX: 20, maxY: 5 });
     expect(line.warnings.join()).not.toContain('zero XY extent');
@@ -130,5 +139,49 @@ describe('external program stops (ADR-630)', () => {
     expect(review('G21\nG0 X0 Y0\nG1 X5 F100\nM5\nM10\n').warnings.join()).not.toContain(
       'M0 or M1',
     );
+  });
+});
+
+describe('external program command spellings (ADR-630)', () => {
+  it.each(['G91', 'G+91', 'G91.0', 'G 91', 'G091'])('finds relative moves spelt %s', (word) => {
+    const warnings = review(`G21\n${word}\nG1 X-100 F600\n`).warnings.join('\n');
+    expect(warnings).toContain('relative moves (G91)');
+  });
+
+  it('does not read G91.1 (arc centre mode) as relative moves', () => {
+    expect(review('G21\nG91.1\nG1 X10 F600\n').warnings.join()).not.toContain('(G91)');
+  });
+
+  it.each(['M6', 'M 6', 'M06', 'M6.0'])('finds a tool change spelt %s', (word) => {
+    expect(review(`G21\nG0 X1\n${word} T2\n`, CNC).warnings.join()).toContain('tool change (M6)');
+  });
+
+  it('tells storing a G28/G30 position from moving to it', () => {
+    const stores = review('G21\nG0 X1 Y1\nG28.1\nG30.1\n').warnings.join('\n');
+    expect(stores).toContain('stores a new G28 or G30 position');
+    expect(stores).not.toContain('moves to a stored position');
+    const moves = review('G21\nG0 X1 Y1\nG28\n').warnings.join('\n');
+    expect(moves).toContain('moves to a stored position');
+  });
+
+  it('finds G53 and G10 offset writes however they are spelt', () => {
+    expect(review('G21\nG0 X1\nG 53 G0 X0\n').warnings.join()).toContain('(G53)');
+    expect(review('G21\nG0 X1\nG10.0 L20 P1 X0\n').warnings.join()).toContain('G10 L20');
+  });
+});
+
+describe('external program final units (ADR-630)', () => {
+  it('says the controller is left in inches only when the program ends in inches', () => {
+    const ends = review('G20\nG0 X1 Y1\nG1 X2 F10\n').warnings.join('\n');
+    expect(ends).toContain('leaves the controller in inches');
+    const back = review('G20\nG0 X1 Y1\nG21\nG1 X20 F100\n');
+    expect(back.units).toBe('both');
+    expect(back.warnings.join('\n')).not.toContain('leaves the controller in inches');
+    expect(back.warnings.join('\n')).toContain('ends in millimetres');
+  });
+
+  it('does not count the baseline as the program declaring millimetres', () => {
+    expect(review('G0 X1 Y1\nG1 X2 F100\n').units).toBe('undeclared');
+    expect(review('G20\nG0 X1 Y1\n').units).toBe('inch');
   });
 });

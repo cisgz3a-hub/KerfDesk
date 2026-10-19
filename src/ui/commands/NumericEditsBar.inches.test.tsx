@@ -64,6 +64,19 @@ describe('NumericEditsBar in inches (ADR-629)', () => {
     expect(useStore.getState().undoStack).toHaveLength(0);
   });
 
+  it('commits nothing when Enter is pressed on an unedited rounded inch box', async () => {
+    installRect(10, 10);
+    useStore.setState({ dirty: false });
+    const container = await render();
+    const width = input(container, 'Selection width');
+    expect(width.value).toBe('0.3937');
+    await act(async () => {
+      width.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    expect(useStore.getState().project.scene.objects[0]?.transform.scaleX).toBe(1);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
   it('follows a switch back to millimetres without editing anything', async () => {
     const container = await render();
     await act(async () => useDisplayUnitsStore.getState().setLengthUnit('mm'));

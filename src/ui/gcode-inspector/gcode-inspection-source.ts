@@ -29,7 +29,9 @@ export type GcodeInspectionTiming = {
 
 export type GcodeInspectionContext = Pick<
   BuildRenderModelOptions,
-  'machineKind' | 'laserPowerControl'
+  // initialPositionMm: an external run reads its program from where the head
+  // stands (ADR-630); other inspections start at the drawn origin.
+  'machineKind' | 'laserPowerControl' | 'initialPositionMm'
 > & {
   readonly timing?: GcodeInspectionTiming;
   /** The machine bed in program coordinates, only when the program runs in

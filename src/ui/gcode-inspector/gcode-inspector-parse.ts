@@ -72,6 +72,9 @@ function createInspectionReader(context: GcodeInspectionContext, observer: Inspe
   const options: BuildRenderModelOptions = {
     machineKind: context.machineKind,
     laserPowerControl: context.laserPowerControl,
+    ...(context.initialPositionMm === undefined
+      ? {}
+      : { initialPositionMm: context.initialPositionMm }),
     retainPreciseSegmentLengths: true,
     renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   };

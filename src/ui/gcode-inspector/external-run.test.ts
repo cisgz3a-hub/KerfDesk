@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseStatusReport } from '../../core/controllers/grbl/status-parser';
 import { createProject } from '../../core/scene';
+import * as frameAction from '../laser/use-frame-action';
 import { useStore } from '../state';
 import type { FrameVerification } from '../state/frame-verification';
 import { useLaserStore } from '../state/laser-store';
@@ -9,8 +10,10 @@ import { resetStore } from '../state/test-helpers';
 import {
   EXTERNAL_FRAME_CHANGED,
   EXTERNAL_FRAME_FIRST,
+  EXTERNAL_HEAD_MOVED,
   EXTERNAL_MODE_CHANGED,
   externalStartIssue,
+  frameExternalProgram,
   startExternalProgram,
   waitForExternalFrame,
   type ExternalFrame,
@@ -20,6 +23,7 @@ const RUN = {
   name: 'part.nc',
   gcode: 'G21 G90\nG0 X0 Y0\nM4 S500\nG1 X10 F600\nM5\n',
   envelope: { minX: 0, minY: 0, maxX: 10, maxY: 0 },
+  start: { x: 0, y: 0, z: 0 },
 };
 
 function idleAt(x: number): void {
@@ -50,6 +54,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   useLaserStore.setState(initialLaserState());
   resetStore();
 });
@@ -78,6 +83,24 @@ describe('external run Start checks (ADR-630)', () => {
     expect(externalStartIssue(frame)).toBe(EXTERNAL_MODE_CHANGED);
   });
 
+  it('refuses when the head is not where the program was read from', () => {
+    // A Frame that ended away from the program's start: the session and
+    // position still match the record, but the program starts elsewhere.
+    idleAt(5);
+    expect(externalStartIssue(framed())).toBe(EXTERNAL_HEAD_MOVED);
+  });
+
+  it('will not Frame from a spot other than the one the program was read from', async () => {
+    vi.spyOn(frameAction, 'prepareTransientFrameController').mockResolvedValue({
+      laser: useLaserStore.getState(),
+    } as never);
+    const frame = vi.fn(async () => undefined);
+    useLaserStore.setState({ frame });
+    idleAt(5);
+    await expect(frameExternalProgram(RUN)).rejects.toThrow(EXTERNAL_HEAD_MOVED);
+    expect(frame).not.toHaveBeenCalled();
+  });
+
   it('streams exactly the framed program once, as a laser job', async () => {
     // Without a $32 reading the laser-mode acknowledgement asks first.
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -95,6 +118,13 @@ describe('external run Start checks (ADR-630)', () => {
     expect(() => options.assertFinalStartAuthorized()).not.toThrow();
     idleAt(3);
     expect(() => options.assertFinalStartAuthorized()).toThrow(EXTERNAL_FRAME_CHANGED);
+    idleAt(0);
+    // The Laser/CNC switch stays usable while Start arms.
+    const project = useStore.getState().project;
+    useStore.setState({
+      project: { ...project, machine: { kind: 'cnc', params: { safeZMm: 5 } } as never },
+    });
+    expect(() => options.assertFinalStartAuthorized()).toThrow(EXTERNAL_MODE_CHANGED);
     expect(options).toHaveProperty('laserModeStartEvidence');
     confirm.mockRestore();
   });

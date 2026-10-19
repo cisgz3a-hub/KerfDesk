@@ -38,7 +38,12 @@ it.each(['M0', 'M1'])(
     const verification = { boundsSignature: 'external:cnc', wco: null, workOriginActive: false };
     useLaserStore.setState({ frameVerification: verification });
     const frame = {
-      run: { name: 'external.nc', gcode, envelope: { minX: 0, minY: 0, maxX: 2, maxY: 0 } },
+      run: {
+        name: 'external.nc',
+        gcode,
+        envelope: { minX: 0, minY: 0, maxX: 2, maxY: 0 },
+        start: { x: 0, y: 0, z: 0 },
+      },
       machineKind: 'cnc' as const,
       verification,
       controller: useLaserStore.getState(),

@@ -32,9 +32,10 @@ describe('external program Frame record (ADR-630)', () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
     const verification = record();
-    await useLaserStore
-      .getState()
-      .frame(BOUNDS, 1000, undefined, undefined, undefined, verification);
+    await useLaserStore.getState().frame(BOUNDS, 1000, undefined, undefined, undefined, {
+      verification,
+      returnToWorkPosition: { x: 0, y: 0 },
+    });
     await acknowledgeFrameToolOffPrelude(connection);
     // The move to the first corner, then the four sides.
     for (let leg = 0; leg < 5; leg += 1) await acknowledgeAndSettleFrameLeg(connection);
@@ -49,9 +50,10 @@ describe('external program Frame record (ADR-630)', () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
     const verification = record();
-    await useLaserStore
-      .getState()
-      .frame(BOUNDS, 1000, undefined, undefined, undefined, verification);
+    await useLaserStore.getState().frame(BOUNDS, 1000, undefined, undefined, undefined, {
+      verification,
+      returnToWorkPosition: { x: 0, y: 0 },
+    });
     await acknowledgeFrameToolOffPrelude(connection);
     // error:15 is GRBL's jog target beyond the machine's travel.
     connection.emitLine('error:15');

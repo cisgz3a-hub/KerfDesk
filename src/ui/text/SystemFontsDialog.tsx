@@ -1,7 +1,7 @@
 // SystemFontsDialog — lists the fonts installed on this computer and embeds
 // the chosen face through the ordinary font import (ADR-628).
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Dialog, DialogActions } from '../kit';
 import {
   filterSystemFonts,
@@ -27,6 +27,30 @@ export const SYSTEM_FONTS_EMPTY =
 export const SYSTEM_FONT_RESTRICTED =
   "This font's licence restricts embedding. Keep projects that use it to yourself unless the licence allows sharing.";
 
+// Reading a face can be slow. Closing the dialog meanwhile abandons it: a
+// dismissed font must never land in the text editor afterwards.
+function useCloseGuard(onClose: () => void): {
+  readonly isOpen: () => boolean;
+  readonly close: () => void;
+} {
+  const open = useRef(true);
+  useEffect(
+    () => () => {
+      open.current = false;
+    },
+    [],
+  );
+  return {
+    isOpen: () => open.current,
+    // Once only: an import that ends after the dialog closed does not close it again.
+    close: () => {
+      if (!open.current) return;
+      open.current = false;
+      onClose();
+    },
+  };
+}
+
 export function SystemFontsDialog(props: {
   readonly query: Promise<SystemFontQuery>;
   readonly importFont: (file: File) => Promise<void>;
@@ -38,15 +62,18 @@ export function SystemFontsDialog(props: {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [restricted, setRestricted] = useState<SystemFontFile | null>(null);
+  const { isOpen, close } = useCloseGuard(onClose);
   const embed = async (file: File): Promise<void> => {
+    if (!isOpen()) return;
     await importFont(file);
-    onClose();
+    close();
   };
   const choose = async (face: SystemFontFace): Promise<void> => {
     setBusy(face.postscriptName);
     setError(null);
     try {
       const chosen = await systemFontFile(face);
+      if (!isOpen()) return;
       if (chosen.restricted) setRestricted(chosen);
       else await embed(chosen.file);
     } catch (caught) {
@@ -56,7 +83,7 @@ export function SystemFontsDialog(props: {
     }
   };
   return (
-    <Dialog title="System fonts" size="md" onClose={onClose}>
+    <Dialog title="System fonts" size="md" onClose={close}>
       {restricted === null ? (
         <SystemFontsBody
           result={result}
@@ -94,7 +121,7 @@ export function SystemFontsDialog(props: {
             </Button>
           </>
         )}
-        <Button type="button" onClick={onClose}>
+        <Button type="button" onClick={close}>
           Close
         </Button>
       </DialogActions>

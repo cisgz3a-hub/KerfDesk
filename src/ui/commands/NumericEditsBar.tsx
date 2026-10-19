@@ -296,7 +296,9 @@ function NumberField(props: {
   };
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (event.key === 'Enter') {
-      commit(event.currentTarget.value);
+      // Enter on the text as shown is no edit either: in an inch box it would
+      // write back the four-decimal rounding (10 mm shown as 0.3937).
+      commitIfEdited(event.currentTarget.value);
       return;
     }
     const stepped = steppedDraft(event.key, evaluate(event.currentTarget.value), step, format);

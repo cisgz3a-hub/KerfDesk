@@ -1,10 +1,12 @@
 // external-run — Frame and Start for a G-code file opened in the Inspector
-// (ADR-630). The Frame uses the ordinary Frame boundary (controller queue,
-// G54 selection, report units, completion settlement) and traces the
-// program's XY envelope with the tool off. A clean completion records a Frame
-// for this exact program; Start checks that record and that the controller
-// session, position and origin are unchanged, then streams the program once
-// through the ordinary streamer. Every other finding is a warning.
+// (ADR-630). The program is read from where the head stands (its first move,
+// relative moves and arcs start there). The Frame uses the ordinary Frame
+// boundary (controller queue, G54 selection, report units, completion
+// settlement), traces the program's XY envelope with the tool off and returns
+// to that start. A clean completion records a Frame for this exact program;
+// Start checks that record, that the head is still at the start, and that the
+// controller session, origin and machine mode are unchanged, then streams the
+// program once through the ordinary streamer. Every other finding is a warning.
 
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { streamingModeForController } from '../../core/devices';
@@ -15,6 +17,7 @@ import { confirmLaserModeStartEvidence } from '../laser/laser-mode-start-acknowl
 import { controllerStartPreparationStillCurrent } from '../laser/start-job-authorization';
 import { prepareTransientFrameController } from '../laser/use-frame-action';
 import { useStore } from '../state';
+import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import type { FrameVerification } from '../state/frame-verification';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
@@ -25,6 +28,8 @@ export type ExternalRun = {
   /** The exact bytes Start streams (normalizeExternalProgram). */
   readonly gcode: string;
   readonly envelope: ExternalProgramEnvelope;
+  /** The work position the program was read from, where it starts. */
+  readonly start: { readonly x: number; readonly y: number; readonly z: number };
 };
 
 /** A clean Frame of one external program, as the controller stood after it. */
@@ -41,6 +46,23 @@ export const EXTERNAL_FRAME_CHANGED =
   'The controller session, position or origin changed after the Frame. Frame the program again.';
 export const EXTERNAL_MODE_CHANGED =
   'The machine mode changed after the Frame. Frame the program again.';
+export const EXTERNAL_HEAD_MOVED =
+  'The head is not where the program was read from. It is read again from where the head stands; Frame again.';
+
+// Closer than this, two reported positions are the same spot (reports carry
+// three decimals of a millimetre).
+const SAME_SPOT_MM = 0.002;
+
+/** True while the head stands where `run` was read from. */
+export function headAtRunStart(run: ExternalRun, laser: LaserState): boolean {
+  const here = reportedWorkPositionMm(laser, laser.controllerSettings?.reportInches === true);
+  if (here === null) return false;
+  return (
+    Math.abs(here.x - run.start.x) <= SAME_SPOT_MM &&
+    Math.abs(here.y - run.start.y) <= SAME_SPOT_MM &&
+    Math.abs(here.z - run.start.z) <= SAME_SPOT_MM
+  );
+}
 
 let frameSequence = 0;
 
@@ -58,6 +80,7 @@ export async function frameExternalProgram(run: ExternalRun): Promise<ExternalFr
   const controller = await prepareTransientFrameController(project);
   if (controller === null) return null;
   const laser = useLaserStore.getState();
+  if (!headAtRunStart(run, laser)) throw new Error(EXTERNAL_HEAD_MOVED);
   frameSequence += 1;
   const verification: FrameVerification = {
     boundsSignature: `external-program:${frameSequence}`,
@@ -67,14 +90,10 @@ export async function frameExternalProgram(run: ExternalRun): Promise<ExternalFr
   const completion = waitForExternalFrame(verification);
   try {
     const { framingFeedMmPerMin } = deviceForActiveHead(project.device, project.machine);
-    await controller.laser.frame(
-      run.envelope,
-      framingFeedMmPerMin,
-      undefined,
-      project,
-      undefined,
+    await controller.laser.frame(run.envelope, framingFeedMmPerMin, undefined, project, undefined, {
       verification,
-    );
+      returnToWorkPosition: { x: run.start.x, y: run.start.y },
+    });
   } catch (error) {
     completion.cancel();
     throw error;
@@ -125,12 +144,22 @@ export function externalStartIssue(
   if (frame === null || laser.frameVerification !== frame.verification) {
     return EXTERNAL_FRAME_FIRST;
   }
+  return externalHandoffIssue(frame, laser, project);
+}
+
+/** The checks that must still hold at the final Start handoff, after the
+ * Frame record itself has been spent: same machine mode, same controller
+ * session, origin and position, and the head at the program's start. */
+function externalHandoffIssue(frame: ExternalFrame, laser: LaserState, project: Project) {
   if (machineKindOf(project.machine) !== frame.machineKind) return EXTERNAL_MODE_CHANGED;
-  return controllerStartPreparationStillCurrent(frame.controller, laser, {
-    ignoreAdvisoryControllerEvidence: true,
-  })
-    ? null
-    : EXTERNAL_FRAME_CHANGED;
+  if (
+    !controllerStartPreparationStillCurrent(frame.controller, laser, {
+      ignoreAdvisoryControllerEvidence: true,
+    })
+  ) {
+    return EXTERNAL_FRAME_CHANGED;
+  }
+  return headAtRunStart(frame.run, laser) ? null : EXTERNAL_HEAD_MOVED;
 }
 
 /** Streams the framed program once. False when the operator declined a
@@ -168,17 +197,16 @@ export async function startExternalProgram(frame: ExternalFrame): Promise<boolea
     // M0/M1 in an external CNC program are controller program stops, not
     // KerfDesk's emitted multi-bit plan boundaries. Preserve the exact bytes.
     toolChangePause: false,
-    // Start clears the Frame record before this runs, so it checks the
-    // controller evidence the record was bound to.
+    // Start clears the Frame record before this runs, so it checks what the
+    // record was bound to. Start arming can take a while, during which the
+    // Laser/CNC switch stays usable, so the machine mode is checked here too.
     assertFinalStartAuthorized: () => {
-      const current = useLaserStore.getState();
-      if (
-        !controllerStartPreparationStillCurrent(frame.controller, current, {
-          ignoreAdvisoryControllerEvidence: true,
-        })
-      ) {
-        throw new Error(EXTERNAL_FRAME_CHANGED);
-      }
+      const issue = externalHandoffIssue(
+        frame,
+        useLaserStore.getState(),
+        useStore.getState().project,
+      );
+      if (issue !== null) throw new Error(issue);
     },
     ...(laserModeStartEvidence === undefined ? {} : { laserModeStartEvidence }),
     ...(cncSetupAttestation === null || cncSetupAttestation === undefined

@@ -44,7 +44,9 @@ function speedDisplay(unit: DisplayLengthUnit): SpeedDisplay {
   return {
     unit: 'in/min',
     toDisplay: (mmPerMin) => Number((mmPerMin / MM_PER_INCH).toFixed(1)),
-    fromDisplay: (inPerMin) => inPerMin * MM_PER_INCH,
+    // A micrometre per minute absorbs the 25.4 round trip's floating-point
+    // noise, so the 100 mm/min stop commits 100, not 99.99999999999999.
+    fromDisplay: (inPerMin) => Math.round(inPerMin * MM_PER_INCH * 1e3) / 1e3,
     describe: (inPerMin) => `${inPerSecFormat.format(inPerMin / 60)} in/s`,
   };
 }
@@ -100,7 +102,9 @@ export function SpeedInput(props: {
       }}
       min={min}
       max={max}
-      stops={display.unit === 'mm/min' ? stops : stops.map(display.toDisplay)}
+      // Exact converted stops: the slider lands on the very speed the stop
+      // names; only the labels and the number box round it.
+      stops={display.unit === 'mm/min' ? stops : stops.map((stop) => stop / MM_PER_INCH)}
       describe={display.describe}
       title={`Feed rate in ${display.unit} for this layer. The slider covers this machine's usual working speeds, ${formatFeed(range.min)} to ${formatFeed(range.max)} mm/min; type any speed up to its Output max feed, ${formatFeed(maxFeed)} mm/min (Machine Setup).`}
     />

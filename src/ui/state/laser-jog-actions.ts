@@ -72,8 +72,8 @@ export function jogActions(
     jogToMachinePosition: (x, y, feed) => runJogToMachinePosition(context, x, y, feed),
     jog: (params, owner) => runJog(context, params, owner),
     cancelJog: () => runCancelJog(set, get, refs, safeWrite),
-    frame: (bounds, feed, candidate, jobProject, owner, verification) =>
-      runFrame(context, bounds, feed, candidate, jobProject, owner, verification),
+    frame: (bounds, feed, candidate, jobProject, owner, external) =>
+      runFrame(context, bounds, feed, candidate, jobProject, owner, external),
     traceFrame: (bounds, feed, candidate, owner) =>
       runFrame(context, bounds, feed, candidate, undefined, owner),
   };
@@ -200,7 +200,7 @@ async function runFrame(
   candidate: Parameters<LaserState['frame']>[2] | Parameters<LaserState['traceFrame']>[2],
   jobProject?: Parameters<LaserState['frame']>[3],
   owner?: MachineExecutionOwner,
-  verification?: Parameters<LaserState['frame']>[5],
+  external?: Parameters<LaserState['frame']>[5],
 ): Promise<void> {
   assertMachineExecutionOwner(owner);
   context = { ...context, safeWrite: ownedMachineWrite(context.safeWrite, owner) };
@@ -212,7 +212,16 @@ async function runFrame(
   assertMachineExecutionOwner(owner);
   // A new physical Frame voids every earlier proof, traced or permitted.
   set({ frameVerification: null, framedRun: null, frameTrace: null });
-  const plan = buildFrameDispatchPlan(refs, get, bounds, feed, candidate, jobProject);
+  const externalFrame = candidate === undefined ? external : undefined;
+  const plan = buildFrameDispatchPlan(
+    refs,
+    get,
+    bounds,
+    feed,
+    candidate,
+    jobProject,
+    externalFrame,
+  );
   if (plan.kind === 'blocked') {
     set({ lastWriteError: plan.message, log: pushLog(get(), `[lf2] ${plan.message}`) });
     throw new Error(plan.message);
@@ -239,7 +248,7 @@ async function runFrame(
       0,
       undefined,
       frameSettlementLine,
-      candidate === undefined ? verification : undefined,
+      externalFrame?.verification,
       plan.expectedReturnWorkZMm,
     ),
     ...(owner === undefined ? {} : { executionOwner: owner }),

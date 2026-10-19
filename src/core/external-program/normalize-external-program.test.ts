@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeExternalProgram, stripComments } from './normalize-external-program';
+import {
+  EXTERNAL_PROGRAM_BASELINE,
+  canonicalLine,
+  createExternalProgramNormalizer,
+  normalizeExternalProgram,
+  sourceLines,
+  stripComments,
+} from './normalize-external-program';
+
+const BASE = `${EXTERNAL_PROGRAM_BASELINE}\n`;
 
 function sent(text: string): string {
   const result = normalizeExternalProgram(text);
@@ -14,22 +23,29 @@ function reasons(text: string): ReadonlyArray<string> {
 }
 
 describe('external G-code program normalization (ADR-630)', () => {
-  it('removes comments, % markers, blank lines and surrounding spaces only', () => {
+  it('sends the G21 G90 baseline first, then each line as GRBL reads it', () => {
     const text =
       '%\r\n(Fusion post)\r\nG21 G90 ; metric\r\n\r\n  G0 X10 (rapid) Y5  \r\nM5\r\n%\r\n';
-    expect(sent(text)).toBe('G21 G90\nG0 X10  Y5\nM5\n');
+    expect(sent(text)).toBe(`${BASE}G21G90\nG0X10Y5\nM5\n`);
   });
 
-  it('keeps words, order and inner spacing exactly as written', () => {
-    expect(sent('g1x1.5y-2f600\nG2 X10 Y0 I5 J0\n')).toBe('g1x1.5y-2f600\nG2 X10 Y0 I5 J0\n');
+  it('keeps words, their order and their case; only spaces, tabs and / go', () => {
+    expect(sent('g1x1.5y-2f600\nG2 X10 Y0 I5 J0\n')).toBe(`${BASE}g1x1.5y-2f600\nG2X10Y0I5J0\n`);
+  });
+
+  it('joins split numbers as stock GRBL does, so the review sees what runs', () => {
+    // GRBL discards whitespace while collecting a line: this runs as G1X100F600.
+    expect(sent('G 1 X1 0 0 F600\n')).toBe(`${BASE}G1X100F600\n`);
+    // A comment removed from inside a number joins it the same way.
+    expect(sent('G1 X1(note)00\n')).toBe(`${BASE}G1X100\n`);
   });
 
   it('reports what it sends and what it dropped', () => {
     const result = normalizeExternalProgram('(header)\nG0 X1\n\n%\nG1 X2 F100 ; cut\n');
     if (result.kind !== 'ok') throw new Error('refused');
     expect(result.program).toMatchObject({
-      lineCount: 2,
-      byteCount: 'G0 X1\nG1 X2 F100\n'.length,
+      lineCount: 3,
+      byteCount: `${BASE}G0X1\nG1X2F100\n`.length,
       droppedLineCount: 3,
       commentsRemoved: true,
     });
@@ -41,7 +57,7 @@ describe('external G-code program normalization (ADR-630)', () => {
   });
 
   it('drops realtime characters that sit inside comments', () => {
-    expect(sent('G0 X1 (hold here!)\nM5 ; done?\n')).toBe('G0 X1\nM5\n');
+    expect(sent('G0 X1 (hold here!)\nM5 ; done?\n')).toBe(`${BASE}G0X1\nM5\n`);
   });
 
   it('refuses $ controller commands, naming the line', () => {
@@ -49,11 +65,17 @@ describe('external G-code program normalization (ADR-630)', () => {
     expect(found[0]).toContain('Line 2 is a $ controller command ($H)');
   });
 
-  it('keeps supported advisory coordinate findings and ignores commented writes', () => {
-    expect(sent('G21\nG53 G0 X1\nG55\nG92 X0\nG28\n')).toContain('G92 X0');
-    expect(sent('G0 X1 (G10 L20 P1 X0)\n')).toBe('G0 X1\n');
-    expect(sent('G0 X10 Y20\n')).toBe('G0 X10 Y20\n');
-    expect(sent('G10L20P1X0Y0\nG1X20F600\n')).toBe('G10L20P1X0Y0\nG1X20F600\n');
+  it('refuses a $ command hidden behind the / block-delete mark or spaces', () => {
+    // Stock GRBL ignores '/' and spaces, so these reach it as $J= and $H.
+    expect(reasons('/$J=G91 G21 X100 F600\n')[0]).toContain('Line 1 is a $ controller command');
+    expect(reasons('G0 X0\n / $H\n')[0]).toContain('Line 2 is a $ controller command ($H)');
+    expect(sent('/G1 X10 F100\n')).toBe(`${BASE}G1X10F100\n`);
+  });
+
+  it('keeps coordinate commands for the review to warn about, and ignores commented ones', () => {
+    expect(sent('G21\nG53 G0 X1\nG55\nG92 X0\nG28\n')).toContain('G92X0');
+    expect(sent('G0 X1 (G10 L20 P1 X0)\n')).toBe(`${BASE}G0X1\n`);
+    expect(sent('G10L20P1X0Y0\nG1X20F600\n')).toBe(`${BASE}G10L20P1X0Y0\nG1X20F600\n`);
   });
 
   it('refuses realtime command characters outside comments', () => {
@@ -61,14 +83,14 @@ describe('external G-code program normalization (ADR-630)', () => {
     expect(reasons('G0 X1\n?\n')[0]).toContain('Line 2 holds "?"');
   });
 
-  it('refuses control and non-ASCII characters', () => {
+  it('refuses control and non-ASCII characters, but not tabs', () => {
     expect(reasons('G0 X1\u0018\n')[0]).toContain('code 24');
     expect(reasons('G0 X1 Y°2\n')[0]).toContain('non-ASCII');
-    expect(sent('G0\tX1\n')).toBe('G0\tX1\n');
+    expect(sent('G0\tX1\n')).toBe(`${BASE}G0X1\n`);
   });
 
-  it.each(['\u00a0', '\u000b', '\u000c', '\ufeff'])(
-    'validates boundary whitespace instead of silently trimming it: %j',
+  it.each([' ', '\u000b', '\u000c', '﻿'])(
+    'refuses whitespace GRBL does not discard instead of dropping it: %j',
     (character) => {
       expect(reasons(`${character}G0 X1\n`)[0]).toContain('control or non-ASCII');
       expect(reasons(`G0 X1${character}\n`)[0]).toContain('control or non-ASCII');
@@ -76,11 +98,11 @@ describe('external G-code program normalization (ADR-630)', () => {
     },
   );
 
-  it('counts blank source lines and trims only surrounding ASCII spaces and tabs', () => {
+  it('counts blank source lines', () => {
     const result = normalizeExternalProgram('\n \t\n\t G1 X1  Y2\t \n');
     expect(result).toMatchObject({
       kind: 'ok',
-      program: { droppedLineCount: 2, commentsRemoved: false, gcode: 'G1 X1  Y2\n' },
+      program: { droppedLineCount: 2, commentsRemoved: false, gcode: `${BASE}G1X1Y2\n` },
     });
   });
 
@@ -93,5 +115,25 @@ describe('external G-code program normalization (ADR-630)', () => {
     const found = reasons(Array.from({ length: 8 }, (_, index) => `$${index}`).join('\n'));
     expect(found).toHaveLength(6);
     expect(found[5]).toBe('…and 3 more lines like these.');
+  });
+});
+
+describe('chunked normalization (ADR-630)', () => {
+  it('splits CR, LF and CRLF lines without a trailing blank line', () => {
+    expect([...sourceLines('a\r\nb\rc\nd')]).toEqual(['a', 'b', 'c', 'd']);
+    expect([...sourceLines('a\n')]).toEqual(['a']);
+    expect([...sourceLines('\n\n')]).toEqual(['', '']);
+    expect([...sourceLines('')]).toEqual([]);
+  });
+
+  it('gives the same result fed line by line as all at once', () => {
+    const text = '(head)\nG21\n G0 X1 Y2\n%\nM5\n';
+    const normalizer = createExternalProgramNormalizer();
+    for (const line of sourceLines(text)) normalizer.push(line);
+    expect(normalizer.finish()).toEqual(normalizeExternalProgram(text));
+  });
+
+  it('canonicalizes a line the way stock GRBL collects it', () => {
+    expect(canonicalLine(' G1 X1\t0 / Y2 ')).toBe('G1X10Y2');
   });
 });

@@ -9017,37 +9017,49 @@ The G-code Inspector is free in every edition (ADR-627).
 1. Open a `.nc` / `.gcode` / `.tap` file in the Inspector (File → Open G-code…, or drop it on
    the workspace). Once it is read, the footer offers **Run on machine...**. The project's own
    program (Inspect G-code) does not offer it: it already has Frame and Start.
-2. **Run on machine...** opens **Run *file name***. It lists what is sent (lines and bytes; the
-   file's comments, `%` markers and blank lines are left out, surrounding ASCII spaces/tabs are trimmed and line endings become LF), the
-   estimated time from a fresh parse of those exact sendable bytes, the Frame outline (its size and lowest corner in work
-   coordinates, travel moves included), the units the program declares and whether it runs as a laser or a CNC job
-   (the current machine mode).
-3. **Frame** is enabled while connected, Idle and with no other motion running; its tooltip
-   says why otherwise. It runs the ordinary Frame preparation (G54 selection, report units)
-   and traces the program's XY outline at the current work origin with the tool off.
+2. **Run on machine...** opens **Run *file name***. It lists what is sent (lines and bytes:
+   `G21 G90` first, then each line as GRBL itself reads it, with comments, spaces, tabs, `/`
+   marks, `%` markers and blank lines left out and LF line endings), the estimated time, the
+   Frame outline (its size and lowest corner in work coordinates, travel moves included), where
+   it starts, the units the program declares and whether it runs as a laser or a CNC job (the
+   current machine mode). All of it comes from parsing those exact bytes from where the head
+   stands. A large file is prepared a slice at a time.
+3. **Frame** is enabled while connected, Idle, with no other motion running, once the machine
+   reports where the head is and every line fits the controller; its tooltip says why
+   otherwise. It runs the ordinary Frame preparation (G54 selection, report units), traces the
+   program's XY outline at the current work origin with the tool off and returns to where the
+   program starts.
 4. A clean Frame unlocks **Start**. The status reads **Ready to start**. A Jog, Home, origin
    or probe change, reset, alarm, reconnect, another Frame or a machine-mode switch locks it
-   again with the reason.
+   again with the reason; the program is then read again from wherever the head stands.
 5. **Start** asks the usual laser-mode (`$32`) or CNC workholding question, checks the Frame is
-   still current, then streams the program with the ordinary streamer and closes the
-   Inspector. The Live Motion bar's Pause, Resume and **ABORT JOB** work as for any job.
+   still current and the head is still at the program's start, then streams the program with
+   the ordinary streamer and closes the Inspector. The last check, after the controller is
+   prepared, repeats the session, origin, position and machine-mode checks. The Live Motion
+   bar's Pause, Resume and **ABORT JOB** work as for any job.
 6. One Frame allows one run. Running the file again needs another Frame.
 
 #### Warnings (never refuse)
 
-Moves in machine coordinates (`G53`), a work coordinate switch away from `G54`, `G92`,
-`G28`/`G30`, work-offset writes (`G10 L2`/`G10 L20`, explicitly warning that later moves may
-be displaced from the traced outline), relative moves (`G91`), inches (`G20`, which also leaves the controller in
-inches), the laser or spindle still on at the end, a tool change (`M6`), a program that looks
-like the other machine mode, program stops (`M0`/`M1`, sent unchanged, so the controller
-holds until the machine's own cycle start; KerfDesk's Resume does not release them), zero XY extent (Frame visits a point and does not prove Z clearance or depth; without X/Y words the Inspector assumes X0 Y0 while the real program keeps current XY), and the Inspector's Program Health notices and warnings.
+Work-offset writes (`G10 L2`/`G10 L20`, listed first: later moves, and later jobs, may be
+displaced from the traced outline), moves in machine coordinates (`G53`), a work coordinate
+switch away from `G54`, `G92`, `G28`/`G30` moves and `G28.1`/`G30.1` stored positions,
+relative moves (`G91`, read from where the head stands), a program that ends in inches (`G20`,
+which leaves the controller in inches; one that switches back says so instead), the laser or
+spindle still on at the end, a tool change (`M6`), program stops (`M0`/`M1`, sent unchanged, so
+the controller holds until the machine's own cycle start; KerfDesk's Resume does not release
+them), a program that looks like the other machine mode, zero XY extent (the Frame visits a
+point and proves no Z clearance or depth), and Program Health notices and warnings. Commands
+are found however they are spelt (`G+91`, `G91.0`, `G 91`).
 
 #### Refusals (factual only)
 
 The dialog shows the reason and offers only **Close** when the file holds a NUL byte, has no
-line to send, holds a `$` controller command, a realtime character (`?`, `!`, `~`), a
-control or non-ASCII character outside a comment, or the Inspector cannot construct a finite motion envelope. Start itself
-still refuses a line longer than the controller's line or receive buffer (ADR-375).
+line to send, holds a `$` controller command (also behind a `/` or spaces), a realtime
+character (`?`, `!`, `~`), a control or non-ASCII character outside a comment (spaces and
+tabs are dropped; other whitespace is refused), or the Inspector cannot construct a finite
+motion envelope. A line longer than the connected controller's line or receive buffer
+(ADR-375) is named before Frame and keeps Frame unavailable.
 
 #### Not included
 

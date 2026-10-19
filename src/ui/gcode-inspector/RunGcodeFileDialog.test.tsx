@@ -56,8 +56,9 @@ function button(body: HTMLElement, label: string): HTMLButtonElement {
 describe('Run G-code file dialog (ADR-630)', () => {
   it('reviews what will be sent and keeps Start locked until a Frame', async () => {
     const body = await show('(job)\nG21 G90\nG0 X10 Y5\nM4 S500\nG1 X60 Y45 F1000\nM5\n');
-    expect(body.textContent).toContain('5 lines');
-    expect(body.textContent).toContain('Comments, % markers and blank lines are left out');
+    expect(body.textContent).toContain('6 lines');
+    expect(body.textContent).toContain('G21 G90 first');
+    expect(body.textContent).toContain('/ marks, % markers and blank lines left out');
     expect(body.textContent).toContain('50 mm × 40 mm');
     expect(body.textContent).toContain('millimetres (G21)');
     expect(button(body, 'Start').disabled).toBe(true);
@@ -92,7 +93,7 @@ describe('Run G-code file dialog (ADR-630)', () => {
     await act(async () => button(body, 'Frame').click());
     expect(frame).toHaveBeenCalledWith(
       expect.objectContaining({
-        gcode: text.replace('(note)', ''),
+        gcode: 'G21G90\nG21G90\nG0X0Y0\nM4S500\nG1X10F600\nG1X100\nM5\n',
         envelope: { minX: 0, minY: 0, maxX: 100, maxY: 0 },
       }),
     );
@@ -117,7 +118,11 @@ describe('Run G-code file dialog (ADR-630)', () => {
     expect(button(body, 'Frame').disabled).toBe(false);
     const frame = vi.spyOn(externalRun, 'frameExternalProgram').mockResolvedValue(null);
     await act(async () => button(body, 'Frame').click());
-    expect(frame).toHaveBeenCalledWith(expect.objectContaining({ gcode: text }));
+    expect(frame).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gcode: 'G21G90\nG21G90\nG0X10Y0\nG10L20P1X0Y0\nM4S500\nG1X20F600\nM5\n',
+      }),
+    );
   });
 
   it('explains a file it cannot send, with no Frame or Start', async () => {

@@ -1,16 +1,22 @@
 // normalize-external-program — turns an opened G-code file into the exact
-// bytes an external run streams (ADR-630). Comments, '%' tape markers, blank
-// lines and ASCII spaces/tabs around each line are removed; nothing else changes.
-// Refusals are factual only: what the controller cannot take as a job line.
+// bytes an external run streams (ADR-630). Each line is put in the form stock
+// GRBL itself reads: comments, spaces, tabs and the '/' block-delete mark are
+// removed, as GRBL discards them while collecting a line, so the review parses
+// the same words the controller runs (`G 1 X1 0 0` is `G1X100`). '%' tape
+// markers and blank lines are dropped, and one baseline line, `G21G90`, goes
+// first, so a millimetre/absolute mode left by an earlier program cannot change
+// what was framed. Refusals are factual only: what the controller cannot take
+// as a job line.
 //
 // GRBL treats '?', '!', '~' and every byte above 0x7F as realtime commands
-// before a line is collected, even inside a comment, and runs '$' commands only
-// while Idle (error:8 otherwise):
+// before a line is collected, even inside a comment, ignores whitespace and
+// '/', and runs '$' commands only while Idle (error:8 otherwise):
 // https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/serial.c#L150-L156
+// https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L113-L148
 // https://github.com/gnea/grbl/wiki/Grbl-v1.1-Commands
 
 export type ExternalProgram = {
-  /** One line per sent line, each ending in '\n'. */
+  /** One line per sent line, each ending in '\n', the baseline first. */
   readonly gcode: string;
   readonly lineCount: number;
   readonly byteCount: number;
@@ -23,48 +29,84 @@ export type ExternalProgramResult =
   | { readonly kind: 'ok'; readonly program: ExternalProgram }
   | { readonly kind: 'refused'; readonly reasons: ReadonlyArray<string> };
 
+/** Millimetres and absolute distance, the modes the review parses from. */
+export const EXTERNAL_PROGRAM_BASELINE = 'G21G90';
+
 /** The refusals listed before "and more", so a bad file stays readable. */
 const MAX_REASONS = 5;
 const REALTIME_CHARS = new Set(['?', '!', '~']);
+const NUL_REASON = 'The file holds a NUL byte, so it is not a text G-code program.';
 
-export function normalizeExternalProgram(text: string): ExternalProgramResult {
-  if (text.includes('\0')) {
-    return refused(['The file holds a NUL byte, so it is not a text G-code program.']);
-  }
+export type ExternalProgramNormalizer = {
+  /** One source line, without its line terminator. */
+  readonly push: (raw: string) => void;
+  readonly finish: () => ExternalProgramResult;
+};
+
+/** Line-at-a-time normalization, so a large file can be fed in chunks. */
+export function createExternalProgramNormalizer(): ExternalProgramNormalizer {
   const reasons: string[] = [];
-  const lines: string[] = [];
+  const lines: string[] = [EXTERNAL_PROGRAM_BASELINE];
+  let lineNumber = 0;
   let droppedLineCount = 0;
   let commentsRemoved = false;
-  const sourceLines = text.split(/\r\n|\r|\n/);
-  // A final line terminator ends the last source line; it is not a blank line.
-  if (sourceLines.at(-1) === '') sourceLines.pop();
-  sourceLines.forEach((raw, index) => {
-    const stripped = stripComments(raw);
-    if (stripped !== raw) commentsRemoved = true;
-    // Other whitespace is controller input, not permitted normalization.
-    // Leave it present so validation cannot silently erase invalid bytes.
-    const line = stripped.replace(/^[ \t]+|[ \t]+$/g, '');
-    if (line === '' || line === '%') {
-      droppedLineCount += 1;
-      return;
-    }
-    const reason = lineRefusal(line, index + 1);
-    if (reason !== null) reasons.push(reason);
-    lines.push(line);
-  });
-  if (reasons.length > 0) return refused(summarize(reasons));
-  if (lines.length === 0) return refused(['The file has no G-code line to send.']);
-  const gcode = lines.map((line) => `${line}\n`).join('');
+  let sawNul = false;
   return {
-    kind: 'ok',
-    program: {
-      gcode,
-      lineCount: lines.length,
-      byteCount: gcode.length,
-      droppedLineCount,
-      commentsRemoved,
+    push: (raw) => {
+      lineNumber += 1;
+      if (raw.includes('\0')) {
+        sawNul = true;
+        return;
+      }
+      const stripped = stripComments(raw);
+      if (stripped !== raw) commentsRemoved = true;
+      const reason = characterRefusal(stripped, lineNumber);
+      if (reason !== null) reasons.push(reason);
+      const line = canonicalLine(stripped);
+      if (line === '' || line === '%') {
+        droppedLineCount += 1;
+        return;
+      }
+      if (reason === null && line.startsWith('$'))
+        reasons.push(controllerCommand(line, lineNumber));
+      lines.push(line);
+    },
+    finish: () => {
+      if (sawNul) return refused([NUL_REASON]);
+      if (reasons.length > 0) return refused(summarize(reasons));
+      if (lines.length === 1) return refused(['The file has no G-code line to send.']);
+      const gcode = lines.map((line) => `${line}\n`).join('');
+      return {
+        kind: 'ok',
+        program: {
+          gcode,
+          lineCount: lines.length,
+          byteCount: gcode.length,
+          droppedLineCount,
+          commentsRemoved,
+        },
+      };
     },
   };
+}
+
+export function normalizeExternalProgram(text: string): ExternalProgramResult {
+  const normalizer = createExternalProgramNormalizer();
+  for (const line of sourceLines(text)) normalizer.push(line);
+  return normalizer.finish();
+}
+
+/** The file's lines split on CR, LF or CRLF, without building one big array.
+ * A final line terminator ends the last line; it is not a blank line. */
+export function* sourceLines(text: string): Generator<string> {
+  let start = 0;
+  while (start < text.length) {
+    let end = start;
+    while (end < text.length && text[end] !== '\n' && text[end] !== '\r') end += 1;
+    yield text.slice(start, end);
+    if (text[end] === '\r' && text[end + 1] === '\n') end += 1;
+    start = end + 1;
+  }
 }
 
 /** Removes '(...)' and ';' comments. An unclosed '(' runs to the line end. */
@@ -86,10 +128,12 @@ export function stripComments(line: string): string {
   return kept;
 }
 
-function lineRefusal(line: string, lineNumber: number): string | null {
-  if (line.startsWith('$')) {
-    return `Line ${lineNumber} is a $ controller command (${preview(line)}). The controller runs those only while Idle, so send it from the Console instead.`;
-  }
+/** The line as stock GRBL collects it: spaces, tabs and '/' are discarded. */
+export function canonicalLine(line: string): string {
+  return line.replace(/[ \t/]/g, '');
+}
+
+function characterRefusal(line: string, lineNumber: number): string | null {
   for (const char of line) {
     const code = char.codePointAt(0) ?? 0;
     if (REALTIME_CHARS.has(char)) {
@@ -100,6 +144,10 @@ function lineRefusal(line: string, lineNumber: number): string | null {
     }
   }
   return null;
+}
+
+function controllerCommand(line: string, lineNumber: number): string {
+  return `Line ${lineNumber} is a $ controller command (${preview(line)}). The controller runs those only while Idle, so send it from the Console instead.`;
 }
 
 function preview(line: string): string {

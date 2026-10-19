@@ -1,0 +1,181 @@
+// RunGcodeFileControls — the Run dialog's review, Frame and Start (ADR-630).
+// Frame is the only gate. The refusals here are factual: no reported head
+// position to read the program from, or a line the connected controller
+// cannot take, which Start would refuse anyway, so it is said before Frame.
+
+import { useEffect, useMemo, useState } from 'react';
+import { streamingModeForController } from '../../core/devices';
+import { formatDuration } from '../../core/job/format-duration';
+import { machineKindOf } from '../../core/scene';
+import { formatLengthWithUnit } from '../display-length';
+import { Button, DialogActions } from '../kit';
+import { useStore } from '../state';
+import { useLengthUnit } from '../state/display-units';
+import { useLaserStore, type LaserState } from '../state/laser-store';
+import { jogFrameCommandBlockMessage } from '../state/laser-store-helpers';
+import { assertGcodeFitsController } from '../state/laser-start-program-assertions';
+import {
+  externalStartIssue,
+  frameExternalProgram,
+  startExternalProgram,
+  type ExternalFrame,
+} from './external-run';
+import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
+import type { PreparedExternalRun } from './prepare-external-run';
+import { RunGcodeFileSummary } from './RunGcodeFileSummary';
+import type { RunStart } from './use-external-program';
+
+type ReadyRun = Extract<PreparedExternalRun, { readonly kind: 'ready' }>;
+
+export const WAITING_FOR_POSITION =
+  'Waiting for the connected machine to report where the head is, which the program is read from.';
+
+// Frame and Start, one at a time, keeping the last error to show. The start
+// position is held while framing and while the Frame stays valid, so the
+// review is not read again from the head's passing positions.
+function useExternalRunActions(
+  prepared: ReadyRun,
+  onPin: (start: RunStart | null) => void,
+  onStarted: () => void,
+) {
+  const [frame, setFrame] = useState<ExternalFrame | null>(null);
+  const [busy, setBusy] = useState<'framing' | 'starting' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const attempt = async (kind: 'framing' | 'starting', work: () => Promise<void>) => {
+    setBusy(kind);
+    setError(null);
+    try {
+      await work();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const runFrame = (): Promise<void> =>
+    attempt('framing', async () => {
+      onPin(prepared.run.start);
+      const framed = await frameExternalProgram(prepared.run).catch((caught: unknown) => {
+        onPin(null);
+        throw caught;
+      });
+      setFrame(framed);
+      if (framed === null) {
+        onPin(null);
+        setError('The Frame did not run or did not finish cleanly, so Start stays locked.');
+      }
+    });
+  const runStart = (): Promise<void> =>
+    attempt('starting', async () => {
+      if (frame !== null && (await startExternalProgram(frame))) onStarted();
+    });
+  return { frame, busy, error, runFrame, runStart };
+}
+
+function useControllerFitIssue(gcode: string): string | null {
+  const project = useStore((state) => state.project);
+  const controllerKind = useLaserStore((state) => state.activeControllerKind);
+  const { controllerKind: deviceKind, streamingMode, rxBufferBytes } = project.device;
+  return useMemo(() => {
+    try {
+      assertGcodeFitsController(
+        gcode,
+        { streamingMode: streamingModeForController(deviceKind, streamingMode), rxBufferBytes },
+        controllerKind,
+      );
+      return null;
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      return message.replace(/ Job not started\.$/, '');
+    }
+  }, [gcode, controllerKind, deviceKind, streamingMode, rxBufferBytes]);
+}
+
+/** Why Frame is unavailable now, or null when it can run. */
+function frameBlockReason(
+  laser: LaserState,
+  fitIssue: string | null,
+  start: RunStart | null,
+): string | null {
+  if (laser.connection.kind !== 'connected') return 'Connect to the machine first.';
+  return (
+    jogFrameCommandBlockMessage(laser) ?? fitIssue ?? (start === null ? WAITING_FOR_POSITION : null)
+  );
+}
+
+export function RunGcodeFileControls(props: {
+  readonly prepared: ReadyRun;
+  readonly analysis: GcodeInspectorAnalysis;
+  /** Null until the connected machine reports where the head stands. */
+  readonly start: RunStart | null;
+  readonly onPin: (start: RunStart | null) => void;
+  readonly onClose: () => void;
+  readonly onStarted: () => void;
+}): JSX.Element {
+  const { prepared, onPin } = props;
+  const unit = useLengthUnit();
+  const project = useStore((state) => state.project);
+  const laser = useLaserStore((state) => state);
+  const actions = useExternalRunActions(prepared, onPin, props.onStarted);
+  const { frame, busy, error } = actions;
+  const fitIssue = useControllerFitIssue(prepared.run.gcode);
+  // A spent or expired Frame no longer holds the start: read the program again
+  // from wherever the head is now.
+  const frameSpent = frame !== null && laser.frameVerification !== frame.verification;
+  useEffect(() => {
+    if (frameSpent && busy === null) onPin(null);
+  }, [frameSpent, busy, onPin]);
+  const frameBlock = frameBlockReason(laser, fitIssue, props.start);
+  const startIssue = externalStartIssue(frame, laser, project);
+  const status =
+    busy === 'framing'
+      ? 'Framing… the head traces the program outline with the tool off, then returns.'
+      : (startIssue ?? 'Ready to start: the framed program and placement are unchanged.');
+  return (
+    <>
+      <RunGcodeFileSummary
+        prepared={prepared}
+        analysis={props.analysis}
+        machineKind={machineKindOf(project.machine)}
+        startKnown={props.start !== null}
+        formatLength={(mm) => formatLengthWithUnit(mm, unit)}
+        formatSeconds={formatDuration}
+      />
+      {fitIssue === null ? null : (
+        <p className="lf-run-gcode-error" role="alert">
+          {fitIssue}
+        </p>
+      )}
+      <p className="lf-muted" role="status" aria-live="polite">
+        {status}
+      </p>
+      {error === null ? null : (
+        <p className="lf-run-gcode-error" role="alert">
+          {error}
+        </p>
+      )}
+      <DialogActions>
+        <Button type="button" onClick={props.onClose}>
+          Close
+        </Button>
+        <Button
+          type="button"
+          disabled={busy !== null || frameBlock !== null}
+          title={frameBlock ?? 'Trace the program outline over the material with the tool off.'}
+          onClick={() => void actions.runFrame()}
+        >
+          Frame
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          disabled={busy !== null || startIssue !== null}
+          title={startIssue ?? 'Send this program to the machine.'}
+          onClick={() => void actions.runStart()}
+        >
+          Start
+        </Button>
+      </DialogActions>
+    </>
+  );
+}

@@ -48,16 +48,17 @@ describe('external run through the laser store (ADR-630)', () => {
       workOriginActive: false,
     };
     const envelope = { minX: 0, minY: 0, maxX: 10, maxY: 10 };
-    await useLaserStore
-      .getState()
-      .frame(envelope, 1000, undefined, undefined, undefined, verification);
+    await useLaserStore.getState().frame(envelope, 1000, undefined, undefined, undefined, {
+      verification,
+      returnToWorkPosition: { x: 0, y: 0 },
+    });
     await acknowledgeFrameToolOffPrelude(connection);
     for (let leg = 0; leg < 5; leg += 1) await acknowledgeAndSettleFrameLeg(connection);
     await acknowledgeMotionSettlement(connection);
     expect(useLaserStore.getState().frameVerification).toBe(verification);
 
     const frame = {
-      run: { name: 'part.nc', gcode: GCODE, envelope },
+      run: { name: 'part.nc', gcode: GCODE, envelope, start: { x: 0, y: 0, z: 0 } },
       machineKind: 'laser' as const,
       verification,
       controller: useLaserStore.getState(),

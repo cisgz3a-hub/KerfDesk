@@ -18,18 +18,22 @@ export function RunGcodeFileSummary(props: {
   readonly prepared: Extract<PreparedExternalRun, { readonly kind: 'ready' }>;
   readonly analysis: GcodeInspectorAnalysis;
   readonly machineKind: MachineKind;
+  /** False until the machine reports the head position the outline starts from. */
+  readonly startKnown: boolean;
   readonly formatLength: (mm: number) => string;
   readonly formatSeconds: (seconds: number) => string;
 }): JSX.Element {
   const { program, review, run } = props.prepared;
-  const { envelope } = run;
+  const { envelope, start } = run;
   return (
     <div className="lf-run-gcode-summary">
       <dl>
         <dt>Sends</dt>
         <dd>
-          {program.lineCount} lines, {program.byteCount} bytes. Comments, % markers and blank lines
-          are left out; surrounding spaces and tabs are trimmed. Lines are sent with LF endings.
+          {program.lineCount} lines, {program.byteCount} bytes: G21 G90 first (millimetres and
+          absolute moves, the modes the review reads the program in), then each line as GRBL itself
+          reads it, with comments, spaces, tabs, / marks, % markers and blank lines left out and LF
+          line endings. Nothing else is changed.
         </dd>
         <dt>Estimated time</dt>
         <dd>
@@ -44,6 +48,12 @@ export function RunGcodeFileSummary(props: {
           {props.formatLength(envelope.maxY - envelope.minY)}; lowest corner X{' '}
           {props.formatLength(envelope.minX)}, Y {props.formatLength(envelope.minY)} (work
           coordinates, travel moves included)
+        </dd>
+        <dt>Starts from</dt>
+        <dd>
+          {props.startKnown
+            ? `where the head stands: X ${props.formatLength(start.x)}, Y ${props.formatLength(start.y)}. The Frame returns there.`
+            : 'the work origin until the connected machine reports where the head is'}
         </dd>
         <dt>Units</dt>
         <dd>{UNITS_TEXT[review.units]}</dd>
