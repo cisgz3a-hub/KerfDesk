@@ -975,7 +975,8 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 4. Numbering ends automatically after every run unit has been assigned.
 5. While numbering is open, other design edits (Delete, nudge, paste, Undo/Redo, menu, toolbar
    and command-search commands) are refused with a notice to click **Done** or **Cancel** first,
-   so Cancel can never silently discard them.
+   so Cancel can never silently discard them. A canvas click numbers artwork whatever tool is
+   chosen, the Text tool included, and a double-click opens no editor.
 
 #### Success - inspect a job from either surface
 1. Click a run row: its complete run unit is selected on the canvas, highlighted with its operation
