@@ -1,8 +1,6 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import {
-  artworkOperationName,
   isRegistrationBox,
-  primaryOperationForObject,
   type Layer,
   type RasterImage,
   type SceneObject,
@@ -24,6 +22,7 @@ import {
   SelectedShapeGeometryFields,
 } from './SelectedShapeGeometryFields';
 import { AdvancedArtworkSettings } from './AdvancedArtworkSettings';
+import { artworkDisplayName, artworkDisplayNames } from './artwork-display-names';
 
 export function SelectedObjectProperties(): JSX.Element | null {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
@@ -37,6 +36,7 @@ export function SelectedObjectProperties(): JSX.Element | null {
     () => objects.filter((object) => !isRegistrationBox(object) && object.locked !== true),
     [objects],
   );
+  const names = useMemo(() => artworkDisplayNames(objects), [objects]);
   const selectedObjects = useMemo(
     () => selectedSceneObjects(artwork, selectedObjectId, additionalSelectedIds),
     [artwork, selectedObjectId, additionalSelectedIds],
@@ -55,6 +55,7 @@ export function SelectedObjectProperties(): JSX.Element | null {
   return (
     <ArtworkPropertiesInspector
       artwork={artwork}
+      names={names}
       layers={layers}
       context={context}
       isCncMachine={isCncMachine}
@@ -66,6 +67,7 @@ export function SelectedObjectProperties(): JSX.Element | null {
 
 type ArtworkPropertiesInspectorProps = {
   readonly artwork: ReadonlyArray<SceneObject>;
+  readonly names: ReadonlyMap<string, string>;
   readonly layers: ReadonlyArray<Layer>;
   readonly context: ArtworkInspectorContext;
   readonly isCncMachine: boolean;
@@ -87,26 +89,13 @@ function ArtworkPropertiesInspector(props: ArtworkPropertiesInspectorProps): JSX
       className="lf-artwork-inspector"
     >
       <header className="lf-artwork-context">
-        <div>
-          <span className="lf-artwork-eyebrow">{artworkInspectorHeading(context)}</span>
-          <strong
-            title={
-              context.objects.length > 1
-                ? `${context.objects.length} artworks selected`
-                : artworkOperationName(context.primaryObject)
-            }
-          >
-            {context.objects.length > 1
-              ? 'Edit the selection together'
-              : artworkOperationName(context.primaryObject)}
-          </strong>
-        </div>
+        <ArtworkContextTitle context={context} names={props.names} />
         <ArtworkEditorTabs id={editorId} active={editorView} onSelect={setEditorView} />
       </header>
       {context.selectionActive ? null : (
         <ArtworkTargetChooser
           artwork={props.artwork}
-          layers={props.layers}
+          names={props.names}
           value={context.objects[0]?.id ?? ''}
           onChange={props.onChooseArtwork}
         />
@@ -206,20 +195,42 @@ function artworkInspectorContext(
     : { selectionActive: false, objects: [inspected], primaryObject: inspected };
 }
 
-function artworkInspectorHeading(context: ArtworkInspectorContext): string {
-  if (!context.selectionActive) return 'Artwork settings';
-  return context.objects.length === 1
-    ? 'Selected artwork'
-    : `${context.objects.length} artworks selected`;
+// One line: a short word for where the artwork came from, then its name, so
+// the settings start higher on a short window (ADR-631).
+function ArtworkContextTitle(props: {
+  readonly context: ArtworkInspectorContext;
+  readonly names: ReadonlyMap<string, string>;
+}): JSX.Element {
+  const { context } = props;
+  if (context.objects.length > 1) {
+    const count = `${context.objects.length} artworks selected`;
+    return (
+      <p className="lf-artwork-context__title" title={`${count}. Edits apply to all of them.`}>
+        <strong>{count}</strong>
+      </p>
+    );
+  }
+  const name = artworkDisplayName(props.names, context.primaryObject);
+  return (
+    <p className="lf-artwork-context__title" title={name}>
+      <span className="lf-artwork-eyebrow">{context.selectionActive ? 'Selected' : 'Editing'}</span>
+      <strong>{name}</strong>
+    </p>
+  );
 }
 
 function ArtworkTargetChooser(props: {
   readonly artwork: ReadonlyArray<SceneObject>;
-  readonly layers: ReadonlyArray<Layer>;
+  readonly names: ReadonlyMap<string, string>;
   readonly value: string;
   readonly onChange: (id: string) => void;
 }): JSX.Element {
-  const options = artworkOptions(props.artwork, props.layers);
+  // The artwork's own name, the same name the header shows, so the picker
+  // never reads as a list of operations.
+  const options = props.artwork.map((object) => ({
+    id: object.id,
+    label: artworkDisplayName(props.names, object),
+  }));
   return (
     <div className="lf-artwork-target">
       <p className="lf-artwork-hint">Nothing selected on canvas. You can keep editing here.</p>
@@ -261,24 +272,6 @@ function primarySelectedObjectId(
   return selectedObjectId !== null && objects.some((object) => object.id === selectedObjectId)
     ? selectedObjectId
     : (objects[0]?.id ?? null);
-}
-
-function artworkOptions(
-  objects: ReadonlyArray<SceneObject>,
-  layers: ReadonlyArray<Layer>,
-): ReadonlyArray<{ readonly id: string; readonly label: string }> {
-  const bases = objects.map(
-    (object) => primaryOperationForObject(object, layers)?.name ?? artworkOperationName(object),
-  );
-  const totals = new Map<string, number>();
-  bases.forEach((base) => totals.set(base, (totals.get(base) ?? 0) + 1));
-  const seen = new Map<string, number>();
-  return objects.map((object, index) => {
-    const base = bases[index] ?? artworkOperationName(object);
-    const occurrence = (seen.get(base) ?? 0) + 1;
-    seen.set(base, occurrence);
-    return { id: object.id, label: totals.get(base) === 1 ? base : `${base} (${occurrence})` };
-  });
 }
 
 function selectedSceneObjects(

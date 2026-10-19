@@ -10,17 +10,17 @@ afterEach(async () => {
   for (const directory of directories.splice(0))
     await rm(directory, { recursive: true, force: true });
 });
-async function setup(platform = 'win32', backend = 'unknown', available = true) {
+/** `tag` is the key provider's ciphertext prefix: v11 a Secret Service, v10 the fallback key. */
+async function setup(platform = 'win32', tag = 'v11', available = true) {
   const directory = await mkdtemp(join(tmpdir(), 'kerfdesk-ai-test-'));
   directories.push(directory);
   const secureStorage = {
     isAsyncEncryptionAvailable: vi.fn(async () => available),
-    getSelectedStorageBackend: () => backend,
     encryptStringAsync: vi.fn(async (text: string) =>
-      Buffer.from(text.split('').reverse().join('')),
+      Buffer.from(tag + text.split('').reverse().join('')),
     ),
     decryptStringAsync: vi.fn(async (bytes: Buffer) => ({
-      result: bytes.toString().split('').reverse().join(''),
+      result: bytes.subarray(3).toString().split('').reverse().join(''),
       shouldReEncrypt: false,
     })),
   };
@@ -73,14 +73,51 @@ describe('AI credential persistence', () => {
     expect(await store.read()).toBeNull();
   });
   it.each([
-    ['linux', 'basic_text', true],
-    ['linux', 'unknown', true],
-    ['win32', 'unknown', false],
-  ] as const)('has no plaintext fallback on %s %s', async (platform, backend, available) => {
-    const { store, secureStorage } = await setup(platform, backend, available);
+    ['linux', 'v11', false],
+    ['win32', 'v10', false],
+  ] as const)('has no plaintext fallback on %s %s', async (platform, tag, available) => {
+    const { store, secureStorage } = await setup(platform, tag, available);
     expect(await store.available()).toBe(false);
     await expect(store.write({ apiKey: 'fake', model: 'mock' })).rejects.toThrow('unavailable');
     expect(secureStorage.encryptStringAsync).not.toHaveBeenCalled();
+  });
+  it('refuses the Linux fallback key, whatever backend Electron names', async () => {
+    // A GNOME desktop with no keyring running still encrypts, under the shared v10 key.
+    const { directory, store, secureStorage } = await setup('linux', 'v10');
+    expect(await store.available()).toBe(false);
+    await expect(store.write({ apiKey: 'fake', model: 'mock' })).rejects.toThrow('unavailable');
+    await expect(store.read()).rejects.toThrow('unavailable');
+    // Only the one probe was encrypted, never the key, and nothing was written.
+    expect(secureStorage.encryptStringAsync).toHaveBeenCalledOnce();
+    expect(secureStorage.encryptStringAsync).not.toHaveBeenCalledWith(
+      expect.stringContaining('fake'),
+    );
+    await expect(readFile(join(directory, 'ai-assistant.v1'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+  it.each(['v11', 'v12'])(
+    'keeps the key under a Linux %s keyring key on any desktop, probing once',
+    async (tag) => {
+      // A tiling window manager reports basic_text yet reaches a running Secret Service.
+      const { directory, store, secureStorage } = await setup('linux', tag);
+      const value = { apiKey: 'fake-test-key', model: 'mock-model' };
+      expect(await store.available()).toBe(true);
+      await store.write(value);
+      expect(await store.read()).toEqual(value);
+      expect((await readFile(join(directory, 'ai-assistant.v1'))).subarray(0, 3).toString()).toBe(
+        tag,
+      );
+      // The probe and the key: the provider cannot change within a process.
+      expect(secureStorage.encryptStringAsync).toHaveBeenCalledTimes(2);
+    },
+  );
+  it('asks the Linux keyring again after a probe that failed outright', async () => {
+    const { store, secureStorage } = await setup('linux');
+    secureStorage.encryptStringAsync.mockRejectedValueOnce(new Error('bus closed'));
+    expect(await store.available()).toBe(false);
+    expect(await store.available()).toBe(true);
+    expect(await store.read()).toBeNull();
   });
   it('refuses malformed configuration and oversized existing ciphertext', async () => {
     const { directory, store } = await setup();

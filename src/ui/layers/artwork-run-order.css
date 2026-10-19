@@ -33,11 +33,6 @@
   gap: 8px;
 }
 
-.lf-run-order-toolbar-actions > .lf-btn--primary {
-  flex: 1;
-  min-width: 0;
-}
-
 .lf-run-order-search {
   display: grid;
   gap: 5px;
@@ -316,20 +311,14 @@
   grid-template-rows: 38px minmax(0, 1fr) 24px 32px;
 }
 
+/* No step line: the summary takes its row, so the card keeps the fixed height
+   the virtualised list counts on. */
+.lf-run-order-card--no-steps {
+  grid-template-rows: 38px minmax(0, 1fr) 32px;
+}
+
 .lf-run-order-navigation {
-  min-width: 0;
-  color: var(--lf-text-muted);
   font-size: 12px;
-}
-
-.lf-run-order-navigation > summary {
-  padding: 6px 0;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.lf-run-order-navigation[open] > .lf-run-order-search {
-  margin: 6px 0 10px;
 }
 
 .lf-run-order-detail-toggle {

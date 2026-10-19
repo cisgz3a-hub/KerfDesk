@@ -1,4 +1,5 @@
 import { LicenceServiceError } from './licensing-http.js';
+import { LinuxKeyringUnavailableError } from './licensing-store.js';
 
 // What the licence panel says for each service answer (ADR-523, ADR-540,
 // ADR-523 Amendment 2). Every code the service can send a device has a message
@@ -30,17 +31,20 @@ const PROTOCOL_CODES = [
 /** A Map, so a code such as `constructor` can never reach an inherited member. */
 export const ERRORS: ReadonlyMap<string, string> = new Map([
   ['device_limit_reached', DEVICE_LIMIT],
-  ['trial_expired', 'The Pro trial on this device has ended. KerfDesk Free keeps working.'],
+  [
+    'trial_expired',
+    'The trial on this device has ended. Buy a licence or enter your licence key to keep using KerfDesk.',
+  ],
   [
     'trial_already_used',
-    'A Pro trial has already been used on this computer, so another cannot start. KerfDesk Free keeps working. Buy Pro or enter your licence key, or email support@kerfdesk.com if you have never tried Pro here.',
+    'A trial has already been used on this computer, so another cannot start. Buy a licence or enter your licence key, or email support@kerfdesk.com if you have never tried KerfDesk here.',
   ],
   ['invalid_credentials', KEY_REFUSED],
   ['invalid_license_tier', KEY_REFUSED],
   ['license_not_found', KEY_REFUSED],
   [
     'license_revoked',
-    'This licence has been cancelled, so Pro tools are locked. KerfDesk Free keeps working. Contact KerfDesk support if this is unexpected.',
+    'This licence has been cancelled. Contact KerfDesk support if this is unexpected.',
   ],
   [
     'license_inactive',
@@ -105,14 +109,17 @@ export function errorMessage(code: string): string | null {
 export const RELEASED = new Set(['activation_released', 'activation_inactive']);
 export const REVOKED = new Set(['license_revoked']);
 const FREE_HERE =
-  'Enter your licence key to use Pro here again, or contact KerfDesk support to free the seat.';
+  'Enter your licence key to use KerfDesk here again, or contact KerfDesk support to free the seat.';
 export const MESSAGES = {
   invalidKey:
     'That is not a whole KerfDesk licence key. A key starts with KD1. and is 84 characters long. Copy it again from the purchase page or your email, then paste it here.',
   unreadable:
-    'The licence saved on this computer can’t be read, for example after a Windows account or password reset, so Pro tools are locked. Everything else works. Reset it, then enter your licence key again; this computer keeps its licence seat.',
+    'The licence saved on this computer can’t be read, for example after a Windows account or password reset. Reset it, then enter your licence key again; this computer keeps its licence seat.',
   unavailable:
-    'The licence service or this computer’s secure storage is unavailable, so Pro tools may be locked. Everything else works. Check your connection and that you are signed in to your operating-system account, then try again.',
+    'The licence service or this computer’s secure storage is unavailable. Check your connection and that you are signed in to your operating-system account, then try again.',
+  // Not a network fault: the app cannot use the keyring until it restarts.
+  linuxKeyring:
+    'KerfDesk keeps its licence in your desktop’s keyring, and no keyring is running here, so a trial or licence key cannot be saved. Your internet connection is not the problem. Install GNOME Keyring or KWallet (or another Secret Service, such as KeePassXC), make sure it starts and unlocks when you sign in, then restart KerfDesk.',
   unconfirmed:
     'The licence service could not confirm this licence. Your saved licence keeps working.',
   deactivated: 'This device has been deactivated and its licence seat is free for another device.',
@@ -126,6 +133,13 @@ export const MESSAGES = {
   paid: 'Payment confirmed and Pro is unlocked. Copy your licence key below and keep it safe: you need it to activate KerfDesk on your other computers.',
   orderForgotten: 'The saved order was removed from this computer. You can start a new checkout.',
 } as const;
+
+/** Why a licence read or action failed before any answer: a missing Linux keyring is no outage. */
+export function unavailableMessage(error: unknown): string {
+  return error instanceof LinuxKeyringUnavailableError
+    ? MESSAGES.linuxKeyring
+    : MESSAGES.unavailable;
+}
 
 /** After a key unlocks paid Pro, an unfinished purchase no longer hides Renew (ADR-523 Amendment 2). */
 export function staleOrderMessage(orderId: string | null): string {

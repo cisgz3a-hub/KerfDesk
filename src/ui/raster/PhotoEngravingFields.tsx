@@ -2,9 +2,10 @@ import { dpiToLinesPerMm, linesPerMmToDpi, linesPerMmToLineIntervalMm } from '..
 import type { RasterImage } from '../../core/scene';
 import { Button } from '../kit';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
+import { DitherSwatchPicker } from '../layers/DitherSwatchPicker';
 import { imageDensityBounds } from './image-density-bounds';
 import {
-  PHOTO_DITHER_CHOICES,
+  PHOTO_DITHERS,
   photoDither,
   photoSourceDimensions,
   type PhotoEngravingDraft,
@@ -21,21 +22,17 @@ export function PhotoEngravingFields(props: PhotoEngravingFieldsProps): JSX.Elem
   const { draft, onChange } = props;
   return (
     <div className="lf-photo-engraving__controls">
-      <label>
+      {/* A div, not a label: a label would hand a click on its name to the first swatch. */}
+      <div className="lf-photo-engraving__field">
         <span>Photo processing</span>
-        <select
-          className="lf-select"
-          title="Choose the dot pattern used to reproduce photographic shading."
+        <DitherSwatchPicker
           value={draft.ditherAlgorithm}
-          onChange={(event) => onChange({ ditherAlgorithm: photoDither(event.target.value) })}
-        >
-          {PHOTO_DITHER_CHOICES.map((choice) => (
-            <option key={choice.value} value={choice.value}>
-              {choice.label}
-            </option>
-          ))}
-        </select>
-      </label>
+          algorithms={PHOTO_DITHERS}
+          ariaLabel="Photo processing"
+          title="Choose the dot pattern used to reproduce photographic shading."
+          onChange={(algorithm) => onChange({ ditherAlgorithm: photoDither(algorithm) })}
+        />
+      </div>
       <label>
         <span>Material marking</span>
         <select

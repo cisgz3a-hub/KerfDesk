@@ -1,22 +1,6 @@
 import type { Layer } from '../../core/scene';
 import { useStore } from '../state';
-import { Icon } from '../kit/icons';
-
-const orderControlStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 2,
-};
-
-const orderButtonStyle: React.CSSProperties = {
-  display: 'grid',
-  placeItems: 'center',
-  width: 22,
-  height: 18,
-  padding: 0,
-  lineHeight: 1,
-  fontSize: 11,
-};
+import { IconButton } from '../kit';
 
 export function LayerOrderControls(props: {
   readonly layer: Layer;
@@ -25,27 +9,25 @@ export function LayerOrderControls(props: {
 }): JSX.Element {
   const moveLayer = useStore((s) => s.moveLayer);
   return (
-    <span style={orderControlStyle} aria-label={`Order controls for ${props.layer.name}`}>
-      <button
-        type="button"
+    <span
+      className="lf-operation-order"
+      role="group"
+      aria-label={`Order controls for ${props.layer.name}`}
+    >
+      <IconButton
+        icon="chevron-up"
+        label={`Move ${props.layer.name} up`}
         title="Move operation up"
-        aria-label={`Move ${props.layer.name} up`}
         disabled={!props.canMoveUp}
         onClick={() => moveLayer(props.layer.id, 'up')}
-        style={orderButtonStyle}
-      >
-        <Icon name="chevron-up" size={14} />
-      </button>
-      <button
-        type="button"
+      />
+      <IconButton
+        icon="chevron-down"
+        label={`Move ${props.layer.name} down`}
         title="Move operation down"
-        aria-label={`Move ${props.layer.name} down`}
         disabled={!props.canMoveDown}
         onClick={() => moveLayer(props.layer.id, 'down')}
-        style={orderButtonStyle}
-      >
-        <Icon name="chevron-down" size={14} />
-      </button>
+      />
     </span>
   );
 }

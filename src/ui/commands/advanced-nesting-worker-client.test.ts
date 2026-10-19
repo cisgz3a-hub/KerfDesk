@@ -6,6 +6,7 @@ import { startProductionNestingSearch } from './production-nesting-worker-client
 class FakeWorker {
   static last: FakeWorker;
   onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+  onerror: ((event: ErrorEvent) => void) | null = null;
   terminate = vi.fn();
   postMessage = vi.fn();
   constructor() {
@@ -34,7 +35,7 @@ function launch(isolated = true) {
   return { input, progress, search, module, best };
 }
 describe('advanced worker ownership', () => {
-  it('terminates both workers on cancellation and ignores late solver events', async () => {
+  it('retires the solver host before terminating it on cancellation', async () => {
     const { module, best, search } = launch();
     module.send({ kind: 'advanced-start', instance: '{}' });
     const engine = FakeWorker.last;
@@ -47,10 +48,21 @@ describe('advanced worker ownership', () => {
     search.cancel();
     expect(await search.result).toEqual({ cancelled: true, best });
     expect(module.terminate).toHaveBeenCalledOnce();
-    expect(engine.terminate).toHaveBeenCalledOnce();
+    // The host must first stop its pthread workers, or Chromium can keep it alive.
+    expect(engine.postMessage).toHaveBeenLastCalledWith({ kind: 'retire' });
+    expect(engine.terminate).not.toHaveBeenCalled();
     const count = module.postMessage.mock.calls.length;
     engine.send({ kind: 'certificate', certificate: 'late' });
     expect(module.postMessage).toHaveBeenCalledTimes(count);
+    // A pthread stopped mid-load reports an error; the host is still retiring.
+    const preventDefault = vi.fn();
+    engine.onerror?.({ preventDefault } as unknown as ErrorEvent);
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(engine.terminate).not.toHaveBeenCalled();
+    engine.send({ kind: 'retired' });
+    expect(engine.terminate).toHaveBeenCalledOnce();
+    engine.send({ kind: 'retired' });
+    expect(engine.terminate).toHaveBeenCalledOnce();
   });
   it('retains the valid baseline and stops both workers at the hard deadline', async () => {
     vi.useFakeTimers();
@@ -60,8 +72,13 @@ describe('advanced worker ownership', () => {
     await vi.advanceTimersByTimeAsync(15000);
     expect(await search.result).toEqual({ cancelled: false, best });
     expect(module.terminate).toHaveBeenCalledOnce();
-    expect(engine.terminate).toHaveBeenCalledOnce();
+    expect(engine.postMessage).toHaveBeenLastCalledWith({ kind: 'retire' });
     expect(progress.mock.lastCall?.[0].notice).toContain('time limit');
+    // A host that never reports its retirement is still terminated.
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(engine.terminate).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(engine.terminate).toHaveBeenCalledOnce();
   });
   it('uses standard nesting and explains unavailable browser isolation', async () => {
     const { module, best, search, progress, input } = launch(false);
@@ -75,6 +92,8 @@ describe('advanced worker ownership', () => {
     module.send({ kind: 'advanced-start', instance: '{}' });
     const engine = FakeWorker.last;
     engine.send({ kind: 'error', message: 'engine failed' });
+    expect(engine.postMessage).toHaveBeenLastCalledWith({ kind: 'retire' });
+    engine.send({ kind: 'retired' });
     expect(engine.terminate).toHaveBeenCalledOnce();
     expect(module.postMessage.mock.lastCall?.[0]).toMatchObject({
       kind: 'advanced-finished',

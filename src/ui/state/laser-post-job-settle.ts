@@ -9,6 +9,7 @@ import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 import { settledProgramAirAssistPatch } from './air-assist-command-state';
 import type { TranscriptSource } from './laser-transcript';
+import { lostReplyProbeOutstanding, type LostReplyProbeRefs } from './laser-lost-reply-probe';
 import {
   continueControllerOperation,
   controllerOperationOwner,
@@ -37,10 +38,11 @@ const SETTLE_MARKER_ACTIVITY_TIMEOUT_MS = 30_000;
  * Controller lifecycle refs with the concrete active driver required to choose
  * the family-specific settlement marker.
  */
-export type PostJobSettleRefs = ControllerLifecycleRefs & {
-  readonly driver: ControllerDriver;
-  readonly connection?: SerialConnection | null;
-};
+export type PostJobSettleRefs = ControllerLifecycleRefs &
+  LostReplyProbeRefs & {
+    readonly driver: ControllerDriver;
+    readonly connection?: SerialConnection | null;
+  };
 
 /**
  * Starts family-specific post-job drain confirmation and marks completion only
@@ -57,6 +59,9 @@ export function beginPostJobSettle(
   if (state.streamer?.status !== 'done') return;
   if (state.controllerOperation !== null) return;
   if (refs.controllerCommand !== null || refs.controllerIdleWait !== null) return;
+  // The settle marker would take a lost-reply probe's `ok` as its own; the
+  // probe starts the settle once its reply is in (ADR-610 Amendment 1).
+  if (lostReplyProbeOutstanding(refs)) return;
   const operation = { kind: 'post-job-settle', phase: 'dwell', idleReports: 0 } as const;
   const owner = controllerOperationOwner(operation);
   const connection = refs.connection;

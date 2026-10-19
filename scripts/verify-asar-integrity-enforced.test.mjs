@@ -275,3 +275,39 @@ test('an app that ran, hung or exited cleanly did not refuse the archive', () =>
   assert.equal(integrityVerdict({ ...LAUNCH, timedOut: true }).refused, false);
   assert.equal(integrityVerdict({ ...LAUNCH, code: 0 }).refused, false);
 });
+
+test('a commercial baseline behind its licence window qualifies only when expected', async (context) => {
+  const { archivePath, bytes, baseline } = fixture(context);
+  // ADR-623: an unlicensed commercial package opens behind its licence window.
+  const renderer = {
+    ...baseline.smokeResult.renderer,
+    licenceWindow: true,
+    imported: false,
+    saved: false,
+    licensing: {
+      kind: 'observed',
+      channel: 'commercial',
+      state: 'activation-required',
+      edition: 'free',
+      proEnabled: false,
+      updateState: 'unavailable',
+    },
+  };
+  delete renderer.fileAccess;
+  delete renderer.savedBytes;
+  const gated = { ...baseline, smokeResult: { ...baseline.smokeResult, renderer } };
+  let calls = 0;
+  const launch = async () => {
+    calls += 1;
+    return calls === 1 ? gated : { ...LAUNCH, stderr: DIAGNOSTIC };
+  };
+  const result = await verifyAsarIntegrity('fixture', archivePath, 1000, launch, {
+    expectLicenceWindow: true,
+  });
+  assert.equal(result.verdict.refused, true);
+  assert.deepEqual(readFileSync(archivePath), bytes);
+  calls = 0;
+  await assert.rejects(verifyAsarIntegrity('fixture', archivePath, 1000, launch), /SVG import/);
+  assert.equal(calls, 1);
+  assert.deepEqual(readFileSync(archivePath), bytes);
+});
