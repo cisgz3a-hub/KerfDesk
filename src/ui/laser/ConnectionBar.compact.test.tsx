@@ -126,6 +126,15 @@ describe('compact machine connection', () => {
     expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe('Connected');
   });
 
+  it('reads Not responding while a connected controller has gone quiet (ADR-611 A1)', async () => {
+    const host = await renderBar({ connection: { kind: 'connected' }, controllerWentSilent: true });
+    expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe('Not responding');
+    expect(host.querySelector('[data-silent="true"]')).not.toBeNull();
+    await renderBar({ connection: { kind: 'connected' }, controllerWentSilent: false }, host);
+    expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe('Connected');
+    expect(host.querySelector('[data-silent]')).toBeNull();
+  });
+
   it('shows a failed connection while details are closed', async () => {
     const host = await renderBar({
       connection: { kind: 'failed', error: 'Failed to open serial port.' },

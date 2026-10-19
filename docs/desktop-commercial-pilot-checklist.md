@@ -113,18 +113,18 @@ For each version, from a clean checkout at the tagged source:
 
 - [ ] Install N from the downloaded file in the disposable account. The
       installer shows the commercial terms, not the free License & Safety Notice.
-- [ ] First launch opens the workspace as KerfDesk Free with no activation screen
-      (ADR-540). The status bar shows `Free · Try Pro`; projects, camera and serial
-      work without a licence.
-- [ ] Open a Pro tool (Tools > Box Generator). The Pro prompt names it and offers
-      the trial, Buy Pro and "I have a licence key". Not now leaves it closed.
-- [ ] Start the trial from that prompt. The tool opens, the status bar shows
-      `Pro trial · 30 days left`, and Help > Licence shows
-      `30-day Pro trial · Ends <date>` exactly 30 days after the server registration.
+- [ ] First launch opens only the Activate KerfDesk licence window (ADR-623): no
+      workspace, menu, project, camera or serial port behind it. It offers the
+      trial, a licence key and Buy Pro. Escape does nothing; Quit KerfDesk and the
+      window's X close the app.
+- [ ] Start the trial from the licence window. The workspace opens, the status bar
+      shows `Pro trial · 30 days left`, Help > Licence shows
+      `30-day Pro trial · Ends <date>` exactly 30 days after the server
+      registration, and Tools > Box Generator opens without a prompt.
 - [ ] Quit and relaunch offline. Pro stays unlocked.
 - [ ] Set the clock back more than five minutes before the last check: the app
-      still opens, as Free, and Help > Licence reports a clock problem. Only Pro
-      tools are locked. Restore the clock and relaunch.
+      opens to the licence window, which reports a clock problem. Restore the
+      clock, then Refresh licence or relaunch: the workspace opens.
 - [ ] With a paid or developer licence instead of the trial, set the clock back
       the same way: Pro stays unlocked (ADR-523 Amendment 2). Restore the clock.
 - [ ] Uninstall and reinstall N in the same account, then start the trial again:
@@ -162,10 +162,11 @@ For each version, from a clean checkout at the tagged source:
 - [ ] Quit KerfDesk normally. N+1 installs, and on relaunch Help > About shows
       N+1. Projects, recent files and settings created in N are unchanged.
 - [ ] A licence whose update coverage ends before N+1's release date stays on N:
-      nothing downloads, N keeps working, and N+1 installed manually opens as Free
-      and reports that the release is newer than the included updates.
+      nothing downloads, N keeps working, and N+1 installed manually opens to the
+      licence window, which reports that the release is newer than the included
+      updates.
 - [ ] A device with no licence, or whose trial ended, takes N+1 at quit and
-      opens it as Free.
+      opens it to the licence window.
 - [ ] Tampered or wrong-publisher installers are refused (swap the served
       installer on a private staging bucket only, never production).
 

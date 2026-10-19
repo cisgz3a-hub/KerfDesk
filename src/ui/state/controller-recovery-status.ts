@@ -1,6 +1,7 @@
 import { controllerInformationActivityIsBusy } from './controller-information-activity';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import type { LaserState } from './laser-store';
+import { hostAwareSilenceRemainingMs, type StatusPollSchedule } from './laser-status-poll-schedule';
 
 type RecoveryStatus = Pick<
   LaserState,
@@ -48,6 +49,50 @@ export function controllerReconnectRecommended(state: RecoveryStatus, now = Date
  * Controller info, out of the way, as other senders keep it. */
 export function controllerStoppedResponding(state: RecoveryStatus, now = Date.now()): boolean {
   return state.connection.kind === 'connected' && controllerResponseMissing(state, now);
+}
+
+/**
+ * A controller that answered status queries in this session and then stopped,
+ * while nothing it owns may hold its replies: the connection bar reads "Not
+ * responding" instead of "Connected" (ADR-611 Amendment 1), as other senders
+ * show a stalled link. GRBL may leave `?` unanswered while it homes, and a
+ * queued-poll controller is not asked while a job streams, so neither counts.
+ */
+export function controllerWentSilent(
+  state: RecoveryStatus &
+    Pick<LaserState, 'capabilities'> &
+    Partial<Pick<LaserState, 'transcript'>>,
+  now = Date.now(),
+  schedule: StatusPollSchedule | null = null,
+): boolean {
+  if (state.connection.kind !== 'connected') return false;
+  if (state.capabilities.statusQuery !== 'realtime-report' || state.controllerOperation !== null) {
+    return false;
+  }
+  // A line still owed its reply may be what the controller is busy with: a
+  // Console `$H` owns no operation, and GRBL answers neither `?` nor the `$H`
+  // until homing ends.
+  if (state.pendingUntrackedAcks > 0) return false;
+  const observed = state.statusResponseObservation ?? state.statusObservation;
+  if (observed === null || observed.sessionEpoch !== state.controllerSessionEpoch) return false;
+  // Any line the controller sent proves it is talking, not only a status
+  // report: the `ok` that ends a Console `$H` restarts the window before the
+  // next status reply arrives.
+  const lastHeardAt = Math.max(observed.observedAt, lastInboundLineAt(state.transcript));
+  // Only time the status poll ran on schedule counts: a hidden, throttled or
+  // sleeping page asked nothing, so its gap is not the controller's silence.
+  return (
+    hostAwareSilenceRemainingMs(schedule, lastHeardAt, CONTROLLER_RESPONSE_WINDOW_MS, now) === 0
+  );
+}
+
+function lastInboundLineAt(transcript: LaserState['transcript'] | undefined): number {
+  if (transcript === undefined) return Number.NEGATIVE_INFINITY;
+  for (let index = transcript.length - 1; index >= 0; index -= 1) {
+    const entry = transcript[index];
+    if (entry?.direction === 'in') return entry.at;
+  }
+  return Number.NEGATIVE_INFINITY;
 }
 
 function currentQualificationFailed(state: RecoveryStatus): boolean {

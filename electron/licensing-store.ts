@@ -3,6 +3,7 @@ import { mkdir, open, readdir, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { record, type SignedEntitlement } from './licensing-verification.js';
 import { validLicencePayment, type LicencePayment } from './licensing-commerce.js';
+import { createSecureStorageCheck } from './secure-storage-check.js';
 
 export type LicenceCredential = {
   readonly entitlement: SignedEntitlement;
@@ -47,6 +48,16 @@ export class LicenceStoreUnreadableError extends Error {
   }
 }
 
+/**
+ * Linux keeps a licence only under a keyring's key (createSecureStorageCheck).
+ * Without one, a trial or key cannot be saved until one runs and KerfDesk restarts.
+ */
+export class LinuxKeyringUnavailableError extends Error {
+  constructor() {
+    super('No Secret Service keyring is available to keep the licence.');
+  }
+}
+
 export function validLicenceKey(value: unknown): value is string {
   return (
     typeof value === 'string' &&
@@ -58,7 +69,6 @@ export function validLicenceKey(value: unknown): value is string {
 }
 type SecureStorage = {
   readonly isAsyncEncryptionAvailable: () => Promise<boolean>;
-  readonly getSelectedStorageBackend: () => string;
   readonly encryptStringAsync: (value: string) => Promise<Buffer>;
   readonly decryptStringAsync: (
     value: Buffer,
@@ -112,18 +122,13 @@ export function createLicensingStore(options: {
 }): LicensingStore {
   const file = join(options.userDataPath, FILE_NAME);
   const secure = options.secureStorage;
+  const usable = createSecureStorageCheck(secure, options.platform);
   const check = async (): Promise<void> => {
-    if (
-      !(await secure.isAsyncEncryptionAvailable()) ||
-      (options.platform === 'linux' &&
-        !['gnome_libsecret', 'kwallet', 'kwallet5', 'kwallet6'].includes(
-          secure.getSelectedStorageBackend(),
-        ))
-    ) {
-      throw new Error(
-        'Secure operating-system credential storage is unavailable. Unlock your keychain or password manager and try again.',
-      );
-    }
+    if (await usable()) return;
+    if (options.platform === 'linux') throw new LinuxKeyringUnavailableError();
+    throw new Error(
+      'Secure operating-system credential storage is unavailable. Unlock your keychain or password manager and try again.',
+    );
   };
   const write = async (value: LicenceRecord): Promise<void> => {
     await check();

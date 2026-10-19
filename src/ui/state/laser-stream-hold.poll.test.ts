@@ -13,9 +13,16 @@ type FakeConnection = SerialConnection & {
   readonly emitClose: () => void;
 };
 
+// GRBL answers lines in order: a `$G` written behind job lines the test still
+// withholds is answered only after them (ADR-610 Amendment 1).
+function jobRepliesWithheld(): boolean {
+  return (useLaserStore.getState().streamer?.inFlight.length ?? 0) > 0;
+}
+
 function makeConnection(writes: string[]): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
+  const queuedBehindJob: string[] = [];
   const connection: FakeConnection = {
     write: async (data) => {
       const acknowledgeStartFence = captureTestLaserStartFenceAck(data, connection.emitLine);
@@ -35,8 +42,9 @@ function makeConnection(writes: string[]): FakeConnection {
         connection.emitLine('ok');
       }
       if (data === '$G\n') {
-        connection.emitLine('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
-        connection.emitLine('ok');
+        const reply = ['[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]', 'ok'];
+        if (jobRepliesWithheld()) queuedBehindJob.push(...reply);
+        else reply.forEach((line) => connection.emitLine(line));
       }
       acknowledgeStartFence();
     },
@@ -51,6 +59,9 @@ function makeConnection(writes: string[]): FakeConnection {
     close: async () => undefined,
     emitLine: (line) => {
       for (const handler of lineHandlers) handler(line);
+      if (line === 'ok' && !jobRepliesWithheld() && queuedBehindJob.length > 0) {
+        queuedBehindJob.splice(0).forEach((queued) => connection.emitLine(queued));
+      }
     },
     emitClose: () => {
       for (const handler of closeHandlers) handler();

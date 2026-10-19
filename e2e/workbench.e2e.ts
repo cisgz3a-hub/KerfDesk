@@ -1,4 +1,5 @@
 import { expect, test as baseTest, type Page } from '@playwright/test';
+import { waitForStartupSplash } from './fixtures/startup-splash';
 import { test as kerfDeskTest, type KerfDeskFixture } from './fixtures/kerfdesk-test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -44,6 +45,8 @@ baseTest(
   async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto('/');
+    // Keyboard navigation below needs the revealed, no longer inert workspace.
+    await waitForStartupSplash(page);
     await expect(page.getByRole('menubar', { name: 'Application menu' })).toBeVisible();
     await expect(page.getByLabel('KerfDesk workspace', { exact: true })).toBeVisible();
     await expect(page.getByRole('tablist', { name: 'Side panel' })).toBeVisible();

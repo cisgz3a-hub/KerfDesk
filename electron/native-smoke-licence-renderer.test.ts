@@ -6,6 +6,9 @@ import type { NativeLicencePhase } from './native-smoke-licence-config.js';
 // Test the additional phase UI independently of the existing import/save smoke.
 vi.mock('./native-smoke-renderer.js', () => ({
   RENDERER_SMOKE_SOURCE: 'Promise.resolve({licensing:{kind:"observed",updateState:"unavailable"}})',
+  // The real probe polls; this fixture's DOM is already settled.
+  RENDERER_WORKSPACE_READY_SOURCE:
+    'Promise.resolve(document.querySelector(\'header[aria-label="Toolbar"]\') === null && document.querySelector(\'[aria-label="Activate KerfDesk"]\') !== null ? "licence-window" : "workspace")',
 }));
 const free = {
   channel: 'commercial',
@@ -27,22 +30,20 @@ function fixture(initial: typeof free) {
   let status = initial;
   let submitted = '';
   let studioOpened = false;
+  // The workspace's edition control exists only once the window lets the profile in (ADR-623).
   const edition = document.createElement('button');
   const update = () => {
     edition.setAttribute(
       'aria-label',
-      `Edition: ${status.edition === 'pro' ? 'Pro' : 'Free'}. Open licence settings`,
+      `Edition: ${status.edition === 'pro' ? 'Pro' : 'Licence needed'}. Open licence settings`,
     );
   };
   update();
-  edition.onclick = () => {
-    const panel = document.createElement('section');
-    panel.setAttribute('role', 'dialog');
-    panel.setAttribute('aria-label', 'KerfDesk licence');
-    panel.innerHTML =
-      '<input id="kerfdesk-licence-key" type="password"><button disabled>Activate licence</button><button>Deactivate this device</button><button aria-label="Close licence settings">Close</button>';
-    const input = panel.querySelector('input')!;
-    const buttons = panel.querySelectorAll('button');
+  const keyForm = (container: HTMLElement) => {
+    container.innerHTML =
+      '<input id="kerfdesk-licence-key" type="text"><button disabled>Activate licence</button><button>Deactivate this device</button><button aria-label="Close licence settings">Close</button>';
+    const input = container.querySelector('input')!;
+    const buttons = container.querySelectorAll('button');
     input.addEventListener('input', () => {
       buttons[0]!.disabled = input.value.length < 8;
     });
@@ -50,12 +51,25 @@ function fixture(initial: typeof free) {
       submitted = input.value;
       status = pro;
       update();
+      gate.remove();
+      document.body.append(edition, studio);
     };
     buttons[1]!.onclick = () => {
       status = free;
       update();
     };
-    buttons[2]!.onclick = () => panel.remove();
+    buttons[2]!.onclick = () => container.remove();
+  };
+  const gate = document.createElement('section');
+  gate.setAttribute('role', 'dialog');
+  gate.setAttribute('aria-label', 'Activate KerfDesk');
+  gate.setAttribute('data-licence-state', 'activation-required');
+  keyForm(gate);
+  edition.onclick = () => {
+    const panel = document.createElement('section');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'KerfDesk licence');
+    keyForm(panel);
     document.body.append(panel);
   };
   const studio = document.createElement('button');
@@ -72,7 +86,8 @@ function fixture(initial: typeof free) {
     dialog.append(close);
     document.body.append(dialog);
   };
-  document.body.append(edition, studio);
+  if (status.edition === 'pro') document.body.append(edition, studio);
+  else document.body.append(gate);
   const fetch = vi.fn(async (_url, options) => {
     expect(options).toMatchObject({ method: 'GET', headers: { 'X-KerfDesk-Licensing': '1' } });
     return Response.json(status);
@@ -128,8 +143,17 @@ describe('native qualification uses normal UI controls', () => {
     expect(ui.studioOpened()).toBe(false);
   });
 
+  it('refuses activation when the workspace opened behind the licence window', async () => {
+    const ui = fixture(free);
+    const toolbar = document.createElement('header');
+    toolbar.setAttribute('aria-label', 'Toolbar');
+    document.body.append(toolbar);
+    await expect(execute('activate', ui.fetch)).rejects.toThrow('without the licence window');
+    expect(ui.submitted()).toBe('');
+  });
+
   it('refuses activation over an existing Pro profile and offline proof from Free', async () => {
-    await expect(execute('activate', fixture(pro).fetch)).rejects.toThrow('initially Free');
+    await expect(execute('activate', fixture(pro).fetch)).rejects.toThrow('initially unlicensed');
     document.body.replaceChildren();
     await expect(execute('offline', fixture(free).fetch)).rejects.toThrow(
       'did not retain developer Pro',

@@ -22,6 +22,8 @@ packaging, pass before a PR can merge.
   rehearsal must succeed. Windows, macOS and commercial macOS may be skipped
   only when the workflow's native-build input is false. When native builds are
   requested, they must also succeed.
+- The aggregate checks out its own workflow revision, not `inputs.ref`: the
+  release train may select an older commit that predates the gate script.
 - Failed, cancelled, missing or unexpected dependency results fail the gate.
   A cancelled workflow cannot supply a successful gate. A workflow regression
   test requires the aggregate's dependency list to cover every packaging job.
