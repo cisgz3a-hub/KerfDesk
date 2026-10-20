@@ -1,14 +1,18 @@
 // One-click vector commands (Offset outlines, Cut Shapes) compute in the
 // vector worker (ADR-609) instead of freezing the canvas. They share one slot:
-// a newer click of any of them, refused or not, terminates the running one, so
-// at most one background result is ever committing. That also keeps two
+// a newer click of any of them, refused or not, terminates the running one (and
+// says so unless it asks for the same work), so at most one background result
+// is ever committing. That also keeps two
 // commits from asking for Pro admission at once, which holds one request.
 // The result is committed through the ordinary action, as one undo step, only
 // when the project and selection are still the ones the click saw. A real
 // browser whose worker cannot start runs the command in thread, as before;
-// work that ran and failed is reported, never retried on the UI thread.
+// work that ran and failed is reported, never retried on the UI thread. While
+// a tool's Pro prompt is open, a finished result is not committed: the prompt holds
+// another tool's edit, which committing over it would lose.
 
 import type { VectorSceneObject } from '../../core/geometry';
+import { proPromptOpen } from '../licensing/edition';
 import { useStore } from '../state';
 import { selectedObjectIds } from '../state/scene-group-actions';
 import { useToastStore } from '../state/toast-store';
@@ -38,21 +42,32 @@ type Snapshot = {
 
 type Running = {
   readonly label: string;
+  readonly task: VectorOpTask;
   readonly session: VectorOpSession;
   readonly stopNotice: () => void;
 };
 
 let running: Running | null = null;
 
-/** Terminates the running one-click command, if any; `next` names what replaced it. */
-export function cancelBackgroundVectorCommand(next?: string): void {
+/**
+ * Terminates the running one-click command, if any. `next` names what replaced
+ * it and `nextTask` is its work (absent for a click the action refuses). Only
+ * a repeat of exactly the same work replaces it silently: Outward copy then
+ * Inward copy are both Offset outlines, and the first one's copy is lost.
+ */
+export function cancelBackgroundVectorCommand(next?: string, nextTask?: VectorOpTask): void {
   const current = running;
   if (current === null) return;
   running = null;
   current.stopNotice();
   current.session.release();
-  if (next !== undefined && next !== current.label) {
+  if (next === undefined) return;
+  if (next !== current.label) {
     useToastStore.getState().pushToast(`${current.label} was cancelled: ${next} started.`, 'info');
+  } else if (nextTask === undefined || !sameTask(nextTask, current.task)) {
+    useToastStore
+      .getState()
+      .pushToast(`The earlier ${current.label} was cancelled: a newer one started.`, 'info');
   }
 }
 
@@ -60,10 +75,11 @@ export function cancelBackgroundVectorCommand(next?: string): void {
 export async function runVectorCommandInBackground<T extends VectorOpTask>(
   command: BackgroundVectorCommand<T>,
 ): Promise<boolean> {
-  cancelBackgroundVectorCommand(command.label);
+  cancelBackgroundVectorCommand(command.label, command.task);
   const session = createVectorOpSession();
   const owner: Running = {
     label: command.label,
+    task: command.task,
     session,
     stopNotice: workingNotice(command.label),
   };
@@ -83,6 +99,21 @@ export async function runVectorCommandInBackground<T extends VectorOpTask>(
       .getState()
       .pushToast(
         `${command.label} was not applied: the project or selection changed while it was worked out.`,
+        'info',
+      );
+    return false;
+  }
+  // A current domain error has no edit to admit or commit. Preserve its specific
+  // warning even while another tool is waiting on a Pro prompt.
+  if (outcome.kind === 'done' && outcome.result.kind === 'error') {
+    useToastStore.getState().pushToast(outcome.result.error.message, 'warning');
+    return false;
+  }
+  if (proPromptOpen()) {
+    useToastStore
+      .getState()
+      .pushToast(
+        `${command.label} was not applied: a Pro prompt is open. Close it, then run ${command.label} again.`,
         'info',
       );
     return false;
@@ -119,4 +150,9 @@ function unchanged(before: Snapshot): boolean {
     now.selection.length === before.selection.length &&
     now.selection.every((id, index) => id === before.selection[index])
   );
+}
+
+// Tasks are small plain data built in the same key order by one caller.
+function sameTask(a: VectorOpTask, b: VectorOpTask): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }

@@ -48,12 +48,12 @@ describe('DeviceSetupWizard router commit', () => {
     try {
       await act(async () => input(view.host, 'Use S maximum as spindle RPM').click());
       await act(async () => button(view.host, 'Use detected values').click());
-      await act(async () => button(view.host, 'Check essentials').click());
+      await act(async () => button(view.host, 'Next').click());
       expect(input(view.host, 'Bed width (mm)').value).toBe('750');
       expect(input(view.host, 'Spindle maximum').value).toBe('24000');
       expect(view.host.querySelector('input[aria-label="GRBL $30 max power S"]')).toBeNull();
 
-      await act(async () => button(view.host, 'Review setup').click());
+      await act(async () => button(view.host, 'Next').click());
       await act(async () => button(view.host, 'Save CNC machine setup').click());
 
       const state = useStore.getState();
@@ -91,9 +91,9 @@ describe('DeviceSetupWizard router commit', () => {
           lastSettingsReadAt: null,
         });
       });
-      expect(view.host.textContent).toContain('Find your machine');
+      expect(view.host.textContent).toContain('Not connected');
       expect(view.host.textContent).not.toContain('Use detected values');
-      await act(async () => button(view.host, 'Check essentials').click());
+      await act(async () => button(view.host, 'Next').click());
       expect(input(view.host, 'Bed width (mm)').value).not.toBe('750');
       expect(input(view.host, 'Spindle maximum').value).toBe('12000');
     } finally {

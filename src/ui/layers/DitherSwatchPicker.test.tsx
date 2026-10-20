@@ -10,6 +10,7 @@ import {
   FIRST,
   load,
   mount as mountInspector,
+  openAdvanced,
   SECOND,
 } from './__fixtures__/selected-operation-inspector';
 
@@ -180,6 +181,45 @@ describe('Dither swatch picker', () => {
     }
   });
 
+  it('submits the checked swatch under its form name and offers only the given modes', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const onChange = vi.fn<(algorithm: DitherAlgorithm) => void>();
+    await act(async () =>
+      root.render(
+        <form>
+          <DitherSwatchPicker
+            name="ditherAlgorithm"
+            value="stucki"
+            algorithms={['jarvis', 'stucki', 'floyd-steinberg']}
+            ariaLabel="Dither for photo"
+            title={TITLE}
+            onChange={onChange}
+          />
+        </form>,
+      ),
+    );
+    try {
+      const form = host.querySelector('form');
+      if (form === null) throw new Error('form missing');
+      expect(radios(host).map((input) => input.value)).toEqual([
+        'jarvis',
+        'stucki',
+        'floyd-steinberg',
+      ]);
+      expect(new FormData(form).getAll('ditherAlgorithm')).toEqual(['stucki']);
+      await press(radio(host, 'floyd-steinberg'), 'ArrowRight');
+      await press(radio(host, 'jarvis'), 'End');
+      expect(onChange.mock.calls.map(([algorithm]) => algorithm)).toEqual([
+        'jarvis',
+        'floyd-steinberg',
+      ]);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('jumps with Home and End and leaves other keys and shortcuts alone', async () => {
     const view = await mountPicker('atkinson');
     try {
@@ -267,6 +307,33 @@ describe('Dither in the selected-operation inspector', () => {
           expect(document.getElementById(describedBy)?.textContent).toBe(text);
         }
         expect(checkedValue(view.host)).toBe(ditherAlgorithm);
+      } finally {
+        await view.unmount();
+      }
+    },
+  );
+
+  // Compile applies Min power to every Grayscale burn, original pixels included.
+  it.each([
+    ['Grayscale', 'grayscale', false, false, true],
+    ['a binary dither under Use original pixels', 'jarvis', true, true, true],
+    ['a binary dither without it', 'jarvis', false, false, false],
+    ['a binary dither on artwork that disagrees on it', 'jarvis', true, false, false],
+    ['Grayscale on artwork that disagrees on it', 'grayscale', true, false, true],
+  ] as const)(
+    'offers Min power exactly when the image burns as Grayscale: %s',
+    async (_case, ditherAlgorithm, firstPassThrough, secondPassThrough, shown) => {
+      load(
+        { ...FIRST, ...image, ditherAlgorithm, passThrough: firstPassThrough },
+        { ...SECOND, ...image, ditherAlgorithm, passThrough: secondPassThrough },
+      );
+      const view = await mountInspector();
+      try {
+        const inline = view.host.querySelector('input[aria-label^="Minimum power for"]');
+        expect(inline !== null).toBe(shown);
+        if (firstPassThrough !== secondPassThrough) return;
+        await openAdvanced(view.host);
+        expect(document.querySelector('form input[name="minPower"]') !== null).toBe(shown);
       } finally {
         await view.unmount();
       }

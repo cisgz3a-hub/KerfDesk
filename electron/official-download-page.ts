@@ -19,7 +19,7 @@ export function isOfficialDesktopDownloadUrl(url: string): boolean {
   return canonicalOfficialDesktopDownloadUrl(url) !== null;
 }
 
-const STABLE_VERSION = /^(0|[1-9][0-9]{0,15}).(0|[1-9][0-9]{0,15}).(0|[1-9][0-9]{0,15})$/;
+const STABLE_VERSION = /^(0|[1-9][0-9]{0,15})\.(0|[1-9][0-9]{0,15})\.(0|[1-9][0-9]{0,15})$/;
 
 /**
  * The download page section for one verified commercial version on macOS or

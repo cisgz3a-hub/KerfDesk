@@ -32,8 +32,10 @@ test('CNC review separates configured spindle values from live controller scale'
   await dialog.screenshot({ path: testInfo.outputPath('cnc-controller-mismatch.png') });
 
   await seedReview(page, { ceiling: 6000, live: null });
-  const warnings = dialog.locator('details').filter({ hasText: /^Warnings/ });
-  await warnings.locator('summary').click();
+  // ADR-638: warnings are an always-visible list of headlines; the rest of
+  // each warning's text sits folded under it.
+  const warnings = dialog.getByRole('region', { name: 'Warnings', exact: true });
+  await expect(warnings).toBeVisible();
   await expect(warnings).toContainText('Spindle maximum is 6000 RPM');
   await expect(warnings).toContainText('actual spindle RPM is not measured');
   await expect(controller).toContainText('Not read this session');

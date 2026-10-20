@@ -270,6 +270,31 @@ describe('a line still owed its reply (Console $H homing)', () => {
     expect(controllerWentSilent(homing, now)).toBe(false);
     expect(controllerWentSilent({ ...homing, pendingUntrackedAcks: 0 }, now)).toBe(true);
   });
+
+  it('reads silent once the silence outlasts the longest homing cycle (ADR-610 Amendment 2)', () => {
+    // A Console reply lost to a UART line error never arrives, so the ledger
+    // stays owed for the session; it must not hide a controller that then
+    // goes quiet.
+    const owed = (silentForMs: number) =>
+      state({
+        controllerQualification: { kind: 'qualified', epoch: 4, settings: 'verified' },
+        pendingUntrackedAcks: 1,
+        statusObservation: {
+          sessionEpoch: 4,
+          positionEpoch: 1,
+          sequence: 7,
+          observedAt: now - silentForMs,
+        },
+      });
+    const homingBoundMs = 60_000;
+    expect(controllerWentSilent(owed(homingBoundMs - 1_000), now, null, homingBoundMs)).toBe(false);
+    expect(controllerWentSilent(owed(homingBoundMs), now, null, homingBoundMs)).toBe(true);
+    // Without the controller's own bound, the Home button's reply wait applies.
+    expect(controllerWentSilent(owed(119_000), now)).toBe(false);
+    expect(controllerWentSilent(owed(120_000), now)).toBe(true);
+    // A bound never shortens the ordinary window.
+    expect(controllerWentSilent(owed(7_000), now, null, 1_000)).toBe(false);
+  });
 });
 
 describe('any controller line restarts the silence window', () => {

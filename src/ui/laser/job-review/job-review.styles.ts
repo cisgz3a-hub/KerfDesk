@@ -1,6 +1,6 @@
 // Shared inline-style constants for the Job Review dialog sections (ADR-224
-// v2 look). Chrome classes (.lf-banner, .lf-dialog…) come from tokens.css;
-// table and stock-card styles live in job-review-table.styles.ts.
+// v3 look). Chrome classes (.lf-banner, .lf-dialog…) come from tokens.css;
+// operation-card and stock-card styles live in job-review-card.styles.ts.
 
 import type { CSSProperties } from 'react';
 
@@ -11,6 +11,9 @@ export const sectionStyle: CSSProperties = { marginTop: 14 };
 
 // Uppercase micro-label heading a section (kept an h3 for the a11y outline).
 export const sectionHeadingStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'baseline',
+  flexWrap: 'wrap',
   margin: '0 0 7px',
   fontSize: 11,
   fontWeight: 700,
@@ -54,9 +57,21 @@ export const connectionLabelStyle: CSSProperties = {
   color: 'var(--lf-text-muted)',
 };
 
+export const verifiedChipStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  fontSize: 11,
+  fontWeight: 650,
+  padding: '1px 8px',
+  borderRadius: 999,
+  background: 'var(--lf-tint-success)',
+  color: 'var(--lf-success-fg)',
+};
+
 export const statRowStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))',
   gap: 8,
   marginTop: 12,
 };
@@ -65,10 +80,11 @@ export const statTileStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 2,
+  minWidth: 0,
   background: 'var(--lf-bg-0)',
   border: '1px solid var(--lf-border)',
   borderRadius: 'var(--lf-radius-lg)',
-  padding: '9px 11px 8px',
+  padding: '8px 10px 7px',
 };
 
 // The estimated-time tile is the one number every start decision weighs;
@@ -84,10 +100,13 @@ export const statLabelStyle: CSSProperties = {
   letterSpacing: '0.07em',
   textTransform: 'uppercase',
   color: 'var(--lf-text-faint)',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
 };
 
 export const statValueStyle: CSSProperties = {
-  fontSize: 19,
+  fontSize: 18,
   fontWeight: 700,
   fontVariantNumeric: 'tabular-nums',
   lineHeight: 1.2,
@@ -96,12 +115,13 @@ export const statValueStyle: CSSProperties = {
 // Word-valued tiles (the Origin tile) read as labels, not measurements.
 export const statTextValueStyle: CSSProperties = {
   ...statValueStyle,
-  fontSize: 14,
+  fontSize: 13,
   paddingTop: 3,
 };
 
 export const heroValueColor = 'var(--lf-accent-fg)';
 
+// The whole detail, wrapped: a hover title cannot be read by keyboard or touch.
 export const statDetailStyle: CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-text-muted)',
@@ -114,17 +134,20 @@ export const recomputingStyle: CSSProperties = {
   color: 'var(--lf-text-muted)',
 };
 
-export const warnDetailsStyle: CSSProperties = {
+export const warnBoxStyle: CSSProperties = {
   marginTop: 12,
   background: 'var(--lf-tint-warning)',
   border: '1px solid var(--lf-border)',
   borderLeft: '3px solid var(--lf-warning)',
   borderRadius: 'var(--lf-radius-lg)',
+  padding: '7px 11px 8px',
 };
 
-export const warnSummaryStyle: CSSProperties = {
-  cursor: 'pointer',
-  padding: '8px 11px',
+export const warnTitleStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  margin: 0,
   fontSize: 12,
   fontWeight: 700,
   color: 'var(--lf-warning-fg)',
@@ -133,11 +156,53 @@ export const warnSummaryStyle: CSSProperties = {
 export const warnHintStyle: CSSProperties = { fontWeight: 400, opacity: 0.85 };
 
 export const warnListStyle: CSSProperties = {
-  margin: 0,
-  padding: '0 14px 9px 30px',
+  listStyle: 'none',
+  margin: '5px 0 0',
+  padding: 0,
+  display: 'grid',
+  gap: 3,
   fontSize: 12,
-  lineHeight: 1.5,
+  lineHeight: 1.45,
   color: 'var(--lf-text)',
+};
+
+export const warnItemStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 8,
+};
+
+export const warnBulletStyle: CSSProperties = {
+  flex: '0 0 auto',
+  width: 5,
+  height: 5,
+  marginTop: 7,
+  borderRadius: '50%',
+  background: 'var(--lf-warning)',
+};
+
+export const warnBodyStyle: CSSProperties = { minWidth: 0, flex: '1 1 auto' };
+
+// list-style: none hides the summary's own disclosure triangle (Chromium).
+export const warnItemSummaryStyle: CSSProperties = {
+  cursor: 'pointer',
+  fontWeight: 600,
+  listStyle: 'none',
+};
+
+export const warnChevronStyle: CSSProperties = {
+  display: 'inline-flex',
+  marginLeft: 6,
+  verticalAlign: 'middle',
+  color: 'var(--lf-text-muted)',
+};
+
+export const warnHeadlineStyle: CSSProperties = { fontWeight: 600 };
+
+export const warnDetailTextStyle: CSSProperties = {
+  margin: '2px 0 4px',
+  whiteSpace: 'pre-wrap',
+  color: 'var(--lf-text-muted)',
 };
 
 export const bannerStyle: CSSProperties = { marginTop: 12 };
@@ -153,7 +218,7 @@ export const factListStyle: CSSProperties = { margin: '6px 0 0' };
 
 export const factRowStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '160px 1fr',
+  gridTemplateColumns: '140px 1fr',
   gap: 8,
   padding: '2px 0',
   fontSize: 12,
@@ -164,8 +229,15 @@ export const factTermStyle: CSSProperties = {
   fontWeight: 650,
 };
 
+export const machineFactsGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+  alignItems: 'start',
+  gap: 8,
+  marginTop: 14,
+};
+
 export const detailsStyle: CSSProperties = {
-  marginTop: 10,
   border: '1px solid var(--lf-border)',
   borderRadius: 'var(--lf-radius-lg)',
   padding: '7px 10px',
@@ -173,7 +245,7 @@ export const detailsStyle: CSSProperties = {
 
 export const detailsSummaryStyle: CSSProperties = {
   cursor: 'pointer',
-  fontSize: 13,
+  fontSize: 12,
   fontWeight: 650,
 };
 
@@ -200,16 +272,8 @@ export const ackPromptStyle: CSSProperties = {
 
 export const ackFootnoteStyle: CSSProperties = {
   fontSize: 11,
-  color: 'var(--lf-text-muted)',
+  fontWeight: 650,
   margin: '8px 0 0',
-};
-
-export const verifiedNoteStyle: CSSProperties = {
-  borderLeft: '3px solid var(--lf-success)',
-  padding: '7px 9px',
-  color: 'var(--lf-text-muted)',
-  fontSize: 12,
-  margin: '14px 0 0',
 };
 
 export const toolPlanListStyle: CSSProperties = {
@@ -231,6 +295,7 @@ export const footerBarStyle: CSSProperties = {
   borderTop: '1px solid var(--lf-border)',
   display: 'flex',
   alignItems: 'center',
+  flexWrap: 'wrap',
   gap: 10,
   zIndex: 1,
 };

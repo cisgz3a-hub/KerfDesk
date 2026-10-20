@@ -72,7 +72,7 @@ describe('native background startup after the workspace opening gates', () => {
     expect(startCamera).not.toHaveBeenCalled();
     signals.admitWorkspace(signals.observeRequest()({ edition: 'pro' })!);
     expect(startCamera).toHaveBeenCalledOnce();
-    // A reopened macOS window or a reload opens behind the licence window again.
+    // A reopened macOS window or a reload stops it until that renderer acknowledges.
     await handle(request('/api/desktop/workspace-ready'));
     expect(stopCamera).toHaveBeenCalled();
     expect(startCamera).toHaveBeenCalledOnce();

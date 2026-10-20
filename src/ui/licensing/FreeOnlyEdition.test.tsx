@@ -11,7 +11,7 @@ const NO_UPDATES: CommercialUpdateStatus = {
 };
 import { EditionProvider } from './EditionProvider';
 import { EditionStatusButton, PRO_IN_DESKTOP_LABEL } from './EditionStatusButton';
-import { LICENCE_SETTINGS_EVENT, proFeaturesUnlocked, useEdition } from './edition';
+import { LICENCE_SETTINGS_EVENT, proFeaturesUnlocked, proPromptOpen, useEdition } from './edition';
 import { DESKTOP_DOWNLOAD_URL } from './edition-policy';
 import { PRO_FEATURES } from './pro-features';
 
@@ -93,10 +93,19 @@ function expectEveryProFeatureListed(): void {
   expect(document.body.textContent).not.toContain('Start free 30-day trial');
 }
 async function expectDesktopDialog(open: () => void): Promise<void> {
+  expect(proPromptOpen()).toBe(false);
   await act(async () => openButton().click());
   expect(open).not.toHaveBeenCalled();
   expect(document.body.textContent).toContain('V-carve is a Pro tool');
+  // The notice keeps no edit (nothing here unlocks Pro), so background work
+  // that finishes meanwhile may still commit (ADR-609).
+  expect(proPromptOpen()).toBe(false);
   expectEveryProFeatureListed();
+  const decline = [...document.querySelectorAll('button')].find(
+    (value) => value.textContent === 'Not now',
+  );
+  await act(async () => decline?.click());
+  expect(proPromptOpen()).toBe(false);
 }
 function statusChip(): HTMLButtonElement | undefined {
   return [...document.querySelectorAll('button')].find(
@@ -206,6 +215,7 @@ it('opens the same notice from Help > Licence in the web app', async () => {
   await act(async () => window.dispatchEvent(new Event(LICENCE_SETTINGS_EVENT)));
   expect(document.body.textContent).toContain('Pro is in the desktop app');
   expectEveryProFeatureListed();
+  expect(proPromptOpen()).toBe(false);
 });
 
 it('gives a free desktop build the notice instead of the licence panel', async () => {
@@ -221,6 +231,7 @@ it('gives a free desktop build the notice instead of the licence panel', async (
   expect(document.body.textContent).toContain('Pro is in the desktop app');
   expect(document.querySelector('[aria-label="KerfDesk licence"]')).toBeNull();
   expectEveryProFeatureListed();
+  expect(proPromptOpen()).toBe(false);
 });
 
 it('shows no Pro notice in explicit unrestricted development providers', async () => {

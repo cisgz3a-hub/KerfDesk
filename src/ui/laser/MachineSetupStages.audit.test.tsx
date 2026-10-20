@@ -11,7 +11,7 @@ import { initialLaserState } from '../state/laser-store-helpers';
 import { resetStore } from '../state/test-helpers';
 import { DeviceSetupControls } from './device-setup/DeviceSetupControls';
 import { DeviceSetupMachineCapability } from './device-setup/DeviceSetupMachineCapability';
-import { DeviceSetupProfilePicker } from './device-setup/DeviceSetupProfilePicker';
+import { DeviceSetupMachinePicker } from './device-setup/DeviceSetupMachinePicker';
 import { MachineSetupDialogHost } from './device-setup/MachineSetupDialogHost';
 import { deviceSetupReducer, initDeviceSetup } from './device-setup/device-setup-flow';
 import { useMachineSetupDialogStore } from './device-setup/machine-setup-dialog-store';
@@ -93,7 +93,7 @@ describe('three-stage Machine Setup integration audit', () => {
     useLaserStore.setState({ home, writeGrblSetting });
     openSetup();
     expect(host.querySelectorAll('[aria-label="Machine Setup steps"] button')).toHaveLength(3);
-    act(() => button('Check essentials').click());
+    act(() => button('Next').click());
     expect(host.querySelector('fieldset[aria-label="Essentials"]')).not.toBeNull();
     const name = host.querySelector<HTMLInputElement>('[aria-label="Device name"]')!;
     act(() => {
@@ -106,7 +106,7 @@ describe('three-stage Machine Setup integration audit', () => {
     expect(host.querySelector<HTMLInputElement>('[aria-label="Device name"]')?.value).toBe(
       'Three-stage audit machine',
     );
-    act(() => button('Review setup').click());
+    act(() => button('Next').click());
     expect(host.querySelector('fieldset[aria-label="Review & save"]')).not.toBeNull();
     act(() => ariaButton('Go to step 1: Machine').click());
     act(() => ariaButton('Go to step 3: Review & save').click());
@@ -116,7 +116,7 @@ describe('three-stage Machine Setup integration audit', () => {
     expect(useStore.getState().undoStack).toHaveLength(undoCount + 1);
     expect(useMachineSetupDialogStore.getState().state.kind).toBe('idle');
     act(() => button('Machine Setup').click());
-    act(() => button('Check essentials').click());
+    act(() => button('Next').click());
     const laterName = host.querySelector<HTMLInputElement>('[aria-label="Device name"]')!;
     act(() => {
       laterName.value = 'Discard this later edit';
@@ -186,23 +186,50 @@ describe('three-stage Machine Setup integration audit', () => {
     expect(useStore.getState().project).toBe(project);
   });
 
-  it('Browse all and profile details preserve the draft, while choosing a card changes only the chosen draft profile', async () => {
+  it('search, type filter and profile details preserve the draft, while choosing a row changes only the chosen draft profile', async () => {
     let snapshot = initDeviceSetup(DEFAULT_DEVICE_PROFILE, null);
     function Harness(): JSX.Element {
       const [state, dispatch] = useReducer(deviceSetupReducer, snapshot);
       snapshot = state;
-      return <DeviceSetupProfilePicker state={state} dispatch={dispatch} />;
+      return <DeviceSetupMachinePicker state={state} dispatch={dispatch} />;
     }
     const project = useStore.getState().project;
     render(<Harness />);
-    expect(host.querySelectorAll('article.lf-setup-profile')).toHaveLength(2);
     const draft = snapshot.draft;
-    const browse = [...host.querySelectorAll('button')].find((item) =>
-      item.textContent?.startsWith('Browse all'),
+    const rows = (): number =>
+      host.querySelectorAll('.lf-setup-picker-list input[name="setup-machine"]').length;
+    const all = rows();
+    const search = host.querySelector<HTMLInputElement>('input[aria-label="Search machines"]')!;
+    act(() => {
+      search.value = 'ortur';
+      Simulate.change(search);
+    });
+    expect(rows()).toBeLessThan(all);
+    act(() => {
+      search.value = '';
+      Simulate.change(search);
+    });
+    const cnc = [
+      ...host.querySelectorAll<HTMLInputElement>('input[name="setup-machine-kind-filter"]'),
+    ].find((item) => item.closest('label')?.textContent === 'CNC')!;
+    act(() => cnc.click());
+    expect(rows()).toBeLessThan(all);
+    expect(snapshot.draft).toBe(draft);
+    const use = host.querySelector<HTMLInputElement>(
+      '.lf-setup-picker-list input[aria-label^="Use "]',
     )!;
-    act(() => browse.click());
-    expect(host.querySelectorAll('article.lf-setup-profile').length).toBeGreaterThan(2);
-    expect(button('Show fewer profiles').getAttribute('aria-expanded')).toBe('true');
+    const chosenName = use.getAttribute('aria-label')?.slice('Use '.length);
+    expect(use.type).toBe('radio');
+    // The whole row is the control: the label wraps it, and the chosen
+    // machine's Profile details sit outside it, so reading cannot choose.
+    expect(use.closest('label')?.classList.contains('lf-setup-picker-row')).toBe(true);
+    expect(use.closest('label')?.querySelector('details')).toBeNull();
+    act(() => use.click());
+    expect(snapshot.draft.name).toBe(chosenName);
+    expect(
+      host.querySelector<HTMLInputElement>(`input[aria-label="Use ${chosenName}"]`)?.checked,
+    ).toBe(true);
+    const chosen = snapshot;
     for (const summary of host.querySelectorAll<HTMLElement>('summary')) {
       const details = summary.parentElement as HTMLDetailsElement;
       act(() => summary.click());
@@ -210,21 +237,7 @@ describe('three-stage Machine Setup integration audit', () => {
       act(() => summary.click());
       expect(details.open).toBe(false);
     }
-    expect(snapshot.draft).toBe(draft);
-    const use = host.querySelector<HTMLInputElement>('input[aria-label^="Use "]')!;
-    const chosenName = use.closest('article')?.querySelector('strong')?.textContent;
-    expect(use.type).toBe('radio');
-    // The whole card is the control: the label wraps the card body, and only
-    // Profile details sits outside it so reading evidence cannot select.
-    expect(use.closest('label')?.classList.contains('lf-setup-profile-choice')).toBe(true);
-    expect(use.closest('label')?.querySelector('details')).toBeNull();
-    act(() => use.click());
-    expect(snapshot.draft.name).toBe(chosenName);
-    expect(
-      host.querySelector<HTMLInputElement>(`input[aria-label="Use ${chosenName}"]`)?.checked,
-    ).toBe(true);
-    act(() => button('Show fewer profiles').click());
-    expect(host.querySelectorAll('article.lf-setup-profile')).toHaveLength(2);
+    expect(snapshot).toBe(chosen);
     expect(useStore.getState().project).toBe(project);
   });
 });

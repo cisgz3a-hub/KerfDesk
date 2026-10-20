@@ -33,6 +33,9 @@ type JobReviewStore = {
   readonly waiter: ((signal: JobReviewSignal) => void) | null;
   /** Highest-priority signal raised while unarmed, consumed by `nextSignal`. */
   readonly pendingSignal: JobReviewSignal | null;
+  /** Operations whose card holds an unsaved edit (ADR-638). Start, from the
+   *  dialog or a remote approval, waits until none does. */
+  readonly editingOperationIds: ReadonlySet<string>;
   // Gate-facing — the start flow drives these.
   readonly open: (model: JobReviewModel, purpose?: JobReviewPurpose) => boolean;
   readonly nextSignal: () => Promise<JobReviewSignal>;
@@ -45,6 +48,27 @@ type JobReviewStore = {
   readonly cancel: () => void;
   readonly cancelAndClose: () => void;
   readonly requestRebuild: () => void;
+  readonly reportEditing: (operationId: string, isEditing: boolean) => void;
+};
+
+const NO_EDITS: ReadonlySet<string> = new Set();
+
+// No review open: no request, no waiter, no held signal, no card editing.
+const IDLE: Pick<
+  JobReviewStore,
+  | 'state'
+  | 'requestOwner'
+  | 'requestDocumentEpoch'
+  | 'waiter'
+  | 'pendingSignal'
+  | 'editingOperationIds'
+> = {
+  state: { kind: 'idle' },
+  requestOwner: null,
+  requestDocumentEpoch: null,
+  waiter: null,
+  pendingSignal: null,
+  editingOperationIds: NO_EDITS,
 };
 
 const SIGNAL_PRIORITY: Readonly<Record<JobReviewSignal, number>> = {
@@ -69,11 +93,7 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
     }
   };
   return {
-    state: { kind: 'idle' },
-    requestOwner: null,
-    requestDocumentEpoch: null,
-    waiter: null,
-    pendingSignal: null,
+    ...IDLE,
     open: (model, purpose = 'start') => {
       // A second Start while a review is showing means an upstream gate
       // failed (the modal backdrop and shortcut suppression cover the known
@@ -86,6 +106,7 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
         requestDocumentEpoch: useStore.getState().projectDocumentEpoch,
         waiter: null,
         pendingSignal: null,
+        editingOperationIds: NO_EDITS,
       });
       return true;
     },
@@ -114,17 +135,11 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
       if (state.kind !== 'open') return;
       set({ state: { ...state, isPreparing: false, blocker } });
     },
-    close: () =>
-      set({
-        state: { kind: 'idle' },
-        requestOwner: null,
-        requestDocumentEpoch: null,
-        waiter: null,
-        pendingSignal: null,
-      }),
+    close: () => set(IDLE),
     confirm: () => {
-      const { state } = get();
+      const { state, editingOperationIds } = get();
       if (state.kind !== 'open' || state.isPreparing || state.blocker !== null) return;
+      if (editingOperationIds.size > 0) return;
       fire('confirm');
     },
     cancel: () => fire('cancel'),
@@ -135,5 +150,13 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
       set({ state: { kind: 'idle' } });
     },
     requestRebuild: () => fire('rebuild'),
+    reportEditing: (operationId, isEditing) => {
+      const current = get().editingOperationIds;
+      if (current.has(operationId) === isEditing) return;
+      const next = new Set(current);
+      if (isEditing) next.add(operationId);
+      else next.delete(operationId);
+      set({ editingOperationIds: next });
+    },
   };
 });
