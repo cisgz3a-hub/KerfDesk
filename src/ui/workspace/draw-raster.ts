@@ -139,7 +139,7 @@ export function drawRasterImage(
 
   drawBitmapAtTransform(
     ctx,
-    rasterPaint(obj, displayDataUrl, img, options.adjustments ?? obj, options.onBitmapReady),
+    rasterPaint(displayDataUrl, img, options.adjustments ?? obj, options.onBitmapReady),
     obj.bounds,
     obj.transform,
     view,
@@ -152,7 +152,6 @@ export function drawRasterImage(
 // (ADR-359 Amendment 1). A photo kept behind a trace draws like any other
 // image: it engraves like one (ADR-648).
 function rasterPaint(
-  obj: Parameters<typeof drawRasterImage>[1],
   displayDataUrl: string,
   img: HTMLImageElement,
   adjustments: LumaAdjustments,

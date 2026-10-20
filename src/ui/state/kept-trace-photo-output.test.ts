@@ -17,6 +17,7 @@ import {
   type TracedImage,
 } from '../../core/scene';
 import { sortCutsLast } from '../../core/sort-cuts-last';
+import { traceSourceForTracedImage } from '../commands/image-command-actions';
 import { hoverOutputSettings } from '../workspace/hover-output-settings';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
@@ -72,6 +73,12 @@ function trace(): TracedImage {
   };
 }
 
+function sourcesInJob(project: Project): ReadonlyArray<string> {
+  return compileJob(project.scene, project.device).groups.flatMap((group) =>
+    group.kind === 'raster' ? [group.sourceObjectId] : [group.kind],
+  );
+}
+
 function groupKinds(project: Project): ReadonlyArray<string> {
   return compileJob(project.scene, project.device).groups.map((group) => group.kind);
 }
@@ -118,8 +125,8 @@ describe('a photo kept when tracing (ADR-648)', () => {
     expect(groupKinds(useStore.getState().project)).toEqual(['raster']);
 
     const traced = traceKeepingPhoto();
-    expect(object(traced, 'photo')).not.toHaveProperty('role');
     expect(groupKinds(traced)).toEqual(['raster', 'fill']);
+    expect(object(traced, 'photo')).not.toHaveProperty('role');
 
     const cut = offsetOutlineAsCut();
     expect(cut.scene.objects.map((candidate) => candidate.id)).not.toContain('trace');
@@ -142,6 +149,7 @@ describe('a photo kept when tracing (ADR-648)', () => {
     );
     expect(traceOperationId).not.toBe(photoOperation?.id);
     expect(traceObject).toMatchObject({ kind: 'traced-image', traceSourceId: 'photo' });
+    expect(traceSourceForTracedImage(traced, traceObject)?.id).toBe('photo');
   });
 
   it('frames the photo footprint, not only the outline', () => {
@@ -211,5 +219,95 @@ describe('a photo kept when tracing (ADR-648)', () => {
       'raster',
       'cut',
     ]);
+  });
+
+  it('still engraves the photo after the trace is deleted', () => {
+    traceKeepingPhoto();
+    useStore.getState().removeSceneObject('trace');
+    const project = useStore.getState().project;
+
+    expect(project.scene.objects.map((candidate) => candidate.id)).toEqual(['photo']);
+    expect(groupKinds(project)).toEqual(['raster']);
+  });
+
+  it('duplicates only the trace, which keeps its Re-trace link to the photo', () => {
+    traceKeepingPhoto();
+    useStore.setState({ selectedObjectId: 'trace', additionalSelectedIds: new Set() });
+    useStore.getState().duplicateSelection();
+    const project = useStore.getState().project;
+    const rasters = project.scene.objects.filter((candidate) => candidate.kind === 'raster-image');
+    const traces = project.scene.objects.filter((candidate) => candidate.kind === 'traced-image');
+
+    expect(rasters.map((candidate) => candidate.id)).toEqual(['photo']);
+    expect(traces).toHaveLength(2);
+    expect(
+      traces.map((candidate) => 'traceSourceId' in candidate && candidate.traceSourceId),
+    ).toEqual(['photo', 'photo']);
+    // One photo engraving, not one per copy.
+    expect(sourcesInJob(project).filter((source) => source === 'photo')).toHaveLength(1);
+  });
+
+  it('copies the photo with the trace only when both are selected', () => {
+    traceKeepingPhoto();
+    useStore.setState({ selectedObjectId: 'trace', additionalSelectedIds: new Set(['photo']) });
+    useStore.getState().duplicateSelection();
+    const project = useStore.getState().project;
+    const copies = project.scene.objects.filter(
+      (candidate) => candidate.id !== 'trace' && candidate.id !== 'photo',
+    );
+    const copiedPhoto = copies.find((candidate) => candidate.kind === 'raster-image');
+    const copiedTrace = copies.find((candidate) => candidate.kind === 'traced-image');
+
+    expect(copiedPhoto).toBeDefined();
+    expect(copiedTrace).toMatchObject({ traceSourceId: copiedPhoto?.id });
+  });
+
+  it('pastes a trace into another project without a link to a photo it lacks', () => {
+    traceKeepingPhoto();
+    useStore.setState({ selectedObjectId: 'trace', additionalSelectedIds: new Set() });
+    useStore.getState().copySelection();
+    useStore.getState().pasteClipboard();
+    const sameDocument = useStore
+      .getState()
+      .project.scene.objects.filter((candidate) => candidate.kind === 'traced-image');
+    expect(
+      sameDocument.map((candidate) => 'traceSourceId' in candidate && candidate.traceSourceId),
+    ).toEqual(['photo', 'photo']);
+
+    const clipboard = useStore.getState().sceneClipboard;
+    resetStore();
+    useStore.setState({ sceneClipboard: clipboard, projectDocumentEpoch: 1 });
+    useStore.getState().pasteClipboard();
+    const pasted = useStore.getState().project.scene.objects;
+
+    expect(pasted.map((candidate) => candidate.kind)).toEqual(['traced-image']);
+    expect(pasted[0]).not.toHaveProperty('traceSourceId');
+  });
+
+  it('burns a Raster scan trace on its own copy of the photo operation, kept on re-trace', () => {
+    useStore.getState().importRasterImage(photo());
+    const bitmap: RasterImage = { ...photo(), id: 'trace-bitmap', source: 'portrait.jpg (trace)' };
+    useStore.getState().commitRasterizedTrace('photo', bitmap, { deleteSourceAfterTrace: false });
+    const first = useStore.getState().project;
+    const [photoOperation] = operationIdsForObject(object(first, 'photo'), first.scene.layers);
+    const resultOperations = operationIdsForObject(
+      object(first, 'trace-bitmap'),
+      first.scene.layers,
+    );
+
+    expect(resultOperations).toHaveLength(1);
+    expect(resultOperations).not.toContain(photoOperation);
+    useStore.getState().setLayerParam(photoOperation ?? '', { output: false });
+    expect(sourcesInJob(useStore.getState().project)).toEqual(['trace-bitmap']);
+
+    useStore.getState().commitRasterizedTrace('photo', bitmap, {
+      deleteSourceAfterTrace: false,
+      replaceTraceId: bitmap.id,
+    });
+    const again = useStore.getState().project;
+    expect(operationIdsForObject(object(again, 'trace-bitmap'), again.scene.layers)).toEqual(
+      resultOperations,
+    );
+    expect(again.scene.layers).toHaveLength(first.scene.layers.length);
   });
 });

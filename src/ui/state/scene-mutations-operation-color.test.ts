@@ -164,11 +164,24 @@ describe('operation color assignment', () => {
 });
 
 describe('rasterized (raster-output) trace color assignment', () => {
-  it('gives a rasterized trace the first palette color by reusing the source image operation', () => {
+  it('gives a rasterized trace the next colour on its copy of a kept source operation', () => {
+    // ADR-648: the kept photo engraves on its own operation; the result burns
+    // on a copy of it, which takes the next free colour.
     const result = applyRasterizedTraceToExisting(
       { project: importedSource(), undoStack: [] },
       SOURCE_ID,
       { ...sourceRaster(), id: 'rtrace1' },
+    );
+    expect(operationColorFor(result.project, SOURCE_ID)).toBe(FIRST_PALETTE_COLOR);
+    expect(operationColorFor(result.project, 'rtrace1')).toBe(SECOND_PALETTE_COLOR);
+  });
+
+  it('gives a rasterized trace the first palette color by reusing a deleted source operation', () => {
+    const result = applyRasterizedTraceToExisting(
+      { project: importedSource(), undoStack: [] },
+      SOURCE_ID,
+      { ...sourceRaster(), id: 'rtrace1' },
+      { deleteSourceAfterTrace: true },
     );
     expect(operationColorFor(result.project, 'rtrace1')).toBe(FIRST_PALETTE_COLOR);
   });

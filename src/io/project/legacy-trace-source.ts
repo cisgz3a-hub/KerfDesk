@@ -1,4 +1,4 @@
-import type { Project, SceneObject } from '../../core/scene';
+import type { Project, Scene, SceneObject } from '../../core/scene';
 import { CAMERA_CAPTURE_SOURCE, withImageOutputOff } from '../../core/scene/reference-image-output';
 
 // ADR-648: earlier builds tagged a picture kept behind its trace
@@ -11,7 +11,7 @@ import { CAMERA_CAPTURE_SOURCE, withImageOutputOff } from '../../core/scene/refe
 export function settleLegacyTraceSources(project: Project): Project {
   const legacy = project.scene.objects.filter(hasLegacyTraceSourceRole);
   if (legacy.length === 0) return project;
-  let scene = { ...project.scene, objects: project.scene.objects.map(withoutLegacyRole) };
+  let scene: Scene = { ...project.scene, objects: project.scene.objects.map(withoutLegacyRole) };
   for (const capture of legacy) {
     if (capture.kind === 'raster-image' && capture.source === CAMERA_CAPTURE_SOURCE) {
       scene = withImageOutputOff(scene, capture.id);
