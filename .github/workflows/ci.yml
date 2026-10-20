@@ -92,6 +92,11 @@ jobs:
       - name: Check ADR numbers
         run: pnpm check:adr-numbers
 
+      # Deploy and every release run this guard; running it here too means a
+      # change to the index.html shell fails its pull request, not the release.
+      - name: Check the repository guard
+        run: pnpm guard:repo
+
       - name: Check GitHub Actions pins
         run: pnpm check:action-pins
 
