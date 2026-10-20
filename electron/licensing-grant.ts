@@ -1,4 +1,4 @@
-import { checkGrantTime, LicenceClockError, paidClockOffset } from './licensing-clock.js';
+import { checkGrantTime, grantTimeChecked } from './licensing-clock.js';
 import type { LicencePayment } from './licensing-commerce.js';
 import type { LicensingConfig } from './licensing-config.js';
 import { displayDeviceName, RELEASED, REVOKED } from './licensing-messages.js';
@@ -12,8 +12,6 @@ export type GrantAction = 'activate' | 'trial' | 'refresh';
 export type VerifiedGrant = {
   readonly credential: LicenceCredential;
   readonly claims: LicenceClaims;
-  /** Set when a paid refresh was accepted despite this computer's clock (ADR-592). */
-  readonly clockOffset?: number;
 };
 type ActivationBody = {
   readonly licenseId: string;
@@ -97,29 +95,19 @@ export function grantRequest(
 }
 
 /**
- * Checks a service grant for this device. A grant issued more than five
- * minutes from this computer's clock throws LicenceClockError, for every tier,
- * except a paid refresh within one check-in period: the service did confirm
- * that licence, so it is kept with the measured offset (ADR-592).
+ * Checks a service grant for this device. A trial or developer grant issued
+ * more than five minutes from this computer's clock throws LicenceClockError.
+ * A paid grant is accepted whatever the clock says: its rights never end, so
+ * the clock cannot change them (ADR-623 Amendment 2).
  */
 export function verifyGrant(
   config: LicensingConfig,
   value: unknown,
   device: string,
   now: number,
-  action: GrantAction,
 ): VerifiedGrant {
   const grant = verifySignedGrant(config, value, device);
-  try {
-    checkGrantTime(grant.claims.issuedAt, now);
-  } catch (error) {
-    const clockOffset =
-      error instanceof LicenceClockError && action === 'refresh'
-        ? paidClockOffset(grant.claims, error.offset)
-        : null;
-    if (clockOffset === null) throw error;
-    return { ...grant, clockOffset };
-  }
+  if (grantTimeChecked(grant.claims)) checkGrantTime(grant.claims.issuedAt, now);
   return grant;
 }
 
@@ -145,8 +133,8 @@ function verifySignedGrant(config: LicensingConfig, value: unknown, device: stri
 /**
  * The record a verified grant leaves. A fresh grant ends any stuck
  * deactivation, and a key that unlocks paid Pro drops an unfinished purchase,
- * which would otherwise hide Renew (ADR-523 Amendment 2). A clock offset is
- * kept only with the grant it was measured for.
+ * which would otherwise hide Renew (ADR-523 Amendment 2). A clock offset an
+ * older version saved is dropped: nothing reads it now (ADR-623 Amendment 2).
  */
 export function grantedRecord(
   action: GrantAction,
@@ -165,7 +153,6 @@ export function grantedRecord(
     lastSeenAt: now,
     refreshedAt: now,
     credential: grant.credential,
-    ...(grant.clockOffset === undefined ? {} : { clockOffset: grant.clockOffset }),
     ...(payment === undefined || stale ? {} : { payment }),
     ...(action === 'activate' && validLicenceKey(licenseKey) ? { licenseKey } : {}),
   };

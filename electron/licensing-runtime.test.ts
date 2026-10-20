@@ -335,11 +335,11 @@ describe('licence key and recovery (ADR-523 Amendment 1)', () => {
     expect(h.saved()?.credential).toBeDefined();
     expect(h.saved()?.pendingDeactivation).toBeUndefined();
   });
-  it('confirms saved rights in the background about once a week', async () => {
-    const fresh = harness({ ...saved(), refreshedAt: NOW / 1000 - 3 * 86_400 });
+  it('confirms saved paid rights in the background about once a day', async () => {
+    const fresh = harness({ ...saved(), refreshedAt: NOW / 1000 - 23 * 3600 });
     await fresh.runtime.refreshInBackground();
     expect(fresh.fetch).not.toHaveBeenCalled();
-    const due = harness({ ...saved(), refreshedAt: NOW / 1000 - 8 * 86_400 });
+    const due = harness({ ...saved(), refreshedAt: NOW / 1000 - 86_400 });
     await due.runtime.refreshInBackground();
     expect(due.fetch).toHaveBeenCalledOnce();
     expect(String(due.fetch.mock.calls[0]?.[0])).toContain('/v1/activations/refresh');
@@ -720,8 +720,18 @@ describe('synchronous eligibility at update installation', () => {
 
 describe('clock checks and the saved clock mark (ADR-523 Amendment 2)', () => {
   it('reports a clock more than five minutes off as a clock problem, not an outage', async () => {
+    // A paid grant never reads the clock (ADR-623 Amendment 2); a developer grant still does.
     const h = harness();
-    h.fetch.mockResolvedValue(grant(claims({ issuedAt: NOW / 1000 + 2 * 3600 })));
+    h.fetch.mockResolvedValue(
+      grant(
+        claims({
+          tier: 'developer',
+          perpetualUpdates: true,
+          updatesUntil: null,
+          issuedAt: NOW / 1000 + 2 * 3600,
+        }),
+      ),
+    );
     const activated = await h.runtime.activate(TEST_KEY);
     expect(activated).toMatchObject({ state: 'clock-error', edition: 'free', tier: null });
     expect(activated.message).toContain('about 2 hours behind');

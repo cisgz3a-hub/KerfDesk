@@ -10,12 +10,16 @@ import {
 describe('when a quiet check asks the licence service (ADR-592)', () => {
   const NOW = 1_790_000_000;
   const paid = { state: 'ready', tier: 'paid' };
-  it('asks weekly for paid rights, daily for a trial, and at once when overdue', () => {
+  it('asks daily for paid rights and a trial, weekly for developer rights, and at once when overdue', () => {
+    // LightBurn tries once a day (ADR-623 Amendment 2).
     const seen = { refreshedAt: NOW, lastSeenAt: NOW };
-    expect(licenceRefreshDue(paid, seen, NOW + 6 * 86_400)).toBe(false);
-    expect(licenceRefreshDue(paid, seen, NOW + 7 * 86_400)).toBe(true);
+    expect(licenceRefreshDue(paid, seen, NOW + 86_399)).toBe(false);
+    expect(licenceRefreshDue(paid, seen, NOW + 86_400)).toBe(true);
     expect(licenceRefreshDue({ state: 'ready', tier: 'trial' }, seen, NOW + 86_400)).toBe(true);
-    expect(licenceRefreshDue({ state: 'checkin-required', tier: 'paid' }, seen, NOW)).toBe(true);
+    const developer = { state: 'ready', tier: 'developer' };
+    expect(licenceRefreshDue(developer, seen, NOW + 6 * 86_400)).toBe(false);
+    expect(licenceRefreshDue(developer, seen, NOW + 7 * 86_400)).toBe(true);
+    expect(licenceRefreshDue({ state: 'checkin-required', tier: 'trial' }, seen, NOW)).toBe(true);
     expect(licenceRefreshDue({ state: 'unavailable', tier: null }, seen, NOW + 30 * 86_400)).toBe(
       false,
     );

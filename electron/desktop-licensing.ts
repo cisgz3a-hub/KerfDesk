@@ -160,7 +160,7 @@ export function createDesktopLicensing(options: Options) {
         entry,
       ),
     /**
-     * Runs once the window is open: a quiet weekly licence confirmation, then
+     * Runs once the window is open: a quiet daily licence confirmation, then
      * the update check. Neither holds the licence window: the confirmation
      * starts once the renderer has read the saved status (ADR-623).
      * Licence confirmation and manual release discovery repeat every 30 minutes.

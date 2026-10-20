@@ -237,10 +237,10 @@ class LicensingService {
     this.updateCache.failAuthentication();
     let grant: VerifiedGrant;
     try {
-      grant = verifyGrant(this.config, value, device, this.now(), action);
+      grant = verifyGrant(this.config, value, device, this.now());
     } catch (error) {
       if (!(error instanceof LicenceClockError)) throw error;
-      // The service answered, but this clock is too far off (a paid refresh is kept: verifyGrant).
+      // The service answered, but this clock is too far off for a trial or developer grant.
       const message = clockErrorMessage(error.offset, this.options.platform);
       return { ...this.evaluate(saved, device), state: 'clock-error', message };
     }
@@ -301,9 +301,9 @@ class LicensingService {
   readonly startTrial = () => this.safe(() => this.acquire('trial'), true);
   readonly refresh = () => this.safe(() => this.acquire('refresh'), true);
   /**
-   * Quietly confirms saved rights about once a week, and otherwise moves a
-   * trial's clock mark on. Runs at launch and every 30 minutes while KerfDesk is
-   * open; it never blocks or interrupts work.
+   * Quietly confirms saved rights about once a day, and otherwise moves a
+   * clock mark on. Runs at launch and every 30 minutes while KerfDesk is open;
+   * it never blocks or interrupts work.
    */
   readonly refreshInBackground = backgroundRefresh.createBackgroundLicenceRefresh({
     config: () => this.config,
