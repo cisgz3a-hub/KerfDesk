@@ -1,6 +1,8 @@
 // Pointing at an operation row pulses its artwork on the canvas once (ADR-620).
 // The pointer must settle on the row first, so sweeping down the list does not
-// set off a pulse per row. Display only: nothing is selected or changed.
+// set off a pulse per row. Keyboard focus within the row does the same, so the
+// pulse is not pointer-only now that artwork rests in ink. Display only:
+// nothing is selected or changed.
 
 import { useEffect, useRef } from 'react';
 import { PULSE_HOVER_DWELL_MS } from '../workspace/artwork-pulse';
@@ -9,6 +11,8 @@ import { useUiStore } from '../state/ui-store';
 export function useOperationRowHover(operationId: string): {
   readonly onPointerEnter: () => void;
   readonly onPointerLeave: () => void;
+  readonly onFocus: () => void;
+  readonly onBlur: (event: React.FocusEvent<HTMLElement>) => void;
 } {
   const setHovered = useUiStore((state) => state.setHoveredOperationId);
   const release = useUiStore((state) => state.releaseHoveredOperationId);
@@ -25,14 +29,22 @@ export function useOperationRowHover(operationId: string): {
     },
     [operationId, release],
   );
+  const settle = (): void => {
+    cancel();
+    timer.current = setTimeout(() => setHovered(operationId), PULSE_HOVER_DWELL_MS);
+  };
+  const leave = (): void => {
+    cancel();
+    release(operationId);
+  };
   return {
-    onPointerEnter: () => {
-      cancel();
-      timer.current = setTimeout(() => setHovered(operationId), PULSE_HOVER_DWELL_MS);
-    },
-    onPointerLeave: () => {
-      cancel();
-      release(operationId);
+    onPointerEnter: settle,
+    onPointerLeave: leave,
+    // Focus moving between the row's own controls stays on the row; a settled
+    // pulse is not restarted, because the hovered id does not change.
+    onFocus: settle,
+    onBlur: (event) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) leave();
     },
   };
 }

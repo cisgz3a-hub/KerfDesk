@@ -1,4 +1,5 @@
 import {
+  automaticTimeSetting,
   CHECK_IN_LIMIT,
   CLOCK_TOLERANCE,
   checkInDueAt,
@@ -113,6 +114,8 @@ export function evaluateLicence(
   device: string,
   now: number,
   proLatched: boolean,
+  /** `process.platform`, so clock advice names this computer's own settings. */
+  platform: string,
 ): LicenceStatus {
   const summary = (
     state: LicenceStatus['state'],
@@ -158,7 +161,7 @@ export function evaluateLicence(
     return summary(
       'clock-error',
       claims,
-      'This computer’s clock is earlier than the last licence check, so your trial cannot be used. Turn on Set time automatically in Windows’ Date & time settings, then choose Refresh licence.',
+      `This computer’s clock is earlier than the last licence check, so your trial cannot be used. Turn on ${automaticTimeSetting(platform)}, then choose Refresh licence.`,
     );
   if (claims.accessExpiresAt !== null && Math.max(now, saved.lastSeenAt) >= claims.accessExpiresAt)
     return summary(
@@ -166,7 +169,11 @@ export function evaluateLicence(
       claims,
       'Your 30-day trial has ended. Buy a licence or enter your licence key to keep using KerfDesk.',
     );
-  return withCheckInDue(summary(...currentRights(claims, release, saved, now)), claims, saved);
+  return withCheckInDue(
+    summary(...currentRights(claims, release, saved, now, platform)),
+    claims,
+    saved,
+  );
 }
 
 /** A paid grant's saved clock offset (ADR-592); a trial is never measured by one. */
@@ -189,19 +196,21 @@ function currentRights(
   release: VerifiedRelease,
   saved: LicenceRecord,
   now: number,
+  platform: string,
 ): [LicenceStatus['state'], LicenceClaims, string | null] {
   const offset = paidOffset(claims, saved);
   if (checkInOverdue(claims, saved.lastSeenAt, now, offset))
-    return ['checkin-required', claims, checkInMessage(claims)];
+    return ['checkin-required', claims, checkInMessage(claims, platform)];
   if (!licenceCoversRelease(claims, release))
     return ['updates-expired', claims, updatesExpiredMessage(claims)];
   // The last confirmation arrived with this clock off: keep saying so.
-  return ['ready', claims, Math.abs(offset) > CLOCK_TOLERANCE ? clockWarningMessage(offset) : null];
+  const clockOff = Math.abs(offset) > CLOCK_TOLERANCE;
+  return ['ready', claims, clockOff ? clockWarningMessage(offset, platform) : null];
 }
 
-function checkInMessage(claims: LicenceClaims): string {
+function checkInMessage(claims: LicenceClaims, platform: string): string {
   const days = Math.round((CHECK_IN_LIMIT[claims.tier] ?? 0) / 86_400);
-  return `KerfDesk has not confirmed this ${claims.tier === 'trial' ? 'trial' : 'licence'} with the licence service for more than ${days} days, so it needs a check before KerfDesk opens again. An open KerfDesk keeps its projects, Frame and Start. Connect to the internet and choose Refresh licence. If this computer’s clock is wrong, turn on Set time automatically in Windows’ Date & time settings first.`;
+  return `KerfDesk has not confirmed this ${claims.tier === 'trial' ? 'trial' : 'licence'} with the licence service for more than ${days} days, so it needs a check before KerfDesk opens again. An open KerfDesk keeps its projects, Frame and Start. Connect to the internet and choose Refresh licence. If this computer’s clock is wrong, turn on ${automaticTimeSetting(platform)} first.`;
 }
 
 function updatesExpiredMessage(claims: LicenceClaims): string {

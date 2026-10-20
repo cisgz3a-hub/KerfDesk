@@ -40,7 +40,7 @@ export function parseLicenceStatus(value: unknown): LicenceStatus {
       status.storeUnreadable,
     ].every((flag) => typeof flag === 'boolean') ||
     !validRights(status) ||
-    !validAdmissionGeneration(status.admissionGeneration) ||
+    !validAdmission(status) ||
     !nullableText(status.licenseKey, 256) ||
     !nullableText(status.paymentOrderId, 160) ||
     !nullableText(status.message, 1000)
@@ -49,8 +49,12 @@ export function parseLicenceStatus(value: unknown): LicenceStatus {
   return status;
 }
 
-function validAdmissionGeneration(generation: unknown): boolean {
-  return generation === undefined || (Number.isSafeInteger(generation) && Number(generation) >= 0);
+function validAdmission(status: LicenceStatus): boolean {
+  const generation = status.admissionGeneration;
+  return (
+    (generation === undefined || (Number.isSafeInteger(generation) && Number(generation) >= 0)) &&
+    [undefined, true, false].includes(status.sessionAdmitted)
+  );
 }
 
 function validRights(status: LicenceStatus): boolean {

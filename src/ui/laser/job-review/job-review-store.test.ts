@@ -51,6 +51,20 @@ describe('useJobReviewStore', () => {
     expect(useJobReviewStore.getState().waiter).toBeNull();
   });
 
+  it('holds Confirm from any caller while a card has an unsaved edit (ADR-638)', () => {
+    useJobReviewStore.getState().open(model);
+    useJobReviewStore.getState().reportEditing('red', true);
+    useJobReviewStore.getState().confirm();
+    expect(useJobReviewStore.getState().pendingSignal).toBeNull();
+    useJobReviewStore.getState().reportEditing('red', false);
+    useJobReviewStore.getState().confirm();
+    expect(useJobReviewStore.getState().pendingSignal).toBe('confirm');
+    // A new review starts with no card editing.
+    useJobReviewStore.getState().reportEditing('blue', true);
+    useJobReviewStore.getState().close();
+    expect(useJobReviewStore.getState().editingOperationIds.size).toBe(0);
+  });
+
   it('holds signals raised while unarmed and hands over the highest-priority one', async () => {
     useJobReviewStore.getState().open(model);
     useJobReviewStore.getState().requestRebuild();

@@ -3,13 +3,14 @@ import type { VectorSceneObject } from '../../core/geometry';
 import { offsetShapes, type OffsetShapesOptions } from '../../core/geometry/offset-shapes';
 import { unpackSceneObjectsMessage } from '../packed-scene-objects-transfer';
 import { createVectorOpSession } from './vector-op-worker-client';
-import type { VectorOpRequest, VectorOpResponse, VectorOpTask } from './vector-op-worker-protocol';
+import type { VectorOpMessage, VectorOpRequest, VectorOpTask } from './vector-op-worker-protocol';
 import { vectorOpResponse } from './vector-op-worker-runtime';
 import { parityObjects } from './vector-op-worker.test-fixture';
 
-// Answers like the real worker, but only when the test delivers the reply.
+// Answers like the real worker, but only when the test delivers the reply (or
+// the `ready` its script posts once it has run).
 class FakeWorker {
-  onmessage: ((event: MessageEvent<VectorOpResponse>) => void) | null = null;
+  onmessage: ((event: MessageEvent<VectorOpMessage>) => void) | null = null;
   onerror: (() => void) | null = null;
   onmessageerror: (() => void) | null = null;
   readonly requests: VectorOpRequest[] = [];
@@ -28,11 +29,11 @@ class FakeWorker {
     const { response, transfer } = vectorOpResponse(request.id, this.sources, request.task);
     this.onmessage?.({
       data: structuredClone(response, { transfer }),
-    } as MessageEvent<VectorOpResponse>);
+    } as MessageEvent<VectorOpMessage>);
   }
 
-  send(response: VectorOpResponse): void {
-    this.onmessage?.({ data: response } as MessageEvent<VectorOpResponse>);
+  send(message: VectorOpMessage): void {
+    this.onmessage?.({ data: message } as MessageEvent<VectorOpMessage>);
   }
 
   terminate(): void {
@@ -136,9 +137,31 @@ describe('vector worker session (ADR-609)', () => {
   it.each(['onerror', 'onmessageerror'] as const)('retires a worker after %s', async (handler) => {
     const { session, workers } = harness();
     const running = session.run(parityObjects(), offset(1));
+    workers[0]!.send({ kind: 'ready' });
     workers[0]![handler]?.();
     await expect(running).resolves.toMatchObject({ kind: 'failed' });
     expect(workers[0]!.terminated).toBe(true);
+  });
+
+  it('treats a worker whose script never loads as unavailable, not failed', async () => {
+    // A module worker whose chunk 404s or is blocked still constructs, then errors.
+    const { session, workers } = harness();
+    const sources = parityObjects();
+    const running = session.run(sources, offset(1));
+    workers[0]!.onerror?.();
+    await expect(running).resolves.toStrictEqual({
+      kind: 'unavailable',
+      message: 'The geometry could not be worked out in the background.',
+    });
+    expect(workers[0]!.terminated).toBe(true);
+    // Each fresh worker must announce itself again: one that started earlier
+    // does not vouch for its replacement.
+    const started = session.run(sources, offset(2));
+    workers[1]!.send({ kind: 'ready' });
+    const replacing = session.run(sources, offset(3));
+    await expect(started).resolves.toStrictEqual({ kind: 'superseded' });
+    workers[2]!.onerror?.();
+    await expect(replacing).resolves.toMatchObject({ kind: 'unavailable' });
   });
 
   it('reports a request it could not post as unavailable', async () => {
