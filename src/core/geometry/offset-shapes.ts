@@ -55,17 +55,23 @@ const CORNER_MITER_LIMIT = 4;
 const DEFAULT_MITER_LIMIT = 2;
 const FALLBACK_COLOR = '#000000';
 
+// LightBurn's Corner Style figure cuts a Bevel corner off at the offset
+// distance, so its flat sides run on past the corner (ADR-410 Amendment 2).
+// That is Clipper's Square join. Clipper's Bevel join cuts between the two
+// offset points instead, only 0.71 x the distance from a right-angled corner.
 const JOIN_TYPE: Readonly<Record<OffsetCornerStyle, JoinType>> = {
   round: JoinType.Round,
-  bevel: JoinType.Bevel,
+  bevel: JoinType.Square,
   corner: JoinType.Miter,
 };
 
-// LightBurn does not document open-path end caps; the cap follows the corner
-// style so a Corner offset of a line has square ends and Round has round ends.
+// LightBurn documents no open-path end caps. A line end is a 180° turn, and
+// its cap keeps the outline the offset distance clear of the line: Round has
+// a half circle; Bevel and Corner have a square cap, which is what their joins
+// make of a 180° turn. A flat (butt) cap would cut through the line's end.
 const OPEN_END_TYPE: Readonly<Record<OffsetCornerStyle, EndType>> = {
   round: EndType.Round,
-  bevel: EndType.Butt,
+  bevel: EndType.Square,
   corner: EndType.Square,
 };
 
