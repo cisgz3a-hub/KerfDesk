@@ -180,7 +180,7 @@ function cncReadiness(
 // A router job with laser mode on or unconfirmed. GRBL's laser mode passes zero
 // spindle speed on every non-cutting motion and skips the spin-up delay, both
 // at the dwell after M3 and on Resume (CNC audit JR-1, MC-1: gcode.c, protocol.c).
-// Job Review opens its warning list for these (JobReviewWarnings).
+// Job Review opens the full text of these warnings (JobReviewWarnings).
 export const CNC_LASER_MODE_UNKNOWN_MESSAGE =
   'Controller did not report GRBL $32. KerfDesk cannot prove the controller is in router mode.';
 export const CNC_LASER_MODE_UNVERIFIED_MESSAGE =

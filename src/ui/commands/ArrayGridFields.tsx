@@ -189,7 +189,9 @@ function GridTotalFields(props: {
 // The total is shown from the spacing, but while the field is focused it keeps
 // what is typed, so a half-typed number is not replaced by the recomputed one.
 // Each keystroke that gives a valid total sets the spacing; leaving the field
-// shows the total again.
+// shows the total again. A total that cannot size the grid is explained once
+// the field is left, not at every keystroke on the way to a valid one (typing
+// 120 passes through 1 and 12).
 function TotalField(props: {
   readonly label: string;
   readonly title: string;
@@ -201,6 +203,8 @@ function TotalField(props: {
   readonly set: (spacing: string) => void;
 }): JSX.Element {
   const [draft, setDraft] = useState<string | null>(null);
+  // What was typed when the field was last left, if it could not be used.
+  const [rejected, setRejected] = useState<string | null>(null);
   const n = Math.max(1, Math.trunc(Number(props.count)) || 1);
   const gap = Number(props.spacing) || 0;
   const shown =
@@ -210,12 +214,14 @@ function TotalField(props: {
       ? null
       : spacingForTotal(Number(text), Math.trunc(Number(props.count)), props.size, props.spaceBy);
   const minimum = props.spaceBy === 'centres' ? props.size : n * props.size;
-  const problem =
-    draft === null || draft === shown.toFixed(2) || spacingFor(draft) !== null
+  // A cleared field is not a problem: leaving it shows the total again.
+  const problemFor = (text: string): string | null =>
+    text.trim() === '' || text === shown.toFixed(2) || spacingFor(text) !== null
       ? null
       : n < 2
         ? `Set at least 2 ${props.countName} to size the grid by its total.`
         : `Enter a total of at least ${minimum.toFixed(2)} mm.`;
+  const problem = draft === null && rejected !== null ? problemFor(rejected) : null;
   return (
     <>
       <label style={fieldStyle}>
@@ -225,8 +231,14 @@ function TotalField(props: {
           title={props.title}
           min={0}
           step={0.1}
-          onFocus={(event) => setDraft(event.currentTarget.value)}
-          onBlur={() => setDraft(null)}
+          onFocus={(event) => {
+            setDraft(event.currentTarget.value);
+            setRejected(null);
+          }}
+          onBlur={() => {
+            setRejected(draft !== null && problemFor(draft) !== null ? draft : null);
+            setDraft(null);
+          }}
           onChange={(event) => {
             const text = event.currentTarget.value;
             setDraft(text);

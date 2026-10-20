@@ -1,12 +1,13 @@
 import { JobReviewRegistrationJig, registrationJigConfirmLabel } from './JobReviewRegistrationJig';
 // JobReviewDialog — the pre-start Job Review window (ADR-224). Opens for
-// every Start that goes through the shared start flow, shows everything the
-// burn depends on (stats from the exact prepared G-code, grouped warnings,
-// laser-editable / CNC read-only artwork settings with per-mode detail
-// lines, CNC material & stock, live controller/machine facts, and the absorbed safety
-// acknowledgement), and hands the operator's Confirm/Cancel back to the
-// flow's review gate. Placement is read-only here (v2): the origin tile and
-// the footer fact echo it, editing stays on the machine rail.
+// every Start that goes through the shared start flow and shows what the
+// burn depends on at a glance (v3): stat tiles from the exact prepared
+// G-code, one-line warnings, a card per operation whose laser core numbers
+// Edit and Save straight to the main settings (CNC read-only), CNC material
+// & stock, folded live controller/machine facts, and the absorbed safety
+// acknowledgement. It hands the operator's Confirm/Cancel back to the flow's
+// review gate. Placement is read-only here (v2): the origin tile and the
+// footer fact echo it, editing stays on the machine rail.
 
 import { useEffect, useRef, type RefObject } from 'react';
 import { Button, Dialog, Icon } from '../../kit';
@@ -16,23 +17,23 @@ import {
   bannerStyle,
   footerBarStyle,
   footerOriginStyle,
-  sectionHeadingStyle,
-  sectionStyle,
+  machineFactsGridStyle,
   startButtonContentStyle,
 } from './job-review.styles';
 import { JobReviewAcknowledgement } from './JobReviewAcknowledgement';
 import { JobReviewCncOwnerActions } from './JobReviewCncOwnerActions';
 import { JobReviewControllerSection } from './JobReviewControllerSection';
 import { JobReviewHeader } from './JobReviewHeader';
-import { JobReviewLayersTable } from './JobReviewLayersTable';
 import { JobReviewMachineSection } from './JobReviewMachineSection';
-import { JobReviewSettingsApproval } from './JobReviewSettingsApproval';
+import { JobReviewOperations } from './JobReviewOperations';
 import { JobReviewStats } from './JobReviewStats';
 import { JobReviewStockCard } from './JobReviewStockCard';
 import { JobReviewWarnings } from './JobReviewWarnings';
 import { useJobReviewRebuildTrigger } from './use-job-review-rebuild';
 import { useLaserStore } from '../../state/laser-store';
 import type { JobReviewModel } from './job-review-model';
+
+export const SAVE_EDIT_BEFORE_START_TITLE = 'Save or discard your settings change first.';
 
 export function JobReviewDialog(): JSX.Element | null {
   const state = useJobReviewStore((s) => s.state);
@@ -47,18 +48,30 @@ function OpenJobReview(props: {
   const copy = reviewCopy(purpose);
   const topAnchorRef = useRef<HTMLSpanElement>(null);
   const requestReviewRebuild = useJobReviewRebuildTrigger();
+  // Operation cards report Edit/Save; Start waits while any card holds an
+  // unsaved draft, so the job never runs values other than the ones shown.
+  // The store holds it, so a remote approval waits too (ADR-638 Amendment 1).
+  const isEditing = useJobReviewStore((s) => s.editingOperationIds.size > 0);
+  const reportEditing = useJobReviewStore((s) => s.reportEditing);
   useReviewInitialFocus(topAnchorRef);
   const handleCancel = (): void => useJobReviewStore.getState().cancel();
-  const handleConfirm = (): void => useJobReviewStore.getState().confirm();
   const startDisabledReason = isPreparing
     ? copy.preparingTitle
     : blocker !== null
       ? blocker.join('\n')
-      : null;
+      : isEditing
+        ? SAVE_EDIT_BEFORE_START_TITLE
+        : null;
+  const handleConfirm = (): void => {
+    if (startDisabledReason === null) useJobReviewStore.getState().confirm();
+  };
   return (
     <Dialog title={copy.dialogTitle} size="xl" onClose={handleCancel}>
       <span ref={topAnchorRef} aria-hidden="true" />
-      <JobReviewHeader machineKind={model.machineKind} />
+      <JobReviewHeader
+        machineKind={model.machineKind}
+        laserModeVerified={model.acknowledgement.kind === 'laser-verified'}
+      />
       <JobReviewRegistrationJig
         output={model.registrationJigOutput}
         wholeOutput={model.registrationJigWholeOutput}
@@ -77,8 +90,12 @@ function OpenJobReview(props: {
           ? {}
           : { openCncContourOmissions: model.openCncContourOmissions })}
       />
-      {model.machineKind === 'cnc' ? <JobReviewCncOwnerActions /> : null}
-      <ReviewArtwork model={model} purpose={purpose} onApprove={requestReviewRebuild} />
+      <ReviewArtwork
+        model={model}
+        purpose={purpose}
+        onSaved={requestReviewRebuild}
+        onEditingChange={reportEditing}
+      />
       <ReviewMachineFacts model={model} purpose={purpose} />
       <JobReviewAcknowledgement acknowledgement={model.acknowledgement} purpose={purpose} />
       <div style={footerBarStyle}>
@@ -110,24 +127,29 @@ function OpenJobReview(props: {
 function ReviewArtwork(props: {
   model: JobReviewModel;
   purpose: JobReviewPurpose;
-  onApprove: () => void;
+  onSaved: () => void;
+  onEditingChange: (operationId: string, isEditing: boolean) => void;
 }): JSX.Element {
   if (props.purpose === 'laser-second-pass')
     return (
       <p>
-        The painted areas and their power are fixed to the completed Frame. Cancel to change them in
-        the second-pass canvas, then Frame the changed pass.
+        Painted areas and their power are fixed to the completed Frame. To change them, cancel, edit
+        the second pass, then Frame it again.
       </p>
     );
   return (
     <>
-      <JobReviewStockCard />
-      <JobReviewLayersTable
+      <JobReviewOperations
         machineKind={props.model.machineKind}
         effectiveOperations={props.model.effectiveOperations}
+        onSaved={props.onSaved}
+        onEditingChange={props.onEditingChange}
       />
-      {props.model.machineKind === 'laser' ? (
-        <JobReviewSettingsApproval onApprove={props.onApprove} />
+      {props.model.machineKind === 'cnc' ? (
+        <>
+          <JobReviewCncOwnerActions />
+          <JobReviewStockCard />
+        </>
       ) : null}
     </>
   );
@@ -144,8 +166,7 @@ function ReviewMachineFacts({
   const context =
     purpose === 'laser-second-pass' && frozenProject ? { project: frozenProject } : {};
   return (
-    <section aria-label="Before you start" style={sectionStyle}>
-      <h3 style={sectionHeadingStyle}>Before you start</h3>
+    <section aria-label="Controller and machine" style={machineFactsGridStyle}>
       <JobReviewControllerSection machineKind={model.machineKind} {...context} />
       <JobReviewMachineSection
         machineKind={model.machineKind}
@@ -159,11 +180,11 @@ function ReviewMachineFacts({
 }
 
 // The kit's dialog a11y focuses the first focusable child — here that is a
-// power input two sections down, which both opens the review scrolled past
-// its header and lets a stray keystroke edit a setting sight-unseen. A
-// review opens as a document: show it from the top and focus the dialog
-// surface itself (still inside the focus trap; Tab reaches the fields next).
-// One animation frame later than the kit's focus so this wins the race.
+// button two sections down, which both opens the review scrolled past its
+// header and lets a stray keystroke act sight-unseen. A review opens as a
+// document: show it from the top and focus the dialog surface itself (still
+// inside the focus trap; Tab reaches the controls next). One animation frame
+// later than the kit's focus so this wins the race.
 function useReviewInitialFocus(anchor: RefObject<HTMLElement>): void {
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -221,7 +242,7 @@ function reviewCopy(purpose: JobReviewPurpose): JobReviewCopy {
     return {
       dialogTitle: 'Review job before framing',
       preparingTitle: 'Recomputing the job with your latest edits before framing — one moment.',
-      cancelTitle: 'Close this review without framing. Edits made here are kept.',
+      cancelTitle: 'Close this review without framing. Saved edits are kept.',
       confirmTitle: 'Accept this review and frame the exact job shown above.',
       confirmLabel: 'Accept & Frame',
     };
@@ -229,7 +250,7 @@ function reviewCopy(purpose: JobReviewPurpose): JobReviewCopy {
   return {
     dialogTitle: 'Review job before starting',
     preparingTitle: 'Recomputing the job with your latest edits — one moment.',
-    cancelTitle: 'Close this review without starting. Edits made here are kept.',
+    cancelTitle: 'Close this review without starting. Saved edits are kept.',
     confirmTitle: 'Start this job now with the settings shown above.',
     confirmLabel: 'Start job',
   };

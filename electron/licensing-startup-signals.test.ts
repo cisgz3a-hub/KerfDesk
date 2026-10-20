@@ -13,19 +13,46 @@ async function settled(promise: Promise<void>): Promise<boolean> {
 afterEach(() => vi.useRealTimers());
 
 describe('startup signals for the licence window (ADR-623)', () => {
-  it('admits only after the mounted renderer acknowledges, and re-gates each opening', () => {
+  it('admits only after the mounted renderer acknowledges, and re-gates services each opening', () => {
     const signals = createStartupSignals(false);
     const seen: boolean[] = [];
     signals.admission.onChange((admitted) => seen.push(admitted));
     signals.observeRequest()({ edition: 'free' });
     const generation = signals.observeRequest()({ edition: 'pro' });
     expect(seen).toEqual([false]);
+    expect(signals.sessionAdmitted()).toBe(false);
     signals.admitWorkspace(generation!);
     signals.observeRequest()({ edition: 'pro' });
-    // A reopened macOS window, or a reload, opens behind the window again.
+    // Services such as the camera run only behind a mounted workspace, so a
+    // reopened macOS window or a reload holds them until its renderer acknowledges
+    // (the camera once ran on behind a fresh renderer). The session itself stays
+    // let in, so that renderer opens to its workspace, not the licence window,
+    // even with a free status: a crash reload must reach job recovery
+    // (ADR-623 Amendment 1).
     signals.admission.rendererOpening();
-    signals.observeRequest()({ edition: 'free' });
+    const reloaded = signals.observeRequest()({ edition: 'free' });
     expect(seen).toEqual([false, true, false]);
+    expect(signals.sessionAdmitted()).toBe(true);
+    signals.admitWorkspace(reloaded!);
+    expect(seen).toEqual([false, true, false, true]);
+  });
+
+  it('keeps the session admitted across a renderer crash, but not into a new launch', () => {
+    const signals = createStartupSignals(false);
+    signals.admitWorkspace(signals.observeRequest()({ edition: 'pro' })!);
+    signals.admission.rendererGone();
+    signals.admission.rendererOpening();
+    expect(signals.sessionAdmitted()).toBe(true);
+    expect(createStartupSignals(false).sessionAdmitted()).toBe(false);
+  });
+
+  it('never latches the session on an acknowledgement its window could not have given', () => {
+    // The licence window admits only on a Pro status; an acknowledgement after
+    // nothing but Free must not let a later reload past the window.
+    const signals = createStartupSignals(false);
+    signals.admitWorkspace(signals.observeRequest()({ edition: 'free' })!);
+    signals.admission.rendererOpening();
+    expect(signals.sessionAdmitted()).toBe(false);
   });
 
   it('ignores a Pro reply to a renderer that reloaded before it arrived', () => {
@@ -37,6 +64,7 @@ describe('startup signals for the licence window (ADR-623)', () => {
     staleRequest({ edition: 'pro' });
     signals.admitWorkspace(0);
     expect(seen).toEqual([false]);
+    expect(signals.sessionAdmitted()).toBe(false);
     signals.admitWorkspace(signals.observeRequest()({ edition: 'pro' })!);
     expect(seen).toEqual([false, true]);
   });

@@ -1,13 +1,13 @@
-// The rules behind the lost-reply probe (ADR-610 Amendment 1): which firmware
-// it may ask, when its deadlines run, and who owns its reply.
+// The rules behind the lost-reply probe (ADR-610 Amendments 1 and 2): which
+// firmware it may ask and when, when its deadlines run, and who owns its reply.
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { grblDriver, selectControllerDriver } from '../../core/controllers';
 import { createStreamer } from '../../core/controllers/grbl';
 import {
   handleLostReplyProbeLine,
-  hasOrderedProbe,
   LOST_REPLY_PROBE_REPLY_GRACE_MS,
+  lostReplyProofRule,
   reconcileLostStreamAcknowledgements,
   reportShowsIdle,
 } from './laser-lost-ack-reconcile';
@@ -20,25 +20,41 @@ afterEach(() => {
 });
 
 describe('lost-reply proof rules', () => {
-  it('probes only controllers that answer $G in order behind job lines', () => {
+  it('probes at once only controllers that answer $G in order behind job lines', () => {
     for (const kind of ['grbl-v1.1', 'grblhal', 'fluidnc'] as const) {
-      expect(hasOrderedProbe(selectControllerDriver(kind), kind)).toBe(true);
+      expect(lostReplyProofRule(selectControllerDriver(kind), kind)).toBe('ordered-probe');
     }
     const falcon = selectControllerDriver('grblhal', 'creality-falcon-a1-pro');
-    expect(hasOrderedProbe(falcon, 'grblhal')).toBe(true);
-    expect(hasOrderedProbe(selectControllerDriver('smoothieware'), 'smoothieware')).toBe(false);
-    expect(hasOrderedProbe(selectControllerDriver('marlin'), 'marlin')).toBe(false);
+    expect(lostReplyProofRule(falcon, 'grblhal')).toBe('ordered-probe');
+    expect(lostReplyProofRule(selectControllerDriver('smoothieware'), 'smoothieware')).toBe(
+      'sustained-idle',
+    );
+    expect(lostReplyProofRule(selectControllerDriver('marlin'), 'marlin')).toBe('sustained-idle');
   });
 
   it('requires the firmware itself to be identified, not only the profile', () => {
     const grbl = selectControllerDriver('grbl-v1.1');
     // The profile's driver stays in use when a banner names other firmware.
-    expect(hasOrderedProbe(grbl, 'grblhal')).toBe(true);
-    expect(hasOrderedProbe(grbl, 'smoothieware', true)).toBe(false);
-    expect(hasOrderedProbe(grbl, 'marlin')).toBe(false);
+    expect(lostReplyProofRule(grbl, 'grblhal')).toBe('ordered-probe');
+    expect(lostReplyProofRule(grbl, 'smoothieware', true)).toBe('sustained-idle');
+    expect(lostReplyProofRule(grbl, 'marlin')).toBe('sustained-idle');
     // No banner: only a stock GRBL $I reply this session identifies it.
-    expect(hasOrderedProbe(grbl, null)).toBe(false);
-    expect(hasOrderedProbe(grbl, null, true)).toBe(true);
+    expect(lostReplyProofRule(grbl, null, true)).toBe('ordered-probe');
+  });
+
+  it('asks unidentified GRBL-family firmware only after the sustained Idle (ADR-610 Amendment 2)', () => {
+    // grblHAL, FluidNC and the Falcon command set have no identifying `$I`, so
+    // a board that printed no banner stays unidentified for the session.
+    for (const driver of [
+      selectControllerDriver('grbl-v1.1'),
+      selectControllerDriver('grblhal'),
+      selectControllerDriver('fluidnc'),
+      selectControllerDriver('grblhal', 'creality-falcon-a1-pro'),
+      selectControllerDriver('grbl-v1.1', 'creality-falcon-a1-pro'),
+    ]) {
+      expect(lostReplyProofRule(driver, null)).toBe('probe-after-sustained-idle');
+    }
+    expect(lostReplyProofRule(selectControllerDriver('smoothieware'), null)).toBe('sustained-idle');
   });
 
   it('accepts only a current-session Idle report', () => {

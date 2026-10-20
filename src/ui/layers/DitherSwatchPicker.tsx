@@ -54,6 +54,21 @@ export function originalPixelsNotice(
 }
 
 /**
+ * Whether Min power shapes the burn, so its field belongs on screen. Only
+ * Grayscale shades between Min power and Power; every other dither burns full
+ * power or nothing. Original pixels burn as Grayscale whatever the stored
+ * dither (imageDitherAlgorithm), and compile applies Min power to them too. A
+ * null value is Mixed: the field shows only when every selected image burns
+ * as Grayscale.
+ */
+export function burnsAsGrayscale(
+  passThrough: boolean | null,
+  dither: DitherAlgorithm | null,
+): boolean {
+  return passThrough === true || dither === 'grayscale';
+}
+
+/**
  * The Dither choice as a radio group of swatches, each the same ramp burned
  * with that mode. `value` is null when the selected artwork disagrees (Mixed):
  * no swatch is checked until one is chosen. `notice` says when something else

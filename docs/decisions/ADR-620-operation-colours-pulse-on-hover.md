@@ -47,11 +47,14 @@ mock-up, with a 1400 ms pulse.
    visibility do not count. Per-artwork setting overrides are not considered.
 4. **Operation rows.** Resting the pointer (90 ms) on an operation row in the Artwork panel pulses
    that operation's artwork and its same-settings siblings in the row's colour, sweeping left to
-   right. Passing over rows without settling pulses nothing.
+   right. Passing over rows without settling pulses nothing. Keyboard focus settling within a row
+   does the same and ends when focus leaves the row, so the pulse is not pointer-only (2026-10-20
+   audit fix).
 5. **Hold Alt to peek.** Holding Alt (Option on a Mac) alone for 150 ms draws every operation
    colour, as before this decision; releasing returns to ink. Any other key during the hold
    (Alt+W, Alt+arrow alignment) cancels it, a quick tap does nothing, and losing window focus ends
-   it. A peek suppresses the browser's menu focus on release.
+   it. A peek suppresses the browser's menu focus on release. Alt held while focus is in a text
+   field (an editable target) is typing and never peeks (2026-10-20 audit fix).
 6. **Reduced motion.** With the operating system's reduced-motion setting, the colour and edge
    show while the pointer rests, without the pulse or glow.
 7. **The first operation is blue.** Black moves to the end of `OPERATION_PALETTE`: a black

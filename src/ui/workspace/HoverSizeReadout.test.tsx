@@ -11,6 +11,7 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
+import { CANVAS_PADDING_PX } from './canvas-layout';
 import { HoverSizeReadout } from './HoverSizeReadout';
 
 (
@@ -98,6 +99,49 @@ describe('HoverSizeReadout', () => {
     await hoverAt(130, 70);
     expect(container.textContent).toContain('60.0 × 40.0 mm');
     expect(container.textContent).toContain('X 100.0, Y 50.0');
+  });
+
+  it('reports the power and speed the hovered artwork runs at', async () => {
+    const container = await render(projectWithRect());
+    await hoverAt(130, 70);
+    expect(container.textContent).toContain('Power 30% · Speed 1500 mm/min');
+  });
+
+  it('names a locked piece rather than the piece beneath it, as the hover pulse does', async () => {
+    const base = projectWithRect();
+    const locked: SceneObject = { ...RECT, id: 'L1', name: 'Locked lid', locked: true };
+    const project = { ...base, scene: addObject(base.scene, locked) };
+    const container = await render(project);
+    await hoverAt(130, 70);
+    expect(container.textContent).toContain('Locked lid');
+  });
+
+  it('keeps the readout on the canvas near its right and bottom edges', async () => {
+    const project = projectWithRect();
+    const container = await render(project);
+    await hoverAt(130, 70);
+    // Room to spare: the chip hangs right of and below the pointer.
+    expect((container.firstElementChild as HTMLElement).style.transform).toBe('');
+
+    // At 1 px per mm, panned so the hovered point lands in the bed's far corner.
+    const { bedWidth, bedHeight } = project.device;
+    await act(async () =>
+      root?.render(
+        <HoverSizeReadout
+          project={project}
+          canvasSize={{
+            width: bedWidth + CANVAS_PADDING_PX * 2,
+            height: bedHeight + CANVAS_PADDING_PX * 2,
+          }}
+          viewState={{ zoomFactor: 1, panX: bedWidth - 150, panY: bedHeight - 100 }}
+          enabled
+        />,
+      ),
+    );
+    await hoverAt(131, 71);
+    expect((container.firstElementChild as HTMLElement).style.transform).toBe(
+      'translate(-100%, -100%)',
+    );
   });
 
   it('says nothing over empty bed, after the pointer leaves, or while disabled', async () => {

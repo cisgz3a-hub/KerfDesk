@@ -26,6 +26,8 @@ export type LicenceEntry = {
    */
   readonly observeRequest?: (() => (status: LicenceStatus) => number | null) | undefined;
   readonly admitWorkspace?: ((generation: number) => void) | undefined;
+  /** Whether this app session's licence window already let a workspace in (ADR-623 Amendment 1). */
+  readonly sessionAdmitted?: (() => boolean) | undefined;
 };
 
 export function withLicensingRoutes(
@@ -56,7 +58,11 @@ export function withLicensingRoutes(
     const observe = entry.observeRequest?.();
     const sent = (status: LicenceStatus): Response => {
       const generation = observe?.(status);
-      return response(generation == null ? status : { ...status, admissionGeneration: generation });
+      if (generation == null) return response(status);
+      // A renderer reloaded in a session the window already let in opens to its
+      // workspace and job recovery, whatever the rights are now.
+      const session = entry.sessionAdmitted?.() === true ? { sessionAdmitted: true } : {};
+      return response({ ...status, admissionGeneration: generation, ...session });
     };
     if (action === 'status' && request.method === 'GET') return sent(await runtime.status());
     if (ENTRY_ACTIONS.has(action)) return entryRoute(action as EntryAction, request, entry);

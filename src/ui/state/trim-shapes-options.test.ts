@@ -168,4 +168,26 @@ describe('Trim Shapes options', () => {
       'The kept segment is on the same layer as the trimmed shape, so it will be cut too.',
     );
   });
+
+  it('keeps a stretch in a colour with no layer on its own path binding, and warns', () => {
+    // The artwork says Cut, but this path is bound to Score: the operator saw it as Score.
+    const plain = art('only', square(0, 0, 20));
+    const original: ImportedSvg = {
+      ...plain,
+      paths: plain.paths.map((path) => ({ ...path, operationIds: ['score'] })),
+    };
+    const state = useStore.getState();
+    useStore.setState({
+      project: { ...state.project, scene: { ...state.project.scene, objects: [original] } },
+    });
+    useToastStore.setState({ toasts: [] });
+    useStore.getState().trimShapeAt({ x: 20, y: 10 }, 0.5, { keepRemoved: { color: '#00ff00' } });
+    const kept = objects().find(
+      (object) => object.kind === 'imported-svg' && object.source === 'Trimmed segment',
+    );
+    expect(kept?.operationIds).toEqual(['score']);
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toContain(
+      'The kept segment is on the same layer as the trimmed shape, so it will be cut too.',
+    );
+  });
 });
