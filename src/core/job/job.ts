@@ -77,8 +77,13 @@ export type CutSegment = {
   readonly leadSource?: string;
   /** ADR-626: on a contour given leads, where the closed contour lies in
    * `polyline` (first and last index, inclusive), so editing where a job
-   * starts can still pick any point on it (jobWithoutLeads). */
-  readonly leadContour?: { readonly from: number; readonly to: number };
+   * starts can still pick supported points on it (jobWithoutLeads). Native
+   * contour moves retain their fingerprint and move-boundary start policy. */
+  readonly leadContour?: {
+    readonly from: number;
+    readonly to: number;
+    readonly arcMoves?: CutArcMoves;
+  };
 };
 
 /** Fitted line/arc moves for a CutSegment (ADR-432), with a fingerprint of
