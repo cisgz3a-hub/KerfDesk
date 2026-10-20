@@ -191,12 +191,16 @@ function PendingProDialog({
 /**
  * Lets the workspace in the first time this session reports Pro, and keeps it
  * in until KerfDesk closes: a licence change never unmounts a running job or an
- * open project (ADR-623).
+ * open project (ADR-623). The main process remembers that the app session was
+ * let in, so a renderer reloaded after a crash, or a reopened macOS window,
+ * reaches its workspace and job recovery even after rights ended (ADR-623
+ * Amendment 1).
  */
 function useSessionAdmission(status: LicenceStatus | null, client: LicenceAdapter): boolean {
   const [admitted, setAdmitted] = useState(false);
   const acknowledged = useRef<number | null>(null);
-  if (!admitted && status?.edition === 'pro') setAdmitted(true);
+  const admits = status?.edition === 'pro' || status?.sessionAdmitted === true;
+  if (!admitted && admits) setAdmitted(true);
   useEffect(() => {
     const generation = status?.admissionGeneration;
     if (!admitted || generation === undefined || acknowledged.current === generation) return;
@@ -205,7 +209,7 @@ function useSessionAdmission(status: LicenceStatus | null, client: LicenceAdapte
       acknowledged.current = null;
     });
   }, [admitted, client, status]);
-  return admitted || status?.edition === 'pro';
+  return admitted || admits;
 }
 
 /**
