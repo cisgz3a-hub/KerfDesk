@@ -157,7 +157,8 @@ KerfDesk already had CNC profile leads (`core/cnc/profile-lead.ts`, ADR-250), cl
     Line cut groups and never change; CNC keeps its own ADR-250 leads. Preparation is routed to the
     background worker when a scene's work units reach the budget (`preparation-complexity.ts`); each
     asked-for lead on a closed contour adds one unit per 0.25 mm of lead, so thousands of contours
-    with long leads are not fitted on the UI thread.
+    with long leads are not fitted on the UI thread. The contours counted are the ones compile cuts:
+    the canonical curve subpaths when a path has them, as saved projects do, else its polylines.
 
 ### Why this is better than LightBurn
 
