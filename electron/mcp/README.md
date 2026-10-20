@@ -58,7 +58,7 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `review_machine_job` | Machine write admission | Prepare the ordinary exact Job Review with a one-use handle; does not confirm Start. |
 | `start_job` | Machine write admission, `reviewId` UUID | Explicitly confirm the owned current review; changed review facts require another confirmation. |
 | `abort_job` | `requestId` UUID | Canonical network Abort, independently admitted while another command waits; no artwork revision required. |
-| `connect_machine`, `disconnect_machine` | Machine write admission | ADR-585. Reconnect only to the port already chosen on the PC (`portSelection: 'automatic'`); disconnect refused during a job or motion. |
+| `connect_machine`, `disconnect_machine` | Machine write admission | ADR-585. Reconnect only to the port already chosen on the PC (`portSelection: 'remembered-only'`, ADR-639); disconnect refused during a job or motion. |
 | `home_machine` | Machine write admission | Desktop Home with all its guards. |
 | `set_work_origin` | Machine write admission, `axes` xy/z | Desktop Set origin here / Zero Z; no motion. |
 | `pause_job`, `resume_job` | `requestId` UUID | Desktop Pause/Resume with controller confirmation; no artwork revision required. |

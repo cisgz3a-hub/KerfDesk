@@ -1,4 +1,6 @@
-import { describeAlarm, type StreamerStatus } from '../../core/controllers/grbl';
+import type { StreamerStatus } from '../../core/controllers/grbl';
+import { presentAlarm } from '../../core/controllers/grbl/response-presentation';
+import type { ControllerKind } from '../../core/devices';
 import type { JobInterruption } from '../../core/recovery';
 import {
   currentStreamResetMayLosePosition,
@@ -66,22 +68,26 @@ const PLANNER_DISCARDING_KINDS: ReadonlyArray<JobInterruption['kind']> = [
 ];
 
 /** Whether the run's stop may have killed the steppers mid-motion: a reset
- * KerfDesk sent against a moving machine, or an alarm GRBL or grblHAL
- * documents as losing position (a hard limit, ALARM:3). Code 10 is a homing
- * failure on GRBL and an E-stop on grblHAL; both lose position, so either
- * table's verdict counts. Start refuses an alarmed controller, so an alarm
- * code seen during a run was raised by it (ADR-215 Amendment 1). */
+ * KerfDesk sent against a moving machine, or an alarm the connected
+ * controller's own table documents as losing position (a hard limit,
+ * ALARM:3). The tables number alarms differently: 13 is a hard stop on
+ * FluidNC but probe protection on grblHAL, so the code is read against the
+ * firmware that raised it (ADR-644): the connected driver's, and also the
+ * banner's when it names a different firmware, either verdict counting.
+ * Start refuses an alarmed controller, so an alarm code seen during a run was
+ * raised by it (ADR-215 Amendment 1). */
 export function runStopMayHaveLostPosition(state: {
   readonly alarmCode: number | null;
   readonly streamReset?: StreamReset | null;
   readonly streamerEpoch: number;
+  readonly activeControllerKind: ControllerKind;
+  readonly detectedControllerKind?: ControllerKind | null;
 }): boolean {
   if (currentStreamResetMayLosePosition(state)) return true;
-  if (state.alarmCode === null) return false;
-  return (
-    describeAlarm(state.alarmCode, 'grbl')?.positionLost === true ||
-    describeAlarm(state.alarmCode, 'grblhal')?.positionLost === true
-  );
+  const code = state.alarmCode;
+  if (code === null) return false;
+  const kinds = [state.activeControllerKind, state.detectedControllerKind ?? null];
+  return kinds.some((kind) => kind !== null && presentAlarm(kind, code)?.positionLost === true);
 }
 
 function interruptionCause(

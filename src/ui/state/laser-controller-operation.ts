@@ -49,6 +49,9 @@ export type LaserControllerOperation =
       readonly pollingOwnership?: 'terminal-exchange';
       /** This owned exchange may have dispatched a move; Disconnect must stop it. */
       readonly mayMove?: true;
+      /** A read (settings, build info, firmware or module report) that cannot
+       * move the machine, so a lost link raises no E-stop banner (ADR-639). */
+      readonly movesNothing?: true;
     }
   | {
       readonly kind: 'recovery';
@@ -147,6 +150,13 @@ export function interactiveControllerOperation(
   };
 }
 
+/** An owned exchange that only reads from the controller (ADR-639). */
+export function readOnlyControllerOperation(
+  label: string,
+): Extract<LaserControllerOperation, { readonly kind: 'interactive-command' }> {
+  return { ...interactiveControllerOperation(label, 'terminal-exchange'), movesNothing: true };
+}
+
 export function controllerOperationCommandBlockMessage(
   operation: LaserControllerOperation | null,
 ): string | null {
@@ -156,6 +166,56 @@ export function controllerOperationCommandBlockMessage(
 export function isUnsafeControllerOperation(operation: LaserControllerOperation | null): boolean {
   return operation !== null && operation.kind !== 'connection-handshake';
 }
+
+/** How a lost link could leave the machine moving (ADR-639). 'job': a job's
+ * queue, its post-job tail or the fence just before Start; 'motion': Home,
+ * auto-focus, probe, the start mark, the stop a Disconnect writes (it replaces
+ * the jog or job it stops), a reset not yet answered from its far side, or any
+ * owned command not marked movesNothing, since a motion settlement can move.
+ * null: the operation reads or waits and moves nothing (the handshake,
+ * settings, build-info, firmware and module reads, and work-Z reads).
+ * `latestReport` is the controller's last status report: a reset clears it. */
+export function controllerOperationMotion(
+  operation: LaserControllerOperation | null,
+  latestReport: { readonly state: string } | null = null,
+): 'job' | 'motion' | null {
+  if (operation === null) return null;
+  if (operation.kind === 'interactive-command') {
+    return operation.movesNothing === true ? null : 'motion';
+  }
+  if (operation.kind === 'recovery') {
+    return resetMayStillMove(operation.phase, latestReport) ? 'motion' : null;
+  }
+  return OPERATION_MOTION[operation.kind];
+}
+
+// Abort and Reset controller write Ctrl-X to stop whatever was moving. The
+// reset is not proven delivered until the controller reports from its far
+// side, so until a fresh report shows it at rest the motion may still run.
+const AT_REST_AFTER_RESET: ReadonlySet<string> = new Set(['Idle', 'Alarm', 'Sleep']);
+
+function resetMayStillMove(
+  phase: 'reset' | 'awaiting-idle',
+  latestReport: { readonly state: string } | null,
+): boolean {
+  if (phase === 'reset') return true;
+  return latestReport === null || !AT_REST_AFTER_RESET.has(latestReport.state);
+}
+
+const OPERATION_MOTION: Record<
+  Exclude<LaserControllerOperation['kind'], 'interactive-command' | 'recovery'>,
+  'job' | 'motion' | null
+> = {
+  'post-job-settle': 'job',
+  'start-arming': 'job',
+  home: 'motion',
+  autofocus: 'motion',
+  probe: 'motion',
+  'job-start-mark': 'motion',
+  disconnect: 'motion',
+  'connection-handshake': null,
+  'work-z-recovery': null,
+};
 
 export function describeControllerOperation(operation: LaserControllerOperation | null): string {
   if (operation?.kind === 'connection-handshake') {

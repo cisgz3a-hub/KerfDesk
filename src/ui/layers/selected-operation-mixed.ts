@@ -42,6 +42,12 @@ const OPERATION_SETTING_KEYS = [
   'imageCrossHatch',
   'passAngleStepDeg',
   'autoOverscan',
+  'leadInEnabled',
+  'leadOutEnabled',
+  'leadStyle',
+  'leadLengthMm',
+  'leadAngleDeg',
+  'leadSide',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 export function mixedOperationFields(

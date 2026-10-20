@@ -11,7 +11,8 @@ import { controllerStoppedResponding } from '../state/controller-recovery-status
 import { useLaserStore } from '../state/laser-store';
 import type { ConnectControllerOptions } from '../state/laser-store';
 import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
-import { ConnectionBar } from './ConnectionBar';
+import { pauseAutoConnect, useAutoConnectSession } from '../state/auto-connect-session';
+import { ConnectionBar, type ConnectionBarProps } from './ConnectionBar';
 import { connectMachine } from './connect-machine';
 import { ConnectedMachineProfile } from './ConnectedMachineProfile';
 import { LaserModuleRow } from './LaserModuleRow';
@@ -65,9 +66,16 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
     if (useLaserStore.getState().getMachineSettingsReadBlockReason() !== null) return;
     void retryQualification().catch(controllerActionFailureHandler('Check controller'));
   };
-  // A connected machine is closed first, so the chosen port replaces it.
+  // The operator's Disconnect pauses auto-connect until a port they choose
+  // opens (ADR-639); the store's own disconnect, used by the baud scan, does not.
+  const disconnect = async (): Promise<void> => {
+    pauseAutoConnect();
+    await disconnectController();
+  };
+  // A connected machine is closed first, so the chosen port replaces it. A
+  // cancelled picker then leaves it disconnected and auto-connect paused.
   const choosePort = async (): Promise<void> => {
-    if (useLaserStore.getState().connection.kind === 'connected') await disconnectController();
+    if (useLaserStore.getState().connection.kind === 'connected') await disconnect();
     await connectMachine(platform, { portSelection: 'choose' });
   };
   const autoConnect = useAutoConnectPreference();
@@ -86,16 +94,13 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         details={<MachineDetailsContent />}
         setup={<DeviceSetupControls />}
         onChoosePort={() => void choosePort().catch(controllerActionFailureHandler('Connect'))}
-        autoConnect={autoConnect.enabled}
-        onAutoConnectChange={autoConnect.change}
+        {...autoConnect}
         portChoiceEndsOnRestart={platform.serial.picksEndOnRestart === true}
         portMemoryNeedsSerialNumber={isApplePlatform() || isLinuxDesktop()}
         connection={connection}
         machineNoun={machineNoun(props.machineKind)}
         onConnect={connect}
-        onDisconnect={() =>
-          void disconnectController().catch(controllerActionFailureHandler('Disconnect'))
-        }
+        onDisconnect={() => void disconnect().catch(controllerActionFailureHandler('Disconnect'))}
         onForget={props.onForget}
         qualification={qualification}
         qualificationReadBlockReason={qualificationReadBlockReason}
@@ -123,16 +128,23 @@ function MachineDetailsContent(): JSX.Element {
   );
 }
 
-function useAutoConnectPreference(): {
-  readonly enabled: boolean;
-  readonly change: (enabled: boolean) => void;
-} {
+// The saved preference, plus this run's pause and skipped hint (ADR-639).
+function useAutoConnectPreference(): Pick<
+  ConnectionBarProps,
+  'autoConnect' | 'onAutoConnectChange' | 'autoConnectPaused' | 'autoConnectSkipped'
+> {
   const [enabled, setEnabled] = useState(() => loadAutoConnectPreference(browserLocalStorage()));
+  const session = useAutoConnectSession();
   const change = (next: boolean): void => {
     saveAutoConnectPreference(browserLocalStorage(), next);
     setEnabled(next);
   };
-  return { enabled, change };
+  return {
+    autoConnect: enabled,
+    onAutoConnectChange: change,
+    autoConnectPaused: session.paused,
+    autoConnectSkipped: session.skippedReason,
+  };
 }
 
 function ConnectionHints(props: {

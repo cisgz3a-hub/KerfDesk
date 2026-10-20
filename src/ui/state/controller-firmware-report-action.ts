@@ -7,7 +7,7 @@ import type { LiveRefs, LaserState } from './laser-store';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
 import {
   controllerOperationOwner,
-  interactiveControllerOperation,
+  readOnlyControllerOperation,
 } from './laser-controller-operation';
 import { startControllerCommand } from './laser-interactive-command';
 import type { SafeWrite } from './laser-safe-write';
@@ -32,10 +32,7 @@ export function firmwareReportActions(
       const connection = refs.connection;
       const driver = refs.driver;
       const sessionEpoch = get().controllerSessionEpoch;
-      const operation = interactiveControllerOperation(
-        'Reading firmware report',
-        'terminal-exchange',
-      );
+      const operation = readOnlyControllerOperation('Reading firmware report');
       const owns = (): boolean => {
         const current = get().controllerOperation;
         return (
