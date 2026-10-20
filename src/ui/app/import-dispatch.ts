@@ -330,9 +330,8 @@ async function dispatchOneFile(
   }
   const openInspector = actions.openGcodeInspector;
   if (openInspector !== undefined) {
-    await whenPro('gcode-inspector', () =>
-      openGcodeFileInInspector(file, openInspector, actions.pushToast),
-    );
+    // The G-code Inspector is free in every edition (ADR-627).
+    await openGcodeFileInInspector(file, openInspector, actions.pushToast);
   }
 }
 

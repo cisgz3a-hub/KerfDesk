@@ -29,7 +29,11 @@ export type GcodeInspectionTiming = {
 
 export type GcodeInspectionContext = Pick<
   BuildRenderModelOptions,
-  'machineKind' | 'laserPowerControl'
+  // initialPositionMm: an external run reads its program from where the head
+  // stands (ADR-630); other inspections start at the drawn origin.
+  // boundsFromStart: its Frame outline keeps only motion placed in the work
+  // coordinates the program starts in (ADR-630 Amendment 1).
+  'machineKind' | 'laserPowerControl' | 'initialPositionMm' | 'boundsFromStart'
 > & {
   readonly timing?: GcodeInspectionTiming;
   /** The machine bed in program coordinates, only when the program runs in
@@ -60,7 +64,11 @@ export type GcodeInspectionSource = (
   | { readonly kind: 'blob'; readonly blob: Blob }
   | { readonly kind: 'text'; readonly text: string }
 ) &
-  GcodeInspectionContext;
+  GcodeInspectionContext & {
+    /** A file the operator opened, which the Inspector may run (ADR-630);
+     * the project's own program has Frame and Start already. */
+    readonly openedFile?: true;
+  };
 
 /** Context belongs to the compiled snapshot; arbitrary imported programs have
  * no inferred machine kind because CNC and laser share M3/M4/S words.
