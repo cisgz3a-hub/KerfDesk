@@ -34,6 +34,7 @@ import { emitScanlineFillGroup } from './grbl-fill-emission';
 import {
   LINE_END,
   contourEntryComment,
+  leadComment,
   overcutComment,
   tabSpanComment,
   feedComment,
@@ -280,7 +281,7 @@ function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
-    `; layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}${overcutComment(group.finalPassOvercutMm)}${tabSpanComment(group.tabSpanPowerPercent)}`,
+    `; layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}${overcutComment(group.finalPassOvercutMm)}${leadComment(group.laserLeads)}${tabSpanComment(group.tabSpanPowerPercent)}`,
   );
   pushOperationProvenanceComment(chunks, group);
   const segmentContext = { ...context, s, feed, entryRunwayMm: group.entryRunwayMm };

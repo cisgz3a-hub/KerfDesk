@@ -95,8 +95,9 @@ LongMill), design in Inkscape / Illustrator / Affinity, and expect a LightBurn-s
   negative and pass-through.
 - Image trace with five presets across three in-house engines: filled-contour (Line Art, Smooth,
   Sharp), **centerline/medial-axis**, and Canny **edge detection**.
-- Kerf compensation, automatic holding tabs, set-work-origin (`G92`), framing, and
-  **Convert to Bitmap** for vector→raster engraving.
+- Kerf compensation, automatic holding tabs, **lead-in/lead-out** that finds the scrap side of
+  each shape, set-work-origin (`G92`), framing, and **Convert to Bitmap** for vector→raster
+  engraving.
 
 ### CNC / router
 

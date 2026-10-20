@@ -18,6 +18,7 @@ import {
 import { flattenColoredPathCurvesForTransform } from '../scene/curve-path';
 import { effectiveOperationForObject } from '../effective-output';
 import { sceneHasVCarveOutputLayer } from './vcarve-preparation-complexity';
+import { laserLeadSpecFor } from './laser-lead-settings';
 import {
   createFillEstimateWorkBudget,
   estimatePathFillSegments,
@@ -26,6 +27,10 @@ import {
 
 export const PREPARATION_RAW_VECTOR_SEGMENT_BUDGET = 100_000;
 export const PREPARATION_COMPILED_SEGMENT_BUDGET = 20_000;
+// Laser leads (ADR-626) are fitted in 0.05 mm steps, each checked against the
+// cuts nearby, at up to four lengths and four restarts: about as much work as
+// one source segment for every quarter millimetre of lead.
+const LEAD_MM_PER_WORK_UNIT = 0.25;
 
 /**
  * Advisory size class for a scene. 'unknown' means the bounded fill estimate
@@ -127,14 +132,29 @@ function laserVectorPreparationWorkUnits(scene: Scene, segmentBudget: number): n
       const operation = effectiveLayer(layer, obj);
       if (operation.mode === 'image') continue;
       const passes = laserPassCount(operation.passes);
+      const leadUnits = leadWorkUnitsPerContour(operation);
       for (const path of vectorPaths(obj)) {
         if (!pathUsesOperation(obj, path, layer)) continue;
         const transform = vectorTransform(obj);
         if (transform !== null) count += countPathSegments(path, transform, segmentBudget) * passes;
+        if (leadUnits > 0) count += leadUnits * closedContourCount(path);
         if (count >= segmentBudget) return count;
       }
     }
   }
+  return count;
+}
+
+function leadWorkUnitsPerContour(operation: Layer): number {
+  const spec = operation.mode === 'line' ? laserLeadSpecFor(operation) : null;
+  if (spec === null) return 0;
+  const leads = (spec.leadIn ? 1 : 0) + (spec.leadOut ? 1 : 0);
+  return leads * Math.ceil(spec.lengthMm / LEAD_MM_PER_WORK_UNIT);
+}
+
+function closedContourCount(path: ColoredPath): number {
+  let count = 0;
+  for (const polyline of path.polylines) if (polyline.closed) count += 1;
   return count;
 }
 
