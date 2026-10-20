@@ -17,10 +17,10 @@ const STAGES: Record<
 > = {
   identify: {
     title: 'Machine',
-    hint: 'Find it or choose it',
-    heading: 'Let’s set up your machine.',
+    hint: 'Choose your machine',
+    heading: 'Which machine do you have?',
     description:
-      'Connect it and KerfDesk fills in what the controller reports, or choose the type and a profile yourself.',
+      'Choose it from the list, or enter its size and firmware if it isn’t listed. Connecting fills in what the controller reports.',
   },
   confirm: {
     title: 'Essentials',
@@ -200,24 +200,14 @@ function SetupActions(props: ShellProps): JSX.Element {
           </Button>
         ) : (
           <Button
-            variant={stage === 'identify' ? 'default' : 'primary'}
+            variant="primary"
             onClick={() => props.dispatch({ kind: 'next' })}
             disabled={props.saving}
             {...helpProps('control:laser.device-setup.next')}
           >
-            {stage === 'identify' ? 'Check essentials' : 'Review setup'} <Icon name="arrow-right" />
+            Next <Icon name="arrow-right" />
           </Button>
         )}
-        {stage === 'identify' ? (
-          <Button
-            variant="primary"
-            onClick={() => props.dispatch({ kind: 'go', step: 'review' })}
-            disabled={props.saving}
-            title="Go straight to the review of your selected profile. Nothing is saved until you press Save there."
-          >
-            Review setup <Icon name="arrow-right" />
-          </Button>
-        ) : null}
       </DialogActions>
     </footer>
   );

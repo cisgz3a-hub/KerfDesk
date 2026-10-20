@@ -1,6 +1,6 @@
-// Which state Find my machine is in, with its heading and one-line
-// explanation (ADR-420). Derived from the live connection each render; the
-// only local choice is "Set up without connecting".
+// Which state the Machine stage's connection strip is in, with its heading and
+// one-line explanation (ADR-420, ADR-637). Derived from the live connection
+// each render. Choosing a machine never waits on it.
 
 import { assertNever } from '../../../core/scene';
 import type { ConnectionState } from '../../state/laser-store';
@@ -13,7 +13,6 @@ export type FindMachinePhaseKind =
   | 'unsupported'
   | 'file-only'
   | 'idle'
-  | 'offline'
   | 'connecting'
   | 'reading'
   | 'scanning'
@@ -43,47 +42,41 @@ export type FindMachineFacts = {
   readonly networkTarget?: string | undefined;
 };
 
-export function findMachinePhase(
-  model: {
-    readonly supportsSerial: boolean;
-    readonly driver: { readonly capabilities: { readonly transport: 'serial' | 'file-only' } };
-    readonly guide: { readonly label: string; readonly writeExplanation: string };
-    readonly baudRate: number;
-    readonly laser: {
-      readonly connection: ConnectionState;
-      readonly qualification: ControllerQualification;
-      readonly statusReport: unknown;
-      readonly detectedControllerKind: string | null;
-      readonly serialPortInfo: Parameters<typeof usbIdLabel>[0];
-      readonly connectedBaudRate: number | null;
-    };
-    readonly scan: { readonly status: BaudScanStatus };
-    readonly networkTarget?: string | undefined;
-  },
-  offline: boolean,
-): FindMachinePhase {
+export function findMachinePhase(model: {
+  readonly supportsSerial: boolean;
+  readonly driver: { readonly capabilities: { readonly transport: 'serial' | 'file-only' } };
+  readonly guide: { readonly label: string; readonly writeExplanation: string };
+  readonly baudRate: number;
+  readonly laser: {
+    readonly connection: ConnectionState;
+    readonly qualification: ControllerQualification;
+    readonly statusReport: unknown;
+    readonly detectedControllerKind: string | null;
+    readonly serialPortInfo: Parameters<typeof usbIdLabel>[0];
+    readonly connectedBaudRate: number | null;
+  };
+  readonly scan: { readonly status: BaudScanStatus };
+  readonly networkTarget?: string | undefined;
+}): FindMachinePhase {
   const { laser } = model;
-  return phaseFromFacts(
-    {
-      supportsSerial: model.supportsSerial,
-      transport: model.driver.capabilities.transport,
-      controllerLabel: model.guide.label,
-      fileOnlyExplanation: model.guide.writeExplanation,
-      baudRate: model.baudRate,
-      connection: laser.connection,
-      qualification: laser.qualification,
-      heardController: laser.statusReport !== null || laser.detectedControllerKind !== null,
-      detectedLabel: laser.detectedControllerKind,
-      portUsb: usbIdLabel(laser.serialPortInfo),
-      connectedBaudRate: laser.connectedBaudRate,
-      scan: model.scan.status,
-      networkTarget: model.networkTarget,
-    },
-    offline,
-  );
+  return phaseFromFacts({
+    supportsSerial: model.supportsSerial,
+    transport: model.driver.capabilities.transport,
+    controllerLabel: model.guide.label,
+    fileOnlyExplanation: model.guide.writeExplanation,
+    baudRate: model.baudRate,
+    connection: laser.connection,
+    qualification: laser.qualification,
+    heardController: laser.statusReport !== null || laser.detectedControllerKind !== null,
+    detectedLabel: laser.detectedControllerKind,
+    portUsb: usbIdLabel(laser.serialPortInfo),
+    connectedBaudRate: laser.connectedBaudRate,
+    scan: model.scan.status,
+    networkTarget: model.networkTarget,
+  });
 }
 
-export function phaseFromFacts(facts: FindMachineFacts, offline: boolean): FindMachinePhase {
+export function phaseFromFacts(facts: FindMachineFacts): FindMachinePhase {
   if (facts.transport === 'file-only') {
     return phase(
       'file-only',
@@ -116,18 +109,18 @@ export function phaseFromFacts(facts: FindMachineFacts, offline: boolean): FindM
     case 'connected':
       return connectedPhase(facts);
     case 'disconnected':
-      return disconnectedPhase(facts, offline);
+      return disconnectedPhase(facts);
     default:
       return assertNever(facts.connection);
   }
 }
 
-function disconnectedPhase(facts: FindMachineFacts, offline: boolean): FindMachinePhase {
+function disconnectedPhase(facts: FindMachineFacts): FindMachinePhase {
   if (!facts.supportsSerial) {
     return phase(
       'unsupported',
       'This browser can’t reach USB machines',
-      'Use Chrome or Edge, or the KerfDesk desktop app, to find the machine. You can still set it up below without connecting.',
+      'Use Chrome or Edge, or the KerfDesk desktop app, to connect. You can still choose your machine below.',
     );
   }
   if (facts.scan.kind === 'none') {
@@ -137,18 +130,11 @@ function disconnectedPhase(facts: FindMachineFacts, offline: boolean): FindMachi
       `Tried ${facts.scan.tried.join(', ')} baud. Check the USB cable and that the machine is switched on, or choose a different port.`,
     );
   }
-  if (offline) {
-    return phase(
-      'offline',
-      'Setting up without connecting',
-      'Choose the machine type and a profile below, or enter your own values. You can find the machine at any time.',
-    );
-  }
   return phase(
     'idle',
-    'Find your machine',
+    'Not connected',
     facts.networkTarget === undefined
-      ? 'Plug it in by USB and switch it on. KerfDesk reads its firmware, work area, speed and power range and fills them in for you. Nothing moves, and no controller setting is changed.'
+      ? 'Connect by USB to read the firmware, work area, speed and power range into this setup. Nothing moves, and no controller setting is changed. You can choose your machine without connecting.'
       : `Connect to ${facts.networkTarget} to read its firmware and settings. Nothing moves, and no controller setting is changed.`,
   );
 }

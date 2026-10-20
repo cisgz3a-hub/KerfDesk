@@ -7,8 +7,9 @@ import {
 } from '../../core/variables';
 import { Button } from '../kit';
 import { useStore } from '../state';
-import { DEFAULT_TEXT_COLOR } from '../../core/text';
-import { renderTextGeometry } from './render-text-geometry';
+import { DEFAULT_TEXT_COLOR, type TextRenderResult } from '../../core/text';
+import { TextWorkerError } from './text-worker-session';
+import { useTextWorkerSession } from './use-text-worker-session';
 import type { DialogValues } from './use-text-dialog-fields';
 
 type Row = {
@@ -102,6 +103,7 @@ function useRowLayout(
   values: DialogValues | undefined,
 ): Readonly<Record<number, string>> {
   const [layouts, setLayouts] = useState<Readonly<Record<number, string>>>({});
+  const textWorker = useTextWorkerSession();
   useEffect(() => {
     let current = true;
     setLayouts({});
@@ -115,22 +117,30 @@ function useRowLayout(
         current = false;
       };
     }
+    // Set while a row is being laid out. Only busy work is released when the
+    // rows change or the preview closes; an idle worker keeps its parsed font
+    // for the next edit (ADR-643, decision 5).
+    let busy = false;
     const render = async (): Promise<void> => {
+      busy = true;
       const result: Record<number, string> = {};
       for (const row of rows) {
         if (!current) return;
         if (!row.valid) continue;
         try {
-          const rendered = await renderTextGeometry({ ...values, content: row.value });
-          const layout = rendered.textBoxLayout;
-          result[row.index] =
-            layout === undefined
-              ? 'Natural text size'
-              : `${layout.overflow ? 'Overflow' : 'Fits'} · ${layout.sizeMm.toFixed(2)} mm · ${layout.lineCount} lines`;
+          const rendered = await textWorker.render({ ...values, content: row.value });
+          result[row.index] = rowLayoutLabel(rendered.textBoxLayout);
         } catch (error) {
           result[row.index] = error instanceof Error ? error.message : String(error);
+          // A worker that cannot start fails the same way for every later row,
+          // and each attempt would start and retire another one.
+          if (error instanceof TextWorkerError && error.outcome === 'unavailable') {
+            for (const rest of rows) if (rest.valid) result[rest.index] ??= error.message;
+            break;
+          }
         }
       }
+      busy = false;
       if (current) setLayouts(result);
     };
     const timer = window.setTimeout(() => {
@@ -139,9 +149,16 @@ function useRowLayout(
     return () => {
       current = false;
       window.clearTimeout(timer);
+      if (busy) textWorker.release();
     };
-  }, [rows, values]);
+  }, [rows, values, textWorker]);
   return layouts;
+}
+
+function rowLayoutLabel(layout: TextRenderResult['textBoxLayout']): string {
+  if (layout === undefined) return 'Natural text size';
+  const fit = layout.overflow ? 'Overflow' : 'Fits';
+  return `${fit} · ${layout.sizeMm.toFixed(2)} mm · ${layout.lineCount} lines`;
 }
 
 function previewTextObject(content: string, values: DialogValues | undefined): TextObject {
