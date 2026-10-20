@@ -2450,6 +2450,13 @@ that the laser is off. Travel, stopped/error/disconnected states, and uncertain 
 keep the ordinary position marker. Cooling colours follow physical route distance, so splitting
 one straight cut into smaller G-code moves does not change its cooling pattern.
 
+A User Origin or Current Position job draws its route, burn, head marker and start markers over
+the artwork it burns, not where its origin sits on the bed, so a job started from a hand-set
+origin shows one picture. Absolute Coords jobs draw at their bed position, which is where the
+artwork sits on the canvas. The camera job watch still compares the real bed position (ADR-642).
+With the camera overlay on, whose picture shows the real bed, the idle status says **Drawn over
+artwork — burns at your origin**.
+
 The in-memory sidecar carries the emitted-program fingerprint plus initial position, connection
 session, position epoch, active driver, and current-session detected-family evidence. If any of that
 evidence changes before controller handoff, Start continues normally but remaining time is
@@ -3301,9 +3308,15 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    a connection. Neither action dismisses the physical-safety notice.
    Both live in **More connection options → Controller info**. Reading settings
    after a reset, and a read that failed while the controller still answers
-   status queries, do not pop up a toolbar notice: the machine runs without
-   them, as in other senders. Only a controller that has stopped answering
-   shows the brief "Controller is not responding" notice (ADR-611). A controller
+   status queries, do not pop up anything, even when a reply still owed makes
+   Reconnect the recommendation in Controller info: the machine runs without
+   them, as in other senders. When a failed read meets a controller that
+   stopped answering status queries (re-checked every second, so a wedged
+   transport counts), the recovery card with Retry and Reconnect opens by
+   itself at the top of the canvas, under any safety notice.
+   Closing it folds it into a **Controller needs recovery** button that stays
+   until the controller recovers; a new failure opens the card again (ADR-642,
+   replacing ADR-611's brief toolbar notice). A controller
    that answered and then goes quiet for 8 s, outside homing and other controller
    operations, turns the connection status to an amber **Not responding** until
    its next reply (ADR-611 Amendment 1). While a sent line is still owed its
