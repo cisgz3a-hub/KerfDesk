@@ -92,6 +92,8 @@ export function harness(initial: LicenceRecord | null = null) {
     store,
     deviceId: async () => device,
     deviceName: 'Test device',
+    // Clock advice names the platform's settings; tests run on every OS.
+    platform: 'win32',
     fetch,
     openCheckout,
     now: () => clock,

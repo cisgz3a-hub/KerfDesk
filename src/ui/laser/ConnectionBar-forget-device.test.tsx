@@ -133,6 +133,49 @@ describe('ConnectionBar device permission actions', () => {
     );
   });
 
+  // ADR-639: nobody clicked, so a skipped automatic connect is a quiet note,
+  // and the rail stays "Not connected" with no alert.
+  it('shows a skipped automatic connect as a quiet hint, not an alert', async () => {
+    const host = await renderBar({
+      connection: { kind: 'disconnected' },
+      autoConnectSkipped: 'Failed to execute open on SerialPort: Failed to open serial port.',
+    });
+    expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe('Not connected');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    const hint = host.querySelector('.lf-connection-auto-hint');
+    expect(hint?.textContent).toBe(
+      'Didn’t connect by itself: the laser’s port is in use by another program. Close it, then Connect.',
+    );
+    expect(hint?.closest('[role="alert"]')).toBeNull();
+    await cleanup?.();
+
+    const connected = await renderBar({
+      connection: { kind: 'connected' },
+      autoConnectSkipped: 'Failed to open serial port.',
+    });
+    expect(connected.querySelector('.lf-connection-auto-hint')).toBeNull();
+  });
+
+  it('says auto-connect is paused after the operator disconnected', async () => {
+    const host = await renderBar({
+      autoConnect: true,
+      autoConnectPaused: true,
+      onAutoConnectChange: vi.fn(),
+    });
+    await openMenu(host);
+    const paused = menuItem('Connect automatically (paused until you connect)');
+    expect(paused?.getAttribute('aria-checked')).toBe('true');
+    await cleanup?.();
+
+    const off = await renderBar({
+      autoConnect: false,
+      autoConnectPaused: true,
+      onAutoConnectChange: vi.fn(),
+    });
+    await openMenu(off);
+    expect(menuItem('Connect automatically')?.getAttribute('aria-checked')).toBe('false');
+  });
+
   it('retries missing controller information through the open connection', async () => {
     const onRetry = vi.fn();
     const onReconnect = vi.fn();

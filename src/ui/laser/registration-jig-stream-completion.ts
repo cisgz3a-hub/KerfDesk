@@ -181,6 +181,17 @@ function publishArtworkSelection(
     return;
   }
   current.setRegistrationOutput('artwork');
+  // An edit guard (open run numbering) can refuse the switch; a Start then
+  // would burn the outline again over the placed piece, so do not claim it.
+  if (registrationRunState(useStore.getState().project.scene) !== 'artwork') {
+    useToastStore
+      .getState()
+      .pushToast(
+        'Outline finished, but Outline only stays selected. Choose Artwork only before you Start the artwork.',
+        'warning',
+      );
+    return;
+  }
   useToastStore
     .getState()
     .pushToast(

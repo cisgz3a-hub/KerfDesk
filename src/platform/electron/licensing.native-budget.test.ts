@@ -56,6 +56,15 @@ describe('desktop native trial-budget contract', () => {
     },
   );
 
+  it('carries the session admission only as a boolean (ADR-623 Amendment 1)', () => {
+    const admitted = { ...legacy, edition: 'free', sessionAdmitted: true };
+    expect(parseLicenceStatus(admitted)).toBe(admitted);
+    for (const sessionAdmitted of [1, 'true', null])
+      expect(() => parseLicenceStatus({ ...legacy, sessionAdmitted })).toThrow(
+        'Invalid licence response',
+      );
+  });
+
   it.each(['paid', 'developer'] as const)('refuses a trial-only duration on %s rights', (tier) => {
     expect(() =>
       parseLicenceStatus({ ...legacy, tier, accessExpiresAt: null, trialExpiresInMs: 90_000 }),

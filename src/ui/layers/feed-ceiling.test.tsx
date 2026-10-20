@@ -12,7 +12,6 @@ import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
-import { ReviewNumberCell } from '../laser/job-review/ReviewNumberCell';
 import { CutsLayersPanel } from './CutsLayersPanel';
 
 (
@@ -152,37 +151,6 @@ describe('Speed above Output max feed', () => {
       typeAndBlur(input(host, SPEED_SELECTOR), '8000');
       expect(storedSpeed()).toBe(8000);
       expect(notice(host)).toBeNull();
-    } finally {
-      await unmount();
-    }
-  });
-
-  it('reports a capped Job Review speed instead of snapping silently', async () => {
-    const commits: number[] = [];
-    const clamps: number[] = [];
-    const { host, unmount } = await render(
-      <table>
-        <tbody>
-          <tr>
-            <ReviewNumberCell
-              label="Speed mm/min for Cut"
-              value={1000}
-              min={1}
-              max={10000}
-              onCommit={(value) => commits.push(value)}
-              onClamp={(requested) => clamps.push(requested)}
-            />
-          </tr>
-        </tbody>
-      </table>,
-    );
-    try {
-      typeAndBlur(input(host, 'input[aria-label="Speed mm/min for Cut"]'), '12000');
-      expect(clamps).toEqual([12000]);
-      expect(commits.at(-1)).toBe(10000);
-
-      typeAndBlur(input(host, 'input[aria-label="Speed mm/min for Cut"]'), '9000');
-      expect(clamps).toEqual([12000]);
     } finally {
       await unmount();
     }

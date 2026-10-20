@@ -34,6 +34,8 @@ import type { Vec3 } from '../geometry/vec3';
 import type { IslandFillMotionPolicy } from './island-fill-motion';
 import type { FillRunwayPolicy } from './fill-runway-policy';
 import type { EffectiveScanDirection } from './scan-direction-policy';
+import type { CutGroupLaserLeads } from './laser-lead-settings';
+import type { KerfSideAssumedDiagnostic } from './kerf-scene-sides';
 
 export type CutSegment = {
   /** Timing-only CNC projection already uses the CNC emitter's coordinate
@@ -62,6 +64,17 @@ export type CutSegment = {
   /** ADR-432: the same burn as native line/arc moves. Laser line cuts only,
    * on arc-capable machines; read it through validCutArcMoves. */
   readonly arcMoves?: CutArcMoves;
+  /** ADR-626: the burn the final pass runs instead of `polyline`, present only
+   * on a contour that has leads and an overcut: the overcut runs past the start
+   * and the lead-out leaves from where it ends. Read it through
+   * finalPassCutSegments; bounds, coordinate checks and the rotary mapping read
+   * it too. Written as chords, as an overcut final pass always is (ADR-415). */
+  readonly finalPassBurn?: { readonly polyline: ReadonlyArray<Vec2> };
+  /** ADR-626 Amd 1: the scene contour a closed Line contour was cut from
+   * (laserLeadSourceKey), so leads judge its scrap side among the whole
+   * scene's contours. Compile writes it only when some operation asks for
+   * leads; preparation drops it once leads are placed. */
+  readonly leadSource?: string;
 };
 
 /** Fitted line/arc moves for a CutSegment (ADR-432), with a fingerprint of
@@ -116,12 +129,36 @@ export type CutGroup = {
   // power it runs at (`power` already includes it). Absent on every other
   // group, so their output is unchanged.
   readonly tabSpanPowerPercent?: number;
+  // ADR-626: present only on a Line operation's cut group whose operation
+  // asks for a lead-in or lead-out. Compile records it; preparation adds the
+  // leads once the planner has chosen where each closed contour starts
+  // (apply-laser-leads.ts). Absent everywhere else, so output is unchanged.
+  readonly laserLeads?: CutGroupLaserLeads;
+  // ADR-626: the whole outline of each of this group's contours that tabs or
+  // perforation cut into pieces, for laser leads to read. Preparation drops it
+  // once leads are placed, so a prepared job never carries it.
+  readonly topologyRings?: ReadonlyArray<CutTopologyRing>;
   readonly segments: ReadonlyArray<CutSegment>;
+};
+
+/** A contour cut in pieces, whole (ADR-626): `forest` and `contour` match the
+ * pieces' nesting. */
+export type CutTopologyRing = {
+  readonly forest: string;
+  readonly contour: string;
+  readonly polyline: ReadonlyArray<Vec2>;
+  /** As on CutSegment (ADR-626 Amd 1). */
+  readonly leadSource?: string;
 };
 
 export type FillGroup = Omit<
   CutGroup,
-  'kind' | 'segments' | 'finalPassOvercutMm' | 'tabSpanPowerPercent'
+  | 'kind'
+  | 'segments'
+  | 'finalPassOvercutMm'
+  | 'tabSpanPowerPercent'
+  | 'laserLeads'
+  | 'topologyRings'
 > & {
   readonly kind: 'fill';
   readonly fillStyle?: LayerFillStyle;
@@ -416,6 +453,8 @@ export type JobDiagnostic =
       readonly count: number;
       readonly kerfOffsetMm: number;
     }
+  // ADR-486 amendment 3: a closed shape taken for a score line or border.
+  | KerfSideAssumedDiagnostic
   // Hatch geometry existed, but every sweep rounded to a stationary point at
   // emitted G-code precision. Keep this advisory so microscopic fill loss is
   // visible without turning it into a Start, Frame, or export refusal.
@@ -434,6 +473,43 @@ export type JobDiagnostic =
       readonly kind: 'image-scan-angle-rotary';
       readonly layerName: string;
       readonly source: string;
+    }
+  // ADR-626: the operation asks for leads, but some contours get none or a
+  // shorter one. `count` perforated contours have no closed outline left to
+  // lead into, and `count` tabbed contours start and stop at their tabs
+  // instead. `layerId` tells operations that share a name apart; `layerName`
+  // is shown.
+  | {
+      readonly kind: 'laser-leads-perforated';
+      readonly layerId: string;
+      readonly layerName: string;
+      readonly count: number;
+    }
+  | {
+      readonly kind: 'laser-leads-tabbed';
+      readonly layerId: string;
+      readonly layerName: string;
+      readonly count: number;
+    }
+  // `shortened` leads were cut down and `omitted` left out because the full
+  // lead would leave the scrap side, come too close to another cut line or
+  // leave the bed.
+  | {
+      readonly kind: 'laser-leads-adjusted';
+      readonly layerId: string;
+      readonly layerName: string;
+      readonly shortened: number;
+      readonly omitted: number;
+    }
+  // ADR-626 Amd 1: with Lead side automatic, `count` contours got no leads
+  // because a closed shape on an operation without leads (`aroundName`) holds
+  // them, and it may be a part or only a score line or border.
+  | {
+      readonly kind: 'laser-leads-side-unknown';
+      readonly layerId: string;
+      readonly layerName: string;
+      readonly count: number;
+      readonly aroundName: string;
     };
 
 /** Complete compile evidence for one scheduled V-carve operation. */

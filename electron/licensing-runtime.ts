@@ -54,6 +54,8 @@ type RuntimeOptions = {
   /** Read only when starting a trial; null when this computer has no usable one. */
   readonly hardwareId?: () => Promise<string | null>;
   readonly deviceName: string;
+  /** Whose clock settings clock advice names; this process's platform by default. */
+  readonly platform?: string;
   readonly fetch: (url: string, init: RequestInit) => Promise<Response>;
   readonly openCheckout?: (url: string) => Promise<void>;
   readonly openPurchasePage?: (url: string) => Promise<void>;
@@ -62,7 +64,7 @@ type RuntimeOptions = {
 
 const EMPTY: LicenceRecord = { schemaVersion: 1, lastSeenAt: 0 };
 export function createLicensingRuntime(options: RuntimeOptions) {
-  return new LicensingService(options);
+  return new LicensingService({ platform: process.platform, ...options });
 }
 
 class LicensingService {
@@ -78,7 +80,7 @@ class LicensingService {
   private queue: Promise<unknown> = Promise.resolve();
   private readonly updateCache: LicensingUpdateCache;
 
-  constructor(private readonly options: RuntimeOptions) {
+  constructor(private readonly options: RuntimeOptions & { readonly platform: string }) {
     this.config = options.config;
     this.updateCache = new LicensingUpdateCache(options.config, () => this.now());
   }
@@ -129,6 +131,7 @@ class LicensingService {
       device,
       ended ? Math.max(this.now(), clock.expiresAt) : this.now(),
       clock === null && this.proUnlocked(),
+      this.options.platform,
     );
     // An observed expiry stays ended even if its disk checkpoint cannot be saved.
     if (result.accessExpiresAt !== null && clock?.expiresAt !== result.accessExpiresAt)
@@ -238,8 +241,8 @@ class LicensingService {
     } catch (error) {
       if (!(error instanceof LicenceClockError)) throw error;
       // The service answered, but this clock is too far off (a paid refresh is kept: verifyGrant).
-      const kept = this.evaluate(saved, device);
-      return { ...kept, state: 'clock-error', message: clockErrorMessage(error.offset) };
+      const message = clockErrorMessage(error.offset, this.options.platform);
+      return { ...this.evaluate(saved, device), state: 'clock-error', message };
     }
     const { next, droppedOrder } = grantedRecord(action, saved, grant, this.now(), licenseKey);
     await this.write(next, device);
