@@ -16,6 +16,7 @@ import { CncUtilitiesPanel } from '../machine/CncUtilitiesPanel';
 import { ConsolePanel } from './ConsolePanel';
 import { SuperConsoleLauncher } from './super-console/SuperConsoleLauncher';
 import { AlarmBanner } from './AlarmBanner';
+import { ControllerPinNotice } from './ControllerPinNotice';
 import { openMachineSetup } from './device-setup';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
@@ -100,6 +101,7 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
             onReset={control.runReset}
           />
         )}
+        <ControllerPinNotice />
         {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
         <MachineJogControls
           disabled={jogPadDisabled}

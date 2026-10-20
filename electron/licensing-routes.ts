@@ -225,7 +225,8 @@ type EntryAction = 'licence-link' | 'clipboard-key' | 'project-seal-key';
 
 /**
  * kerfdesk://licence (GET, answered once), Paste key (empty JSON POST) and this
- * computer's project seal key (GET, ADR-592).
+ * computer's project seal key (GET, ADR-592). Optional startup reads explicitly
+ * report absence in Free/Preview builds; they never acquire commercial helpers.
  */
 async function entryRoute(
   action: EntryAction,
@@ -233,12 +234,12 @@ async function entryRoute(
   entry: LicenceEntry,
 ): Promise<Response> {
   if (action === 'licence-link')
-    return request.method === 'GET' && entry.licenceLink
-      ? response(await entry.licenceLink.consume())
+    return request.method === 'GET'
+      ? response((await entry.licenceLink?.consume()) ?? { open: false, licenseKey: null })
       : missing();
   if (action === 'project-seal-key')
-    return request.method === 'GET' && entry.projectSealKey
-      ? response({ key: await entry.projectSealKey() })
+    return request.method === 'GET'
+      ? response({ key: (await entry.projectSealKey?.()) ?? null })
       : missing();
   if (!jsonPost(request)) return missing();
   const body = await readBody(request);

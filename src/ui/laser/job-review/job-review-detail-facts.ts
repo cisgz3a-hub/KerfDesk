@@ -23,6 +23,7 @@ import {
   perforationPatternFor,
 } from '../../../core/job/operation-cut-extras';
 import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from '../../../core/job/compile-job-defaults';
+import { laserLeadSpecFor } from '../../../core/job/laser-lead-settings';
 import { passAngleStepApplies } from '../../../core/job/scan-pass-angles';
 import { normalizedScanAngleDeg } from '../../../core/raster/raster-scan-frame';
 import {
@@ -151,7 +152,23 @@ function lineCutExtrasParts(settings: LayerOperationSettings): ReadonlyArray<str
           `perforated ${formatMm(perforation.cutMm)} mm cut / ${formatMm(perforation.skipMm)} mm skip`,
         ]),
     ...(overcutMm > 0 ? [`overcut ${formatMm(overcutMm)} mm on final pass`] : []),
+    ...leadPart(settings),
   ];
+}
+
+// ADR-626, shown only when an operation asks for a lead.
+function leadPart(settings: LayerOperationSettings): ReadonlyArray<string> {
+  const spec = laserLeadSpecFor(settings);
+  if (spec === null) return [];
+  const which =
+    spec.leadIn && spec.leadOut ? 'lead-in and lead-out' : spec.leadIn ? 'lead-in' : 'lead-out';
+  const side =
+    spec.side === 'auto'
+      ? 'in the scrap'
+      : spec.side === 'outside'
+        ? 'always outside'
+        : 'always inside';
+  return [`${which} ${spec.style} ${formatMm(spec.lengthMm)} mm at ${spec.angleDeg}°, ${side}`];
 }
 
 function localScanOffsetPart(settings: LayerOperationSettings): ReadonlyArray<string> {

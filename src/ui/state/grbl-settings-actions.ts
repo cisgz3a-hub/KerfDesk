@@ -15,7 +15,7 @@ import {
   qualifyingController,
 } from './laser-controller-qualification';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
-import { interactiveControllerOperation } from './laser-controller-operation';
+import { readOnlyControllerOperation } from './laser-controller-operation';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
@@ -43,8 +43,9 @@ type SettingsWriteFn = (
 
 const BUILD_INFO_READ_OPERATION_LABEL = 'Reading controller build information';
 
+// Settings and build-info reads and $-setting writes move nothing (ADR-639).
 function settingsControllerOperation(label: string) {
-  return interactiveControllerOperation(label, 'terminal-exchange');
+  return readOnlyControllerOperation(label);
 }
 
 export type GrblSettingsActionRefs = ControllerLifecycleRefs &
