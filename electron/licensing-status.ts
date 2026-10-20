@@ -1,11 +1,9 @@
 import {
   automaticTimeSetting,
   CHECK_IN_LIMIT,
-  CLOCK_TOLERANCE,
   checkInDueAt,
   checkInOverdue,
   clockRolledBack,
-  clockWarningMessage,
 } from './licensing-clock.js';
 import type { LicensingConfig } from './licensing-config.js';
 import type { LicenceRecord } from './licensing-store.js';
@@ -40,7 +38,8 @@ export type LicenceStatus = {
   readonly trialExpiresInMs?: number;
   /**
    * Unix seconds on this computer's clock when new Pro choices pause unless the
-   * licence service confirms these rights first (ADR-592). Absent without a check-in.
+   * licence service confirms these rights first (ADR-592). Only a trial has a
+   * check-in; paid and developer rights never carry one (ADR-623 Amendment 2).
    */
   readonly checkInDueAt?: number;
   readonly updatesUntil: number | null;
@@ -170,47 +169,40 @@ export function evaluateLicence(
       'Your 30-day trial has ended. Buy a licence or enter your licence key to keep using KerfDesk.',
     );
   return withCheckInDue(
-    summary(...currentRights(claims, release, saved, now, platform)),
+    summary(...currentRights(claims, release, saved.lastSeenAt, now, platform)),
     claims,
-    saved,
   );
 }
 
-/** A paid grant's saved clock offset (ADR-592); a trial is never measured by one. */
-function paidOffset(claims: LicenceClaims, saved: LicenceRecord): number {
-  return claims.tier === 'paid' ? (saved.clockOffset ?? 0) : 0;
-}
-
-function withCheckInDue(
-  status: LicenceStatus,
-  claims: LicenceClaims,
-  saved: LicenceRecord,
-): LicenceStatus {
-  const due = checkInDueAt(claims, paidOffset(claims, saved));
+function withCheckInDue(status: LicenceStatus, claims: LicenceClaims): LicenceStatus {
+  const due = checkInDueAt(claims);
   return due === null ? status : { ...status, checkInDueAt: due };
 }
 
-/** Rights that verified and have not ended: due a check-in, beyond their updates, or ready. */
+/**
+ * Rights that verified and have not ended: a trial due a check-in, beyond their
+ * updates, or ready. A paid licence is never due a check-in and never reads the
+ * clock here, so offline or with a wrong clock it opens as usual (ADR-623
+ * Amendment 2); only its update period can stop a newer release.
+ */
 function currentRights(
   claims: LicenceClaims,
   release: VerifiedRelease,
-  saved: LicenceRecord,
+  lastSeenAt: number,
   now: number,
   platform: string,
 ): [LicenceStatus['state'], LicenceClaims, string | null] {
-  const offset = paidOffset(claims, saved);
-  if (checkInOverdue(claims, saved.lastSeenAt, now, offset))
+  if (checkInOverdue(claims, lastSeenAt, now))
     return ['checkin-required', claims, checkInMessage(claims, platform)];
   if (!licenceCoversRelease(claims, release))
     return ['updates-expired', claims, updatesExpiredMessage(claims)];
-  // The last confirmation arrived with this clock off: keep saying so.
-  const clockOff = Math.abs(offset) > CLOCK_TOLERANCE;
-  return ['ready', claims, clockOff ? clockWarningMessage(offset, platform) : null];
+  return ['ready', claims, null];
 }
 
+/** Only a trial has a check-in (ADR-592, ADR-623 Amendment 2). */
 function checkInMessage(claims: LicenceClaims, platform: string): string {
   const days = Math.round((CHECK_IN_LIMIT[claims.tier] ?? 0) / 86_400);
-  return `KerfDesk has not confirmed this ${claims.tier === 'trial' ? 'trial' : 'licence'} with the licence service for more than ${days} days, so it needs a check before KerfDesk opens again. An open KerfDesk keeps its projects, Frame and Start. Connect to the internet and choose Refresh licence. If this computer’s clock is wrong, turn on ${automaticTimeSetting(platform)} first.`;
+  return `KerfDesk has not confirmed this trial with the licence service for more than ${days} days, so it needs a check before KerfDesk opens again. An open KerfDesk keeps its projects, Frame and Start. Connect to the internet and choose Refresh licence. If this computer’s clock is wrong, turn on ${automaticTimeSetting(platform)} first.`;
 }
 
 function updatesExpiredMessage(claims: LicenceClaims): string {
