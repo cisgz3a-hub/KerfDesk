@@ -16,8 +16,8 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose your machine',
         instruction:
-          'On Machine, plug the machine in by USB, switch it on and press Find my machine. KerfDesk reads its firmware, work area, speed and power range and fills them into the draft, listing each change with one Undo. Then check Laser only, CNC only or Laser + CNC, and pick a laser profile by clicking anywhere on its card, using search or Browse all profiles, or choose a CNC preset. To set up offline, choose Set up without connecting.',
-        focus: 'Machine · Find my machine · profile',
+          'On Machine, choose your machine from the list: every listed laser and CNC machine is there, grouped by brand, and you can search or show only Laser or CNC. Click anywhere on its row. If it is not listed, choose My machine isn’t listed and enter its type, work area and firmware. Connecting is optional: press Connect in the strip at the top and KerfDesk reads the firmware, work area, speed and power range into the draft, listing each change with one Undo. Then press Next.',
+        focus: 'Machine · machine list · Connect',
         result: 'The draft setup has the correct kind of machine and controller.',
       },
       {
@@ -65,7 +65,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 3,
-    location: 'Machine toolbar → Connect, or Machine Setup → Machine → Find my machine',
+    location: 'Machine toolbar → Connect, or Machine Setup → Machine → Connect',
     prerequisites:
       'A supported serial controller and the appropriate machine profile. File-only profiles use export instead.',
     visual: 'machine',
@@ -73,7 +73,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Check the selected controller',
         instruction:
-          'Open Machine Setup and press Find my machine, or check the controller under Connection options. Close other software that already owns the same serial port.',
+          'Open Machine Setup and press Connect in the strip at the top, or check the controller under Connection options. Close other software that already owns the same serial port.',
         focus: 'Selected controller',
         result: 'The connection attempt targets the driver and device you intend to use.',
         visual: 'settings',
