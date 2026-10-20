@@ -14,6 +14,7 @@ import type { MachineOperation } from './machine-types';
 import { recoveryRepository } from '../state/recovery';
 import type * as Recovery from '../state/recovery';
 import { useToastStore } from '../state/toast-store';
+import { REVIEW_EDITING_MESSAGE } from './machine-review-presenter';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -168,6 +169,40 @@ describe('remote Start uses the ordinary exact review and one-use claim', () => 
     expect(useLaserStore.getState().startJob).toHaveBeenCalledTimes(1);
     const gcode = vi.mocked(useLaserStore.getState().startJob).mock.calls[0]![0];
     expect(recoveryRepository.getSnapshot().activeRun?.artifact.gcode).toBe(gcode);
+  });
+
+  it('a card mid-edit on the PC withdraws the remote review until it is saved or discarded', async () => {
+    const args = writeArgs(adapter);
+    await adapter.execute('review_machine_job', args);
+    const shown = await reviewing(args.requestId);
+    useJobReviewStore.getState().reportEditing('red', true);
+    const held = await read(args.requestId);
+    expect(held.state).toBe('preparing');
+    expect(held.review).toBeUndefined();
+    expect(held.message).toBe(REVIEW_EDITING_MESSAGE);
+    expect(
+      resultCode(
+        await adapter.execute(
+          'start_job',
+          writeArgs(adapter, { reviewId: shown.review!.reviewId }),
+        ),
+      ),
+    ).toBe('not_found');
+    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
+
+    useJobReviewStore.getState().reportEditing('red', false);
+    const fresh = await reviewing(args.requestId, shown.review!.reviewId);
+    expect(
+      resultCode(
+        await adapter.execute(
+          'start_job',
+          writeArgs(adapter, { reviewId: fresh.review!.reviewId }),
+        ),
+      ),
+    ).toBe('ok');
+    await vi.waitFor(() => expect(useLaserStore.getState().startJob).toHaveBeenCalledTimes(1), {
+      timeout: 5000,
+    });
   });
 
   it('power/speed edits retain Frame, replace the review token and stream freshly approved bytes', async () => {

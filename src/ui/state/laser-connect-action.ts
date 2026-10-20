@@ -24,6 +24,11 @@ import { useToastStore } from './toast-store';
 import { browserLocalStorage } from './browser-local-storage';
 import { clearCncLiveCaps } from './detected-settings-action';
 import {
+  clearAutoConnectSkipped,
+  noteAutoConnectSkipped,
+  resumeAutoConnect,
+} from './auto-connect-session';
+import {
   chooseGrantedPort,
   loadRememberedSerialPort,
   rememberSerialPort,
@@ -63,6 +68,7 @@ export async function runConnectAction(
   // refusal is a factual transport inability, not a policy gate. It comes
   // before the picker and before any live connection or attempt is touched
   // (audit RU-6).
+  clearAutoConnectSkipped();
   const driver = selectControllerDriver(options.controllerKind, options.controllerCommandSet);
   if (driver.capabilities.transport === 'file-only') {
     set((state) => ({ log: pushLog(state, FILE_ONLY_CONNECT_REFUSAL) }));
@@ -157,23 +163,50 @@ async function connectSerialController(
       return;
     }
     attachRememberedConnection(attachConnection, connection, baudRate, portRef);
+    liftAutoConnectPauseOnOpen(options.portSelection);
     reportBackgroundStreaming(set, connection, adapter.id);
   } catch (error) {
     if (!connectAttemptIsCurrent(refs, attempt)) {
       await releaseCancelledPermission().catch(() => undefined);
       return;
     }
-    reportConnectionFailure(set, refs, attemptedBaudRate, requestedPort?.info ?? null, error);
+    reportConnectionFailure(set, refs, options, attemptedBaudRate, requestedPort, error);
   }
+}
+
+// Any attempt clears the last automatic attempt's hint. Only a connect someone
+// asked for that opened its port lifts the pause their Disconnect set, so a
+// cancelled picker or a failed open leaves it set (ADR-639).
+function liftAutoConnectPauseOnOpen(selection: ConnectControllerOptions['portSelection']): void {
+  if (selection !== 'automatic') resumeAutoConnect();
+}
+
+// Nobody clicked, so a failed background open (the port held by LightBurn or
+// LaserGRBL, or unplugged mid-open) is no alert and no incident: one log line,
+// the ordinary disconnected state and the rail's quiet hint (ADR-639).
+function reportAutomaticConnectSkipped(set: SetFn, error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  set((state) => ({
+    log: pushLog(state, `[lf2] Automatic connect skipped: ${message}`),
+    connection: { kind: 'disconnected' },
+    controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch),
+  }));
+  noteAutoConnectSkipped(message);
 }
 
 function reportConnectionFailure(
   set: SetFn,
   refs: LiveRefs,
+  options: ConnectControllerOptions,
   baudRate: number,
-  portInfo: SerialPortIdentity | null,
+  port: SerialPortRef | null,
   error: unknown,
 ): void {
+  if (options.portSelection === 'automatic') {
+    reportAutomaticConnectSkipped(set, error);
+    return;
+  }
+  const portInfo: SerialPortIdentity | null = port?.info ?? null;
   const message = error instanceof Error ? error.message : String(error);
   set((state) => ({
     ...publishControllerIncident(
@@ -208,8 +241,9 @@ function selectedTransport(port: SerialPortRef, adapter: PlatformAdapter): 'seri
 
 // The machine's port opens without the picker when chooseGrantedPort finds it
 // among the ports the operator picked before (ADR-420). 'choose' always asks;
-// 'automatic' never does, because auto-connect has no click to show a picker
-// with, and a null result reads as a cancelled picker.
+// 'automatic' and 'remembered-only' never do, because auto-connect and a
+// remote Connect have no click on this PC to show a picker with, and a null
+// result reads as a cancelled picker.
 async function resolveSerialPort(
   adapter: PlatformAdapter,
   selection: ConnectControllerOptions['portSelection'] = 'remembered',
@@ -225,7 +259,7 @@ async function resolveSerialPort(
     // A cancelled attempt may retire its selected grant, never launch a picker.
     if (!isCurrent()) return null;
   }
-  if (selection === 'automatic') return null;
+  if (selection === 'automatic' || selection === 'remembered-only') return null;
   return adapter.serial.requestPort();
 }
 

@@ -49,9 +49,13 @@ function mergeClosedUpCounts(
 ): ReadonlyArray<CompileDiagnostic> {
   const merged: CompileDiagnostic[] = [];
   for (const diagnostic of diagnostics) {
-    const index = merged.findIndex((earlier) => sameClosedUpLayer(earlier, diagnostic));
+    const index = merged.findIndex(
+      (earlier) => sameClosedUpLayer(earlier, diagnostic) || sameAssumedSide(earlier, diagnostic),
+    );
     const earlier = merged[index];
     if (earlier?.kind === 'kerf-offset-closed-up' && diagnostic.kind === 'kerf-offset-closed-up') {
+      merged[index] = { ...earlier, count: earlier.count + diagnostic.count };
+    } else if (earlier?.kind === 'kerf-side-assumed' && diagnostic.kind === 'kerf-side-assumed') {
       merged[index] = { ...earlier, count: earlier.count + diagnostic.count };
     } else {
       merged.push(diagnostic);
@@ -69,6 +73,16 @@ function sameClosedUpLayer(a: CompileDiagnostic, b: CompileDiagnostic): boolean 
   );
 }
 
+function sameAssumedSide(a: CompileDiagnostic, b: CompileDiagnostic): boolean {
+  return (
+    a.kind === 'kerf-side-assumed' &&
+    b.kind === 'kerf-side-assumed' &&
+    a.layerId === b.layerId &&
+    a.aroundName === b.aroundName &&
+    a.kerfOffsetMm === b.kerfOffsetMm
+  );
+}
+
 function diagnosticWarning(diagnostic: CompileDiagnostic): string {
   switch (diagnostic.kind) {
     case 'offset-fill-failed':
@@ -81,6 +95,8 @@ function diagnosticWarning(diagnostic: CompileDiagnostic): string {
       return kerfOffsetFailedWarning(diagnostic.layerName);
     case 'kerf-offset-closed-up':
       return kerfClosedUpWarning(diagnostic.layerName, diagnostic.count, diagnostic.kerfOffsetMm);
+    case 'kerf-side-assumed':
+      return kerfSideAssumedWarning(diagnostic);
     case 'fill-collapsed-at-precision':
       return FILL_COLLAPSED_AT_PRECISION_WARNING(diagnostic.layerName);
     case 'image-scan-angle-rotary':
@@ -123,4 +139,17 @@ function kerfClosedUpWarning(layerName: string, count: number, kerfOffsetMm: num
     return `Kerf offset on layer "${layerName}" shrank ${count} ${one ? 'part' : 'parts'} narrower than ${kerf} to nothing, ${lost} or use a kerf offset closer to 0.`;
   }
   return `Kerf offset on layer "${layerName}" closed up ${count} ${one ? 'hole or slot' : 'holes or slots'} narrower than ${kerf}, ${lost} or use a smaller kerf offset.`;
+}
+
+// ADR-486 Amd 3: a closed shape on a layer without kerf offset, leads or tabs
+// may be a part cut uncompensated, or only a score line or border. The offset
+// took it for the latter; if it is the former, the side is wrong, and the cut
+// is off its drawn width by four offsets (two on each side).
+function kerfSideAssumedWarning(
+  diagnostic: Extract<CompileDiagnostic, { readonly kind: 'kerf-side-assumed' }>,
+): string {
+  const one = diagnostic.count === 1;
+  const around = `"${diagnostic.aroundName}"`;
+  const error = formatFeatureMm(4 * Math.abs(diagnostic.kerfOffsetMm));
+  return `Kerf offset on layer "${diagnostic.layerName}": ${diagnostic.count} ${one ? 'shape sits' : 'shapes sit'} inside a closed shape on layer ${around}, which has no kerf offset, leads or tabs, so ${one ? 'it was' : 'they were'} offset as if that shape were only a score line or border. If ${around} cuts parts out, ${one ? 'this shape was' : 'these shapes were'} offset to the wrong side and ${one ? 'comes' : 'come'} out ${error} mm off ${one ? 'its' : 'their'} drawn width: give ${around} a kerf offset, or cut both on one layer.`;
 }

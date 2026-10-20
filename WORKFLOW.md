@@ -118,7 +118,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Rulers**: top and left, mm units. Tick and label spacing follow the zoom (ADR-348): the labelled step is the smallest 1-2-5 number whose labels stay clear of each other, minor ticks subdivide it while they remain separable, and a taller half-step tick marks the middle of a division. The pointer position is marked on both strips while it is over the canvas.
 - **Grid**: light dotted, 10mm spacing, behind bed.
 - **Origin marker**: small cross at the device-profile origin.
-- **Hover size**: with the select tool and no drag in progress, resting the pointer on artwork shows its name, `W × H mm`, and the X/Y of its top-left beside the cursor. Display only — it changes no selection, no geometry, and no output.
+- **Hover size**: with the select tool and no drag in progress, resting the pointer on artwork (locked artwork too) shows its name, `W × H mm`, and the X/Y of its top-left beside the cursor, flipping to the pointer's other side near the canvas's right or bottom edge. On a laser it also shows the power and speed output runs the piece at, one line per distinct run (at most three, then `+N more settings`): the artwork's override and power scale applied, a Grayscale image (or one using original pixels) as its `min–max%` range, and a speed above Output max feed as the capped speed marked `(capped)`. A piece that output skips says why: `No operation`, `Output off`, `Trace source, not output`, or `Not engraved: operation is in Image mode` (vector artwork on an Image operation; a bitmap on Line or Fill names that mode) (ADR-348 Amendment 1). Display only — it changes no selection, no geometry, and no output.
 - **Drop hint**: centered ghost text "Drag an SVG here, or use File → Import" — visible only when scene is empty, fades out on hover.
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
   Telemetry scrolls in its own hidden-scrollbar lane. Ready web or desktop update actions sit in a
@@ -131,7 +131,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Machine connection toolbar**: the machine name and connection status sit beside the numeric transforms, with Connect/Disconnect, the Machine Setup icon and the connection-options menu. The machine-name dropdown shows the full profile, bed size, controller, connected port, fitted Laser module selector and supported FluidNC or grblHAL network connection form. Tab moves between its fields; Escape closes it and returns focus to the machine name. Field input stays inside the dropdown while the existing Abort shortcut remains available. Connection failures and qualification/recovery notices remain visible outside the dropdown. On narrow windows the machine controls wrap onto a second top row, and remain available when either sidebar is collapsed. Detected-settings notifications also remain active with the sidebar closed.
 - **Artwork panel**: docked right with **Properties**, **Run order**, and **Materials** views in Laser mode (**Recipes** in CNC). Properties is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
-- **Laser artwork settings (ADR-430)**: one line names the selected artwork at the top of the Properties view, with a light Operation | Artwork tab row under it (ADR-631). The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power and Speed each pair a full-width slider with exact numeric entry; Passes remains a numeric field; Fill adds Line spacing and Angle, and Image adds Dither (swatches that preview each mode on a grey ramp), Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
+- **Laser artwork settings (ADR-430)**: one line names the selected artwork at the top of the Properties view, with a light Operation | Artwork tab row under it (ADR-631). The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power and Speed each pair a full-width slider with exact numeric entry; Passes remains a numeric field; Fill adds Line spacing and Angle, and Image adds Dither (swatches that preview each mode on a grey ramp), Line interval and (Grayscale, or Use original pixels, which burns as Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
 - **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). An adaptive pocket's Entry & travel names its own helix ("Climb · Adaptive helix"), and names the Ramp entry angle only as the entry of reliefs on the same operation ("Relief ramp 5°", ADR-481 Amendment 1). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only. Closed-only operations also show the exact count of omitted open contours, including mixed closed/open artwork; all-open vector operations without assigned relief retain the no-toolpath explanation (ADR-481 Amendment 2).
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, Include in output, artwork selection, settings clipboard, and delete controls; Delete sits apart in danger style. Visibility lives on the card's eye, not in the disclosure (ADR-631).
 - **Machine controls panel (ADR-593 Amendment 1)**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. The current machine state shares the heading, and the existing jog group stays above three softly glowing utility buttons: **Origin**, **Placement** and **Console**. Each expands its section directly below the buttons inside Machine, leaving Artwork and the canvas unobscured. Escape, the close button or clicking the selected button collapses it; working in neighbouring settings leaves it open. Typed positions, unsent commands, filters and disclosures survive closing or switching tools. Full coordinates, work-origin identity and feed/power details are in Origin. The positioning group has no separate scroller; Step and Speed follow the arrow grid. The open utility uses the remaining panel height and scrolls only when needed. When the fixed controls and an open utility cannot fit, short bodies use one full rail scroller; expanded recovery notices also retain that fallback. Frame and Start remain outside it. Both panels can be resized or hidden independently. The machine panel may be collapsed during a job because active run controls live independently in the Live Motion bar.
@@ -142,7 +142,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Workspace layout**: the toolbar offers **Auto layout**, **Compact**, and **Spacious**, saved locally across reloads. Auto uses Compact when the viewport is at most 1439 px wide **or** 719 px high; otherwise it uses Spacious. Compact has one scrolling sidebar with keyboard-accessible **Artwork** and **Machine** tabs. Spacious shows the two independent panels. These are viewport CSS pixels, so browser zoom and display scaling affect the available space.
 - **Narrow windows**: below 960 px wide, the workspace always uses the single Compact sidebar, including when Spacious is selected. The saved Spacious preference takes effect again when the window is wide enough. Layout changes preserve the panels' existing controls and job workflow.
 - **CNC Canvas Focus**: has no effect. It collapsed the CNC 3D result pane by default when the viewport was 1439 px wide or less (ADR-223), and that pane has not been shown since 2026-08-03 (F-CNC28).
-- **Left tool strip (ADR-051)**: the default strip is 50 px wide and scrolls on short windows. Edit and Draw groups retain Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and a named icon button for the design library. Design Studio (Pro) has a labelled button in the main toolbar (ADR-272, flows F-DS1..F-DS4). Curve-node actions remain beside the editing tools with readable labels. Preview is in the primary toolbar, with a More fallback at narrow widths, and the Window menu.
+- **Left tool strip (ADR-051)**: the default strip is 40 px wide with 30 px tools (52 px while curve actions show; ADR-608) and scrolls on short windows. Edit and Draw groups retain Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and a named icon button for the design library. Design Studio (Pro) has a labelled button in the main toolbar (ADR-272, flows F-DS1..F-DS4). Curve-node actions remain beside the editing tools with readable labels. Preview is in the primary toolbar, with a More fallback at narrow widths, and the Window menu.
 - **Machine-panel hierarchy (ADR-340, ADR-420 Amendment 2, ADR-593)**: a coloured Home button occupies the centre of the jog arrows; if homing is not configured it opens the same setup entry. Beside the arrows, three compact rows hold Manual Air, laser Auto-focus or its setup entry, and Set origin here. CNC keeps Home and Set origin when Manual Air is hidden, and still offers OFF for air left on in Laser mode. The Origin dropdown contains Reset/persistent-origin, Release motors, typed/saved positioning, the timed start mark, hand-positioning guidance and CNC probing. Placement contains placement/output and CNC maintenance. Console contains communication controls, Super console, machine hours and history/recovery. Active interruption notices, repeat offers, probe-removal/work-Z notices and the canonical Live Motion controls remain outside those dropdowns. Manual Air's setup guidance and switching behaviour are unchanged. Tutorial buttons no longer sit beside positioning, origin or Frame/Start: lessons live in Learn and on the tool panels that teach a procedure (ADR-348).
 - **Artwork centre & LED (ADR-603 Amendment 1)**: Marlin Fan-mosfet profiles have no positioning-light controls or commands (ADR-612). For supported profiles, select one artwork or group on the canvas, then use the button beneath the jog arrows. With several artworks selected, first choose one in **Artwork to centre**, then click the button; choosing alone sends no motion and keeps the canvas selection. The head moves with the cutting beam off to that artwork's centre on the board, using the configured pointer offset, then leaves the separate LED on. Absolute Coords can use the canvas directly; User Origin, Verified Origin and Current Position use a completed Frame's captured placement, so Frame once before centring an individual artwork. Start keeps the same framed placement. **LED on** and **LED off** switch the separate light without moving the head or requiring a selection. There is no expiry timer. Off remains available after reset for a configured light because auxiliary outputs may stay on; the control tracks commands, not an optical sensor. Machine Setup → Options → Positioning LED / crosshair stores the documented on/off commands and pointer offset in canvas bed axes. No output is enabled by default; stock GRBL needs a documented vendor/custom-firmware mapping, and Ruida's file-only path or a manually switched light must be controlled at the machine. **Centre & LED after Frame (ADR-605)** remains an independent, opt-in setting in the same section: a clean Frame from the Frame button centres the LED on the whole framed job and leaves it on. It works in all four Cartesian placement modes and retains the original placement for Start (ADR-605 Amendment 1). Changed artwork or placement, interrupted/failed travel, or a later ordinary jog still invalidates Frame.
 - **After a job completes (ADR-340, ADR-603)**: the job dock shows **Job complete** and **Done** after controller settlement. Pausing during final settlement retains that run's completion owner and Resume requires fresh Idle evidence. Missing acknowledgements say **Waiting for controller replies**, without asserting a controller hold; a new acknowledgement clears the stale wait immediately. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains offered while its receipt still matches the job, and like Start it needs a fresh Frame (ADR-372 Amendment 1). Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
@@ -791,9 +791,10 @@ the linked artwork.
    of its operation colour with a faint halo, then ebbs back to ink. Every other piece whose
    operation has the same settings does the same in that colour, rippling out from the piece
    under the pointer. A soft colour edge stays while the pointer rests there. Resting on an
-   operation row does the same for that operation's artwork.
+   operation row, or moving keyboard focus into one, does the same for that operation's artwork.
 3. Hold **Alt** (Option on a Mac) to show every operation colour at once; let go to return to ink.
-   Alt shortcuts such as `Alt+W` do not trigger it.
+   Alt shortcuts such as `Alt+W` do not trigger it, and neither does holding Alt while typing in a
+   text field.
 4. With reduced motion turned on in the operating system, the colour shows while the pointer
    rests instead of pulsing.
 5. Display only: Preview, output and saved projects are unchanged. New operations start at blue;
@@ -925,9 +926,9 @@ the linked artwork.
 
 Artwork overrides preserve Constant, Dynamic, and an explicit Auto choice through Save/Open.
 An absent artwork power-mode override inherits the assigned operation; explicit Auto follows the
-device default even when that operation selects Constant or Dynamic. Job Review's settings approval
-tracks artwork overrides, power scale, operation bindings, and operation settings, so the badge
-marks later edits as unapproved without changing the existing Frame/Start policy.
+device default even when that operation selects Constant or Dynamic. Saving a Job Review card
+(ADR-638) writes power, speed, passes and air through the same store actions, including artwork
+that owns those fields, without changing the existing Frame/Start policy.
 
 #### Success — edit power value
 1. Click input, type new value (or use stepper).
@@ -974,7 +975,8 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 4. Numbering ends automatically after every run unit has been assigned.
 5. While numbering is open, other design edits (Delete, nudge, paste, Undo/Redo, menu, toolbar
    and command-search commands) are refused with a notice to click **Done** or **Cancel** first,
-   so Cancel can never silently discard them.
+   so Cancel can never silently discard them. A canvas click numbers artwork whatever tool is
+   chosen, the Text tool included, and a double-click opens no editor.
 
 #### Success - inspect a job from either surface
 1. Click a run row: its complete run unit is selected on the canvas, highlighted with its operation
@@ -2070,12 +2072,15 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
    Settings changed since Frame are prepared before review; no job streams before confirmation.
    A laser controller that reports `$32=0` contributes
    the `$32` acknowledgement banner rather than refusing Frame or Start.
-6. Job Review uses the v2 surface: five stat tiles (estimated time as the accent hero tile with
-   cut/travel split, job size and motion envelope, operations/cutters, G-code lines and bytes, and a
-   read-only Origin tile); a collapsed amber **Warnings (N)** dropdown whose summary always shows
-   the count and groups identical warnings; a CNC **Material & stock** card; the editable **Artwork
-   settings** table; collapsible read-only Controller and Machine fact sections; and the applicable
-   laser acknowledgement or CNC workholding/exclusive-access attestation. If Frame preparation
+6. Job Review uses the compact confirm sheet (ADR-638): one row of stat tiles (estimated time as
+   the accent hero tile with cut/travel split, job size and motion envelope, operations/cutters,
+   G-code lines and bytes, and read-only Origin and Output scope tiles); an amber warnings box with
+   the count and one short headline per warning, each warning's full text one click away; a
+   **Settings** card per operation with power (and a meter), speed, passes and air, or the CNC bit,
+   depths, feeds and spindle speed; a CNC **Material & stock** card; folded read-only Controller and
+   Machine facts side by side; and the applicable laser acknowledgement or CNC
+   workholding/exclusive-access attestation. A verified laser session shows a **Laser mode
+   verified** chip in the header instead. If Frame preparation
    selected G54 from G55-G59, the durable warning names the original WCS and says the active
    selection changed, stored offsets were not erased, and Cancel leaves G54 selected. Placement is
    not editable in review; the sticky footer echoes the resolved origin beside Cancel and **Start
@@ -2085,9 +2090,14 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
    maximum, or the laser profile's S maximum in laser mode. A CNC operation above its configured
    spindle maximum still contributes a warning when controller settings are unavailable. These
    facts describe requested/compiled settings and controller scaling, not measured spindle RPM.
-7. Editing a value in Job Review commits through the normal store actions and re-runs preparation.
-   The stat tiles dim behind **Recomputing…** while synchronized evidence refreshes. **Approve
-   settings** remains informational and never adds a Start gate. A power/speed edit retains
+7. **Edit** on a laser card turns its values into fields; **Save** writes them to the main
+   settings through the normal store actions and re-runs preparation, and **Discard** or Escape
+   drops the draft. Save writes only the values whose fields were changed, so a speed nobody
+   touched stays as stored even above Output max feed. Start waits while a card is mid-edit, so
+   the job never runs values other than the ones shown; a phone or MCP client sees the review
+   withdrawn with "A setting is being edited in the Job Review on the PC" and gets a new one to
+   approve once the edit is saved or discarded (ADR-638 Amendment 1). The stat tiles dim behind **Recomputing…** while synchronized evidence
+   refreshes. CNC cards stay read-only. A power/speed edit retains
    Frame when the new motion envelope and placement are unchanged. Changed coordinates require
    another Frame; changed executable settings require fresh displayed review and approval before
    streaming. Each Start claims the approved program once.
@@ -2237,7 +2247,7 @@ minimum target size.
    bound still applies; the CNC-only Door progress extension does not.
 
 #### Success — generic CNC resume (ADR-180 amendment 2)
-1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens its Warnings list for a router job whose `$32` is on or unreported. When a GRBL or grblHAL controller reports `$32=1`, that warning carries **Send $32=0**: after a confirm, it writes the setting through Machine Settings' guarded write, reads `$$` back to verify, and the warning clears (ADR-180 Amendment 6). FluidNC, whose `$32` follows its YAML spindle type, gets no button.
+1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens that warning's full text for a router job whose `$32` is on or unreported. When a GRBL or grblHAL controller reports `$32=1`, that warning carries **Send $32=0**: after a confirm, it writes the setting through Machine Settings' guarded write, reads `$$` back to verify, and the warning clears (ADR-180 Amendment 6). FluidNC, whose `$32` follows its YAML spindle type, gets no button.
 2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues. In laser mode (`$32=1`) GRBL and grblHAL skip that delay, and the stopped cutter moves the instant power returns (CNC audit MC-1).
 3. Fresh post-command same-session `Door:3` reports keep **JOB RESUMING** live without refilling.
    Two seconds of silence fails; a non-resettable 30-second maximum bounds custom firmware. Only
@@ -2771,7 +2781,8 @@ authorization, Frame proof, controller command, or safety boundary.
    operation is disabled. Burn the complete outline set on the jig base before
    placing the pieces. After an accepted, successful complete outline run has
    physically settled, the unchanged project automatically selects **Artwork only**.
-   Frame, interrupted/failed runs and selected-only outline runs do not switch it.
+   Frame, interrupted/failed runs and selected-only outline runs do not switch it. If the switch
+   is refused (run numbering is open), a warning says **Outline only** stays selected.
 8. Put one blank inside each burned outline and focus on the blank's **top surface**,
    which is higher than the outline surface. Keep X/Y placement and work origin
    unchanged. Confirm **Artwork only** before burning the artwork. Every
@@ -2955,16 +2966,28 @@ authorization, Frame proof, controller command, or safety boundary.
   records, so a response suffix cannot become a false acknowledgement. The writer remains
   available for Stop; no missing reply is synthesized or replayed (ADR-600).
 - A reply lost that way leaves the last line of the job unacknowledged after the machine has
-  finished. Once every line has been sent, nothing else is owed a reply and the controller has
-  reported Idle for 1 s, KerfDesk sends one `$G` to GRBL, grblHAL and FluidNC controllers
-  (the Falcon included). They answer it only after every earlier line, so its `[GC:...]`
-  report proves the job was read and any reply still missing was lost. The job then finishes
-  through the ordinary post-job settle instead of the 90-second watchdog resetting the
-  controller, usually within about 2 s. A controller holding its own program answers only
-  after the held lines, so it is never finished early. Other controllers with a realtime
-  status (Smoothieware) wait for 15 s of Idle plus any G4 still in flight instead. The log
-  names how many replies were lost and that one may have been an error (ADR-610 and its
-  Amendment 1).
+  finished. Once every line has been sent and nothing else is owed a reply, KerfDesk sends one
+  `$G` to a GRBL, grblHAL or FluidNC profile (the Falcon profiles included). GRBL-family
+  firmware answers it only after every earlier line, so its `[GC:...]` report proves the job
+  was read and any reply still missing was lost. The job then finishes through the ordinary
+  post-job settle instead of the 90-second watchdog resetting the controller.
+  - When the firmware identified itself this session (its welcome banner, or a stock GRBL
+    `$I` reply), the `$G` goes after 1 s of Idle and the job usually finishes within about
+    2 s.
+  - A board that printed no banner (it did not reboot when the port opened, as native-USB
+    boards and boards reconnected after Disconnect may not) stays unidentified: grblHAL,
+    FluidNC and the Falcon have no `$I` KerfDesk reads as identity. The `$G` then waits for
+    15 s of Idle (three reports, plus any G4 still in flight), so the job finishes after about
+    15 s, and never earlier than that even if the firmware is not GRBL-family after all.
+  - A controller holding its own program answers the `$G` only after the held lines, so on
+    GRBL-family firmware the job is not finished while lines are still held. This is code and
+    simulator evidence; the Falcon's own firmware was not tested.
+  - Firmware identified as Smoothieware (or a banner naming other non-GRBL firmware) gets no
+    `$G`: the job finishes after 15 s of Idle plus any G4 still in flight. Smoothieware's
+    ordering is unverified, so a board holding its program at Idle for longer could still be
+    finished early.
+  The log names how many replies were lost and that one may have been an error (ADR-610 and
+  its Amendments 1 and 2).
 - After any page stall, the controller output that queued up meanwhile is handed to the app
   in slices of about 8 ms, with input, drawing and the status poll running in between,
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
@@ -3263,7 +3286,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    shows the brief "Controller is not responding" notice (ADR-611). A controller
    that answered and then goes quiet for 8 s, outside homing and other controller
    operations, turns the connection status to an amber **Not responding** until
-   its next reply (ADR-611 Amendment 1).
+   its next reply (ADR-611 Amendment 1). While a sent line is still owed its
+   reply (a Console `$H` is answered only when homing ends) the wait is as long
+   as the Home button would wait for that reply, not for the rest of the
+   session: a reply lost on the link never arrives (ADR-610 Amendment 2).
 4. A CNC Pause/Resume confirmation warning retains the paused job and its saved
    artifact. A later accepted Abort, actual Disconnect or controller fault
    records its own terminal cause. A reset-owned host freeze remains provisional.

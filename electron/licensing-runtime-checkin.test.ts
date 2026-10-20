@@ -95,6 +95,38 @@ it.each([
     expect(h.saved()?.clockOffset).toBeUndefined();
   },
 );
+// The desktop app ships for macOS and Linux too (ADR-623 Amendment 1).
+it.each([
+  { platform: 'darwin', setting: 'System Settings > General > Date & Time' },
+  { platform: 'linux', setting: 'your desktop’s date and time settings' },
+])('names $platform’s own clock settings in every clock message', async ({ platform, setting }) => {
+  const on = (h: ReturnType<typeof harness>) => createLicensingRuntime({ ...h.options, platform });
+  const overdue = harness(saved());
+  overdue.clock(NOW + 31 * DAY_MS);
+  const rolledBack = harness(saved(trialClaims()));
+  rolledBack.clock(NOW - 600_000);
+  const refused = harness();
+  refused.fetch.mockResolvedValue(grant(claims({ issuedAt: NOW / 1000 + 2 * 3600 })));
+  const keptOffset = harness({ ...saved(), refreshedAt: NOW / 1000 });
+  keptOffset.clock(NOW + 8 * DAY_MS + 3_600_000);
+  keptOffset.fetch.mockResolvedValue(grant(claims({ issuedAt: NOW / 1000 + 8 * 86_400 })));
+  const messages = [
+    await on(overdue).status(),
+    await on(rolledBack).status(),
+    await on(refused).activate(TEST_KEY),
+    await on(keptOffset).refresh(),
+  ].map((status) => `${status.state}: ${status.message}`);
+  expect(messages.map((message) => message.split(':')[0])).toEqual([
+    'checkin-required',
+    'clock-error',
+    'clock-error',
+    'ready',
+  ]);
+  for (const message of messages) {
+    expect(message).toContain(setting);
+    expect(message).not.toContain('Windows');
+  }
+});
 it('still refuses a trial, an activation or a paid offset beyond one check-in period', async () => {
   const trial = harness({ ...saved(trialClaims()), refreshedAt: NOW / 1000 });
   trial.fetch.mockImplementation(answering(trialClaims({ issuedAt: NOW / 1000 - 3600 })));

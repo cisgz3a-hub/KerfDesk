@@ -198,3 +198,16 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* A background auto-connect that did not open the port (ADR-639): a quiet
+   note, not an alert, because nobody clicked Connect. */
+.lf-connection-auto-hint {
+  margin: 0;
+  color: var(--lf-text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.lf-connection-compact .lf-connection-auto-hint {
+  max-width: 520px;
+}

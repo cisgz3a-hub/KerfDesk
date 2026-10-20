@@ -106,7 +106,14 @@ export function holdReason({ variable, openIssues }) {
  * with no newer beta cut, is not on the stable ring yet and is not held. An
  * older beta that a newer one replaced is never promoted.
  */
-export function promotionDecision({ beta, stable, now, held, quietDays = QUIET_DAYS }) {
+export function promotionDecision({
+  beta,
+  stable,
+  betaObservedAt,
+  now,
+  held,
+  quietDays = QUIET_DAYS,
+}) {
   const newest = beta[0]?.payload;
   if (newest === undefined)
     return { due: false, version: null, reason: 'The beta ring has no release yet.' };
@@ -116,7 +123,14 @@ export function promotionDecision({ beta, stable, now, held, quietDays = QUIET_D
   if (stable[0] !== undefined && compareStableVersions(stable[0].payload.version, version) > 0)
     throw new Error(`The stable ring is ahead of the newest beta (${version}).`);
   if (held) return { due: false, version, reason: `${version} is held: ${held}.` };
-  const quietUntil = Date.parse(newest.publishedAt) + quietDays * DAY_MS;
+  const observed = Date.parse(betaObservedAt);
+  if (!Number.isFinite(observed))
+    return {
+      due: false,
+      version,
+      reason: `${version} is awaiting verified public beta observation before its quiet days begin.`,
+    };
+  const quietUntil = observed + quietDays * DAY_MS;
   if (now.getTime() < quietUntil)
     return {
       due: false,
