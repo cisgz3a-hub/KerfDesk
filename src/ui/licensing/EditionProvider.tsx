@@ -141,7 +141,7 @@ function useEditionValue(
   freeBuild: boolean,
 ): EditionValue {
   const { status, isPro, hasPendingPro, requestPro } = session;
-  const { showAll, hasPrompt, request } = desktop;
+  const { showAll, request } = desktop;
   return useMemo<EditionValue>(
     () => ({
       status,
@@ -151,13 +151,15 @@ function useEditionValue(
         return isPro();
       },
       proInDesktop: freeBuild,
+      // Only the licence prompt keeps an edit it can still run. A free build
+      // cannot unlock Pro, so its desktop notice holds none (ADR-609).
       get proPromptOpen() {
-        return hasPendingPro() || hasPrompt();
+        return !freeBuild && hasPendingPro();
       },
       requestPro: freeBuild ? request : requestPro,
       openLicence: freeBuild ? showAll : openLicence,
     }),
-    [freeBuild, hasPendingPro, hasPrompt, isPro, request, requestPro, status, showAll],
+    [freeBuild, hasPendingPro, isPro, request, requestPro, status, showAll],
   );
 }
 

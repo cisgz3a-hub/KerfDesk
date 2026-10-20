@@ -63,8 +63,20 @@ async function listOpens(warnings: ReadonlyArray<string>): Promise<boolean | und
 }
 
 describe('JobReviewWarnings', () => {
-  it('keeps ordinary advisories folded under the count', async () => {
-    expect(await listOpens(['Layer L1 cuts 8 mm into 6.35 mm stock.'])).toBe(false);
+  it('shows each warning as a short headline with the rest folded under it', async () => {
+    const host = await renderWarnings([
+      'Layer L1 cuts 8 mm into 6.35 mm stock. Check the stock thickness before cutting.',
+      'Island fill can overburn small details.',
+    ]);
+    expect(host.querySelector('h3')?.textContent).toBe('2 warnings· none block the start');
+    expect([...host.querySelectorAll('li')].map((item) => item.textContent)).toEqual([
+      'Layer L1 cuts 8 mm into 6.35 mm stockCheck the stock thickness before cutting.',
+      'Island fill can overburn small details',
+    ]);
+    expect(host.querySelector('summary')?.textContent).toBe(
+      'Layer L1 cuts 8 mm into 6.35 mm stock',
+    );
+    expect(host.querySelector('details')?.open).toBe(false);
   });
 
   // CNC audit JR-1: the $32 warning sat folded while laser mode skips the

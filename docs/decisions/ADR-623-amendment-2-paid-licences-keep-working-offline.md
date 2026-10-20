@@ -81,3 +81,9 @@ What LightBurn does:
   30 days, which no longer applies. The owner should drop the paid deadline from them before the
   release that carries this decision. The AGENTS.md summary of ADR-592 ("paid 30 days") is the maintainer's to
   update the same way.
+
+### Merged with ADR-592 Amendment 1 (refresh nonce)
+
+ADR-592 Amendment 1 landed first. Its nonce is kept for every refresh: a grant
+that signs another request's nonce is refused. Its paid wrong-clock offset is
+removed here, because a paid grant is no longer held to the clock.

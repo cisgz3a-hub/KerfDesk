@@ -2,6 +2,10 @@
 
 **Status:** Implemented in source; the service change takes effect at the next Worker redeploy and the app change at the next commercial desktop release. The paid check-in in decision 2 is removed by [ADR-623 Amendment 2](ADR-623-amendment-2-paid-licences-keep-working-offline.md): paid licences keep working offline, as LightBurn's do; trials keep theirs | **Date:** 2026-10-12 | **Amends:** ADR-523 Amendments 1 and 2 (offline paid rights, clock rules), ADR-540 item 3 and Amendment 1 item 5 (desktop Free and existing Pro projects), ADR-540 Amendment 2 item 4 (trial identity), ADR-544 "What is accepted" and "Later, when abuse shows"
 
+**Amended:** [Amendment 1](ADR-592-amendment-1-refresh-nonce.md) counts a paid
+check-in from a computer with a wrong clock only when the grant signs back the
+nonce its refresh request sent.
+
 ### Context
 
 On 2026-10-12 the owner reported that people could bypass the licence and get Pro

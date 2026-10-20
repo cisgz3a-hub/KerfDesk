@@ -1,7 +1,7 @@
 import { lookup } from './admin.mjs';
 import { writeAudit } from './audit.mjs';
 import { ROUTE } from './routes.mjs';
-import { device, identifier, requireValue, secret, text } from './validation.mjs';
+import { device, identifier, nonce, requireValue, secret, text } from './validation.mjs';
 
 const DAY = 86_400;
 const MAX_DEVICES = 3;
@@ -230,7 +230,13 @@ export class LicensingAuthority {
     return activation;
   }
 
+  /**
+   * Confirms a seat. The nonce the app sends with a refresh is signed back into
+   * the grant, so the app can tell this answer from a saved one replayed to it
+   * (ADR-592 Amendment 1). An older app sends none and gets the grant it always did.
+   */
   async refresh(body) {
+    const refreshNonce = body.refreshNonce === undefined ? undefined : nonce(body.refreshNonce);
     const authenticated = await this.authenticateActivation(body);
     const result = this.records.transaction((tx) => {
       const activation = tx.get(`activation:${authenticated.activationId}`);
@@ -243,7 +249,7 @@ export class LicensingAuthority {
       );
       return { license, activation };
     });
-    return this.issue(result.license, result.activation, body.deviceId);
+    return this.issue(result.license, result.activation, body.deviceId, refreshNonce);
   }
 
   async deactivate(body) {
@@ -331,7 +337,7 @@ export class LicensingAuthority {
     return lookup(this, body, admin);
   }
 
-  async issue(license, activation, deviceId) {
+  async issue(license, activation, deviceId, refreshNonce) {
     const claims = {
       schemaVersion: 1,
       product: 'kerfdesk-desktop',
@@ -344,6 +350,7 @@ export class LicensingAuthority {
       updatesUntil: license.updatesUntil,
       perpetualUpdates: license.perpetualUpdates,
       maxDevices: MAX_DEVICES,
+      ...(refreshNonce === undefined ? {} : { refreshNonce }),
     };
     const entitlement = await this.crypto.sign(claims);
     const activationToken = await this.activationToken(activation.activationId);

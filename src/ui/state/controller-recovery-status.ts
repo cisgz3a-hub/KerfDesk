@@ -20,6 +20,10 @@ type RecoveryStatus = Pick<
 >;
 
 const CONTROLLER_RESPONSE_WINDOW_MS = 8_000;
+/** How long a line still owed its reply may keep the controller silent when
+ * the caller passes no homing bound: the Home button's own wait for its reply
+ * on a controller that reports while it homes (laser-home-action.ts). */
+const OWED_REPLY_SILENCE_MS = 120_000;
 
 /** Connection replacement follows current communication evidence, rather than
  * the kind of a persistent warning from an earlier incident. */
@@ -57,6 +61,8 @@ export function controllerStoppedResponding(state: RecoveryStatus, now = Date.no
  * responding" instead of "Connected" (ADR-611 Amendment 1), as other senders
  * show a stalled link. GRBL may leave `?` unanswered while it homes, and a
  * queued-poll controller is not asked while a job streams, so neither counts.
+ * `owedReplySilenceMs` is the longest homing cycle the controller's settings
+ * allow (the Home button's own reply wait).
  */
 export function controllerWentSilent(
   state: RecoveryStatus &
@@ -64,6 +70,7 @@ export function controllerWentSilent(
     Partial<Pick<LaserState, 'transcript'>>,
   now = Date.now(),
   schedule: StatusPollSchedule | null = null,
+  owedReplySilenceMs = OWED_REPLY_SILENCE_MS,
 ): boolean {
   if (state.connection.kind !== 'connected') return false;
   if (state.capabilities.statusQuery !== 'realtime-report' || state.controllerOperation !== null) {
@@ -71,8 +78,14 @@ export function controllerWentSilent(
   }
   // A line still owed its reply may be what the controller is busy with: a
   // Console `$H` owns no operation, and GRBL answers neither `?` nor the `$H`
-  // until homing ends.
-  if (state.pendingUntrackedAcks > 0) return false;
+  // until homing ends. That excuses the silence only as long as homing could
+  // last: a reply lost on the link never arrives and leaves the line owed for
+  // the session, which must not hide a controller that then goes quiet
+  // (ADR-610 Amendment 2).
+  const windowMs =
+    state.pendingUntrackedAcks > 0
+      ? Math.max(CONTROLLER_RESPONSE_WINDOW_MS, owedReplySilenceMs)
+      : CONTROLLER_RESPONSE_WINDOW_MS;
   const observed = state.statusResponseObservation ?? state.statusObservation;
   if (observed === null || observed.sessionEpoch !== state.controllerSessionEpoch) return false;
   // Any line the controller sent proves it is talking, not only a status
@@ -81,9 +94,7 @@ export function controllerWentSilent(
   const lastHeardAt = Math.max(observed.observedAt, lastInboundLineAt(state.transcript));
   // Only time the status poll ran on schedule counts: a hidden, throttled or
   // sleeping page asked nothing, so its gap is not the controller's silence.
-  return (
-    hostAwareSilenceRemainingMs(schedule, lastHeardAt, CONTROLLER_RESPONSE_WINDOW_MS, now) === 0
-  );
+  return hostAwareSilenceRemainingMs(schedule, lastHeardAt, windowMs, now) === 0;
 }
 
 function lastInboundLineAt(transcript: LaserState['transcript'] | undefined): number {
