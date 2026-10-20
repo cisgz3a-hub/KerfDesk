@@ -1,4 +1,5 @@
 import { normalizeSceneObject } from './normalize-scene-object';
+import { settleLegacyTraceSources } from './legacy-trace-source';
 import { normalizePositioningLight } from '../../core/devices/positioning-light';
 import type { ReliefAuthoringResolutions } from './project-relief-authoring-validator';
 // deserializeProject - parses a .lf2 string and returns a typed Project, or a
@@ -103,7 +104,7 @@ export function deserializeProjectValue(raw: unknown): DeserializeResult {
 
   let project: Project;
   try {
-    project = normalizeProject(workingRaw, resolvedDocuments);
+    project = settleLegacyTraceSources(normalizeProject(workingRaw, resolvedDocuments));
   } catch (error) {
     return {
       kind: 'invalid',

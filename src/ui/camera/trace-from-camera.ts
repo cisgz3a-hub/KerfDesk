@@ -10,6 +10,7 @@ import type { CameraPose, LensModel } from '../../core/camera/model/camera-model
 import type { SurfaceHeightArea } from '../../core/camera/model/height-areas';
 import type { RgbaImage } from '../../core/camera/rgba-image';
 import { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
+import { CAMERA_CAPTURE_SOURCE } from '../../core/scene/reference-image-output';
 import { rgbaToPngDataUrl } from './png-encode';
 import { extractLumaBase64 } from '../trace/image-loader';
 
@@ -62,7 +63,7 @@ export function buildCameraTraceImage(args: {
     source: {
       kind: 'raster-image',
       id: crypto.randomUUID(),
-      source: 'camera capture',
+      source: CAMERA_CAPTURE_SOURCE,
       dataUrl,
       pixelWidth: image.width,
       pixelHeight: image.height,

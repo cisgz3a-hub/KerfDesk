@@ -16,8 +16,7 @@ export function normalizeSceneObject(
   resolvedDocuments?: ReliefAuthoringResolutions,
 ): unknown {
   if (!isObject(obj)) return obj;
-  const { libraryProvenance: rawLibraryProvenance, ...withoutLibraryProvenance } =
-    withoutLegacyTraceSourceRole(obj);
+  const { libraryProvenance: rawLibraryProvenance, ...withoutLibraryProvenance } = obj;
   const libraryProvenance =
     obj['kind'] === 'imported-svg'
       ? normalizeLibraryAssetProvenance(rawLibraryProvenance)
@@ -36,16 +35,6 @@ export function normalizeSceneObject(
   if (obj['kind'] !== 'text') return normalized;
   if (typeof obj['letterSpacing'] === 'number') return normalized;
   return { ...normalized, letterSpacing: DEFAULT_TEXT_LETTER_SPACING };
-}
-
-// ADR-648: earlier builds tagged a photo kept behind a trace
-// `role: 'trace-source'` and left it out of every job. A kept photo is now an
-// ordinary image, so the marker is dropped on load: the photo engraves on its
-// operation like any other, and the next save writes it without the marker.
-function withoutLegacyTraceSourceRole(obj: Record<string, unknown>): Record<string, unknown> {
-  if (obj['kind'] !== 'raster-image' || !('role' in obj)) return obj;
-  const { role: _legacyRole, ...ordinaryImage } = obj;
-  return ordinaryImage;
 }
 
 function normalizedDesignIntent(

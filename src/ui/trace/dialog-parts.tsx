@@ -285,7 +285,7 @@ export function DeleteImageAfterTraceToggle(props: {
         type="checkbox"
         className="lf-checkbox"
         checked={props.checked}
-        title="Remove the source bitmap after creating the trace. Uncheck to keep it for Re-trace Original."
+        title="Remove the image after creating the trace. Leave it off to keep the image: it engraves on its own operation, and Re-trace Original can use it."
         onChange={(e) => props.onChange(e.target.checked)}
       />
       <span>Delete Image After trace</span>
