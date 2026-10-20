@@ -203,18 +203,17 @@ async function sendLightOn(
   try {
     await positioningLightCommand(context, mapping.onCommand);
   } catch (error) {
-    const kind = context.refs.driver.kind;
-    if (
-      error instanceof ControllerCommandRefusedError &&
-      error.controllerErrorCode === 20 &&
-      (kind === 'grbl-v1.1' || kind === 'grblhal' || kind === 'fluidnc') &&
-      owns()
-    ) {
+    if (grblRefusalCode(error, context.refs.driver) === 20 && owns()) {
       set({ positioningLightEnabled: false });
       lightSnapshots.delete(context.refs);
     }
     throw error;
   }
+}
+
+function grblRefusalCode(error: unknown, { kind }: LiveRefs['driver']): number | null {
+  if (!(error instanceof ControllerCommandRefusedError)) return null;
+  return ['grbl-v1.1', 'grblhal', 'fluidnc'].includes(kind) ? error.controllerErrorCode : null;
 }
 
 async function turnOffPreviousLight(context: PositioningLightTransaction): Promise<void> {
@@ -353,15 +352,30 @@ async function moveToLightTarget(
     // together, so an Abort cannot land between the lines and leave G91 modal.
     await positioningLightBatch(context, commands);
   } catch (error) {
-    // A refused single native jog (GRBL error:15 soft limit) never started;
-    // any other failure leaves the move's fate unknown and is contained.
-    if (!(commands.length === 1 && error instanceof ControllerCommandRefusedError)) onMotion();
+    // Only a qualified parser/travel rejection with no reported motion proves
+    // the native jog never started. Ambiguous faults retain Abort containment.
+    if (!refusedNativeJogBeforeMotion(context, commands, error)) onMotion();
     throw error;
   }
   onMotion();
   await settlePositioningLightMove(context);
   assertLightTargetReached(context, target);
   restoreFrameProof(context, set, proof);
+}
+
+function refusedNativeJogBeforeMotion(
+  context: PositioningLightTransaction,
+  commands: ReadonlyArray<string>,
+  error: unknown,
+): boolean {
+  if (commands.length !== 1 || !commands[0]?.trim().startsWith('$J=')) return false;
+  const driver = context.refs.driver;
+  const code = grblRefusalCode(error, driver);
+  return (
+    driver.capabilities.jog === 'native-jog' &&
+    (code === 15 || code === 20) &&
+    context.get().statusReport?.state === 'Idle'
+  );
 }
 
 type LightMoveFrameProof = StashedFrameProof & {

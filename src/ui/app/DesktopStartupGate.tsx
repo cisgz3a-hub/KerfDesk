@@ -6,7 +6,14 @@ const PACKAGED_DESKTOP = () =>
   window.location.protocol === 'app:' && window.location.hostname === 'app';
 
 /** Put this inside first-use agreement, and outside every workspace provider. */
-export function DesktopStartupGate({ children }: { readonly children: ReactNode }): JSX.Element {
+export function DesktopStartupGate({
+  children,
+  onNativeReady,
+}: {
+  readonly children: ReactNode;
+  /** Starts local services before children mount, without waiting for their work to finish. */
+  readonly onNativeReady?: () => void;
+}): JSX.Element {
   const [state, setState] = useState<StartupState>(() =>
     PACKAGED_DESKTOP() ? 'opening' : 'ready',
   );
@@ -25,7 +32,13 @@ export function DesktopStartupGate({ children }: { readonly children: ReactNode 
     })
       .then((response) => {
         if (response.status !== 204) throw new Error('Desktop startup unavailable');
-        if (mounted) setState(controller.signal.aborted ? 'failed' : 'ready');
+        if (!mounted) return;
+        if (controller.signal.aborted) {
+          setState('failed');
+          return;
+        }
+        onNativeReady?.();
+        setState('ready');
       })
       .catch(() => {
         if (mounted) setState('failed');
@@ -36,7 +49,7 @@ export function DesktopStartupGate({ children }: { readonly children: ReactNode 
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [attempt]);
+  }, [attempt, onNativeReady]);
   useEffect(() => {
     if (state !== 'ready') return installDesktopCloseReceiver(window);
     return;

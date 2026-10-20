@@ -141,7 +141,11 @@ async function attach(context) {
   );
   context.page.on('console', (message) => {
     if (message.type() === 'error')
-      manifest.rendererErrors.push({ kind: 'console', message: message.text() });
+      manifest.rendererErrors.push({
+        kind: 'console',
+        message: message.text(),
+        location: message.location(),
+      });
   });
   context.page.on('dialog', (dialog) => {
     manifest.rendererErrors.push({
@@ -237,10 +241,12 @@ async function fileCommand(page, name) {
   return command;
 }
 
-async function showRunOrder(page) {
+export async function showRunOrder(page) {
   const panels = page.getByRole('region', { name: 'Workspace side panels', exact: true });
   await panels.waitFor({ state: 'visible' });
-  const artwork = panels.getByRole('tab', { name: /^(Artwork|Cuts \/ Layers)$/ });
+  const artwork = panels
+    .getByRole('tablist', { name: 'Side panel', exact: true })
+    .getByRole('tab', { name: /^(Artwork|Cuts \/ Layers)$/ });
   if (await artwork.isVisible()) await artwork.click();
   await panels.getByRole('tab', { name: 'Run order', exact: true }).click();
 }

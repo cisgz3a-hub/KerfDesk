@@ -73,7 +73,8 @@ function rotaryEntryBounds(
   return { ...bounds, minY: reverse ? extent - high : low, maxY: reverse ? extent - low : high };
 }
 
-function jobYRange(job: Job): { readonly min: number; readonly max: number } | null {
+/** The Y the rotary rebases and wraps: every burn's points, final passes included. */
+export function jobYRange(job: Job): { readonly min: number; readonly max: number } | null {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
   for (const group of job.groups) {
@@ -85,6 +86,11 @@ function jobYRange(job: Job): { readonly min: number; readonly max: number } | n
     if (group.kind !== 'cut' && group.kind !== 'fill') continue;
     for (const segment of group.segments) {
       for (const p of segment.polyline) {
+        min = Math.min(min, p.y);
+        max = Math.max(max, p.y);
+      }
+      // ADR-626: a final pass with an overcut leaves by its own lead-out.
+      for (const p of segment.finalPassBurn?.polyline ?? []) {
         min = Math.min(min, p.y);
         max = Math.max(max, p.y);
       }
@@ -131,11 +137,17 @@ function mapSegment<T extends CutSegment>(
   reverse: boolean,
 ): T {
   // A Y scale turns arcs into ellipses; the chords are what the rotary runs.
+  const mapPoint = (p: Vec2): Vec2 => {
+    const forward = (p.y - baseY) * yScale;
+    return { x: p.x, y: reverse ? extent - forward : forward };
+  };
+  const finalPass = segment.finalPassBurn;
   return {
     ...withoutArcMoves(segment),
-    polyline: segment.polyline.map((p) => {
-      const forward = (p.y - baseY) * yScale;
-      return { x: p.x, y: reverse ? extent - forward : forward };
-    }),
+    polyline: segment.polyline.map(mapPoint),
+    // ADR-626: the final pass's own burn moves with the rest of the segment.
+    ...(finalPass === undefined
+      ? {}
+      : { finalPassBurn: { polyline: finalPass.polyline.map(mapPoint) } }),
   };
 }

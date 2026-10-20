@@ -150,6 +150,30 @@ describe('parseStatusReport — Pn pins (ADR-053 P3)', () => {
     expect(pins?.limitX).toBe(false);
   });
 
+  // ADR-644: grblHAL Report extensions, `Pn:` E (E-stop), M (motor warning),
+  // F (motor fault). https://github.com/grblHAL/core/wiki/Report-extensions
+  it('decodes grblHAL E-stop, motor warning and motor fault', () => {
+    const pins = parseStatusReport('<Alarm:10|MPos:0.000,0.000,0.000|FS:0,0|Pn:EMF>')?.pins;
+    expect(pins).toMatchObject({ estop: true, motorWarning: true, motorFault: true });
+    expect(pins?.limitX).toBe(false);
+    const estopOnly = parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Pn:E>')?.pins;
+    expect(estopOnly).toEqual({
+      limitX: false,
+      limitY: false,
+      limitZ: false,
+      probe: false,
+      door: false,
+      estop: true,
+    });
+  });
+
+  it('leaves the grblHAL fields out of a stock GRBL report', () => {
+    const pins = parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Pn:XPD>')?.pins;
+    expect(pins).not.toHaveProperty('estop');
+    expect(pins).not.toHaveProperty('motorWarning');
+    expect(pins).not.toHaveProperty('motorFault');
+  });
+
   it('returns pins=null when GRBL omits the Pn field (nothing triggered)', () => {
     expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>')?.pins).toBeNull();
   });

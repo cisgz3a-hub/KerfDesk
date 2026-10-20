@@ -82,10 +82,14 @@ const desktopLicenceClient =
   adapter.id === 'electron' && window.location.protocol === 'app:'
     ? createDesktopLicenceAdapter()
     : undefined;
-// Before any project opens or saves: seals tell this computer's Pro work apart (ADR-592).
-const sealKey = desktopLicenceClient?.projectSealKey;
-if (sealKey !== undefined) installProjectSealKey(sealKey);
 if (desktopLicenceClient !== undefined) startLicensedEditionLocked();
+
+function prepareDesktopWorkspace(): void {
+  // Native licensing routes open at the ready handshake. Start the key load
+  // before project providers mount; project IO waits for it, not the workspace.
+  const sealKey = desktopLicenceClient?.projectSealKey;
+  if (sealKey !== undefined) installProjectSealKey(sealKey);
+}
 
 // If a render crash unmounts the App (and its Abort button + Ctrl+. listener),
 // the crash screen still needs a way to request a controller abort (F60/F65). Both
@@ -113,7 +117,7 @@ createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary softwareAbort={softwareAbort}>
       <PlatformProvider adapter={adapter}>
-        <DesktopStartupGate>
+        <DesktopStartupGate onNativeReady={prepareDesktopWorkspace}>
           <DesktopDownloadContext.Provider value={resolveWindowsDesktopDownload}>
             <EditionProvider
               {...(import.meta.env.DEV &&
