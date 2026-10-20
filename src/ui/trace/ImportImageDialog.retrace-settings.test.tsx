@@ -124,10 +124,7 @@ describe('Re-trace Original keeps the committed trace settings (ADR-408)', () =>
     });
 
     // 2. Save and reopen the project through the real .lf2 boundary.
-    const saved: Project = projectWith(
-      seed,
-      { ...committed, traceSourceId: seed.id },
-    );
+    const saved: Project = projectWith(seed, { ...committed, traceSourceId: seed.id });
     const loaded = deserializeProject(serializeProject(saved));
     expect(loaded.kind).toBe('ok');
     if (loaded.kind !== 'ok') return;

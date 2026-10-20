@@ -104,9 +104,7 @@ describe('Diagonal contacts survives Re-trace Original (ADR-455)', () => {
     expect(committed.traceSettings?.overrides).toEqual({ turnPolicy: 'connect-ink' });
 
     const loaded = deserializeProject(
-      serializeProject(
-        projectWith(seed, { ...committed, traceSourceId: seed.id }),
-      ),
+      serializeProject(projectWith(seed, { ...committed, traceSourceId: seed.id })),
     );
     expect(loaded.kind).toBe('ok');
     if (loaded.kind !== 'ok') return;
