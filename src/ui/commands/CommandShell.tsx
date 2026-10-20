@@ -390,7 +390,9 @@ function aboutText(): string {
     `Built ${__BUILD_TIME__}`,
     '',
     'Copyright © 2026 Johann Stolk. All rights reserved.',
-    'Terms of use: Help > License & Safety Notice.',
+    // verify-packaged-preview-metadata.mjs finds the About asset by this line's
+    // "Terms of use: License & Safety Notice" prefix.
+    'Terms of use: License & Safety Notice, in the Help menu.',
     'Third-party components and their licences: see /third-party-notices.txt.',
     '',
     'SAFETY: this software drives laser and CNC machinery. Verify every',
