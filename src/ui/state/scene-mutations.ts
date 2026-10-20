@@ -40,6 +40,7 @@ import type { BedFit } from '../../core/scene/fit-to-bed';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
 import { objectTabAnchorFields } from '../../core/scene/object-tab-anchors';
 import { withColourLayerPowers, type ColourLayerCommit } from '../../core/trace/colour-layer-power';
+import { repairRemovedProjectObjectReferences } from './repair-object-dependencies';
 
 export { positionTraceOverRasterSource } from './trace-placement';
 
@@ -273,7 +274,7 @@ export function applyTraceToExisting(
   sourceId: string,
   traced: TracedImage,
   options: TraceExistingImageOptions = {},
-): MutationResult {
+): MutationResult & ReturnType<typeof repairRemovedProjectObjectReferences> {
   const existing = s.project.scene.objects.find((o) => o.id === sourceId);
   const prepared = prepareTraceSource(s.project.scene, existing, options);
   let scene = prepared.scene;
@@ -309,11 +310,10 @@ export function applyTraceToExisting(
     ? replaceObject(scene, positionedTrace.id, created.object)
     : addObject(scene, created.object);
   for (const operation of operations) scene = addLayer(scene, operation);
-  if (prepared.shouldPruneLayers || options.replaceTraceId !== undefined) {
+  if (prepared.shouldPruneLayers || options.replaceTraceId !== undefined)
     scene = pruneOrphanLayers(scene);
-  }
   return {
-    project: { ...s.project, scene },
+    ...repairRemovedProjectObjectReferences({ ...s.project, scene }),
     selectedObjectId: positionedTrace.id,
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],

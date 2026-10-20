@@ -46,6 +46,16 @@ export function firstZoneCrossedBySegment(
   return null;
 }
 
+/** The enabled zones a bed-coordinate rectangle overlaps, edges included. An
+ * external program's Frame outline is checked this way (ADR-630 Amendment 1):
+ * its motion stays inside the outline, so a zone outside it is clear. */
+export function zonesOverlappingRect(
+  rect: Rect,
+  zones: ReadonlyArray<NoGoZone>,
+): ReadonlyArray<NoGoZone> {
+  return zones.filter((zone) => zone.enabled && rectsIntersect(rect, rectForZone(zone)));
+}
+
 export function findNoGoZoneCollisions(
   gcode: string | ReadonlyArray<string>,
   zones: ReadonlyArray<NoGoZone>,

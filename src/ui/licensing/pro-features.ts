@@ -13,8 +13,7 @@ export type ProFeature =
   | 'registration-jig'
   | 'place-board'
   | 'box-generator'
-  | 'design-studio'
-  | 'gcode-inspector';
+  | 'design-studio';
 
 export const PRO_FEATURES: Readonly<
   Record<ProFeature, { readonly name: string; readonly summary: string }>
@@ -56,10 +55,6 @@ export const PRO_FEATURES: Readonly<
     name: 'Design Studio',
     summary:
       'Draw parts to size by hand in a full window, with precision tools, snapping and dimensions.',
-  },
-  'gcode-inspector': {
-    name: 'G-code Inspector',
-    summary: 'Open any G-code file, or this project’s own, and check it move by move in 3D.',
   },
 };
 

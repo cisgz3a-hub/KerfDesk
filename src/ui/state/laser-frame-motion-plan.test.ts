@@ -72,4 +72,26 @@ describe('Frame dispatch with a chosen perimeter start', () => {
     expect(plan.lines).toHaveLength(grblDriver.commands.frameToolOffLines.length + 6);
     expect(plan.lines.at(-1)).toBe('$J=G90 G21 X15.000 Y10.000 F6000\n');
   });
+
+  it('returns an external program Frame to where the program starts (ADR-630)', () => {
+    const plan = buildFrameDispatchPlan(
+      refs,
+      useLaserStore.getState,
+      bounds,
+      6000,
+      undefined,
+      createProject(),
+      {
+        verification: {
+          boundsSignature: 'external-program:plan',
+          wco: null,
+          workOriginActive: false,
+        },
+        returnToWorkPosition: { x: 30, y: 40 },
+      },
+    );
+    expect(plan.kind).toBe('ready');
+    if (plan.kind !== 'ready') return;
+    expect(plan.lines.at(-1)).toBe('$J=G90 G21 X30.000 Y40.000 F6000\n');
+  });
 });

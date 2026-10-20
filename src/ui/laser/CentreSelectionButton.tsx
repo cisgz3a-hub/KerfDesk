@@ -1,7 +1,7 @@
 import { rotaryAppliesTo } from '../../core/job/rotary-job';
 import { machineKindOf } from '../../core/scene';
 import {
-  positioningLightIssue,
+  devicePositioningLightIssue,
   positioningLightSupported,
 } from '../../core/devices/positioning-light';
 import { useStore } from '../state';
@@ -185,12 +185,5 @@ function positioningControlsVisible(
 function positioningSetupNeeded(
   device: ReturnType<typeof useStore.getState>['project']['device'],
 ): boolean {
-  return (
-    device.positioningLight === undefined ||
-    positioningLightIssue(
-      device.positioningLight,
-      device.controllerKind,
-      device.gcodeDialect?.dialectId,
-    ) !== null
-  );
+  return device.positioningLight === undefined || devicePositioningLightIssue(device) !== null;
 }

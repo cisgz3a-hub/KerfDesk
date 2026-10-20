@@ -142,6 +142,7 @@ function mapSegment<T extends CutSegment>(
     return { x: p.x, y: reverse ? extent - forward : forward };
   };
   const finalPass = segment.finalPassBurn;
+  const contour = segment.leadContour;
   return {
     ...withoutArcMoves(segment),
     polyline: segment.polyline.map(mapPoint),
@@ -149,5 +150,7 @@ function mapSegment<T extends CutSegment>(
     ...(finalPass === undefined
       ? {}
       : { finalPassBurn: { polyline: finalPass.polyline.map(mapPoint) } }),
+    // Retained editing geometry follows the same no-arcs rule as the burn.
+    ...(contour === undefined ? {} : { leadContour: { from: contour.from, to: contour.to } }),
   };
 }

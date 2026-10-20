@@ -13,6 +13,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { grblDriver, marlinDriver } from '../../core/controllers';
+import { useDisplayUnitsStore } from '../state/display-units';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { StatusDisplay } from './StatusDisplay';
@@ -57,6 +58,40 @@ afterEach(() => {
   act(() => root.unmount());
   host.remove();
   useLaserStore.setState({ ...initialLaserState(), capabilities: originalCapabilities });
+  useDisplayUnitsStore.setState({ lengthUnit: 'mm' });
+});
+
+// ADR-629: the Machine panel readout in both units.
+describe('StatusDisplay units', () => {
+  function positionRow(): string {
+    act(() => root.render(<StatusDisplay />));
+    const row = [...host.querySelectorAll('div')].find((div) =>
+      div.textContent?.startsWith('MPos:'),
+    );
+    return row?.textContent ?? '';
+  }
+
+  it('reads the position in millimetres, then in inches', () => {
+    useLaserStore.setState({
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 25.4, y: 50.8, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
+      wcoCache: { x: 254, y: 127, z: 0 },
+      workOriginActive: true,
+      workOriginSource: 'unknown',
+    });
+    expect(positionRow()).toBe('MPos: X 25.400 Y 50.800 Z 0.000');
+    expect(originRow()).toBe('Origin: X 254.000 Y 127.000 (reported by controller)');
+    useDisplayUnitsStore.setState({ lengthUnit: 'in' });
+    expect(positionRow()).toBe('MPos: X 1.0000 Y 2.0000 Z 0.0000 in');
+    expect(originRow()).toBe('Origin: X 10.0000 Y 5.0000 in (reported by controller)');
+  });
 });
 
 describe('StatusDisplay origin row', () => {
