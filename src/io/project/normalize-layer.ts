@@ -272,6 +272,7 @@ function normalizeCommonLayerFields(out: Record<string, unknown>): void {
     out['tabSkipInnerShapes'] = LAYER_DEFAULTS.tabSkipInnerShapes;
   }
   normalizeTabLayoutFields(out);
+  normalizeLeadFields(out);
 }
 
 // ADR-494: the optional tab layout and tab power stay absent (tabs by count,
@@ -285,6 +286,19 @@ function normalizeTabLayoutFields(out: Record<string, unknown>): void {
   }
   const power = out['tabCutPowerPercent'];
   if (!isNonNegativeNumber(power) || power > 100) delete out['tabCutPowerPercent'];
+}
+
+// ADR-626: the optional lead settings stay absent (no leads) unless they
+// hold a usable value, like the tab settings above.
+function normalizeLeadFields(out: Record<string, unknown>): void {
+  if (typeof out['leadInEnabled'] !== 'boolean') delete out['leadInEnabled'];
+  if (typeof out['leadOutEnabled'] !== 'boolean') delete out['leadOutEnabled'];
+  if (out['leadStyle'] !== 'arc' && out['leadStyle'] !== 'line') delete out['leadStyle'];
+  if (!isPositiveNumber(out['leadLengthMm'])) delete out['leadLengthMm'];
+  const angle = out['leadAngleDeg'];
+  if (typeof angle !== 'number' || !Number.isFinite(angle)) delete out['leadAngleDeg'];
+  const side = out['leadSide'];
+  if (side !== 'auto' && side !== 'outside' && side !== 'inside') delete out['leadSide'];
 }
 
 function normalizeFillLayerFields(out: Record<string, unknown>): void {

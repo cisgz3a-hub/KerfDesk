@@ -11,6 +11,12 @@ import {
   effectiveOperationForObject,
   operationOverrideForObject,
 } from '../../core/effective-output';
+import {
+  leadStyleFor,
+  maxLeadAngleDeg,
+  MIN_LEAD_ANGLE_DEG,
+  MIN_LEAD_LENGTH_MM,
+} from '../../core/job/laser-lead-settings';
 import { rematerializeParametricShape, type ParametricShapeSpec } from '../../core/shapes';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
@@ -213,7 +219,24 @@ function reconcileArtworkBounds(
     const width = patch.dotWidthCorrectionMm ?? current.dotWidthCorrectionMm;
     if (width > maximum) next.dotWidthCorrectionMm = maximum;
   }
+  reconcileLeadAngle(patch, current, next);
   return next;
+}
+
+// ADR-626: an arc lead turns up to 180 degrees, a line lead meets the cut at
+// up to 90. A bulk edit of the angle alone keeps each artwork's angle within
+// its own style's range, as the artwork's settings then show.
+function reconcileLeadAngle(
+  patch: ObjectOperationOverride,
+  current: Layer,
+  next: Record<string, unknown>,
+): void {
+  if (patch.leadAngleDeg === undefined && patch.leadStyle === undefined) return;
+  const style = patch.leadStyle ?? leadStyleFor(current);
+  const angle = patch.leadAngleDeg ?? current.leadAngleDeg;
+  if (angle === undefined) return;
+  const within = Math.min(maxLeadAngleDeg(style), Math.max(MIN_LEAD_ANGLE_DEG, angle));
+  if (within !== angle) next.leadAngleDeg = within;
 }
 
 function selectedObjectIds(state: ObjectPropertiesState): Set<string> {
@@ -272,7 +295,19 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   setBoolean(out, 'imageCrossHatch', patch.imageCrossHatch);
   setFiniteNumber(out, 'passAngleStepDeg', patch.passAngleStepDeg);
   setBoolean(out, 'autoOverscan', patch.autoOverscan);
+  setLeadFields(out, patch);
   return out as ObjectOperationOverride;
+}
+
+// ADR-626 lead-in and lead-out.
+function setLeadFields(out: Record<string, unknown>, patch: ObjectOperationOverride): void {
+  setBoolean(out, 'leadInEnabled', patch.leadInEnabled);
+  setBoolean(out, 'leadOutEnabled', patch.leadOutEnabled);
+  if (patch.leadStyle === 'arc' || patch.leadStyle === 'line') out.leadStyle = patch.leadStyle;
+  setMinimumNumber(out, 'leadLengthMm', patch.leadLengthMm, MIN_LEAD_LENGTH_MM);
+  setFiniteNumber(out, 'leadAngleDeg', patch.leadAngleDeg);
+  if (patch.leadSide === 'auto' || patch.leadSide === 'outside' || patch.leadSide === 'inside')
+    out.leadSide = patch.leadSide;
 }
 
 // ADR-494 tab layout and tab power.

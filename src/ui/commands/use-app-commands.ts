@@ -48,6 +48,7 @@ import {
 } from './selection-command-state';
 import { controllerActionFailureHandler } from '../laser/report-controller-action-failure';
 import { connectMachine } from '../laser/connect-machine';
+import { pauseAutoConnect } from '../state/auto-connect-session';
 import { useEdition } from '../licensing/edition';
 import { useGuideLockStore } from '../workspace/guide-lock-store';
 import { labelProCommands } from './edition-command-gate';
@@ -304,8 +305,11 @@ function laserCommandContext(
   return {
     connectLaser: () =>
       void connectMachine(platform).catch(controllerActionFailureHandler('Connect')),
-    disconnectLaser: () =>
-      void laser.disconnect().catch(controllerActionFailureHandler('Disconnect')),
+    // The operator's Disconnect pauses auto-connect until they connect (ADR-639).
+    disconnectLaser: () => {
+      pauseAutoConnect();
+      void laser.disconnect().catch(controllerActionFailureHandler('Disconnect'));
+    },
     homeLaser: () => void laser.home().catch(controllerActionFailureHandler('Home')),
   };
 }
