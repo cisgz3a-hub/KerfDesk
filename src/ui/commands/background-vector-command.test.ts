@@ -30,11 +30,11 @@ vi.mock('./vector-op-worker-client', () => ({
   },
 }));
 
-function command(label: string) {
+function command(label: string, deltaMm = 1) {
   return {
     label,
     sources: parityObjects(),
-    task: { kind: 'offset-paths', deltaMm: 1, id: 'offset-paths' } as const,
+    task: { kind: 'offset-paths', deltaMm, id: 'offset-paths' } as const,
     commit: vi.fn(),
     inThread: vi.fn(),
   };
@@ -88,6 +88,30 @@ describe('one-click background vector commands (ADR-609)', () => {
     expect(cut.commit).toHaveBeenCalledOnce();
   });
 
+  it('says so when a newer click of the same command asks for different work', async () => {
+    // Outward copy, then Inward copy while it runs: both are Offset outlines.
+    const outward = command('Offset outlines', 1);
+    const inward = command('Offset outlines', -1);
+    const first = runVectorCommandInBackground(outward);
+    const second = runVectorCommandInBackground(inward);
+    await expect(first).resolves.toBe(false);
+    expect(sessions[0]!.released).toBe(true);
+    expect(messages()).toContain('The earlier Offset outlines was cancelled: a newer one started.');
+    sessions[1]!.resolve({ kind: 'done', result: { kind: 'ok', value: null } });
+    await expect(second).resolves.toBe(true);
+    expect(outward.commit).not.toHaveBeenCalled();
+    expect(inward.commit).toHaveBeenCalledOnce();
+  });
+
+  it('replaces a run silently when the newer click asks for the same work', async () => {
+    const first = runVectorCommandInBackground(command('Offset outlines', 1));
+    const second = runVectorCommandInBackground(command('Offset outlines', 1));
+    await expect(first).resolves.toBe(false);
+    expect(messages()).toStrictEqual([]);
+    sessions[1]!.resolve({ kind: 'done', result: { kind: 'ok', value: null } });
+    await expect(second).resolves.toBe(true);
+  });
+
   it('lets a refused click cancel the running command', async () => {
     const offset = command('Offset outlines');
     const running = runVectorCommandInBackground(offset);
@@ -95,6 +119,7 @@ describe('one-click background vector commands (ADR-609)', () => {
     await expect(running).resolves.toBe(false);
     expect(sessions[0]!.released).toBe(true);
     expect(offset.commit).not.toHaveBeenCalled();
+    expect(messages()).toContain('The earlier Offset outlines was cancelled: a newer one started.');
   });
 
   it('does not commit over an open Pro prompt', async () => {

@@ -97,6 +97,20 @@ describe('canvas text pointer routing', () => {
     },
   );
 
+  it('leaves a click to canvas numbering while it is open, so the click numbers artwork', () => {
+    useUiStore.getState().startArtworkNumbering([]);
+    try {
+      const project = useStore.getState().project;
+      const { handlers, fallback } = pointerHarness(project);
+      handlers.onPointerDown(pointerAt(project, { x: 80, y: 90 }));
+
+      expect(fallback.onPointerDown).toHaveBeenCalledOnce();
+      expect(useCanvasTextStore.getState().session).toBeNull();
+    } finally {
+      useUiStore.getState().finishArtworkNumbering();
+    }
+  });
+
   it('does not transform or replace the session while outside-click saving is pending', () => {
     const project = useStore.getState().project;
     const { handlers, fallback } = pointerHarness(project);
@@ -184,6 +198,24 @@ describe('canvas text double-click routing', () => {
     handleCanvasDoubleClick(event);
 
     expect(useCanvasTextStore.getState().session?.original).toBe(object);
+  });
+
+  it('opens no editor on a double-click while canvas numbering is open', () => {
+    const object = textObject('text');
+    const project = projectWithText(object);
+    const { canvas } = pointerHarness(project);
+    useUiStore.setState({ toolMode: { kind: 'select' }, ...VIEW });
+    useUiStore.getState().startArtworkNumbering([]);
+    try {
+      handleCanvasDoubleClick({
+        ...pointerAt(project, applyTransform({ x: 8, y: 4 }, object.transform)),
+        detail: 2,
+        currentTarget: canvas,
+      });
+      expect(useCanvasTextStore.getState().session).toBeNull();
+    } finally {
+      useUiStore.getState().finishArtworkNumbering();
+    }
   });
 
   it('keeps empty-space and node-mode double-clicks out of text editing', () => {

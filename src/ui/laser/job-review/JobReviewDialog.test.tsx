@@ -16,7 +16,8 @@ import { useMachineSetupDialogStore } from '../device-setup/machine-setup-dialog
 import { BACKGROUND_OUTPUT_PREPARATION_BUSY_MESSAGE } from '../output-preparation-errors';
 import type { JobReviewModel } from './job-review-model';
 import { useJobReviewStore } from './job-review-store';
-import { JobReviewDialog } from './JobReviewDialog';
+import { JobReviewDialog, SAVE_EDIT_BEFORE_START_TITLE } from './JobReviewDialog';
+import { LASER_MODE_VERIFIED_NOTE } from './JobReviewHeader';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -112,10 +113,10 @@ describe('JobReviewDialog', () => {
       expect(useJobReviewStore.getState().pendingSignal).toBe('confirm');
     },
   );
-  it('audit Controller Machine and Warnings disclosures toggle without resolving review', async () => {
+  it('audit Controller and Machine disclosures toggle without resolving review', async () => {
     useJobReviewStore.getState().open(model);
     await render();
-    for (const prefix of ['Controller', 'Machine', 'Warnings']) {
+    for (const prefix of ['Controller', 'Machine']) {
       const summary = [...host.querySelectorAll('summary')].find((node) =>
         node.textContent?.trim().startsWith(prefix),
       );
@@ -143,45 +144,81 @@ describe('JobReviewDialog', () => {
     expect(host.textContent).toContain('8 × 8 mm');
     expect(host.textContent).toContain('Fill runway');
     expect(host.textContent).toContain('8 / 8 full');
-    expect(host.textContent).toContain('Warnings (1)');
-    expect(host.textContent).toContain('Island fill can overburn small details.');
+    expect(host.textContent).toContain('1 warning');
+    expect(host.querySelector('section[aria-label="Warnings"] li')?.textContent).toBe(
+      'Island fill can overburn small details',
+    );
     expect(host.querySelector('details')?.open).toBe(false);
     expect(host.textContent).toContain('User origin — anchor front left');
     expect(host.textContent).toContain('Controller laser mode prompt body.');
-    expect(host.textContent).toContain('Artwork settings');
-    expect(host.textContent).toContain('Before you start');
+    expect(host.querySelector('section[aria-label="Settings"]')).not.toBeNull();
+    expect(host.querySelector('section[aria-label="Controller and machine"]')).not.toBeNull();
+    // An unverified laser session shows the prompt, not the verified chip.
+    expect(host.textContent).not.toContain('Laser mode verified');
     // v2: placement is read-only — no placement controls inside the review.
     expect(host.textContent).not.toContain('Job placement');
     expect(host.querySelector('select')).toBeNull();
     // Laser profiles have no stock; the CNC card must stay out of the way.
     expect(host.textContent).not.toContain('Material & stock');
-    expect(buttonByText('Approve settings').disabled).toBe(false);
+    expect(buttonByText('Edit').disabled).toBe(false);
+    expect(host.textContent).not.toContain('Approve settings');
     expect(host.textContent).not.toContain('Edit Artwork settings');
     expect(host.textContent).not.toContain('Edit Machine Setup');
     expect(buttonByText('Start job').disabled).toBe(false);
     expect(host.querySelector('form')).toBeNull();
   });
 
-  it('commits an edited value to the main settings and approves an immediate rebuild', async () => {
+  it('saves an edited value to the main settings, rebuilds at once, and holds Start meanwhile', async () => {
     useJobReviewStore.getState().open(model);
     await render();
+
+    await act(async () => buttonByText('Edit').click());
+    const start = buttonByText('Start job');
+    expect(start.disabled).toBe(true);
+    expect(start.title).toBe(SAVE_EDIT_BEFORE_START_TITLE);
+    await act(async () => start.click());
+    expect(useJobReviewStore.getState().pendingSignal).toBeNull();
+
     const power = host.querySelector('input[aria-label^="Power % for"]');
     if (!(power instanceof HTMLInputElement)) throw new Error('Power input not found');
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-
     await act(async () => {
       setter?.call(power, '55');
       power.dispatchEvent(new Event('input', { bubbles: true }));
-      power.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
     });
+    expect(useStore.getState().project.scene.layers[0]?.power).not.toBe(55);
+
+    await act(async () => buttonByText('Save').click());
+
     expect(useStore.getState().project.scene.layers[0]?.power).toBe(55);
-    expect(host.textContent).toContain('Changes are synced to the Artwork panel');
-
-    await act(async () => buttonByText('Approve settings').click());
-
-    expect(host.textContent).toContain('Approved — current values are synced');
     expect(useJobReviewStore.getState().pendingSignal).toBe('rebuild');
     expect(buttonByText('Start job').disabled).toBe(false);
+  });
+
+  it('keeps the review open when Escape discards a card edit', async () => {
+    useJobReviewStore.getState().open(model);
+    await render();
+    await act(async () => buttonByText('Edit').click());
+    const power = host.querySelector('input[aria-label^="Power % for"]');
+    if (!(power instanceof HTMLInputElement)) throw new Error('Power input not found');
+
+    await act(async () => {
+      power.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+
+    expect(useJobReviewStore.getState().state.kind).toBe('open');
+    expect(useJobReviewStore.getState().pendingSignal).toBeNull();
+    expect(buttonByText('Start job').disabled).toBe(false);
+  });
+
+  it('shows a verified laser session as a header chip instead of a prompt', async () => {
+    useJobReviewStore.getState().open({ ...model, acknowledgement: { kind: 'laser-verified' } });
+    await render();
+
+    const chip = host.querySelector('[role="note"]');
+    expect(chip?.textContent).toBe('Laser mode verified');
+    expect(chip?.getAttribute('title')).toBe(LASER_MODE_VERIFIED_NOTE);
+    expect(host.textContent).not.toContain('Confirm laser settings');
   });
 
   it.each([
@@ -193,11 +230,11 @@ describe('JobReviewDialog', () => {
       useJobReviewStore.getState().open({ ...model, warnings: [warning] });
       await render();
 
-      const warningDetails = [...host.querySelectorAll('details')].find((details) =>
-        details.querySelector('summary')?.textContent?.includes('Warnings'),
-      );
-      expect(warningDetails?.open).toBe(true);
-      expect(warningDetails?.textContent).toContain(warning);
+      const item = host.querySelector('section[aria-label="Warnings"] li');
+      const [headline, detail] = warning.split(': ');
+      expect(item?.querySelector('summary')?.textContent).toBe(headline);
+      expect(item?.querySelector('details')?.open).toBe(true);
+      expect(item?.textContent).toContain(detail?.slice(1));
       expect(buttonByText('Start job').disabled).toBe(false);
     },
   );
@@ -229,7 +266,7 @@ describe('JobReviewDialog', () => {
     await render();
 
     expect(host.textContent).toContain('Review job before framing');
-    expect(host.textContent).toContain('Pressing Accept & Frame records this confirmation');
+    expect(host.textContent).toContain('Pressing Accept & Frame confirms this.');
     const frame = buttonByText('Accept & Frame');
     expect(frame.disabled).toBe(false);
     expect(frame.title).toBe('Accept this review and frame the exact job shown above.');
@@ -297,7 +334,7 @@ describe('JobReviewDialog', () => {
     await render();
 
     expect(host.textContent).toContain('ROUTER');
-    expect(host.textContent).toContain('CNC setup confirmation');
+    expect(host.textContent).toContain('Confirm CNC setup');
     expect(host.textContent).toContain('CNC attestation prompt body.');
     expect(host.textContent).toContain('Material & stock');
     // One name for the no-recipe state across the rail and this report.
