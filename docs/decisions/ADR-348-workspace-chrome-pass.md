@@ -1,6 +1,6 @@
 ## ADR-348 - Workspace chrome pass: menu-bar Undo, one rail width, tutorials only on tools, zoom-aware rulers, hover size (2026-09-22)
 
-**Status:** Accepted. | **Date:** 2026-09-22
+**Status:** Accepted; decision 5 (hover size readout) amended by ADR-348 Amendment 1 (power and speed). | **Date:** 2026-09-22
 
 ### Context
 

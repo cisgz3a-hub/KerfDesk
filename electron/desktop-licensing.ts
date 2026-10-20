@@ -128,6 +128,7 @@ export function createDesktopLicensing(options: Options) {
     ...licenceEntry(config, desktopLicenceLink(config, options.packaged), options),
     observeRequest: signals.observeRequest,
     admitWorkspace: signals.admitWorkspace,
+    sessionAdmitted: signals.sessionAdmitted,
   };
   const rings = createUpdateRingStore(options.userDataPath);
   const { manual, installer } = manualUpdateChecks(config, options, runtime);
@@ -159,7 +160,7 @@ export function createDesktopLicensing(options: Options) {
         entry,
       ),
     /**
-     * Runs once the window is open: a quiet weekly licence confirmation, then
+     * Runs once the window is open: a quiet licence confirmation (a trial daily, paid rights weekly), then
      * the update check. Neither holds the licence window: the confirmation
      * starts once the renderer has read the saved status (ADR-623).
      * Licence confirmation and manual release discovery repeat every 30 minutes.

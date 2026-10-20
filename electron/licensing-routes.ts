@@ -26,6 +26,8 @@ export type LicenceEntry = {
    */
   readonly observeRequest?: (() => (status: LicenceStatus) => number | null) | undefined;
   readonly admitWorkspace?: ((generation: number) => void) | undefined;
+  /** Whether this app session's licence window already let a workspace in (ADR-623 Amendment 1). */
+  readonly sessionAdmitted?: (() => boolean) | undefined;
 };
 
 export function withLicensingRoutes(
@@ -56,7 +58,11 @@ export function withLicensingRoutes(
     const observe = entry.observeRequest?.();
     const sent = (status: LicenceStatus): Response => {
       const generation = observe?.(status);
-      return response(generation == null ? status : { ...status, admissionGeneration: generation });
+      if (generation == null) return response(status);
+      // A renderer reloaded in a session the window already let in opens to its
+      // workspace and job recovery, whatever the rights are now.
+      const session = entry.sessionAdmitted?.() === true ? { sessionAdmitted: true } : {};
+      return response({ ...status, admissionGeneration: generation, ...session });
     };
     if (action === 'status' && request.method === 'GET') return sent(await runtime.status());
     if (ENTRY_ACTIONS.has(action)) return entryRoute(action as EntryAction, request, entry);
@@ -219,7 +225,8 @@ type EntryAction = 'licence-link' | 'clipboard-key' | 'project-seal-key';
 
 /**
  * kerfdesk://licence (GET, answered once), Paste key (empty JSON POST) and this
- * computer's project seal key (GET, ADR-592).
+ * computer's project seal key (GET, ADR-592). Optional startup reads explicitly
+ * report absence in Free/Preview builds; they never acquire commercial helpers.
  */
 async function entryRoute(
   action: EntryAction,
@@ -227,12 +234,12 @@ async function entryRoute(
   entry: LicenceEntry,
 ): Promise<Response> {
   if (action === 'licence-link')
-    return request.method === 'GET' && entry.licenceLink
-      ? response(await entry.licenceLink.consume())
+    return request.method === 'GET'
+      ? response((await entry.licenceLink?.consume()) ?? { open: false, licenseKey: null })
       : missing();
   if (action === 'project-seal-key')
-    return request.method === 'GET' && entry.projectSealKey
-      ? response({ key: await entry.projectSealKey() })
+    return request.method === 'GET'
+      ? response({ key: (await entry.projectSealKey?.()) ?? null })
       : missing();
   if (!jsonPost(request)) return missing();
   const body = await readBody(request);

@@ -29,6 +29,11 @@ export type LicenceStatus = {
   readonly trialExpiresInMs?: number;
   /** The opening renderer's identity, acknowledged only after its workspace mounts. */
   readonly admissionGeneration?: number;
+  /**
+   * The licence window already let a workspace in during this app session, so a
+   * reloaded renderer or reopened window opens to it again (ADR-623 Amendment 1).
+   */
+  readonly sessionAdmitted?: boolean;
   /** Unix seconds on this computer's clock when new Pro choices pause without a check-in (ADR-592). */
   readonly checkInDueAt?: number;
   readonly updatesUntil: number | null;
@@ -480,7 +485,14 @@ export type CameraBridgeAdapter = {
   // app origin, so frames fetched through it are pixel-readable.
   readonly proxiedFrameUrl: (cameraUrl: string) => string;
   readonly health: () => Promise<CameraBridgeHealth>;
+  // Switch the Falcon A1 Pro's head pointer at `host` over its HTTP link (ADR-635).
+  readonly switchFalconPointer?: (host: string, on: boolean) => Promise<FalconPointerSwitchResult>;
 };
+
+export type FalconPointerSwitchResult =
+  | { readonly kind: 'ok' }
+  // Refused, unreachable, or the bridge is missing; `reason` says which.
+  | { readonly kind: 'failed'; readonly reason: string };
 
 // Unsigned desktop Preview update discovery (ADR-249). This is notification
 // only: the adapter can report a newer version and supply one fixed website

@@ -17,7 +17,7 @@ import {
   type ControllerCommandKind,
   type ControllerLifecycleRefs,
 } from './laser-interactive-command';
-import { interactiveControllerOperation } from './laser-controller-operation';
+import { readOnlyControllerOperation } from './laser-controller-operation';
 import { qualifiedController } from './laser-controller-qualification';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
@@ -186,10 +186,7 @@ async function probeLaserModuleForQualification(
 ): Promise<void> {
   if (refs.driver.laserModuleProbe === undefined) return;
   set({
-    controllerOperation: interactiveControllerOperation(
-      LASER_MODULE_CHECK_LABEL,
-      'terminal-exchange',
-    ),
+    controllerOperation: readOnlyControllerOperation(LASER_MODULE_CHECK_LABEL),
   });
   try {
     await probeLaserModule({

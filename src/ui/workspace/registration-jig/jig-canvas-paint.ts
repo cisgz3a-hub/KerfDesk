@@ -14,6 +14,7 @@ import { drawSelectionMarquee } from '../draw-selection-marquee';
 import { drawSelectionSetOverlay } from '../draw-selection-overlay';
 import { computeView, type ViewState, type ViewTransform } from '../view-transform';
 import { jigEditableSelection } from './jig-canvas-selection';
+import { useLengthUnit } from '../../state/display-units';
 
 export type JigMarquee = { readonly start: Vec2; readonly end: Vec2 };
 
@@ -35,6 +36,8 @@ export function useJigCanvasPaint(
   const { selectedIds, marquee, dropOutlineId } = overlay;
   const [paintRevision, setPaintRevision] = useState(0);
   const cache = useRef(createDisplayPolylineCache());
+  // The jig editor's rulers count in the operator's display unit (ADR-629).
+  const lengthUnit = useLengthUnit();
   useEffect(() => {
     const canvas = ref.current;
     const ctx = canvas?.getContext('2d');
@@ -48,6 +51,7 @@ export function useJigCanvasPaint(
         view: viewState,
         displayPolylineCache: cache.current,
         onRasterBitmapReady: () => setPaintRevision((revision) => revision + 1),
+        lengthUnit,
       });
       const view = computeView(
         size.width,
@@ -59,7 +63,17 @@ export function useJigCanvasPaint(
       drawJigCanvasOverlay(ctx, displayed, { selectedIds, marquee, dropOutlineId }, view);
     });
     return () => cancelAnimationFrame(frame);
-  }, [ref, displayed, selectedIds, marquee, dropOutlineId, size, viewState, paintRevision]);
+  }, [
+    ref,
+    displayed,
+    selectedIds,
+    marquee,
+    dropOutlineId,
+    size,
+    viewState,
+    paintRevision,
+    lengthUnit,
+  ]);
 }
 
 export function drawJigCanvasOverlay(

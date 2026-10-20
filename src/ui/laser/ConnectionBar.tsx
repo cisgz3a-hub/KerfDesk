@@ -7,6 +7,9 @@
 //   connected    → "Connected", "Disconnect"
 //   failed       → "Couldn't connect" with the reason, "Connect" to retry
 //
+// A background auto-connect that could not open the port stays "Not
+// connected" with a quiet hint instead of the alert (ADR-639).
+//
 // Connect reuses the port the machine was on last time and asks for one only
 // the first time; "Use a different port…" always asks. "Forget Controller"
 // and "Connect automatically" live in the menu so the everyday row holds only
@@ -22,7 +25,6 @@ import type { ControllerQualification } from '../state/laser-controller-qualific
 import type { ConnectionState } from '../state/laser-store';
 import { CompactConnectionControls } from './CompactConnectionControls';
 import {
-  BriefQualificationNotice,
   QualificationNotice,
   useControllerNotice,
   type ControllerNotice,
@@ -39,8 +41,6 @@ export type ConnectionBarProps = {
   readonly qualification?: ControllerQualification;
   readonly qualificationReadBlockReason?: string | null;
   readonly reconnectRecommended?: boolean;
-  /** The controller stopped answering status queries; only this pops up (ADR-611). */
-  readonly controllerStoppedResponding?: boolean;
   /** A controller that answered this session has gone quiet: "Not responding" (ADR-611 A1). */
   readonly controllerWentSilent?: boolean;
   readonly onRetryQualification?: () => void;
@@ -49,6 +49,10 @@ export type ConnectionBarProps = {
   readonly onChoosePort?: () => void;
   readonly autoConnect?: boolean;
   readonly onAutoConnectChange?: (enabled: boolean) => void;
+  /** The operator's Disconnect paused auto-connect until they Connect (ADR-639). */
+  readonly autoConnectPaused?: boolean;
+  /** Why the last automatic connect did not open the port, for a quiet hint (ADR-639). */
+  readonly autoConnectSkipped?: string | null;
   /** Chosen ports last only until KerfDesk closes (ADR-366). */
   readonly portChoiceEndsOnRestart?: boolean;
   /** Only an adapter with a USB serial number is remembered across restarts: macOS and Linux,
@@ -80,14 +84,9 @@ export function ConnectionBar(props: Props): JSX.Element {
       data-silent={silent ? 'true' : undefined}
     >
       <div className="lf-connection-toolbar-layout">
-        <div
-          className="lf-controller-notice-slot"
-          role="status"
-          aria-label="Controller updates"
-          aria-atomic="true"
-        >
-          <BriefQualificationNotice {...props} notice={notice} />
-        </div>
+        {/* Keeps the controls at the trailing edge. A controller that needs
+            recovery says so over the canvas instead of here (ADR-642). */}
+        <div className="lf-connection-toolbar-spacer" />
         <div className="lf-connection-toolbar-controls">
           <CompactConnectionControls
             machineName={props.machineName ?? 'Unnamed machine'}
@@ -118,6 +117,11 @@ export function ConnectionBar(props: Props): JSX.Element {
           {connectionFailureText(connection.error, props.machineNoun)}
         </p>
       )}
+      {connection.kind === 'disconnected' && props.autoConnectSkipped != null ? (
+        <p className="lf-connection-auto-hint">
+          {autoConnectSkippedText(props.autoConnectSkipped, props.machineNoun)}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -238,7 +242,11 @@ function ConnectionMenu(props: Props & { readonly notice: ControllerNotice }): J
           )}
           {props.onAutoConnectChange === undefined ? null : (
             <MenuItem
-              label="Connect automatically"
+              label={
+                props.autoConnect === true && props.autoConnectPaused === true
+                  ? 'Connect automatically (paused until you connect)'
+                  : 'Connect automatically'
+              }
               title={autoConnectTitle(props)}
               checked={props.autoConnect === true}
               onClick={() => run(() => props.onAutoConnectChange?.(props.autoConnect !== true))}
@@ -316,6 +324,15 @@ export function connectionFailureText(
     return linux ? `${busy} ${LINUX_SERIAL_ACCESS}` : busy;
   }
   return error;
+}
+
+// The usual reason is the same busy port connectionFailureText explains, held
+// by LightBurn, LaserGRBL or a serial monitor (ADR-639).
+export function autoConnectSkippedText(reason: string, machineNoun: string): string {
+  if (/failed to open serial port/i.test(reason)) {
+    return `Didn’t connect by itself: the ${machineNoun}’s port is in use by another program. Close it, then Connect.`;
+  }
+  return `Didn’t connect by itself: ${reason}`;
 }
 
 const LINUX_SERIAL_ACCESS =

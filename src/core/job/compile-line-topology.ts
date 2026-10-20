@@ -2,7 +2,8 @@
 import type { DeviceProfile } from '../devices';
 import type { Polyline } from '../scene';
 import { collectLineSourcesForLayer, type LineSegmentCollection } from './collect-line-segments';
-import type { CutSegment, CutTopologyRing } from './job';
+import type { CutSegment, CutTopologyRing, JobDiagnostic } from './job';
+import type { KerfSceneSides } from './kerf-scene-sides';
 import {
   layerKerfDiagnostics,
   withLayerKerf,
@@ -14,33 +15,29 @@ import { perforateLineSegments } from './line-cut-extras';
 import { properContourDepths } from './proper-contour-containment';
 import type { VectorProcessBucket } from './vector-process-buckets';
 
+/** The scene's kerf sides (ADR-486 Amd 3) and the operation being compiled. */
+export type KerfSidesFor = {
+  readonly operationId: string;
+  readonly sides: () => KerfSceneSides;
+};
+
+type Collected = {
+  readonly bucket: VectorProcessBucket;
+  readonly source: ReturnType<typeof collectLineSourcesForLayer>;
+};
+
 export function lineTopologyCollections(
   buckets: ReadonlyArray<VectorProcessBucket>,
   device: DeviceProfile,
   scope: string,
   keepLeadRings = false,
+  kerfSides?: KerfSidesFor,
 ): ReadonlyMap<VectorProcessBucket, LineSegmentCollection> {
   const collected = buckets.map((bucket) => ({
     bucket,
     source: collectLineSourcesForLayer(bucket.objects, bucket.layer, device, keepLeadRings),
   }));
-  const all = collected.flatMap(({ source }) => [
-    ...source.kerf.flatMap((path) => path.sources.map(asContour)),
-    ...source.segments.filter((segment) => segment.closed),
-  ]);
-  const depths = properContourDepths(all);
-  const context = new Map<Polyline, KerfContextDepth>();
-  let cursor = 0;
-  for (const { source } of collected) {
-    for (const path of source.kerf) {
-      const own = properContourDepths(path.sources.map(asContour));
-      path.sources.forEach((ring, index) => {
-        const total = depths[cursor++] ?? 0;
-        context.set(ring.polyline, { total, outside: total - (own[index] ?? 0) });
-      });
-    }
-    cursor += source.segments.filter((segment) => segment.closed).length;
-  }
+  const { context, assumed } = kerfContext(collected, kerfSides);
   const kerfed = collected.map(({ bucket, source }) => ({
     bucket,
     line: withLayerKerf(source, bucket.layer, device, context),
@@ -71,7 +68,10 @@ export function lineTopologyCollections(
     result.set(bucket, {
       segments: output,
       tabSpans: tabbed.tabSpans,
-      kerfDiagnostics: layerKerfDiagnostics(line, bucket.layer),
+      kerfDiagnostics: [
+        ...layerKerfDiagnostics(line, bucket.layer),
+        ...assumedSideDiagnostics(assumed.get(bucket), bucket),
+      ],
       ...(tabbed.tabbedContours === undefined ? {} : { tabbedContours: tabbed.tabbedContours }),
       ...(perforatedContours === 0 ? {} : { perforatedContours }),
       ...(topologyRings.length === 0 ? {} : { topologyRings }),
@@ -101,6 +101,78 @@ function brokenContourRings(
     const ring = { forest, contour, polyline: segment.polyline };
     return [segment.leadSource === undefined ? ring : { ...ring, leadSource: segment.leadSource }];
   });
+}
+
+// Each kerf contour's depth: among the scene's part edges when the scene knows
+// its contour (kerf-scene-sides.ts, ADR-486 Amd 3), so a hole on its own
+// operation, or selected alone, is still a hole; otherwise among this run's
+// closed contours, as before. Its own path's depth is this run's either way.
+function kerfContext(
+  collected: ReadonlyArray<Collected>,
+  kerfSides: KerfSidesFor | undefined,
+): {
+  readonly context: ReadonlyMap<Polyline, KerfContextDepth>;
+  readonly assumed: ReadonlyMap<VectorProcessBucket, ReadonlyMap<string, number>>;
+} {
+  const context = new Map<Polyline, KerfContextDepth>();
+  const assumed = new Map<VectorProcessBucket, Map<string, number>>();
+  if (!collected.some(({ source }) => source.kerf.length > 0)) return { context, assumed };
+  const sides = kerfSides?.sides();
+  let runDepths: number[] | undefined;
+  const runDepth = (index: number): number => {
+    runDepths ??= properContourDepths(
+      collected.flatMap(({ source }) => [
+        ...source.kerf.flatMap((path) => path.sources.map(asContour)),
+        ...source.segments.filter((segment) => segment.closed),
+      ]),
+    );
+    return runDepths[index] ?? 0;
+  };
+  let cursor = 0;
+  for (const { bucket, source } of collected) {
+    for (const path of source.kerf) {
+      const own = properContourDepths(path.sources.map(asContour));
+      path.sources.forEach((ring, index) => {
+        const at = cursor++;
+        const ownDepth = own[index] ?? 0;
+        const holders =
+          sides === undefined || kerfSides === undefined || ring.sceneContour === undefined
+            ? undefined
+            : sides(ring.sceneContour, kerfSides.operationId);
+        if (holders === undefined) {
+          const total = runDepth(at);
+          context.set(ring.polyline, { total, outside: total - ownDepth });
+          return;
+        }
+        context.set(ring.polyline, {
+          total: ownDepth + holders.outside,
+          outside: holders.outside,
+        });
+        if (holders.assumedAround === undefined) return;
+        const counts = assumed.get(bucket) ?? new Map<string, number>();
+        counts.set(holders.assumedAround, (counts.get(holders.assumedAround) ?? 0) + 1);
+        assumed.set(bucket, counts);
+      });
+    }
+    cursor += source.segments.filter((segment) => segment.closed).length;
+  }
+  return { context, assumed };
+}
+
+// ADR-486 Amd 3: kerf contours inside a closed shape that was not read as a
+// part edge, so Job Review can say what the offset assumed.
+function assumedSideDiagnostics(
+  counts: ReadonlyMap<string, number> | undefined,
+  bucket: VectorProcessBucket,
+): JobDiagnostic[] {
+  return [...(counts ?? [])].map(([aroundName, count]) => ({
+    kind: 'kerf-side-assumed',
+    layerId: bucket.layer.id,
+    layerName: bucket.layer.name,
+    count,
+    aroundName,
+    kerfOffsetMm: bucket.layer.kerfOffsetMm,
+  }));
 }
 
 function asContour(source: KerfSource): CutSegment {

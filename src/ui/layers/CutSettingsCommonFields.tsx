@@ -141,7 +141,7 @@ function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
           max={10}
           step={0.01}
           label="kerf offset"
-          title="Compensate laser beam width on closed Line cuts. Positive cuts outside outer shapes and inside holes, and a shape inside another shape of this operation counts as a hole; source artwork is unchanged."
+          title="Compensate laser beam width on closed Line cuts. Positive cuts outside outer shapes and inside holes. A shape inside another shape on this operation, or on one with a kerf offset, leads or tabs, counts as a hole; source artwork is unchanged."
         />
         <span className="lf-field-unit">mm</span>
       </Field>

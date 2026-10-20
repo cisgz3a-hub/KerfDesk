@@ -1,18 +1,26 @@
-// Display-only warnings for the Job Review dialog (ADR-224 v2): an amber
-// disclosure whose summary always shows the count. It normally stays collapsed,
-// but opens for controller-identity evidence so the mismatch is prominent, and
-// for a router job whose controller has laser mode on or unconfirmed ($32), where
-// the spindle skips its spin-up (CNC audit JR-1, MC-1), and for a Focus Test on
-// a profile without confirmed Z or with a sweep beyond travel. The laser-mode-on row
-// carries a one-click Send $32=0 (ADR-180 Amendment 6).
-// Never gates Confirm — these are the strings the start flow used to
-// flash in a toast, plus the job-intent set, held still and grouped.
+// Display-only warnings for the Job Review dialog (ADR-224 v3): one short
+// headline per warning, always visible, with the rest of its text one click
+// away. Controller-identity evidence, a router job whose controller has laser
+// mode on or unconfirmed ($32, where the spindle skips its spin-up: CNC audit
+// JR-1, MC-1) and a Focus Test without confirmed Z open their detail at once.
+// The laser-mode-on row carries a one-click Send $32=0 (ADR-180 Amendment 6).
+// Never gates Confirm — these are the strings the start flow used to flash
+// in a toast, plus the job-intent set, held still and grouped.
 
+import { useState } from 'react';
+import { Icon } from '../../kit';
 import {
-  warnDetailsStyle,
+  warnBodyStyle,
+  warnBoxStyle,
+  warnBulletStyle,
+  warnChevronStyle,
+  warnDetailTextStyle,
+  warnHeadlineStyle,
   warnHintStyle,
+  warnItemStyle,
+  warnItemSummaryStyle,
   warnListStyle,
-  warnSummaryStyle,
+  warnTitleStyle,
 } from './job-review.styles';
 import {
   CNC_LASER_MODE_ENABLED_MESSAGE,
@@ -20,6 +28,7 @@ import {
 } from '../../../core/preflight/controller-readiness';
 import { isFocusTestMachineWarning } from '../../../core/job/focus-test';
 import { isControllerIdentityWarning } from '../controller-identity-warnings';
+import { splitReviewWarning } from './review-warning-headline';
 import { SendRouterModeButton } from './SendRouterModeButton';
 import { ShowOmittedFillArtworkButton } from './ShowOmittedFillArtworkButton';
 import { ShowOmittedCncArtworkButton } from './ShowOmittedCncArtworkButton';
@@ -31,29 +40,18 @@ export function JobReviewWarnings(props: {
   readonly openFillOmissions?: JobReviewFillOmissions;
   readonly openCncContourOmissions?: JobReviewCncContourOmissions;
 }): JSX.Element | null {
-  if (props.warnings.length === 0) return null;
+  const count = props.warnings.length;
+  if (count === 0) return null;
   return (
-    <details
-      open={
-        props.openFillOmissions !== undefined ||
-        props.openCncContourOmissions !== undefined ||
-        props.warnings.some(opensWarningList)
-      }
-      style={warnDetailsStyle}
-    >
-      <summary
-        style={warnSummaryStyle}
-        title="Review every warning for this job. Warnings never block the start."
-      >
-        Warnings ({props.warnings.length}){' '}
-        <span style={warnHintStyle}>— open to review; none block the start</span>
-      </summary>
+    <section aria-label="Warnings" style={warnBoxStyle}>
+      <h3 style={warnTitleStyle}>
+        <Icon name="warning" size={13} />
+        {count} {count === 1 ? 'warning' : 'warnings'}
+        <span style={warnHintStyle}>· none block the start</span>
+      </h3>
       <ul style={warnListStyle}>
         {props.warnings.map((warning) => (
-          <li key={warning}>
-            {warning}
-            {warning === CNC_LASER_MODE_ENABLED_MESSAGE ? <SendRouterModeButton /> : null}
-          </li>
+          <WarningItem key={warning} warning={warning} />
         ))}
       </ul>
       {props.openFillOmissions === undefined ? null : (
@@ -62,11 +60,52 @@ export function JobReviewWarnings(props: {
       {props.openCncContourOmissions === undefined ? null : (
         <ShowOmittedCncArtworkButton omissions={props.openCncContourOmissions} />
       )}
+    </section>
+  );
+}
+
+function WarningItem(props: { readonly warning: string }): JSX.Element {
+  const { headline, detail } = splitReviewWarning(props.warning);
+  return (
+    <li style={warnItemStyle}>
+      <span aria-hidden="true" style={warnBulletStyle} />
+      <div style={warnBodyStyle}>
+        {detail === null ? (
+          <span style={warnHeadlineStyle}>{headline}</span>
+        ) : (
+          <WarningDetail
+            headline={headline}
+            detail={detail}
+            initiallyOpen={opensWarningDetail(props.warning)}
+          />
+        )}
+        {props.warning === CNC_LASER_MODE_ENABLED_MESSAGE ? <SendRouterModeButton /> : null}
+      </div>
+    </li>
+  );
+}
+
+// The row's bullet is its only marker; a trailing chevron says it expands.
+function WarningDetail(props: {
+  readonly headline: string;
+  readonly detail: string;
+  readonly initiallyOpen: boolean;
+}): JSX.Element {
+  const [isOpen, setIsOpen] = useState(props.initiallyOpen);
+  return (
+    <details open={isOpen} onToggle={(event) => setIsOpen(event.currentTarget.open)}>
+      <summary style={warnItemSummaryStyle} title={isOpen ? 'Hide details' : 'Show details'}>
+        {props.headline}
+        <span aria-hidden="true" style={warnChevronStyle}>
+          <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} size={10} />
+        </span>
+      </summary>
+      <p style={warnDetailTextStyle}>{props.detail}</p>
     </details>
   );
 }
 
-function opensWarningList(warning: string): boolean {
+function opensWarningDetail(warning: string): boolean {
   return (
     isControllerIdentityWarning(warning) ||
     isCncLaserModeMessage(warning) ||

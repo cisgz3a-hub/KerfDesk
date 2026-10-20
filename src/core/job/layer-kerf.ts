@@ -56,6 +56,9 @@ export type KerfSource = {
   readonly nesting?: CutSegment['nesting'];
   /** The scene contour it comes from, for laser leads (ADR-626 Amd 1). */
   readonly leadSource?: string;
+  /** The same key, always set by compile: the scene decides which side of
+   * it the offset goes to (ADR-486 Amd 3). */
+  readonly sceneContour?: string;
 };
 export type KerfContextDepth = { readonly total: number; readonly outside: number };
 

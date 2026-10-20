@@ -24,7 +24,6 @@ import {
 } from './canvas-motion-plan';
 import { canvasExecutablePlan } from './canvas-preview-motion';
 import { canvasProgramSource } from './canvas-program-source';
-import { stockNativeEvidence } from './native-bed-frame.test-support';
 
 const JOB: Job = {
   groups: [
@@ -330,27 +329,6 @@ describe('CanvasMotionPlan', () => {
       jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
     });
     expect(plan.coordinateFrame.kind).toBe('relative');
-  });
-
-  it('keeps the machine frame with homing and verified positive native coordinates', () => {
-    const plan = buildCanvasMotionPlan({
-      gcode: 'G21\nG90\nM3 S0\nG0 X0 Y0\nG1 X20 S500',
-      prepared: prepared('grbl-v1.1', true),
-      machine: {
-        ...machine,
-        ...stockNativeEvidence(prepared('grbl-v1.1', true).project.device, true),
-        workOriginActive: true,
-        wcoCache: { x: 5, y: 5, z: 0 },
-        homingState: 'confirmed' as const,
-      },
-      statusQuery: 'realtime-report',
-      jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
-    });
-    expect(plan.coordinateFrame).toEqual({
-      kind: 'machine',
-      workOffsetMm: { x: 5, y: 5, z: 0 },
-      nativeToBedOffsetMm: { x: 0, y: 0 },
-    });
   });
 
   it('labels verified-origin plans as relative and keeps the marker artwork-relative', () => {

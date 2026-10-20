@@ -19,7 +19,6 @@ import { ProInDesktopDialog } from './ProInDesktopDialog';
 import type { ProFeature } from './pro-features';
 import { createTrialExpiryClock, expireTrialStatus } from './trial-expiry';
 import { useTrialExpiry } from './use-trial-expiry';
-import { useCheckInReminder } from './use-checkin-reminder';
 import { useLicenceLink } from './use-licence-link';
 
 export { LICENCE_SETTINGS_EVENT };
@@ -142,7 +141,7 @@ function useEditionValue(
   freeBuild: boolean,
 ): EditionValue {
   const { status, isPro, hasPendingPro, requestPro } = session;
-  const { showAll, hasPrompt, request } = desktop;
+  const { showAll, request } = desktop;
   return useMemo<EditionValue>(
     () => ({
       status,
@@ -152,13 +151,15 @@ function useEditionValue(
         return isPro();
       },
       proInDesktop: freeBuild,
+      // Only the licence prompt keeps an edit it can still run. A free build
+      // cannot unlock Pro, so its desktop notice holds none (ADR-609).
       get proPromptOpen() {
-        return hasPendingPro() || hasPrompt();
+        return !freeBuild && hasPendingPro();
       },
       requestPro: freeBuild ? request : requestPro,
       openLicence: freeBuild ? showAll : openLicence,
     }),
-    [freeBuild, hasPendingPro, hasPrompt, isPro, request, requestPro, status, showAll],
+    [freeBuild, hasPendingPro, isPro, request, requestPro, status, showAll],
   );
 }
 
@@ -191,12 +192,16 @@ function PendingProDialog({
 /**
  * Lets the workspace in the first time this session reports Pro, and keeps it
  * in until KerfDesk closes: a licence change never unmounts a running job or an
- * open project (ADR-623).
+ * open project (ADR-623). The main process remembers that the app session was
+ * let in, so a renderer reloaded after a crash, or a reopened macOS window,
+ * reaches its workspace and job recovery even after rights ended (ADR-623
+ * Amendment 1).
  */
 function useSessionAdmission(status: LicenceStatus | null, client: LicenceAdapter): boolean {
   const [admitted, setAdmitted] = useState(false);
   const acknowledged = useRef<number | null>(null);
-  if (!admitted && status?.edition === 'pro') setAdmitted(true);
+  const admits = status?.edition === 'pro' || status?.sessionAdmitted === true;
+  if (!admitted && admits) setAdmitted(true);
   useEffect(() => {
     const generation = status?.admissionGeneration;
     if (!admitted || generation === undefined || acknowledged.current === generation) return;
@@ -205,7 +210,7 @@ function useSessionAdmission(status: LicenceStatus | null, client: LicenceAdapte
       acknowledged.current = null;
     });
   }, [admitted, client, status]);
-  return admitted || status?.edition === 'pro';
+  return admitted || admits;
 }
 
 /**
@@ -334,7 +339,6 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
   }, [accept, client]);
   useLicenceStatusPolling(load);
   useTrialExpiry(status, accept, trialClock);
-  useCheckInReminder(status);
   const isPro = useCallback(
     () => statusRef.current?.edition === 'pro' && trialClock.remainingMs(statusRef.current) > 0,
     [trialClock],

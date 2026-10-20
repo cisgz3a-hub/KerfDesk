@@ -10,6 +10,7 @@ import {
   FIRST,
   load,
   mount as mountInspector,
+  openAdvanced,
   SECOND,
 } from './__fixtures__/selected-operation-inspector';
 
@@ -306,6 +307,33 @@ describe('Dither in the selected-operation inspector', () => {
           expect(document.getElementById(describedBy)?.textContent).toBe(text);
         }
         expect(checkedValue(view.host)).toBe(ditherAlgorithm);
+      } finally {
+        await view.unmount();
+      }
+    },
+  );
+
+  // Compile applies Min power to every Grayscale burn, original pixels included.
+  it.each([
+    ['Grayscale', 'grayscale', false, false, true],
+    ['a binary dither under Use original pixels', 'jarvis', true, true, true],
+    ['a binary dither without it', 'jarvis', false, false, false],
+    ['a binary dither on artwork that disagrees on it', 'jarvis', true, false, false],
+    ['Grayscale on artwork that disagrees on it', 'grayscale', true, false, true],
+  ] as const)(
+    'offers Min power exactly when the image burns as Grayscale: %s',
+    async (_case, ditherAlgorithm, firstPassThrough, secondPassThrough, shown) => {
+      load(
+        { ...FIRST, ...image, ditherAlgorithm, passThrough: firstPassThrough },
+        { ...SECOND, ...image, ditherAlgorithm, passThrough: secondPassThrough },
+      );
+      const view = await mountInspector();
+      try {
+        const inline = view.host.querySelector('input[aria-label^="Minimum power for"]');
+        expect(inline !== null).toBe(shown);
+        if (firstPassThrough !== secondPassThrough) return;
+        await openAdvanced(view.host);
+        expect(document.querySelector('form input[name="minPower"]') !== null).toBe(shown);
       } finally {
         await view.unmount();
       }

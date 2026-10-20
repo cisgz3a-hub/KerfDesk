@@ -37,6 +37,11 @@ describe('browser Free build boundary', () => {
     expect(isBrowserFreeMode('test', 'serve')).toBe(false);
   });
 
+  it('keeps the free G-code Inspector in the browser build (ADR-627)', () => {
+    const paths = Object.keys(PRO_BUILD_ENTRIES);
+    expect(paths.some((path) => path.startsWith('src/ui/gcode-inspector/'))).toBe(false);
+  });
+
   it('checks every explicit source boundary and refuses renamed implementations', () => {
     for (const path of Object.keys(PRO_BUILD_ENTRIES)) {
       const source = readFileSync(resolve(path), 'utf8');

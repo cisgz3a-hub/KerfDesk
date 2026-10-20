@@ -126,15 +126,34 @@ describe('ArrayDialog', () => {
     await setInput('Total width (mm)', '5');
     expect(total.value).toBe('5');
     expect(inputValue('Horizontal spacing (mm)')).toBe('2');
-    expect(requiredHost().querySelector('[role="alert"]')?.textContent).toBe(
-      'Enter a total of at least 40.00 mm.',
-    );
+    // On the way to 50, 5 is too small; that is not an error while typing.
+    expect(requiredHost().querySelector('[role="alert"]')).toBeNull();
     await setInput('Total width (mm)', '50');
     expect(total.value).toBe('50');
     expect(inputValue('Horizontal spacing (mm)')).toBe('10.000');
-    expect(requiredHost().querySelector('[role="alert"]')).toBeNull();
     await act(async () => Simulate.blur(total));
     expect(total.value).toBe('50.00');
+    expect(requiredHost().querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('explains a total that cannot size the grid once the field is left', async () => {
+    await renderDialog({ onApply: vi.fn() });
+    const total = labelled('Total width (mm)').querySelector('input');
+    if (!(total instanceof HTMLInputElement)) throw new Error('Total width input missing');
+    await act(async () => Simulate.focus(total));
+    await setInput('Total width (mm)', '5');
+    await act(async () => Simulate.blur(total));
+    expect(total.value).toBe('42.00');
+    expect(inputValue('Horizontal spacing (mm)')).toBe('2');
+    expect(requiredHost().querySelector('[role="alert"]')?.textContent).toBe(
+      'Enter a total of at least 40.00 mm.',
+    );
+    await act(async () => Simulate.focus(total));
+    expect(requiredHost().querySelector('[role="alert"]')).toBeNull();
+    await setInput('Total width (mm)', '');
+    await act(async () => Simulate.blur(total));
+    expect(total.value).toBe('42.00');
+    expect(requiredHost().querySelector('[role="alert"]')).toBeNull();
   });
 
   it('cancels without applying an array', async () => {

@@ -6,6 +6,15 @@ import type { PlatformAdapter } from '../../platform/types';
 import type { AutofocusResult } from './autofocus-action';
 import type { ConsoleCommandOptions } from './laser-console-actions';
 import type { FramedRunCandidate, FrameTraceCandidate } from './framed-run';
+import type { FrameVerification } from './frame-verification';
+
+/** An external G-code program's Frame (ADR-630): no run candidate, a record
+ * stored as `frameVerification` on a clean completion, and the work position
+ * the program was read from, which the Frame returns to. */
+export type ExternalFrameRequest = {
+  readonly verification: FrameVerification;
+  readonly returnToWorkPosition: { readonly x: number; readonly y: number };
+};
 import type { FrameWcsSelection } from './frame-wcs-selection';
 import type { StartJobOptions } from './laser-job-options';
 import type { JobStopReason } from './job-stop-request';
@@ -32,8 +41,11 @@ export type ConnectControllerOptions = {
   /** Which port to open (ADR-420). 'remembered', the default, reuses the port
    * the operator picked before when exactly one fits and shows the picker
    * otherwise; 'choose' always shows the picker; 'automatic' never does and
-   * ends quietly when no remembered port is attached. */
-  readonly portSelection?: 'remembered' | 'choose' | 'automatic' | undefined;
+   * ends quietly when no remembered port is attached. Only 'automatic', the
+   * background auto-connect, fails quietly (ADR-639). 'remembered-only' is a
+   * Connect a person asked for without a picker to show (KerfDesk Remote): it
+   * opens only the remembered port and reports a failed open like a click. */
+  readonly portSelection?: 'remembered' | 'remembered-only' | 'choose' | 'automatic' | undefined;
 };
 
 export type LaserStoreActions = {
@@ -105,6 +117,8 @@ export type LaserStoreActions = {
      * Frame). Laser or CNC Frame motion follows this job, not the open canvas. */
     jobProject?: Project,
     owner?: MachineExecutionOwner,
+    /** Only without a run candidate: an external program's Frame (ADR-630). */
+    external?: ExternalFrameRequest,
   ) => Promise<void>;
   /** Physically trace a job's bounds before its exact program exists. Same
    * motion and completion boundary as `frame`, but a clean completion records
