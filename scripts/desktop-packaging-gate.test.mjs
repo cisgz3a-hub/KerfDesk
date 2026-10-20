@@ -142,10 +142,11 @@ test('the required aggregate always observes every packaging job and uses the ac
   const decision = scope.steps.find((step) => step.id === 'scope');
   assert.equal(decision.run, 'node scripts/desktop-packaging-scope.mjs');
   assert.equal(decision.env.EVENT_NAME, '${{ github.event_name }}');
-  assert.equal(
-    scope.steps.find((step) => step.uses?.startsWith('actions/checkout@')).with['fetch-depth'],
-    2,
-  );
+  const scopeCheckout = scope.steps.find((step) => step.uses?.startsWith('actions/checkout@'));
+  assert.equal(scopeCheckout.with['fetch-depth'], 2);
+  // Like the gate, the scope script runs from this workflow's revision: a
+  // release-train call may select an older commit without the script.
+  assert.equal(scopeCheckout.with.ref, undefined);
   const verdict = gate.steps.find((step) => step.run === 'node scripts/desktop-packaging-gate.mjs');
   assert.equal(verdict.env.NEEDS, '${{ toJSON(needs) }}');
   assert.equal(verdict.env.NATIVE_PACKAGING, '${{ inputs.native == true }}');

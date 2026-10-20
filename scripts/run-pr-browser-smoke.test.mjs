@@ -5,7 +5,37 @@ import test from 'node:test';
 
 import { JSON_SCHEMA, load } from 'js-yaml';
 
-import { PR_SMOKE_CORE, selectSpecs, specFilesOfListing } from './run-pr-browser-smoke.mjs';
+import {
+  PR_SMOKE_CORE,
+  selectSpecs,
+  specFilesOfListing,
+  specsNamingChangedFixtures,
+} from './run-pr-browser-smoke.mjs';
+
+test('a changed browser fixture selects the specs that load it, through other fixtures too', () => {
+  const sources = new Map([
+    ['e2e/tools-ai-audit.e2e.ts', "await page.goto('/e2e/fixtures/tools-ai-audit.html');"],
+    ['e2e/fixtures/tools-ai-audit.html', '<script type="module" src="./tools-ai-audit.tsx">'],
+    ['e2e/fixtures/tools-ai-audit.tsx', 'export {};'],
+    ['e2e/composed-svg-roundtrip.e2e.ts', "readFixture('composed-svg', name)"],
+    ['e2e/fixtures/composed-svg/circle.svg.json', '{}'],
+    ['e2e/unrelated.spec.ts', 'nothing here'],
+  ]);
+  // The tsx is loaded by the page, never imported by the test process.
+  assert.deepEqual(specsNamingChangedFixtures(['e2e/fixtures/tools-ai-audit.tsx'], sources), [
+    'e2e/tools-ai-audit.e2e.ts',
+  ]);
+  // A data file is selected by the folder the spec names.
+  assert.deepEqual(
+    specsNamingChangedFixtures(['e2e/fixtures/composed-svg/circle.svg.json'], sources),
+    ['e2e/composed-svg-roundtrip.e2e.ts'],
+  );
+  // Changed specs and paths outside e2e/ are left to Playwright's own selection.
+  assert.deepEqual(
+    specsNamingChangedFixtures(['e2e/unrelated.spec.ts', 'src/ui/app/main.tsx'], sources),
+    [],
+  );
+});
 
 // ADR-647: a pull request's Chrome UX smoke runs fixed core specs and the specs
 // it changed; pushes to main and every other event run the whole suite.

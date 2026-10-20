@@ -37,7 +37,10 @@ this plan before any change.
    `scripts/run-pr-browser-smoke.mjs`: 11 fixed core spec files (app shell, workspace, layout,
    documents, SVG import and save, project save, canvas text, first machine setup and the
    G-code preview), plus every spec Playwright's `--only-changed` finds changed since the base
-   branch, which includes specs whose imported helpers changed. The checks job still runs on
+   branch, which includes specs whose imported helpers changed. Because that only follows the
+   test process's imports, every spec that names a changed non-spec file under `e2e/` is selected
+   too, through other files that name it (a spec opens `tools-ai-audit.html`, which loads
+   `tools-ai-audit.tsx`); a data file is matched by the fixture folder it sits in. The checks job still runs on
    every event (browser test type-check and discovery, cold start, viewer responsiveness and
    the production-bundle smoke).
 2. **Pushes to main, merge queue entries and manual runs** still run the whole suite in four
@@ -48,7 +51,9 @@ this plan before any change.
    changes is renderer source outside `src/platform/`, `src/ui/app/` and `src/ui/licensing/`, a
    unit test, a browser spec, documentation or the website, the AppImage/.deb job and the
    commercial Linux rehearsal are skipped. Any other path, an unknown path or an empty diff
-   selects them. A failed scope job leaves its output empty, which also selects them.
+   selects them. A failed scope job leaves its output empty, which also selects them. Like the
+   packaging gate, the scope job runs from the workflow's own revision, because a release-train
+   call may package an older commit that predates the scope script.
    *Package, check and launch the desktop app* still runs on every pull request, so every
    renderer change is still packaged and launched.
 4. **The required check names do not change.** A job skipped by its condition reports success
