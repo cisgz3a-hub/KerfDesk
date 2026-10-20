@@ -29,14 +29,25 @@ const DRAWN_ORIGIN: RunStart = { x: 0, y: 0, z: 0 };
 
 export function RunGcodeFileDialog(props: RunGcodeFileDialogProps): JSX.Element {
   const normalized = useNormalizedProgram(props.text);
+  // While Start arms the controller, closing would hide a job that still
+  // starts: Close, Escape and the dialog's own close button all wait.
+  const [arming, setArming] = useState(false);
+  const onClose = (): void => {
+    if (!arming) props.onClose();
+  };
   return (
-    <Dialog title={`Run ${props.name}`} size="md" onClose={props.onClose}>
+    <Dialog title={`Run ${props.name}`} size="md" onClose={onClose}>
       {normalized === null ? (
-        <Preparing onClose={props.onClose} />
+        <Preparing onClose={onClose} />
       ) : normalized.kind === 'refused' ? (
-        <RefusedRun reasons={normalized.reasons} onClose={props.onClose} />
+        <RefusedRun reasons={normalized.reasons} onClose={onClose} />
       ) : (
-        <InspectExternalRun {...props} program={normalized.program} />
+        <InspectExternalRun
+          {...props}
+          onClose={onClose}
+          onArming={setArming}
+          program={normalized.program}
+        />
       )}
     </Dialog>
   );
@@ -47,7 +58,10 @@ export function RunGcodeFileDialog(props: RunGcodeFileDialogProps): JSX.Element 
 // moves and arcs start there. While framing, and while that Frame holds, the
 // start is pinned so the head's passing positions do not re-read the program.
 function InspectExternalRun(
-  props: RunGcodeFileDialogProps & { readonly program: ExternalProgram },
+  props: RunGcodeFileDialogProps & {
+    readonly program: ExternalProgram;
+    readonly onArming: (arming: boolean) => void;
+  },
 ): JSX.Element {
   const project = useStore((state) => state.project);
   const live = useLiveRunStart();
@@ -95,6 +109,7 @@ function InspectExternalRun(
       onPin={setPinned}
       onClose={props.onClose}
       onStarted={props.onStarted}
+      onArming={props.onArming}
     />
   );
 }

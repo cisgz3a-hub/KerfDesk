@@ -28,6 +28,9 @@ import type { RunStart } from './use-external-program';
 
 type ReadyRun = Extract<PreparedExternalRun, { readonly kind: 'ready' }>;
 
+export const CLOSE_WHILE_STARTING =
+  'Start is preparing the controller. Close is available once the job starts or Start stops; ABORT JOB stays on the Live Motion bar.';
+
 export const WAITING_FOR_POSITION =
   'Waiting for the connected machine to report where the head is, which the program is read from.';
 
@@ -41,6 +44,7 @@ function useExternalRunActions(
   frameState: FrameState,
   onPin: (start: RunStart | null) => void,
   onStarted: () => void,
+  onArming: (arming: boolean) => void,
 ) {
   const { frame, onFramed: setFrame } = frameState;
   const [busy, setBusy] = useState<'framing' | 'starting' | null>(null);
@@ -71,9 +75,18 @@ function useExternalRunActions(
         onPin(framed.run.start);
       }
     });
+  // Closing the dialog cannot cancel a Start that is arming, so the dialog
+  // stays until it streams or stops. The lock follows the Start itself, not
+  // this component, which a re-read of the review can replace meanwhile.
   const runStart = (): Promise<void> =>
     attempt('starting', async () => {
-      if (frame !== null && (await startExternalProgram(frame))) onStarted();
+      if (frame === null) return;
+      onArming(true);
+      try {
+        if (await startExternalProgram(frame)) onStarted();
+      } finally {
+        onArming(false);
+      }
     });
   return { frame, busy, error, runFrame, runStart };
 }
@@ -123,12 +136,20 @@ export function RunGcodeFileControls(props: {
   readonly onPin: (start: RunStart | null) => void;
   readonly onClose: () => void;
   readonly onStarted: () => void;
+  /** True while Start is arming, when the dialog refuses to close. */
+  readonly onArming: (arming: boolean) => void;
 }): JSX.Element {
   const { prepared, onPin } = props;
   const unit = useLengthUnit();
   const project = useStore((state) => state.project);
   const laser = useLaserStore((state) => state);
-  const actions = useExternalRunActions(prepared, props.frameState, onPin, props.onStarted);
+  const actions = useExternalRunActions(
+    prepared,
+    props.frameState,
+    onPin,
+    props.onStarted,
+    props.onArming,
+  );
   const { frame, busy, error } = actions;
   const fitIssue = useControllerFitIssue(prepared.run.gcode);
   // A spent or expired Frame no longer holds the start: read the program again
@@ -167,28 +188,54 @@ export function RunGcodeFileControls(props: {
           {error}
         </p>
       )}
-      <DialogActions>
-        <Button type="button" onClick={props.onClose}>
-          Close
-        </Button>
-        <Button
-          type="button"
-          disabled={busy !== null || frameBlock !== null}
-          title={frameBlock ?? 'Trace the program outline over the material with the tool off.'}
-          onClick={() => void actions.runFrame()}
-        >
-          Frame
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          disabled={busy !== null || startIssue !== null}
-          title={startIssue ?? 'Send this program to the machine.'}
-          onClick={() => void actions.runStart()}
-        >
-          Start
-        </Button>
-      </DialogActions>
+      <RunActions
+        busy={busy}
+        frameBlock={frameBlock}
+        startIssue={startIssue}
+        onClose={props.onClose}
+        onFrame={() => void actions.runFrame()}
+        onStart={() => void actions.runStart()}
+      />
     </>
+  );
+}
+
+function RunActions(props: {
+  readonly busy: 'framing' | 'starting' | null;
+  readonly frameBlock: string | null;
+  readonly startIssue: string | null;
+  readonly onClose: () => void;
+  readonly onFrame: () => void;
+  readonly onStart: () => void;
+}): JSX.Element {
+  const { busy } = props;
+  return (
+    <DialogActions>
+      <Button
+        type="button"
+        disabled={busy === 'starting'}
+        {...(busy === 'starting' ? { title: CLOSE_WHILE_STARTING } : {})}
+        onClick={props.onClose}
+      >
+        Close
+      </Button>
+      <Button
+        type="button"
+        disabled={busy !== null || props.frameBlock !== null}
+        title={props.frameBlock ?? 'Trace the program outline over the material with the tool off.'}
+        onClick={props.onFrame}
+      >
+        Frame
+      </Button>
+      <Button
+        type="button"
+        variant="primary"
+        disabled={busy !== null || props.startIssue !== null}
+        title={props.startIssue ?? 'Send this program to the machine.'}
+        onClick={props.onStart}
+      >
+        Start
+      </Button>
+    </DialogActions>
   );
 }

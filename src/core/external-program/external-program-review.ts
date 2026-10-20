@@ -263,11 +263,13 @@ function coordinateSystemWarnings(model: ReviewModel): ReadonlyArray<string> {
   ];
 }
 
+// GRBL switches the spindle or laser off at a program end (M2/M30), as the
+// Inspector's parser does, so a CAM program ending in M30 without M5 is fine.
 function toolLeftOnWarnings(model: ReviewModel): ReadonlyArray<string> {
   let on = false;
   for (const event of model.events) {
     if (event.kind === 'spindle-on') on = true;
-    else if (event.kind === 'spindle-off') on = false;
+    else if (event.kind === 'spindle-off' || event.kind === 'program-end') on = false;
   }
   return on
     ? [

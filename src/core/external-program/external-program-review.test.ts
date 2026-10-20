@@ -124,6 +124,15 @@ describe('external G-code program review (ADR-630)', () => {
     expect(warnings).toContain('never sends M5');
   });
 
+  it('counts M2/M30 as switching the tool off, as GRBL does, until a later M3/M4', () => {
+    for (const end of ['M30', 'M2']) {
+      const ended = review(`G21 G90\nM3 S500\nG1 X10 F600\n${end}\n`).warnings.join('\n');
+      expect(ended).not.toContain('never sends M5');
+    }
+    const relit = review('G21 G90\nM3 S500\nG1 X10 F600\nM30\nM3 S200\nG1 X20\n').warnings;
+    expect(relit.join('\n')).toContain('never sends M5');
+  });
+
   it('warns when the program looks like the other machine mode', () => {
     const router = 'G21 G90\nM3 S18000\nG0 Z5\nG0 X0 Y0\nG1 Z-2 F300\nG1 X10 F800\nM5\n';
     const laserWarnings = review(router, LASER).warnings.join('\n');

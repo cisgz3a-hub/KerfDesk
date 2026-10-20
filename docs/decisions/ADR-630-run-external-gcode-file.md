@@ -43,7 +43,7 @@ The **Run** dialog is the one review for the file: name, lines and bytes to send
 - relative moves (`G91`), read from where the head stands; Start runs them from that same spot;
 - program stops (`M0`/`M1`), sent to the controller unchanged;
 - a program that ends in inches (`G20`), which leaves the controller in inches until the next program sets `G21`; a program that switches back to `G21` is described as such instead;
-- the laser or spindle still on at the end of the program (no `M5`);
+- the laser or spindle still on at the end of the program (no `M5`, and no `M2`/`M30` after the last `M3`/`M4`, since GRBL switches it off at a program end);
 - a program that looks like the other machine mode (spindle speeds above the laser's S range in Laser mode, or no Z motion in CNC mode);
 - tool changes (`M6`), which stock GRBL does not support;
 - zero XY extent: Frame visits a point rather than tracing an XY outline and does not prove Z clearance or cutting depth. An axis the program never sets runs where the head stands now;
@@ -82,5 +82,8 @@ An audit of this decision's first implementation found the Frame outline, some w
 5. **The CNC start height.** A CNC Frame begun below work Z0 leaves the bit at safe Z (ADR-192). The program is then read again from that height and Start compares with it, so the head check still covers all three axes; before, Start stayed locked.
 6. **The Run on machine button** is enabled only while connected, Idle and with nothing else running, as this decision always said; its tooltip gives the reason otherwise.
 7. **Units text.** An undeclared program runs in millimetres: the `G21` baseline goes first.
+8. **Program end.** GRBL switches the spindle or laser off at `M2`/`M30`, as the Inspector's parser does, so the "still on at the end" warning counts a program end as off until a later `M3`/`M4`.
+9. **Arcs.** The outline holds each arc's exact extent. The display samples arcs in coarser chords than a controller's `$12` interpolation, and a chord can cut inside the arc's outermost point, which the head still reaches.
+10. **Start arming.** The dialog cannot be closed while Start prepares the controller: closing does not cancel the Start, so the program could begin streaming with no dialog showing. Close returns once the job streams or Start stops; ABORT JOB stays on the Live Motion bar.
 
 Verification: unit tests cover each placement case above, the bed and zone warnings, the probe, unsupported-word and `S` warnings, the dropped and refused control characters, the point Frame for a program that never moves, the CNC start height after a Frame, and the button's enablement; a component test drives the dialog through Frame and Start. No hardware was run.

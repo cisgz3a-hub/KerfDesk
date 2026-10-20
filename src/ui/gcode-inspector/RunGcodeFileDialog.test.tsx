@@ -11,6 +11,7 @@ import { resetStore } from '../state/test-helpers';
 import { EXTERNAL_FRAME_FIRST } from './external-run';
 import * as externalRun from './external-run';
 import { RunGcodeFileDialog } from './RunGcodeFileDialog';
+import { CLOSE_WHILE_STARTING } from './RunGcodeFileControls';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -35,13 +36,17 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-async function show(text: string, onStarted: () => void = vi.fn()): Promise<HTMLElement> {
+async function show(
+  text: string,
+  onStarted: () => void = vi.fn(),
+  onClose: () => void = vi.fn(),
+): Promise<HTMLElement> {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
   await act(async () =>
     root?.render(
-      <RunGcodeFileDialog name="part.nc" text={text} onClose={vi.fn()} onStarted={onStarted} />,
+      <RunGcodeFileDialog name="part.nc" text={text} onClose={onClose} onStarted={onStarted} />,
     ),
   );
   return document.body;
@@ -129,6 +134,47 @@ describe('Run G-code file dialog (ADR-630)', () => {
     const [gcode] = startJob.mock.calls[0] as unknown as [string];
     expect(gcode).toBe('G21G90\nG21G90\nG0X0Y0\nM4S500\nG1X10F600\nM5\n');
     expect(onStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it('cannot be closed while Start is arming the controller', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>'),
+    });
+    const onClose = vi.fn();
+    const body = await show('G21 G90\nG0 X0 Y0\nM4 S500\nG1 X10 F600\nM5\n', vi.fn(), onClose);
+    vi.spyOn(externalRun, 'frameExternalProgram').mockImplementation(async (run) => {
+      const verification = {
+        boundsSignature: 'external:arming',
+        wco: null,
+        workOriginActive: false,
+      };
+      useLaserStore.setState({ frameVerification: verification });
+      return { run, machineKind: 'laser', verification, controller: useLaserStore.getState() };
+    });
+    await act(async () => button(body, 'Frame').click());
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    let finishArming: () => void = () => undefined;
+    const startJob = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishArming = resolve;
+        }),
+    );
+    useLaserStore.setState({ startJob });
+    await act(async () => button(body, 'Start').click());
+    expect(startJob).toHaveBeenCalledTimes(1);
+    const close = button(body, 'Close');
+    expect(close.disabled).toBe(true);
+    expect(close.title).toBe(CLOSE_WHILE_STARTING);
+    await act(async () => {
+      close.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    await act(async () => finishArming());
+    expect(button(body, 'Close').disabled).toBe(false);
+    await act(async () => button(body, 'Close').click());
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('lists warnings without blocking anything', async () => {

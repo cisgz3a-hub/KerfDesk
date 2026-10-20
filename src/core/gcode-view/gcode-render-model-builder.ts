@@ -8,6 +8,8 @@ import { ARC_EPSILON, arcSweepAngle, PROGRAM_PARSE_REASON, type GcodeWordMatch }
 // Deep import: the core/gcode barrel is at its public-export cap (ADR-015).
 import { stripControllerComments } from '../gcode/word-scan';
 import { timingArcPoints } from './controller-arc-points';
+// Deep import: the exact arc box, also used by the output invariants.
+import { arcAabb } from '../invariants/arc-bounds';
 import {
   createLaserRenderState,
   isLaserOffFeed,
@@ -389,6 +391,12 @@ function emitArc(
   context.controllerArcBudgetRelief += arc.budgetRelief;
   points[points.length - 1] = { x: target.x, y: target.y };
   pushArcPairs(context, points, target, sweep * radius, line, clockwise);
+  // The display's chords can cut inside the arc's outermost points, which the
+  // controller's finer interpolation reaches. A Frame built from the program's
+  // bounds must cover them (ADR-630), so the arc's exact box counts too.
+  const box = arcAabb(from, target, center.x - from.x, center.y - from.y, clockwise);
+  context.program.include({ x: box.minX, y: box.minY, z: modal.z });
+  context.program.include({ x: box.maxX, y: box.maxY, z: modal.z });
   return true;
 }
 
