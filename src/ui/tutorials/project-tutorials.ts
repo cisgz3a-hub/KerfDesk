@@ -8,7 +8,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
     category: 'Getting started',
     machine: 'all',
     minutes: 4,
-    location: 'File → New, then the canvas and Artwork / Operations',
+    location: 'File → New, then the canvas and the Artwork panel',
     prerequisites: 'Choose the correct machine type and project setup before preparing output.',
     visual: 'workspace',
     steps: [
@@ -24,7 +24,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Set the size and operation',
         instruction:
-          'Select the rectangle. In Settings → Artwork, set its size. Open Operation and choose a laser Line or CNC Profile.',
+          'Select the rectangle. In Properties → Artwork, set its size. Open Operation and choose a laser Line or CNC Profile.',
         focus: 'Artwork and operation',
         result: 'The shape has a size and an operation.',
         visual: 'layers',
@@ -117,7 +117,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
         title: 'Choose its next step',
         instruction:
           'For vectors, choose an operation. Use Adjust Image in laser mode to prepare pictures, Trace Image to make editable outlines, or CNC relief for STL models.',
-        focus: 'Artwork / Operations',
+        focus: 'Artwork panel',
         result: 'You have a next step for the imported artwork.',
         visual: 'layers',
       },
@@ -140,7 +140,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Find the tools',
         instruction:
-          'Use the left toolbar to draw. Place artwork on the canvas. Find settings in Artwork / Operations and machine controls in the machine panel.',
+          'Use the left toolbar to draw. Place artwork on the canvas. Find settings in the Artwork panel and machine controls in the machine panel.',
         focus: 'Tools · canvas · settings',
         result: 'You know where to draw and find settings.',
       },

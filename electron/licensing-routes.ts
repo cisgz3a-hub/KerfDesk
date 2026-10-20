@@ -1,5 +1,5 @@
 import { trustedAppRequest } from './app-route-guard.js';
-import type { LicensingRuntime } from './licensing-runtime.js';
+import type { LicenceStatus, LicensingRuntime } from './licensing-runtime.js';
 import { isLicenceCheckoutOperation } from './licensing-commerce.js';
 import { validActivationId } from './licensing-devices.js';
 import { findLicenceKey } from '../public/licence-key-text.mjs';
@@ -20,6 +20,12 @@ export type LicenceEntry = {
   readonly licenceLink?: LicenceLink | null | undefined;
   /** This computer's project seal key (ADR-592), for a commercial build's own renderer. */
   readonly projectSealKey?: (() => Promise<string | null>) | undefined;
+  /**
+   * Watches one renderer request from its start: the status it is sent tells
+   * the licence window's reads and admission apart from a reloaded renderer's (ADR-623).
+   */
+  readonly observeRequest?: (() => (status: LicenceStatus) => number | null) | undefined;
+  readonly admitWorkspace?: ((generation: number) => void) | undefined;
 };
 
 export function withLicensingRoutes(
@@ -35,6 +41,7 @@ export function withLicensingRoutes(
     if (!url.pathname.startsWith(PREFIX)) return fallback(request);
     if (!trustedAppRequest(request, url, 'X-KerfDesk-Licensing')) return missing();
     const action = url.pathname.slice(PREFIX.length);
+    if (action === 'workspace-admitted') return workspaceAdmissionRoute(request, entry);
     if (action === 'early-updates') return earlyUpdateRoute(request, earlyUpdates);
     if (
       [
@@ -46,13 +53,32 @@ export function withLicensingRoutes(
       ].includes(action)
     )
       return updateRoute(action, request, updates, requestUpdateClose);
-    if (action === 'status' && request.method === 'GET') return response(await runtime.status());
+    const observe = entry.observeRequest?.();
+    const sent = (status: LicenceStatus): Response => {
+      const generation = observe?.(status);
+      return response(generation == null ? status : { ...status, admissionGeneration: generation });
+    };
+    if (action === 'status' && request.method === 'GET') return sent(await runtime.status());
     if (ENTRY_ACTIONS.has(action)) return entryRoute(action as EntryAction, request, entry);
     if (!jsonPost(request)) return missing();
     const body = await readBody(request);
     if (!record(body)) return response({ error: 'invalid_request' }, 400);
-    return dispatch(action, body, runtime);
+    return dispatch(action, body, runtime, sent);
   };
+}
+
+async function workspaceAdmissionRoute(request: Request, entry: LicenceEntry): Promise<Response> {
+  if (!jsonPost(request) || entry.admitWorkspace === undefined) return missing();
+  const body = await readBody(request);
+  if (
+    !record(body) ||
+    Object.keys(body).length !== 1 ||
+    !Number.isSafeInteger(body.generation) ||
+    Number(body.generation) < 0
+  )
+    return response({ error: 'invalid_request' }, 400);
+  entry.admitWorkspace(Number(body.generation));
+  return response({ ok: true });
 }
 
 function jsonPost(request: Request): boolean {
@@ -131,12 +157,13 @@ async function dispatch(
   action: string,
   body: Record<string, unknown>,
   runtime: LicensingRuntime,
+  sent: (status: LicenceStatus) => Response,
 ): Promise<Response> {
   if (action === 'activate')
     return Object.keys(body).length === 1 && typeof body.licenseKey === 'string'
-      ? response(await runtime.activate(body.licenseKey))
+      ? sent(await runtime.activate(body.licenseKey))
       : response({ error: 'invalid_request' }, 400);
-  if (action === 'checkout') return checkout(body, runtime);
+  if (action === 'checkout') return checkout(body, runtime, sent);
   if (action === 'devices' || action === 'release-device') return devices(action, body, runtime);
   if (Object.keys(body).length !== 0) return response({ error: 'invalid_request' }, 400);
   const actions = {
@@ -149,12 +176,13 @@ async function dispatch(
     'discard-payment': runtime.discardPayment,
   };
   return Object.hasOwn(actions, action)
-    ? response(await actions[action as keyof typeof actions]())
+    ? sent(await actions[action as keyof typeof actions]())
     : missing();
 }
 async function checkout(
   body: Record<string, unknown>,
   runtime: LicensingRuntime,
+  sent: (status: LicenceStatus) => Response,
 ): Promise<Response> {
   if (
     !isLicenceCheckoutOperation(body.operation) ||
@@ -162,7 +190,7 @@ async function checkout(
     (body.licenseKey !== undefined && typeof body.licenseKey !== 'string')
   )
     return response({ error: 'invalid_request' }, 400);
-  return response(await runtime.checkout(body.operation, body.licenseKey as string | undefined));
+  return sent(await runtime.checkout(body.operation, body.licenseKey as string | undefined));
 }
 
 /** Help > Licence > Manage devices: list the key's seats, or free one of them. */

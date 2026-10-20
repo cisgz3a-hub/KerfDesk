@@ -54,11 +54,15 @@ Phone QR scanning and direct preview gestures follow ADR-569 Amendment 2. **Scan
 #### Success — first run (no prior project)
 
 The startup loading screen uses a charcoal-and-copper KerfDesk wordmark over sculpted timber
-artwork, with **Created by Ons Houtkombuis** visible below. Its text and indeterminate activity
-bar paint before the artwork loads, and remain readable if the image is unavailable. Reduced
-motion uses a static indicator. In the web app the screen fades away once the workspace canvas
-has had a paint opportunity. The desktop app keeps it up until at least two seconds after launch
-and fades it over half a second, so a fast local start does not flash (ADR-049 Amendment 1). A
+artwork, with **Created by Ons Houtkombuis** visible below. The artwork is embedded in the
+startup page and decoded with the text, so the wood is present on the first splash paint.
+The splash becomes visible only after its complete markup is parsed, even when the HTML
+arrives in chunks. The workspace does not accept pointer or keyboard input behind it.
+Reduced motion uses a static indicator. Both web and desktop hold the screen for at least four
+visible seconds from its first frame after the workspace module starts, then fade it over
+750 ms once the workspace canvas has had a paint opportunity. Time before that frame or while
+the browser document or native desktop window is hidden does not consume the hold
+(ADR-049 Amendment 2). A
 startup crash is shown at once. It introduces no startup interaction or modal.
 
 1. App opens to **empty workspace** state (see F-A2).
@@ -126,10 +130,10 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Top command toolbar**: Open, Import, Import Image, Save and Preview lead with readable labels when space permits. Selecting an image brings Trace image into the row; Image Studio remains in **More**. Other commands remain in **More** and the application menus, with their existing shortcuts, disabled reasons, tooltips and actions. The row measures available width and moves commands into More instead of scrolling horizontally. Utility controls share the row down to 520 px. The project name includes an unsaved-change indicator.
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Machine connection toolbar**: the machine name and connection status sit beside the numeric transforms, with Connect/Disconnect, the Machine Setup icon and the connection-options menu. The machine-name dropdown shows the full profile, bed size, controller, connected port, fitted Laser module selector and supported FluidNC or grblHAL network connection form. Tab moves between its fields; Escape closes it and returns focus to the machine name. Field input stays inside the dropdown while the existing Abort shortcut remains available. Connection failures and qualification/recovery notices remain visible outside the dropdown. On narrow windows the machine controls wrap onto a second top row, and remain available when either sidebar is collapsed. Detected-settings notifications also remain active with the sidebar closed.
-- **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
-- **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power and Speed each pair a full-width slider with exact numeric entry; Passes remains a numeric field; Fill adds Line spacing and Angle, and Image adds Dither (swatches that preview each mode on a grey ramp), Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
+- **Artwork panel**: docked right with **Properties**, **Run order**, and **Materials** views in Laser mode (**Recipes** in CNC). Properties is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
+- **Laser artwork settings (ADR-430)**: one line names the selected artwork at the top of the Properties view, with a light Operation | Artwork tab row under it (ADR-631). The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power and Speed each pair a full-width slider with exact numeric entry; Passes remains a numeric field; Fill adds Line spacing and Angle, and Image adds Dither (swatches that preview each mode on a grey ramp), Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
 - **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). An adaptive pocket's Entry & travel names its own helix ("Climb · Adaptive helix"), and names the Ramp entry angle only as the entry of reliefs on the same operation ("Relief ramp 5°", ADR-481 Amendment 1). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only. Closed-only operations also show the exact count of omitted open contours, including mixed closed/open artwork; all-open vector operations without assigned relief retain the no-toolpath explanation (ADR-481 Amendment 2).
-- **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
+- **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, Include in output, artwork selection, settings clipboard, and delete controls; Delete sits apart in danger style. Visibility lives on the card's eye, not in the disclosure (ADR-631).
 - **Machine controls panel (ADR-593 Amendment 1)**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. The current machine state shares the heading, and the existing jog group stays above three softly glowing utility buttons: **Origin**, **Placement** and **Console**. Each expands its section directly below the buttons inside Machine, leaving Artwork and the canvas unobscured. Escape, the close button or clicking the selected button collapses it; working in neighbouring settings leaves it open. Typed positions, unsent commands, filters and disclosures survive closing or switching tools. Full coordinates, work-origin identity and feed/power details are in Origin. The positioning group has no separate scroller; Step and Speed follow the arrow grid. The open utility uses the remaining panel height and scrolls only when needed. When the fixed controls and an open utility cannot fit, short bodies use one full rail scroller; expanded recovery notices also retain that fallback. Frame and Start remain outside it. Both panels can be resized or hidden independently. The machine panel may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
 - **Placement & output**: the **Placement** utility button opens the existing placement and output settings, plus CNC maintenance tools when applicable. Mouse, Space, Enter and Arrow Down open it without activating canvas or job shortcuts. Tab moves through its fields and Escape closes it.
@@ -144,7 +148,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **After a job completes (ADR-340, ADR-603)**: the job dock shows **Job complete** and **Done** after controller settlement. Pausing during final settlement retains that run's completion owner and Resume requires fresh Idle evidence. Missing acknowledgements say **Waiting for controller replies**, without asserting a controller hold; a new acknowledgement clears the stale wait immediately. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains offered while its receipt still matches the job, and like Start it needs a fresh Frame (ADR-372 Amendment 1). Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
 - **Workspace colours**: panels, drawing bed, grid, rulers and controls use the application appearance preference, defaulting to Light. Window > Appearance offers Light, Dark and Match System (ADR-339). Dark mode uses the approved charcoal drawing surface and light, readable vector ink. Contrast adjustments happen only while drawing the workspace; saved artwork, raster pixels, exported files and machine output retain their original colours and settings. The layout menu uses the same themed surface as the rest of the workspace.
 - **Notifications**: transient messages stay within the available canvas area, clear of the job dock, Live Motion bar, and zoom controls. An open modal gives notifications a reserved scrolling row so they do not cover its actions. Message lifetimes and dismissal controls are unchanged.
-- **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores Auto and opens both panels. Compact still displays one tab at a time. Panel visibility does not affect the Live Motion bar.
+- **Window menu**: checked `Artwork Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores Auto and opens both panels. Compact still displays one tab at a time. Panel visibility does not affect the Live Motion bar.
 - **Studio keyboard ownership**: native form and activation controls retain their browser keys. Focusable resize separators and sliders retain their arrow keys, and a Studio root never reuses a key already handled by a nested control.
 
 #### Disabled controls
@@ -152,7 +156,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - `File → Save Project As`
 - `File → Save G-code`
 - All transform controls
-- Cuts/Layers row controls
+- Artwork operation row controls
 
 #### Enabled controls
 - `File → New` (no-op when already empty)
@@ -779,14 +783,15 @@ the linked artwork.
    tabs; text and drawn shapes that change become paths in the same step, and locked artwork is
    left as it is. The notice says what changed. Settings are remembered for the session.
 
-### F-A6j. Operation colours on the canvas (ADR-620)
+### F-A6j. Operation colours on the canvas (ADR-620, ADR-632)
 
 1. Artwork rests in plain ink on the workspace, so the canvas shows the design itself. Every
    operation still has its own colour, shown on its row in the Artwork panel.
-2. With the Select tool, rest the pointer on a piece of artwork: it pulses once in its operation
-   colour, and every other piece whose operation has the same settings pulses in that same
-   colour, rippling out from the piece under the pointer. A soft colour edge stays while the
-   pointer rests there. Resting on an operation row does the same for that operation's artwork.
+2. With the Select tool, rest the pointer on a piece of artwork: it swells once into a soft tint
+   of its operation colour with a faint halo, then ebbs back to ink. Every other piece whose
+   operation has the same settings does the same in that colour, rippling out from the piece
+   under the pointer. A soft colour edge stays while the pointer rests there. Resting on an
+   operation row does the same for that operation's artwork.
 3. Hold **Alt** (Option on a Mac) to show every operation colour at once; let go to return to ink.
    Alt shortcuts such as `Alt+W` do not trigger it.
 4. With reduced motion turned on in the operating system, the colour shows while the pointer
@@ -933,23 +938,24 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 1. Click Output checkbox.
 2. Layer's paths immediately hidden from preview render.
 3. Layer's paths *excluded* from generated G-code.
-4. Cuts/Layers row appears dimmed.
+4. The Artwork operation row appears dimmed.
 
 #### Success - reorder a layer
 1. Click a layer's up or down order control.
-2. The row moves one position in the Cuts/Layers list.
+2. The row moves one position in the operations list.
 3. Generated output processes operations in that order inside each artwork run.
 4. Undo restores the previous layer order.
 
 #### Success - choose which artwork runs first
-1. Open **Run order** in the docked Artwork / Operations rail.
+1. Open **Run order** in the docked Artwork panel.
 2. Enter a one-based **Run** number on any row. The complete run unit moves to that position and all
    other rows renumber automatically.
 3. For large jobs, search by artwork/operation/settings or enter **Jump to run**; the windowed list
    scrolls directly to that row without rendering the whole project at once.
 4. The displayed position updates without changing canvas stacking, geometry, operation settings,
    visibility, output flags, or automatic colours.
-5. Laser output follows the numbered run-unit order exactly. Each row reports its output step(s).
+5. Laser output follows the numbered run-unit order exactly. Each row reports its output step(s)
+   whenever they differ from its run number (ADR-631).
 6. CNC preserves global clearing-before-profile order and contiguous tool sections within each
    clearing/profile phase. Each row shows both
    its requested run number and the exact effective CNC step(s), so any necessary difference is
@@ -1041,7 +1047,7 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 ### F-A7b. Operations list tools and Sort cuts last (ADR-480)
 
-1. The **•••** button on the Cuts / Layers header opens **Turn output on for all**, **Turn output
+1. The **•••** button in the Artwork panel's **All operations** section opens **Turn output on for all**, **Turn output
    off for all**, **Invert output**, **Show all**, **Hide all**, **Invert visibility** and **Sort
    cuts last**. Each row's **Show only this** hides every other operation.
 2. Each is one undo step. Hidden artwork leaves the selection. The registration jig's output is
@@ -1702,7 +1708,7 @@ Left to right:
 - **Cursor position** — `X 124.3, Y 87.0 mm`
 - **Selection summary** — `1 selected · 50.0 × 30.0 mm` (or `Nothing selected`)
 - **Object count** — `Objects: 3`
-- **Layer count** — `Layers: 2 (1 output)`
+- **Operation count** — `Operations: 2 (1 output)`
 - **Device** — `Default 400×400`
 - **Zoom** — `100%`
 - **Job estimate** — Phase C feature; not in Phase A.
@@ -2691,6 +2697,8 @@ authorization, Frame proof, controller command, or safety boundary.
    what the box encloses, right to left what it touches. Shift-drag or Shift-click adds
    to the selection, and Ctrl+A selects all the artwork (not the outlines) unless a field
    has focus. Locked or hidden objects, including locked outlines, are never selected.
+   As on the main canvas, drag with the right or middle mouse button, or hold Space and
+   drag, to pan; the wheel zooms.
 2. In **Jig layout**, choose Rectangle or Circle, enter the outline size, then enter
    rows, columns, and horizontal/vertical spacing. Apply the layout before saving;
    until then the tab reads **Jig layout •**. A 1 x 5 grid creates five independently
@@ -2914,13 +2922,16 @@ authorization, Frame proof, controller command, or safety boundary.
   records, so a response suffix cannot become a false acknowledgement. The writer remains
   available for Stop; no missing reply is synthesized or replayed (ADR-600).
 - A reply lost that way leaves the last line of the job unacknowledged after the machine has
-  finished. Once every line has been sent and nothing else is owed a reply, fresh Idle status
-  reports finish the job instead of the 90-second watchdog resetting the controller: an empty
-  `Bf` receive buffer and planner for 8 s, or, when the controller reports no `Bf`, Idle for
-  15 s, plus the time of any G4 still in flight. A `Bf` showing unread input keeps waiting, so
-  a controller holding its own program is not finished early. The ordinary post-job settle
-  then confirms completion, and the log names how many replies were lost and that one may
-  have been an error (ADR-610).
+  finished. Once every line has been sent, nothing else is owed a reply and the controller has
+  reported Idle for 1 s, KerfDesk sends one `$G` to GRBL, grblHAL and FluidNC controllers
+  (the Falcon included). They answer it only after every earlier line, so its `[GC:...]`
+  report proves the job was read and any reply still missing was lost. The job then finishes
+  through the ordinary post-job settle instead of the 90-second watchdog resetting the
+  controller, usually within about 2 s. A controller holding its own program answers only
+  after the held lines, so it is never finished early. Other controllers with a realtime
+  status (Smoothieware) wait for 15 s of Idle plus any G4 still in flight instead. The log
+  names how many replies were lost and that one may have been an error (ADR-610 and its
+  Amendment 1).
 - After any page stall, the controller output that queued up meanwhile is handed to the app
   in slices of about 8 ms, with input, drawing and the status poll running in between,
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
@@ -3216,7 +3227,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    after a reset, and a read that failed while the controller still answers
    status queries, do not pop up a toolbar notice: the machine runs without
    them, as in other senders. Only a controller that has stopped answering
-   shows the brief "Controller is not responding" notice (ADR-611).
+   shows the brief "Controller is not responding" notice (ADR-611). A controller
+   that answered and then goes quiet for 8 s, outside homing and other controller
+   operations, turns the connection status to an amber **Not responding** until
+   its next reply (ADR-611 Amendment 1).
 4. A CNC Pause/Resume confirmation warning retains the paused job and its saved
    artifact. A later accepted Abort, actual Disconnect or controller fault
    records its own terminal cause. A reset-owned host freeze remains provisional.
@@ -3327,65 +3341,93 @@ record is per machine profile and Laser/CNC head. Only **Save machine setup**
 completes it; Cancel or an unsuccessful connection leaves the next Connect eligible.
 Configured profiles connect directly. Automatic connections and recovery Reconnect
 keep their existing behavior and do not open setup (ADR-420 Amendment 3).
-The Machine stage keeps a primary **Review setup** shortcut beside **Check essentials** (ADR-420
-Amendment 4). After choosing a profile, **Review setup** opens the final review directly; only
-**Save machine setup** applies it. **Check essentials** remains available to edit values first.
-Neither selecting the shortcut nor saving an ordinary software profile disconnects the controller.
+Machine and Essentials each have one forward button, **Next** (ADR-637; it replaces ADR-420
+Amendment 4's **Review setup** shortcut and **Check essentials**). The stage buttons still open any
+stage directly, Review included; only **Save machine setup** applies the draft. Neither moving
+between stages nor saving an ordinary software profile disconnects the controller.
 **Cancel without saving** closes at once. Escape and the header close button close at once unless
 the operator changed the draft (a new machine's automatic fill alone does not count); then they
 first ask **Discard your changes to this setup?** with **Keep editing** (focused, and Escape
 again) or **Discard changes**.
 
-1. **Machine** — **Find my machine** opens the stage (ADR-420). It connects with the draft's
-   controller, baud and streaming choice, reusing the remembered port as the rail's Connect does,
-   and reads the controller's identity and settings; nothing moves and no controller setting is
-   written. Its heading follows the connection: **Find your machine**, **Connecting…**,
-   **Reading your controller…**, **Waiting for the controller…**, **Found your <firmware>
-   controller**, **Your machine didn’t answer**, **Couldn’t connect**, or **No answer at any
-   common speed**. When found it lists the
-   reported travel, max speed, power range, laser mode and Z travel.
-   - For a machine not set up before in this browser, or after the operator presses **Find my
-     machine**, the reported values are filled into the draft by themselves: the firmware the
+1. **Machine** — the stage asks **Which machine do you have?** (ADR-637). A one-line connection
+   strip sits at the top and the machine list follows; connecting is never needed to choose.
+   - The strip (ADR-420) connects with the draft's controller, baud and streaming choice when the
+     operator presses **Connect**, reusing the remembered port as the rail's Connect does, and
+     reads the controller's identity and settings; nothing moves and no controller setting is
+     written. Its heading follows the connection: **Not connected**, **Connecting…**, **Reading
+     your controller…**, **Waiting for the controller…**, **Found your <firmware> controller**,
+     **Your machine didn’t answer**, **Couldn’t connect**, or **No answer at any common speed**.
+     When found it lists the reported travel, max speed, power range, laser mode and Z travel.
+   - For a machine not set up before in this browser, or after the operator presses **Connect** in
+     the strip, the reported values are filled into the draft by themselves: the firmware the
      banner names (when the driver can connect to it), the baud rate that answered, the machine
-     type from `$32` (laser mode on or off; a Laser + CNC draft keeps both), and the mapped `$$`
-     values. The card lists each change
+     type from `$32` (laser mode on or off; a Laser + CNC draft keeps both, and a machine chosen
+     from the list keeps the type the list gives it, ADR-637 Amendment 1), and the mapped `$$`
+     values. The strip lists each change
      as old → new with one **Undo** that restores the draft as it was. A machine already set up
      that the operator only opens setup for keeps its values and offers **Use detected values**
      for the ones that differ (ADR-347). When the adopted firmware differs from the one it
-     connected with, Find reconnects once with it.
+     connected with, Connect reconnects once with it.
    - **Your machine didn’t answer** appears when nothing came back within 10 s of connecting (a
      board that restarts when the port opens can take several seconds to answer, ADR-375). It
      offers **Try other speeds**, which reconnects at 115200,
      230400, 250000, 921600, 57600, 38400, 19200 and 9600 baud in turn and stops at the first that
      answers; **Stop** ends it. **Use a different port…** always shows the picker.
-   - **Set up without connecting** keeps the whole stage usable offline; a browser without
-     WebSerial says so and keeps the offline path. A file-only controller explains that its jobs
-     are saved as files.
-   - **Connection options**, under the card, holds the controller family, baud, output dialect,
+   - A browser without WebSerial says so in the strip and the list stays usable. A file-only
+     controller explains that its jobs are saved as files.
+   - **Connection options**, under the strip, holds the controller family, baud, output dialect,
      advanced streaming and the command contract.
-   The capability cards follow: choose **Laser only**, **CNC only**, or **Laser + CNC**; hybrids
-   also choose the active mode after Save. Laser-capable machines then see up to two compact profile previews, keeping the selected catalog
-   profile in view. Search or **Browse all N profiles** opens the rest of the catalog. CNC-capable
-   machines also have CNC presets. A profile card is one option in a radio group: a pointer
-   anywhere on the card chooses that profile and copies it into the draft, while **Profile details**
-   sits outside the choice so reading the evidence selects nothing. Choosing copies the preset
-   whole, so a later correction to the preset never reaches that copy; when a saved copy still
-   holds a value a correction replaced (the xTool D1 Pro's front-left origin, the Sculpfun S30's
-   410 x 400 mm bed), Job Review names the old and corrected values as an advisory (ADR-322
-   Amendment 1), and Machine Setup shows a **Preset correction** row under Origin with one click
-   to use the corrected value (ADR-322 Amendment 2). Nothing is applied on its own. A saved copy
-   of the Creality Falcon A1 Pro preset made before the preset had its vendor command set connects
-   with the generic grblHAL commands: Machine Setup shows its card unselected at the head of the
-   preview with a notice, one click re-applies the preset into the draft, and Job Review names the
-   copy and why it matters, since Frame then sends `M9` just before Start (ADR-375). A preset's
-   content is pinned to its `catalogVersion`, so a preset change has to bump the version. Detected
-   matches are
-   prioritised among the remaining profiles and explain their evidence under **Profile details**,
-   but generic `$$` values never establish hardware identity: "Possible match" remains the
-   ceiling, so Find my machine never picks a catalog profile. **Import or export a machine
-   profile** is a separate disclosure on Machine.
+   - **The machine list** holds every listed laser profile and CNC preset in one scrolling list,
+     grouped by brand from A to Z, with **Search machines** (brand, model, type or `WxH`) and an
+     **All / Laser / CNC** filter; a Laser + CNC machine shows under both. The generic firmware
+     starters are not machines, so they are not listed. A row is one option in a radio group: a
+     pointer anywhere on it chooses that machine and copies it into the draft. A row shows the
+     model, work area, laser power and type; once a controller has named its firmware, laser rows
+     add **Same firmware** or **Other firmware** as a hint. Under the list the chosen machine shows
+     the draft's work area, power and type with its controller, the evidence label, warnings and
+     **Profile details**, which sit outside the choice so reading the evidence selects nothing; a
+     Laser + CNC machine also asks which toolhead is fitted. A listed machine that an earlier setup
+     saved as another type says so and shows the type question (ADR-637 Amendment 1).
+   - A choice that would replace values someone set does not apply at once (ADR-637 Amendment 1):
+     the max feed, S range, origin and homing, frame speed, no-go zones, scan-offset, camera or
+     rotary calibration, saved positions, or a Laser + CNC machine's CNC values, where they differ
+     from the listed profile or firmware starter the draft came from and from what the controller
+     reported. A notice after the list names what would be replaced, with **Replace settings** and
+     **Keep current settings**. The radios keep the draft's choice meanwhile, so arrowing through
+     the list over such a draft asks for each row in turn instead of applying it. The name and work
+     area are not counted: every machine brings its own.
+   - Choosing a CNC preset makes the draft a CNC-only machine with the preset's name, work area and
+     spindle ceiling, and leaves the controller unchanged; over a listed laser profile it starts
+     from the generic starter for the same controller, and a Laser + CNC machine's CNC values go
+     back to the defaults, so no laser brand's values stay behind.
+   - **My machine isn’t listed**, after the list, asks four things: name, type (**Laser only**,
+     **CNC only** or **Laser + CNC**, with the active toolhead for a hybrid, chosen after Save with
+     the toolbar's Laser / CNC), work area and firmware (the same draft value as Connection
+     options' controller). On a draft that is still a firmware starter apart from its name, type
+     and work area, the firmware choice starts from that firmware's generic starter (Ruida's
+     rear-right origin and 900 × 600 mm, Marlin's S 0-255), keeping the name, the type and a work
+     area the operator typed; otherwise it changes the controller only. Chosen while a listed
+     machine is in the draft, it starts again from the
+     generic starter for the same controller, named **My machine**, keeping the work area; chosen on
+     the untouched starter it only names it **My machine**. A draft that is neither listed nor the
+     untouched starter (imported, filled in from the controller, or set up earlier) opens with this
+     choice selected.
+   - Choosing copies the preset whole, so a later correction to the preset never reaches that
+     copy; when a saved copy still holds a value a correction replaced (the xTool D1 Pro's
+     front-left origin, the Sculpfun S30's 410 x 400 mm bed), Job Review names the old and
+     corrected values as an advisory (ADR-322 Amendment 1), and Machine Setup shows a **Preset
+     correction** row under Origin with one click to use the corrected value (ADR-322 Amendment 2).
+     Nothing is applied on its own. A saved copy of the Creality Falcon A1 Pro preset made before
+     the preset had its vendor command set connects with the generic grblHAL commands: Machine
+     Setup shows its row unchosen with a notice, one click re-applies the preset into the draft,
+     and Job Review names the copy and why it matters, since Frame then sends `M9` just before
+     Start (ADR-375). A preset's content is pinned to its `catalogVersion`, so a preset change has
+     to bump the version. Generic `$$` values never establish hardware identity, so connecting
+     never chooses a machine from the list. **Import or export a machine profile** is a separate
+     disclosure on Machine.
    CNC catalogue entries supply geometry and an assumed spindle ceiling only; they leave the
-   controller choice unchanged. Controller notes and sources remain visible beside the selected
+   controller choice unchanged. Controller notes and sources remain visible beside the chosen
    preset. Onefinity entries require an external controller/postprocessor integration and do not
    claim compatible KerfDesk output.
    A connection whose driver or command set differs from the draft's shows **The connection does
@@ -3436,7 +3478,7 @@ settings and Job Review keep their existing read-only setup references.
 #### Success — connected controller answers its read commands
 
 1. Detected identity remains a separate observation from the saved profile. For a new machine, or
-   after **Find my machine**, the draft adopts the reported firmware, baud, machine type and
+   after **Connect** in Machine Setup's connection strip, the draft adopts the reported firmware, baud, machine type and
    values with one **Undo**; otherwise a mismatch is explicit and must be resolved deliberately.
 2. Supported numeric readback values can be copied into the draft with **Use detected values**.
    Using `$30` as the CNC spindle ceiling requires the explicit option and reported CNC mode
@@ -3877,7 +3919,7 @@ or traced image) with at least one closed polyline.
 
 **Empty**:
 - *No SceneObjects yet* — the Mode dropdown still works, but no
-  geometry exists to fill. The Cuts/Layers panel shows its "Import a
+  geometry exists to fill. The Artwork panel shows its "Import a
   design to populate layers" hint.
 
 **Edge cases**:
@@ -3927,9 +3969,10 @@ or traced image) with at least one closed polyline.
 ### F-F2. Image-engrave a raster (Phase F.2 — code shipped through F.2.e; hardware burn pending)
 
 For portraits, import a sharp photograph, set its physical size, select it and choose
-**Photo engraving...** in the toolbar or Tools → Image (ADR-581). Compare Jarvis and
-Stucki, select whether the material marks dark or light, then adjust midtones before
-brightness and contrast. Higher gamma lightens midtones in KerfDesk. The preview
+**Photo engraving...** in the toolbar or Tools → Image (ADR-581). Compare the Jarvis and
+Stucki swatches under Photo processing, select whether the material marks dark or
+light, then adjust midtones before brightness and contrast. Higher gamma lightens
+midtones in KerfDesk. The preview
 uses the selected engraving grid and reports when its display has been reduced;
 it simulates relative marks, not material colour or beam/heat spread. **Apply photo
 settings** preserves original pixels and writes only that photo's settings in one
@@ -3975,7 +4018,13 @@ correct M4-mode raster G-code from Compile.
      dark-to-light ramp run through that mode's real `dither()`; Grayscale shows a
      smooth ramp. A caption names the chosen mode and says what it is for, the
      arrow keys move and select like radios, and artwork with different dithers
-     shows **Mixed** with no swatch chosen. Default `floyd-steinberg`.
+     shows **Mixed** with no swatch chosen. Default `floyd-steinberg`. **More cut
+     settings → Image detail**, the material preset wizard's Image details and
+     **Adjust Image** show the same swatches, and the checked swatch is the Dither
+     they save; the **Photo engraving** dialog shows only Jarvis, Stucki and
+     Floyd-Steinberg. While Use original pixels (Pass-through in Adjust Image) is
+     on and a binary swatch is chosen, a note under the swatches says the image
+     burns as Grayscale until that box is off.
    - **Lines/mm**: number input, 5..25, default 10.
 6. Workspace shows the image where it will burn; no separate "preview
    the dither" overlay in v1 — the image itself is the preview.
@@ -4769,7 +4818,7 @@ share them as files.
 details directly — name, thickness, then cut settings — without first
 editing a layer.
 
-**Entry.** Cuts / Layers rail → **Materials** → **New material...** (or **Edit** on a
+**Entry.** Artwork panel → **Materials** → **New material...** (or **Edit** on a
 preset row) opens a multi-step `Dialog` wizard. The draft commits only
 on the final Save, so Cancel/Escape at any step discards it.
 
@@ -4783,7 +4832,7 @@ on the final Save, so Cancel/Escape at any step discards it.
    speed, passes, air assist.
 3. **Mode details.** Only the chosen mode's fields — Line (kerf,
    tabs/bridges), Fill (interval/LPI, angle, overscan, cross-hatch,
-   direction, style), or Image (dither, DPI/interval, dot width,
+   direction, style), or Image (dither swatches, DPI/interval, dot width,
    negative, pass-through, image direction, uncalibrated-direction intent,
    and optional local scan-offset override). Saving a recipe records those
    effective image fields; applying a recipe without a local offset clears a
@@ -4819,7 +4868,7 @@ of the active library auto-saves. The legacy single-library slot
 (`laserforge.material-library.v1`, F-ML1) is migrated in once, then
 removed.
 
-**Entry.** Cuts / Layers rail → **Materials** → **Saved Libraries...** opens a
+**Entry.** Artwork panel → **Materials** → **Saved Libraries...** opens a
 `Dialog` listing every saved library: name, device hint, preset count,
 last updated.
 
@@ -6509,7 +6558,7 @@ as the pane's design record.
 
 #### Success
 1. When a controller is connected and its `$$` snapshot differs from the current setup,
-   **Machine Setup > Machine > Find my machine** shows the detected values (ADR-420). **Use detected
+   **Machine Setup > Machine**'s connection strip shows the detected values (ADR-420, ADR-637). **Use detected
    values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131) into the setup
    draft; **Save machine setup** commits them, then the difference clears.
    `$30` is offered as spindle RPM only when the same dump reports `$32=0`;
@@ -6518,7 +6567,7 @@ as the pane's design record.
 #### Error — none (opt-in)
 1. Nothing changes until **Use detected values** updates the draft and **Save machine setup**
    commits it; leaving or cancelling the flow changes neither project nor controller. A new
-   machine, or one the operator pressed **Find my machine** for, gets the values in the draft by
+   machine, or one the operator pressed **Connect** for in the strip, gets the values in the draft by
    themselves with one **Undo**; the Save boundary is the same.
 
 #### Empty

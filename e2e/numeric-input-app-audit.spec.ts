@@ -62,7 +62,7 @@ test('mixed artwork power scale accepts explicit 100 after clearing its blank dr
     .filter({ has: page.getByText('Select All', { exact: true }) })
     .click();
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await panel
@@ -95,7 +95,7 @@ test('laser Machine Setup numbers accept clear, pause and retyping', async ({ pa
   await openBasicProject(page);
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Machine Setup', exact: true });
-  await dialog.getByRole('button', { name: 'Check essentials', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Next', exact: true }).click();
   for (const field of [
     { label: 'Bed width (mm)', value: '510' },
     { label: 'Bed height (mm)', value: '320' },
@@ -107,11 +107,11 @@ test('laser Machine Setup numbers accept clear, pause and retyping', async ({ pa
     await input.press('Tab');
     await expect(input).toHaveValue(field.value);
   }
-  await dialog.getByRole('button', { name: 'Review setup', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
   await dialog.getByRole('button', { name: 'Save machine setup', exact: true }).click();
   await expect(dialog).toBeHidden();
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
-  await dialog.getByRole('button', { name: 'Check essentials', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(dialog.getByRole('spinbutton', { name: 'Bed width (mm)', exact: true })).toHaveValue(
     '510',
   );
@@ -121,8 +121,9 @@ test('CNC Machine Setup safe Z and RPM accept clear, pause and retyping', async 
   await openBasicProject(page);
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const dialog = page.getByRole('dialog');
+  await dialog.getByRole('radio', { name: 'My machine isn’t listed', exact: true }).check();
   await dialog.getByRole('radio', { name: /CNC only/ }).check();
-  await dialog.getByRole('button', { name: 'Check essentials', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Next', exact: true }).click();
   for (const field of [
     { label: 'Safe Z', value: '4.5' },
     { label: 'Spindle maximum', value: '12000' },
@@ -157,7 +158,7 @@ async function openBasicProject(page: Page): Promise<Locator> {
     .getByRole('tab', { name: 'Artwork', exact: true });
   if (await sideTab.isVisible()) await sideTab.click();
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await expect(panel.getByRole('radiogroup', { name: /^Mode for/ })).toBeVisible();

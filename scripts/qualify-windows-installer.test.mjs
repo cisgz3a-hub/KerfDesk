@@ -715,3 +715,102 @@ test(
     }
   },
 );
+
+test(
+  'historical uninstall-gap failures do not strand a developer seat',
+  {
+    skip: process.platform !== 'win32',
+  },
+  () => {
+    const quoted = (value) => `'${value.replaceAll("'", "''")}'`;
+    // Execute the actual scenario with fake installers, profile actions and I/O.
+    // Nothing installs, launches an app, reads credentials or calls a provider.
+    const command = `
+$ErrorActionPreference = 'Stop'
+$ast = [Management.Automation.Language.Parser]::ParseFile(${quoted(script)}, [ref]$null, [ref]$null)
+$condition = ${quoted("$Scenario -eq 'HistoricalUpgrade'")}
+$scenario = $ast.Find({ param($node)
+  $node -is [Management.Automation.Language.IfStatementAst] -and
+  $node.Clauses[0].Item1.Extent.Text -eq $condition -and
+  $node.Clauses[0].Item2.Extent.Text.Contains('historical-uninstall-retaining-data')
+}, $true).Clauses[0].Item2.Extent.Text
+$exercise = [scriptblock]::Create($scenario.Substring(1, $scenario.Length - 2))
+function Install-Candidate($Label, $Installer, $Version, $Source) {
+  $script:events.Add($Label)
+  if ($Label -eq 'historical-install-after-uninstall' -and $script:failure -eq 'reinstall') { throw 'Synthetic reinstall failure' }
+  $script:executableExists = $true
+}
+function Uninstall-Candidate($Label) { $script:events.Add($Label); $script:executableExists = $false }
+function Invoke-HistoricalProfile($Label, $Phase, $Version, $Source) {
+  $script:events.Add($Label)
+  $script:seatActive = $Phase -ne 'release'
+}
+function Assert-DataRetained {
+  if (-not $script:executableExists -and $script:failure -eq 'retention') { throw 'Synthetic retained-data failure' }
+}
+function Get-FileEvidence { return @{ sha256 = 'synthetic' } }
+function Test-Path { return $script:executableExists }
+function Set-Content { param($LiteralPath, $Encoding) }
+function Copy-Item { }
+$executable = 'synthetic-executable'; $project = 'synthetic-project'; $sentinel = 'synthetic-sentinel'
+$Installer = 'baseline'; $UpgradeInstaller = 'upgrade'; $Version = '1.0.0'; $UpgradeVersion = '1.0.1'
+$SourceCommit = 'baseline-source'; $UpgradeSourceCommit = 'upgrade-source'; $EvidenceRoot = 'synthetic-evidence'
+$reports = foreach ($failure in @('retention', 'reinstall')) {
+  $script:failure = $failure
+  $script:events = [Collections.Generic.List[string]]::new()
+  $script:seatActive = $false; $script:executableExists = $false
+  $failed = $false
+  try { & $exercise } catch { $failed = $true }
+  @{ failure = $failure; failed = $failed; seatActive = $script:seatActive; events = @($script:events) }
+}
+$reports | ConvertTo-Json -Depth 4 -Compress
+`;
+    const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', command], {
+      encoding: 'utf8',
+      timeout: 15_000,
+      windowsHide: true,
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    const reports = JSON.parse(result.stdout);
+    assert.equal(reports.length, 2, result.stdout);
+    for (const report of reports) {
+      assert.equal(report.failed, true, report.failure);
+      assert.ok(report.events.includes('historical-uninstall-retaining-data'), report.failure);
+      if (report.failure === 'reinstall')
+        assert.ok(report.events.includes('historical-install-after-uninstall'));
+      assert.equal(report.seatActive, false, report.failure);
+    }
+  },
+);
+
+test('the qualification licence reaches only the historical profile child, which releases its seat', async () => {
+  const { readFileSync } = await import('node:fs');
+  const parent = readFileSync(script, 'utf8');
+  const profile = readFileSync(
+    fileURLToPath(new URL('./installed-upgrade-profile.ps1', import.meta.url)),
+    'utf8',
+  );
+  // ADR-623: installers and other children never inherit the secret.
+  const taken = parent.indexOf('Remove-Item Env:KERFDESK_NATIVE_QUALIFICATION_LICENCE');
+  assert.ok(taken > 0 && taken < parent.indexOf('Install-Candidate'));
+  assert.match(
+    parent,
+    /EnvironmentVariables\['KERFDESK_QUALIFICATION_LICENCE_KEY'\] = \$qualificationLicence/,
+  );
+  // The profile child drops it before starting KerfDesk and never records it.
+  const dropped = profile.indexOf('Remove-Item Env:KERFDESK_QUALIFICATION_LICENCE_KEY');
+  assert.ok(
+    dropped > 0 && dropped < profile.indexOf('[Diagnostics.ProcessStartInfo]::new($Executable)'),
+  );
+  assert.doesNotMatch(profile, /\$receipt\.[\w.]+\s*=\s*\$(licenceKey|Key)\b/);
+  assert.doesNotMatch(profile, /return[^\n]*\$(licenceKey|Key)\b/);
+  // The seat is released before the final uninstall, and on failure too.
+  const release = parent.indexOf("'historical-licence-release' 'release'");
+  assert.ok(
+    release > 0 && release < parent.indexOf("Uninstall-Candidate 'historical-final-uninstall'"),
+  );
+  assert.match(parent, /'historical-licence-cleanup' 'release'/);
+  // A seat still signing out is retried, and never recorded as released.
+  assert.match(profile, /Retry device deactivation[\s\S]*still signing out/);
+});

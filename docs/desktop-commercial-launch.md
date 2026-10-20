@@ -14,9 +14,11 @@ change. Existing web and free/Preview app builds continue to work without activa
 | Johann and Father | Two individual free developer keys, three computers each, unlimited updates |
 
 Paddle-added taxes are additional. Expired update coverage never ends paid use of
-an already eligible version. The workspace always opens as Free; the licence
-controls choosing new Pro tools, never entry into the app or an active machining session. Keep normal Frame, review,
-Abort and controller workflows intact.
+an already eligible version. The commercial desktop app has no Free edition: it
+opens behind a licence window, with no workspace mounted, until this device has a
+trial or licence (ADR-623). Once open, a session keeps its workspace until KerfDesk
+closes, and a licence change never interrupts an active machining session. Keep
+normal Frame, review, Abort and controller workflows intact.
 
 ## Provider preparation
 
@@ -147,10 +149,11 @@ After packaging, run the native smoke against the actual executable:
 node scripts/verify-windows-packaged-native-smoke.mjs <absolute-sandbox-executable> --expect-fresh-sandbox --output=<external-evidence-directory>
 ```
 
-This creates a disposable profile, verifies startup and SVG import/project save,
-and checks the local licence and update status without starting a trial, creating
-a checkout or contacting hardware. File pickers and the save destination are
-stubbed; this is not installed-app native-dialog qualification. Windows may warn
+This creates a disposable profile, verifies that the fresh sandbox opens behind
+its licence window with no workspace mounted (ADR-623), and checks the local
+licence and update status without starting a trial, creating a checkout or
+contacting hardware. Import and save need a licensed profile, so this sandbox
+check does not cover them; this is not installed-app native-dialog qualification. Windows may warn
 about the unsigned installer, and some policies can prevent it from running.
 Test payments use Paddle sandbox; this package is not a customer purchase build.
 
@@ -166,8 +169,9 @@ owner. Their names are not activation codes. No universal development bypass shi
 On disposable user profiles, install the signed commercial build, start a trial,
 restart offline, activate a developer licence, exercise the three-seat limit and
 transfer, and verify expired trials and expired update periods separately. Confirm
-the app opens as Free with no licence and that only Pro tools ask for one
-(ADR-540). Open and save projects, and verify the normal active-job close handoff
+that with no licence the app opens only the licence window, that Quit and the
+window's X close it there, and that a trial or licence opens the workspace
+(ADR-623). Open and save projects, and verify the normal active-job close handoff
 with a simulator. Do not operate hardware without
 an explicit request.
 
@@ -184,8 +188,9 @@ behaviour.
 Record the exact source, artifact and hosted identity. Only then enable customer
 checkout and advertise automatic commercial updates.
 
-Browser and unlicensed desktop builds now run Free under ADR-540 Amendment 1,
-independently of whether checkout is enabled. Browser builds preserve saved Pro
+Browser builds and desktop builds that cannot take a licence (Preview, source) run
+Free under ADR-540 Amendment 1, independently of whether checkout is enabled; an
+unlicensed commercial desktop build opens behind its licence window (ADR-623). Browser builds preserve saved Pro
 projects for desktop instead of loading their operations. Keep the owner's working
 desktop build until a licensed replacement is qualified; an unlicensed Preview
 cannot unlock new Pro tools. The launch change drops "Once sales open," from

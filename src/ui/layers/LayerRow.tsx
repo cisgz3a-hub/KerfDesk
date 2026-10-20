@@ -62,55 +62,60 @@ export function LayerRow(props: {
   );
 }
 
+// Visibility is not repeated here: the eye on the row owns it. Output stays,
+// because the editor cannot reach an operation whose artwork is all locked,
+// or one with no artwork (ADR-631).
 function OperationManagement(props: {
   readonly layer: Layer;
   readonly canMoveUp: boolean;
   readonly canMoveDown: boolean;
 }): JSX.Element {
-  const setLayerParam = useStore((state) => state.setLayerParam);
   return (
     <details className="lf-operation-card__management">
       <summary
         aria-label={`More controls for ${props.layer.name}`}
-        title="Operation order, output, clipboard and delete controls"
+        title="Operation order, output, selection, clipboard and delete controls"
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
         }}
       >
         <Icon name="more" size={18} />
       </summary>
-      <div className="lf-operation-card__management-body">
-        <LayerOrderControls {...props} />
-        <div style={togglesStyle}>
-          <label title="Show or hide this operation on the workspace">
-            <input
-              type="checkbox"
-              checked={props.layer.visible}
-              aria-label={`Show ${props.layer.name}`}
-              title="Show or hide this operation on the workspace"
-              onChange={(event) => setLayerParam(props.layer.id, { visible: event.target.checked })}
-            />{' '}
-            Show
-          </label>
-          <label title="Include this operation in preview and machine output">
-            <input
-              type="checkbox"
-              checked={props.layer.output}
-              aria-label={`Output ${props.layer.name}`}
-              title="Include this operation in preview and machine output"
-              onChange={(event) => setLayerParam(props.layer.id, { output: event.target.checked })}
-            />{' '}
-            Output
-          </label>
+      <div className="lf-operation-card__management-body lf-operation-menu">
+        <div className="lf-operation-menu__group">
+          <span className="lf-operation-menu__label">Order</span>
+          <LayerOrderControls {...props} />
         </div>
-        <div style={actionsStyle}>
+        <OperationOutputToggle layer={props.layer} />
+        <div className="lf-operation-menu__actions">
           <SelectLayerObjectsButton layer={props.layer} />
           <ShowOnlyLayerButton layer={props.layer} />
+        </div>
+        <div className="lf-operation-menu__actions">
           <LayerSettingsClipboardButtons layer={props.layer} />
+        </div>
+        <div className="lf-operation-menu__danger">
           <DeleteLayerButton layer={props.layer} />
         </div>
       </div>
     </details>
+  );
+}
+
+function OperationOutputToggle({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((state) => state.setLayerParam);
+  const title = 'Include this operation in preview and machine output';
+  return (
+    <label className="lf-operation-menu__toggle" title={title}>
+      <input
+        type="checkbox"
+        checked={layer.output}
+        aria-label={`Include in output: ${layer.name}`}
+        title={title}
+        onChange={(event) => setLayerParam(layer.id, { output: event.target.checked })}
+      />
+      Include in output
+    </label>
   );
 }
 
@@ -228,16 +233,4 @@ const summaryStyle: React.CSSProperties = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'normal',
-};
-const togglesStyle: React.CSSProperties = {
-  gridColumn: '2 / -1',
-  display: 'flex',
-  gap: 12,
-  fontSize: 11,
-};
-const actionsStyle: React.CSSProperties = {
-  gridColumn: '2 / -1',
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 5,
 };

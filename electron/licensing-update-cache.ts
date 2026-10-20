@@ -48,6 +48,20 @@ export class LicensingUpdateCache {
     );
   }
 
+  async readEligible(
+    load: () => Promise<unknown>,
+    envelope: unknown,
+    expectedVersion: string,
+  ): Promise<boolean> {
+    if (this.config.channel !== 'commercial') return false;
+    try {
+      await load();
+      return this.eligible(envelope, expectedVersion);
+    } catch {
+      return false;
+    }
+  }
+
   async manualEligible(envelope: string, expectedVersion: string): Promise<boolean> {
     if (
       this.config.channel !== 'commercial' ||

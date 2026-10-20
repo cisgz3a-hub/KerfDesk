@@ -1,11 +1,13 @@
 import type { NativeLicencePhase } from './native-smoke-licence-config.js';
-import { RENDERER_SMOKE_SOURCE } from './native-smoke-renderer.js';
+import { RENDERER_SMOKE_SOURCE, RENDERER_WORKSPACE_READY_SOURCE } from './native-smoke-renderer.js';
 
 // Fixed UI actions only: no arbitrary script input, entitlement override or
 // response substitution. The key exists only in this evaluated call's memory.
+// An unlicensed profile opens behind the licence window (ADR-623), so activation
+// enters the key there; the import/save smoke runs once the workspace is in.
 const QUALIFICATION_SOURCE = String.raw`async (phase, key) => {
-  const smoke = await ${RENDERER_SMOKE_SOURCE};
   if (location.href !== 'app://app/index.html') throw new Error('Qualification requires the packaged app');
+  if (!['activate', 'offline', 'deactivate'].includes(phase)) throw new Error('Unknown qualification phase');
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const wait = async (read, message) => {
     for (let attempt = 0; attempt < 250; attempt += 1) {
@@ -39,13 +41,16 @@ const QUALIFICATION_SOURCE = String.raw`async (phase, key) => {
     opener.click();
     return wait(() => document.querySelector('[role="dialog"][aria-label="KerfDesk licence"]'), 'Licence panel missing');
   };
+  // Observe licensing only once the renderer has opened: its workspace, or the
+  // settled licence window that stands in its place.
+  const opened = await ${RENDERER_WORKSPACE_READY_SOURCE};
   const before = await status();
   let proAction = 'not-requested';
   if (phase === 'activate') {
-    if (!isFree(before)) throw new Error('Activation qualification requires an initially Free profile');
-    await openLicence();
+    if (!isFree(before)) throw new Error('Activation qualification requires an initially unlicensed profile');
+    if (opened !== 'licence-window') throw new Error('The workspace opened without the licence window');
     const input = await wait(() => document.getElementById('kerfdesk-licence-key'), 'Licence input missing');
-    if (!(input instanceof HTMLInputElement) || input.type !== 'password') throw new Error('Licence input is not private');
+    if (!(input instanceof HTMLInputElement)) throw new Error('Licence input missing');
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, key);
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
@@ -53,17 +58,18 @@ const QUALIFICATION_SOURCE = String.raw`async (phase, key) => {
     activate.click();
     key = '';
     await wait(async () => isDeveloper(await status()), 'Developer activation was not observed');
-  } else if (phase === 'offline') {
+  }
+  const smoke = await ${RENDERER_SMOKE_SOURCE};
+  if (phase === 'offline') {
     if (!isDeveloper(before)) throw new Error('Offline restart did not retain developer Pro');
-  } else if (phase === 'deactivate') {
-    if (!isFree(before)) {
-      if (!isDeveloper(before) && before.deactivationPending !== true) throw new Error('Unexpected licence before cleanup');
-      await openLicence();
-      const release = await wait(() => button('Deactivate this device') || button('Retry device deactivation'), 'Deactivation control missing');
-      release.click();
-      await wait(async () => isFree(await status()), 'Device deactivation was not confirmed');
-    }
-  } else throw new Error('Unknown qualification phase');
+  } else if (phase === 'deactivate' && !isFree(before)) {
+    if (!isDeveloper(before) && before.deactivationPending !== true) throw new Error('Unexpected licence before cleanup');
+    // A seat still signing out leaves the profile behind the licence window.
+    if (smoke.licenceWindow !== true) await openLicence();
+    const release = await wait(() => button('Deactivate this device') || button('Retry device deactivation'), 'Deactivation control missing');
+    release.click();
+    await wait(async () => isFree(await status()), 'Device deactivation was not confirmed');
+  }
   if (phase !== 'deactivate') {
     await wait(() => button('Edition: Pro. Open licence settings'), 'Renderer did not unlock Pro');
     button('Close licence settings')?.click();

@@ -144,6 +144,10 @@
   color: var(--lf-success-fg);
 }
 
+.lf-connection-compact[data-silent='true'] .lf-connection-machine-status {
+  color: var(--lf-warning-fg);
+}
+
 .lf-connection-compact[data-state='failed'] .lf-connection-machine-status {
   color: var(--lf-danger);
 }

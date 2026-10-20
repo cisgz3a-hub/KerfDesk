@@ -92,6 +92,8 @@ test('the required aggregate always observes every packaging job and uses the ac
   const verdict = gate.steps.find((step) => step.run === 'node scripts/desktop-packaging-gate.mjs');
   assert.equal(verdict.env.NEEDS, '${{ toJSON(needs) }}');
   assert.equal(verdict.env.NATIVE_PACKAGING, '${{ inputs.native == true }}');
+  // The verdict runs from the workflow's own revision: a release-train call may
+  // select an older commit that predates this script (ADR-621).
   assert.equal(
     gate.steps.find((step) => step.uses?.startsWith('actions/checkout@')).with.ref,
     undefined,

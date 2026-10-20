@@ -3,32 +3,23 @@ param(
   [string]$Executable,
   [ValidateSet('App', 'Installer')]
   [string]$Kind = 'App',
-  [string]$SourceCommit
+  # An already published installer keeps the description it was built with;
+  # releases up to 1.0.19 predate the macOS and Linux wording (ADR-607).
+  [switch]$Historical
 )
 
 $ErrorActionPreference = 'Stop'
 $expectedCompanyName = 'Johann Stolk'
 $expectedProductName = 'KerfDesk'
 $appFileDescription = 'KerfDesk'
+$installerFileDescription = 'Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows, macOS and Linux desktop from one codebase.'
+$windowsOnlyInstallerFileDescription = 'Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows desktop from one codebase.'
 $expectedFileDescription = if ($Kind -eq 'Installer') {
-  # NSIS takes FileDescription from package.json. Historical upgrade baselines
-  # must use their authenticated source, not today's package description.
-  $repository = Split-Path -Parent $PSScriptRoot
-  $metadata = if ($SourceCommit) {
-    if ($SourceCommit -notmatch '^[a-f0-9]{40}$') { throw 'Expected a full package source commit.' }
-    $text = & git -C $repository show "${SourceCommit}:package.json"
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot read package metadata at the expected source.' }
-    ($text -join "`n") | ConvertFrom-Json
-  } else {
-    Get-Content -LiteralPath (Join-Path $repository 'package.json') -Raw | ConvertFrom-Json
-  }
-  if ($metadata.description -isnot [string] -or [string]::IsNullOrWhiteSpace($metadata.description)) {
-    throw 'Package metadata must declare the installer description.'
-  }
-  $metadata.description
+  $installerFileDescription
 } else {
   $appFileDescription
 }
+if ($Historical -and $Kind -ne 'Installer') { throw 'Only a published installer can be historical.' }
 $copyrightSymbol = [char]0x00A9
 $expectedLegalCopyright = "Copyright $copyrightSymbol 2026 Johann Stolk"
 
@@ -51,6 +42,9 @@ function Assert-PackageField {
 
 Assert-PackageField -Label 'CompanyName' -Actual $versionInfo.CompanyName -Expected $expectedCompanyName
 Assert-PackageField -Label 'ProductName' -Actual $versionInfo.ProductName -Expected $expectedProductName
+if ($Historical -and $versionInfo.FileDescription -eq $windowsOnlyInstallerFileDescription) {
+  $expectedFileDescription = $windowsOnlyInstallerFileDescription
+}
 Assert-PackageField -Label 'FileDescription' -Actual $versionInfo.FileDescription -Expected $expectedFileDescription
 Assert-PackageField -Label 'LegalCopyright' -Actual $versionInfo.LegalCopyright -Expected $expectedLegalCopyright
 

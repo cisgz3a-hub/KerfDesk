@@ -262,7 +262,7 @@ async function openBasicProject(page: Page): Promise<Locator> {
     .getByRole('tab', { name: 'Artwork', exact: true });
   if (await sideTab.isVisible()) await sideTab.click();
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   await expect(panel.getByRole('radiogroup', { name: /^Mode for/ })).toBeVisible();

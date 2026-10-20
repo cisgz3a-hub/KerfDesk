@@ -73,7 +73,8 @@ describe('browser entry', () => {
   });
 
   it('replaces the splash with an accessible explicit retry if the first workspace chunk fails', async () => {
-    document.body.innerHTML = '<div id="app-root"></div><div id="app-splash">Loading</div>';
+    // index.html ships the root inert until the splash is dismissed.
+    document.body.innerHTML = '<div id="app-root" inert></div><div id="app-splash">Loading</div>';
     const reload = vi.fn();
     await openBrowserEntry(desktop, {
       openLicencePage: vi.fn(),
@@ -81,6 +82,8 @@ describe('browser entry', () => {
       onWorkspaceError: () => showWorkspaceStartupError(document, reload),
     });
     expect(document.getElementById('app-splash')).toBeNull();
+    expect(document.getElementById('app-root')?.hasAttribute('inert')).toBe(false);
+    expect(document.activeElement?.textContent).toBe('Reload KerfDesk');
     expect(document.querySelector('[role="alert"]')?.textContent).toContain(
       'could not finish opening',
     );

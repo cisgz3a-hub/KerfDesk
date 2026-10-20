@@ -5,13 +5,13 @@ name: Desktop package check
 # file patterns and fuse flips apply silently, and the release lanes' own
 # package checks otherwise ran only when a release was tagged.
 #
-# - Linux packages the stable config as an unpacked app, on every pull request
-#   and push to main. A second Linux job builds the AppImage and .deb from the
-#   Preview config, checks their package contract, installs the .deb and
-#   launches the installed app with Ubuntu's default sandbox restriction in
-#   place, then removes it (ADR-607). A third rehearses the commercial Linux
-#   build of the unsigned lane, and macOS rehearses its commercial build with
-#   the native jobs (ADR-613).
+# - Linux packages the stable config as an unpacked app, on every pull request,
+#   merge queue entry and push to main. A second Linux job builds the AppImage
+#   and .deb from the Preview config, checks their package contract, installs
+#   the .deb and launches the installed app with Ubuntu's default sandbox
+#   restriction in place, then removes it (ADR-607). A third rehearses the
+#   commercial Linux build of the unsigned lane, and macOS rehearses its
+#   commercial build with the native jobs (ADR-613).
 # - Windows and macOS build the unsigned Preview exactly as the Preview release
 #   lane does, and run that lane's package contract. Windows then installs it,
 #   launches the installed app and uninstalls it; macOS launches the app from
@@ -27,6 +27,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The merge queue tests each queued pull request on a gh-readonly-queue/main/...
+  # branch and waits for the required checks this workflow reports (ADR-645).
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
     inputs:
       native:
@@ -71,6 +75,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # The verdict runs from this workflow's own revision, not the commit
+      # being packaged: the release train may pass an older commit that
+      # predates the gate script.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -337,8 +344,9 @@ jobs:
 
   windows-package:
     name: Package, install and launch the Windows desktop app
-    # Only the release train and manual runs set `native`; pull requests and
-    # pushes to main leave the inputs context empty, so this job is skipped.
+    # Only the release train and manual runs set `native`; pull requests,
+    # merge queue entries and pushes to main leave the inputs context empty, so
+    # this job is skipped.
     if: ${{ inputs.native == true }}
     runs-on: windows-latest
     timeout-minutes: 45

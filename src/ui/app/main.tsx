@@ -22,8 +22,6 @@ import {
 import type { PlatformAdapter } from '../../platform/types';
 import { webAdapter } from '../../platform/web';
 import { ErrorBoundary, type SoftwareAbort } from '../common/ErrorBoundary';
-import { startPagedAssetReconciliation } from '../import/paged-asset-startup';
-import { watchPagedRasterOwnership } from '../import/paged-raster-ownership-watch';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { unownedControllerMotion } from '../state/unowned-controller-motion';
@@ -39,6 +37,8 @@ import { installProjectSealKey } from '../licensing/project-seal';
 import { startLicensedEditionLocked } from '../licensing/edition';
 import { watchPreloadErrors } from './preload-error-toast';
 import { DesktopStartupGate } from './DesktopStartupGate';
+import { WorkspaceAssetLifecycle } from './WorkspaceAssetLifecycle';
+import { dismissStartupSplash } from './startup-splash';
 
 const rootElement = document.getElementById('app-root');
 if (rootElement === null) {
@@ -49,8 +49,6 @@ if (rootElement === null) {
 // paints a frame in one theme and then flips (ADR-339).
 initAppTheme();
 
-startPagedAssetReconciliation();
-watchPagedRasterOwnership();
 // Before anything lazy loads: a chunk gone after an update in another window
 // gets one advisory toast, and nothing reloads by itself (ADR-060).
 watchPreloadErrors();
@@ -128,6 +126,7 @@ createRoot(rootElement).render(
                 : {})}
               {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
             >
+              <WorkspaceAssetLifecycle />
               <App />
             </EditionProvider>
           </DesktopDownloadContext.Provider>
@@ -137,48 +136,6 @@ createRoot(rootElement).render(
   </StrictMode>,
 );
 
-// Static HTML supplies the wordmark and indeterminate loader before JS arrives.
-// Give the successfully drawn workspace one paint opportunity, then reveal it.
-// The web app reveals at once. The desktop app, which loads from disk in a
-// fraction of a second, holds the screen for a short minimum from launch and
-// fades it slowly so it reads as a loading screen, not a flash (ADR-049
-// Amendment 1). A startup crash is always revealed immediately, and reduced
-// motion removes the fade.
-const DESKTOP_STARTUP = adapter.id === 'electron';
-const SPLASH_MIN_VISIBLE_MS = DESKTOP_STARTUP ? 2000 : 0;
-const SPLASH_FADE_MS = DESKTOP_STARTUP ? 500 : 180;
-const SPLASH_MAX_WAIT_MS = 5000;
-const SPLASH_HIDDEN_CLASS = 'app-splash--hidden';
-const splashStartedAt = performance.now();
-
-function fadeOutSplash(): void {
-  const splash = document.getElementById('app-splash');
-  if (splash === null) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    splash.remove();
-    return;
-  }
-  // index.html's rule carries the web duration; the desktop fade is longer.
-  splash.style.transitionDuration = `${SPLASH_FADE_MS}ms`;
-  splash.classList.add(SPLASH_HIDDEN_CLASS);
-  const remove = (): void => splash.remove();
-  splash.addEventListener('transitionend', remove, { once: true });
-  // Fallback: reduced-motion (no transition) or a missed transitionend.
-  window.setTimeout(remove, SPLASH_FADE_MS + 50);
-}
-
-function dismissWhenBoardReady(): void {
-  const boardPainted =
-    document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null;
-  const startupCrashed = document.querySelector('#app-root > [role="alert"]') !== null;
-  const timedOut = performance.now() - splashStartedAt > SPLASH_MAX_WAIT_MS;
-  // performance.now() counts from navigation, when the static splash first paints.
-  const heldLongEnough = performance.now() >= SPLASH_MIN_VISIBLE_MS;
-  if (startupCrashed || ((boardPainted || timedOut) && heldLongEnough)) {
-    requestAnimationFrame(fadeOutSplash);
-    return;
-  }
-  requestAnimationFrame(dismissWhenBoardReady);
-}
-
-requestAnimationFrame(dismissWhenBoardReady);
+// Static timber and branding paint together before JS. Hold from the first
+// startup frame in both editions, excluding time the document is hidden.
+dismissStartupSplash({ desktop: adapter.id === 'electron' });

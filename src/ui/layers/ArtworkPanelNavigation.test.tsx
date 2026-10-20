@@ -73,8 +73,8 @@ describe('Artwork panel navigation', () => {
       const tablist = required(host, '[role="tablist"][aria-label="Artwork panel view"]');
       expect([...tablist.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toEqual(
         machineKind === 'laser'
-          ? ['Settings', 'Run order', 'Materials']
-          : ['Settings', 'Run order', 'Recipes'],
+          ? ['Properties', 'Run order', 'Materials']
+          : ['Properties', 'Run order', 'Recipes'],
       );
       const lastView = 'materials';
       const first = required<HTMLButtonElement>(tablist, '#cuts-layers-layers-tab');

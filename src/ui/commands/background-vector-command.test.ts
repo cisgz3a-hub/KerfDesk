@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setActiveEdition, UNRESTRICTED_EDITION } from '../licensing/edition';
+import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { resetStore } from '../state/test-helpers';
 import {
@@ -49,6 +51,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cancelBackgroundVectorCommand();
+  setActiveEdition(null);
   vi.useRealTimers();
 });
 
@@ -93,6 +96,62 @@ describe('one-click background vector commands (ADR-609)', () => {
     expect(sessions[0]!.released).toBe(true);
     expect(offset.commit).not.toHaveBeenCalled();
   });
+
+  it('does not commit over an open Pro prompt', async () => {
+    const offset = command('Offset outlines');
+    const running = runVectorCommandInBackground(offset);
+    setActiveEdition({ ...UNRESTRICTED_EDITION, proPromptOpen: true });
+    sessions[0]!.resolve({ kind: 'done', result: { kind: 'ok', value: null } });
+    await expect(running).resolves.toBe(false);
+    expect(offset.commit).not.toHaveBeenCalled();
+    expect(messages()).toContain(
+      'Offset outlines was not applied: a Pro prompt is open. Close it, then run Offset outlines again.',
+    );
+  });
+
+  it('reports a geometry error while a Pro prompt is open without committing', async () => {
+    const offset = command('Offset outlines');
+    const running = runVectorCommandInBackground(offset);
+    const project = useStore.getState().project;
+    setActiveEdition({ ...UNRESTRICTED_EDITION, proPromptOpen: true });
+    sessions[0]!.resolve({
+      kind: 'done',
+      result: {
+        kind: 'error',
+        error: { kind: 'operation-failed', message: 'The offset collapsed.' },
+      },
+    });
+    await expect(running).resolves.toBe(false);
+    expect(messages()).toContain('The offset collapsed.');
+    expect(offset.commit).not.toHaveBeenCalled();
+    expect(offset.inThread).not.toHaveBeenCalled();
+    expect(useStore.getState().project).toBe(project);
+  });
+
+  it.each(['project', 'selection'] as const)(
+    'does not report a geometry error for a superseded %s',
+    async (changed) => {
+      const offset = command('Offset outlines');
+      const running = runVectorCommandInBackground(offset);
+      if (changed === 'project') useStore.setState({ project: { ...useStore.getState().project } });
+      else useStore.setState({ selectedObjectId: 'another-artwork' });
+      setActiveEdition({ ...UNRESTRICTED_EDITION, proPromptOpen: true });
+      sessions[0]!.resolve({
+        kind: 'done',
+        result: {
+          kind: 'error',
+          error: { kind: 'operation-failed', message: 'The old offset collapsed.' },
+        },
+      });
+      await expect(running).resolves.toBe(false);
+      expect(messages()).not.toContain('The old offset collapsed.');
+      expect(messages()).toContain(
+        'Offset outlines was not applied: the project or selection changed while it was worked out.',
+      );
+      expect(offset.commit).not.toHaveBeenCalled();
+      expect(offset.inThread).not.toHaveBeenCalled();
+    },
+  );
 
   it('keeps its working notice up until the work settles', async () => {
     vi.useFakeTimers();

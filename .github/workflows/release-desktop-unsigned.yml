@@ -185,7 +185,8 @@ jobs:
             Tee-Object -FilePath (Join-Path $evidence 'packaged-security.txt')
           if ($LASTEXITCODE -ne 0) { throw 'Packaged fuse or runtime closure verification failed.' }
           $before = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
-          node scripts/verify-asar-integrity-enforced.mjs $executable $archive "--output=$evidence/asar-probe" 2>&1 |
+          # The unlicensed commercial baseline opens behind its licence window (ADR-623).
+          node scripts/verify-asar-integrity-enforced.mjs $executable $archive "--output=$evidence/asar-probe" --expect-licence-window 2>&1 |
             Tee-Object -FilePath (Join-Path $evidence 'asar-integrity.txt')
           $integrityExit = $LASTEXITCODE
           $after = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
@@ -200,6 +201,8 @@ jobs:
           PREVIOUS_RELEASE_SHA: ${{ steps.plan.outputs.previousSourceSha }}
           RELEASE_VERSION: ${{ steps.plan.outputs.version }}
           RELEASE_SHA: ${{ steps.plan.outputs.sourceSha }}
+          # Opens a build behind the licence window, then releases the seat (ADR-623).
+          KERFDESK_NATIVE_QUALIFICATION_LICENCE: ${{ secrets.KERFDESK_NATIVE_QUALIFICATION_LICENCE }}
         shell: pwsh
         run: |
           $root = Join-Path $env:GITHUB_WORKSPACE 'artifacts/historical-installers'
@@ -213,7 +216,7 @@ jobs:
             -Installer $previous.installer -Version $previous.manifest.version -SourceCommit $previous.manifest.sourceSha `
             -UpgradeInstaller $installer -UpgradeVersion $env:RELEASE_VERSION -UpgradeSourceCommit $env:RELEASE_SHA `
             -EvidenceRoot (Join-Path $env:GITHUB_WORKSPACE 'artifacts/installed-qualification/historical-upgrade')
-          "Native upgrade from $env:PREVIOUS_RELEASE_VERSION retained the saved project, preferences, machine profile and Free licence state." >> $env:GITHUB_STEP_SUMMARY
+          "Native upgrade from $env:PREVIOUS_RELEASE_VERSION retained the saved project, preferences, machine profile and licence state." >> $env:GITHUB_STEP_SUMMARY
       - name: Retain installed Windows qualification evidence
         if: always() && steps.plan.outputs.publish == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

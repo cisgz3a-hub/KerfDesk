@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { runNativeSmoke } from './verify-windows-packaged-native-smoke.mjs';
+import { parseNativeSmokeArgs, runNativeSmoke } from './verify-windows-packaged-native-smoke.mjs';
 import {
   closeChild,
   failedSmoke,
@@ -10,6 +10,7 @@ import {
   smokeArgs,
   smokeFixture,
   smokePaths,
+  validResult,
   writeSmokeResult,
 } from './native-smoke-test-support.mjs';
 
@@ -172,4 +173,61 @@ test('spawn throw still records a failed attempt and cleans its unused profile',
   assert.equal(error.manifest.process.spawned, false);
   assert.equal(error.manifest.cleanup, 'removed');
   assert.equal(error.manifest.rawResult, 'missing');
+});
+
+test('records and validates the commercial licence-window flow selected by CLI arguments', async (t) => {
+  const fixture = await smokeFixture(t);
+  const options = parseNativeSmokeArgs([
+    process.execPath,
+    `--output=${fixture.output}`,
+    '--timeout-ms=5000',
+    '--expect-licence-window',
+  ]);
+  const result = await runNativeSmoke(
+    options,
+    scriptedSpawn(async (child, args) => {
+      const paths = smokePaths(args);
+      const renderer = {
+        ...validResult(paths.userData).renderer,
+        licenceWindow: true,
+        imported: false,
+        saved: false,
+        licensing: {
+          kind: 'observed',
+          channel: 'commercial',
+          // Activatable on every platform: a trial or key can open this package.
+          state: 'activation-required',
+          edition: 'free',
+          proEnabled: false,
+          updateState: 'up-to-date',
+        },
+      };
+      delete renderer.savedBytes;
+      delete renderer.fileAccess;
+      await writeSmokeResult(args, { renderer });
+      closeChild(child);
+    }),
+    { tempBase: fixture.root },
+  );
+  const stored = JSON.parse(
+    await readFile(resolve(result.evidenceDirectory, 'manifest.json'), 'utf8'),
+  );
+  assert.equal(stored.outcome, 'success');
+  assert.equal(stored.licensingExpectation, 'commercial-licence-window');
+  assert.equal(stored.validationFailure, null);
+  assert.equal(stored.process.childClosed, true);
+  assert.equal(stored.cleanup, 'removed');
+  const rejected = await failedSmoke(
+    runNativeSmoke(
+      options,
+      scriptedSpawn(async (child, args) => {
+        await writeSmokeResult(args);
+        closeChild(child);
+      }),
+      { tempBase: fixture.root },
+    ),
+  );
+  assert.equal(rejected.manifest.licensingExpectation, 'commercial-licence-window');
+  assert.equal(rejected.manifest.failure.kind, 'validation');
+  assert.match(rejected.message, /commercial licence window/);
 });

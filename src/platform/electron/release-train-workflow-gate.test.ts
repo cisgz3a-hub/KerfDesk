@@ -64,13 +64,10 @@ function expectPackagingSourceRefs(text: string): void {
       step.uses?.startsWith('actions/checkout@'),
     );
     expect(checkouts, name).toHaveLength(1);
-    if (name === 'desktop-packaging-gate') {
-      // Historical candidates can predate the aggregate script. Run the gate
-      // from its workflow revision while packaging the requested candidate.
-      expect(checkouts[0]?.with?.ref, name).toBeUndefined();
-    } else {
-      expect(checkouts[0]?.with?.ref, name).toBe('${{ inputs.ref }}');
-    }
+    // The aggregate gate judges results with its own workflow revision; every
+    // packaging job builds the commit the caller selected.
+    const expectedRef = name === 'desktop-packaging-gate' ? undefined : '${{ inputs.ref }}';
+    expect(checkouts[0]?.with?.ref, name).toBe(expectedRef);
   }
 }
 
