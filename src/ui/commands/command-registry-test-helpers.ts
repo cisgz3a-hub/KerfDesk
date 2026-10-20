@@ -33,6 +33,8 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     importGcodeArtwork: vi.fn(),
     printArtwork: vi.fn(),
     ...baseCtxAppearance(),
+    // ADR-650: optional in the context, so the registry runs without it.
+    toneCalibration: vi.fn(),
     ...overrides,
   } as AppCommandContext;
 }

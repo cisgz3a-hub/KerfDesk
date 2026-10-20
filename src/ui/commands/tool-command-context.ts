@@ -4,6 +4,7 @@
 
 import type { usePlatform } from '../app/platform-context';
 import { handleSaveProcessedBitmap } from '../app/save-processed-bitmap';
+import { openToneCalibration } from '../calibration/tone-calibration-store';
 import { openPhotoEngraving } from '../raster/photo-engraving-store';
 import type { useStore } from '../state';
 import type { useToastStore } from '../state/toast-store';
@@ -31,6 +32,7 @@ type ToolCommandContext = Pick<
   | 'boxFitTest'
   | 'materialTest'
   | 'intervalTest'
+  | 'toneCalibration'
   | 'scanOffsetTest'
   | 'focusTest'
   | 'optimizationSettings'
@@ -76,6 +78,7 @@ export function toolCommandContext(
     boxFitTest: callbacks.requestBoxFitTest,
     materialTest: callbacks.requestMaterialTest,
     intervalTest: callbacks.requestIntervalTest,
+    toneCalibration: openToneCalibration,
     scanOffsetTest: callbacks.requestScanOffsetTest,
     focusTest: callbacks.requestFocusTest,
     optimizationSettings: callbacks.requestOptimizationSettings,

@@ -30,6 +30,7 @@ import type { AppCommand, CommandId } from './command-types';
 export const LASER_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>([
   'tools.material-test',
   'tools.interval-test',
+  'tools.tone-calibration',
   'tools.scan-offset-test',
   'tools.focus-test',
   'tools.fill-selection',
