@@ -92,18 +92,35 @@ check_electron_notices() {
 # The libraries electron-builder copies from its AppImage toolset into usr/lib.
 # Each is listed, with its licence, in docs/licensing/appimage-runtime-notices.txt
 # (ADR-017 Amendment 1); a library not named there must be added to the notices first.
+# The GPL-3.0 libraries and GConf are left out by scripts/appimage-toolset.mjs
+# (ADR-017 Amendment 2), so the AppImage must not carry them.
 check_appimage_libraries() {
   local lib_dir="${1:?usr/lib folder is required}"
   test -d "${lib_dir}" || return 0
   local name
   while IFS= read -r name; do
     case "${name}" in
-      libXss.so.1* | libXtst.so.6* | libnotify.so.4* | libgconf-2.so.4* | \
-        libappindicator3.so.1* | libindicator3.so.7*) ;;
+      libXss.so.1* | libXtst.so.6* | libnotify.so.4*) ;;
+      libappindicator3.so.1* | libindicator3.so.7* | libgconf-2.so.4*)
+        fail "The AppImage carries usr/lib/${name}, which KerfDesk leaves out (ADR-017 Amendment 2)" ;;
       *) fail "The AppImage carries usr/lib/${name}, which the third-party notices do not list" ;;
     esac
   done < <(find "${lib_dir}" -mindepth 1 -printf '%P\n' | sort)
   echo "AppImage usr/lib: $(find "${lib_dir}" -mindepth 1 -printf '%P\n' | sort | tr '\n' ' ')"
+}
+
+# Nothing the AppImage carries links a left-out library, so leaving them out
+# cannot stop KerfDesk loading; at most a loader that asks for one finds none.
+check_no_left_out_links() {
+  local root="${1:?AppImage folder is required}"
+  command -v readelf >/dev/null || fail 'readelf is required to check the AppImage libraries'
+  local needed
+  needed="$( (find "${root}" -type f \( -name kerfdesk -o -name '*.so' -o -name '*.so.*' \) \
+    -exec readelf -d {} + 2>/dev/null || true) | sed -n 's/.*(NEEDED).*\[\(.*\)\]$/\1/p' | sort -u)"
+  test -n "${needed}" || fail "readelf found no linked libraries in ${root}"
+  if grep -E '^(libappindicator3\.so\.1|libindicator3\.so\.7|libgconf-2\.so\.4)' <<<"${needed}"; then
+    fail 'Something in the AppImage links a library KerfDesk leaves out (ADR-017 Amendment 2)'
+  fi
 }
 
 work="$(mktemp -d)"
@@ -139,6 +156,7 @@ test -x "${root}/kerfdesk" || fail 'AppImage has no kerfdesk executable'
 check_legal_files "${root}/resources"
 check_electron_notices "${root}"
 check_appimage_libraries "${root}/usr/lib"
+check_no_left_out_links "${root}"
 check_desktop_entry "${root}/kerfdesk.desktop" 'AppRun %U'
 check_metadata "${root}/resources/app.asar"
 
