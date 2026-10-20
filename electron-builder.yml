@@ -145,6 +145,11 @@ appImage:
 toolsets:
   appimage: 1.0.3
 
+# The toolset's lib/x64 also holds GPL-3.0 libraries (libappindicator3,
+# libindicator3) and GConf, which KerfDesk does not use. This hook gives
+# electron-builder a copy of the toolset without them (ADR-017 Amendment 2).
+artifactBuildStarted: scripts/appimage-toolset.mjs
+
 # This stable config has no macOS target: the Mac builds are the unsigned
 # Preview (electron-builder.preview.yml, ADR-248) until a Developer ID and
 # notarization exist. The Linux block above packages the same app (ADR-607).

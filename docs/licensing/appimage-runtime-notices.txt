@@ -6,7 +6,7 @@ electron-userland/electron-builder-binaries release appimage@1.0.3, file
 appimage-tools-runtime-20251108.tar.gz (SHA-256
 84021a78ee214ae6fd33a2d62a92ba25542dd10bc86bf117a9b2d0bba44e7665). KerfDesk's
 own code does not link, import or call any of them (ADR-017 Amendment 1).
-The full LGPL-2.1 and GPL-3.0 texts follow this section.
+The full LGPL-2.1 text follows this section.
 
 1. The AppImage runtime. This is the small program at the start of the
 .AppImage file. It mounts the compressed image through FUSE and then starts
@@ -422,7 +422,9 @@ SOFTWARE.
 builds from the same toolset into the AppImage's usr/lib folder, and AppRun
 puts that folder on the library search path. They are unmodified. Each one's
 source is the Ubuntu 18.04 (bionic) source package named, at
-https://launchpad.net/ubuntu/bionic/+source/<source package>.
+https://launchpad.net/ubuntu/bionic/+source/<source package>. The toolset also
+holds libgconf-2, libappindicator3 and libindicator3; KerfDesk's build leaves
+them out, so the AppImage does not carry them (ADR-017 Amendment 2).
 
 --- AppImage component: libXss.so.1, libXScrnSaver 1.2.2 (MIT/X11) ---
 Ubuntu source package: libxss
@@ -608,33 +610,3 @@ This library is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
 Software Foundation; either version 2.1 of the License, or (at your option)
 any later version. Full text: see the LGPL-2.1 section at the end of this part.
-
---- AppImage component: libgconf-2.so.4, GConf 3.2.6 (LGPL-2.0-or-later) ---
-Ubuntu source package: gconf
-Copyright (C) 1999, 2000, 2001, 2002, 2005 Red Hat Inc.
-Copyright (C) 2000-2008 Free Software Foundation, Inc.
-Copyright (C) 2008 Matthias Clasen
-Copyright (C) 2005 Novell, Inc.
-Copyright (C) 2005 Mark McLoughlin
-Copyright (C) 2001 Sun Microsystems, Inc.
-GConf is licensed under the GNU Lesser General Public License, version 2 or
-(at your option) any later version; it is distributed here under version 2.1.
-Full text: see the LGPL-2.1 section at the end of this part.
-
---- AppImage component: libappindicator3.so.1, libappindicator 12.10.1 (LGPL-2.1 and GPL-3.0) ---
-Ubuntu source package: libappindicator
-Copyright (C) 2009, 2010 Canonical Ltd.
-src/app-indicator.c, src/app-indicator.h and the generated enum types are
-licensed under the GNU Lesser General Public License, version 2.1. The other
-files compiled into the library, such as src/generate-id.c, are licensed under
-the GNU General Public License, version 3. Full texts: see the LGPL-2.1 and
-GPL-3.0 sections at the end of this part.
-
---- AppImage component: libindicator3.so.7, libindicator 16.10.0 (GPL-3.0) ---
-Ubuntu source package: libindicator
-Copyright (C) 2009, 2010 Canonical Ltd.
-Author: Ted Gould <ted@canonical.com>
-This library is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License version 3.0 as published by the
-Free Software Foundation. Full text: see the GPL-3.0 section at the end of
-this part.
