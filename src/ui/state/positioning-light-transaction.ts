@@ -5,7 +5,11 @@ import {
   cancelFreshControllerStatusWait,
   waitForFreshControllerStatus,
 } from './laser-controller-status-wait';
-import { cancelControllerLifecycleRefs, startControllerCommand } from './laser-interactive-command';
+import {
+  cancelControllerLifecycleRefs,
+  ControllerCommandRefusedError,
+  startControllerCommand,
+} from './laser-interactive-command';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { recordStatusPollTick } from './laser-status-poll-schedule';
 import { jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
@@ -91,6 +95,12 @@ export async function switchLight(
   context.assertCurrent();
   await switchFalconPointer(on);
   context.assertCurrent();
+}
+
+/** The GRBL-family error code that refused a light exchange, or null. */
+export function grblRefusalCode(error: unknown, { kind }: LiveRefs['driver']): number | null {
+  if (!(error instanceof ControllerCommandRefusedError)) return null;
+  return ['grbl-v1.1', 'grblhal', 'fluidnc'].includes(kind) ? error.controllerErrorCode : null;
 }
 
 /** Several lines written together as one owned exchange; every line must

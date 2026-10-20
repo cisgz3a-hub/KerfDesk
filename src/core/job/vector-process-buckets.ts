@@ -1,11 +1,10 @@
 import type { Layer, SceneObject, ColoredPath } from '../scene';
-import { layerOperationSettingsEqual, sceneObjectUsesOperation } from '../scene';
-import {
-  effectiveOperationForObject,
-  operationOverrideForObject,
-} from '../scene/effective-operation';
+import { sceneObjectUsesOperation } from '../scene';
+import { effectiveOperationForObject } from '../scene/effective-operation';
+import { layerOperationOutputEqual } from '../scene/layer';
 import { effectiveObjectPowerPercent } from './object-power-scale';
 import { sharedObjectPowerScalePercent } from './compile-job-object-policy';
+import { hasOutputOperationOverride } from './laser-lead-settings';
 
 export type VectorArtwork = Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>;
 export type VectorProcessBucket = {
@@ -27,7 +26,7 @@ export function vectorProcessBuckets(
     const effective = effectiveOperationForObject(layer, object);
     if (effective.mode === 'image') continue;
     const bucket = settingsBuckets.find((candidate) =>
-      layerOperationSettingsEqual(candidate.layer, effective),
+      layerOperationOutputEqual(candidate.layer, effective),
     );
     if (bucket === undefined) settingsBuckets.push({ layer: effective, objects: [object] });
     else bucket.objects.push(object);
@@ -41,7 +40,7 @@ export function vectorProcessBuckets(
         power: effectiveObjectPowerPercent(bucket.layer, object),
       }));
     const powerSource =
-      bucket.objects.find((object) => operationOverrideForObject(layer, object) !== undefined) ??
+      bucket.objects.find((object) => hasOutputOperationOverride(bucket.layer, object)) ??
       bucket.objects[0];
     return powerSource === undefined
       ? []

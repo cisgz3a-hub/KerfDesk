@@ -89,11 +89,97 @@ For a published pair, run **Qualify published Windows upgrade** on `main`, selec
 
 Follow the workflow to successful publication, then verify the public download. Users can use **Help > Check for Updates** immediately or wait for the startup/30-minute check; they choose the download and installation themselves.
 
+## Delivery evidence and recovery
+
+ADR-616 adds required public verification after storage publication. To repeat
+the read-only check with the exact published version and source, use a fresh
+absolute evidence directory:
+
+```text
+node scripts/verify-public-desktop-release.mjs --expected-version <X.Y.Z> --expected-source-sha <40-hex> --output-dir <absolute-directory> --website
+```
+
+The website probe requires Chrome. Preview uses
+`scripts/verify-public-preview-release.mjs` with the same arguments and an exact
+Preview version; it verifies all seven artifacts. A missing Preview feed remains
+unavailable until an approved Preview publication succeeds. Neither verifier
+publishes files or executes an installer.
+
+The unsigned workflow keeps native qualification, dependency and delivery
+evidence for 90 days. After all checks pass it signs a compact receipt at
+`desktop/commercial-manual/releases/<version>/release-receipts/<runId>-<attempt>.json`.
+The receipt proves only the recorded workflow checks and excludes raw logs,
+paths, screenshots and credentials. It remains available with the immutable
+release after GitHub's raw artifacts expire.
+
+A failed public check or receipt upload may occur **after latest has advanced**.
+Inspect the publication step, signed public manifest and retained evidence
+before acting. Do not rebuild the same version, delete immutable objects or
+assume a workflow retry will repair it: the planner skips an already published
+source. Rerun the public verifier read-only; any receipt recovery requires an
+explicitly authorised protected workflow with the exact source, original
+run/attempt evidence and signing identity. The receipt helper refuses evidence
+from a different run, source or installer. Do not fabricate a success receipt
+for evidence that has expired or checks that did not run.
+
+For a transient receipt write/readback failure **after the original public
+delivery passed**, an authorised operator can dispatch **Recover original desktop
+release receipt** on current main. Review the original canonical unsigned run,
+exact failed receipt attempt, signed version/source and retained evidence first:
+
+~~~text
+gh workflow run recover-desktop-release-receipt.yml --ref main -f original_run_id=<run-id> -f original_attempt=<attempt> -f source_sha=<40-hex-original-source> -f version=<X.Y.Z>
+~~~
+
+The manual-only job needs the existing unsigned-release enablement switch,
+protected desktop-commercial environment and shared publication lock. It uses
+current trusted main code, authenticates exact original GitHub run/attempt/job and
+artifact provenance, verifies archive sizes and digests, and reads only bounded
+retained data. It never executes a recovered installer/script, rebuilds or
+republishes the release, or changes latest/catalogue. Original source and lockfile
+are read without checking out or executing that source. The signed identity,
+installer, native launch/upgrade, restored ASAR, dependency report and historical
+public-delivery evidence must match; the original stable signing key is required.
+The same original receipt payload/key is retried idempotently; a separate 90-day
+recovery artifact records the recovery run and original artifact IDs/digests.
+
+A newer latest does not invalidate an upgrade-backed release's retained historic
+proof, and the recovery makes no claim to freshly check that release's website.
+Expired/missing/ambiguous artifacts, originally failed/missing public delivery,
+cancelled runs, or missing exact-attempt jobs/checks refuse. In particular, some
+reused-job reruns may lack a complete exact-attempt job list. First-release
+recovery retains the existing one-entry authenticated catalogue requirement and
+refuses once later history exists. This narrow retry does not cover those cases;
+do not fabricate checks or rebuild the same version to get around a refusal.
+
+For the separate signed-beta train, a missing authenticated observation holds
+automatic promotion. An authorised operator can run **Release train** on `main`
+with `action=observe`, the exact `version` and the reviewed
+`beta_catalog_sha256`. This manual-only job uses the existing protected
+`desktop-commercial` signing and storage configuration and the shared
+publication lock. It requires the train enablement switch and canonical
+repository; schedules never select it. It calls the existing authenticated
+`release-train.mjs observe` command without exporting protected credentials.
+This observes the exact newest beta and starts its waiting period now; it does
+not build, publish or promote the release, change its licence date, or accept
+`--now`. Keep all release enablement variables off until the fixes and the
+intended provider action are approved.
 ## macOS and Linux (ADR-613)
 
 The same workflow publishes the commercial Mac and Linux builds of each Windows release, under the same version, once Windows is published. Each system is off until its repository variable is `on`: `KERFDESK_UNSIGNED_MACOS_RELEASES` (Apple silicon and Intel DMGs) and `KERFDESK_UNSIGNED_LINUX_RELEASES` (x64 `.deb` and AppImage). The Windows documents above, and their single writer, are unchanged: installed Windows copies never see a Mac or Linux file.
 
-The build jobs hold no secret. The Windows job hands them its public signed release identity; `scripts/build-commercial-platform.sh` prepares from it (`prepare-commercial-desktop.mjs --release-identity`), packages, and qualifies the package (contract, fuses, launch, import and save; ASAR tamper refusal on macOS; `.deb` install and AppImage launch on Ubuntu 24.04). The publish jobs, in the `desktop-commercial` environment, accept only the files whose SHA-256 their build jobs reported and run:
+The ADR-616 public-delivery verifier and signed success receipt above cover Windows and Preview only. The commercial Mac/Linux jobs currently prove package qualification and authenticated R2 readback, retain native artifacts for seven days, and do not yet prove public CDN/page delivery or retain a durable success receipt. Windows success must not depend on an absent platform feed. Keep the separate platform switches disabled until their publication and qualification are explicitly authorised.
+
+The build jobs hold no secret. Immediately after confirmed Windows publication,
+the workflow captures the public signed identity before public delivery and
+receipt checks. Enabled companion jobs can use that confirmed identity even if a
+later Windows audit step fails; cancellation, absent identity and failed or
+skipped companion builds still prevent their publication. Windows audit or
+receipt failure remains a failed workflow and requires the recovery above. This
+handoff does not rebuild or republish Windows. It prevents later audit failures
+from discarding a confirmed handoff; it does not repair historical runs or a
+cancellation between publication and handoff. The Windows job hands the
+companion jobs its public signed release identity; `scripts/build-commercial-platform.sh` prepares from it (`prepare-commercial-desktop.mjs --release-identity`), packages, and qualifies the package (contract, fuses, launch, import and save; ASAR tamper refusal on macOS; `.deb` install and AppImage launch on Ubuntu 24.04). The publish jobs, in the `desktop-commercial` environment, accept only the files whose SHA-256 their build jobs reported and run:
 
 ```text
 node scripts/publish-platform-commercial-release.mjs --platform <macos|linux> --sha256 <file>=<64-hex> [...] <release-directory> <commercial-release-identity.json>
