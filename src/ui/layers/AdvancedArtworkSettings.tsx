@@ -16,6 +16,7 @@ import { Icon } from '../kit';
 import { useStore } from '../state';
 import { useMixedOperationNumber } from './mixed-operation-input';
 import { parseEnglishDecimalInput } from './english-decimal-input';
+import { useSettingsEditGlow } from './use-settings-edit-glow';
 import { imageDitherAlgorithm } from '../../core/raster/image-processing';
 
 export function AdvancedArtworkSettings(props: {
@@ -44,8 +45,16 @@ export function AdvancedArtworkSettings(props: {
   });
   const draftScale = parseEnglishDecimalInput(input.displayValue);
   const results = powerResults(props.objects, props.layers, draftScale);
+  // The multiplier scales every operation of the selected artwork (ADR-645).
+  const glow = useSettingsEditGlow({
+    owner: 'artwork-power-multiplier',
+    objectIds: props.objects.map((object) => object.id),
+    operationIds: props.layers
+      .filter((layer) => props.objects.some((object) => sceneObjectUsesOperation(object, layer)))
+      .map((layer) => layer.id),
+  });
   return (
-    <details className="lf-artwork-disclosure">
+    <details className="lf-artwork-disclosure" onFocus={glow.onFocus} onBlur={glow.onBlur}>
       <summary title="Adjust power for this artwork without changing its operation settings">
         <span>
           <strong>Advanced artwork settings</strong>
