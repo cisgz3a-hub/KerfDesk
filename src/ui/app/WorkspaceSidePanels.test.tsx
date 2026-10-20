@@ -69,38 +69,20 @@ afterEach(() => {
 });
 
 describe('WorkspaceSidePanels', () => {
-  it('offers independently collapsible, resizable desktop panels', async () => {
+  it('shows both resizable desktop panels with no show/hide row above them', async () => {
     const { host, root } = await renderPanels();
     try {
       expect(host.textContent).toContain('Layer rail');
       expect(host.textContent).toContain('Machine rail');
       expect(host.querySelectorAll('[aria-label$="resizable panel"]')).toHaveLength(2);
-      const layersToggle = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent?.trim() === 'Artwork',
-      );
-      // Constant label; the shown/hidden state is carried by aria-pressed (the
-      // accent-fill toggle) and the title, not by flipping the label text.
-      expect(layersToggle?.getAttribute('aria-pressed')).toBe('true');
-      await act(async () => layersToggle?.click());
-      expect(host.textContent).not.toContain('Layer rail');
-      expect(layersToggle?.getAttribute('aria-pressed')).toBe('false');
-      expect(layersToggle?.getAttribute('title')).toBe('Show Artwork panel');
-      expect(layersToggle?.classList.contains('lf-panel-expand-hint')).toBe(true);
-      const machineToggle = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent?.trim() === 'Machine',
-      );
-      expect(machineToggle?.classList.contains('lf-panel-expand-hint')).toBe(false);
-      await act(async () => machineToggle?.click());
-      expect(host.textContent).not.toContain('Machine rail');
-      expect(machineToggle?.classList.contains('lf-panel-expand-hint')).toBe(true);
+      // Each panel folds from its own heading, so the only button here is the
+      // mocked job dock's.
+      expect([...host.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Frame job']);
 
-      await act(async () => layersToggle?.click());
+      await act(async () => useUiStore.getState().setRailPanelVisible('layers', false));
+      await act(async () => useUiStore.getState().setRailPanelVisible('machine', false));
       expect(host.textContent).toContain('Layer rail');
-      expect(layersToggle?.classList.contains('lf-panel-expand-hint')).toBe(false);
-      expect(machineToggle?.classList.contains('lf-panel-expand-hint')).toBe(true);
-      await act(async () => machineToggle?.click());
       expect(host.textContent).toContain('Machine rail');
-      expect(machineToggle?.classList.contains('lf-panel-expand-hint')).toBe(false);
     } finally {
       await act(async () => root.unmount());
     }
@@ -189,17 +171,15 @@ describe('WorkspaceSidePanels', () => {
     }
   });
 
-  it('reopens a hidden desktop panel when another surface routes to it', async () => {
+  it('expands a collapsed desktop panel when another surface routes to it', async () => {
+    useUiStore.getState().setRailPanelVisible('layers', false);
     const { host, root } = await renderPanels();
     try {
-      const layersToggle = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent?.trim() === 'Artwork',
-      );
-      await act(async () => layersToggle?.click());
-      expect(host.textContent).not.toContain('Layer rail');
+      const layers = requiredPanel(host, 'Artwork resizable panel');
+      expect(layers.style.width).toBe(COLLAPSED_PANEL_WIDTH_CSS);
 
       await act(async () => useUiStore.getState().focusRailPanel('layers'));
-      expect(host.textContent).toContain('Layer rail');
+      expect(layers.style.width).toBe('300px');
     } finally {
       await act(async () => root.unmount());
     }
@@ -320,14 +300,14 @@ describe('WorkspaceSidePanels', () => {
     }
   });
 
-  it('reset layout reopens hidden desktop panels and restores automatic sizing', async () => {
+  it('reset layout expands collapsed desktop panels and restores automatic sizing', async () => {
+    useUiStore.getState().setRailPanelVisible('layers', false);
+    useUiStore.getState().setRailPanelVisible('machine', false);
     const { host, root } = await renderPanels();
     try {
-      const layers = host.querySelector<HTMLButtonElement>('[title="Hide Artwork panel"]');
-      await act(async () => layers?.click());
-      expect(host.textContent).not.toContain('Layer rail');
       await act(async () => resetWorkspaceLayout(useUiStore.getState()));
-      expect(host.textContent).toContain('Layer rail');
+      expect(requiredPanel(host, 'Artwork resizable panel').style.width).toBe('300px');
+      expect(requiredPanel(host, 'Machine controls resizable panel').style.width).toBe('300px');
       expect(useWorkspaceLayoutStore.getState().preference).toBe('auto');
     } finally {
       await act(async () => root.unmount());

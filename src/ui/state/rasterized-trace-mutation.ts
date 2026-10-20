@@ -24,6 +24,7 @@ import {
   effectiveOperationForObject,
   operationOverrideForObject,
 } from '../../core/effective-output';
+import { repairRemovedProjectObjectReferences } from './repair-object-dependencies';
 
 /**
  * Atomically replace a trace result with an Image-pipeline raster.
@@ -38,7 +39,10 @@ export function applyRasterizedTraceToExisting(
   sourceId: string,
   raster: RasterImage,
   options: TraceExistingImageOptions = {},
-): MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> } {
+): MutationResult &
+  ReturnType<typeof repairRemovedProjectObjectReferences> & {
+    readonly additionalSelectedIds: ReadonlySet<string>;
+  } {
   const source = s.project.scene.objects.find(
     (object): object is RasterImage => object.id === sourceId && object.kind === 'raster-image',
   );
@@ -75,9 +79,8 @@ export function applyRasterizedTraceToExisting(
     committed = allocated.committed;
   }
   scene = pruneOrphanLayers(scene);
-
   return {
-    project: { ...s.project, scene },
+    ...repairRemovedProjectObjectReferences({ ...s.project, scene }),
     selectedObjectId: committed.id,
     additionalSelectedIds: new Set<string>(),
     undoStack: pushUndo(s.project, s.undoStack),

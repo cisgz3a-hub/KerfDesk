@@ -134,7 +134,7 @@ function runSection(ctx) {
         body: 'Preview shows cuts and travel moves on the canvas, and a GRBL-style motion planner estimates how long the job will take. It is an estimate, not a promise: it hasn’t been compared with real run times.',
         points: [
           'Toolpath preview with an estimated run time',
-          'With Pro, play the program back in 3D in the G-code Inspector',
+          'Play the program back in 3D in the G-code Inspector',
           'Automated tests check that the G-code keeps the laser off on every travel move',
         ],
         media: shot(ctx, 'preview', { caption: 'The toolpath preview in KerfDesk.' }),

@@ -22,4 +22,8 @@ describe('connection controls during auto-focus', () => {
   it('continues to lock connection controls during owned motion', () => {
     expect(connectionControlsBusy({ kind: 'jog' }, null)).toBe(true);
   });
+
+  it('frees them for a stopped owner that only a missing reply holds (ADR-640)', () => {
+    expect(connectionControlsBusy({ kind: 'jog' }, null, true)).toBe(false);
+  });
 });

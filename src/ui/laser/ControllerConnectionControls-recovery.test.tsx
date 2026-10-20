@@ -21,6 +21,7 @@ import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { settleTestGrblHandshake } from '../state/laser-test-start-helpers';
 import { ControllerConnectionControls } from './ControllerConnectionControls';
+import { WorkspaceSafetyNotice } from './WorkspaceSafetyNotice';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -104,6 +105,7 @@ async function render(platform: PlatformAdapter, machineKind: 'laser' | 'cnc' = 
           controllerOperation={null}
           onForget={() => undefined}
         />
+        <WorkspaceSafetyNotice />
       </PlatformProvider>,
     );
   });

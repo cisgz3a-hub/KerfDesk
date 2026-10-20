@@ -21,6 +21,8 @@ import {
 } from '../state/infer-machine-position';
 import { isRestoredWorkOrigin } from '../state/work-origin-state';
 import { controllerReportsWorkOffset } from './work-offset-assumption';
+import { useLengthUnit } from '../state/display-units';
+import { feedUnitLabel, MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
 
 export function StatusDisplay({
   variant = 'all',
@@ -31,6 +33,7 @@ export function StatusDisplay({
   const originName = useLaserStore(customOriginName);
   const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
   const reportsOffset = useLaserStore((s) => controllerReportsWorkOffset(s.capabilities));
+  const unit = useLengthUnit();
   if (report === null) return unavailableStatus(variant);
   if (variant === 'state') return <StatusState report={report} />;
   const pos = inferCurrentMachinePosition(report, wcoCache, reportInches);
@@ -45,15 +48,17 @@ export function StatusDisplay({
       {variant !== 'details' && <StatusState report={report} />}
       {pos !== null && (
         <div style={posRowStyle}>
-          <strong>MPos:</strong> X {pos.x.toFixed(3)} Y {pos.y.toFixed(3)} Z {pos.z.toFixed(3)}
+          <strong>MPos:</strong> X {dro(pos.x, unit)} Y {dro(pos.y, unit)} Z {dro(pos.z, unit)}
+          {inchMark(unit)}
         </div>
       )}
       <div style={customOrigin ? originCustomStyle : originDefaultStyle}>
-        <strong>Origin:</strong> {originLabel(customOrigin, wcoMm, reportsOffset, originName)}
+        <strong>Origin:</strong> {originLabel(customOrigin, wcoMm, reportsOffset, originName, unit)}
       </div>
       {feedMmPerMin !== null && (
         <div style={feedRowStyle}>
-          <strong>F:</strong> {feedMmPerMin} mm/min <strong>S:</strong> {report.spindle ?? 0}
+          <strong>F:</strong> {feedText(feedMmPerMin, unit)} <strong>S:</strong>{' '}
+          {report.spindle ?? 0}
           {report.laserPowerPercent != null && (
             <>
               {' '}
@@ -93,11 +98,28 @@ function originLabel(
   wcoMm: ReturnType<typeof reportedWorkOffsetMm>,
   reportsOffset: boolean,
   originName: string,
+  unit: DisplayLengthUnit,
 ): string {
   if (wcoMm === null) return reportsOffset ? 'not reported yet' : 'not reported';
   return customOrigin
-    ? `X ${wcoMm.x.toFixed(3)} Y ${wcoMm.y.toFixed(3)} (${originName})`
+    ? `X ${dro(wcoMm.x, unit)} Y ${dro(wcoMm.y, unit)}${inchMark(unit)} (${originName})`
     : 'machine 0,0';
+}
+
+// A position readout: thousandths of a millimetre or ten-thousandths of an
+// inch, the usual DRO precision for each unit (ADR-629).
+function dro(mm: number, unit: DisplayLengthUnit): string {
+  return unit === 'in' ? (mm / MM_PER_INCH).toFixed(4) : mm.toFixed(3);
+}
+
+// Millimetre readouts have always gone unlabelled here; inches say so.
+function inchMark(unit: DisplayLengthUnit): string {
+  return unit === 'in' ? ' in' : '';
+}
+
+function feedText(feedMmPerMin: number, unit: DisplayLengthUnit): string {
+  const value = unit === 'in' ? Number((feedMmPerMin / MM_PER_INCH).toFixed(1)) : feedMmPerMin;
+  return `${value} ${feedUnitLabel(unit)}`;
 }
 
 // Which XY origin is in effect, as each lasts differently: a G92 KerfDesk

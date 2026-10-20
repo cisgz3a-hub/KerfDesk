@@ -2,7 +2,8 @@ import { rotaryAppliesTo } from '../../core/job';
 import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import {
   POSITIONING_LIGHT_UNSUPPORTED_MESSAGE,
-  positioningLightIssue,
+  devicePositioningLightIssue,
+  isFalconPointerLight,
   positioningLightSupported,
 } from '../../core/devices/positioning-light';
 import type { PositioningLight } from '../../core/devices/positioning-light';
@@ -14,21 +15,24 @@ import {
   controllerOperationOwner,
   interactiveControllerOperation,
 } from './laser-controller-operation';
-import { jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
-import { pendingTransportWriteCount } from './laser-start-queue-fence';
+import { pushLog } from './laser-store-helpers';
 import { frameProofReset } from './laser-session-reset';
 import { rebasedLightMoveFramePatch, type StashedFrameProof } from './completed-frame-run';
 import { warnJogMotionPolicy } from './laser-jog-warnings';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWrite } from './laser-safe-write';
 import { useStore } from './store';
-import { ControllerCommandRefusedError } from './laser-interactive-command';
+import { FalconPointerNotSentError, switchFalconPointer } from './falcon-pointer-link';
 import {
+  assertPositioningLightAdmission as assertAdmission,
+  findFalconBeforeHold,
+  grblRefusalCode,
   positioningLightBatch,
   positioningLightCommand,
   positioningLightFence,
   positioningLightStatus,
   settlePositioningLightMove,
+  switchLight,
   type PositioningLightTransaction,
 } from './positioning-light-transaction';
 
@@ -66,6 +70,22 @@ export function positioningLightActions(
 /** The captured off command while the light may still be on over this same
  * connection, for Disconnect's best-effort cleanup; null otherwise. */
 export function positioningLightDisconnectOff(state: LaserState, refs: LiveRefs): string | null {
+  const lit = litMapping(state, refs);
+  return lit === null || isFalconPointerLight(lit) ? null : lit.offCommand;
+}
+
+/** While the Falcon pointer may still be on from this same connection,
+ * Disconnect switches it off over the network, best effort (ADR-635). */
+export function falconPointerOffOnDisconnect(state: LaserState, refs: LiveRefs): void {
+  if (isFalconPointerLight(litMapping(state, refs) ?? undefined))
+    void switchFalconPointer(false).catch(() => undefined);
+}
+
+function sessionLight(refs: LiveRefs): PositioningLight | undefined {
+  return lightSnapshots.get(refs)?.mapping;
+}
+
+function litMapping(state: LaserState, refs: LiveRefs): PositioningLight | null {
   const snapshot = lightSnapshots.get(refs);
   const dialect = useStore.getState().project.device.gcodeDialect?.dialectId;
   return positioningLightSupported(dialect) &&
@@ -73,25 +93,8 @@ export function positioningLightDisconnectOff(state: LaserState, refs: LiveRefs)
     snapshot !== undefined &&
     refs.connection !== null &&
     snapshot.connection === refs.connection
-    ? snapshot.mapping.offCommand
+    ? snapshot.mapping
     : null;
-}
-
-function assertAdmission(state: LaserState, refs: LiveRefs): void {
-  if (state.connection.kind !== 'connected' || refs.connection === null)
-    throw new Error('Connect a controller before using the positioning light.');
-  if (refs.driver.capabilities.transport === 'file-only')
-    throw new Error('This controller supports file export only, not a live positioning light.');
-  const blocked = jogFrameCommandBlockMessage(state);
-  if (blocked !== null) throw new Error(blocked);
-  if (
-    state.autofocusBusy ||
-    state.probeBusy ||
-    refs.controllerStatusWait != null ||
-    state.pendingUntrackedAcks > 0 ||
-    pendingTransportWriteCount(state) > 0
-  )
-    throw new Error('Wait for the current controller command to settle.');
 }
 
 type Target = {
@@ -112,6 +115,9 @@ async function runPositioningLight(
 ): Promise<void> {
   assertAdmission(get(), refs);
   assertTarget(target);
+  // The light this request switches, or the one still on from this session.
+  const lights = [resolveMapping(get(), refs, enabled), sessionLight(refs)];
+  await findFalconBeforeHold(set, get, refs, lights);
   const mapping = resolveMapping(get(), refs, enabled);
   const { context, owns, session, dispose } = createTransaction(
     set,
@@ -132,7 +138,7 @@ async function runPositioningLight(
       await turnOffPreviousLight(context);
       for (const line of lightToolOffLines(driver.commands.frameToolOffLines, target !== undefined))
         await positioningLightCommand(context, line);
-      await positioningLightCommand(context, mapping.offCommand);
+      await switchLight(context, mapping, false);
       set({ positioningLightEnabled: false });
       lightSnapshots.delete(refs);
       await positioningLightFence(context);
@@ -146,7 +152,7 @@ async function runPositioningLight(
       lightSnapshots.set(refs, { mapping: { ...mapping }, session, connection: refs.connection });
       await sendLightOn(context, set, mapping, owns);
     } else {
-      await positioningLightCommand(context, mapping.offCommand);
+      await switchLight(context, mapping, false);
       set({ positioningLightEnabled: false });
       lightSnapshots.delete(refs);
     }
@@ -201,9 +207,11 @@ async function sendLightOn(
 ): Promise<void> {
   set({ positioningLightEnabled: true });
   try {
-    await positioningLightCommand(context, mapping.onCommand);
+    await switchLight(context, mapping, true);
   } catch (error) {
-    if (grblRefusalCode(error, context.refs.driver) === 20 && owns()) {
+    // A Falcon pointer request that never left KerfDesk cannot have lit it.
+    const notSent = error instanceof FalconPointerNotSentError;
+    if ((grblRefusalCode(error, context.refs.driver) === 20 || notSent) && owns()) {
       set({ positioningLightEnabled: false });
       lightSnapshots.delete(context.refs);
     }
@@ -211,15 +219,10 @@ async function sendLightOn(
   }
 }
 
-function grblRefusalCode(error: unknown, { kind }: LiveRefs['driver']): number | null {
-  if (!(error instanceof ControllerCommandRefusedError)) return null;
-  return ['grbl-v1.1', 'grblhal', 'fluidnc'].includes(kind) ? error.controllerErrorCode : null;
-}
-
 async function turnOffPreviousLight(context: PositioningLightTransaction): Promise<void> {
   const previous = lightSnapshots.get(context.refs);
   if (previous?.session() === true && context.get().positioningLightEnabled)
-    await positioningLightCommand(context, previous.mapping.offCommand);
+    await switchLight(context, previous.mapping, false);
 }
 
 // Standalone LED switching keeps unrelated coolant/fan accessories unchanged.
@@ -257,7 +260,7 @@ function resolveMapping(state: LaserState, refs: LiveRefs, enabled: boolean): Po
   if (!enabled && previous?.session() === true) return previous.mapping;
   assertProfileDriver(refs);
   const mapping = device.positioningLight;
-  const issue = positioningLightIssue(mapping, refs.driver.kind, device.gcodeDialect?.dialectId);
+  const issue = devicePositioningLightIssue({ ...device, controllerKind: refs.driver.kind });
   if (mapping === undefined || issue !== null)
     throw new Error(issue ?? 'Configure the separate positioning light in Device Profile first.');
   if (state.positioningLightEnabled && previous?.session() !== true)

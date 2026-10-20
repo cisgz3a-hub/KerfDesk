@@ -1,9 +1,10 @@
 import type { LicenceClaims } from './licensing-verification.js';
 
 // Clock rules for licences (ADR-523, ADR-523 Amendment 2). Only a trial ends by
-// the clock: a paid or developer licence never expires. Trial and paid devices
-// must still confirm their rights online now and then before choosing new Pro
-// tools (ADR-592); existing work and output never wait for that.
+// the clock: a paid or developer licence never expires. A trial must still
+// confirm its rights online now and then before choosing new Pro tools
+// (ADR-592); a paid licence never has to, and keeps working offline whatever the
+// clock says (ADR-623 Amendment 2). Existing work and output never wait for it.
 
 /** How far this computer's clock may differ from the licence service's, in seconds. */
 export const CLOCK_TOLERANCE = 300;
@@ -33,8 +34,9 @@ export function nextClockMark(
 /**
  * A paid licence's new last-seen mark, or null when nothing needs saving. It is
  * saved at most every five minutes, so winding the clock back cannot hold off
- * the paid check-in or its weekly refresh (ADR-592). Developer rights have no
- * check-in, and a trial saves its own mark every second.
+ * the quiet refresh that fetches a refund (ADR-592). It never locks anything
+ * (ADR-623 Amendment 2). Developer rights have no mark, and a trial saves its
+ * own mark every second.
  */
 export function nextPaidMark(
   rights: Pick<LicenceClaims, 'tier'>,
@@ -46,68 +48,46 @@ export function nextPaidMark(
 
 const DAY = 86_400;
 /**
- * How long a device may go without the licence service confirming its rights
+ * How long a trial may go without the licence service confirming its rights
  * before new Pro choices pause (ADR-592). The signed `issuedAt` of the last grant
- * is the confirmation, so it cannot be moved on by editing saved files.
- * Developer licences are exempt.
+ * is the confirmation, so it cannot be moved on by editing saved files. Paid and
+ * developer licences have none: like LightBurn's, a paid licence activated here
+ * keeps working offline indefinitely (ADR-623 Amendment 2).
  */
 export const CHECK_IN_LIMIT: Readonly<Partial<Record<LicenceClaims['tier'], number>>> = {
   trial: 3 * DAY,
-  paid: 30 * DAY,
 };
 
 /**
- * True when this device must reach the licence service before choosing new Pro
+ * True when this trial must reach the licence service before choosing new Pro
  * tools: its last confirmation is older than the limit, or this computer's clock
- * is earlier than that confirmation. A paid grant accepted while this clock was
- * off (see `paidClockOffset`) is measured from the local time it arrived: the
- * signed `issuedAt` moved by the offset saved with it.
+ * is earlier than that confirmation. Never true for paid or developer rights.
  */
 export function checkInOverdue(
   claims: Pick<LicenceClaims, 'tier' | 'issuedAt'>,
   lastSeenAt: number,
   now: number,
-  clockOffset = 0,
 ): boolean {
   const limit = CHECK_IN_LIMIT[claims.tier];
   if (limit === undefined) return false;
-  const confirmedAt = confirmedHere(claims, limit, clockOffset);
+  const confirmedAt = claims.issuedAt;
   return Math.max(now, lastSeenAt) - confirmedAt > limit || now + CLOCK_TOLERANCE < confirmedAt;
 }
 
 /** When, on this computer's clock, new Pro choices pause without a check-in; null if never. */
-export function checkInDueAt(
-  claims: Pick<LicenceClaims, 'tier' | 'issuedAt'>,
-  clockOffset = 0,
-): number | null {
+export function checkInDueAt(claims: Pick<LicenceClaims, 'tier' | 'issuedAt'>): number | null {
   const limit = CHECK_IN_LIMIT[claims.tier];
-  return limit === undefined ? null : confirmedHere(claims, limit, clockOffset) + limit;
-}
-
-function confirmedHere(
-  claims: Pick<LicenceClaims, 'tier' | 'issuedAt'>,
-  limit: number,
-  clockOffset: number,
-): number {
-  const shift = claims.tier === 'paid' ? Math.max(-limit, Math.min(limit, clockOffset)) : 0;
-  return claims.issuedAt + shift;
+  return limit === undefined ? null : claims.issuedAt + limit;
 }
 
 /**
- * The offset to save with a paid refresh grant that verified apart from this
- * computer's clock, or null when the grant is refused as before. The service
- * did confirm the licence, so the check-in counts, but the clock is still not
- * trusted: the next check-in is measured from when the grant arrived here. A
- * trial is never accepted this way, so a wrong clock cannot extend it, and an
- * offset beyond one check-in period is refused, so an edited offset buys at
- * most one more period.
+ * True when a fresh grant is held to this computer's clock. A paid grant is
+ * not: paid rights never end and have no check-in, so the clock cannot change
+ * what they allow, and a paying customer is never refused for a wrong clock
+ * (ADR-623 Amendment 2). A trial's deadline, and a developer grant, still are.
  */
-export function paidClockOffset(
-  claims: Pick<LicenceClaims, 'tier'>,
-  offset: number,
-): number | null {
-  const limit = CHECK_IN_LIMIT[claims.tier];
-  return claims.tier === 'paid' && limit !== undefined && Math.abs(offset) <= limit ? offset : null;
+export function grantTimeChecked(claims: Pick<LicenceClaims, 'tier'>): boolean {
+  return claims.tier !== 'paid';
 }
 
 /** A freshly issued grant whose time is too far from this computer's clock. */
@@ -140,11 +120,6 @@ export function automaticTimeSetting(platform: string): string {
 
 export function clockErrorMessage(offset: number, platform: string): string {
   return `This computer’s clock is ${roughly(Math.abs(offset))} ${offset > 0 ? 'ahead' : 'behind'}, so the licence could not be confirmed. Turn on ${automaticTimeSetting(platform)}, check the time zone, then try again.`;
-}
-
-/** Shown while a paid licence's last confirmation arrived with this computer's clock off. */
-export function clockWarningMessage(offset: number, platform: string): string {
-  return `This computer’s clock is ${roughly(Math.abs(offset))} ${offset > 0 ? 'ahead' : 'behind'}. Your licence was confirmed anyway, but turn on ${automaticTimeSetting(platform)} and check the time zone so later licence checks keep working.`;
 }
 
 // Called only for more than five minutes, so every unit rounds to two or more.

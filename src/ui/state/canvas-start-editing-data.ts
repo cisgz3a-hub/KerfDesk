@@ -5,6 +5,7 @@ import {
   jobStartPointOptions,
   resolveJobStartPoint,
 } from '../../core/job/job-start-point';
+import { jobWithoutLeads } from '../../core/job/led-contours';
 import type { Vec2 } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 
@@ -26,9 +27,11 @@ export function buildCanvasStartEditingData(
     prepared.project.device.scanningOffsets,
     prepared.project.device,
   );
-  const selection = resolveJobStartPoint(prepared.job, { x: 0, y: 0 }, options);
+  // Leads follow the start (ADR-626): edit it on the contours themselves.
+  const contours = jobWithoutLeads(prepared.job);
+  const selection = resolveJobStartPoint(contours, { x: 0, y: 0 }, options);
   return {
-    job: jobStartEditingJob(prepared.job, options),
+    job: jobStartEditingJob(contours, options),
     jobOriginOffset: prepared.jobOriginOffset,
     ...(includeBounds
       ? { bounds: computeJobStartBounds(prepared.job, prepared.project.device) }
