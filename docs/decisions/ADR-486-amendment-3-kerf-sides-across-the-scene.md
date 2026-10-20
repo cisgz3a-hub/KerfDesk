@@ -21,6 +21,32 @@ operation). Reproduced end to end with a 0.5 mm Kerf Offset, a 40 mm plate and a
 - the hole on the plate's own operation, with **Cut selected graphics** and only the hole selected,
   was cut 11 mm wide too, and so was a hole whose plate's operation had output off.
 
+### Compared with LightBurn
+
+LightBurn's documented rule is the baseline. Its kerf guide ("Kerf — What It Is and How to
+Compensate for It", <https://docs.lightburnsoftware.com/latest/Guides/Test-KerfOffset/>, the same
+text in the 2.0 guide) says that "Shapes that lie within other shapes on the same layer" get the
+offset direction reversed so that holes come out the right size, and that the offset applies to
+every closed shape assigned to the layer. The Line Mode reference only says that a positive value
+offsets outward and a negative one inward. The documentation says nothing about shapes on other
+layers, about shapes inside holes, or about selected-only output.
+
+- **Same result on one layer.** For any layout drawn on one layer (one KerfDesk operation),
+  KerfDesk gives the result that rule describes: a shape inside another shape of the layer is a
+  hole and shrinks under a positive offset, and the shape around it grows. KerfDesk counts
+  containment parity, so an island inside a hole grows again (ADR-486); LightBurn's documentation
+  does not say how it treats islands.
+- **Where it differs.** A hole on its own layer, inside a plate on another operation with a kerf
+  offset, leads or tabs, is offset as a hole here, so it comes out the drawn size. LightBurn users
+  report that LightBurn offsets such a hole outward, as an outer shape, and that moving inner cuts
+  onto a layer of their own reverses their kerf direction (forum threads "Kerf Offset
+  clarification", <https://forum.lightburnsoftware.com/t/kerf-offset-clarification/162137>, and
+  "Weird Kerf Offset behavior",
+  <https://forum.lightburnsoftware.com/t/weird-kerf-offset-behavior/75763>). Those are user
+  reports, not documented behaviour, and were not checked in LightBurn itself. KerfDesk also judges
+  the side whatever the output scope or the output switches, which the documentation does not
+  cover.
+
 ### Decision
 
 1. **Judged among the scene** (`core/job/kerf-scene-sides.ts`). Preparation hands compile the
