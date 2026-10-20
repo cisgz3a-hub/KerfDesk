@@ -128,7 +128,14 @@ test('the newest beta reaches everyone after its quiet days, unless held or alre
   ];
   const stable = [beta[1]];
   const decide = (now, extra = {}) =>
-    promotionDecision({ beta, stable, now: at(now), held: null, ...extra });
+    promotionDecision({
+      beta,
+      stable,
+      betaObservedAt: '2026-09-29T07:30:00.000Z',
+      now: at(now),
+      held: null,
+      ...extra,
+    });
   assert.deepEqual(decide('2026-10-03T07:29:59Z'), {
     due: false,
     version: '2026.40.0',
@@ -140,6 +147,20 @@ test('the newest beta reaches everyone after its quiet days, unless held or alre
     reason: '2026.40.0 has had 4 quiet days in beta with no newer beta.',
   });
   assert.equal(decide('2026-10-03T09:43:00Z', { quietDays: 7 }).due, false);
+  // A delayed build keeps its cut date for licence eligibility, but it has
+  // not spent those intervening days in beta. Only the observation starts it.
+  assert.equal(
+    decide('2026-10-04T09:43:00Z', { betaObservedAt: '2026-10-04T09:00:00.000Z' }).due,
+    false,
+  );
+  assert.equal(
+    decide('2026-10-08T09:00:00Z', { betaObservedAt: '2026-10-04T09:00:00.000Z' }).due,
+    true,
+  );
+  assert.match(
+    decide('2026-10-30T00:00:00Z', { betaObservedAt: null }).reason,
+    /awaiting verified public beta observation/u,
+  );
   assert.deepEqual(
     decide('2026-10-10T00:00:00Z', { held: 'an open issue is labelled release-hold' }),
     {

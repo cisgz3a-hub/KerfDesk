@@ -305,6 +305,14 @@ function translateCncPass(pass: CncPass, dx: number, dy: number): CncPass {
 function translateCutGroup(group: CutGroup, dx: number, dy: number): CutGroup {
   return {
     ...group,
+    ...(group.topologyRings === undefined
+      ? {}
+      : {
+          topologyRings: group.topologyRings.map((ring) => ({
+            ...ring,
+            polyline: ring.polyline.map((point) => ({ x: point.x + dx, y: point.y + dy })),
+          })),
+        }),
     segments: group.segments.map((segment) => translateSegment(segment, dx, dy)),
   };
 }

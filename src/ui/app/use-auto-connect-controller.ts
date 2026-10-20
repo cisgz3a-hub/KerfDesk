@@ -3,7 +3,8 @@
 // itself. It opens only a port chooseGrantedPort would open without asking,
 // never shows a picker, and does nothing while any connection, job or
 // controller operation exists. Connecting reads the controller's settings and
-// moves nothing. The Connect menu's "Connect automatically" turns it off.
+// moves nothing. The Connect menu's "Connect automatically" turns it off, and
+// the operator's Disconnect or Forget pauses it until they Connect (ADR-639).
 
 import { useEffect } from 'react';
 import type { PlatformAdapter } from '../../platform/types';
@@ -13,6 +14,7 @@ import { useStore } from '../state';
 import { browserLocalStorage } from '../state/browser-local-storage';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { autoConnectPaused } from '../state/auto-connect-session';
 import {
   chooseGrantedPort,
   loadAutoConnectPreference,
@@ -45,8 +47,9 @@ export function installAutoConnect(platform: PlatformAdapter): () => void {
         .getState()
         .connect(platform, { ...connectOptionsForDevice(device), portSelection: 'automatic' });
     } catch {
-      // A port another program holds, or one unplugged mid-open, leaves the
-      // failed state for the operator's own Connect; nothing else to do here.
+      // A port another program holds, or one unplugged mid-open, ends as a
+      // log line and the rail's quiet hint (ADR-639); the operator's Connect
+      // retries it.
     } finally {
       running = false;
     }
@@ -61,6 +64,7 @@ export function installAutoConnect(platform: PlatformAdapter): () => void {
 
 function autoConnectAllowed(): boolean {
   if (!loadAutoConnectPreference(browserLocalStorage())) return false;
+  if (autoConnectPaused()) return false;
   const laser = useLaserStore.getState();
   if (laser.lastConnectionTransport === 'tcp') return false;
   if (laser.connection.kind === 'connecting' || laser.connection.kind === 'connected') return false;

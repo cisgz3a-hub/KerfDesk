@@ -182,19 +182,25 @@ describe('K1 operation topology survives process settings', () => {
     expect(fillOwnersAt(job, 50, y)).toEqual([80]);
   });
 
-  it("control: contours assigned to separate operations do not change each other's kerf side", () => {
+  it('a plate on another operation with a kerf offset makes a hole (ADR-486 Amd 3)', () => {
     const assigned = (object: ImportedSvg, operationId: string): ImportedSvg => ({
       ...object,
       paths: object.paths.map((path) => ({ ...path, operationIds: [operationId] })),
     });
-    const job = compileJob(
-      {
-        objects: [assigned(plate, 'operation'), assigned(hole, 'second')],
-        layers: [layer({ kerfOffsetMm: 1 }), { ...layer({ kerfOffsetMm: 1 }), id: 'second' }],
-      },
-      device,
-    );
-    expect(sortedWidths(job)).toEqual([102, 22]);
+    const separate = (plateKerfMm: number): Job =>
+      compileJob(
+        {
+          objects: [assigned(plate, 'operation'), assigned(hole, 'second')],
+          layers: [
+            layer({ kerfOffsetMm: plateKerfMm }),
+            { ...layer({ kerfOffsetMm: 1 }), id: 'second' },
+          ],
+        },
+        device,
+      );
+    expect(sortedWidths(separate(1))).toEqual([102, 18]);
+    // Control: an operation without kerf offset, leads or tabs may only score.
+    expect(sortedWidths(separate(0))).toEqual([100, 22]);
   });
 
   it('control: a Fill override contributes no container to the Line topology', () => {

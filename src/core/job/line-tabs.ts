@@ -30,6 +30,8 @@ export type LineTabbing = {
   readonly segments: ReadonlyArray<CutSegment>;
   /** The tab spans, burned only when the operation has a tab power. */
   readonly tabSpans: ReadonlyArray<CutSegment>;
+  /** Closed contours split at tabs; they get no laser leads (ADR-626). */
+  readonly tabbedContours?: number;
 };
 
 /** `placedTabPoints` maps a segment index to the machine-space centres of the
@@ -65,6 +67,7 @@ export function applyLineTabs(
   const layout = automaticTabLayoutFor(settings);
   const burns: CutSegment[] = [];
   const tabSpans: CutSegment[] = [];
+  let tabbedContours = 0;
   polylines.forEach((polyline, index) => {
     const centers = tabCentersFor(layout, placedTabPoints.get(index), eligible[index] === true);
     const split =
@@ -75,10 +78,11 @@ export function applyLineTabs(
       burns.push(cutSegment(polyline, segments[index]));
       return;
     }
+    tabbedContours += 1;
     for (const burn of split.burns) burns.push(cutSegment(burn, segments[index]));
     for (const tab of split.tabs) tabSpans.push(cutSegment(tab, segments[index]));
   });
-  return { segments: burns, tabSpans };
+  return { segments: burns, tabSpans, tabbedContours };
 }
 
 /** The group burning an operation's tab spans at its tab power, to follow the
