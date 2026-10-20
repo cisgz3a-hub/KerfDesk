@@ -97,7 +97,9 @@ async function expectDesktopDialog(open: () => void): Promise<void> {
   await act(async () => openButton().click());
   expect(open).not.toHaveBeenCalled();
   expect(document.body.textContent).toContain('V-carve is a Pro tool');
-  expect(proPromptOpen()).toBe(true);
+  // The notice keeps no edit (nothing here unlocks Pro), so background work
+  // that finishes meanwhile may still commit (ADR-609).
+  expect(proPromptOpen()).toBe(false);
   expectEveryProFeatureListed();
   const decline = [...document.querySelectorAll('button')].find(
     (value) => value.textContent === 'Not now',
