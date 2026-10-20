@@ -111,25 +111,30 @@ const FLUIDNC_ERRORS = new Map<number, ErrorPresentation>(
   FLUIDNC_ERROR_ENTRIES.map(([code, title]) => [code, { code, title }]),
 );
 
+// positionLost follows the stock GRBL table where the meaning matches. A soft
+// limit feed-holds before it alarms, and probe and G-code failures stop
+// between moves, so those keep position. Every other code is conservative
+// (true), as the grblHAL table is: re-homing after a stop KerfDesk cannot
+// explain is the safe default (ADR-644).
 const FLUIDNC_ALARM_ENTRIES = [
-  [1, 'Hard Limit'],
-  [2, 'Soft Limit'],
-  [3, 'Abort Cycle'],
-  [4, 'Probe Fail Initial'],
-  [5, 'Probe Fail Contact'],
-  [6, 'Homing Fail Reset'],
-  [7, 'Homing Fail Door'],
-  [8, 'Homing Fail Pulloff'],
-  [9, 'Homing Fail Approach'],
-  [10, 'Spindle Control'],
-  [11, 'Input Pin Initially On'],
-  [12, 'Ambiguous Switch'],
-  [13, 'Hard Stop'],
-  [14, 'Unhomed'],
-  [15, 'Init'],
-  [16, 'Expander Reset'],
-  [17, 'GCode Error'],
-  [18, 'Probe Hard Limit'],
+  [1, 'Hard Limit', true],
+  [2, 'Soft Limit', false],
+  [3, 'Abort Cycle', true],
+  [4, 'Probe Fail Initial', false],
+  [5, 'Probe Fail Contact', false],
+  [6, 'Homing Fail Reset', true],
+  [7, 'Homing Fail Door', true],
+  [8, 'Homing Fail Pulloff', true],
+  [9, 'Homing Fail Approach', true],
+  [10, 'Spindle Control', true],
+  [11, 'Input Pin Initially On', true],
+  [12, 'Ambiguous Switch', true],
+  [13, 'Hard Stop', true],
+  [14, 'Unhomed', true],
+  [15, 'Init', true],
+  [16, 'Expander Reset', true],
+  [17, 'GCode Error', false],
+  [18, 'Probe Hard Limit', true],
 ] as const;
 
 // Hard limit, soft limit and hard stop put FluidNC in its Critical state, which
@@ -148,9 +153,12 @@ const FLUIDNC_CRITICAL_ALARM_ACTIONS = new Map<number, string>([
 ]);
 
 const FLUIDNC_ALARMS = new Map<number, AlarmPresentation>(
-  FLUIDNC_ALARM_ENTRIES.map(([code, title]) => {
+  FLUIDNC_ALARM_ENTRIES.map(([code, title, positionLost]) => {
     const action = FLUIDNC_CRITICAL_ALARM_ACTIONS.get(code);
-    return [code, action === undefined ? { code, title } : { code, title, action }];
+    return [
+      code,
+      action === undefined ? { code, title, positionLost } : { code, title, action, positionLost },
+    ];
   }),
 );
 

@@ -1,3 +1,4 @@
+import { pauseAutoConnect } from '../state/auto-connect-session';
 import { useLaserStore } from '../state/laser-store';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useToastStore } from '../state/toast-store';
@@ -15,6 +16,8 @@ export function confirmForgetController(): void {
 }
 
 export async function forgetControllerAndClearStartBlockers(): Promise<void> {
+  // Like Disconnect, Forget pauses auto-connect until the operator connects (ADR-639).
+  pauseAutoConnect();
   try {
     await useLaserStore.getState().forgetDevice?.();
   } catch (error) {
