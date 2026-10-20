@@ -47,6 +47,7 @@ const SETTING_KEYS: ReadonlyArray<keyof ObjectOperationSettingsOverride> = [
   'leadLengthMm',
   'leadAngleDeg',
   'leadSide',
+  'photoToneCurve',
 ];
 
 export const objectOperationSettingKeys: ReadonlySet<string> = new Set(SETTING_KEYS);
