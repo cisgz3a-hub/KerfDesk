@@ -13,7 +13,7 @@ import {
 import { segmentNesting } from './cut-segment-nesting';
 import { compilationPolylines } from './compilation-polylines';
 import { laserArcFitFor } from './cut-arc-moves';
-import type { CutSegment, JobDiagnostic } from './job';
+import type { CutSegment, CutTopologyRing, JobDiagnostic } from './job';
 import { placedTabPointsForContour } from './laser-tab-anchors';
 import {
   kerfArcSourceRings,
@@ -22,6 +22,7 @@ import {
   type KerfSource,
   type PendingKerfGroup,
 } from './layer-kerf';
+import { laserLeadSourceKey } from './laser-lead-sides';
 import { perforateLineSegments } from './line-cut-extras';
 import { applyLineTabs } from './line-tabs';
 
@@ -29,6 +30,12 @@ export type LineSegmentCollection = {
   readonly segments: ReadonlyArray<CutSegment>;
   readonly tabSpans: ReadonlyArray<CutSegment>;
   readonly kerfDiagnostics: ReadonlyArray<JobDiagnostic>;
+  /** Closed contours split at tabs (ADR-494); laser leads skip them. */
+  readonly tabbedContours?: number;
+  /** Closed contours perforation cut into dashes; laser leads skip them. */
+  readonly perforatedContours?: number;
+  /** Whole outlines of the contours tabs or perforation split (ADR-626). */
+  readonly topologyRings?: ReadonlyArray<CutTopologyRing>;
 };
 
 // Line segments as collected, with the machine-space centres of any tabs
@@ -40,13 +47,16 @@ export type LineSegmentSink = {
   readonly kerf: PendingKerfGroup[];
 };
 
+/** `leadSources`: stamp each closed contour with the scene contour it comes
+ * from (CutSegment.leadSource), for laser leads (ADR-626 Amd 1). */
 export function collectLineSourcesForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
+  leadSources = false,
 ): LineSegmentSink {
   const out: LineSegmentSink = { segments: [], placedTabs: new Map(), kerf: [] };
-  for (const obj of objects) appendSegmentsFromObject(obj, layer, device, out);
+  for (const obj of objects) appendSegmentsFromObject(obj, layer, device, out, leadSources);
   return out;
 }
 
@@ -72,6 +82,7 @@ function appendSegmentsFromObject(
   layer: Layer,
   device: DeviceProfile,
   out: LineSegmentSink,
+  leadSources: boolean,
 ): void {
   // Exhaustive over SceneObject.kind — enforced by
   // `@typescript-eslint/switch-exhaustiveness-check`. The default arm's
@@ -79,13 +90,13 @@ function appendSegmentsFromObject(
   // variant lands (per ADR-014).
   switch (obj.kind) {
     case 'imported-svg':
-      return appendPathSegments(obj, layer, device, out);
+      return appendPathSegments(obj, layer, device, out, leadSources);
     case 'text':
-      return appendPathSegments(obj, layer, device, out);
+      return appendPathSegments(obj, layer, device, out, leadSources);
     case 'traced-image':
-      return appendPathSegments(obj, layer, device, out);
+      return appendPathSegments(obj, layer, device, out, leadSources);
     case 'shape':
-      return appendPathSegments(obj, layer, device, out);
+      return appendPathSegments(obj, layer, device, out, leadSources);
     case 'raster-image':
       // F.2.c: SceneObject union now includes raster-image. The
       // dedicated raster emit path (compileRasterGroup → emitRaster)
@@ -116,6 +127,7 @@ function appendPathSegments(
   layer: Layer,
   device: DeviceProfile,
   out: LineSegmentSink,
+  leadSources: boolean,
 ): void {
   for (const [pathIndex, path] of object.paths.entries()) {
     if (!pathUsesOperation(object, path, layer)) continue;
@@ -124,6 +136,8 @@ function appendPathSegments(
     const nesting = segmentNesting(path, `${object.id}#${pathIndex}`);
     const kerfArcSource = kerfArcSourceRings(path, object.transform, layer, device);
     for (const [index, polyline] of compilationPolylines(path, object.transform).entries()) {
+      const sceneContour = laserLeadSourceKey(object.id, pathIndex, index);
+      const source = leadSourceOf(leadSources, polyline, sceneContour);
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, object.transform), device),
       );
@@ -138,6 +152,8 @@ function appendPathSegments(
           polyline: { points: ring, closed: true },
           points: placed,
           ...(known === undefined ? {} : { nesting: known }),
+          ...source,
+          sceneContour,
         });
       } else {
         const segment = sourceLineSegment(
@@ -145,13 +161,22 @@ function appendPathSegments(
           points,
           polyline.closed ? nesting(index) : undefined,
         );
-        pushLineSegment(out, withArcs(index, segment), placed);
+        pushLineSegment(out, { ...withArcs(index, segment), ...source }, placed);
       }
     }
     if (closedForKerf.length > 0) {
       out.kerf.push({ insertAt: out.segments.length, sources: closedForKerf });
     }
   }
+}
+
+// ADR-626 Amd 1: the scene contour a closed contour comes from, for leads.
+function leadSourceOf(
+  wanted: boolean,
+  polyline: Polyline,
+  key: string,
+): Pick<CutSegment, 'leadSource'> {
+  return wanted && polyline.closed ? { leadSource: key } : {};
 }
 
 // Closed output repeats its first point: emitters walk the coordinates and

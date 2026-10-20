@@ -3,6 +3,7 @@ import {
   normalizeGrblRxBufferBytes,
   type GrblStreamingMode,
 } from '../../grbl-streaming';
+import { isEepromWriteLine } from './eeprom-write-line';
 import { findFirstSendableLineOver } from './sendable-line-scan';
 
 // GRBL character-counted streaming buffer (pure state machine).
@@ -192,7 +193,10 @@ type FillResult = {
 };
 
 // Greedily batch queued lines that fit the remaining RX buffer. Stops early at
-// a tool-change M0 (leaving it queued) or when the next line won't fit.
+// a tool-change M0 (leaving it queued) or when the next line won't fit. A line
+// that writes the controller's EEPROM is a sync point (ADR-644): it goes out
+// only into an empty window, alone, and step() sends nothing after it until
+// its reply arrives.
 function fillBuffer(state: StreamerState): FillResult {
   let queueIndex = state.queueIndex;
   let inFlight = state.inFlight;
@@ -210,10 +214,13 @@ function fillBuffer(state: StreamerState): FillResult {
     }
     const bytes = next.length;
     if (inFlightBytes + bytes > state.rxBufferBytes) break;
+    const eepromWrite = isEepromWriteLine(next);
+    if (eepromWrite && inFlight.length > 0) break;
     sent.push(next);
     inFlight = [...inFlight, { line: next, bytes }];
     inFlightBytes += bytes;
     queueIndex += 1;
+    if (eepromWrite) break;
   }
   return { queueIndex, inFlight, inFlightBytes, sent, hitToolChange: false };
 }
@@ -227,6 +234,7 @@ export function step(state: StreamerState): StepResult {
   if (state.streamingMode === 'ping-pong' && state.inFlight.length > 0) {
     return { state, toSend: '' };
   }
+  if (awaitingEepromWriteAck(state)) return { state, toSend: '' };
   const { queueIndex, inFlight, inFlightBytes, sent, hitToolChange } = fillBuffer(state);
   const toSend = sent.join('');
   // Return the tool-change transition explicitly even when nothing was sent
@@ -243,6 +251,12 @@ export function step(state: StreamerState): StepResult {
     state: { ...state, status: 'streaming', queueIndex, inFlight, inFlightBytes },
     toSend,
   };
+}
+
+// An EEPROM-writing line is only ever sent alone, so it is in flight by itself.
+function awaitingEepromWriteAck(state: StreamerState): boolean {
+  const only = state.inFlight.length === 1 ? state.inFlight[0] : undefined;
+  return only !== undefined && isEepromWriteLine(only.line);
 }
 
 // Leave a tool-change hold: drop the un-sent M0 from the queue head and count

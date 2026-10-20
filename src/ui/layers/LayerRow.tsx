@@ -38,6 +38,8 @@ export function LayerRow(props: {
       style={rowStyle(props.layer.output, active)}
       onPointerEnter={hover.onPointerEnter}
       onPointerLeave={hover.onPointerLeave}
+      onFocus={hover.onFocus}
+      onBlur={hover.onBlur}
     >
       <OperationActivation
         layer={props.layer}

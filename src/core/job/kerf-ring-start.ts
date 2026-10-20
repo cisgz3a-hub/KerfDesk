@@ -11,6 +11,7 @@
 // touch the ring's bounds are compared, so a path of many contours does not
 // compare every ring with every start.
 
+import { projectPointToPolyline } from '../cnc/cnc-tab-anchors';
 import type { Polyline, Vec2 } from '../scene';
 import { polylineBounds, type SegmentBounds } from './segment-bounds';
 
@@ -35,6 +36,50 @@ export function startKerfRingsAtSources(
     return start === undefined || bounds === null ? [] : [{ start, reach: grown(bounds, grow) }];
   });
   return rings.map((ring) => startRingNearSource(ring, starts));
+}
+
+/** For each ring, the index of the source contour it was offset from: the
+ * nearest to it, by sampled distance, of the sources within its reach; -1 when
+ * none is. Laser leads read a kerf contour's scrap side from it (ADR-626 Amd 1). */
+export function kerfRingOwners(
+  rings: ReadonlyArray<Polyline>,
+  sources: ReadonlyArray<Polyline>,
+  kerfOffsetMm: number,
+): number[] {
+  const grow = MITRE_REACH * Math.abs(kerfOffsetMm) + REACH_SLACK_MM;
+  const reaches = sources.map((source) => {
+    const bounds = polylineBounds(source.points);
+    return bounds === null ? null : grown(bounds, grow);
+  });
+  return rings.map((ring) => {
+    const bounds = polylineBounds(ring.points);
+    let owner = -1;
+    let best = Number.POSITIVE_INFINITY;
+    sources.forEach((source, index) => {
+      const reach = reaches[index];
+      if (bounds === null || reach === null || reach === undefined || !overlaps(reach, bounds))
+        return;
+      const distanceSq = sampledDistanceSq(ring, source);
+      if (distanceSq < best) {
+        owner = index;
+        best = distanceSq;
+      }
+    });
+    return owner;
+  });
+}
+
+const OWNER_SAMPLES = 16;
+
+function sampledDistanceSq(ring: Polyline, source: Polyline): number {
+  let distanceSq = Number.POSITIVE_INFINITY;
+  const stride = Math.max(1, Math.floor(ring.points.length / OWNER_SAMPLES));
+  for (let index = 0; index < ring.points.length; index += stride) {
+    const point = ring.points[index] as Vec2;
+    const projection = projectPointToPolyline(source, point);
+    if (projection !== null) distanceSq = Math.min(distanceSq, projection.distanceSq);
+  }
+  return distanceSq;
 }
 
 function startRingNearSource(ring: Polyline, starts: ReadonlyArray<SourceStart>): Polyline {

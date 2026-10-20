@@ -1,4 +1,12 @@
-import { cncPassXyPoints, type Job, type RasterGroup } from '../job';
+import {
+  cncPassXyPoints,
+  type CutGroup,
+  type CutSegment,
+  type FillGroup,
+  type Job,
+  type RasterGroup,
+} from '../job';
+import { finalPassCutSegments } from '../job/cut-pass-segments';
 import { rasterRowsInProviderOrder } from '../job/raster-rows';
 import type { RasterPowerValues } from '../raster/raster-power-values';
 import type { PreflightIssue, PreflightResult } from './preflight';
@@ -56,10 +64,7 @@ function measureCompiledWorkUntilLimit(
               (sum, pass) => sum + Math.max(1, cncPassXyPoints(pass).length - 1),
               0,
             )
-          : group.segments.reduce(
-              (sum, segment) => sum + Math.max(0, segment.polyline.length - 1),
-              0,
-            ) * Math.max(1, Math.floor(group.passes));
+          : vectorMotionSegments(group);
       motionSegments += groupSegments;
       estimatedOutputBytes += groupSegments * ESTIMATED_VECTOR_LINE_BYTES;
     }
@@ -68,6 +73,16 @@ function measureCompiledWorkUntilLimit(
     }
   }
   return { motionSegments, estimatedOutputBytes, isComplete: true };
+}
+
+function vectorMotionSegments(group: CutGroup | FillGroup): number {
+  const passes = Math.max(1, Math.floor(group.passes));
+  const final = group.kind === 'cut' ? finalPassCutSegments(group) : group.segments;
+  return polylineSegments(group.segments) * (passes - 1) + polylineSegments(final);
+}
+
+function polylineSegments(segments: ReadonlyArray<CutSegment>): number {
+  return segments.reduce((sum, segment) => sum + Math.max(0, segment.polyline.length - 1), 0);
 }
 
 // Since ADR-243 these findings are ADVISORY: consumers surface them in the

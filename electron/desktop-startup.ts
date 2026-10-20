@@ -40,7 +40,8 @@ export function createDesktopBackgroundStartup(
           ((error: unknown) => console.warn('Desktop update check failed:', error)),
       });
     },
-    // Each renderer, a reopened macOS window or a reload, opens behind the licence window.
+    // Each renderer, a reopened macOS window or a reload, holds services until it
+    // acknowledges its mounted workspace.
     () => licence.admission?.rendererOpening(),
   );
 }

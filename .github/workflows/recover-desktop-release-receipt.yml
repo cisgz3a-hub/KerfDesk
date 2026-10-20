@@ -1,0 +1,70 @@
+name: Recover original desktop release receipt
+
+on:
+  workflow_dispatch:
+    inputs:
+      original_run_id:
+        description: Original unsigned release workflow run ID
+        required: true
+        type: string
+      original_attempt:
+        description: Exact original failed receipt attempt
+        required: true
+        type: string
+      source_sha:
+        description: Reviewed 40-character original signed source SHA
+        required: true
+        type: string
+      version:
+        description: Exact already published Windows version
+        required: true
+        type: string
+
+concurrency:
+  group: kerfdesk-commercial-manual-publication
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  recover:
+    if: >-
+      github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
+      github.repository == 'cisgz3a-hub/KerfDesk' && vars.KERFDESK_UNSIGNED_RELEASES == 'on'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: desktop-commercial
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - name: Authenticate original evidence and retry only its immutable receipt
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          KERFDESK_UNSIGNED_RELEASES: ${{ vars.KERFDESK_UNSIGNED_RELEASES }}
+          ORIGINAL_RUN_ID: ${{ inputs.original_run_id }}
+          ORIGINAL_ATTEMPT: ${{ inputs.original_attempt }}
+          ORIGINAL_SOURCE_SHA: ${{ inputs.source_sha }}
+          ORIGINAL_VERSION: ${{ inputs.version }}
+          DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: ${{ secrets.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY }}
+          DESKTOP_STABLE_MANIFEST_KEY_ID: ${{ vars.DESKTOP_STABLE_MANIFEST_KEY_ID }}
+          COMMERCIAL_R2_API_TOKEN: ${{ secrets.COMMERCIAL_R2_API_TOKEN }}
+          COMMERCIAL_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          node scripts/recover-desktop-release-receipt.mjs
+          "$ORIGINAL_RUN_ID" "$ORIGINAL_ATTEMPT" "$ORIGINAL_SOURCE_SHA" "$ORIGINAL_VERSION"
+      - name: Retain distinct recovery audit
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: desktop-receipt-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/desktop-receipt-recovery/
+          retention-days: 90
+          if-no-files-found: warn

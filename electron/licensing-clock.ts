@@ -126,13 +126,25 @@ export function checkGrantTime(issuedAt: number, now: number): void {
   if (Math.abs(now - issuedAt) > CLOCK_TOLERANCE) throw new LicenceClockError(now - issuedAt);
 }
 
-export function clockErrorMessage(offset: number): string {
-  return `This computer’s clock is ${roughly(Math.abs(offset))} ${offset > 0 ? 'ahead' : 'behind'}, so the licence could not be confirmed. Turn on Set time automatically in Windows’ Date & time settings, check the time zone, then try again.`;
+/**
+ * The setting that keeps this computer's clock right, where its own system keeps
+ * it (`process.platform`): KerfDesk ships for Windows, macOS and Linux, and each
+ * Linux desktop names it a little differently.
+ */
+export function automaticTimeSetting(platform: string): string {
+  if (platform === 'win32') return 'Set time automatically in Windows’ Date & time settings';
+  if (platform === 'darwin')
+    return 'Set time and date automatically in System Settings > General > Date & Time';
+  return 'automatic date and time in your desktop’s date and time settings';
+}
+
+export function clockErrorMessage(offset: number, platform: string): string {
+  return `This computer’s clock is ${roughly(Math.abs(offset))} ${offset > 0 ? 'ahead' : 'behind'}, so the licence could not be confirmed. Turn on ${automaticTimeSetting(platform)}, check the time zone, then try again.`;
 }
 
 /** Shown while a paid licence's last confirmation arrived with this computer's clock off. */
-export function clockWarningMessage(offset: number): string {
-  return `This computer’s clock is ${roughly(Math.abs(offset))} ${offset > 0 ? 'ahead' : 'behind'}. Your licence was confirmed anyway, but turn on Set time automatically in Windows’ Date & time settings and check the time zone so later licence checks keep working.`;
+export function clockWarningMessage(offset: number, platform: string): string {
+  return `This computer’s clock is ${roughly(Math.abs(offset))} ${offset > 0 ? 'ahead' : 'behind'}. Your licence was confirmed anyway, but turn on ${automaticTimeSetting(platform)} and check the time zone so later licence checks keep working.`;
 }
 
 // Called only for more than five minutes, so every unit rounds to two or more.

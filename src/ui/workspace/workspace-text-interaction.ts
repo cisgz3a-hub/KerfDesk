@@ -46,7 +46,7 @@ export function workspaceTextPointerHandlers(args: TextPointerArgs): OwnedPointe
       const ui = useUiStore.getState();
       if (event.defaultPrevented || isModalOpen(ui)) return;
       if (useCanvasTextStore.getState().session !== null) return;
-      if (ui.toolMode.kind === 'text' && !args.previewMode && event.button === 0 && !ui.spaceDown) {
+      if (textToolOwnsCanvas(ui, args.previewMode) && event.button === 0) {
         const position = canvasMouseToScene(
           event,
           args.canvasRef.current,
@@ -69,11 +69,26 @@ export function workspaceTextPointerHandlers(args: TextPointerArgs): OwnedPointe
       args.handlers.onPointerMove(event);
       const ui = useUiStore.getState();
       const canvas = args.canvasRef.current;
-      if (canvas !== null && ui.toolMode.kind === 'text' && !args.previewMode && !ui.spaceDown) {
+      if (canvas !== null && textToolOwnsCanvas(ui, args.previewMode)) {
         canvas.style.cursor = 'text';
       }
     },
   };
+}
+
+// Canvas numbering (Run order) owns a click on the canvas whatever the tool,
+// as it does for the drawing tools: a text session begun mid-numbering would
+// be refused on save by the numbering edit guard, losing what was typed.
+function textToolOwnsCanvas(
+  ui: ReturnType<typeof useUiStore.getState>,
+  previewMode: boolean,
+): boolean {
+  return (
+    ui.toolMode.kind === 'text' &&
+    !previewMode &&
+    !ui.spaceDown &&
+    ui.artworkNumbering.kind !== 'active'
+  );
 }
 
 export function useCanvasTextDisplayProject(
@@ -117,6 +132,8 @@ function openCanvasObjectEditor(
   ui: ReturnType<typeof useUiStore.getState>,
 ): void {
   if (ui.toolMode.kind !== 'select' && ui.toolMode.kind !== 'text') return;
+  // Numbering's clicks name a run; an editor opened now could not save.
+  if (ui.artworkNumbering.kind === 'active') return;
   const point = canvasMouseToScene(event, event.currentTarget, app.project, ui);
   const id = point === null ? null : hitTest(app.project.scene, point);
   if (id === null) return;

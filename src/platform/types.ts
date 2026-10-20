@@ -29,6 +29,11 @@ export type LicenceStatus = {
   readonly trialExpiresInMs?: number;
   /** The opening renderer's identity, acknowledged only after its workspace mounts. */
   readonly admissionGeneration?: number;
+  /**
+   * The licence window already let a workspace in during this app session, so a
+   * reloaded renderer or reopened window opens to it again (ADR-623 Amendment 1).
+   */
+  readonly sessionAdmitted?: boolean;
   /** Unix seconds on this computer's clock when new Pro choices pause without a check-in (ADR-592). */
   readonly checkInDueAt?: number;
   readonly updatesUntil: number | null;
