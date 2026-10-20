@@ -12,6 +12,8 @@ type Props = {
   readonly onRetry: (() => void) | undefined;
   readonly onReconnect: (() => void) | undefined;
   readonly disabled: boolean;
+  /** The controller stopped answering status queries (ADR-611). */
+  readonly stoppedResponding?: boolean;
 };
 
 // Keep recovery actions available without adding a row to the connection bar.
@@ -29,11 +31,7 @@ export function ControllerRecoveryToast(props: Props): JSX.Element {
       }}
     >
       <div className="lf-controller-recovery-toast__heading">
-        <strong>
-          {props.reconnectRecommended
-            ? 'Controller connection needs recovery'
-            : 'Controller information unavailable'}
-        </strong>
+        <strong>{recoveryHeading(props)}</strong>
         <button
           type="button"
           className="lf-btn lf-controller-recovery-toast__close"
@@ -53,6 +51,13 @@ export function ControllerRecoveryToast(props: Props): JSX.Element {
       <RecoveryActions {...props} />
     </section>
   );
+}
+
+// Titles say what happened to the machine, not the internal check that
+// failed; Retry and Reconnect stay as offered (ADR-611 Amendment 2).
+function recoveryHeading(props: Props): string {
+  if (props.stoppedResponding === true) return 'Machine stopped answering';
+  return 'Couldn’t read machine settings';
 }
 
 function RecoveryActions(props: Props): JSX.Element {

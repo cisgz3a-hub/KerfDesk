@@ -3283,7 +3283,12 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    after a reset, and a read that failed while the controller still answers
    status queries, do not pop up a toolbar notice: the machine runs without
    them, as in other senders. Only a controller that has stopped answering
-   shows the brief "Controller is not responding" notice (ADR-611). A controller
+   shows the brief "Machine stopped answering" notice (ADR-611); a failed read
+   is titled "Couldn’t read machine settings" in Controller info. While the
+   read runs, the status beside the dot reads "Connecting…", then "Reading
+   settings…", and the "Machine settings detected" toast appears only when the
+   read offers profile updates or its review items changed since the last read
+   for that machine profile (ADR-611 Amendment 2). A controller
    that answered and then goes quiet for 8 s, outside homing and other controller
    operations, turns the connection status to an amber **Not responding** until
    its next reply (ADR-611 Amendment 1). While a sent line is still owed its

@@ -71,6 +71,7 @@ type QualificationNoticeProps = {
   readonly qualification: ControllerQualification | undefined;
   readonly readBlockReason: string | null | undefined;
   readonly reconnectRecommended: boolean;
+  readonly stoppedResponding: boolean;
   readonly onRetry: (() => void) | undefined;
   readonly onReconnect: (() => void) | undefined;
   readonly disabled: boolean;
@@ -96,7 +97,7 @@ export function BriefQualificationNotice(
     <ControllerToolbarNotice
       key={props.notice.key}
       focusFallbackRef={props.notice.triggerRef}
-      message="Controller is not responding"
+      message="Machine stopped answering"
       detail={qualification.message}
       onShow={props.notice.show}
     />
@@ -190,6 +191,7 @@ function QualificationDetails(props: QualificationNoticeProps): JSX.Element | nu
       message={qualification.message}
       readBlockReason={props.readBlockReason}
       reconnectRecommended={props.reconnectRecommended}
+      stoppedResponding={props.stoppedResponding}
       onRetry={props.onRetry}
       onReconnect={props.onReconnect}
       disabled={props.disabled}

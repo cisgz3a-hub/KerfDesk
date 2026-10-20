@@ -4,7 +4,8 @@
 //
 //   disconnected → "Not connected", primary "Connect"
 //   connecting   → "Connecting…" (disabled)
-//   connected    → "Connected", "Disconnect"
+//   connected    → "Connected", "Disconnect"; while its settings are read,
+//                  "Connecting…" then "Reading settings…" (ADR-611 Amendment 2)
 //   failed       → "Couldn't connect" with the reason, "Connect" to retry
 //
 // A background auto-connect that could not open the port stays "Not
@@ -98,8 +99,16 @@ export function ConnectionBar(props: Props): JSX.Element {
         <div className="lf-connection-toolbar-controls">
           <CompactConnectionControls
             machineName={props.machineName ?? 'Unnamed machine'}
-            status={silent ? 'Not responding' : connectionStatusLabel(connection)}
-            statusDot={<StatusDot connection={connection} silent={silent} />}
+            status={
+              silent ? 'Not responding' : connectionStatusText(connection, props.qualification)
+            }
+            statusDot={
+              <StatusDot
+                connection={connection}
+                silent={silent}
+                qualifying={qualifyingPhase(connection, props.qualification) !== null}
+              />
+            }
             machine={props.machine}
             details={props.details}
             leading={props.mode}
@@ -115,6 +124,7 @@ export function ConnectionBar(props: Props): JSX.Element {
         qualification={props.qualification}
         readBlockReason={props.qualificationReadBlockReason}
         reconnectRecommended={props.reconnectRecommended === true}
+        stoppedResponding={props.controllerStoppedResponding === true}
         onRetry={props.onRetryQualification}
         onReconnect={props.onReconnectQualification}
         disabled={props.disabled}
@@ -318,6 +328,37 @@ export function connectionStatusLabel(connection: ConnectionState): string {
   }
 }
 
+type QualifyingPhase = Extract<ControllerQualification, { readonly kind: 'qualifying' }>['phase'];
+
+function qualifyingPhase(
+  connection: ConnectionState,
+  qualification: ControllerQualification | undefined,
+): QualifyingPhase | null {
+  return connection.kind === 'connected' && qualification?.kind === 'qualifying'
+    ? qualification.phase
+    : null;
+}
+
+// The settings read after a connect or reset is progress, not news: it shows
+// here beside the dot instead of in a notice (ADR-611 Amendment 2).
+export function connectionStatusText(
+  connection: ConnectionState,
+  qualification: ControllerQualification | undefined,
+): string {
+  const phase = qualifyingPhase(connection, qualification);
+  switch (phase) {
+    case null:
+      return connectionStatusLabel(connection);
+    case 'controller-response':
+      return 'Connecting…';
+    case 'reset-cleanup':
+    case 'settings-read':
+      return 'Reading settings…';
+    default:
+      return assertNever(phase, 'ControllerQualificationPhase');
+  }
+}
+
 // Chromium's open() failure names no cause; the usual one is another program
 // (LightBurn, a serial monitor, another KerfDesk tab) holding the port. Linux
 // opens a serial port only for members of its serial group (dialout on Debian,
@@ -349,8 +390,12 @@ const LINUX_SERIAL_ACCESS =
 function StatusDot(props: {
   readonly connection: ConnectionState;
   readonly silent: boolean;
+  readonly qualifying: boolean;
 }): JSX.Element {
-  const color = props.silent ? 'var(--lf-warning)' : connectionStatusColor(props.connection);
+  const color =
+    props.silent || props.qualifying
+      ? 'var(--lf-warning)'
+      : connectionStatusColor(props.connection);
   return (
     <span
       aria-hidden="true"
