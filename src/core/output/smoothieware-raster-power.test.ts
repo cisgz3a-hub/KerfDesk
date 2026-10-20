@@ -87,6 +87,7 @@ describe('Smoothieware original-unit raster power', () => {
     'sierra3',
     'sierra2',
     'sierra-lite',
+    'blue-noise',
   ] as const)('%s preserves fractional full-burn pixels in both compilation paths', (algorithm) => {
     for (const pixels of [[0], [0, 0, 0, 0, 0]]) {
       const project = imageProject(25, algorithm, pixels);
