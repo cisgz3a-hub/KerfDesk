@@ -30,13 +30,13 @@ fault.
 - Titles say what happened to the machine. A failed read reads **Couldn’t read
   machine settings**; a controller that stopped answering reads **Machine
   stopped answering**, on the canvas recovery card, its folded button and in
-  Controller info. The detail
-  text, Retry and Reconnect are unchanged, and Reconnect is still offered
-  whenever `controllerReconnectRecommended` holds.
+  Controller info. The detail text, Retry and Reconnect are unchanged, and
+  Reconnect is still offered whenever `controllerReconnectRecommended` holds.
 
 ### Evidence and limits
 
-`ConnectionBar-info-recovery.test.tsx` pins the phase status text and the new
+`ConnectionBar-info-recovery.test.tsx` and `WorkspaceControllerRecovery.test.tsx`
+pin the phase status text and the new
 titles; `MachineConnectionToolbar.test.tsx` pins the toast rule (an unchanged
 reconnect stays quiet, updates always announce, a new profile confirms once).
 Unit-tested only; no machine was operated.
