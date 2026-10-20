@@ -19,7 +19,11 @@ import {
 } from '../../core/controllers/grbl';
 import { detectControllerFromBanner, type ControllerEvent } from '../../core/controllers';
 import { parseActiveWcsFromModalResponses } from '../../core/controllers/grbl/work-offset-readback';
-import { flushResetCleanup } from './laser-reset-cleanup';
+import { flushResetCleanup, ownedResetRetainedSettings } from './laser-reset-cleanup';
+import {
+  noteControllerSettingsRead,
+  retainedControllerSettingsPatch,
+} from './laser-owned-reset-settings';
 import {
   qualifiedController,
   qualifyingController,
@@ -298,6 +302,7 @@ function publishDetectedSettings(
     }
     return;
   }
+  noteControllerSettingsRead(refs);
   set((current) => ({
     // The terminal $$ acknowledgement is a FIFO boundary: any old-unit
     // status generated before the setting changed has already been received.
@@ -316,6 +321,9 @@ function publishDetectedSettings(
     controllerQualification: qualifiedController(state.controllerSessionEpoch, 'verified'),
     grblSettingsRows: detected.settingsRows,
     lastSettingsReadAt: Date.now(),
+    // The plain result of a routine read lives here and in Controller info;
+    // the toast speaks only when the read found something new (ADR-648).
+    log: pushLog(current, `[lf2] Controller settings read (${detected.settingsRows.length}).`),
     ...(isSettingsReadOperation(current.controllerOperation) ? { controllerOperation: null } : {}),
   }));
   publishCncLiveCaps(detected.controllerSettings);
@@ -377,6 +385,9 @@ function handleWelcomeLine(
   // The rebooted controller starts a new transcript; anything the old session
   // held back belongs to neither (ADR-333).
   clearTranscriptBuffer(refs);
+  // The banner of a reset KerfDesk sent on this port keeps the `$$`/`$I`
+  // snapshot; any other banner discards it (ADR-648).
+  const retainedSettings = ownedResetRetainedSettings(refs);
   refs.settingsCollector = idleCollector();
   refs.settingsCollectorSessionEpoch = null;
   clearCncLiveCaps();
@@ -405,6 +416,9 @@ function handleWelcomeLine(
     detectedSettings: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
+    ...(retainedSettings === null
+      ? {}
+      : retainedControllerSettingsPatch(retainedSettings, nextSessionEpoch)),
     // An ALARM:N the reset itself raised (Abort mid-motion) is still the
     // controller's alarm after the banner; any other code belonged to the
     // previous boot (audit streaming-4).
@@ -441,8 +455,11 @@ function handleWelcomeLine(
   // out NOW, after the ledger reset above — its ack is unambiguous (audit
   // F2): the controller is fully booted, so the ok cannot be swallowed and
   // cannot be orphaned by this banner.
+  if (retainedSettings !== null) publishCncLiveCaps(retainedSettings.controllerSettings);
   flushResetCleanup(refs, (line, action) => safeWrite(line, action, 'system'), 'reset-boundary');
-  scheduleControllerQualification(set, get, refs, nextSessionEpoch);
+  scheduleControllerQualification(set, get, refs, nextSessionEpoch, {
+    modalStateOnly: retainedSettings !== null,
+  });
 }
 
 function controllerResetBoundaryPolicy(state: LaserState): {

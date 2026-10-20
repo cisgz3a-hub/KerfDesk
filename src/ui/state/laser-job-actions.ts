@@ -65,6 +65,7 @@ import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 import { createStartArmingCompletion } from './laser-start-arming-completion';
 import type { TranscriptSource } from './laser-transcript';
+import { noteControllerSettingWrite } from './laser-owned-reset-settings';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -152,6 +153,7 @@ async function runStartJob(
     );
     assertStartHandoff(context, options, setupEpoch, completion.assertCurrent);
     consumeClaimedFramedRun(set, get, options.framedRunPermit);
+    noteControllerSettingWrite(context.refs, gcode);
     const writeOwner = installInitialStream(context, gcode, options, { stepped, labels, toolIds });
     completion.streamStarted(writeOwner, options.runId ?? null);
     if (stepped.toSend.length === 0) {

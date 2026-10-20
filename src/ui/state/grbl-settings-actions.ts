@@ -12,8 +12,10 @@ import {
 } from './detected-settings-action';
 import {
   failedControllerQualificationPatch,
+  qualifiedController,
   qualifyingController,
 } from './laser-controller-qualification';
+import { hasRetainedSettingsForSession } from './laser-owned-reset-settings';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { readOnlyControllerOperation } from './laser-controller-operation';
 import type { LaserSafetyAction } from './laser-safety-notice';
@@ -142,6 +144,63 @@ async function readMachineSettingsAction(
     clearInteractiveOperation(set, qualificationEpoch);
   } catch (err) {
     failSettingsOperation(set, refs, qualificationEpoch, 'read', err);
+  }
+}
+
+/** Qualification after the banner of a reset KerfDesk sent: the `$$` and `$I`
+ * snapshot it kept still describes EEPROM, so only the modal state the reset
+ * restarted is read again (ADR-648). Without that snapshot, a full read. */
+export async function readModalStateAfterOwnedReset(
+  set: SetFn,
+  get: GetFn,
+  refs: GrblSettingsActionRefs,
+  write: SettingsWriteFn,
+): Promise<void> {
+  const epoch = get().controllerSessionEpoch;
+  if (!hasRetainedSettingsForSession(get(), epoch)) {
+    return readMachineSettingsAction(set, get, refs, write);
+  }
+  const blocked = machineSettingsReadBlockReason(get(), {
+    settingsCollectionActive: refs.settingsCollector.kind === 'collecting',
+    resetCleanupPending: refs.pendingResetCleanup != null,
+  });
+  if (blocked !== null) return blockRead(set, get, blocked);
+  // `$I` too when this session never read it (it failed or was skipped).
+  const readBuildInfo =
+    refs.driver.commands.buildInfoQuery !== null &&
+    get().controllerBuildInfoObservation?.sessionEpoch !== epoch;
+  set({
+    controllerOperation: settingsControllerOperation(
+      readBuildInfo ? BUILD_INFO_READ_OPERATION_LABEL : 'Reading active work coordinates',
+    ),
+    controllerQualification: qualifiedController(epoch, 'verified'),
+  });
+  try {
+    assertSettingsCommandOwnership(get);
+    if (readBuildInfo) {
+      await refreshControllerBuildInfo(set, get, refs, write, epoch);
+      assertSettingsCommandOwnership(get);
+      set((state) =>
+        state.controllerSessionEpoch === epoch
+          ? { controllerOperation: settingsControllerOperation('Reading active work coordinates') }
+          : {},
+      );
+    }
+    await requestTerminalOwnedActiveWcsReadback(get, refs, write, epoch, 'interactive-command');
+    assertSettingsCommandOwnership(get);
+    set((state) =>
+      state.controllerSessionEpoch === epoch
+        ? {
+            log: pushLog(
+              state,
+              '[lf2] Controller settings kept across the reset KerfDesk sent; modal state re-read.',
+            ),
+          }
+        : {},
+    );
+    clearInteractiveOperation(set, epoch);
+  } catch (err) {
+    failSettingsOperation(set, refs, epoch, 'read', err);
   }
 }
 

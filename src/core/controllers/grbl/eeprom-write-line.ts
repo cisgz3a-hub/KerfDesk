@@ -17,11 +17,23 @@ import { scanGcodeWords, stripControllerComments } from '../../gcode/word-scan';
 
 export function isEepromWriteLine(line: string): boolean {
   const code = stripControllerComments(line);
-  if (code.startsWith('$')) return code.includes('=') && !/^\$J=/i.test(code);
+  if (code.startsWith('$')) return isAssignment(code);
   for (const word of scanGcodeWords(code)) {
     if (word.letter !== 'G') continue;
     const tenths = Math.round(word.value * 10);
     if (tenths === 100 || tenths === 281 || tenths === 301) return true;
   }
   return false;
+}
+
+/** A `$` assignment, the part of the list above that can change what `$$` or
+ * `$I` reports (ADR-648). */
+export function isSettingAssignmentLine(line: string): boolean {
+  if (!line.includes('$')) return false;
+  const code = stripControllerComments(line);
+  return code.startsWith('$') && isAssignment(code);
+}
+
+function isAssignment(code: string): boolean {
+  return code.includes('=') && !/^\$J=/i.test(code);
 }
