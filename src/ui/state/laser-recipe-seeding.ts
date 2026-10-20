@@ -11,6 +11,8 @@ import {
   type Project,
   type Scene,
 } from '../../core/scene';
+// Deep import: core/scene's barrel is ratcheted and may only shrink.
+import { withoutInactiveLaserLeadSettings } from '../../core/scene/layer';
 import type { MaterialLibraryDocument, MaterialPreset } from '../../io/material-library';
 
 /** The layer with the preset's recipe applied and linked to it. */
@@ -89,7 +91,15 @@ export function reseedSwitchedLaserLayer(
   if (project.jobSetup.laserMaterial?.autoApplyRecipes !== true || library === null) return after;
   const binding = before.materialBinding;
   if (binding === undefined || binding.libraryId !== library.libraryId) return after;
-  if (!settingsEqual(captureLayerOperationSettings(before), binding.lastResolved)) return after;
+  // Lead fields with both leads off change nothing (ADR-626), so turning
+  // leads on and off again does not count as editing the recipe.
+  if (
+    !settingsEqual(
+      withoutInactiveLaserLeadSettings(captureLayerOperationSettings(before)),
+      withoutInactiveLaserLeadSettings(binding.lastResolved),
+    )
+  )
+    return after;
   const preset = bestPresetForLayer(project, library, after);
   if (preset === undefined) {
     const { materialBinding: _dropped, ...unlinked } = after;

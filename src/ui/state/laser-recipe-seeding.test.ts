@@ -123,6 +123,19 @@ describe('recipes that apply themselves (ADR-496)', () => {
     });
   });
 
+  it('still switches the recipe after leads were turned on and off again', () => {
+    useStore.getState().setJobLaserMaterial(BIRCH_3);
+    const layer = drawRectangle();
+    useStore.getState().setLayerParam(layer.id, { leadInEnabled: true, leadStyle: 'line' });
+    useStore.getState().setLayerParam(layer.id, { leadInEnabled: false });
+    useStore.getState().setLayerParam(layer.id, { mode: 'fill' });
+    expect(operationOf('rect')).toMatchObject({
+      mode: 'fill',
+      power: 35,
+      materialBinding: { presetId: 'birch-3-engrave' },
+    });
+  });
+
   it('keeps an edited operation’s settings when its mode is switched', () => {
     useStore.getState().setJobLaserMaterial(BIRCH_3);
     const layer = drawRectangle();
