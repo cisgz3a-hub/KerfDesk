@@ -109,7 +109,8 @@ it.each([
   refused.fetch.mockResolvedValue(grant(claims({ issuedAt: NOW / 1000 + 2 * 3600 })));
   const keptOffset = harness({ ...saved(), refreshedAt: NOW / 1000 });
   keptOffset.clock(NOW + 8 * DAY_MS + 3_600_000);
-  keptOffset.fetch.mockResolvedValue(grant(claims({ issuedAt: NOW / 1000 + 8 * 86_400 })));
+  // A kept offset needs the signed refresh nonce (ADR-592 Amendment 1).
+  keptOffset.fetch.mockImplementation(answering(claims({ issuedAt: NOW / 1000 + 8 * 86_400 })));
   const messages = [
     await on(overdue).status(),
     await on(rolledBack).status(),
