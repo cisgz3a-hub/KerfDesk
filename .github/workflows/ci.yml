@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The merge queue tests each queued pull request on a gh-readonly-queue/main/...
+  # branch and waits for the required checks this workflow reports (ADR-645).
+  merge_group:
+    types: [checks_requested]
 
 # Cancel in-progress runs on the same PR branch when a new commit lands —
 # but NOT on main. Rapid merge trains (2026-07-21) cancelled every main run
@@ -13,6 +17,8 @@ on:
 # main run always finishes and triggers a deploy of its validated SHA;
 # GitHub still keeps only one PENDING run per group, so intermediate queued
 # pushes are superseded (shown as cancelled) and the tip always runs.
+# A merge queue run has its own gh-readonly-queue/main/pr-N-<sha> ref, so it
+# never shares a group with a pull request, main or another queued entry.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
