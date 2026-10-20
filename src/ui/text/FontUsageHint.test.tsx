@@ -4,6 +4,7 @@ import { createProject, DEFAULT_PROJECT_VARIABLE_DATA } from '../../core/scene';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { FontUsageHint } from './FontUsageHint';
+import type * as TextWorkerSessionModule from './text-worker-session';
 
 vi.mock('./font-loader', async (importOriginal) => {
   const { readFileSync } = await import('node:fs');
@@ -11,6 +12,25 @@ vi.mock('./font-loader', async (importOriginal) => {
   const bytes = readFileSync(resolve(__dirname, 'fonts/Roboto-Regular.ttf'));
   const roboto = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   return { ...(await importOriginal<object>()), loadFont: vi.fn(async () => roboto) };
+});
+
+// A test can make the text worker's missing-character check fail.
+const worker = vi.hoisted(() => ({ failure: null as Error | null }));
+vi.mock('./text-worker-session', async (importOriginal) => {
+  const original = await importOriginal<typeof TextWorkerSessionModule>();
+  return {
+    ...original,
+    createTextWorkerSession: (options?: TextWorkerSessionModule.TextWorkerSessionOptions) => {
+      const session = original.createTextWorkerSession(options);
+      return {
+        ...session,
+        missingCharacters: (...args: Parameters<typeof session.missingCharacters>) =>
+          worker.failure === null
+            ? session.missingCharacters(...args)
+            : Promise.reject(worker.failure),
+      };
+    },
+  };
 });
 
 // The check runs after typing settles, so these tests wait for the DOM
@@ -26,6 +46,7 @@ describe('FontUsageHint characters the font cannot draw', () => {
   let root: Root;
 
   beforeEach(() => {
+    worker.failure = null;
     resetStore();
     host = document.createElement('div');
     document.body.append(host);
@@ -87,6 +108,32 @@ describe('FontUsageHint characters the font cannot draw', () => {
       () => expect(host.textContent).toContain('This font has no \u2713; each engraves as ?.'),
       WAIT,
     );
+  });
+
+  it('says the check did not run when the text worker failed', async () => {
+    const { TextWorkerError } = await import('./text-worker-session');
+    worker.failure = new TextWorkerError(
+      'The background text layout stopped unexpectedly.',
+      'failed',
+    );
+    root.render(<Hint content={'A✓B'} />);
+
+    await vi.waitFor(
+      () =>
+        expect(host.textContent).toBe(
+          'Could not check this font for missing characters. ' +
+            'The background text layout stopped unexpectedly.',
+        ),
+      WAIT,
+    );
+  });
+
+  it('leaves a font that cannot load to the font check', async () => {
+    worker.failure = new Error('Font "x" is not available. Relink it to edit.');
+    root.render(<Hint content={'A✓B'} />);
+
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    expect(host.textContent).toBe('');
   });
 
   it('stays silent when the font covers the text', async () => {
