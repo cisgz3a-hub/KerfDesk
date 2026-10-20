@@ -308,17 +308,16 @@ jobs:
   # this runner makes and pins in its own checkout, so a pull request proves the
   # build, package contract and launches long before a release depends on them.
   commercial-linux:
-    # A literal name: a matrix job skipped by its condition reports its name
-    # unexpanded, which would leave the required "(x64)" check waiting forever.
+    # A literal name and no matrix: a skipped matrix job reports its name
+    # unexpanded, and a running one gets the matrix value appended again, so
+    # either way the required "(x64)" check would never report.
     name: Rehearse the commercial Linux build (x64)
     needs: packaging-scope
     if: ${{ !cancelled() && needs.packaging-scope.outputs.installers != 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 40
-    strategy:
-      matrix:
-        arch: [x64]
     env:
+      REHEARSAL_ARCH: x64
       # A strict X.Y.Z, as a commercial build requires; never a real release.
       VERSION: 0.0.${{ github.run_number }}
     steps: &commercial-rehearsal-steps
@@ -354,14 +353,14 @@ jobs:
       - name: Package and qualify exactly as the release does
         run: |
           platform="$(echo "${RUNNER_OS}" | tr "[:upper:]" "[:lower:]")"
-          bash scripts/build-commercial-platform.sh "${platform}" "${{ matrix.arch }}" \
+          bash scripts/build-commercial-platform.sh "${platform}" "${{ env.REHEARSAL_ARCH }}" \
             "${VERSION}" "$(git rev-parse HEAD)" "${RUNNER_TEMP}/rehearsal-identity.json"
 
       - name: Upload native smoke evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: desktop-package-check-commercial-${{ runner.os }}-${{ matrix.arch }}-${{ inputs.ref || github.sha }}
+          name: desktop-package-check-commercial-${{ runner.os }}-${{ env.REHEARSAL_ARCH }}-${{ inputs.ref || github.sha }}
           path: artifacts/native-smoke/
           if-no-files-found: warn
           retention-days: 14
@@ -381,6 +380,7 @@ jobs:
           - runner: macos-15-intel
             arch: x64
     env:
+      REHEARSAL_ARCH: ${{ matrix.arch }}
       VERSION: 0.0.${{ github.run_number }}
     steps: *commercial-rehearsal-steps
 

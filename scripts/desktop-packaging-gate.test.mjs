@@ -133,9 +133,12 @@ test('the required aggregate always observes every packaging job and uses the ac
   for (const job of NATIVE_PACKAGING_JOBS)
     assert.equal(workflow.jobs[job].if, '${{ inputs.native == true }}');
   // The jobs a pull request may skip report the literal names the ruleset
-  // requires: a skipped matrix job reports its name unexpanded.
+  // requires. No matrix: a skipped matrix job reports its name unexpanded, and
+  // a running one would append (x64) a second time.
   assert.equal(workflow.jobs['commercial-linux'].name, 'Rehearse the commercial Linux build (x64)');
-  assert.deepEqual(workflow.jobs['commercial-linux'].strategy.matrix.arch, ['x64']);
+  assert.equal(workflow.jobs['commercial-linux'].strategy, undefined);
+  assert.equal(workflow.jobs['commercial-linux'].env.REHEARSAL_ARCH, 'x64');
+  assert.equal(workflow.jobs['commercial-macos'].env.REHEARSAL_ARCH, '${{ matrix.arch }}');
   const scope = workflow.jobs[SCOPE_JOB];
   assert.equal(scope.if, undefined);
   assert.equal(scope.outputs.installers, '${{ steps.scope.outputs.installers }}');
