@@ -3,6 +3,7 @@ import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { primaryOperationForObject } from '../../core/scene';
 import { CONNECTION_HELP_TEXT } from '../help/connection-help';
 import { SAFETY_NOTICE_TEXT } from '../help/safety-notice';
+import { LicenseNoticeHost } from '../help/LicenseNoticeDialog';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
@@ -180,6 +181,7 @@ function StoreOpenedDialogs(): JSX.Element {
       <SettingsWindowHost />
       <AiAssistantDialogHost />
       <PhotoEngravingDialogHost />
+      <LicenseNoticeHost />
     </>
   );
 }
@@ -388,7 +390,7 @@ function aboutText(): string {
     `Built ${__BUILD_TIME__}`,
     '',
     'Copyright © 2026 Johann Stolk. All rights reserved.',
-    'Terms of use: License & Safety Notice (/eula.txt).',
+    'Terms of use: Help > License & Safety Notice.',
     'Third-party components and their licences: see /third-party-notices.txt.',
     '',
     'SAFETY: this software drives laser and CNC machinery. Verify every',
