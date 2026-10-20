@@ -2,7 +2,7 @@ import {
   headPositionToNative,
   nativeToHeadPosition,
 } from '../../core/devices/head-position-frames';
-import { positioningLightIssue } from '../../core/devices/positioning-light';
+import { devicePositioningLightIssue } from '../../core/devices/positioning-light';
 import { toMachineCoords, toSceneCoords } from '../../core/devices/origin-transform';
 import { computeFrameBounds, type JobBounds } from '../../core/job';
 import { rotaryAppliesTo } from '../../core/job/rotary-job';
@@ -254,11 +254,7 @@ function assertFramedLightCurrent(
 function assertCentreLightAvailable(framed = false): void {
   const { project, jobPlacement } = useStore.getState();
   // The dialect matters: on a Marlin fan-mosfet profile M106/M107 fire the laser.
-  const issue = positioningLightIssue(
-    project.device.positioningLight,
-    project.device.controllerKind,
-    project.device.gcodeDialect?.dialectId,
-  );
+  const issue = devicePositioningLightIssue(project.device);
   if (project.device.positioningLight === undefined || issue !== null)
     throw new Error(issue ?? 'Set up the separate positioning light in Machine Setup first.');
   if (project.device.controllerKind === 'ruida')

@@ -8,8 +8,9 @@ type Loaded = { readonly saved: LicenceRecord; readonly device: string };
 /**
  * A paid licence's last-seen mark (ADR-592). It moves on from the later of this
  * computer's clock and the time this session has run since the saved mark, so
- * winding the clock back, between or during sessions, cannot hold off the paid
- * check-in or the refresh that fetches a refund. Saving is best effort: paid
+ * winding the clock back, between or during sessions, cannot hold off the
+ * quiet refresh that fetches a refund. It never locks the licence: a paid
+ * licence has no check-in (ADR-623 Amendment 2). Saving is best effort: paid
  * rights never end by the clock, so a failed save changes no status and the
  * mark is tried again at the next check.
  */

@@ -144,7 +144,12 @@ describe('checkpointInterruption', () => {
 // steppers mid-motion is recorded, so recovery cannot offer retained position.
 describe('position loss on the recorded cause', () => {
   const abort = { reason: 'operator', streamerEpoch: 3 } as const;
-  const run = { alarmCode: null, streamReset: null, streamerEpoch: 3 };
+  const run = {
+    alarmCode: null,
+    streamReset: null,
+    streamerEpoch: 3,
+    activeControllerKind: 'grbl-v1.1' as const,
+  };
 
   it('marks the cause when the stop may have lost position', () => {
     expect(checkpointInterruption('errored', null, abort, undefined, true)).toEqual({
@@ -175,6 +180,29 @@ describe('position loss on the recorded cause', () => {
     // ALARM:2 soft limit: GRBL holds before it alarms and keeps position.
     expect(runStopMayHaveLostPosition({ ...run, alarmCode: 2 })).toBe(false);
     expect(runStopMayHaveLostPosition(run)).toBe(false);
+    for (const activeControllerKind of ['grblhal', 'grbl-v1.1'] as const) {
+      expect(runStopMayHaveLostPosition({ ...run, activeControllerKind, alarmCode: 10 })).toBe(
+        true,
+      );
+    }
+  });
+
+  // ADR-644 (protocol audit P-5): FluidNC numbers alarms its own way
+  // (FluidNC/src/Alarm.h). 13 is a hard stop there and probe protection on grblHAL.
+  it('reads an alarm against the table of the firmware that raised it', () => {
+    const fluidnc = { ...run, activeControllerKind: 'fluidnc' as const };
+    for (const alarmCode of [1, 3, 6, 7, 8, 9, 13, 18]) {
+      expect(runStopMayHaveLostPosition({ ...fluidnc, alarmCode })).toBe(true);
+    }
+    for (const alarmCode of [2, 4, 5, 17]) {
+      expect(runStopMayHaveLostPosition({ ...fluidnc, alarmCode })).toBe(false);
+    }
+    const grblhal = { ...run, activeControllerKind: 'grblhal' as const };
+    expect(runStopMayHaveLostPosition({ ...grblhal, alarmCode: 13 })).toBe(false);
+    // A FluidNC banner behind a GRBL profile: either table's loss counts.
+    expect(
+      runStopMayHaveLostPosition({ ...grblhal, alarmCode: 13, detectedControllerKind: 'fluidnc' }),
+    ).toBe(true);
   });
 });
 

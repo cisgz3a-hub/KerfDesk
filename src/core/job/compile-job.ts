@@ -10,15 +10,33 @@ import type { Group, Job, JobDiagnostic } from './job';
 import { compileVectorGroupsForLayer } from './compile-vector-operation';
 import { focusTestProfileIssue } from './focus-test';
 import { FocusTestCompilationError } from './focus-test-compilation-error';
+import { sceneAsksForLaserLeads } from './laser-lead-settings';
+import { lazyKerfSceneSides, type KerfSceneSides } from './kerf-scene-sides';
+
+export type CompileJobOptions = {
+  /** The scene whose Line contours decide which side of a contour the kerf
+   * offset goes to (ADR-486 Amd 3): preparation passes the project's whole
+   * scene, before the output scope. Absent, the compiled scene's own do. */
+  readonly sideScene?: Pick<Scene, 'layers' | 'objects'>;
+};
 
 export function compileJob(
   scene: Scene,
   device: DeviceProfile,
   laserPowerScaleVersion: LaserPowerScaleVersion = 2,
+  options: CompileJobOptions = {},
 ): Job {
   const groups: Group[] = [];
   const diagnostics: JobDiagnostic[] = [];
-  const output = { groups, diagnostics, vectorRun: 0 };
+  // ADR-626: broken-contour outlines are kept for laser leads only when some
+  // operation asks for leads.
+  const output = {
+    groups,
+    diagnostics,
+    vectorRun: 0,
+    keepLeadRings: sceneAsksForLaserLeads(scene),
+    kerfSides: lazyKerfSceneSides(options.sideScene ?? scene, device),
+  };
   const completeSceneObjects = [...scene.objects, ...(scene.outputDependencies ?? [])];
   const jigRuns = registrationJigCompilationRuns(scene);
   if (jigRuns !== null) {
@@ -59,7 +77,13 @@ export function compileJob(
 }
 
 function appendOperationCompilation(
-  output: { readonly groups: Group[]; readonly diagnostics: JobDiagnostic[]; vectorRun: number },
+  output: {
+    readonly groups: Group[];
+    readonly diagnostics: JobDiagnostic[];
+    vectorRun: number;
+    readonly keepLeadRings: boolean;
+    readonly kerfSides: () => KerfSceneSides;
+  },
   vectorObjects: ReadonlyArray<SceneObject>,
   rasterObjects: ReadonlyArray<SceneObject>,
   layer: Layer,
@@ -76,6 +100,8 @@ function appendOperationCompilation(
         device,
         priorityObjectId,
         `vector:${output.vectorRun++}:${operationLayer.id}`,
+        output.keepLeadRings,
+        output.kerfSides,
       );
       for (const group of vector.groups) {
         if (!hasFocusOutputIntent(group, operationLayer)) continue;

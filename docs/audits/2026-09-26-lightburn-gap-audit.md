@@ -84,7 +84,7 @@ Sierra variants).
 | LBG-C11 | Hide Backlash, Cut in Direction Order, Reduce Direction Changes | `R/OptimizationSettings/` | Missing | S-M | open |
 | LBG-C12 | Flood fill travel planning | `R/CutSettingsEditor/FillMode/` | Island Fill covers part of it (`src/core/job/island-fill.ts`) | L | open |
 | LBG-C13 | Remove Overlapping Lines tolerance you can set | `R/OptimizationSettings/` | Fixed tolerance (`src/core/job/remove-cut-overlaps.ts`) | S | Built (ADR-499) |
-| LBG-C14 | Laser lead-in and lead-out | `R/CutSettingsEditor/LineMode/` | Laser-off contour entry on the 4040-safe profile only | M | DECISION (PROJECT.md lists laser lead-in/out out of scope) |
+| LBG-C14 | Laser lead-in and lead-out | `R/CutSettingsEditor/LineMode/` | Laser-off contour entry on the 4040-safe profile only | M | Built (ADR-626): scrap side found per contour, leads that do not fit shortened or left out |
 | LBG-C15 | Laser Z offset and Z step per pass | `R/CutSettingsEditor/LineMode/` | Missing | M | DECISION (laser Z out of scope in PROJECT.md) |
 
 ## Gaps: images and trace
@@ -145,10 +145,10 @@ These are recorded project rules, not oversights. Each needs Johann's call befor
 
 - **Start needs a completed Frame** (PROJECT.md non-negotiable 21, ADR-228). LightBurn starts at once.
 - **Start and End G-code are hard-coded** (PROJECT.md "Out of scope"; LIGHTBURN-STUDY D-05).
-- **Running an external G-code file** is out of scope; opened files go to the inspector.
+- ~~**Running an external G-code file**~~ — decided: an opened file runs through its own Frame and Start review (ADR-630).
 - **Macros are one command each** (ADR-293).
 - **Laser Z per layer, Focus Test** (laser Z out of scope in PROJECT.md).
-- **Inch display units** (PROJECT.md: the internal model is millimetres) and **system font listing**.
+- ~~**Inch display units**~~ and ~~**system font listing**~~ — decided: an Inches display preference (ADR-629) and **System fonts...** (ADR-628). The G-code Inspector is free (ADR-627).
 
 ## Build plan
 

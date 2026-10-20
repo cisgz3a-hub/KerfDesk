@@ -22,7 +22,7 @@ import {
   supportReportCommand,
   termsCommand,
 } from './support-command-family';
-import { findCommandCommand, tutorialsCommand } from './help-command-family';
+import { findCommandCommand, licenseNoticeCommand, tutorialsCommand } from './help-command-family';
 import { editCommands } from './edit-command-family';
 import { arrangeCommands } from './arrange-command-family';
 import { laserCommands } from './laser-command-family';
@@ -57,6 +57,7 @@ export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       ...(ctx.openDataFolder === undefined ? [] : [openDataFolderCommand(ctx.openDataFolder)]),
       discussionsCommand(),
       pricingCommand(),
+      licenseNoticeCommand(),
       termsCommand(),
       privacyCommand(),
       refundsCommand(),

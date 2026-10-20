@@ -5,6 +5,7 @@ import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
 import { rememberSerialPort } from './serial-port-memory';
 import { installAutoConnect } from '../app/use-auto-connect-controller';
+import { resetAutoConnectSession } from './auto-connect-session';
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   let resolve!: (value: T) => void;
@@ -36,6 +37,8 @@ function connection(): SerialConnection {
 beforeEach(() => {
   localStorage.clear();
   useLaserStore.setState(initialLaserState());
+  // The auto-connect pause outlives the laser store (ADR-639).
+  resetAutoConnectSession();
 });
 
 afterEach(async () => {

@@ -13,7 +13,7 @@
 
 import { idleCollector, type SettingsCollectorState } from '../../core/controllers/grbl';
 import * as detectedSettings from './detected-settings-action';
-import { interactiveControllerOperation } from './laser-controller-operation';
+import { readOnlyControllerOperation } from './laser-controller-operation';
 import { retainControllerReportUnits } from './controller-report-units';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
@@ -34,9 +34,10 @@ export const EMPTY_SETTINGS_RESPONSE_MESSAGE =
 export function beginConsoleSettingsRead(set: SetFn, get: GetFn, refs: SettingsReadRefs): void {
   detectedSettings.beginSettingsCollection(refs, get().controllerSessionEpoch);
   set({
-    controllerOperation: interactiveControllerOperation(
+    // A typed `$$` reads like the rail's Read button: it moves nothing, so a
+    // link lost during it raises no E-stop banner (ADR-639).
+    controllerOperation: readOnlyControllerOperation(
       detectedSettings.SETTINGS_READ_OPERATION_LABEL,
-      'terminal-exchange',
     ),
     detectedSettings: null,
     controllerSettings: retainControllerReportUnits(get().controllerSettings),

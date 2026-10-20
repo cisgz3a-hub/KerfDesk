@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { formatDuration } from '../../core/job';
 import { CANVAS_MOTION_SLOT_ID } from '../common/status-bar-slots';
+import { useCameraStore } from '../state/camera-store';
 import { cncPassPosition, type CncPassPosition } from '../state/canvas-pass-progress';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
 
@@ -13,9 +14,10 @@ export function CanvasMotionBadge(props: {
   const overlay = props.overlay;
   const nowMs = useElapsedTick(overlay);
   const slot = useStatusBarSlot();
+  const cameraOverlay = useCameraStore((state) => state.overlayVisible);
   if (overlay === null) return null;
   const passes = overlayPassPosition(overlay);
-  const message = badgeMessage(overlay, passes, nowMs);
+  const message = badgeMessage(overlay, passes, nowMs, cameraOverlay);
   return (
     <>
       <CanvasMotionProbe overlay={overlay} passes={passes} nowMs={nowMs} />
@@ -204,17 +206,28 @@ function markerDescription(overlay: CanvasMotionOverlay): string {
   return `${frameText}; ${jobText}${previous}`;
 }
 
+// Why an idle plan's markers may not show where the job burns.
+function idleViewReason(overlay: CanvasMotionOverlay, cameraOverlay: boolean): string | null {
+  const frame = overlay.plan.coordinateFrame;
+  if (frame.kind !== 'relative') return overlay.plan.unavailableReason;
+  if (frame.bed === undefined) return 'Relative view — physical bed position unverified';
+  // A User Origin job drawn over its artwork knows its bed position (ADR-642).
+  // The camera's picture shows the real bed, where the route drawn over the
+  // artwork does not burn, so that view says so.
+  return cameraOverlay
+    ? 'Drawn over artwork — burns at your origin'
+    : overlay.plan.unavailableReason;
+}
+
 function badgeMessage(
   overlay: CanvasMotionOverlay,
   passes: CncPassPosition | null,
   nowMs: number,
+  cameraOverlay: boolean,
 ): string | null {
   const run = overlay.run;
-  const relative = overlay.plan.coordinateFrame.kind === 'relative';
   if (run === null) {
-    const reason = relative
-      ? 'Relative view — physical bed position unverified'
-      : overlay.plan.unavailableReason;
+    const reason = idleViewReason(overlay, cameraOverlay);
     if (overlay.planIsCurrent !== false) return reason;
     return `Updating start markers${reason === null ? '' : ` • ${reason}`}`;
   }

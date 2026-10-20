@@ -1,4 +1,5 @@
 import { connectOptionsForDevice } from '../commands/connect-options';
+import { pauseAutoConnect } from '../state/auto-connect-session';
 import { isActiveJob, setupCommandBlockMessage } from '../state/laser-store-helpers';
 import { hasPendingControllerWrite } from '../state/laser-start-queue-fence';
 import { useLaserStore } from '../state/laser-store';
@@ -57,25 +58,47 @@ export async function executeConnect(
   const device = (context.options.store ?? useStore).getState().project.device;
   await settle(
     operation,
-    // 'automatic' never opens a port picker: it reuses the port the operator chose on this PC.
+    // 'remembered-only' never opens a port picker: it reuses the port the
+    // operator chose on this PC. A person asked for it, so unlike the
+    // background auto-connect its failure is reported, and once the port opens
+    // it lifts the pause a Disconnect set (ADR-639).
     () =>
-      useLaserStore
-        .getState()
-        .connect(platform, { ...connectOptionsForDevice(device), portSelection: 'automatic' }),
+      useLaserStore.getState().connect(platform, {
+        ...connectOptionsForDevice(device),
+        portSelection: 'remembered-only',
+      }),
     'The machine could not connect. Connect it once on the PC.',
     'Connected.',
   );
-  if (useLaserStore.getState().connection.kind !== 'connected') {
-    operation.committed = false;
-    throw new MachineRefusal(
-      'No saved connection was found. Connect the machine once on the PC, then try again.',
+  const connection = useLaserStore.getState().connection;
+  if (connection.kind === 'connected') return;
+  operation.committed = false;
+  // The saved port was found but would not open, usually because another
+  // program holds it. That is not a missing saved connection.
+  if (connection.kind === 'failed') throw connectFailureRefusal(connection.error);
+  throw new MachineRefusal(
+    'No saved connection was found. Connect the machine once on the PC, then try again.',
+  );
+}
+
+function connectFailureRefusal(error: string): RemoteFault {
+  if (/failed to open serial port/i.test(error)) {
+    return new MachineRefusal(
+      'The machine’s port is busy or unavailable on the PC. Close any other program using it, then try again.',
     );
   }
+  return refusal(
+    new Error(`The machine could not connect: ${error}`),
+    'The machine could not connect. Check it on the PC.',
+  );
 }
 
 export async function executeDisconnect(operation: OwnedMachineOperation): Promise<void> {
   const blocked = disconnectMachineBlockMessage(useLaserStore.getState());
   if (blocked !== null) throw new MachineRefusal(blocked);
+  // Someone ended the connection remotely: a plug-in or power-cycle must not
+  // reopen it by itself until someone connects again (ADR-639).
+  pauseAutoConnect();
   await settle(
     operation,
     () => useLaserStore.getState().disconnect(),
