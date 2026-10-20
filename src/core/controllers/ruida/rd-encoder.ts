@@ -16,6 +16,7 @@
 
 import type { DeviceProfile } from '../../devices';
 import type { CutGroup, Job, JobOriginPlacement } from '../../job';
+import type { Vec2 } from '../../scene';
 import type { RdReferencePoint } from './rd-file-commands';
 import { writeRdJob } from './rd-job-writer';
 import { planRdMotion, type RdMotionPart } from './rd-motion-plan';
@@ -127,21 +128,39 @@ function validateRepresentation(groups: ReadonlyArray<CutGroup>): RdEncodeError 
     for (let segmentIndex = 0; segmentIndex < group.segments.length; segmentIndex += 1) {
       const segment = group.segments[segmentIndex];
       if (segment === undefined) continue;
-      for (let pointIndex = 0; pointIndex < segment.polyline.length; pointIndex += 1) {
-        const point = segment.polyline[pointIndex];
-        if (point === undefined) continue;
-        for (const axis of ['x', 'y'] as const) {
-          const valueUm = mmToUm(point[axis]);
-          if (!isCoord35Encodable(valueUm)) {
-            return {
-              kind: 'coordinate-out-of-range',
-              path: `layer(${group.layerId}).segments[${segmentIndex}].polyline[${pointIndex}].${axis}`,
-              valueUm,
-              minUm: RUIDA_COORD35_MIN,
-              maxUm: RUIDA_COORD35_MAX,
-            };
-          }
-        }
+      const path = `layer(${group.layerId}).segments[${segmentIndex}]`;
+      // ADR-626: a final pass with an overcut runs its own burn; check it too.
+      const error =
+        polylineCoordinateError(segment.polyline, `${path}.polyline`) ??
+        (segment.finalPassBurn === undefined
+          ? null
+          : polylineCoordinateError(
+              segment.finalPassBurn.polyline,
+              `${path}.finalPassBurn.polyline`,
+            ));
+      if (error !== null) return error;
+    }
+  }
+  return null;
+}
+
+function polylineCoordinateError(
+  polyline: ReadonlyArray<Vec2>,
+  path: string,
+): RdEncodeError | null {
+  for (let pointIndex = 0; pointIndex < polyline.length; pointIndex += 1) {
+    const point = polyline[pointIndex];
+    if (point === undefined) continue;
+    for (const axis of ['x', 'y'] as const) {
+      const valueUm = mmToUm(point[axis]);
+      if (!isCoord35Encodable(valueUm)) {
+        return {
+          kind: 'coordinate-out-of-range',
+          path: `${path}[${pointIndex}].${axis}`,
+          valueUm,
+          minUm: RUIDA_COORD35_MIN,
+          maxUm: RUIDA_COORD35_MAX,
+        };
       }
     }
   }

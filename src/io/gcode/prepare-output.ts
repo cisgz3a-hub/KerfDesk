@@ -43,6 +43,7 @@ import {
   validateOutputScope,
   type OutputScope,
   type Project,
+  type Scene,
   type Vec2,
 } from '../../core/scene';
 import {
@@ -56,6 +57,8 @@ import { hasContributingFocusMotion } from '../../core/preflight/focus-contribut
 import { contourEntryBoundsForDevice, withContourEntryBounds } from '../../core/job/contour-entry';
 import { placeCncParks } from '../../core/job/job-origin';
 import { placeLaserFinish } from '../../core/job/laser-finish';
+import { applyLaserLeads } from '../../core/job/apply-laser-leads';
+import { laserLeadOptions } from '../../core/job/laser-lead-rotary';
 import {
   CURRENT_LASER_POWER_SCALE_VERSION,
   type LaserPowerScaleVersion,
@@ -119,7 +122,7 @@ export function prepareOutput(
   try {
     const input = prepareOutputInput(project, options);
     if (!input.ok) return input.prepared;
-    const compiled = compileForMachine(input.project);
+    const compiled = compileForMachine(input.project, input.sourceProject.scene);
     if (compiled.kind === 'relief-materialization-failed') {
       return { ok: false, preflight: reliefMaterializationFailure(compiled) };
     }
@@ -275,11 +278,19 @@ export function completePreparedOutput(
     input.project.device,
   );
   const target = jobStartTarget(input.project, optimized, offset, startOptions);
+  const started = target === null ? optimized : applyJobStartPoint(optimized, target, startOptions);
   return {
     ok: true,
     project: input.project,
     laserPowerScaleVersion: CURRENT_LASER_POWER_SCALE_VERSION,
-    job: target === null ? optimized : applyJobStartPoint(optimized, target, startOptions),
+    // ADR-626: leads join each contour where the beam really starts, so they
+    // follow the planner and the job start point. A job without leads is
+    // returned as is. The scrap side is judged among the whole scene's
+    // contours, so the output scope cannot change it (Amendment 1).
+    job: applyLaserLeads(started, {
+      ...laserLeadOptions(input.project.device, input.project.machine, entryBounds),
+      scene: input.sourceProject.scene,
+    }),
     jobOriginOffset: offset,
     advisories: input.advisories,
   };
@@ -334,12 +345,17 @@ function jobStartTarget(
 }
 
 // One compile entry per machine kind: the project's machine choice routes to
-// the CNC compiler (depth passes, tool offsets) or the laser compiler.
-function compileForMachine(project: Project): CncJobCompilationResult {
+// the CNC compiler (depth passes, tool offsets) or the laser compiler. The
+// laser's kerf sides are judged among the whole scene, output scope aside
+// (ADR-486 Amd 3), as laser leads' are.
+function compileForMachine(project: Project, sideScene: Scene): CncJobCompilationResult {
   const machine = project.machine;
   return machine !== undefined && machine.kind === 'cnc'
     ? compileCncJobResult(project.scene, project.device, machine)
-    : { kind: 'compiled', job: compileJob(project.scene, project.device) };
+    : {
+        kind: 'compiled',
+        job: compileJob(project.scene, project.device, undefined, { sideScene }),
+      };
 }
 
 // Absolute artwork is in bed numbers, so a bed position (CNC park, ADR-392;
