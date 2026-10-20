@@ -9,13 +9,13 @@ import { ProjectSheetsBar } from '../commands/ProjectSheetsBar';
 import { CommandShell } from '../commands';
 import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
-import { useEdition } from '../licensing/edition';
 import { UpdatePrompt } from '../licensing/UpdatePrompt';
 import { LiveMotionBar, useJobShortcuts } from '../laser';
 import { MachineSetupDialogHost } from '../laser/device-setup';
 import { BoardCapturePanel } from '../laser/board-capture';
 import { JobReviewDialog } from '../laser/job-review';
 import { SecondPassHost } from '../laser/second-pass/SecondPassHost';
+import { WorkspaceSafetyNotice } from '../laser/WorkspaceSafetyNotice';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { DesignLibraryHost } from '../library/DesignLibraryHost';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
@@ -30,6 +30,7 @@ import { useAutosave } from './use-autosave';
 import { AutosaveRecoveryControl } from './AutosaveRecoveryControl';
 import { ProProjectDesktopDialog } from './ProProjectDesktopDialog';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
+import { useFalconPointerLink } from './use-falcon-pointer-link';
 import { useJobWatch } from '../camera/job-watch/job-watch-runner';
 import { useAutoConnectController } from './use-auto-connect-controller';
 import { useCncLibraryPersistence } from './use-cnc-library-persistence';
@@ -137,6 +138,7 @@ function AppLifecycle(): null {
   useSpacePan();
   useOperationColorPeek();
   useActiveJobWakeLock();
+  useFalconPointerLink();
   useJobWatch();
   useAutoConnectController();
   useJobCheckpoint();
@@ -155,12 +157,8 @@ function AppLifecycle(): null {
 function CanvasArea(): JSX.Element {
   const showGcode = useCanvasViewStore((store) => store.showGcode);
   const setShowGcode = useCanvasViewStore((store) => store.setShowGcode);
-  const { requestPro } = useEdition();
-  // The G-code 3D view is the G-code Inspector's, a Pro tool (ADR-540).
-  const changeView = (next: boolean): void => {
-    if (next) requestPro('gcode-inspector', () => setShowGcode(true));
-    else setShowGcode(false);
-  };
+  // The G-code 3D view is the G-code Inspector's, free in every edition (ADR-627).
+  const changeView = (next: boolean): void => setShowGcode(next);
   const accessories = (
     <>
       <WorkspaceCameraOverlay />
@@ -169,6 +167,7 @@ function CanvasArea(): JSX.Element {
       {!showGcode ? <CncStockCanvasHud /> : null}
       <MachineSetupBanner />
       <UpdatePrompt />
+      <WorkspaceSafetyNotice />
     </>
   );
   return (

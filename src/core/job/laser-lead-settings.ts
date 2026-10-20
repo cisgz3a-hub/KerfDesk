@@ -135,8 +135,9 @@ function finiteOr(value: number | undefined, fallback: number): number {
 }
 
 /** Whether an artwork's override changes what `effective` cuts, as output reads
- * it: lead fields count only when the operation asks for leads, so a lead shape
- * stored with both leads off changes nothing, as leads off promise. */
+ * it. Lead shape and side stored with both leads off change nothing, as leads
+ * off promise, so an override of only those is none. An override that sets a
+ * lead switch counts: it may turn off leads its operation has on. */
 export function hasOutputOperationOverride(
   effective: Layer,
   object: Pick<SceneObject, 'operationOverride'>,
@@ -145,6 +146,8 @@ export function hasOutputOperationOverride(
   if (override === undefined) return false;
   return (
     laserLeadSpecFor(effective) !== null ||
-    Object.keys(override).some((key) => !isLaserLeadSettingKey(key))
+    Object.keys(override).some((key) => !isLaserLeadSettingKey(key) || LEAD_SWITCHES.has(key))
   );
 }
+
+const LEAD_SWITCHES: ReadonlySet<string> = new Set(['leadInEnabled', 'leadOutEnabled']);

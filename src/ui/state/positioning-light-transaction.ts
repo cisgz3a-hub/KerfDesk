@@ -1,10 +1,18 @@
 import type { StatusReport } from '../../core/controllers/grbl';
+import { isFalconPointerLight, type PositioningLight } from '../../core/devices/positioning-light';
+import { prepareFalconPointer, switchFalconPointer } from './falcon-pointer-link';
 import {
   cancelFreshControllerStatusWait,
   waitForFreshControllerStatus,
 } from './laser-controller-status-wait';
-import { cancelControllerLifecycleRefs, startControllerCommand } from './laser-interactive-command';
+import {
+  cancelControllerLifecycleRefs,
+  ControllerCommandRefusedError,
+  startControllerCommand,
+} from './laser-interactive-command';
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { recordStatusPollTick } from './laser-status-poll-schedule';
+import { jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWrite } from './laser-safe-write';
 
@@ -14,6 +22,48 @@ export type PositioningLightTransaction = {
   readonly write: SafeWrite;
   readonly assertCurrent: () => void;
 };
+
+/** Whether a light transaction may start now; checked before it takes the controller. */
+export function assertPositioningLightAdmission(state: LaserState, refs: LiveRefs): void {
+  if (state.connection.kind !== 'connected' || refs.connection === null)
+    throw new Error('Connect a controller before using the positioning light.');
+  if (refs.driver.capabilities.transport === 'file-only')
+    throw new Error('This controller supports file export only, not a live positioning light.');
+  const blocked = jogFrameCommandBlockMessage(state);
+  if (blocked !== null) throw new Error(blocked);
+  if (
+    state.autofocusBusy ||
+    state.probeBusy ||
+    refs.controllerStatusWait != null ||
+    state.pendingUntrackedAcks > 0 ||
+    pendingTransportWriteCount(state) > 0
+  )
+    throw new Error('Wait for the current controller command to settle.');
+}
+
+/**
+ * Find the Falcon before a light transaction takes the controller, when it may
+ * switch the Falcon pointer (ADR-635): discovery sends the controller nothing
+ * and can take seconds, so it must not hold up jog, Frame or Start. The request
+ * is admitted again once it is done. Throws, with nothing sent, when the
+ * pointer cannot be reached.
+ */
+export async function findFalconBeforeHold(
+  set: (patch: Partial<LaserState>) => void,
+  get: () => LaserState,
+  refs: LiveRefs,
+  lights: ReadonlyArray<PositioningLight | undefined>,
+): Promise<void> {
+  if (!lights.some((light) => isFalconPointerLight(light))) return;
+  try {
+    await prepareFalconPointer();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    set({ lastWriteError: message, log: pushLog(get(), `[lf2] Positioning light: ${message}`) });
+    throw error;
+  }
+  assertPositioningLightAdmission(get(), refs);
+}
 
 /** Each physical step owns its exact terminal reply. Driver shell responses
  * (Smoothie's `fire off`) are classified by the existing driver as an ACK. */
@@ -31,6 +81,26 @@ export async function positioningLightCommand(
     timeoutMode: 'non-idle-status-activity',
   });
   context.assertCurrent();
+}
+
+/** One light state inside the owned transaction: the mapping's G-code line, or
+ * the Falcon pointer's network switch, which the controller never sees (ADR-635). */
+export async function switchLight(
+  context: PositioningLightTransaction,
+  mapping: PositioningLight,
+  on: boolean,
+): Promise<void> {
+  if (!isFalconPointerLight(mapping))
+    return positioningLightCommand(context, on ? mapping.onCommand : mapping.offCommand);
+  context.assertCurrent();
+  await switchFalconPointer(on);
+  context.assertCurrent();
+}
+
+/** The GRBL-family error code that refused a light exchange, or null. */
+export function grblRefusalCode(error: unknown, { kind }: LiveRefs['driver']): number | null {
+  if (!(error instanceof ControllerCommandRefusedError)) return null;
+  return ['grbl-v1.1', 'grblhal', 'fluidnc'].includes(kind) ? error.controllerErrorCode : null;
 }
 
 /** Several lines written together as one owned exchange; every line must

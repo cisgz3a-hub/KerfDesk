@@ -19,8 +19,8 @@ fault.
   dot reads **Connecting…** (waiting for its first reply) and then **Reading
   settings…** (after a reset, and while `$$` runs), with an amber dot. It turns
   to **Connected** when the read ends, whether it succeeded or failed. No
-  notice announces these phases; ADR-611's toolbar notice still appears only
-  for a failed read on a controller that stopped answering.
+  notice announces these phases; the recovery card over the canvas (ADR-642)
+  still opens only for a failed read on a controller that stopped answering.
 - The "Machine settings detected" toast appears when the read offers profile
   updates (a detected value differs from the profile), or when its review
   items (homing and limit settings, unknown settings) differ from the last read
@@ -29,7 +29,8 @@ fault.
   confirms its first read again. Machine Setup still shows every read.
 - Titles say what happened to the machine. A failed read reads **Couldn’t read
   machine settings**; a controller that stopped answering reads **Machine
-  stopped answering**, in the toolbar notice and in Controller info. The detail
+  stopped answering**, on the canvas recovery card, its folded button and in
+  Controller info. The detail
   text, Retry and Reconnect are unchanged, and Reconnect is still offered
   whenever `controllerReconnectRecommended` holds.
 

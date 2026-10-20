@@ -1,7 +1,8 @@
-import type { ControllerKind } from './device-profile';
+import type { ControllerCommandSet, ControllerKind } from './device-profile';
 
 /** A separate pointer, explicitly mapped to the machine's documented accessory output. */
-export type PositioningLight = {
+export type GcodePositioningLight = {
+  readonly kind?: undefined;
   readonly onCommand: string;
   readonly offCommand: string;
   /** Pointer spot minus laser spot, in bed coordinates (millimetres). */
@@ -10,6 +11,32 @@ export type PositioningLight = {
   /** After a clean ordinary Frame, centre the pointer on the framed artwork and switch it on (ADR-605). */
   readonly afterFrame?: boolean;
 };
+
+/** The Falcon A1 Pro's own head pointer. Its firmware has no G-code for it;
+ * it is switched over the machine's HTTP link, as Creality's software does (ADR-635). */
+export type FalconPointerLight = {
+  readonly kind: 'creality-falcon-pointer';
+  readonly offsetXmm: number;
+  readonly offsetYmm: number;
+  readonly afterFrame?: boolean;
+};
+
+export type PositioningLight = GcodePositioningLight | FalconPointerLight;
+
+export const FALCON_POINTER_LIGHT: FalconPointerLight = {
+  kind: 'creality-falcon-pointer',
+  offsetXmm: 0,
+  offsetYmm: 0,
+};
+
+/** The command set whose machine serves the pointer's HTTP switch. */
+export const FALCON_POINTER_COMMAND_SET: ControllerCommandSet = 'creality-falcon-a1-pro';
+
+export function isFalconPointerLight(
+  light: PositioningLight | undefined,
+): light is FalconPointerLight {
+  return light?.kind === 'creality-falcon-pointer';
+}
 
 export const MAX_POSITIONING_LIGHT_OFFSET_MM = 1000;
 
@@ -43,6 +70,7 @@ export function positioningLightIssue(
     return 'Positioning light must contain its on/off commands and X/Y offsets.';
   }
   const light = value as Record<string, unknown>;
+  if (light['kind'] !== undefined) return falconPointerIssue(light);
   for (const field of ['onCommand', 'offCommand'] as const) {
     const issue = commandIssue(light[field], field, controllerKind);
     if (issue !== null) return issue;
@@ -52,10 +80,39 @@ export function positioningLightIssue(
   if (canonicalCommand(onCommand) === canonicalCommand(offCommand)) {
     return 'Positioning light on and off commands must be different.';
   }
-  if (light['afterFrame'] !== undefined && typeof light['afterFrame'] !== 'boolean') {
-    return 'Positioning light "Centre & LED after Frame" must be on or off.';
-  }
-  return digitalOutputPairIssue(onCommand, offCommand, controllerKind) ?? offsetIssue(light);
+  return (
+    afterFrameIssue(light) ??
+    digitalOutputPairIssue(onCommand, offCommand, controllerKind) ??
+    offsetIssue(light)
+  );
+}
+
+/** The light the device can actually switch: the stored mapping must be valid,
+ * and the Falcon pointer exists only on the Falcon A1 Pro command set. */
+export function devicePositioningLightIssue(device: {
+  readonly positioningLight?: unknown;
+  readonly controllerKind?: ControllerKind | undefined;
+  readonly controllerCommandSet?: ControllerCommandSet | undefined;
+  readonly gcodeDialect?: { readonly dialectId?: string } | undefined;
+}): string | null {
+  const light = device.positioningLight;
+  const issue = positioningLightIssue(light, device.controllerKind, device.gcodeDialect?.dialectId);
+  if (issue !== null || !isFalconPointerLight(light as PositioningLight | undefined)) return issue;
+  return device.controllerCommandSet === FALCON_POINTER_COMMAND_SET
+    ? null
+    : 'The Falcon red pointer needs the Creality Falcon A1 Pro machine profile.';
+}
+
+function falconPointerIssue(light: Record<string, unknown>): string | null {
+  if (light['kind'] !== 'creality-falcon-pointer')
+    return 'Positioning light type is not one KerfDesk knows.';
+  return afterFrameIssue(light) ?? offsetIssue(light);
+}
+
+function afterFrameIssue(light: Record<string, unknown>): string | null {
+  return light['afterFrame'] !== undefined && typeof light['afterFrame'] !== 'boolean'
+    ? 'Positioning light "Centre & LED after Frame" must be on or off.'
+    : null;
 }
 
 function commandIssue(
@@ -150,12 +207,20 @@ export function normalizePositioningLight(
   if (value === undefined || positioningLightIssue(value, controllerKind, gcodeDialectId) !== null)
     return undefined;
   const light = value as PositioningLight;
+  const afterFrame = light.afterFrame === true ? { afterFrame: true } : {};
+  if (isFalconPointerLight(light))
+    return {
+      kind: light.kind,
+      offsetXmm: light.offsetXmm,
+      offsetYmm: light.offsetYmm,
+      ...afterFrame,
+    };
   return {
     onCommand: light.onCommand.trim(),
     offCommand: light.offCommand.trim(),
     offsetXmm: light.offsetXmm,
     offsetYmm: light.offsetYmm,
-    ...(light.afterFrame === true ? { afterFrame: true } : {}),
+    ...afterFrame,
   };
 }
 

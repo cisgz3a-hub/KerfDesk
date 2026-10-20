@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createProject, type ColoredPath } from '../../../core/scene';
+import { createProject, IDENTITY_TRANSFORM, type ColoredPath } from '../../../core/scene';
 import { DEFAULT_TRACE_OPTIONS } from '../../../core/trace';
 import type { PreparedTrace } from '../../trace/prepared-trace';
 import {
@@ -65,6 +65,31 @@ describe('inline jig trace import', () => {
     expect(object.traceMode).toBe('centerline');
     expect(object.transform.scaleX).toBeCloseTo(0.5);
     expect(object.transform.scaleY).toBeCloseTo(1);
+  });
+
+  it('lays a trace of a jig image over that image at its placed size', async () => {
+    const image = {
+      kind: 'raster-image' as const,
+      id: 'photo',
+      source: 'logo.png',
+      pixelWidth: 1000,
+      pixelHeight: 500,
+      bounds: { minX: 0, minY: 0, maxX: 40, maxY: 20 },
+      transform: { ...IDENTITY_TRANSFORM, x: 150, y: 175, rotationDeg: 90 },
+      color: '#123456',
+      dither: 'threshold' as const,
+      linesPerMm: 10,
+    };
+    const object = await buildJigTraceObject({
+      source: { ...source, image },
+      options,
+      preparedTrace: prepared,
+      project: createProject(),
+    });
+    // 100 x 50 trace grid across the 40 x 20 mm image, at its position and turn.
+    expect(object.transform).toMatchObject({ x: 150, y: 175, rotationDeg: 90 });
+    expect(object.transform.scaleX).toBeCloseTo(0.4);
+    expect(object.transform.scaleY).toBeCloseTo(0.4);
   });
 
   it('does not publish empty trace geometry', async () => {
