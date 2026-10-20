@@ -1,6 +1,7 @@
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { waitForStartupSplash } from './startup-splash';
 
 export type FixtureEvent = Readonly<Record<string, unknown>> & { readonly kind: string };
 export interface OpenFileFixture {
@@ -32,7 +33,31 @@ const browserFixtureSource = readFileSync(browserFixturePath, 'utf8').replace(
   JSON.stringify(readFileSync(projectFixturePath, 'utf8')),
 );
 
-export const test = base.extend<{ kerfdesk: KerfDeskFixture }>({
+export const test = base.extend<{
+  kerfdesk: KerfDeskFixture;
+  /** 'manual' leaves splash timing to specs that observe the startup screen itself. */
+  startupSplash: 'wait' | 'manual';
+}>({
+  startupSplash: ['wait', { option: true }],
+  page: async ({ page, startupSplash }, use) => {
+    if (startupSplash === 'wait') {
+      // The workspace stays inert behind the startup hold, so a navigation
+      // is complete for a spec only once the splash has revealed it.
+      const goto = page.goto.bind(page);
+      const reload = page.reload.bind(page);
+      page.goto = async (url, options) => {
+        const response = await goto(url, options);
+        await waitForStartupSplash(page);
+        return response;
+      };
+      page.reload = async (options) => {
+        const response = await reload(options);
+        await waitForStartupSplash(page);
+        return response;
+      };
+    }
+    await use(page);
+  },
   kerfdesk: [
     async ({ page }, use) => {
       const pageErrors: Error[] = [];
@@ -145,4 +170,4 @@ function formatPageErrors(errors: readonly Error[]): string {
     : errors.map((error) => error.stack).join('\n');
 }
 
-export { expect, type Locator, type Page };
+export { expect, waitForStartupSplash, type Locator, type Page };

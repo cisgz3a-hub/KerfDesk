@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { TextBoxSettings } from '../../core/scene/text-box';
 import { evaluateNumericEntry } from '../../core/numeric-expression';
 import type { TextRenderResult } from '../../core/text';
-import { renderTextGeometry } from './render-text-geometry';
+import { useTextWorkerSession } from './use-text-worker-session';
 import type { DialogFields, DialogValues } from './use-text-dialog-fields';
 
 export function TextBoxFields({ fields }: { readonly fields: DialogFields }): JSX.Element {
@@ -90,10 +90,11 @@ function BoxLength(props: {
 function TextBoxPreview({ values }: { readonly values: DialogValues }): JSX.Element {
   const [preview, setPreview] = useState<TextRenderResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const textWorker = useTextWorkerSession();
   useEffect(() => {
     let current = true;
     const timer = window.setTimeout(() => {
-      void renderTextGeometry(values).then(
+      void textWorker.render(values).then(
         (result) => {
           if (current) {
             setPreview(result);
@@ -112,7 +113,7 @@ function TextBoxPreview({ values }: { readonly values: DialogValues }): JSX.Elem
       current = false;
       window.clearTimeout(timer);
     };
-  }, [values]);
+  }, [values, textWorker]);
   const layout = preview?.textBoxLayout;
   if (layout === undefined || preview === null)
     return <p role="status">{error ?? 'Updating text frame…'}</p>;

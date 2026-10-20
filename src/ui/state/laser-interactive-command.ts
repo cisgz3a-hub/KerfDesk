@@ -123,14 +123,16 @@ export type FreshIdleWaitOptions = {
 const DEFAULT_COMMAND_TIMEOUT_MS = 8_000;
 const DEFAULT_IDLE_TIMEOUT_MS = 8_000;
 
-/** The controller answered the owned line with a terminal `error:N`. GRBL-family
- * firmware returns it when the line fails to parse or validate, before running
- * it, so the line itself caused no motion. Distinct from ALARM, timeout and
- * cancellation, after which the machine state is uncertain. */
+/** The owned exchange was rejected. This class alone does not prove that the
+ * command had no side effects: generic faults and Marlin handler errors also
+ * reject exchanges. A normalized numeric code is retained only for an immediate
+ * structured terminal error; callers must qualify its protocol and meaning. */
 export class ControllerCommandRefusedError extends Error {
-  constructor(message: string) {
+  readonly controllerErrorCode: number | null;
+  constructor(message: string, code: number | null = null) {
     super(message);
     this.name = 'ControllerCommandRefusedError';
+    this.controllerErrorCode = code;
   }
 }
 
@@ -142,11 +144,10 @@ export function startControllerCommand(
   write: CommandWriteFn,
   options: StartControllerCommandOptions,
 ): Promise<ReadonlyArray<string>> {
-  if (refs.controllerCommand !== null) {
+  if (refs.controllerCommand !== null)
     return Promise.reject(
       new Error('A controller command is already waiting for acknowledgement.'),
     );
-  }
   return new Promise((resolve, reject) => {
     const timeoutMs = options.timeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS;
     const request: ControllerCommandRequest = {
@@ -272,7 +273,8 @@ function rejectCommandFromTerminalResponse(
       return true;
     }
     const reason = response.raw ?? (response.code === null ? 'error' : `error:${response.code}`);
-    finishControllerCommand(refs, request, 'reject', new ControllerCommandRefusedError(reason));
+    const error = new ControllerCommandRefusedError(reason, response.code);
+    finishControllerCommand(refs, request, 'reject', error);
     return true;
   }
   if (response.kind === 'resend') {
@@ -367,9 +369,7 @@ export function observeControllerIdleWait(
       report.state === 'Idle' && completionAllowed ? request.idleReports + 1 : 0;
     return updateOperationIdleReports(state, request.kind, request.idleReports);
   });
-  if (request.idleReports >= request.requiredReports) {
-    finishIdleWait(refs, request, 'resolve');
-  }
+  if (request.idleReports >= request.requiredReports) finishIdleWait(refs, request, 'resolve');
 }
 
 export function cancelControllerLifecycleRefs(

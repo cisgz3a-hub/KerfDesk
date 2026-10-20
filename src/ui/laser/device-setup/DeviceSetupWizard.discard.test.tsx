@@ -2,7 +2,9 @@
 // is discarded (ADR-420 Amendment 4); Cancel without saving stays immediate.
 
 import { act } from 'react';
+import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
 import { machineKindOf } from '../../../core/scene';
 import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
@@ -31,8 +33,10 @@ describe('Machine Setup discard guard', () => {
     const onClose = vi.fn();
     const view = await renderWizard(onClose);
     try {
+      // Choosing "not listed" names the starter; naming it back puts it back.
       await chooseCncOnly(view.host);
       await act(async () => radio(view.host, 'Laser only').click());
+      await rename(view.host, DEFAULT_DEVICE_PROFILE.name);
       await pressEscape();
       expect(onClose).toHaveBeenCalledTimes(1);
     } finally {
@@ -91,8 +95,20 @@ describe('Machine Setup discard guard', () => {
 });
 
 async function chooseCncOnly(host: HTMLElement): Promise<void> {
+  const unlisted = host.querySelector('input[aria-label="My machine isn’t listed"]');
+  if (!(unlisted instanceof HTMLInputElement)) throw new Error('Not-listed choice missing');
+  await act(async () => unlisted.click());
   await act(async () => radio(host, 'CNC only').click());
   expect(radio(host, 'CNC only').checked).toBe(true);
+}
+
+async function rename(host: HTMLElement, name: string): Promise<void> {
+  const field = host.querySelector('input[aria-label="Machine name"]');
+  if (!(field instanceof HTMLInputElement)) throw new Error('Machine name missing');
+  await act(async () => {
+    field.value = name;
+    Simulate.change(field);
+  });
 }
 
 async function pressEscape(): Promise<void> {

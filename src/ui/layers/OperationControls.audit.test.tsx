@@ -31,9 +31,8 @@ async function openDisclosure(host: HTMLElement, label: string): Promise<void> {
 }
 
 describe('artwork control audit: operations', () => {
-  it('changes card visibility and output independently and opens More disclosure', async () => {
+  it('toggles card visibility and output independently, with no Show copy in More', async () => {
     arrangeTwo();
-    const id = layer().id;
     const name = layer().name;
     const host = await mount(<CutsLayersPanel />);
     await openDisclosure(host, 'All operations');
@@ -41,18 +40,46 @@ describe('artwork control audit: operations', () => {
     await click(button(card, `Hide operation ${name}`));
     expect(layer().visible).toBe(false);
     expect(layer().output).toBe(true);
+    await click(button(card, `Show operation ${name}`));
+    expect(layer().visible).toBe(true);
     const summary = card.querySelector('summary')!;
     await click(summary);
     expect(card.querySelector('details')?.open).toBe(true);
-    await click(input(card, `input[aria-label="Show ${name}"]`));
+    // The eye owns visibility; output keeps its one row switch (ADR-631).
+    expect(card.querySelectorAll('details input[type="checkbox"]')).toHaveLength(1);
+    await click(input(card, `input[aria-label="Include in output: ${name}"]`));
+    expect(layer().output).toBe(false);
     expect(layer().visible).toBe(true);
-    await click(input(card, `input[aria-label="Output ${name}"]`));
-    expect(useStore.getState().project.scene.layers.find((item) => item.id === id)?.output).toBe(
-      false,
-    );
-    expect(layer().visible).toBe(true);
+    const remove = button(card, `Delete operation ${name}`);
+    expect(remove.classList.contains('lf-btn--danger')).toBe(true);
+    expect(remove.closest('.lf-operation-menu__danger')).not.toBeNull();
+    expect(
+      button(card, `Copy settings from ${layer().color}`).closest('.lf-operation-menu__danger'),
+    ).toBeNull();
     await click(summary);
     expect(card.querySelector('details')?.open).toBe(false);
+  });
+
+  it('switches output for an operation whose artwork is all locked', async () => {
+    arrangeTwo();
+    const target = layer();
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          objects: state.project.scene.objects.map((object) =>
+            object.id === 'First' ? { ...object, locked: true } : object,
+          ),
+        },
+      },
+    }));
+    const host = await mount(<CutsLayersPanel />);
+    await openDisclosure(host, 'All operations');
+    await openDisclosure(host, `More controls for ${target.name}`);
+    await click(input(host, `input[aria-label="Include in output: ${target.name}"]`));
+    expect(layer().output).toBe(false);
+    expect(layer(1).output).toBe(true);
   });
 
   it('changes selected inspector Show and Output on the owning operation', async () => {

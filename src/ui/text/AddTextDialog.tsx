@@ -44,7 +44,12 @@ function DialogForm(props: {
   const fields = useTextDialogFields(state, project, selectedObjectId);
   const [submitting, setSubmitting] = useState(false);
   const request = useRef(0);
+  const submission = useRef<AbortController | null>(null);
   useEffect(() => {
+    const retire = (): void => retireSubmission(request, submission);
+    const unsubscribeDialog = useUiStore.subscribe((next) => {
+      if (next.textDialog !== state) retire();
+    });
     const unsubscribe = useStore.subscribe((next, previous) => {
       if (
         next.projectDocumentEpoch !== previous.projectDocumentEpoch &&
@@ -53,12 +58,16 @@ function DialogForm(props: {
         close();
     });
     return () => {
-      request.current += 1;
+      retire();
       unsubscribe();
+      unsubscribeDialog();
     };
   }, [close, state]);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
+    if (submission.current !== null) return;
+    const controller = new AbortController();
+    submission.current = controller;
     const token = ++request.current;
     const epoch = useStore.getState().projectDocumentEpoch;
     void commitText(state, fields.values, {
@@ -66,6 +75,10 @@ function DialogForm(props: {
       close,
       pushToast,
       setSubmitting,
+      signal: controller.signal,
+      finished: () => {
+        if (submission.current === controller) submission.current = null;
+      },
       isCurrent: () =>
         request.current === token &&
         useUiStore.getState().textDialog === state &&
@@ -81,8 +94,10 @@ function DialogForm(props: {
       >
         <h2 className="lf-dialog-title">{state.mode === 'add' ? 'Add Text' : 'Edit Text'}</h2>
       </div>
-      <ContentField value={fields.values.content} onChange={fields.setContent} />
-      <TextFormattingFields fields={fields} disabled={submitting} />
+      <fieldset disabled={submitting} style={textFieldsStyle}>
+        <ContentField value={fields.values.content} onChange={fields.setContent} />
+        <TextFormattingFields fields={fields} disabled={submitting} />
+      </fieldset>
       <FormActions
         mode={state.mode}
         canSubmit={
@@ -98,6 +113,15 @@ function DialogForm(props: {
   );
 }
 
+function retireSubmission(
+  request: { current: number },
+  submission: { current: AbortController | null },
+): void {
+  request.current += 1;
+  submission.current?.abort();
+  submission.current = null;
+}
+
 async function commitText(
   state: NonNullable<ReturnType<typeof useUiStore.getState>['textDialog']>,
   v: DialogValues,
@@ -107,11 +131,13 @@ async function commitText(
     readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
     readonly setSubmitting: (v: boolean) => void;
     readonly isCurrent: () => boolean;
+    readonly signal: AbortSignal;
+    readonly finished: () => void;
   },
 ): Promise<void> {
   ctx.setSubmitting(true);
   try {
-    const obj = await buildTextObject(state, v);
+    const obj = await buildTextObject(state, v, ctx.signal);
     if (!ctx.isCurrent()) return;
     ctx.upsert(obj, v.importedFont);
     ctx.close();
@@ -126,6 +152,7 @@ async function commitText(
     }
   } finally {
     if (ctx.isCurrent()) ctx.setSubmitting(false);
+    ctx.finished();
   }
 }
 
@@ -190,9 +217,7 @@ function FormActions(props: {
 }): JSX.Element {
   return (
     <DialogActions>
-      <Button onClick={props.onCancel} disabled={props.submitting}>
-        Cancel
-      </Button>
+      <Button onClick={props.onCancel}>Cancel</Button>
       <Button type="submit" variant="primary" disabled={!props.canSubmit}>
         {props.submitting ? 'Rendering…' : props.mode === 'add' ? 'Add' : 'Save'}
       </Button>
@@ -214,6 +239,16 @@ function Field(props: { readonly label: string; readonly children: React.ReactNo
 // Multi-line rows (textarea, wrapped radios) top-align, unlike .lf-field's
 // default center alignment - layout-only overrides per ADR-047.
 const fieldAlignStyle: React.CSSProperties = { alignItems: 'flex-start' };
+// Keep the dialog's existing row spacing inside the disabled group.
+const textFieldsStyle: React.CSSProperties = {
+  border: 0,
+  margin: 0,
+  padding: 0,
+  minWidth: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'inherit',
+};
 const fieldLabelPadStyle: React.CSSProperties = { paddingTop: 4 };
 const fieldControlStyle: React.CSSProperties = {
   flex: 1,

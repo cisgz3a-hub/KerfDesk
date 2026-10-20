@@ -70,6 +70,15 @@
   }
 }
 
+/* At the narrowest rail the tabs share space by word length, so the longest
+   word, Properties, still fits whole. */
+@container (max-width: 260px) {
+  .lf-artwork-view-tab.lf-btn {
+    flex: 1 1 auto;
+    padding-inline: 2px;
+  }
+}
+
 .lf-artwork-view-content {
   min-height: 0;
   min-width: 0;
@@ -142,6 +151,76 @@
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid var(--lf-border);
+}
+
+/* The row and list "•••" menus stack named groups of shared buttons. Delete
+   sits on its own row, apart from Copy and Paste. */
+.lf-operation-menu,
+.lf-operation-list-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lf-operation-menu__group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lf-operation-list-tools__group {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lf-operation-menu__label {
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-sm);
+  font-weight: 600;
+}
+
+.lf-operation-order {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.lf-operation-menu__toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--lf-text-sm);
+  cursor: pointer;
+}
+
+.lf-operation-menu__toggle > input {
+  margin: 0;
+}
+
+.lf-operation-list-tools__buttons,
+.lf-operation-menu__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lf-operation-list-tools__buttons > .lf-btn,
+.lf-operation-menu__actions > .lf-btn {
+  flex: 1 1 auto;
+  min-height: 28px;
+  white-space: nowrap;
+}
+
+.lf-operation-menu__danger {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--lf-border);
+}
+
+.lf-operation-menu__danger > .lf-btn {
+  min-height: 28px;
 }
 
 /* The operations-list header reuses the row "•••" menu; its summary sits at

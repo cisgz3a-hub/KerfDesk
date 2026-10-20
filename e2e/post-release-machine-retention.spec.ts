@@ -11,7 +11,7 @@ test('New and a renderer restart retain committed machine setup while new artwor
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const setup = page.getByRole('dialog', { name: 'Machine Setup', exact: true });
-  await setup.getByRole('button', { name: 'Check essentials', exact: true }).click();
+  await setup.getByRole('button', { name: 'Next', exact: true }).click();
   for (const [label, value] of [
     ['Bed width (mm)', '321'],
     ['Bed height (mm)', '234'],
@@ -21,11 +21,11 @@ test('New and a renderer restart retain committed machine setup while new artwor
     await input.fill(value);
     await input.press('Tab');
   }
-  await setup.getByRole('button', { name: 'Review setup', exact: true }).click();
+  await setup.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
   await setup.getByRole('button', { name: 'Save machine setup', exact: true }).click();
   await expect(setup).toBeHidden();
   const panel = page.getByRole('complementary', {
-    name: 'Artwork / Operations panel',
+    name: 'Artwork panel',
     exact: true,
   });
   for (const [name, value] of [
@@ -66,7 +66,7 @@ async function newCanvas(page: Page): Promise<void> {
 async function expectSavedMachine(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Machine Setup', exact: true });
-  await dialog.getByRole('button', { name: 'Check essentials', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Next', exact: true }).click();
   for (const [label, value] of [
     ['Bed width (mm)', '321'],
     ['Bed height (mm)', '234'],

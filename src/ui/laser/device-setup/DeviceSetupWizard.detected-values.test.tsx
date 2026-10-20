@@ -38,7 +38,7 @@ describe('DeviceSetupWizard detected values', () => {
       });
       expect(view.host.querySelector('[role="status"]')).toBeNull();
 
-      await act(async () => button(view.host, 'Check essentials').click());
+      await act(async () => button(view.host, 'Next').click());
       expect(input(view.host, 'Bed width (mm)').value).toBe('363');
     } finally {
       await view.unmount();
@@ -65,7 +65,7 @@ describe('DeviceSetupWizard detected values', () => {
       await act(async () => button(view.host, 'Undo').click());
       expect(view.host.querySelector('.lf-setup-found-filled')).toBeNull();
       expect(view.host.textContent).toContain('Your setup is back as it was');
-      await act(async () => button(view.host, 'Check essentials').click());
+      await act(async () => button(view.host, 'Next').click());
       expect(input(view.host, 'Bed width (mm)').value).toBe(
         String(DEFAULT_DEVICE_PROFILE.bedWidth),
       );
@@ -87,7 +87,7 @@ describe('DeviceSetupWizard detected values', () => {
       try {
         expect(view.host.querySelector('.lf-setup-found-filled')).toBeNull();
         expect(view.host.textContent).toContain('Your controller reports values that differ');
-        await act(async () => button(view.host, 'Check essentials').click());
+        await act(async () => button(view.host, 'Next').click());
         expect(input(view.host, 'Bed width (mm)').value).toBe(
           String(DEFAULT_DEVICE_PROFILE.bedWidth),
         );

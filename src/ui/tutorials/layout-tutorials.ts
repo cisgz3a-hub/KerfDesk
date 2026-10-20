@@ -283,14 +283,14 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
     category: 'Layout & production',
     machine: 'all',
     minutes: 4,
-    location: 'Artwork / Operations → Settings and Run order',
+    location: 'Artwork panel → Properties and Run order',
     prerequisites: 'Artwork on the canvas and the correct machine mode.',
     visual: 'layers',
     steps: [
       {
         title: 'Inspect the artwork settings',
         instruction:
-          'Select an object and open Settings → Operation. Laser operations use Line, Fill or Image; CNC operations use their cut type and depth. The Artwork tab holds size, shape, image adjustments and path tools.',
+          'Select an object and open Properties → Operation. Laser operations use Line, Fill or Image; CNC operations use their cut type and depth. The Artwork tab holds size, shape, image adjustments and path tools.',
         focus: 'Selected artwork operation',
         result: 'You can see the settings that belong to this artwork.',
       },

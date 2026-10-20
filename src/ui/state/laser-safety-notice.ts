@@ -35,7 +35,10 @@ export type LaserSafetyAction =
   | 'console'
   // A mid-job refill send (the ack-driven stream continuing), as opposed to
   // the operator-initiated 'start'/'resume' writes.
-  | 'stream';
+  | 'stream'
+  // The read-only `$G` that proves a fully sent stream's missing replies were
+  // lost (ADR-610 Amendment 1): the one `$` line allowed during a job.
+  | 'stream-probe';
 
 export type LaserSafetyNotice =
   | {
@@ -317,6 +320,12 @@ export function writeFailedMessage(action: LaserSafetyAction): string {
     return (
       'A mid-job send failed, so the stream was stopped. The machine may still be executing ' +
       'buffered commands — press ABORT; use physical E-stop or power cutoff now if unsafe.'
+    );
+  }
+  if (action === 'stream-probe') {
+    return (
+      'KerfDesk could not ask the controller to confirm the end of the job because the serial ' +
+      'write failed. Use physical E-stop or power cutoff now if unsafe.'
     );
   }
   if (action === 'fire') {

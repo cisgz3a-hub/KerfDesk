@@ -19,9 +19,62 @@ describe('artwork run order view model', () => {
     expect(
       artworkRunOrderRows(project).map((row) => [row.name, row.position, row.effectiveSteps]),
     ).toEqual([
-      ['Profile', 1, [1]],
-      ['Pocket', 2, [2]],
+      ['Lid', 1, [1]],
+      ['Tray', 2, [2]],
     ]);
+  });
+
+  it('names each run by its artwork and keeps the operation as its summary', () => {
+    const project = projectWithJobs('laser');
+
+    expect(artworkRunOrderRows(project).map((row) => [row.name, row.operationSummary])).toEqual([
+      ['Lid', 'Profile'],
+      ['Tray', 'Pocket'],
+    ]);
+  });
+
+  it('numbers artwork that shares a name, in canvas order, so each run has its own name', () => {
+    const base = projectWithJobs('laser');
+    const [lid, tray] = base.scene.objects;
+    const unnamed = (object: SceneObject | undefined): SceneObject => {
+      if (object === undefined) throw new Error('fixture object missing');
+      return Object.fromEntries(
+        Object.entries(object).filter(([key]) => key !== 'name'),
+      ) as SceneObject;
+    };
+    const project: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        objects: [unnamed(lid), unnamed(tray)],
+        artworkOrder: ['pocket-object', 'profile-object'],
+      },
+    };
+
+    expect(artworkRunOrderRows(project).map((row) => [row.position, row.name])).toEqual([
+      [1, 'Rectangle (2)'],
+      [2, 'Rectangle (1)'],
+    ]);
+  });
+
+  it('gives a composed shared-run name its run number when another run has the same name', () => {
+    const base = projectWithJobs('laser');
+    const project: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        objects: [
+          object('a', 'profile', 10, 'Foo'),
+          object('b', 'profile', 30, 'Foo'),
+          object('c', 'pocket', 50, 'Foo (1) + 1 more'),
+        ],
+        artworkOrder: ['a', 'b', 'c'],
+      },
+    };
+
+    const names = artworkRunOrderRows(project).map((row) => row.name);
+    expect(names).toEqual(['Foo (1) + 1 more (run 1)', 'Foo (1) + 1 more (run 2)']);
+    expect(new Set(names).size).toBe(names.length);
   });
 
   it('shows requested CNC positions alongside clearing-before-profile steps', () => {
@@ -30,8 +83,8 @@ describe('artwork run order view model', () => {
     expect(
       artworkRunOrderRows(project).map((row) => [row.name, row.position, row.effectiveSteps]),
     ).toEqual([
-      ['Profile', 1, [2]],
-      ['Pocket', 2, [1]],
+      ['Lid', 1, [2]],
+      ['Tray', 2, [1]],
     ]);
   });
 
@@ -71,7 +124,10 @@ function projectWithJobs(machine: 'laser' | 'cnc'): Project {
     ...base,
     ...(machine === 'cnc' ? { machine: DEFAULT_CNC_MACHINE_CONFIG } : {}),
     scene: {
-      objects: [object('profile-object', 'profile', 10), object('pocket-object', 'pocket', 40)],
+      objects: [
+        object('profile-object', 'profile', 10, 'Lid'),
+        object('pocket-object', 'pocket', 40, 'Tray'),
+      ],
       layers: [profile, pocket],
       artworkOrder: ['profile-object', 'pocket-object'],
     },
@@ -90,13 +146,14 @@ function operation(
   };
 }
 
-function object(id: string, operationId: string, x: number): SceneObject {
+function object(id: string, operationId: string, x: number, name: string): SceneObject {
   return {
     ...createRectangle({
       id,
       color: '#000000',
       spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
     }),
+    name,
     operationIds: [operationId],
     transform: { ...IDENTITY_TRANSFORM, x, y: 10 },
   };

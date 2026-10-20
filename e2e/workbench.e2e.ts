@@ -1,4 +1,5 @@
 import { expect, test as baseTest, type Page } from '@playwright/test';
+import { waitForStartupSplash } from './fixtures/startup-splash';
 import { test as kerfDeskTest, type KerfDeskFixture } from './fixtures/kerfdesk-test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -44,12 +45,12 @@ baseTest(
   async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto('/');
+    // Keyboard navigation below needs the revealed, no longer inert workspace.
+    await waitForStartupSplash(page);
     await expect(page.getByRole('menubar', { name: 'Application menu' })).toBeVisible();
     await expect(page.getByLabel('KerfDesk workspace', { exact: true })).toBeVisible();
     await expect(page.getByRole('tablist', { name: 'Side panel' })).toBeVisible();
-    await expect(
-      page.getByRole('complementary', { name: 'Artwork / Operations panel' }),
-    ).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Artwork panel' })).toBeVisible();
     await expect(page.getByLabel('Laser controls')).toHaveCount(0);
 
     const file = page.getByRole('menuitem', { name: 'File' });
@@ -96,7 +97,7 @@ baseTest(
     await page.goto('/');
     await (await toolbarCommand(page, 'Import...')).click();
     await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();
-    await expect(page.getByText('Layers: 1 (1 output)', { exact: true })).toBeVisible();
+    await expect(page.getByText('Operations: 1 (1 output)', { exact: true })).toBeVisible();
     expect(workerUrls.length).toBeGreaterThan(0);
 
     await page.keyboard.press('Escape');
@@ -157,12 +158,12 @@ baseTest(
     await expect(dialog).toContainText('Step 1 of 3');
     await dialog.getByText('Connection options', { exact: true }).click();
     await expect(dialog.getByLabel('Controller firmware')).toHaveValue('grbl-v1.1');
-    await dialog.getByRole('button', { name: 'Check essentials', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(dialog).toContainText('Step 2 of 3');
     await dialog.getByLabel('Device name').fill('E2E beginner laser');
     await dialog.getByLabel('Bed width (mm)').fill('510');
     await dialog.getByLabel('Bed width (mm)').blur();
-    await dialog.getByRole('button', { name: 'Review setup', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
 
     await expect(dialog).toContainText('Software configuration is internally consistent');
     await expect(dialog).toContainText('Hardware commissioning checklist');
@@ -172,7 +173,7 @@ baseTest(
 
     await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
     const reopened = page.getByRole('dialog', { name: 'Machine Setup' });
-    await reopened.getByRole('button', { name: 'Check essentials', exact: true }).click();
+    await reopened.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(reopened.getByLabel('Device name')).toHaveValue('E2E beginner laser');
     await expect(reopened.getByLabel('Bed width (mm)')).toHaveValue('510');
   },
@@ -188,18 +189,17 @@ baseTest(
     const dialog = page.getByRole('dialog');
     await expect(dialog).toHaveAccessibleName('Machine Setup');
 
-    await dialog.getByRole('radio', { name: /CNC only/ }).check();
+    // A CNC machine is chosen from the same list as a laser (ADR-637).
+    await dialog.getByRole('radio', { name: 'Use Genmitsu 3018-PRO', exact: true }).check();
     await expect(dialog).toHaveAccessibleName('CNC Machine Setup');
-    await dialog.getByLabel('Built-in CNC machine').selectOption('genmitsu-3018');
-    await dialog.getByRole('button', { name: 'Load into draft', exact: true }).click();
-    await dialog.getByRole('button', { name: 'Check essentials', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(dialog).toContainText('CNC machine limits');
     await expect(dialog.getByLabel('GRBL $30 max power S')).toHaveCount(0);
     await dialog.getByRole('spinbutton', { name: 'Safe Z', exact: true }).fill('9');
     await dialog.getByRole('spinbutton', { name: 'Safe Z', exact: true }).blur();
     await dialog.getByText('Accessories and calibration', { exact: true }).click();
     await expect(dialog).toContainText('Z axis and probe');
-    await dialog.getByRole('button', { name: 'Review setup', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
     await dialog.getByRole('button', { name: 'Save CNC machine setup', exact: true }).click();
 
     const router = page.getByLabel('Router controls', { exact: true });
@@ -245,7 +245,7 @@ baseTest('Machine Setup stays navigable at the narrow breakpoint', async ({ page
   const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
   await expect(dialog).toContainText('Step 1 of 3');
   await expect(dialog.getByRole('navigation', { name: 'Machine Setup steps' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Check essentials', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Next', exact: true })).toBeVisible();
   const responsiveLayout = await dialog.locator('.lf-setup-layout').evaluate((element) => ({
     columns: getComputedStyle(element).gridTemplateColumns,
     width: element.getBoundingClientRect().width,
@@ -253,7 +253,7 @@ baseTest('Machine Setup stays navigable at the narrow breakpoint', async ({ page
   expect(responsiveLayout.columns.split(' ')).toHaveLength(1);
   expect(responsiveLayout.width).toBeGreaterThan(500);
 
-  await dialog.getByRole('button', { name: 'Check essentials', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(dialog).toContainText('Step 2 of 3');
 });
 
@@ -270,7 +270,7 @@ kerfDeskTest(
     await page.getByRole('tab', { name: 'Machine' }).click();
     await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
-    await dialog.getByRole('button', { name: 'Find my machine', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Connect', exact: true }).click();
     await expect(dialog).toContainText('Found your GRBL');
     // A machine not set up before is filled from what it reports (ADR-420).
     await expect(dialog).toContainText('Filled in from your controller');
@@ -287,10 +287,10 @@ kerfDeskTest(
     expect(serialWrites(await kerfdesk.events()).slice(beforeRead)).not.toMatch(/\$\d+=/);
     await expect(dialog).toContainText('→ 350.000 mm');
 
-    await dialog.getByRole('button', { name: 'Check essentials', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
     await dialog.getByLabel('GRBL $30 max power S').fill('900');
     await dialog.getByLabel('GRBL $30 max power S').blur();
-    await dialog.getByRole('button', { name: 'Review setup', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
     await dialog
       .locator('summary')
       .filter({ hasText: /^Controller settings/ })
@@ -321,7 +321,7 @@ kerfDeskTest(
 
     await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
     const reopened = page.getByRole('dialog', { name: 'Machine Setup' });
-    await reopened.getByRole('button', { name: 'Check essentials', exact: true }).click();
+    await reopened.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(reopened.getByLabel('GRBL $30 max power S')).toHaveValue('900');
   },
 );

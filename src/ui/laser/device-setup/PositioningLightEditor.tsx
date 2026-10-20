@@ -86,7 +86,7 @@ function AfterFrameField(props: {
     <label>
       <input
         type="checkbox"
-        title="After a clean Frame in Absolute Coords, move the pointer to the framed artwork centre and switch it on. The Frame stays valid for Start."
+        title="After Frame finishes, automatically show the centre of the whole framed job on the board, using its captured placement and LED offsets. The LED stays on until switched off, and Frame stays valid for Start."
         checked={props.value.afterFrame === true}
         onChange={(event) => {
           const { afterFrame: _previous, ...rest } = props.value;

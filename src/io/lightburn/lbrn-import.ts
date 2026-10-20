@@ -198,7 +198,7 @@ function cutPlannerWarnings(root: Element): ReadonlyArray<string> {
   const byLayer = prefs === undefined ? '' : textField(prefs, ['optimizebylayer']).trim();
   if (byLayer === '' || byLayer === '0') return [];
   return [
-    `LightBurn's Cut Planner for this project does not run layers first (Optimize_ByLayer ${byLayer}); KerfDesk runs it layer by layer in the Cuts / Layers order. Check the Run order view.`,
+    `LightBurn's Cut Planner for this project does not run layers first (Optimize_ByLayer ${byLayer}); KerfDesk runs it operation by operation, in the Artwork panel's operation order. Check the Run order view.`,
   ];
 }
 

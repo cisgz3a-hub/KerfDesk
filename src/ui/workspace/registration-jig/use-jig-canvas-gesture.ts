@@ -56,6 +56,8 @@ export const OBLIQUE_STRETCH_NOTICE =
 
 // A press that travels less than this is a click, not a box selection.
 const MARQUEE_MIN_PX = 3;
+const MIDDLE_BUTTON = 1;
+const RIGHT_BUTTON = 2;
 
 const HANDLE_CURSORS: Readonly<Record<HandleKind, string>> = {
   nw: 'nwse-resize',
@@ -102,13 +104,15 @@ export function useJigCanvasGesture(args: JigGestureArgs) {
 
 function beginJigGesture(context: GestureContext, event: PointerEvent<HTMLCanvasElement>): void {
   const { project, view, ref } = context;
-  if (event.button !== 0 && event.button !== 1) return;
+  const buttonPan = event.button === MIDDLE_BUTTON || event.button === RIGHT_BUTTON;
+  if (event.button !== 0 && !buttonPan) return;
   const point = canvasMouseToScene(event, ref.current, project, view);
   if (point === null) return;
   event.preventDefault();
   event.currentTarget.focus();
   context.setNotice('');
-  const pan = event.button === 1 || context.spaceHeld.current;
+  // The right or middle button pans, as on the main canvas; so does Space+drag.
+  const pan = buttonPan || context.spaceHeld.current;
   const started = { pointerId: event.pointerId, start: point, base: project, view };
   const next = pan
     ? { ...started, kind: 'pan' as const, selectedIds: context.selectedIds }

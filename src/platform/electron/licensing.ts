@@ -40,12 +40,17 @@ export function parseLicenceStatus(value: unknown): LicenceStatus {
       status.storeUnreadable,
     ].every((flag) => typeof flag === 'boolean') ||
     !validRights(status) ||
+    !validAdmissionGeneration(status.admissionGeneration) ||
     !nullableText(status.licenseKey, 256) ||
     !nullableText(status.paymentOrderId, 160) ||
     !nullableText(status.message, 1000)
   )
     throw new Error('Invalid licence response.');
   return status;
+}
+
+function validAdmissionGeneration(generation: unknown): boolean {
+  return generation === undefined || (Number.isSafeInteger(generation) && Number(generation) >= 0);
 }
 
 function validRights(status: LicenceStatus): boolean {
@@ -253,6 +258,9 @@ export function createDesktopLicenceAdapter(
   };
   return {
     status: () => request('status'),
+    workspaceAdmitted: async (generation) => {
+      await send('workspace-admitted', { generation });
+    },
     activate: (licenseKey) => request('activate', { licenseKey }),
     clipboardKey: async () => parseClipboardKey(await send('clipboard-key', {})),
     licenceLink: async () => {

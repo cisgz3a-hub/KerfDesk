@@ -37,7 +37,7 @@ function shapeLesson(shape: ShapeLesson): Tutorial {
       {
         title: 'Set the size',
         instruction: shape.properties,
-        focus: 'Artwork / Operations → Settings → Artwork',
+        focus: 'Artwork panel → Properties → Artwork',
         result: shape.outcome,
       },
     ],
@@ -92,7 +92,7 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
     gesture:
       'Drag from one corner to the opposite corner. Release to finish. Hold Shift while dragging to make a square.',
     properties:
-      'Keep the rectangle selected. In Settings → Artwork, enter Width and Height. Increase Corner radius if you want rounded corners.',
+      'Keep the rectangle selected. In Properties → Artwork, enter Width and Height. Increase Corner radius if you want rounded corners.',
     outcome: 'A rectangle with the width and height you need.',
     tip: 'Width and Height are in millimetres. Corner radius cannot exceed half the shorter side.',
   }),
@@ -103,7 +103,7 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
     gesture:
       'Drag across the space where you want the ellipse. Hold Shift to make a circle. Release to finish.',
     properties:
-      'Keep the ellipse selected. In Settings → Artwork, enter Width and Height. Use the same value for both to make a circle.',
+      'Keep the ellipse selected. In Properties → Artwork, enter Width and Height. Use the same value for both to make a circle.',
     outcome: 'An oval or circle in the size you need.',
     tip: 'For a 30 mm circle, set Width and Height to 30 mm.',
   }),
@@ -113,7 +113,7 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
     visual: 'polygon',
     gesture: 'Drag to draw a six-sided shape. Hold Shift to keep it regular. Release to finish.',
     properties:
-      'In Settings → Artwork, enter the number of Sides. Use 3 for a triangle or 8 for an octagon. Change Radius to set the size.',
+      'In Properties → Artwork, enter the number of Sides. Use 3 for a triangle or 8 for an octagon. Change Radius to set the size.',
     outcome: 'A shape with the number of sides you need.',
     tip: 'The workspace Polygon tool is separate from Design Studio. Use the workspace tool for editable polygon side counts.',
   }),
@@ -123,7 +123,7 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
     visual: 'star',
     gesture: 'Drag to draw a five-point star. Hold Shift to keep it regular. Release to finish.',
     properties:
-      'In Settings → Artwork, change Points and Outer radius. Lower Inset to make deeper gaps between the tips.',
+      'In Properties → Artwork, change Points and Outer radius. Lower Inset to make deeper gaps between the tips.',
     outcome: 'A star with the points and size you choose.',
     tip: 'Try 5 points and 50% inset first. Very narrow tips may be difficult to manufacture at small sizes.',
   }),

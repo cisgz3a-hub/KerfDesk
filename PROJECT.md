@@ -35,7 +35,7 @@ The 1.0 codebase shipped a working app but had a coupling problem: fixes in one 
 
 ## Users and roles
 
-Single role: **operator**. Free/web/Preview builds need no activation. The explicitly prepared commercial desktop channel always opens and runs KerfDesk Free; only opening a Pro tool asks for a signed trial, paid or developer licence (ADR-540, amending ADR-523's admission). Pro stays for the running session even if a trial ends, and a licence never gates Frame, Start or output or stops a running job; machine Start policy is unchanged.
+Single role: **operator**. Free/web/Preview builds need no activation. The explicitly prepared commercial desktop channel has no Free edition: it opens behind a licence window, with no workspace mounted, until this device has a signed trial, paid or developer licence (ADR-623, superseding ADR-540 item 1). Once open, the session keeps its workspace until KerfDesk closes; rights that end mid-session pause only new Pro tool choices (ADR-540 Amendment 2, ADR-592). A licence never gates Frame, Start or output or stops a running job; machine Start policy is unchanged.
 
 **Approved remote access (ADR-564/568/569).** A separately paired phone or MCP client can view summaries and edit the live desktop document. Workspace controls include bundled fonts, ordinary text editing, layout, shared Undo/Redo, current job review and an optional bounded artwork preview. Sharing previews or existing text requires a separate desktop opt-in. A distinct machine-control approval enables discrete Jog, canonical Frame, current Job Review and exact confirmed Start, with canonical Abort. Existing viewing/editing approvals gain no motion access. File exchange, raw G-code, connection changes and recipe/layer creation remain outside this phase. A portable MCP Apps panel and the phone control page use the same commands; hosted, installed-client and hardware qualification remain separate from source implementation.
 
@@ -480,7 +480,7 @@ phase; tracked here so they don't get lost.
 
 ### Maintainer authority
 
-21. **Frame is the only Start guard, and the physical Frame is the spatial source of truth** (ADR-565, amending ADR-228, ADR-230, ADR-232 and ADR-237). A clean completed Frame for the unchanged footprint and placement is the sole ordinary Start authorization on laser and CNC. Power/speed edits, a settled app-owned run and a verified Absolute positioning-light travel (ADR-605) preserve that spatial evidence; a changed prepared motion envelope, placement or coordinate identity requires another Frame. Each Start reviews and claims the current exact executable program once, plus unavoidable live transport/handoff facts. Job Review remains the single warning surface. Calculated bed overhang, configured no-go zones, and controller-setting policy may inform that review but may not refuse Frame or Start. Factual transport inability, an unconstructable executable artifact, and exact-handoff inconsistency remain refusals because no valid command or matching stream can exist. No policy finding may be relabeled as one of those factual categories. The Pro licence check (ADR-540, recorded under ADR-247 by its Amendment 1) is not a Start guard: it never gates Frame, Start, output or a running job.
+21. **Frame is the only Start guard, and the physical Frame is the spatial source of truth** (ADR-565, amending ADR-228, ADR-230, ADR-232 and ADR-237). A clean completed Frame for the unchanged footprint and placement is the sole ordinary Start authorization on laser and CNC. Power/speed edits, a settled app-owned run and a verified positioning-light travel retaining the captured job placement (ADR-605 Amendment 1) preserve that spatial evidence; a changed prepared motion envelope, placement or coordinate identity requires another Frame. Each Start reviews and claims the current exact executable program once, plus unavoidable live transport/handoff facts. Job Review remains the single warning surface. Calculated bed overhang, configured no-go zones, and controller-setting policy may inform that review but may not refuse Frame or Start. Factual transport inability, an unconstructable executable artifact, and exact-handoff inconsistency remain refusals because no valid command or matching stream can exist. No policy finding may be relabeled as one of those factual categories. The Pro licence check (ADR-540, recorded under ADR-247 by its Amendment 1) is not a Start guard: it never gates Frame, Start, output or a running job.
 
 ---
 
@@ -634,7 +634,7 @@ src/
     help/                        built-in help/reference surfaces
     kit/                         local component primitives
     laser/                       Laser window and job controls
-    layers/                      Cuts/Layers window
+    layers/                      Artwork panel
     material-library/            material and preset UI
     raster/                      raster/image controls
     state/                       app/project state glue

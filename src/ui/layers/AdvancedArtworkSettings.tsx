@@ -12,6 +12,7 @@ import {
   effectiveObjectPowerPercent,
   objectPowerScalePercent,
 } from '../../core/effective-output';
+import { Icon } from '../kit';
 import { useStore } from '../state';
 import { useMixedOperationNumber } from './mixed-operation-input';
 import { parseEnglishDecimalInput } from './english-decimal-input';
@@ -44,11 +45,14 @@ export function AdvancedArtworkSettings(props: {
   const draftScale = parseEnglishDecimalInput(input.displayValue);
   const results = powerResults(props.objects, props.layers, draftScale);
   return (
-    <details className="lf-section" style={{ marginTop: 10 }}>
+    <details className="lf-artwork-disclosure">
       <summary title="Adjust power for this artwork without changing its operation settings">
-        Advanced artwork settings
+        <span>
+          <strong>Advanced artwork settings</strong>
+        </span>
+        <Icon name="chevron-down" size={16} />
       </summary>
-      <div style={{ padding: 10 }}>
+      <div className="lf-artwork-disclosure__body">
         <label style={rowStyle}>
           <span>Power multiplier</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

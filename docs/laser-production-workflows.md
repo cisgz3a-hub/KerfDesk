@@ -50,7 +50,7 @@
 
 ## Material libraries
 
-1. Open the **Materials** tab in the Cuts / Layers panel, then open **Saved Libraries**.
+1. Open the **Materials** tab in the Artwork panel, then open **Saved Libraries**.
 2. Import KerfDesk libraries or use **Import CLB** for supported LightBurn material-library records.
 3. Review imported speeds, power, passes, thickness, and warnings; CLB support is import-only.
 4. Apply a preset for a one-time copy or Link it to retain the library and preset identity.
