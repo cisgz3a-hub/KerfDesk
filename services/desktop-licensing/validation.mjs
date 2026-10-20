@@ -35,6 +35,11 @@ export function secret(value) {
   return device(value);
 }
 
+/** A refresh request's random nonce: 32 bytes as 43 base64url characters (ADR-592 Amendment 1). */
+export function nonce(value) {
+  return device(value);
+}
+
 export async function readBody(request, limit = 16_384) {
   const length = request.headers.get('content-length');
   if (length !== null)
