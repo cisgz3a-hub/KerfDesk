@@ -10,12 +10,17 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The merge queue tests each queued pull request on a gh-readonly-queue/main/...
+  # branch and waits for the required checks this workflow reports (ADR-645).
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 # Same rule as ci.yml: a new push cancels a PR branch's in-progress run, but
 # every main run finishes. Cancelling on main left many published commits
 # with only a cancelled Browser smoke run (2026-09-25 audit, DEP-1). GitHub
 # still keeps one pending run per group, so a burst of merges runs the tip.
+# Each merge queue entry has its own gh-readonly-queue ref, so its own group.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
