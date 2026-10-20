@@ -8,6 +8,11 @@ import {
   type DeviceSetupAction,
   type DeviceSetupState,
 } from './device-setup-flow';
+import {
+  chooseMachineEntryActions,
+  machinePickerEntries,
+  selectedMachineEntry,
+} from './machine-picker-entries';
 
 const REPORTED: Partial<DeviceProfile> = {
   bedWidth: 430,
@@ -35,6 +40,13 @@ function report(state: DeviceSetupState, baudRate: number | null) {
 
 function run(state: DeviceSetupState, actions: ReadonlyArray<DeviceSetupAction>) {
   return actions.reduce(deviceSetupReducer, state);
+}
+
+/** The first listed machine of `brand`, chosen as the operator would. */
+function chooseListed(state: DeviceSetupState, brand: string): DeviceSetupState {
+  const entry = machinePickerEntries(state).find((item) => item.brand === brand);
+  if (entry === undefined) throw new Error(`No listed ${brand} machine`);
+  return run(state, chooseMachineEntryActions(state, entry));
 }
 
 describe('planControllerAutoFill', () => {
@@ -84,6 +96,24 @@ describe('planControllerAutoFill', () => {
       machineKinds: ['laser', 'cnc'],
     });
     expect(planControllerAutoFill(hybrid, report(hybrid, null))?.summary.machineKind).toBeNull();
+  });
+
+  // ADR-637 Amendment 1: $32 is a controller setting, not a measurement of the
+  // machine (ADR-240 #2), so a machine chosen from the list keeps its type.
+  it('keeps the type of a machine chosen from the list', () => {
+    const ortur = chooseListed(reported({ ...REPORTED, laserModeEnabled: false }), 'Ortur');
+    const plan = planControllerAutoFill(ortur, report(ortur, null));
+    expect(plan?.summary.machineKind).toBeNull();
+    const filled = run(ortur, plan?.actions ?? []);
+    expect(filled.machineKinds).toEqual(['laser']);
+    // The observation is kept: the draft records laser mode as off.
+    expect(filled.draft.laserModeEnabled).toBe(false);
+    expect(selectedMachineEntry(filled, machinePickerEntries(filled))?.brand).toBe('Ortur');
+
+    const router = chooseListed(reported(REPORTED), 'Genmitsu');
+    const routerPlan = planControllerAutoFill(router, report(router, null));
+    expect(routerPlan?.summary.machineKind).toBeNull();
+    expect(run(router, routerPlan?.actions ?? []).machineKinds).toEqual(['cnc']);
   });
 
   it('plans nothing when the controller reported nothing new', () => {

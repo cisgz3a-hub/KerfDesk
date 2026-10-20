@@ -6,9 +6,8 @@ import {
   MAX_RASTER_LINES_PER_MM,
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster';
-import { imageDitherAlgorithm } from '../../core/raster/image-processing';
 import type { Layer, LayerOperationSettings } from '../../core/scene';
-import { DitherSwatchPicker } from './DitherSwatchPicker';
+import { burnsAsGrayscale, DitherSwatchPicker, originalPixelsNotice } from './DitherSwatchPicker';
 import { mixedCheckboxProps, useMixedOperationNumber } from './mixed-operation-input';
 import type { MixedOperationFields } from './selected-operation-mixed';
 
@@ -45,7 +44,7 @@ export function LayerImageFields(props: {
           <DitherSelect {...controlProps} />
         </div>
       </div>
-      {!props.mixedFields?.ditherAlgorithm && settings.ditherAlgorithm === 'grayscale' ? (
+      {minPowerApplies(settings, props.mixedFields) ? (
         <FieldRow label="Minimum power">
           <MinPowerInput {...controlProps} maxPower={minPowerMax} />
           <span style={unitStyle}>%</span>
@@ -97,7 +96,7 @@ export function LayerImageEssentials(props: {
     reconcileKey: props.reconcileKey,
     ...(props.mixedFields === undefined ? {} : { mixedFields: props.mixedFields }),
   };
-  const grayscale = !props.mixedFields?.ditherAlgorithm && settings.ditherAlgorithm === 'grayscale';
+  const grayscale = minPowerApplies(settings, props.mixedFields);
   return (
     <div className="lf-laser-process-fields">
       <div className="lf-laser-field lf-laser-field--wide">
@@ -128,6 +127,18 @@ export function LayerImageEssentials(props: {
         </label>
       ) : null}
     </div>
+  );
+}
+
+// Min power shows whenever the burn is Grayscale, including original pixels
+// over a binary dither (burnsAsGrayscale); a Mixed setting counts as unknown.
+function minPowerApplies(
+  settings: LayerOperationSettings,
+  mixed: MixedOperationFields | undefined,
+): boolean {
+  return burnsAsGrayscale(
+    mixed?.passThrough ? null : settings.passThrough,
+    mixed?.ditherAlgorithm ? null : settings.ditherAlgorithm,
   );
 }
 
@@ -175,10 +186,8 @@ function passThroughNotice(
   if (mixed?.passThrough) {
     return 'Some selected artwork uses original pixels, which always burns as Grayscale.';
   }
-  if (!settings.passThrough) return undefined;
   const chosen = mixed?.ditherAlgorithm ? null : settings.ditherAlgorithm;
-  if (chosen !== null && imageDitherAlgorithm(settings) === chosen) return undefined;
-  return 'Use original pixels is on, so this burns as Grayscale. The dither chosen here applies once it is off.';
+  return originalPixelsNotice('Use original pixels', settings.passThrough, chosen);
 }
 
 function LineIntervalInput(props: {

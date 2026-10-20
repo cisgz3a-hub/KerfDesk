@@ -10,8 +10,9 @@
 //   * On front-* origins +Y means "away from the operator", so the emitted Y
 //     must be flipped from the SVG Y; rear-* origins put machine 0 at the back
 //     with +Y toward the operator, so it's not.
-//   * +X always means "to the operator's right" — front-right / rear-right
-//     mirror X within the bed.
+//   * On *-left origins +X means "to the operator's right"; front-right and
+//     rear-right mirror X within the bed, so there +X points to the
+//     operator's left (as the Machine Setup corner picker says).
 //
 // Result: what the user sees at the TOP of the canvas (low SVG Y) lands at
 // the BACK of the bed on every origin: front-* origins flip Y to get there,

@@ -13,7 +13,9 @@ import { BrowserDesktopWelcome } from './BrowserDesktopWelcome';
 /**
  * Pro requests in a build that cannot take a licence only explain (ADR-544).
  * `shown` is the Pro tool being explained, or 'all' for the notice that every
- * Pro feature is in the desktop app.
+ * Pro feature is in the desktop app. Neither notice keeps the tool's edit:
+ * nothing here can unlock Pro, so there is no edit to run afterwards, and it
+ * is never an open Pro prompt for background work (ADR-609).
  */
 export function useProInDesktop(): {
   readonly shown: ProFeature | 'all' | null;
@@ -42,18 +44,21 @@ export function useLicenceSettingsEvent(show: () => void): void {
 /** KerfDesk Free for builds without a desktop licence adapter. */
 export function FreeOnlyEdition({ children }: { readonly children: ReactNode }): JSX.Element {
   const desktop = useProInDesktop();
+  const { request, showAll } = desktop;
   const browserWelcome = BROWSER_FREE_BUILD && window.location.protocol !== 'app:';
-  useLicenceSettingsEvent(desktop.showAll);
+  useLicenceSettingsEvent(showAll);
   const value = useMemo<EditionValue>(
     () => ({
       status: null,
       licensed: false,
       pro: false,
       proInDesktop: true,
-      requestPro: desktop.request,
-      openLicence: desktop.showAll,
+      // The desktop notice never holds an edit to run (see useProInDesktop).
+      proPromptOpen: false,
+      requestPro: request,
+      openLicence: showAll,
     }),
-    [desktop.request, desktop.showAll],
+    [request, showAll],
   );
   useEffect(() => {
     setActiveEdition(value);

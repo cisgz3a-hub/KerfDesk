@@ -1,6 +1,6 @@
 ## ADR-620 - Artwork rests in ink; operation colours pulse on hover (2026-10-18)
 
-**Status:** Accepted. | **Date:** 2026-10-18
+**Status:** Accepted; the pulse's timing, strength, glow and edge (decision 2) amended by ADR-632; its drawing cost (decision 8) by ADR-632 Amendment 1. | **Date:** 2026-10-18
 
 ### Context
 
@@ -19,8 +19,11 @@ mock-up, with a 1400 ms pulse.
    canvas artwork ink (`canvasTheme.artworkInk`, which follows the light/dark canvas theme).
    Colours that no operation owns still draw as themselves, so stray artwork stays visible. The
    Preview underlay, raster and relief bitmaps, Design Studio and remote-control views keep their
-   current colours. `resolveObjectDisplay` takes the palette as a parameter that defaults to
-   operation colours; only the workspace asks for ink.
+   current colours, and so does the Registration Jig editor, which has no hover pulse or Alt peek.
+   `resolveObjectDisplay` takes the palette as a parameter that defaults to operation colours;
+   only the workspace asks for ink. Its sprite style key records which paths survived visibility,
+   since in ink every path paints alike. The pulse follows Wireframe View (Fill artwork pulses as
+   outlines) and repaints when the canvas theme changes.
 2. **One pulse on hover.** With the Select tool at rest, when the pointer settles (90 ms) on a
    piece, that piece and every piece whose operation has the same settings pulse once in the
    hovered piece's operation colour: a quick rise, a short hold, a fade over 1400 ms in all, with
@@ -34,17 +37,24 @@ mock-up, with a 1400 ms pulse.
    for it (`hitTest` takes `includeLocked` for this; selection still skips locked artwork). An
    edit during a hover, such as Paste settings on the hovered row, regroups the pieces without a
    second pulse.
-3. **Same settings** means `layerOperationSettingsEqual` plus equal sub-operations for a laser
-   project, or equal CNC settings for a CNC project, where an operation with no CNC block counts
-   as the CNC defaults as it does in output. Settings compare with object keys sorted. Name, colour
-   and visibility do not count. Per-artwork setting overrides are not considered.
+3. **Same settings** means what output would do, not how settings are stored
+   (`pulse-settings-match.ts`). For a laser project: `layerOperationSettingsEqual` after an
+   optional setting an older operation never stored takes the value output uses when it is absent
+   (perforation off, count tabs, no overcut and so on; the power mode and bidirectional scan offset
+   stay machine-dependent), plus sub-operations compared by their enabled state and settings, not their
+   ids or labels. For a CNC project: equal CNC settings, where an operation with no CNC block counts
+   as the CNC defaults as it does in output, compared with object keys sorted. Name, colour and
+   visibility do not count. Per-artwork setting overrides are not considered.
 4. **Operation rows.** Resting the pointer (90 ms) on an operation row in the Artwork panel pulses
    that operation's artwork and its same-settings siblings in the row's colour, sweeping left to
-   right. Passing over rows without settling pulses nothing.
+   right. Passing over rows without settling pulses nothing. Keyboard focus settling within a row
+   does the same and ends when focus leaves the row, so the pulse is not pointer-only (2026-10-20
+   audit fix).
 5. **Hold Alt to peek.** Holding Alt (Option on a Mac) alone for 150 ms draws every operation
    colour, as before this decision; releasing returns to ink. Any other key during the hold
    (Alt+W, Alt+arrow alignment) cancels it, a quick tap does nothing, and losing window focus ends
-   it. A peek suppresses the browser's menu focus on release.
+   it. A peek suppresses the browser's menu focus on release. Alt held while focus is in a text
+   field (an editable target) is typing and never peeks (2026-10-20 audit fix).
 6. **Reduced motion.** With the operating system's reduced-motion setting, the colour and edge
    show while the pointer rests, without the pulse or glow.
 7. **The first operation is blue.** Black moves to the end of `OPERATION_PALETTE`: a black

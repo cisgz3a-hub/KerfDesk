@@ -1,27 +1,19 @@
-// Machine profile choice on the Machine stage: the reviewed catalog, CNC
-// presets, and profile import/export. Controller and serial settings live in
-// Find my machine's Connection options, beside the connection they shape
-// (ADR-420).
+// The machine choice on the Machine stage (ADR-637): one list of listed laser
+// and CNC machines, "My machine isn't listed", and machine-file import/export.
+// Controller and serial settings live in the connection strip's Connection
+// options, beside the connection they shape (ADR-420).
 
 import { mutedStyle } from '../MachineSetupStyles';
 import { ImportExportPanel } from '../MachineSetupImportExport';
-import {
-  deviceSetupSupportsMachineKind,
-  machineSetupProfile,
-  type DeviceSetupStepProps,
-} from './device-setup-flow';
-import { DeviceSetupCncPreset } from './DeviceSetupCncPreset';
-import { DeviceSetupProfilePicker } from './DeviceSetupProfilePicker';
+import { machineSetupProfile, type DeviceSetupStepProps } from './device-setup-flow';
+import { DeviceSetupMachinePicker } from './DeviceSetupMachinePicker';
 
 export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   return (
-    <section style={sectionStyle}>
-      {deviceSetupSupportsMachineKind(state, 'laser') ? (
-        <DeviceSetupProfilePicker state={state} dispatch={dispatch} />
-      ) : null}
-      <DeviceSetupCncPreset state={state} dispatch={dispatch} />
+    <>
+      <DeviceSetupMachinePicker state={state} dispatch={dispatch} />
       <ProfileImport state={state} dispatch={dispatch} />
-    </section>
+    </>
   );
 }
 
@@ -42,5 +34,4 @@ function ProfileImport({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   );
 }
 
-const sectionStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12 };
 const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12, fontWeight: 600 };

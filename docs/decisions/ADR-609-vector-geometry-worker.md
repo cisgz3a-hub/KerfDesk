@@ -37,7 +37,8 @@ menus and typing were frozen, and an open dialog froze again on every edit and o
    task carries the result ids the action will use, so a result can be committed unchanged.
 2. **Dialogs preview in the background and Apply commits the settled result.** Offset Shapes
    and Combine Shapes keep the last settled preview on screen, marked "Updating preview…", until
-   the current request settles. Apply is enabled only for the current request's result and
+   the current request settles. If it settles with a problem, the older preview is cleared, so
+   the dialog never shows geometry its status no longer describes. Apply is enabled only for the current request's result and
    passes it to the action. The action commits it only when its inputs are still exactly the
    action's own: the same source objects by identity and in order, the same options, and
    result ids the scene would still give. That last test is `objectIdStillFree`: the numbered
@@ -57,7 +58,13 @@ menus and typing were frozen, and an open dialog froze again on every edit and o
    commands share one slot. A newer click of either, refused or not, terminates the running one
    and says so when it was the other command. So at most one background result is ever
    committing, and two commits cannot both ask for Pro admission, which holds a single pending
-   request.
+   request. If any Pro prompt is open when a result arrives (another tool's edit is waiting on
+   it), the result is not committed and a notice asks for the command to be run again; committing
+   would replace or invalidate that waiting edit. The edition provider exposes the open prompt as
+   a read-only `proPromptOpen`, including the prompt in Free-only builds, which gates nothing.
+   The all-features licence information notice holds no pending edit and does not count as a
+   tool prompt. A geometry error reports its specific warning without committing, even while a
+   tool prompt is open, after confirming that its project and selection still match the request.
 5. **Newer work cancels older work.** Clipper cannot be interrupted, and these runs last
    seconds to minutes. A newer request therefore terminates a busy worker and starts at once in
    a fresh one, instead of queuing behind work whose answer is no longer wanted. This differs
@@ -138,3 +145,38 @@ debounced edit, mostly opentype.js parsing the font each time. It is the next ca
   command, one command cancelling the other, failures not retried in thread, and the notice
   lasting until the work settles.
 - The existing dialog, action, weld-plan and cut suites pass unchanged in behaviour.
+
+### Amendment 1 - a worker that never loads, a replaced click, and Free builds' notices (2026-10-20)
+
+An audit of the merged work found three gaps.
+
+1. **A worker whose script never loads is `unavailable`.** A module worker whose script cannot be
+   fetched or evaluated still constructs, and reports that only later through `onerror`: a tab
+   left open across a deploy asks for a hashed chunk that is gone, a CSP blocks it, or the
+   browser cannot run module workers. Decision 7 called every `onerror` `failed`, so Offset Shapes
+   and Combine Shapes kept Apply disabled (changing the settings only spawned another worker that
+   failed the same way), and Offset outlines and Cut Shapes only showed an error. The worker now
+   posts `ready` once its script has run, and the client counts an `onerror` before that as
+   `unavailable`, which takes decision 7's documented path: the preview says so, and Apply or the
+   one-click command computes in thread. An `onerror` after `ready` is still `failed`. Each fresh
+   worker must announce itself again.
+2. **A newer click of the same command says that it replaced the running one.** Decision 4 named
+   the cancelled command only when the newer click was the other command. Outward copy and Inward
+   copy are both Offset outlines, so clicking one while the other ran dropped the first copy
+   without a word. The notice now appears whenever the newer click asks for different work ("The
+   earlier Offset outlines was cancelled: a newer one started."), including a click the action
+   refuses. A repeat of exactly the same work (the same task, compared by value) still replaces it
+   silently, since its result is the one the first would have given.
+3. **Only a prompt that keeps an edit counts as an open Pro prompt.** Decision 4 counted the
+   per-tool "Pro is in the desktop app" notice of a Free-only build (and of a desktop build that
+   runs Free) as an open prompt. That notice keeps no edit, since nothing there can unlock Pro, so
+   a finished Cut Shapes or Offset outlines was thrown away for nothing. `proPromptOpen` is now
+   true only while a licensed build's Pro prompt holds the tool's edit. No Pro gate changes:
+   `proPromptOpen` stays read-only and gates nothing.
+
+Verification: `vector-op-worker-client.test.ts` reports an `onerror` before `ready` as
+`unavailable` and after it as `failed`, and a replacement worker must announce itself again;
+`vector-op-worker-entry.test.ts` checks that the worker posts `ready` on load;
+`background-vector-command.test.ts` covers Outward copy then Inward copy, an identical repeat and a
+refused click; `FreeOnlyEdition.test.tsx` keeps `proPromptOpen` false while a Free build explains
+a Pro tool, and `EditionProvider.test.tsx` still reports the licensed prompt.
