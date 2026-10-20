@@ -13,11 +13,13 @@ import {
   sentNonce,
   TEST_KEY,
   token,
+  trialClaims,
 } from './licensing-runtime.test-support';
 
-// ADR-592 Amendment 1: a paid refresh that arrives with this computer's clock off
-// counts as a check-in only when the grant signs back the nonce its request sent,
-// so a saved answer replayed through a proxy cannot push the check-in on.
+// ADR-592 Amendment 1: a refresh grant counts only when it signs back the nonce
+// its request sent, so a saved answer replayed through a proxy cannot push a
+// trial's check-in on, or stand in for the refresh that would deliver a refund.
+// Paid licences have no check-in or clock offset since ADR-623 Amendment 2.
 
 const DAY = 86_400;
 const DAY_MS = DAY * 1000;
@@ -45,42 +47,56 @@ it('sends a new random nonce with every refresh, and none with an activation or 
   expect(sentNonce(fresh.fetch.mock.calls[0]![1])).toBeUndefined();
 });
 
-it.each([
-  { service: 'a current service', echo: true, state: 'unavailable' },
-  { service: 'an older service', echo: false, state: 'clock-error' },
-] as const)(
-  'refuses a saved refresh answer from $service replayed weeks later',
-  async ({ echo, state }) => {
-    // A real refresh on day 8, which the buyer saves before the licence is refunded.
-    const confirmed = NOW + 8 * DAY_MS;
-    const h = harness({ ...saved(), refreshedAt: NOW / 1000 });
-    h.clock(confirmed);
-    const rights = claims({ issuedAt: confirmed / 1000 });
-    let kept: unknown;
-    h.fetch.mockImplementationOnce(async (url, init) => {
-      const response = await answering(rights)(url, echo ? init : { body: '{}' });
-      kept = await response.clone().json();
-      return response;
-    });
-    expect(await h.runtime.refresh()).toMatchObject({ state: 'ready', edition: 'pro' });
-    const before = h.saved();
-    // A proxy with the buyer's own CA answers every later refresh with it.
-    h.fetch.mockImplementation(async () => Response.json(kept));
-    h.clock(confirmed + 20 * DAY_MS);
-    expect(await h.runtime.refresh()).toMatchObject({ state });
-    // Nothing is confirmed: only the paid last-seen mark may move on.
-    expect({ ...h.saved(), lastSeenAt: 0 }).toEqual({ ...before, lastSeenAt: 0 });
-    // The check-in still falls due 30 days after the real confirmation.
-    h.clock(confirmed + 30 * DAY_MS + 1000);
-    const overdue = createLicensingRuntime(h.options);
-    expect(await overdue.status()).toMatchObject({ state: 'checkin-required', edition: 'free' });
-    expect(await overdue.refreshInBackground()).not.toMatchObject({ state: 'ready' });
-    expect(h.saved()?.clockOffset).toBeUndefined();
-    expect(await createLicensingRuntime(h.options).status()).toMatchObject({
-      state: 'checkin-required',
-    });
-  },
-);
+it('refuses a saved trial refresh answer replayed later, so its check-in still falls due', async () => {
+  // A real refresh on day 2, which the trial user saves.
+  const confirmed = NOW + 2 * DAY_MS;
+  const h = harness({ ...saved(trialClaims()), refreshedAt: NOW / 1000 });
+  h.clock(confirmed);
+  const rights = trialClaims({ issuedAt: confirmed / 1000 });
+  let kept: unknown;
+  h.fetch.mockImplementationOnce(async (url, init) => {
+    const response = await answering(rights)(url, init);
+    kept = await response.clone().json();
+    return response;
+  });
+  expect(await h.runtime.refresh()).toMatchObject({ state: 'ready', edition: 'pro' });
+  const before = h.saved();
+  // A proxy answers every later refresh with it.
+  h.fetch.mockImplementation(async () => Response.json(kept));
+  h.clock(confirmed + DAY_MS);
+  expect(await h.runtime.refresh()).toMatchObject({ state: 'unavailable' });
+  expect({ ...h.saved(), lastSeenAt: 0 }).toEqual({ ...before, lastSeenAt: 0 });
+  // The trial check-in still falls due 3 days after the real confirmation.
+  h.clock(confirmed + 3 * DAY_MS + 1000);
+  expect(await createLicensingRuntime(h.options).status()).toMatchObject({
+    state: 'checkin-required',
+    edition: 'free',
+  });
+});
+
+it('refuses a saved paid refresh answer replayed later, so it confirms nothing', async () => {
+  const confirmed = NOW + 8 * DAY_MS;
+  const h = harness({ ...saved(), refreshedAt: NOW / 1000 });
+  h.clock(confirmed);
+  let kept: unknown;
+  h.fetch.mockImplementationOnce(async (url, init) => {
+    const response = await answering(claims({ issuedAt: confirmed / 1000 }))(url, init);
+    kept = await response.clone().json();
+    return response;
+  });
+  expect(await h.runtime.refresh()).toMatchObject({ state: 'ready', edition: 'pro' });
+  const before = h.saved();
+  h.fetch.mockImplementation(async () => Response.json(kept));
+  h.clock(confirmed + 20 * DAY_MS);
+  expect(await h.runtime.refresh()).toMatchObject({ state: 'unavailable' });
+  // Not a confirmation: the next quiet check still asks the service, which is how a
+  // refund reaches this computer. The licence itself keeps working (ADR-623 Amendment 2).
+  expect({ ...h.saved(), lastSeenAt: 0 }).toEqual({ ...before, lastSeenAt: 0 });
+  expect(await createLicensingRuntime(h.options).status()).toMatchObject({
+    state: 'ready',
+    edition: 'pro',
+  });
+});
 
 it('refuses a grant that signs another request’s nonce, even on a correct clock', async () => {
   const h = harness(saved());
@@ -109,8 +125,8 @@ it('refuses a replayed grant whose nonce was rewritten, because the signature co
   expect(h.saved()?.credential).toEqual(saved().credential);
 });
 
-it('keeps a wrong-clock check-in from a background refresh, which brings its own nonce', async () => {
-  // Overdue on this clock, which runs two hours ahead of the service.
+it('accepts a background paid refresh on a clock two hours ahead, and saves no offset', async () => {
+  // Paid rights ignore the clock (ADR-623 Amendment 2); the refresh still brings its own nonce.
   const served = NOW + 31 * DAY_MS;
   const local = served + 2 * 3_600_000;
   const h = harness({ ...saved(), refreshedAt: NOW / 1000 });
@@ -118,7 +134,8 @@ it('keeps a wrong-clock check-in from a background refresh, which brings its own
   h.fetch.mockImplementation(answering(claims({ issuedAt: served / 1000 })));
   expect(await h.runtime.refreshInBackground()).toMatchObject({ state: 'ready', edition: 'pro' });
   expect(h.fetch).toHaveBeenCalledOnce();
-  expect(h.saved()).toMatchObject({ clockOffset: 7200, refreshedAt: local / 1000 });
+  expect(h.saved()).toMatchObject({ refreshedAt: local / 1000 });
+  expect(h.saved()?.clockOffset).toBeUndefined();
 });
 
 it('accepts a nonce-free grant on a correct clock, as older services send', async () => {
