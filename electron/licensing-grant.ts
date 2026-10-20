@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { checkGrantTime, LicenceClockError, paidClockOffset } from './licensing-clock.js';
 import type { LicencePayment } from './licensing-commerce.js';
 import type { LicensingConfig } from './licensing-config.js';
@@ -62,6 +63,13 @@ export function renewalIdentity(
     : undefined;
 }
 
+/** A service call. A refresh also keeps the random nonce it sends (ADR-592 Amendment 1). */
+export type GrantCall = {
+  readonly path: string;
+  readonly body: unknown;
+  readonly nonce?: string;
+};
+
 /** The service call for an action, or null when a refresh has nothing to refresh. */
 export function grantRequest(
   config: LicensingConfig,
@@ -74,15 +82,17 @@ export function grantRequest(
     /** The firmware digest a trial is also bound to, when this computer has one (ADR-592). */
     readonly hardwareId?: string | null | undefined;
   },
-): { readonly path: string; readonly body: unknown } | null {
+): GrantCall | null {
   const { action, saved, device } = request;
-  if (action === 'refresh')
-    return saved.credential === undefined
-      ? null
-      : {
-          path: '/v1/activations/refresh',
-          body: requireActivationBody(config, saved.credential, device),
-        };
+  if (action === 'refresh') {
+    if (saved.credential === undefined) return null;
+    const nonce = randomBytes(32).toString('base64url');
+    return {
+      path: '/v1/activations/refresh',
+      body: { ...requireActivationBody(config, saved.credential, device), refreshNonce: nonce },
+      nonce,
+    };
+  }
   return {
     path: action === 'trial' ? '/v1/trials/start' : '/v1/licenses/activate',
     body: {
@@ -99,8 +109,12 @@ export function grantRequest(
 /**
  * Checks a service grant for this device. A grant issued more than five
  * minutes from this computer's clock throws LicenceClockError, for every tier,
- * except a paid refresh within one check-in period: the service did confirm
- * that licence, so it is kept with the measured offset (ADR-592).
+ * except a paid refresh within one check-in period that signs back `nonce`, the
+ * one its request sent: the service did confirm that licence just now, so it is
+ * kept with the measured offset (ADR-592). Without the nonce a saved grant
+ * replayed later would pass for a new one and push the check-in on each time,
+ * so a grant from an older service is held to the clock, and one that signs any
+ * other nonce is refused (ADR-592 Amendment 1).
  */
 export function verifyGrant(
   config: LicensingConfig,
@@ -108,13 +122,16 @@ export function verifyGrant(
   device: string,
   now: number,
   action: GrantAction,
+  nonce?: string,
 ): VerifiedGrant {
   const grant = verifySignedGrant(config, value, device);
+  const answered = nonce !== undefined && grant.claims.refreshNonce === nonce;
+  if (grant.claims.refreshNonce !== undefined && !answered) throw new Error('Replayed entitlement');
   try {
     checkGrantTime(grant.claims.issuedAt, now);
   } catch (error) {
     const clockOffset =
-      error instanceof LicenceClockError && action === 'refresh'
+      error instanceof LicenceClockError && action === 'refresh' && answered
         ? paidClockOffset(grant.claims, error.offset)
         : null;
     if (clockOffset === null) throw error;
