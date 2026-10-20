@@ -233,9 +233,15 @@ function licensing(site, appPrivacy) {
       The desktop app also quietly confirms saved trial rights daily and paid license rights about
       once a week. It checks whether that confirmation is due at startup and every 30 minutes while
       open, using the same installation digest and saved credential. A failed connection does not
-      interrupt your work. New Pro choices require a confirmation within three days for trials or 30
-      days for paid licenses. Developer licenses are exempt. Existing work, Frame, Start and Save
-      G-code remain available, and the signed trial expiry still applies on your computer.
+      interrupt an open workspace. A trial must still be confirmed within three days before KerfDesk
+      can open again or new Pro tools can be chosen. Its signed expiry and clock rules still apply.
+      Developer licenses have no confirmation deadline. Existing work, Frame, Start and Save G-code
+      remain available in an open workspace.
+    </p>
+    <p>
+      Once activated on this computer, a paid license keeps working offline indefinitely, with no
+      confirmation deadline or clock lock. It remains bound to this installation and covers releases
+      within its update period.
     </p>
     <p>
       The licensing service retains trial installation and firmware digests to recognise repeat
@@ -245,8 +251,8 @@ function licensing(site, appPrivacy) {
     <p>
       The licensing service records verified Paddle refund and chargeback references and their
       effect on a license. Approved full purchase refunds and chargebacks revoke the license;
-      partial and renewal refunds go to support for review. Your next online confirmation picks up a
-      revocation.
+      partial and renewal refunds go to support for review. A revocation or seat deactivation
+      reported by the service takes effect at your next online license confirmation.
     </p>
     <h3>Buying Pro</h3>
     <p>
@@ -378,7 +384,7 @@ export const page = {
     'KerfDesk needs no account for ordinary use. Read about updates, licensing, downloads, optional AI, remote access and machine connections.',
   render: ({ site, appPrivacy = false }) =>
     html`${pageHero({
-      eyebrow: html`Last updated <time datetime="2026-10-12">October 12, 2026</time>`,
+      eyebrow: html`Last updated <time datetime="2026-10-20">October 20, 2026</time>`,
       title: 'Privacy',
       lead: appPrivacy
         ? 'KerfDesk doesn’t track you. This notice covers this privacy page and the KerfDesk app: what each one sends over the network, and what stays on your computer.'

@@ -19,6 +19,7 @@
 // Idle, KerfDesk runs the Cancel settlement itself.
 
 import type { StatusReport } from '../../core/controllers/grbl';
+import type { LaserState } from './laser-store';
 import type { GetFn, SafeWriteFn, SetFn } from './laser-line-shared';
 import { settleAbandonedMotionOperation } from './laser-motion-cancel';
 import type { MotionCancelRefs } from './laser-motion-cancel-context';
@@ -29,6 +30,22 @@ import { pushLog } from './laser-store-helpers';
  * left to the operator (Cancel, ABORT MOTION or reconnect) instead of looping
  * at the poll cadence. */
 const MAX_AUTOMATIC_RELEASE_ATTEMPTS = 2;
+
+/** A cancelled owner that only a missing reply holds: nothing is settling it,
+ * the controller reports Idle, and an acknowledgement is still owed. The owner
+ * stays, because that reply may yet arrive, and only a new serial session
+ * proves it will not. Disconnect and Connect therefore stay available here,
+ * where Cancel's failure tells the operator to use them; before, they were
+ * locked with every other motion owner and only ABORT MOTION got out (ADR-640). */
+export function motionOwnerAwaitsMissingReply(
+  state: Pick<LaserState, 'motionOperation' | 'pendingUntrackedAcks' | 'statusReport'>,
+): boolean {
+  return (
+    isAbandonedMotionOperation(state.motionOperation) &&
+    state.pendingUntrackedAcks > 0 &&
+    state.statusReport?.state === 'Idle'
+  );
+}
 
 /** Called by the status pipeline after it applied `report`. */
 export function releaseAbandonedMotionAtIdle(

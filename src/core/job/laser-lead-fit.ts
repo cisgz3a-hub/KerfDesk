@@ -60,6 +60,9 @@ const BED_SLACK_MM = 1e-6;
 // Share of a short lead's own reach into the scrap its free end must keep
 // from its contour; the rest allows for the contour curving under it.
 const FREE_END_REACH_SHARE = 0.9;
+// A lead-out leaving within this of the way its lead-in came retraces it
+// (retracesLeadIn).
+const RETRACE_DEG = 30;
 
 export function fitLead(
   kind: LeadKind,
@@ -182,4 +185,24 @@ function withinBounds(point: Vec2, bounds: JobBounds): boolean {
     point.y >= bounds.minY &&
     point.y <= bounds.maxY
   );
+}
+
+/** Whether a lead-out runs back along its contour's lead-in, so one pass would
+ * burn that stretch twice: line leads at a right-angle corner leave along the
+ * very line they came in on. Judged where they meet: a lead-out leaving within
+ * RETRACE_DEG of the way the lead-in came overlaps it for more than a kerf
+ * width. Arc leads at a corner part at a right angle and meet again only at
+ * their free ends, both in the scrap. */
+export function retracesLeadIn(leadOut: LeadFit, leadIn: LeadFit): boolean {
+  const outward = direction(leadOut.path.points[0], leadOut.path.points[1]);
+  const inPoints = leadIn.path.points;
+  const back = direction(inPoints[inPoints.length - 1], inPoints[inPoints.length - 2]);
+  if (outward === null || back === null) return false;
+  return outward.x * back.x + outward.y * back.y > Math.cos((RETRACE_DEG * Math.PI) / 180);
+}
+
+function direction(from: Vec2 | undefined, to: Vec2 | undefined): Vec2 | null {
+  if (from === undefined || to === undefined) return null;
+  const length = Math.hypot(to.x - from.x, to.y - from.y);
+  return length === 0 ? null : { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
 }

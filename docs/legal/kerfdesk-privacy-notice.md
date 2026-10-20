@@ -81,7 +81,13 @@ The following remains local unless you send it or approve sharing described in s
 
 ### 3.4 Pro trials and licences
 
-The licensed Windows app contacts our licensing service at license.kerfdesk.com when you start a trial, activate a licence, deactivate a computer, start a purchase or renewal, or confirm a payment. It also confirms your licence in the background when you are online: about once a day during a trial and about once a week for a paid licence. A trial that has not been confirmed for 3 days, or a paid licence for 30 days, pauses new Pro tools until it is confirmed again; your projects and machine control keep working. The ordinary browser workspace does not activate a device. The separate purchase page checks availability, creates an order and claims the fulfilled key through documented browser endpoints. Browser renewal and activation are not supported.
+The licensed Windows app contacts our licensing service at license.kerfdesk.com when you start a trial, activate a licence, deactivate a computer, start a purchase or renewal, or confirm a payment. It also confirms your licence in the background when you are online: about once a day during a trial and about once a week for a paid licence. At startup and every 30 minutes while open, it checks whether a confirmation is due.
+
+Once activated on this computer, a paid licence keeps working offline indefinitely, with no confirmation deadline or clock lock. It remains bound to this installation and covers releases within its update period. Refunds, revocations and seat deactivations reported by the service take effect at the next online licence confirmation.
+
+A trial still needs confirmation within 3 days before KerfDesk can open again or new Pro tools can be chosen. Its signed expiry and clock rules still apply. Existing work, Frame, Start and Save G-code remain available in an open workspace.
+
+The ordinary browser workspace does not activate a device. The separate purchase page checks availability, creates an order and claims the fulfilled key through documented browser endpoints. Browser renewal and activation are not supported.
 
 The app sends only:
 

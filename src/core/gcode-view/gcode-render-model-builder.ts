@@ -4,10 +4,12 @@
 // Composes the shared engine (core/gcode); forgiving by design — bad arcs and
 // unknown words become findings, never failures (ADR-255 §5).
 
-import { ARC_EPSILON, arcSweepAngle, PROGRAM_PARSE_REASON } from '../gcode';
+import { ARC_EPSILON, arcSweepAngle, PROGRAM_PARSE_REASON, type GcodeWordMatch } from '../gcode';
 // Deep import: the core/gcode barrel is at its public-export cap (ADR-015).
 import { stripControllerComments } from '../gcode/word-scan';
 import { timingArcPoints } from './controller-arc-points';
+// Deep import: the exact arc box, also used by the output invariants.
+import { arcAabb } from '../invariants/arc-bounds';
 import {
   createLaserRenderState,
   isLaserOffFeed,
@@ -27,6 +29,7 @@ import {
 } from './native-laser-render-words';
 import { computeProgramStats } from './program-stats';
 import { createProgramBoundsTracker, type ProgramBoundsTracker } from './program-bounds';
+import { createPlacementReader, placeBeforeMotion } from './render-model-placement';
 import { ARC_RADIUS_TOLERANCE_MM, renderArcCenter } from './render-model-arc-center';
 import { createSegmentBuilder, type SegmentBuilder } from './segment-builder';
 import {
@@ -55,6 +58,8 @@ type BuildContext = {
   readonly segments: SegmentBuilder;
   // The program's own extent, without the assumed start (ADR-255 amendment 2).
   readonly program: ProgramBoundsTracker;
+  /** Only with `boundsFromStart` (ADR-630 Amendment 1). */
+  readonly placement: ReturnType<typeof createPlacementReader> | null;
   readonly events: ProgramEvent[];
   readonly skipped: SkippedMotion[];
   readonly unsupported: UnsupportedWordMap;
@@ -81,6 +86,7 @@ export function createGcodeRenderModelBuilder(
     modal: freshRenderModal(options.initialPositionMm),
     segments,
     program: createProgramBoundsTracker(options.initialPositionMm),
+    placement: options.boundsFromStart === true ? createPlacementReader() : null,
     events: [],
     skipped: [],
     unsupported: new Map(),
@@ -175,8 +181,25 @@ function processLine(context: BuildContext, raw: string, line: number): number {
     accounting,
   });
   const outcome = applyLineWords(context.modal, motionWords, line, accounting);
-  if (emitLineMotion(context, outcome, line)) return LINE_CATEGORY.motion;
+  if (emitPlacedLineMotion(context, outcome, motionWords, line)) return LINE_CATEGORY.motion;
   return nonMotionCategory(outcome, motionWords !== words);
+}
+
+// Without `boundsFromStart` every line's axis words are ordinary motion.
+function emitPlacedLineMotion(
+  context: BuildContext,
+  outcome: ReturnType<typeof applyLineWords>,
+  words: ReadonlyArray<GcodeWordMatch>,
+  line: number,
+): boolean {
+  if (context.placement === null) return emitLineMotion(context, outcome, line);
+  const placement = context.placement(words, context.modal.unitScale);
+  placeBeforeMotion(context.program, context.modal, placement);
+  const moved =
+    placement.motion !== 'none' &&
+    emitLineMotion(context, outcome, line, placement.motion !== 'unplaced');
+  if (placement.unknownAfter.length > 0) context.program.forget(placement.unknownAfter);
+  return moved;
 }
 
 function nonMotionCategory(
@@ -194,6 +217,7 @@ function emitLineMotion(
   context: BuildContext,
   outcome: ReturnType<typeof applyLineWords>,
   line: number,
+  placed = true,
 ): boolean {
   if (outcome.homeAxes !== null) {
     emitHome(context, outcome.homeAxes, line);
@@ -204,7 +228,7 @@ function emitLineMotion(
     emitCannedCycle(context, outcome.axisWords, outcome.peckDepth, line);
     return true;
   }
-  emitMotion(context, outcome.axisWords, line);
+  emitMotion(context, outcome.axisWords, line, placed);
   return true;
 }
 
@@ -232,6 +256,7 @@ function emitMotion(
   context: BuildContext,
   axisWords: ReadonlyMap<string, number>,
   line: number,
+  placed: boolean,
 ): void {
   const { modal } = context;
   const target = resolveTarget(modal, axisWords);
@@ -246,7 +271,9 @@ function emitMotion(
   } else {
     emitLinear(context, target, line);
   }
-  context.program.moveTo(target, axisWords, modal.absolute);
+  // A move the outline cannot place leaves its axes unknown instead (the
+  // caller forgets them), so its end is not counted.
+  if (placed) context.program.moveTo(target, axisWords, modal.absolute);
   modal.x = target.x;
   modal.y = target.y;
   modal.z = target.z;
@@ -364,6 +391,12 @@ function emitArc(
   context.controllerArcBudgetRelief += arc.budgetRelief;
   points[points.length - 1] = { x: target.x, y: target.y };
   pushArcPairs(context, points, target, sweep * radius, line, clockwise);
+  // The display's chords can cut inside the arc's outermost points, which the
+  // controller's finer interpolation reaches. A Frame built from the program's
+  // bounds must cover them (ADR-630), so the arc's exact box counts too.
+  const box = arcAabb(from, target, center.x - from.x, center.y - from.y, clockwise);
+  context.program.include({ x: box.minX, y: box.minY, z: modal.z });
+  context.program.include({ x: box.maxX, y: box.maxY, z: modal.z });
   return true;
 }
 

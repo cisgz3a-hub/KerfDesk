@@ -52,6 +52,7 @@ describe('commerce configuration', () => {
       'Laser cutting and engraving',
       '2D CNC cuts',
       'All machine control',
+      'G-code Inspector',
     ]);
     assert.equal(commerce.plans.length, 1, 'Free and Pro are the only editions');
     assert.ok(PRO, 'the Pro plan is configured');
@@ -74,7 +75,6 @@ describe('commerce configuration', () => {
       'Camera alignment',
       'Box generator',
       'Design Studio',
-      'G-code Inspector',
     ]);
   });
 
@@ -140,7 +140,7 @@ describe('commerce configuration', () => {
     assert.match(text, /In the Windows desktop app\./);
     assert.match(
       text,
-      /All Pro features are in the desktop app V-carve, 3D relief, Adaptive clearing, Advanced tracing, Camera alignment, Box generator, Design Studio and G-code Inspector are in KerfDesk Pro, which comes with the Windows desktop app\. KerfDesk in the browser is the Free edition/,
+      /All Pro features are in the desktop app V-carve, 3D relief, Adaptive clearing, Advanced tracing, Camera alignment, Box generator and Design Studio are in KerfDesk Pro, which comes with the Windows desktop app\. KerfDesk in the browser is the Free edition/,
     );
     assert.match(text, /Can I use Pro in the browser\? No\. Pro works in the Windows desktop app/);
     assert.doesNotMatch(text, /browser counts as (?:one|a) device/);
