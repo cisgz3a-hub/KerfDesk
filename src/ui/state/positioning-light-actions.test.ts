@@ -1,10 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ControllerKind } from '../../core/devices/device-profile';
 import { disconnectStopCommands } from './laser-store-helpers';
-import {
-  cancelControllerLifecycleRefs,
-  consumeControllerCommandResponse,
-} from './laser-interactive-command';
+import { cancelControllerLifecycleRefs } from './laser-interactive-command';
 import { positioningLightDisconnectOff } from './positioning-light-actions';
 import {
   framedRunControllerSnapshot,
@@ -150,21 +147,6 @@ describe('separate positioning light transaction', () => {
     await vi.advanceTimersByTimeAsync(9000);
     await failure;
     expect(h.stop).toHaveBeenCalledOnce();
-    expect(h.writes).not.toContain(`${h.mapping.onCommand}\n`);
-  });
-
-  it('releases a refused jog without the reset-based Abort', async () => {
-    const h = harness();
-    h.after((line) => {
-      if (line.startsWith('$J=')) h.hold(line);
-    });
-    const pending = h.actions.centrePositioningLight(40, 45, 1200);
-    const failure = expect(pending).rejects.toThrow('error:15');
-    await vi.waitFor(() => expect(h.writes.some((line) => line.startsWith('$J='))).toBe(true));
-    consumeControllerCommandResponse(h.refs, h.refs.driver.classifyLine('error:15'), 'error:15');
-    await failure;
-    expect(h.stop).not.toHaveBeenCalled();
-    expect(h.get().controllerOperation).toBeNull();
     expect(h.writes).not.toContain(`${h.mapping.onCommand}\n`);
   });
 

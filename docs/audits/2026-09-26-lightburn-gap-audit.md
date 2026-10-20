@@ -84,7 +84,7 @@ Sierra variants).
 | LBG-C11 | Hide Backlash, Cut in Direction Order, Reduce Direction Changes | `R/OptimizationSettings/` | Missing | S-M | open |
 | LBG-C12 | Flood fill travel planning | `R/CutSettingsEditor/FillMode/` | Island Fill covers part of it (`src/core/job/island-fill.ts`) | L | open |
 | LBG-C13 | Remove Overlapping Lines tolerance you can set | `R/OptimizationSettings/` | Fixed tolerance (`src/core/job/remove-cut-overlaps.ts`) | S | Built (ADR-499) |
-| LBG-C14 | Laser lead-in and lead-out | `R/CutSettingsEditor/LineMode/` | Laser-off contour entry on the 4040-safe profile only | M | DECISION (PROJECT.md lists laser lead-in/out out of scope) |
+| LBG-C14 | Laser lead-in and lead-out | `R/CutSettingsEditor/LineMode/` | Laser-off contour entry on the 4040-safe profile only | M | Built (ADR-626): scrap side found per contour, leads that do not fit shortened or left out |
 | LBG-C15 | Laser Z offset and Z step per pass | `R/CutSettingsEditor/LineMode/` | Missing | M | DECISION (laser Z out of scope in PROJECT.md) |
 
 ## Gaps: images and trace

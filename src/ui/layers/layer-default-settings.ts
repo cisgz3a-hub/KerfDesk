@@ -1,4 +1,6 @@
 import { LAYER_DEFAULTS, type Layer, type MachineKind } from '../../core/scene';
+// Deep import: core/scene's barrel is ratcheted and may only shrink.
+import { withoutInactiveLaserLeadSettings, withoutLaserLeadSettings } from '../../core/scene/layer';
 import { normalizeLayer } from '../../io/project/normalize-layer';
 import { validateProjectLayer } from '../../io/project/project-layer-shape-validator';
 import type { LayerDefaultsState } from '../state/layer-default-actions';
@@ -31,7 +33,10 @@ export function captureLayerDefaultSettings(
     parkedOutput,
     ...settings
   } = layer;
-  return { ...settings, output: machineKind === 'cnc' ? (parkedOutput ?? output) : output };
+  return {
+    ...withoutInactiveLaserLeadSettings(settings),
+    output: machineKind === 'cnc' ? (parkedOutput ?? output) : output,
+  };
 }
 
 export function applyLayerDefaultSettings(
@@ -48,8 +53,8 @@ export function applyLayerDefaultSettings(
   const laserOutput =
     output === undefined ? {} : machineKind === 'cnc' ? { parkedOutput: output } : { output };
   return {
-    ...layer,
-    ...withoutCncBlock(artwork),
+    ...withoutLaserLeadSettings(layer),
+    ...withoutInactiveLaserLeadSettings(withoutCncBlock(artwork)),
     ...laserOutput,
     id: layer.id,
     color: layer.color,
