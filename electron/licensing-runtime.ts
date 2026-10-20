@@ -301,7 +301,7 @@ class LicensingService {
   readonly startTrial = () => this.safe(() => this.acquire('trial'), true);
   readonly refresh = () => this.safe(() => this.acquire('refresh'), true);
   /**
-   * Quietly confirms saved rights about once a day, and otherwise moves a
+   * Quietly confirms saved rights (a trial daily, paid rights weekly), and otherwise moves a
    * clock mark on. Runs at launch and every 30 minutes while KerfDesk is open;
    * it never blocks or interrupts work.
    */

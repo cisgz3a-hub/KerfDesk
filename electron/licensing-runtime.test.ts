@@ -335,11 +335,11 @@ describe('licence key and recovery (ADR-523 Amendment 1)', () => {
     expect(h.saved()?.credential).toBeDefined();
     expect(h.saved()?.pendingDeactivation).toBeUndefined();
   });
-  it('confirms saved paid rights in the background about once a day', async () => {
-    const fresh = harness({ ...saved(), refreshedAt: NOW / 1000 - 23 * 3600 });
+  it('confirms saved paid rights in the background about once a week', async () => {
+    const fresh = harness({ ...saved(), refreshedAt: NOW / 1000 - 6 * 86_400 });
     await fresh.runtime.refreshInBackground();
     expect(fresh.fetch).not.toHaveBeenCalled();
-    const due = harness({ ...saved(), refreshedAt: NOW / 1000 - 86_400 });
+    const due = harness({ ...saved(), refreshedAt: NOW / 1000 - 7 * 86_400 });
     await due.runtime.refreshInBackground();
     expect(due.fetch).toHaveBeenCalledOnce();
     expect(String(due.fetch.mock.calls[0]?.[0])).toContain('/v1/activations/refresh');

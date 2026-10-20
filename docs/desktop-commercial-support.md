@@ -125,7 +125,7 @@ this service does not claim to prevent that.
 A paid licence activated on a computer keeps working there offline, for as long
 as it stays offline, as LightBurn's does (ADR-623 Amendment 2). It has no check-in
 and never opens to the licence window for being offline. KerfDesk tries the
-licence service quietly at startup and about once a day while it runs, and shows
+licence service quietly at startup and about once a week while it runs, and shows
 nothing when it cannot connect. Activating a new computer, or the same computer
 after its operating system is reinstalled, needs the internet once.
 

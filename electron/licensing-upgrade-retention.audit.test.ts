@@ -178,7 +178,7 @@ describe('saved commercial rights through a fresh 1.0.8 runtime', () => {
     'keeps saved %s rights and its key after a due offline startup refresh',
     async (tier) => {
       const h = await harness(tier);
-      // A paid or trial refresh is due daily.
+      // A trial refresh is due daily, a paid one weekly.
       h.time(ISSUED + (tier === 'trial' ? 2 : 8) * DAY);
       const saved = await h.store.read();
       expect(await h.runtime().refreshInBackground()).toMatchObject({

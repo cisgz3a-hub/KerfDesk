@@ -10,11 +10,11 @@ import {
 describe('when a quiet check asks the licence service (ADR-592)', () => {
   const NOW = 1_790_000_000;
   const paid = { state: 'ready', tier: 'paid' };
-  it('asks daily for paid rights and a trial, weekly for developer rights, and at once when overdue', () => {
-    // LightBurn tries once a day (ADR-623 Amendment 2).
+  it('asks daily for a trial, weekly for paid and developer rights, and at once when overdue', () => {
+    // Weekly is the paid cadence the privacy notice states (ADR-623 Amendment 2).
     const seen = { refreshedAt: NOW, lastSeenAt: NOW };
-    expect(licenceRefreshDue(paid, seen, NOW + 86_399)).toBe(false);
-    expect(licenceRefreshDue(paid, seen, NOW + 86_400)).toBe(true);
+    expect(licenceRefreshDue(paid, seen, NOW + 7 * 86_400 - 1)).toBe(false);
+    expect(licenceRefreshDue(paid, seen, NOW + 7 * 86_400)).toBe(true);
     expect(licenceRefreshDue({ state: 'ready', tier: 'trial' }, seen, NOW + 86_400)).toBe(true);
     const developer = { state: 'ready', tier: 'developer' };
     expect(licenceRefreshDue(developer, seen, NOW + 6 * 86_400)).toBe(false);

@@ -42,9 +42,11 @@ What LightBurn does:
    next grant drops it. The paid last-seen mark stays: a clock wound back below it, or below the
    last refresh, still makes the next quiet check ask the licence service at once.
 3. **KerfDesk keeps trying quietly.** As before, it checks at startup and every 30 minutes
-   whether a confirmation is due. A paid licence is now due about daily (it was weekly), as
-   LightBurn tries once a day. A failed attempt saves nothing, so an offline computer tries again
-   at each check, and nothing is shown while it is offline. Developer licences stay weekly.
+   whether a confirmation is due. A paid licence stays due about weekly: LightBurn tries once a
+   day, but the published privacy notice states a weekly paid confirmation, and a paid licence
+   needs none to keep working, so weekly only bounds how soon a refund reaches a connected
+   computer. A failed attempt saves nothing, so an offline computer tries again at each check,
+   and nothing is shown while it is offline.
 4. **A refund, revocation or deactivation still applies the next time the computer reaches the
    service.** ADR-592 decision 1 is unchanged: a refunded or charged-back licence is revoked on the
    service. The first successful refresh after that removes the saved rights at once, so new Pro
@@ -71,11 +73,11 @@ What LightBurn does:
 - `CHECK_IN_LIMIT` holds only the trial. `verifyGrant` checks a grant's time only when
   `grantTimeChecked` says so, which is never for a paid grant. `paidClockOffset`,
   `clockWarningMessage` and the renderer's `use-checkin-reminder` are removed.
-  `licenceRefreshDue` waits one day for paid rights. `LicenceStatus.state` keeps
+  `licenceRefreshDue` still waits a week for paid rights. `LicenceStatus.state` keeps
   `checkin-required` and `clock-error` for trials and developer grants, and the renderer handles
   them as before.
 - The owner's privacy texts (the website privacy page and `docs/legal/kerfdesk-privacy-notice.md`)
-  say paid licences confirm about once a week and need a confirmation within 30 days. The owner
-  should update them before the release that carries this decision: about daily, and no deadline
-  for a paid licence. The AGENTS.md summary of ADR-592 ("paid 30 days") is the maintainer's to
+  say paid licences confirm about once a week, which stays true, and need a confirmation within
+  30 days, which no longer applies. The owner should drop the paid deadline from them before the
+  release that carries this decision. The AGENTS.md summary of ADR-592 ("paid 30 days") is the maintainer's to
   update the same way.
