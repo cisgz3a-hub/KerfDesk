@@ -164,6 +164,36 @@ describe('the scrap side of laser leads (ADR-626 Amendment 1)', () => {
     }
   });
 
+  it('leads every piece of a contour two operations split with the same kerf', () => {
+    // Two 10 mm squares joined by a 0.4 mm neck: a -0.25 mm kerf pinches the
+    // neck off, so each operation cuts the same two pieces.
+    const bell: Polyline = {
+      closed: true,
+      points: [
+        { x: 20, y: 20 },
+        { x: 30, y: 20 },
+        { x: 30, y: 24.8 },
+        { x: 40, y: 24.8 },
+        { x: 40, y: 20 },
+        { x: 50, y: 20 },
+        { x: 50, y: 30 },
+        { x: 40, y: 30 },
+        { x: 40, y: 25.2 },
+        { x: 30, y: 25.2 },
+        { x: 30, y: 30 },
+        { x: 20, y: 30 },
+      ],
+    };
+    const kerf = { ...LEADS, kerfOffsetMm: -0.25 };
+    const job = prepared(
+      project([layer('a', kerf), layer('b', kerf)], [shape('bell', bell, ['a', 'b'])]),
+    );
+    const cuts = job.groups.flatMap((group) => (group.kind === 'cut' ? group.segments : []));
+    expect(cuts).toHaveLength(4);
+    for (const cut of cuts) expect(cut.closed).toBe(false);
+    expect(job.diagnostics ?? []).toEqual([]);
+  });
+
   it('names each operation that leaves a side unknown, with its own count', () => {
     const job = prepared(
       project(

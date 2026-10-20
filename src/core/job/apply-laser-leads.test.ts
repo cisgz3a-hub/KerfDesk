@@ -137,6 +137,22 @@ describe('applyLaserLeads (ADR-626)', () => {
     expect(points.at(-1)?.y).toBeCloseTo(-Math.SQRT2, 9);
   });
 
+  it('never leaves a lap-long overcut along the lead-in either', () => {
+    const leads: CutGroupLaserLeads = { ...LEADS, style: 'line', angleDeg: 45 };
+    const done = applyLaserLeads(
+      {
+        groups: [group([square(0, 0, 10)], { laserLeads: leads, finalPassOvercutMm: 40 })],
+      },
+      NO_BED,
+    );
+    // The overcut ends back at the corner, where its lead-out would run out
+    // along the lead-in, so the square starts mid-edge instead.
+    const out = lead(done);
+    expect(out.polyline[1]).toEqual({ x: 5, y: 0 });
+    expect(out.polyline[0]).not.toEqual(out.polyline.at(-1));
+    expect(done.diagnostics).toBeUndefined();
+  });
+
   it('leads a hole from inside, also when the hole is cut by another operation', () => {
     const outer = square(0, 0, 40);
     const hole = square(10, 10, 20);

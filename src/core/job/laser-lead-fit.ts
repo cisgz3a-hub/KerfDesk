@@ -1,7 +1,9 @@
 // Whether a laser lead fits where it is asked to go (ADR-626), and the
 // longest lead on the shortening ladder that does. A lead fits when:
 //   - it stays on the bed (when the program's bed position is known);
-//   - it leaves its own contour and never comes back toward it: walking out
+//   - it never crosses its own contour away from the join
+//     (laser-lead-own-crossing.ts), and it leaves the contour and never comes
+//     back toward it: walking out
 //     from the join, it never comes nearer the contour than it already was
 //     (within TOLERANCE_MM, and up to the clearance), and its free end, where
 //     the start or stop mark lands, is on the scrap side and at least the
@@ -20,6 +22,7 @@ import type { Vec2 } from '../scene';
 import { extendBoundsByEmittedArcMoves } from './cut-arc-moves';
 import type { JobBounds } from './job-bounds';
 import type { LeadObstacles } from './laser-lead-obstacles';
+import { crossesOwnContour } from './laser-lead-own-crossing';
 import {
   ARC_SAMPLE_SAGITTA_MM,
   leadPath,
@@ -85,6 +88,7 @@ export function leadFits(
 ): boolean {
   const { at } = join;
   if (!onBed(path, context.bed, context.arcsEmitted)) return false;
+  if (crossesOwnContour(path.points, at, context.ownRing)) return false;
   const outward = kind === 'in' ? [...path.points].reverse() : path.points;
   // An arc written as G2/G3 bulges up to the sampling sag past the chords
   // checked here, so it keeps that much more clearance from other cut lines.
@@ -192,11 +196,17 @@ function withinBounds(point: Vec2, bounds: JobBounds): boolean {
  * very line they came in on. Judged where they meet: a lead-out leaving within
  * RETRACE_DEG of the way the lead-in came overlaps it for more than a kerf
  * width. Arc leads at a corner part at a right angle and meet again only at
- * their free ends, both in the scrap. */
-export function retracesLeadIn(leadOut: LeadFit, leadIn: LeadFit): boolean {
-  const outward = direction(leadOut.path.points[0], leadOut.path.points[1]);
+ * their free ends, both in the scrap. A lead-out leaving more than `nearMm`
+ * from where the lead-in joins (an overcut's, from where the overcut ends)
+ * cannot run back along it. */
+export function retracesLeadIn(leadOut: LeadFit, leadIn: LeadFit, nearMm: number): boolean {
+  const start = leadOut.path.points[0];
   const inPoints = leadIn.path.points;
-  const back = direction(inPoints[inPoints.length - 1], inPoints[inPoints.length - 2]);
+  const join = inPoints[inPoints.length - 1];
+  if (start === undefined || join === undefined) return false;
+  if (Math.hypot(start.x - join.x, start.y - join.y) > nearMm) return false;
+  const outward = direction(start, leadOut.path.points[1]);
+  const back = direction(join, inPoints[inPoints.length - 2]);
   if (outward === null || back === null) return false;
   return outward.x * back.x + outward.y * back.y > Math.cos((RETRACE_DEG * Math.PI) / 180);
 }

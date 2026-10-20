@@ -258,6 +258,35 @@ describe('laser lead geometry guards (ADR-626)', () => {
     ]);
   });
 
+  it('never crosses a narrow tongue of its own part beside the join', () => {
+    // A 10 mm square started at (1, 0), with a 0.01 mm tongue 2 mm long hanging
+    // from its bottom edge just behind the start, where the lead-in arrives.
+    const tongued = closed([
+      { x: 1, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+      { x: 0, y: 0 },
+      { x: 0.98, y: 0 },
+      { x: 0.98, y: -2 },
+      { x: 0.99, y: -2 },
+      { x: 0.99, y: 0 },
+    ]);
+    const led = first(
+      applyLaserLeads(
+        { groups: [group([tongued], { laserLeads: { ...LEADS, leadOut: false } })] },
+        NO_BED,
+      ),
+    );
+    // The 2 mm arc lead-in into (1, 0) would start at (1 - r, -r), r = 4/π, and
+    // cut through the tongue between two of its samples, so the square starts
+    // elsewhere.
+    const r = 4 / Math.PI;
+    const start = led.polyline[0] as Vec2;
+    expect(led.closed).toBe(false);
+    expect(Math.hypot(start.x - (1 - r), start.y + r)).toBeGreaterThan(1);
+  });
+
   it('fits a lead shorter than the clearance, at every length the setting allows', () => {
     for (const leads of [
       { ...LEADS, lengthMm: 0.1 },

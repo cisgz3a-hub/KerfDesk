@@ -322,3 +322,28 @@ names a score ring and a border separately; `core/job/laser-leads-scope-and-wrap
 artwork override that turns leads off; `ui/state/laser-recipe-seeding.test.ts` reseeds after leads
 were turned on and off; `ui/state/canvas-start-editing-leads.test.ts` picks a start halfway along an
 edge of a led contour. Each failed before this amendment.
+
+### Amendment 3 — further review (2026-10-20)
+
+1. **The overcut's lead-out is held to the same rule.** With one pass and an overcut a whole lap
+   long, the final pass ends back at the seam, and its lead-out could run back along the lead-in. The
+   retrace rule of Amendment 2 now applies to it too, when it leaves within the clearance of where
+   the lead-in joins, so the contour restarts mid-edge.
+2. **Split kerf pieces stay copies across operations.** When a kerf offset splits one scene contour
+   into pieces and two operations cut it with the same offset, each operation's later pieces were
+   given classes of their own, so the other operation's identical piece sat right at the join and
+   blocked every lead. A later piece now takes the class of the piece it matches by shape
+   (`laser-lead-copies.ts` rule) in another operation; pieces of one operation stay apart.
+3. **A lead never crosses its own contour.** The walking checks read the distance to the contour
+   at samples 0.05 mm apart, and right by the join that distance is small anyway, so a lead could cut
+   through a narrow tongue of the part beside the join between two samples. The lead's path is now
+   also tested against the contour (`laser-lead-own-crossing.ts`); only a crossing within 0.2 mm of
+   the join, measured along the contour, where a lead joins and may ride its chords, is allowed.
+4. **Curve-backed artwork counts for routing.** The lead work estimate counts the contours compile
+   cuts: the canonical curve subpaths when a path has them, else its polylines.
+
+Verification: `core/job/apply-laser-leads.test.ts` restarts a lap-long overcut started at a corner;
+`io/gcode/laser-leads-scrap-side.test.ts` leads all four pieces of a dumbbell two operations split
+with the same kerf; `core/job/laser-leads-geometry-guards.test.ts` keeps a lead-in off a 0.01 mm
+tongue beside the join; `core/job/laser-leads-routing.test.ts` routes curve-backed triangles. Each
+failed before this amendment.

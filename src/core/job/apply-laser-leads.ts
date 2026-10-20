@@ -242,19 +242,22 @@ function leadAttempt(
   const plan = leadPlan(segment, group, key, world);
   if (plan === null) return null;
   const { spec, shape } = plan;
-  const finalPass = finalPassLeadOut(segment, group, spec.leadOut, plan);
+  const planned = finalPassLeadOut(segment, group, spec.leadOut, plan);
   // With one pass and an overcut the final pass is the only one: it goes out
   // as chords, so its lead-in is fitted as chords, and the ordinary lead-out
   // never burns, so it is not fitted and cannot block.
-  const ordinaryOutBurns = group.passes > 1 || finalPass === null;
+  const ordinaryOutBurns = group.passes > 1 || planned === null;
   const context = ordinaryOutBurns ? plan.context : asChords(plan.context);
   const leadIn = spec.leadIn ? fitLead('in', plan.startJoin, shape, context) : null;
   const fitted =
     spec.leadOut && ordinaryOutBurns ? fitLead('out', plan.endJoin, shape, context) : null;
   // A lead-out back along the lead-in would burn it twice: the contour is
-  // started elsewhere instead (leadSegment), where the two part.
-  const leadOut =
-    fitted !== null && leadIn !== null && retracesLeadIn(fitted, leadIn) ? null : fitted;
+  // started elsewhere instead (leadSegment), where the two part. So would the
+  // final pass's, when its overcut runs a whole lap back to the seam.
+  const retraces = (out: LeadFit | null): boolean =>
+    out !== null && leadIn !== null && retracesLeadIn(out, leadIn, context.clearanceMm);
+  const leadOut = retraces(fitted) ? null : fitted;
+  const finalPass = planned !== null && retraces(planned.fit) ? { ...planned, fit: null } : planned;
   return {
     segment,
     ringId: plan.ringId,

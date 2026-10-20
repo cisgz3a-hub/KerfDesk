@@ -144,7 +144,9 @@ function ringSides(
         aroundName: '',
       },
   );
+  const sourceClasses = sides.map((side) => side.copyClass);
   splitKerfPieces(rings, owners, sides, fresh);
+  joinPiecesAcrossGroups(rings, owners, sides, sourceClasses);
   return sides;
 }
 
@@ -172,6 +174,36 @@ function splitKerfPieces(
       const side = sides[index];
       if (representative === 0 || side === undefined) return;
       sides[index] = { ...side, copyClass: fresh + (list[representative] ?? index) };
+    });
+  }
+}
+
+// Two operations with the same kerf offset split one scene contour into the
+// same pieces. Each group's first piece kept the contour's class, but a later
+// piece is matched by shape among the contour's rings of other groups, or it
+// would read as another part right at the join and block every lead.
+function joinPiecesAcrossGroups(
+  rings: ReadonlyArray<LeadRing>,
+  owners: ReadonlyArray<RingOwner>,
+  sides: LeadSideVerdict[],
+  sourceClasses: ReadonlyArray<number>,
+): void {
+  const bySource = new Map<number, number[]>();
+  sourceClasses.forEach((copyClass, index) => {
+    const list = bySource.get(copyClass);
+    if (list === undefined) bySource.set(copyClass, [index]);
+    else list.push(index);
+  });
+  for (const list of bySource.values()) {
+    if (list.every((index) => sides[index]?.copyClass === sourceClasses[index])) continue;
+    const representatives = copyRepresentatives(list.map((index) => rings[index] as LeadRing));
+    list.forEach((index, position) => {
+      const other = list[representatives[position] ?? position];
+      const side = sides[index];
+      const match = other === undefined ? undefined : sides[other];
+      if (side === undefined || match === undefined || other === index) return;
+      if (owners[other]?.group === owners[index]?.group) return;
+      sides[index] = { ...side, copyClass: match.copyClass };
     });
   }
 }
