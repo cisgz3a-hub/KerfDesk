@@ -167,7 +167,9 @@ function SelectedOperationEditor(props: {
 /**
  * Lights up what an edit here changes (ADR-646): the selected artwork's own
  * settings while it overrides the operation, otherwise every piece the
- * operation runs.
+ * operation runs. The Cut Settings dialog renders inside this editor and
+ * applies to the same target, so it lights the same pieces; moved to a
+ * portal, it would need these handlers on its own root (Amendment 1).
  */
 function useOperationEditGlow(
   operation: Layer,
