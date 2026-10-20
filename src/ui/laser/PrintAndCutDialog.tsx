@@ -154,27 +154,37 @@ type RegistrationState = {
   readonly setConfirmed: (checked: boolean) => void;
 };
 
+type ConfirmedRegistration = {
+  readonly targets: PrintAndCutDesignTargets;
+  readonly first: Vec2 | null;
+  readonly second: Vec2 | null;
+};
+
 function useRegistrationState(
   targets: PrintAndCutDesignTargets,
   first: Vec2 | null,
   second: Vec2 | null,
   basisError: string | null,
 ): RegistrationState {
-  const [confirmed, setConfirmed] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<ConfirmedRegistration | null>(null);
   const draft = registrationDraft(targets, first, second);
   // Points captured in different bases measure nothing.
   const measured = basisError === null ? draft.measured : null;
   const unusual = basisError === null ? draft.unusual : null;
-  // A confirmation holds for the figures it was given for; any change asks again.
-  const key = unusual === null ? null : `${measured} ${unusual}`;
-  const confirmedUnusual = key !== null && confirmed === key;
+  // Own the exact immutable targets and captures, not their rounded display.
+  // A fresh capture asks again even when it repeats the same coordinates.
+  const confirmedUnusual =
+    unusual !== null &&
+    confirmed?.targets === targets &&
+    confirmed.first === first &&
+    confirmed.second === second;
   const unconfirmed = unusual !== null && !confirmedUnusual ? unusual : null;
   return {
     invalidReason: basisError ?? draft.error ?? unconfirmed,
     measured,
     unusual,
     confirmedUnusual,
-    setConfirmed: (checked) => setConfirmed(checked ? key : null),
+    setConfirmed: (checked) => setConfirmed(checked ? { targets, first, second } : null),
   };
 }
 
