@@ -119,6 +119,23 @@ test('rejects a decision file whose heading disagrees with its filename', () => 
   assert.match(output, /heading says ADR-8, filename says ADR-9/);
 });
 
+test('rejects a decision file whose heading the gate cannot count', () => {
+  // `# ADR-2` (one `#`) is invisible to the heading pattern, so without this
+  // check the file claims nothing and a second ADR-2 passes as unique.
+  const { code, output } = runGate(UNIQUE_DECISIONS, '\n', {
+    'ADR-2-single-hash-heading.md': ['# ADR-2 - Collides, but hidden', ''],
+  });
+  assert.equal(code, 1);
+  assert.match(output, /ADR-2-single-hash-heading\.md {2}has no "## ADR-2 - \.\.\." heading/);
+});
+
+test('lets an amendment file carry no decision heading of its own', () => {
+  const { code } = runGate(UNIQUE_DECISIONS, '\n', {
+    'ADR-2-amendment-1-plain-notes.md': ['# Notes on ADR-2', ''],
+  });
+  assert.equal(code, 0);
+});
+
 test('rejects a decision file that is not named for any ADR', () => {
   const { code, output } = runGate(UNIQUE_DECISIONS, '\n', {
     'notes-about-a-decision.md': ['## ADR-5 - Hidden in an unnamed file', ''],

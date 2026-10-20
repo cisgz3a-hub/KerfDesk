@@ -11,6 +11,10 @@ import type { OwnedMachineOperation } from './machine-operation-state';
 import type { RemoteControlOptions } from './types';
 import { reviewMessageProjector } from './review-message-sharing';
 
+/** Why a remote cannot approve while the PC's review has a card mid-edit. */
+export const REVIEW_EDITING_MESSAGE =
+  'A setting is being edited in the Job Review on the PC. Save or discard it there, then approve the new review.';
+
 /** Approval names exactly one displayed ordinary review owner and model. */
 export function machineReviewPresenter(
   operation: OwnedMachineOperation,
@@ -45,15 +49,8 @@ export function machineReviewPresenter(
         operation.state = 'starting';
         return;
       }
-      if (preparationBlocked(current.state, current.pendingSignal)) {
-        delete operation.review;
-        operation.state = 'preparing';
-        if (current.state.blocker !== null) {
-          operation.message = current.state.blocker.join('\n');
-          operation.privateMessage = true;
-        }
-        return;
-      }
+      const editing = current.editingOperationIds.size > 0;
+      if (heldForPreparation(operation, current.state, current.pendingSignal, editing)) return;
       if (current.state.model !== displayedModel) {
         displayedModel = current.state.model;
         displayedRevision = revision();
@@ -93,6 +90,28 @@ export function machineReviewPresenter(
       },
     };
   };
+}
+// Preparing, blocked or cancelled, or a card mid-edit on the PC: the remote has
+// nothing to approve. Start waits for an unsaved edit (ADR-638) because the job
+// must run only the values the review shows.
+function heldForPreparation(
+  operation: OwnedMachineOperation,
+  state: Extract<JobReviewState, { readonly kind: 'open' }>,
+  signal: JobReviewSignal | null,
+  editing: boolean,
+): boolean {
+  const blocked = preparationBlocked(state, signal);
+  if (!blocked && !editing) return false;
+  delete operation.review;
+  operation.state = 'preparing';
+  if (blocked && state.blocker !== null) {
+    operation.message = state.blocker.join('\n');
+    operation.privateMessage = true;
+  } else if (!blocked) {
+    operation.message = REVIEW_EDITING_MESSAGE;
+    delete operation.privateMessage;
+  }
+  return true;
 }
 function preparationBlocked(
   state: Extract<JobReviewState, { readonly kind: 'open' }>,

@@ -1,10 +1,10 @@
-import { placeTextOnPath } from '../../core/text';
+import { placeTextOnPath, type TextRenderResult } from '../../core/text';
 import { styledBentRender, styledTextContent, styleTextRender } from '../../core/text/text-style';
 import { IDENTITY_TRANSFORM, type TextObject } from '../../core/scene';
 import { parseVariableTemplateSource } from '../../core/variables';
 import type { TextDialogState } from '../state/ui-store';
-import { renderTextGeometry } from './render-text-geometry';
 import { applyTextWeldInWorker } from './text-weld-worker-client';
+import { renderTextGeometryOffThread, type TextGeometryRenderer } from './text-worker-session';
 import {
   sanitizeTextDialogNumericValues,
   type TextDialogNumericValues,
@@ -21,11 +21,16 @@ export class TextObjectValidationError extends Error {
   }
 }
 
-/** Builds editable vector text without changing the project or its undo history. */
+/**
+ * Builds editable vector text without changing the project or its undo history.
+ * The layout runs in a text worker (ADR-643): the caller's session for a
+ * preview, or one of its own for an explicit action.
+ */
 export async function buildTextObject(
   state: TextDialogState,
   values: DialogValues,
   signal?: AbortSignal,
+  render: TextGeometryRenderer = renderTextGeometryOffThread,
 ): Promise<TextObject> {
   signal?.throwIfAborted();
   const content = values.content.normalize('NFC');
@@ -36,17 +41,20 @@ export async function buildTextObject(
   const box = validatedTextBox(values, safeValues);
   const variable = fieldsVariableTemplate(values);
   if (!variable.ok) throw new TextObjectValidationError(variable.message, 'error');
-  const rendered = await renderTextGeometry({
-    fontKey: values.fontKey,
-    embeddedFonts: values.embeddedFonts,
-    content: styledTextContent(content, values.textStyle),
-    sizeMm: safeValues.sizeMm,
-    alignment: values.alignment,
-    lineHeight: safeValues.lineHeight,
-    letterSpacing: safeValues.letterSpacing,
-    color: values.color,
-    ...box,
-  });
+  const rendered = await render(
+    {
+      fontKey: values.fontKey,
+      embeddedFonts: values.embeddedFonts,
+      content: styledTextContent(content, values.textStyle),
+      sizeMm: safeValues.sizeMm,
+      alignment: values.alignment,
+      lineHeight: safeValues.lineHeight,
+      letterSpacing: safeValues.letterSpacing,
+      color: values.color,
+      ...box,
+    },
+    signal,
+  );
   signal?.throwIfAborted();
   const placed = placeRenderedText(rendered, safeValues, values);
   const final = await applyTextWeldInWorker(
@@ -66,8 +74,7 @@ export async function buildTextObject(
     lineHeight: safeValues.lineHeight,
     letterSpacing: safeValues.letterSpacing,
     bendDeg: values.pathText === undefined ? safeValues.bendDeg : 0,
-    ...(values.weldOverlaps === undefined ? {} : { weldOverlaps: values.weldOverlaps }),
-    ...(values.textStyle === undefined ? {} : { textStyle: values.textStyle }),
+    ...weldAndStyleFields(values),
     color: values.color,
     ...box,
     ...(values.pathText === undefined ? {} : { pathText: values.pathText }),
@@ -75,6 +82,14 @@ export async function buildTextObject(
     bounds: final.bounds,
     transform: placed.transform,
     paths: final.paths,
+  };
+}
+
+// Kept in this order: it is the key order a saved project writes.
+function weldAndStyleFields(values: DialogValues): Pick<TextObject, 'weldOverlaps' | 'textStyle'> {
+  return {
+    ...(values.weldOverlaps === undefined ? {} : { weldOverlaps: values.weldOverlaps }),
+    ...(values.textStyle === undefined ? {} : { textStyle: values.textStyle }),
   };
 }
 
@@ -98,11 +113,11 @@ function fieldsVariableTemplate(
 }
 
 function placeRenderedText(
-  rendered: Awaited<ReturnType<typeof renderTextGeometry>>,
+  rendered: TextRenderResult,
   safeValues: TextDialogNumericValues,
   values: DialogValues,
 ): {
-  readonly rendered: Awaited<ReturnType<typeof renderTextGeometry>>;
+  readonly rendered: TextRenderResult;
   readonly transform: typeof IDENTITY_TRANSFORM;
 } {
   if (values.pathText === undefined) {

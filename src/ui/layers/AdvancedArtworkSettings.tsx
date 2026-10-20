@@ -1,13 +1,6 @@
 import { useId } from 'react';
+import { artworkOperationName, type Layer, type SceneObject } from '../../core/scene';
 import {
-  artworkOperationName,
-  outputOperationLayers,
-  sceneObjectUsesOperation,
-  type Layer,
-  type SceneObject,
-} from '../../core/scene';
-import {
-  effectiveOperationForObject,
   effectiveObjectMinPowerPercent,
   effectiveObjectPowerPercent,
   objectPowerScalePercent,
@@ -16,7 +9,7 @@ import { Icon } from '../kit';
 import { useStore } from '../state';
 import { useMixedOperationNumber } from './mixed-operation-input';
 import { parseEnglishDecimalInput } from './english-decimal-input';
-import { imageDitherAlgorithm } from '../../core/raster/image-processing';
+import { artworkOutputRuns, runUsesMinPower } from './artwork-output-runs';
 
 export function AdvancedArtworkSettings(props: {
   readonly objects: ReadonlyArray<SceneObject>;
@@ -118,39 +111,19 @@ function powerResults(
 ) {
   return objects.flatMap((object) => {
     const powerSource = draftScale === null ? object : { powerScale: draftScale };
-    return layers
-      .filter((layer) => sceneObjectUsesOperation(object, layer))
-      .flatMap((layer) =>
-        outputOperationLayers(layer).flatMap((operation) => {
-          const effective = effectiveOperationForObject(operation, object);
-          if (operation.mode === 'image' && object.kind !== 'raster-image') return [];
-          if (!hasLaserProcess(object, effective)) return [];
-          const prefix = objects.length > 1 ? `${artworkOperationName(object)} · ` : '';
-          return [
-            {
-              key: `${object.id}:${operation.id}`,
-              name: `${prefix}${operation.name}`,
-              base: effectiveObjectPowerPercent(effective, {}),
-              scale: objectPowerScalePercent(powerSource),
-              power: effectiveObjectPowerPercent(effective, powerSource),
-              image: effective.mode === 'image',
-              minPower:
-                effective.mode === 'image' && imageDitherAlgorithm(effective) === 'grayscale'
-                  ? effectiveObjectMinPowerPercent(effective, powerSource)
-                  : null,
-            },
-          ];
-        }),
-      );
+    const prefix = objects.length > 1 ? `${artworkOperationName(object)} · ` : '';
+    return artworkOutputRuns(object, layers).map(({ run: operation, effective }) => ({
+      key: `${object.id}:${operation.id}`,
+      name: `${prefix}${operation.name}`,
+      base: effectiveObjectPowerPercent(effective, {}),
+      scale: objectPowerScalePercent(powerSource),
+      power: effectiveObjectPowerPercent(effective, powerSource),
+      image: effective.mode === 'image',
+      minPower: runUsesMinPower(effective)
+        ? effectiveObjectMinPowerPercent(effective, powerSource)
+        : null,
+    }));
   });
-}
-
-function hasLaserProcess(object: SceneObject, operation: Layer): boolean {
-  if (object.kind === 'relief') return false;
-  if (object.kind === 'raster-image') {
-    return object.role !== 'trace-source' && operation.mode === 'image';
-  }
-  return operation.mode !== 'image';
 }
 
 function percent(value: number): string {

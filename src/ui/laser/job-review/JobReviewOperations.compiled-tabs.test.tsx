@@ -20,7 +20,7 @@ import {
 import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
-import { JobReviewLayersTable } from './JobReviewLayersTable';
+import { JobReviewOperations } from './JobReviewOperations';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -72,7 +72,7 @@ const SQUARE: Polyline = {
   ],
 };
 
-describe('JobReviewLayersTable compiled tabs', () => {
+describe('JobReviewOperations compiled tabs', () => {
   it('names tabs only for the operations whose compiled passes rise into them', async () => {
     const settings = {
       ...DEFAULT_CNC_LAYER_SETTINGS,
@@ -97,14 +97,16 @@ describe('JobReviewLayersTable compiled tabs', () => {
     root = createRoot(host);
     await act(async () => {
       root?.render(
-        <JobReviewLayersTable
+        <JobReviewOperations
           machineKind="cnc"
           effectiveOperations={buildEffectiveOperationReview(job, scene)}
         />,
       );
     });
 
-    const cells = [...host.querySelectorAll('td')].map((cell) => cell.textContent);
+    const cells = [...host.querySelectorAll('[data-review-detail]')].map(
+      (line) => line.textContent,
+    );
     expect(cells).toContain('4 passes · stepover 40% · Manual feeds');
     expect(cells).toContain(
       '4 passes · stepover 40% · tabs 4 per shape (6 × 2 mm) above the stock bottom · Manual feeds',

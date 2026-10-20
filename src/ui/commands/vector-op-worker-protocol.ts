@@ -28,6 +28,9 @@ export type VectorOpRequest = {
   readonly task: VectorOpTask;
 };
 
+/** Posted once the worker's script has loaded, before any reply. */
+export type VectorOpReady = { readonly kind: 'ready' };
+
 export type VectorOpResponse =
   /**
    * Offset Shapes returns [outward, inward], either of which may be null. Cut
@@ -45,3 +48,5 @@ export type VectorOpResponse =
       readonly error: VectorOpError | CutShapesError;
     }
   | { readonly id: number; readonly kind: 'fatal'; readonly message: string };
+
+export type VectorOpMessage = VectorOpReady | VectorOpResponse;

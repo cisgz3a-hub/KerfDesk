@@ -19,7 +19,7 @@ import { createRectangle } from '../../../core/shapes/primitives';
 import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
-import { JobReviewLayersTable } from './JobReviewLayersTable';
+import { JobReviewOperations } from './JobReviewOperations';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -122,13 +122,15 @@ describe('Job Review relief levels with independent stage recipes', () => {
       const effective = buildEffectiveOperationReview(job);
       root = createRoot(host);
       await act(async () => {
-        root?.render(<JobReviewLayersTable machineKind="cnc" effectiveOperations={effective} />);
+        root?.render(<JobReviewOperations machineKind="cnc" effectiveOperations={effective} />);
       });
 
       const shapeParts = withShape
         ? '1 pass on the other shapes · stepover 40% · tabs 4 per shape (6 × 2 mm), none on reliefs'
         : 'stepover 40%';
-      expect([...host.querySelectorAll('td')].map((cell) => cell.textContent)).toContain(
+      expect(
+        [...host.querySelectorAll('[data-review-detail]')].map((line) => line.textContent),
+      ).toContain(
         `relief roughing 2 levels to 2.5 mm · ${shapeParts} · ramp entry 5° (relief finishing plunges) · Manual feeds`,
       );
       expect(effective[0]?.relief).toEqual({
