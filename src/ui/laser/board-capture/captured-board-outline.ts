@@ -60,5 +60,15 @@ function closeEnough(actual: number, expected: number): boolean {
 /** The project holds a Place Board outline (ADR-636): its burn step then holds
  *  Frame and Start while the Place Board page is open. */
 export function sceneHasCapturedBoard(scene: Scene): boolean {
-  return findRegistrationBoxes(scene).some((box) => box.provenance === 'captured-board');
+  return capturedBoardKind(scene) !== null;
+}
+
+/** The shape of the project's Place Board outline, or null when it has none.
+ *  Placing and burning work from the project, so they still work after the
+ *  project is reopened and the capture session is gone. */
+export function capturedBoardKind(scene: Scene): CapturedBoardGeometry['kind'] | null {
+  const board = findRegistrationBoxes(scene).find((box) => box.provenance === 'captured-board');
+  if (board === undefined) return null;
+  if (board.spec.kind === 'ellipse') return 'circle';
+  return board.spec.kind === 'polyline' ? 'polygon' : 'rect';
 }

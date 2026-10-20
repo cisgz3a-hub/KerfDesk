@@ -369,3 +369,20 @@ describe('Place board positioning light', () => {
     expect(host.textContent).toContain('Set it up');
   });
 });
+
+describe('Place board with a board from an earlier capture', () => {
+  it('places artwork on it in step 2 and says capturing again replaces it', async () => {
+    connectIdle();
+    // A reopened project: the outline is in the scene, the capture session is new.
+    await act(async () => {
+      useStore.getState().addCapturedBoard({ kind: 'rect', widthMm: 120, heightMm: 80 });
+    });
+    const host = await render();
+    expect(host.textContent).toContain('already has a board from an earlier capture');
+    await click(button(host, 'Use the existing board'));
+    const artwork = host.querySelector('section[aria-label="Place the artwork"]');
+    expect(artwork?.hasAttribute('hidden')).toBe(false);
+    expect(artwork?.textContent).toContain('Position artwork');
+    expect(artwork?.textContent).not.toContain('Capture the board in step 1 first');
+  });
+});

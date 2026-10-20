@@ -69,7 +69,9 @@ export function planBoardArray(
       region.kind === 'polygon'
         ? grid.filter((slot) => boxInsideBoardRegion(region, shifted(cell, slot), margin))
         : grid;
-    return { ...base, offsets, limited: offsets.length < cols * rows };
+    // `limited` reports the 100-per-axis / 500-copy cap, not slots a custom
+    // shape drops for being off the material.
+    return { ...base, offsets, limited: grid.length < cols * rows };
   }
 
   return { ...base, ...circleRowPlan(cell, usableBounds, layout, rows) };

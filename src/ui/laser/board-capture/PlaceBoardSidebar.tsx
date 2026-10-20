@@ -4,12 +4,14 @@
 // at another step.
 
 import { Button } from '../../kit';
+import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { BoardCapturePhase } from './BoardCapturePhase';
 import { BoardPointerBar } from './BoardPointerBar';
 import { BoardShapeToggle } from './BoardShapeToggle';
 import { headTargetForSight } from './board-sight';
 import type { BoardSightView } from './CaptureCard';
+import { sceneHasCapturedBoard } from './captured-board-outline';
 import { PlaceBoardArtworkStep, PlaceBoardBurnStep } from './PlaceBoardSteps';
 import type { BoardCapture, BoardRegistrationEpoch } from './use-board-capture';
 import type { BoardCaptureHandlers } from './use-board-capture-handlers';
@@ -72,10 +74,11 @@ export function PlaceBoardSidebar(props: PlaceBoardSidebarProps): JSX.Element {
       <PanelMessages connected={props.connected} handlers={props.handlers} />
       <section className="lf-jig-fields" aria-label="Capture the board" hidden={step !== 'board'}>
         <BoardPointerBar pointer={props.pointer} connected={props.connected} />
+        <EarlierBoardNote committed={props.capture.state.committed} onStep={onStep} />
         <BoardStep {...props} />
       </section>
       <section className="lf-jig-fields" aria-label="Place the artwork" hidden={step !== 'artwork'}>
-        <PlaceBoardArtworkStep geometry={geometry} onGoToBoard={() => onStep('board')} />
+        <PlaceBoardArtworkStep onGoToBoard={() => onStep('board')} />
       </section>
       <section className="lf-jig-fields" aria-label="Burn on the board" hidden={step !== 'burn'}>
         <PlaceBoardBurnStep geometry={geometry} onGoToBoard={() => onStep('board')} />
@@ -128,6 +131,24 @@ function BoardStep(props: PlaceBoardSidebarProps): JSX.Element {
         onRestartCapture={() => changeShape(state.shapeKind)}
       />
     </>
+  );
+}
+
+// A project reopened with a board from an earlier capture: the session that
+// captured it is gone, so say what step 1 would do and where placing happens.
+function EarlierBoardNote(props: {
+  readonly committed: boolean;
+  readonly onStep: (step: PlaceBoardStepId) => void;
+}): JSX.Element | null {
+  const hasBoard = useStore((state) => sceneHasCapturedBoard(state.project.scene));
+  if (props.committed || !hasBoard) return null;
+  return (
+    <div className="lf-place-board__message lf-place-board__message--hint" role="status">
+      <p>This project already has a board from an earlier capture. Capturing again replaces it.</p>
+      <Button title="Place artwork on the existing board" onClick={() => props.onStep('artwork')}>
+        Use the existing board
+      </Button>
+    </div>
   );
 }
 

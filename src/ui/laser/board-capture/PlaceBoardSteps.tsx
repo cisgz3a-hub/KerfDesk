@@ -19,14 +19,12 @@ import { useStore } from '../../state';
 import { useToastStore } from '../../state/toast-store';
 import { WorkspaceJobActions } from '../WorkspaceJobActions';
 import { BoardArtworkPlacement } from './BoardPlacementControls';
-import { sceneHasCapturedBoard } from './captured-board-outline';
+import { capturedBoardKind, sceneHasCapturedBoard } from './captured-board-outline';
 
-export function PlaceBoardArtworkStep(props: {
-  readonly geometry: CapturedBoardGeometry | null;
-  readonly onGoToBoard: () => void;
-}): JSX.Element {
+export function PlaceBoardArtworkStep(props: { readonly onGoToBoard: () => void }): JSX.Element {
   const platform = usePlatformOptional();
-  if (props.geometry === null) return <NeedsBoard onGoToBoard={props.onGoToBoard} />;
+  const boardKind = useStore((state) => capturedBoardKind(state.project.scene));
+  if (boardKind === null) return <NeedsBoard onGoToBoard={props.onGoToBoard} />;
   const importArtwork = (): void => {
     if (platform === null) return;
     const app = useStore.getState();
@@ -57,7 +55,7 @@ export function PlaceBoardArtworkStep(props: {
           </Button>
         )}
       </div>
-      <BoardArtworkPlacement shape={props.geometry.kind} />
+      <BoardArtworkPlacement shape={boardKind} />
     </>
   );
 }
