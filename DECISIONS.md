@@ -195,7 +195,7 @@
 | ADR-221 | 2026-07-17 | Amended 2026-07-27 | Show wall-clock elapsed job time on the canvas motion badge |
 | ADR-222 | 2026-07-17 | Accepted | Single-artwork scenes select the artwork by default |
 | ADR-223 | 2026-07-17 | Accepted | Default CNC laptop layouts to Canvas Focus while preserving explicit 3D choice |
-| ADR-224 | 2026-07-17 | Accepted | Pre-start Job Review dialog consolidates the Start confirmations |
+| ADR-224 | 2026-07-17 | Accepted; amended by ADR-638 (compact confirm sheet) | Pre-start Job Review dialog consolidates the Start confirmations |
 | ADR-225 | 2026-07-17 | Accepted | Machine-rail control order, go-green actions, and origin coaching |
 | ADR-226 | 2026-07-17 | Accepted | Add four reviewed OFL native-stroke fonts for CNC writing |
 | ADR-227 | 2026-07-17 | Accepted | Status-bar Update button replaces the PWA update popup |

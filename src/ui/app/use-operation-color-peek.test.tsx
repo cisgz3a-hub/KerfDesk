@@ -22,6 +22,12 @@ function key(type: 'keydown' | 'keyup', init: KeyboardEventInit): KeyboardEvent 
   return event;
 }
 
+function editableDiv(): HTMLDivElement {
+  const div = document.createElement('div');
+  div.setAttribute('contenteditable', 'true');
+  return div;
+}
+
 const peek = (): boolean => useUiStore.getState().operationColorPeek;
 
 function pointer(type: string, init: MouseEventInit = {}, pointerId = 1): void {
@@ -72,6 +78,25 @@ describe('useOperationColorPeek', () => {
     key('keydown', { key: 'ArrowLeft', altKey: true });
     vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS * 2);
     expect(peek()).toBe(false);
+  });
+
+  it('never peeks while Alt or Option is held in a text field', () => {
+    for (const field of [
+      document.createElement('input'),
+      document.createElement('textarea'),
+      editableDiv(),
+    ]) {
+      document.body.appendChild(field);
+      field.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Alt', altKey: true, bubbles: true }),
+      );
+      vi.advanceTimersByTime(OPERATION_COLOR_PEEK_DELAY_MS * 2);
+      expect(peek()).toBe(false);
+      const release = new KeyboardEvent('keyup', { key: 'Alt', bubbles: true, cancelable: true });
+      field.dispatchEvent(release);
+      expect(release.defaultPrevented).toBe(false);
+      field.remove();
+    }
   });
 
   it('never peeks during an Alt click or drag, where Alt serves the gesture', () => {

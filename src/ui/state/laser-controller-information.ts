@@ -1,6 +1,8 @@
 import type { StoreApi } from 'zustand';
+import type { ControllerDriver } from '../../core/controllers';
 import type { LaserState } from './laser-store';
 import { controllerReconnectRecommended, controllerWentSilent } from './controller-recovery-status';
+import { homeLineTimeoutMs } from './laser-home-action';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
 import {
   scheduleControllerQualification,
@@ -15,7 +17,8 @@ export type {
 
 export function controllerInformationStatusActions(
   get: () => LaserState,
-  refs: ControllerQualificationScheduleRefs & StatusPollScheduleRefs,
+  refs: ControllerQualificationScheduleRefs &
+    StatusPollScheduleRefs & { readonly driver: ControllerDriver },
 ): Pick<
   LaserState,
   | 'getMachineSettingsReadBlockReason'
@@ -29,8 +32,17 @@ export function controllerInformationStatusActions(
         resetCleanupPending: refs.pendingResetCleanup != null,
       }),
     getControllerReconnectRecommended: () => controllerReconnectRecommended(get()),
-    // Silence counts only time the status poll ran on schedule (ADR-356).
-    getControllerWentSilent: () => controllerWentSilent(get(), Date.now(), refs.statusPollSchedule),
+    // Silence counts only time the status poll ran on schedule (ADR-356). A
+    // line owed its reply excuses it only as long as homing could last.
+    getControllerWentSilent: () => {
+      const state = get();
+      return controllerWentSilent(
+        state,
+        Date.now(),
+        refs.statusPollSchedule,
+        homeLineTimeoutMs(state, refs.driver),
+      );
+    },
   };
 }
 

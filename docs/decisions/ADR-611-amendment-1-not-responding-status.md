@@ -2,6 +2,11 @@
 
 **Status:** Accepted by the maintainer's request to audit and upgrade the controller fixes. **Date:** 2026-10-18.
 
+**Amended by [ADR-610 Amendment 2](ADR-610-amendment-2-unidentified-firmware-and-owed-replies.md):**
+a line still owed its reply excuses the silence only for as long as the Home
+button would wait for a homing reply, because a reply lost on the link leaves
+the line owed for the rest of the session.
+
 ADR-611 kept controller information out of the way and left one pop-up: a
 failed settings read on a controller that has stopped answering. An audit found
 the opposite gap. A controller that answered normally, passed qualification,

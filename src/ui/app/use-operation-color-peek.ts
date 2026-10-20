@@ -1,9 +1,11 @@
 // Hold Alt (Option on a Mac) to see every operation colour on the canvas, and
 // let go to return to plain ink (ADR-620). The peek waits a moment and is
 // cancelled by another key or pointer gesture, so shortcuts such as Alt+Left
-// never flash the colours on the way through.
+// never flash the colours on the way through. Nor does holding Alt while
+// typing in a text field.
 
 import { useEffect } from 'react';
+import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { useUiStore } from '../state/ui-store';
 
 export const OPERATION_COLOR_PEEK_DELAY_MS = 150;
@@ -30,6 +32,9 @@ export function useOperationColorPeek(): void {
         return;
       }
       if (e.repeat || timer !== null || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      // Option types characters on a Mac, and a held Alt in a field is typing,
+      // not a request to recolour the canvas.
+      if (isEditableShortcutTarget(e.target)) return;
       // Alt can join a drag after pointer-down, without another pointer event.
       if (pointers.active()) {
         cancelPeek();

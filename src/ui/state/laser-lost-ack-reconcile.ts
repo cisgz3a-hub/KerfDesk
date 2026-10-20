@@ -1,6 +1,6 @@
 // laser-lost-ack-reconcile — finishes a job whose last acknowledgements were
 // lost on the serial link, instead of holding it until the 90 s watchdog
-// soft-resets the controller (ADR-610, Amendment 1).
+// soft-resets the controller (ADR-610, Amendments 1 and 2).
 //
 // GRBL answers every line with exactly one `ok` or `error:N`, and the streamer
 // counts them in order. A reply lost to a UART line error therefore leaves the
@@ -23,9 +23,18 @@
 // probe only after them, so it is never finished early. `$G` cannot complete
 // a truncated motion line: merged with one, it is rejected.
 //
-// A controller whose ordering is not established here falls back to a
-// sustained Idle: Smoothieware handles `$G` in its shell, and how that orders
-// against queued G-code has not been verified.
+// The profile's driver does not prove the firmware, so the probe is sent after
+// 1 s only when the firmware identified itself this session. grblHAL, FluidNC
+// and the Falcon command set have no `$I` that identifies them, so a board
+// that printed no banner (it did not reboot when the port opened) is asked
+// only once Idle has also held for the sustained-Idle window. A held tail is
+// then still answered behind its lines, and firmware that is not ordered after
+// all is finished no earlier than by the sustained-Idle rule (ADR-610
+// Amendment 2).
+//
+// Firmware identified as one whose ordering is not established here falls
+// back to a sustained Idle: Smoothieware handles `$G` in its shell, and how
+// that orders against queued G-code has not been verified.
 //
 // The missing replies are then applied as acknowledgements, so the ordinary
 // post-job settle runs: its own marker and stable Idle confirm completion
@@ -103,15 +112,15 @@ export function reconcileLostStreamAcknowledgements(
   }
   const tracker = currentTracker(refs, state, streamer);
   observeReport(tracker, state);
-  const probe = hasOrderedProbe(
+  const rule = lostReplyProofRule(
     refs.driver,
     state.detectedControllerKind,
     grblBuildInfoThisSession(state),
   );
-  const proof = { probe, kind: state.activeControllerKind, schedule: refs.statusPollSchedule };
+  const proof = { rule, kind: state.activeControllerKind, schedule: refs.statusPollSchedule };
   if (!proofComplete(tracker, proof, streamer, now)) return false;
   refs.lostAckTracker = null;
-  if (probe) {
+  if (rule !== 'sustained-idle') {
     sendLostReplyProbe(set, get, refs, safeWrite, streamer, now);
     return false;
   }
@@ -214,24 +223,31 @@ function nothingElseOwesReplies(
   );
 }
 
-/** A controller whose `$G` answer is ordered behind every earlier line. The
- *  profile's driver stays in use whatever firmware actually answers (a banner
- *  mismatch is only an advisory), so the firmware itself must be identified as
- *  GRBL, grblHAL or FluidNC in this session: by its banner or, when it printed
- *  none, by a stock GRBL `$I` reply. Unidentified firmware gets the sustained-
- *  Idle rule. */
-export function hasOrderedProbe(
+/** How lost replies at the end of a job are proven:
+ *  - 'ordered-probe': `$G` after 1 s of Idle. The firmware identified itself
+ *    as GRBL, grblHAL or FluidNC this session, by its banner or, when it
+ *    printed none, by a stock GRBL `$I` reply.
+ *  - 'probe-after-sustained-idle': a GRBL-family profile on firmware that did
+ *    not identify itself (no banner, and no `$I` that identifies it). The
+ *    profile's driver stays in use whatever firmware answers, so the probe
+ *    also waits for the sustained-Idle window: never earlier than that rule,
+ *    and a held tail is still answered behind its lines (ADR-610 Amendment 2).
+ *  - 'sustained-idle': firmware identified as one without an ordered `$G`
+ *    (Smoothieware), or a profile without one. */
+export type LostReplyProofRule = 'ordered-probe' | 'probe-after-sustained-idle' | 'sustained-idle';
+
+export function lostReplyProofRule(
   driver: Pick<ControllerDriver, 'kind' | 'commands'>,
   detectedKind: ControllerKind | null,
   grblBuildInfoSeen = false,
-): boolean {
-  const identified =
-    detectedKind !== null ? ORDERED_PROBE_KINDS.includes(detectedKind) : grblBuildInfoSeen;
-  return (
-    identified &&
-    ORDERED_PROBE_KINDS.includes(driver.kind) &&
-    driver.commands.modalStateQuery === '$G'
-  );
+): LostReplyProofRule {
+  const orderedProfile =
+    ORDERED_PROBE_KINDS.includes(driver.kind) && driver.commands.modalStateQuery === '$G';
+  if (!orderedProfile) return 'sustained-idle';
+  if (detectedKind !== null) {
+    return ORDERED_PROBE_KINDS.includes(detectedKind) ? 'ordered-probe' : 'sustained-idle';
+  }
+  return grblBuildInfoSeen ? 'ordered-probe' : 'probe-after-sustained-idle';
 }
 
 function grblBuildInfoThisSession(state: LaserState): boolean {
@@ -292,7 +308,7 @@ function observeReport(tracker: LostAckTracker, state: LaserState): void {
 }
 
 type ProofRule = {
-  readonly probe: boolean;
+  readonly rule: LostReplyProofRule;
   readonly kind: ControllerKind;
   readonly schedule: StatusPollSchedule | null | undefined;
 };
@@ -305,11 +321,13 @@ function proofComplete(
 ): boolean {
   if (tracker.firstAt === null) return false;
   // The probe is answered in order, behind a running G4, so it needs no
-  // allowance for one; a timed proof does.
-  const reports = rule.probe ? PROBE_REPORTS : IDLE_PROOF_REPORTS;
-  const window = rule.probe
-    ? LOST_REPLY_PROBE_AFTER_MS
-    : LOST_ACK_IDLE_PROOF_MS + inFlightDwellMs(rule.kind, streamer);
+  // allowance for one; a timed proof does, and so does a probe to firmware
+  // whose ordering is not proven.
+  const timed = rule.rule !== 'ordered-probe';
+  const reports = timed ? IDLE_PROOF_REPORTS : PROBE_REPORTS;
+  const window = timed
+    ? LOST_ACK_IDLE_PROOF_MS + inFlightDwellMs(rule.kind, streamer)
+    : LOST_REPLY_PROBE_AFTER_MS;
   return (
     tracker.reports >= reports && onScheduleElapsed(rule.schedule, tracker.firstAt, window, now)
   );
