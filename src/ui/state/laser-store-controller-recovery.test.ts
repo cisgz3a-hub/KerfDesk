@@ -305,13 +305,16 @@ describe('controller recovery on the existing connection', () => {
       await vi.advanceTimersByTimeAsync(30_000);
 
       expectQualifying();
-      expect(f.settingsReads()).toBe(1);
+      // Abort's own greeting kept the settings through the wait (ADR-648).
+      expect(useLaserStore.getState().grblSettingsRows).not.toHaveLength(0);
+      const modalReads = f.writes.filter((line) => line === '$G\n').length;
       f.controls.state = 'Idle';
       f.status();
       await vi.advanceTimersByTimeAsync(250);
 
       expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
-      expect(f.settingsReads()).toBe(2);
+      expect(f.settingsReads()).toBe(1);
+      expect(f.writes.filter((line) => line === '$G\n')).toHaveLength(modalReads + 1);
       expectSameConnection(f);
     },
   );

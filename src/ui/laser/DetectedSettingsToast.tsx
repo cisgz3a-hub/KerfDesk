@@ -19,6 +19,11 @@ type DetectedSettingsRead = {
 // Controller info (ADR-648, controller audit 2026-10-19 F-5).
 const itemsReadByPort = new Map<string, ReadonlySet<string>>();
 
+/** Tests start each case as a fresh run of the app. */
+export function forgetDetectedSettingsReads(): void {
+  itemsReadByPort.clear();
+}
+
 export function DetectedSettingsToast(): null {
   const detected = useLaserStore((s) => s.detectedSettings);
   const controllerSettings = useLaserStore((s) => s.controllerSettings);

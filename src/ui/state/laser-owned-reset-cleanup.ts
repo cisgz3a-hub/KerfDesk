@@ -68,7 +68,7 @@ function armCausalResetCleanup(owner: ResetOwnership, context: CleanupContext): 
   };
   armResetCleanup(owner.refs, write, context.lines, {
     requireResetBoundary: true,
-    retainedSettings: owner.retainedSettings,
+    retainedSettings: () => owner.retainedSettings,
     onResetBoundary: () => {
       owner.boundaryObserved = true;
       // Only this reset's own banner carries the snapshot (ADR-648); a later

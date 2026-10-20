@@ -43,50 +43,61 @@ export function noteControllerSettingsRead(refs: OwnedResetSettingsRefs): void {
   refs.settingsReadRevision = refs.settingsWriteRevision ?? 0;
 }
 
+type RetainRefs = OwnedResetSettingsRefs & {
+  readonly settingsCollector?: { readonly kind: string };
+};
+
 /** The current session's completed `$$` read, when nothing has written a
  * setting since and no replacement read is in flight. */
 export function retainableControllerSettings(
   state: LaserState,
-  refs: OwnedResetSettingsRefs & { readonly settingsCollector?: { readonly kind: string } },
+  refs: RetainRefs,
   connection: unknown,
 ): RetainedControllerSettings | null {
-  const epoch = state.controllerSessionEpoch;
   const observation = state.controllerSettingsObservation;
-  if (
-    state.connection.kind !== 'connected' ||
-    observation?.sessionEpoch !== epoch ||
-    state.controllerSettings === null ||
-    state.lastSettingsReadAt === null ||
-    state.grblSettingsRows.length === 0 ||
-    refs.settingsCollector?.kind === 'collecting' ||
-    (refs.settingsReadRevision ?? 0) !== (refs.settingsWriteRevision ?? 0)
-  ) {
-    return null;
-  }
+  const settings = state.controllerSettings;
+  const readAt = state.lastSettingsReadAt;
+  if (observation === null || settings === null || readAt === null) return null;
+  if (!snapshotStillHolds(state, refs)) return null;
   return {
     connection,
-    controllerSettings: state.controllerSettings,
+    controllerSettings: settings,
     grblSettingsRows: state.grblSettingsRows,
     detectedSettings: state.detectedSettings,
     observedAt: observation.observedAt,
-    lastSettingsReadAt: state.lastSettingsReadAt,
-    buildInfo:
-      state.controllerBuildInfoObservation?.sessionEpoch === epoch
-        ? {
-            controllerBuildInfo: state.controllerBuildInfo,
-            controllerBuildInfoRawLines: state.controllerBuildInfoRawLines,
-            controllerBuildInfoObservation: state.controllerBuildInfoObservation,
-          }
-        : null,
+    lastSettingsReadAt: readAt,
+    buildInfo: currentBuildInfo(state),
   };
 }
 
-/** The snapshot, re-stamped for the session the banner opened. The read time
- * stays the original one, so nothing announces a read that did not happen. */
+function snapshotStillHolds(state: LaserState, refs: RetainRefs): boolean {
+  return (
+    state.connection.kind === 'connected' &&
+    hasSessionSettingsRead(state, state.controllerSessionEpoch) &&
+    refs.settingsCollector?.kind !== 'collecting' &&
+    (refs.settingsReadRevision ?? 0) === (refs.settingsWriteRevision ?? 0)
+  );
+}
+
+function currentBuildInfo(state: LaserState): ControllerBuildInfoState | null {
+  if (state.controllerBuildInfoObservation?.sessionEpoch !== state.controllerSessionEpoch) {
+    return null;
+  }
+  return {
+    controllerBuildInfo: state.controllerBuildInfo,
+    controllerBuildInfoRawLines: state.controllerBuildInfoRawLines,
+    controllerBuildInfoObservation: state.controllerBuildInfoObservation,
+  };
+}
+
+/** The snapshot, re-stamped for the session the banner opened (nothing when
+ * the banner kept none). The read time stays the original one, so nothing
+ * announces a read that did not happen. */
 export function retainedControllerSettingsPatch(
-  retained: RetainedControllerSettings,
+  retained: RetainedControllerSettings | null,
   sessionEpoch: number,
 ): Partial<LaserState> {
+  if (retained === null) return {};
   const buildInfo = retained.buildInfo;
   return {
     controllerSettings: retained.controllerSettings,
@@ -106,8 +117,8 @@ export function retainedControllerSettingsPatch(
   };
 }
 
-/** Settings kept from before this session's owned reset, still unchanged. */
-export function hasRetainedSettingsForSession(state: LaserState, sessionEpoch: number): boolean {
+/** This session holds a completed `$$` read: its own, or one an owned reset kept. */
+export function hasSessionSettingsRead(state: LaserState, sessionEpoch: number): boolean {
   return (
     state.controllerSessionEpoch === sessionEpoch &&
     state.controllerSettingsObservation?.sessionEpoch === sessionEpoch &&

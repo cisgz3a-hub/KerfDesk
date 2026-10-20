@@ -284,7 +284,9 @@ describe('post-reset cleanup interrupted while its transport is pending', () => 
       f.emit('ok');
       await vi.advanceTimersByTimeAsync(100);
       expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
-      expect(f.writes.filter((line) => line === '$$\n')).toHaveLength(1);
+      // Abort's own greeting kept the settings; only `$G` is read (ADR-648).
+      expect(f.writes).not.toContain('$$\n');
+      expect(f.writes.filter((line) => line === '$G\n')).toHaveLength(1);
       f.writes.length = 0;
       await useLaserStore
         .getState()

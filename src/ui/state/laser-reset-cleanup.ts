@@ -31,8 +31,8 @@ export type ResetCleanupOptions = {
   readonly onResetBoundary?: () => void;
   readonly onComplete?: (error: unknown | null) => void;
   readonly onCancel?: () => void;
-  /** The `$$`/`$I` snapshot this owned reset carries to its banner (ADR-648). */
-  readonly retainedSettings?: RetainedControllerSettings | null;
+  /** The `$$`/`$I` snapshot this owned reset still carries to its banner (ADR-648). */
+  readonly retainedSettings?: () => RetainedControllerSettings | null;
 };
 
 export type ResetCleanupRefs = {
@@ -64,7 +64,7 @@ export function ownedResetRetainedSettings(
 ): RetainedControllerSettings | null {
   const pending = refs.pendingResetCleanup;
   if (pending?.options.requireResetBoundary !== true) return null;
-  const retained = pending.options.retainedSettings ?? null;
+  const retained = pending.options.retainedSettings?.() ?? null;
   return retained !== null && retained.connection === refs.connection ? retained : null;
 }
 

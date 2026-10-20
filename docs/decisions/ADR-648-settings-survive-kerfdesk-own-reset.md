@@ -33,7 +33,8 @@ Abort that reset the board ended in a toast about a routine read.
    it takes the current session's `$$` snapshot: settings, rows, the pending detected-settings
    patch, read time, and the `$I` evidence when this session read it. The snapshot travels on that
    reset's armed beam-off cleanup, the "owned reset boundary". The banner that closes this reset on
-   the same port restores it, re-stamped for the new controller session. The read time stays the
+   the same port, within the owner's 500 ms banner window, restores it, re-stamped for the new
+   controller session. The read time stays the
    original, so nothing announces a read that did not happen. The CNC live caps are published
    again from it.
 2. **Only `$G` is read again.** Qualification after that banner waits for the same reset cleanup
@@ -43,7 +44,7 @@ Abort that reset the board ended in a toast about a routine read.
 3. **Full invalidation stays everywhere else.** These banners still discard the snapshot and
    re-read `$$`, `$I` and `$G`:
    - a banner no owned reset is waiting for: an uncommanded reboot, `$RST=`'s own reset, or a
-     banner after the reset owner's wait ended;
+     late banner after the owner's 500 ms window, even while the owner still waits for a boot;
    - any banner after the first one an owned reset re-arms for;
    - a banner on a new connection;
    - a banner after any `$` assignment (`$N=`, `$RST=`, `$I=`, `$N0=`) went out since the last
@@ -75,5 +76,12 @@ Abort that reset the board ended in a toast about a routine read.
 - `laser-store-controller-qualification.test.ts` pins Abort, then a `$G`-only re-read with no `$$`
   or `$I`, then qualification and a fresh job, and that an uncommanded banner re-reads `$$`.
 - `DetectedSettingsToast.test.ts` pins that the toast is silent on an unchanged or empty read and
-  reappears for a new item or another port.
+  reappears for a new item or another port. `MachineConnectionToolbar.test.tsx` pins the same for
+  the mounted toolbar.
+- The reset owner drops the snapshot when its 500 ms banner window ends without the banner, so
+  `laser-stream-ack-stall.test.ts` and `laser-reset-response-ownership.test.ts` still see a full
+  `$$` read at a late boot. `laser-reset-cleanup-interruption.test.ts`,
+  `laser-store-controller-recovery.test.ts` and the immediate-greeting case of
+  `laser-reset-response-ownership.test.ts` now expect `$G` only after Abort's or the error stop's
+  own greeting.
 - These are unit and store tests only. No machine was operated.

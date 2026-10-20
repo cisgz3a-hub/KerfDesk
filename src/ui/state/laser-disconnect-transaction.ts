@@ -206,6 +206,9 @@ function waitForOwnedResetBoundary(
       // rejection shorten the window before no-greeting cleanup is attempted.
       const remaining = deadline - Date.now();
       if (remaining > 0) await new Promise<void>((resolve) => setTimeout(resolve, remaining));
+      // A boot after the banner window may not be this reset's, so it re-reads
+      // every setting (ADR-648).
+      if (!owner.boundaryObserved) owner.retainedSettings = null;
     },
   );
 }

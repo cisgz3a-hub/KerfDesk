@@ -12,6 +12,7 @@ import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { forgetDetectedSettingsReads } from './DetectedSettingsToast';
 import { LaserWindow } from './LaserWindow';
 import { MachineConnectionToolbar } from './MachineConnectionToolbar';
 import { MachineSetupDialogHost } from './device-setup';
@@ -46,6 +47,7 @@ beforeEach(() => {
   });
   useUiStore.getState().setRailPanelVisible('machine', true);
   dismissToasts();
+  forgetDetectedSettingsReads();
   useStore.getState().replaceDeviceProfile(FALCON_A1_PRO_GRBLHAL_PROFILE);
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -234,7 +236,10 @@ describe('machine toolbar', () => {
     await act(async () => expand.click());
 
     expect(settingsNotifications()).toEqual([notification]);
+    // A re-read reporting the same update stays quiet; a new one speaks (ADR-648).
     await act(async () => completeControllerSettingsRead(124));
+    expect(settingsNotifications()).toEqual([notification]);
+    await act(async () => completeControllerSettingsRead(125, 500));
     expect(settingsNotifications()).toHaveLength(2);
   });
 });
@@ -252,10 +257,10 @@ async function renderToolbarAndRail(): Promise<void> {
   });
 }
 
-function completeControllerSettingsRead(readAt: number): void {
+function completeControllerSettingsRead(readAt: number, maxPowerS = 255): void {
   useLaserStore.setState({
-    detectedSettings: { maxPowerS: 255 },
-    controllerSettings: { maxPowerS: 255 },
+    detectedSettings: { maxPowerS },
+    controllerSettings: { maxPowerS },
     grblSettingsRows: [],
     lastSettingsReadAt: readAt,
   });

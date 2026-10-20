@@ -36,7 +36,7 @@ import {
   consumeSettingsResponse,
   publishCncLiveCaps,
   SETTINGS_READ_OPERATION_LABEL,
-  type DetectedSettingsResult,
+  shouldShowDetectedSettingsReview,
 } from './detected-settings-action';
 import {
   activeControllerCommandLine,
@@ -335,25 +335,6 @@ function isSettingsReadOperation(operation: LaserState['controllerOperation']): 
   );
 }
 
-function shouldShowDetectedSettingsReview(detected: DetectedSettingsResult): boolean {
-  if (Object.keys(detected.patch).length > 0) return true;
-  const controller = detected.controllerSettings;
-  if (
-    controller.softLimitsEnabled !== undefined ||
-    controller.hardLimitsEnabled !== undefined ||
-    controller.homingEnabled !== undefined ||
-    controller.homingDirectionMask !== undefined
-  ) {
-    return true;
-  }
-  if (isPositive(controller.zMaxFeed) && isPositive(controller.zTravelMm)) return true;
-  return detected.settingsRows.some((row) => !row.known);
-}
-
-function isPositive(value: number | undefined): boolean {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
 // Unknown lines run through banner detection too: connecting with the wrong
 // driver selected (e.g. GRBL driver hearing Marlin's `start`) classifies the
 // foreign banner as unknown, and the advisory is exactly what the operator
@@ -416,9 +397,7 @@ function handleWelcomeLine(
     detectedSettings: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
-    ...(retainedSettings === null
-      ? {}
-      : retainedControllerSettingsPatch(retainedSettings, nextSessionEpoch)),
+    ...retainedControllerSettingsPatch(retainedSettings, nextSessionEpoch),
     // An ALARM:N the reset itself raised (Abort mid-motion) is still the
     // controller's alarm after the banner; any other code belonged to the
     // previous boot (audit streaming-4).
@@ -451,15 +430,14 @@ function handleWelcomeLine(
   if (!resetPolicy.preserveOperation) {
     cancelControllerLifecycleRefs(refs, resetPolicy.cancellationReason);
   }
+  if (retainedSettings !== null) publishCncLiveCaps(retainedSettings.controllerSettings);
   // Beam-off cleanup deferred by a commanded reset (Stop, auto-stop) goes
   // out NOW, after the ledger reset above — its ack is unambiguous (audit
   // F2): the controller is fully booted, so the ok cannot be swallowed and
   // cannot be orphaned by this banner.
-  if (retainedSettings !== null) publishCncLiveCaps(retainedSettings.controllerSettings);
   flushResetCleanup(refs, (line, action) => safeWrite(line, action, 'system'), 'reset-boundary');
-  scheduleControllerQualification(set, get, refs, nextSessionEpoch, {
-    modalStateOnly: retainedSettings !== null,
-  });
+  const modalStateOnly = retainedSettings !== null;
+  scheduleControllerQualification(set, get, refs, nextSessionEpoch, { modalStateOnly });
 }
 
 function controllerResetBoundaryPolicy(state: LaserState): {

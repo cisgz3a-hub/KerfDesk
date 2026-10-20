@@ -12,10 +12,8 @@ import {
 } from './detected-settings-action';
 import {
   failedControllerQualificationPatch,
-  qualifiedController,
   qualifyingController,
 } from './laser-controller-qualification';
-import { hasRetainedSettingsForSession } from './laser-owned-reset-settings';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { readOnlyControllerOperation } from './laser-controller-operation';
 import type { LaserSafetyAction } from './laser-safety-notice';
@@ -43,7 +41,7 @@ type SettingsWriteFn = (
   source?: TranscriptSource,
 ) => Promise<void>;
 
-const BUILD_INFO_READ_OPERATION_LABEL = 'Reading controller build information';
+export const BUILD_INFO_READ_OPERATION_LABEL = 'Reading controller build information';
 
 // Settings and build-info reads and $-setting writes move nothing (ADR-639).
 function settingsControllerOperation(label: string) {
@@ -147,64 +145,7 @@ async function readMachineSettingsAction(
   }
 }
 
-/** Qualification after the banner of a reset KerfDesk sent: the `$$` and `$I`
- * snapshot it kept still describes EEPROM, so only the modal state the reset
- * restarted is read again (ADR-648). Without that snapshot, a full read. */
-export async function readModalStateAfterOwnedReset(
-  set: SetFn,
-  get: GetFn,
-  refs: GrblSettingsActionRefs,
-  write: SettingsWriteFn,
-): Promise<void> {
-  const epoch = get().controllerSessionEpoch;
-  if (!hasRetainedSettingsForSession(get(), epoch)) {
-    return readMachineSettingsAction(set, get, refs, write);
-  }
-  const blocked = machineSettingsReadBlockReason(get(), {
-    settingsCollectionActive: refs.settingsCollector.kind === 'collecting',
-    resetCleanupPending: refs.pendingResetCleanup != null,
-  });
-  if (blocked !== null) return blockRead(set, get, blocked);
-  // `$I` too when this session never read it (it failed or was skipped).
-  const readBuildInfo =
-    refs.driver.commands.buildInfoQuery !== null &&
-    get().controllerBuildInfoObservation?.sessionEpoch !== epoch;
-  set({
-    controllerOperation: settingsControllerOperation(
-      readBuildInfo ? BUILD_INFO_READ_OPERATION_LABEL : 'Reading active work coordinates',
-    ),
-    controllerQualification: qualifiedController(epoch, 'verified'),
-  });
-  try {
-    assertSettingsCommandOwnership(get);
-    if (readBuildInfo) {
-      await refreshControllerBuildInfo(set, get, refs, write, epoch);
-      assertSettingsCommandOwnership(get);
-      set((state) =>
-        state.controllerSessionEpoch === epoch
-          ? { controllerOperation: settingsControllerOperation('Reading active work coordinates') }
-          : {},
-      );
-    }
-    await requestTerminalOwnedActiveWcsReadback(get, refs, write, epoch, 'interactive-command');
-    assertSettingsCommandOwnership(get);
-    set((state) =>
-      state.controllerSessionEpoch === epoch
-        ? {
-            log: pushLog(
-              state,
-              '[lf2] Controller settings kept across the reset KerfDesk sent; modal state re-read.',
-            ),
-          }
-        : {},
-    );
-    clearInteractiveOperation(set, epoch);
-  } catch (err) {
-    failSettingsOperation(set, refs, epoch, 'read', err);
-  }
-}
-
-async function refreshControllerBuildInfo(
+export async function refreshControllerBuildInfo(
   set: SetFn,
   get: GetFn,
   refs: GrblSettingsActionRefs,
@@ -350,7 +291,7 @@ async function writeAndVerifySetting(
   }
 }
 
-function assertSettingsCommandOwnership(get: GetFn): void {
+export function assertSettingsCommandOwnership(get: GetFn): void {
   const mpgBlock = mpgCommandBlockMessage(get());
   if (mpgBlock !== null) throw new Error(mpgBlock);
 }
@@ -361,7 +302,7 @@ function settingWasVerified(get: GetFn, id: number, trimmed: string): boolean {
   );
 }
 
-function failSettingsOperation(
+export function failSettingsOperation(
   set: SetFn,
   refs: GrblSettingsActionRefs,
   expectedEpoch: number,
@@ -415,7 +356,7 @@ function finishSettingsQualification(
   );
 }
 
-function blockRead(set: SetFn, get: GetFn, reason: string): never {
+export function blockRead(set: SetFn, get: GetFn, reason: string): never {
   set({
     lastWriteError: reason,
     log: pushLog(get(), `[lf2] Machine settings read blocked: ${reason}`),
@@ -431,7 +372,7 @@ function blockWrite(set: SetFn, get: GetFn, reason: string): never {
   throw new Error(reason);
 }
 
-function clearInteractiveOperation(set: SetFn, expectedEpoch: number): void {
+export function clearInteractiveOperation(set: SetFn, expectedEpoch: number): void {
   set((state) =>
     state.controllerSessionEpoch === expectedEpoch &&
     state.controllerOperation?.kind === 'interactive-command'

@@ -31,7 +31,8 @@ import {
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { controllerRecoveryActions } from './laser-controller-recovery-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
-import { grblSettingsActions, readModalStateAfterOwnedReset } from './grbl-settings-actions';
+import { grblSettingsActions } from './grbl-settings-actions';
+import { readModalStateAfterOwnedReset } from './laser-owned-reset-requalify';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { connectionActions } from './laser-connection-actions';
 import type { ConnectAttemptOwnershipRefs, ConnectionAttemptState } from './laser-connect-attempt';
@@ -516,8 +517,12 @@ export const useLaserStore = create<LaserState>((set, get) => {
   );
   refs.runControllerQualification = settingsActions.readMachineSettings;
   refs.runModalStateQualification = () =>
-    readModalStateAfterOwnedReset(set, get, refs, (line, action, source) =>
-      safeWrite(set, get, line, action, source),
+    readModalStateAfterOwnedReset(
+      set,
+      get,
+      refs,
+      (line, action, source) => safeWrite(set, get, line, action, source),
+      settingsActions.readMachineSettings,
     );
   return {
     ...initialLaserState(),
