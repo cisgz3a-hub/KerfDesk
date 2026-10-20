@@ -18,6 +18,7 @@ import {
   readCommercialInput,
 } from './commercial-release-package.mjs';
 import { publishCommercialRelease } from './commercial-release-publisher.mjs';
+import { recordBetaObservation } from './commercial-beta-observation.mjs';
 
 const USAGE =
   'Usage: publish-commercial-release.mjs --expected-catalog-sha256 <64-hex|none> <release-directory> <commercial-release-identity.json> <packaged-resources-directory>';
@@ -186,8 +187,16 @@ async function main() {
     verifyInstaller,
     expectedCatalogSha256,
   });
+  const betaObservedAt = await recordBetaObservation({
+    store,
+    keySet,
+    privateKeyPem: process.env.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY,
+    keyId: process.env.DESKTOP_STABLE_MANIFEST_KEY_ID,
+    version: result.version,
+    expectedCatalogSha256: result.catalogSha256,
+  });
   console.log(
-    `Commercial release ${result.version}: ${result.status} to the beta ring. Beta catalogue SHA-256: ${result.catalogSha256}.`,
+    `Commercial release ${result.version}: ${result.status} to the beta ring. Beta catalogue SHA-256: ${result.catalogSha256}. Public beta observed at ${betaObservedAt}.`,
   );
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)

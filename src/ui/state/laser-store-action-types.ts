@@ -32,8 +32,11 @@ export type ConnectControllerOptions = {
   /** Which port to open (ADR-420). 'remembered', the default, reuses the port
    * the operator picked before when exactly one fits and shows the picker
    * otherwise; 'choose' always shows the picker; 'automatic' never does and
-   * ends quietly when no remembered port is attached. */
-  readonly portSelection?: 'remembered' | 'choose' | 'automatic' | undefined;
+   * ends quietly when no remembered port is attached. Only 'automatic', the
+   * background auto-connect, fails quietly (ADR-639). 'remembered-only' is a
+   * Connect a person asked for without a picker to show (KerfDesk Remote): it
+   * opens only the remembered port and reports a failed open like a click. */
+  readonly portSelection?: 'remembered' | 'remembered-only' | 'choose' | 'automatic' | undefined;
 };
 
 export type LaserStoreActions = {

@@ -1,12 +1,13 @@
 import type { DeviceProfile } from '../devices';
-import { layerOperationSettingsEqual, type Layer, type Polyline, type SceneObject } from '../scene';
+import type { Layer, Polyline, SceneObject } from '../scene';
+import { layerOperationOutputEqual } from '../scene/layer';
 import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
 import { buildFillGroup } from './fill-group-build';
 import { hasExecutableFillSweep } from './fill-group-emission';
 import { contourEntryRunwayMm } from './contour-entry';
 import type { CutGroup, JobDiagnostic } from './job';
 import { fillPassLayers } from './scan-pass-angles';
-import { lineOvercutFields } from './line-cut-extras';
+import { lineLeadDiagnostics, lineLeadFields, lineOvercutFields } from './line-cut-extras';
 import { lineTabSpanGroups } from './line-tabs';
 import { offsetFillDiagnostics } from './offset-fill-diagnostics';
 import { commonVectorGroupFields } from './vector-group-fields';
@@ -15,6 +16,7 @@ import { vectorCompilation, type VectorCompilation } from './vector-compilation'
 import { vectorProcessBuckets, type VectorProcessBucket } from './vector-process-buckets';
 import { stableFillArtworkSubset } from './stable-fill-artwork-subset';
 import { lineTopologyCollections } from './compile-line-topology';
+import type { KerfSceneSides } from './kerf-scene-sides';
 import { ownedFillMaterial } from './fill-material-ownership';
 import { normalizeClosedPolylinesNonZeroChecked } from '../geometry/polygon-difference';
 import type { LineSegmentCollection } from './collect-line-segments';
@@ -27,11 +29,19 @@ export function compileVectorGroupsForLayer(
   device: DeviceProfile,
   priorityObjectId: string,
   scope: string,
+  keepLeadRings = false,
+  kerfSides?: () => KerfSceneSides,
 ): VectorCompilation {
   const buckets = vectorProcessBuckets(objects, layer);
   const fillBuckets = buckets.filter((bucket) => bucket.layer.mode === 'fill');
   const lineBuckets = buckets.filter((bucket) => bucket.layer.mode === 'line');
-  const lines = lineTopologyCollections(lineBuckets, device, scope);
+  const lines = lineTopologyCollections(
+    lineBuckets,
+    device,
+    scope,
+    keepLeadRings,
+    kerfSides === undefined ? undefined : { operationId: layer.id, sides: kerfSides },
+  );
   const fill = resolveFillContext(objects, fillBuckets, device);
   const output = vectorCompilation(
     buckets.map((bucket) =>
@@ -104,7 +114,7 @@ function resolveFillContext(
     fillBuckets.every(
       (bucket) =>
         bucket.power === firstFill.power &&
-        layerOperationSettingsEqual(bucket.layer, firstFill.layer),
+        layerOperationOutputEqual(bucket.layer, firstFill.layer),
     );
   const uniformMembers = new Set<SceneObject>(
     uniformFill ? fillBuckets.flatMap((bucket) => bucket.objects) : [],
@@ -185,7 +195,13 @@ function lineGroups(
   // Reported even when no segments survived: a failed kerf offset takes every
   // closed contour on the layer with it, which is precisely the case where the
   // layer would otherwise vanish from the job without a trace.
-  const diagnostics = line.kerfDiagnostics;
+  const diagnostics = [
+    ...line.kerfDiagnostics,
+    ...lineLeadDiagnostics(layer, {
+      tabbed: line.tabbedContours ?? 0,
+      perforated: line.perforatedContours ?? 0,
+    }),
+  ];
   if (line.segments.length === 0 && line.tabSpans.length === 0) return { groups: [], diagnostics };
   const common = {
     ...commonVectorGroupFields(layer, device, powerSource, sourceObjectId),
@@ -202,6 +218,8 @@ function lineGroups(
             kind: 'cut' as const,
             ...runway,
             ...lineOvercutFields(layer, line.segments),
+            ...lineLeadFields(layer, line.segments),
+            ...(line.topologyRings === undefined ? {} : { topologyRings: line.topologyRings }),
             segments: line.segments,
           },
         ];

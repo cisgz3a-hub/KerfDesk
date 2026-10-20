@@ -74,6 +74,13 @@ export function overcutComment(overcutMm: number | undefined): string {
     : ` overcut ${formatGcodeCoordinateMm(overcutMm)} mm on final pass`;
 }
 
+// ADR-626: only a group whose operation asks for leads says so.
+export function leadComment(leads: CutGroup['laserLeads']): string {
+  if (leads === undefined) return '';
+  const which = leads.leadIn && leads.leadOut ? 'in+out' : leads.leadIn ? 'in' : 'out';
+  return ` leads ${which} ${leads.style} ${formatGcodeCoordinateMm(leads.lengthMm)} mm at ${leads.angleDeg} deg`;
+}
+
 // ADR-494: only the group burning an operation's tab spans says so.
 export function tabSpanComment(percent: number | undefined): string {
   return percent === undefined ? '' : ` tab spans at ${percent}% of cut power`;
