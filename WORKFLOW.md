@@ -9142,11 +9142,13 @@ notices and warnings. Commands are found however they are spelt (`G+91`, `G91.0`
 The dialog shows the reason and offers only **Close** when the file holds a NUL byte, has no
 line to send, holds a realtime character (`?`, `!`, `~`), a non-ASCII character or a control
 character a GRBL-family controller acts on (Ctrl-X; grblHAL's Ctrl-C, Ctrl-T, Ctrl-Y, ESC,
-backspace and DEL) outside a comment, or the Inspector cannot construct a finite motion
+backspace and DEL) outside a comment, holds a line a GRBL-family controller rejects whole (two
+commands from one modal group such as `G90G91`, two commands that take the axis words, or a
+repeated word: `error:21`, `24`, `25`), or the Inspector cannot construct a finite motion
 envelope. Other control characters (a DOS end-of-file Ctrl-Z, a form feed) are dropped, as
 GRBL discards them. One refusal is policy, not fact: a `$` controller command (also behind a
-`/` or spaces) belongs in the Console, because GRBL runs it only while Idle and the Frame
-cannot trace what it moves (ADR-630 Amendment 1). A line longer than the connected
+`/` or spaces, or FluidNC's bracket form such as `[J]`) belongs in the Console, because GRBL
+runs it only while Idle and the Frame cannot trace what it moves (ADR-630 Amendment 1). A line longer than the connected
 controller's line or receive buffer (ADR-375) is named before Frame and keeps Frame unavailable.
 
 #### Not included

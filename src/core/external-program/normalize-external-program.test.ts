@@ -72,6 +72,46 @@ describe('external G-code program normalization (ADR-630)', () => {
     expect(sent('/G1 X10 F100\n')).toBe(`${BASE}G1X10F100\n`);
   });
 
+  it("refuses FluidNC's bracket commands, which run as $ commands", () => {
+    // FluidNC rebuilds [J] and [Jog] as $J= (fluidnc-line-limit.ts).
+    expect(reasons('G0 X0\n[J]G91X100F600\nG1 X1 F100\n')[0]).toContain(
+      'Line 2 is a bracket controller command',
+    );
+    expect(reasons(' [Jog] G91 X100 F600\n')[0]).toContain(
+      'Line 1 is a bracket controller command',
+    );
+  });
+
+  it('refuses a block the controller rejects whole, which the Frame would trace as run', () => {
+    // GRBL rejects G90G91 with error:21 and stays absolute; the Inspector
+    // would read the move as relative.
+    expect(reasons('G0 X100\nG90G91G1X10F600\n')[0]).toContain(
+      'Line 2 (G90G91G1X10F600) is one the controller rejects whole: G90 and G91 are in one modal group (error:21)',
+    );
+    expect(reasons('G0 X1 G1 X2 F100\n')[0]).toContain('G0 and G1 are in one modal group');
+    expect(reasons('M3 S100 M5\n')[0]).toContain('M3 and M5 are in one modal group');
+    expect(reasons('G1 X10 X20 F100\n')[0]).toContain('it repeats the X word (error:25)');
+    expect(reasons('G92 G1 X0 F100\n')[0]).toContain(
+      'G92 and G1 both take the axis words (error:24)',
+    );
+  });
+
+  it('accepts the usual CAM preamble and setup lines', () => {
+    const program = [
+      'G17 G21 G90 G94 G40 G49 G80',
+      'G90 G94 G91.1 G40 G49 G17',
+      'G28 G91 Z0',
+      'G53 G0 Z0',
+      'G0 G90 G54 X0 Y0',
+      'M3 S1000 M8',
+      'G4 P1',
+      'G1 X10 Y10 F1000 S500',
+      'M5 M9',
+      'M30',
+    ].join('\n');
+    expect(normalizeExternalProgram(program).kind).toBe('ok');
+  });
+
   it('keeps coordinate commands for the review to warn about, and ignores commented ones', () => {
     expect(sent('G21\nG53 G0 X1\nG55\nG92 X0\nG28\n')).toContain('G92X0');
     expect(sent('G0 X1 (G10 L20 P1 X0)\n')).toBe(`${BASE}G0X1\n`);

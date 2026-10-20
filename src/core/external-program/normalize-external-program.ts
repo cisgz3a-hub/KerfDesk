@@ -27,6 +27,8 @@
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/grbl.h
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L291-L328
 
+import { controllerBlockRejection } from './controller-block-check';
+
 export type ExternalProgram = {
   /** One line per sent line, each ending in '\n', the baseline first. */
   readonly gcode: string;
@@ -84,8 +86,10 @@ export function createExternalProgramNormalizer(): ExternalProgramNormalizer {
         droppedLineCount += 1;
         return;
       }
-      if (reason === null && line.startsWith('$'))
-        reasons.push(controllerCommand(line, lineNumber));
+      if (reason === null) {
+        const lineRefusal = lineRefusalOf(line, lineNumber);
+        if (lineRefusal !== null) reasons.push(lineRefusal);
+      }
       lines.push(line);
     },
     finish: () => {
@@ -175,8 +179,23 @@ function characterRefusal(line: string, lineNumber: number): string | null {
 }
 
 // A policy refusal, recorded as one in ADR-630 Amendment 1.
-function controllerCommand(line: string, lineNumber: number): string {
-  return `Line ${lineNumber} is a $ controller command (${preview(line)}). KerfDesk does not send those inside a job: the controller runs them only while Idle, and the Frame cannot trace what they move. Send it from the Console instead.`;
+// A '$' line, or FluidNC's bracket form of one ('[J]' and '[Jog]' run as
+// '$J=', fluidnc-line-limit.ts), is a controller command; any other line the
+// controller rejects as a block would leave the framed outline wrong.
+function lineRefusalOf(line: string, lineNumber: number): string | null {
+  if (line.startsWith('$')) return controllerCommand(line, lineNumber, '$');
+  if (line.startsWith('[')) return controllerCommand(line, lineNumber, 'bracket');
+  const rejected = controllerBlockRejection(line);
+  if (rejected === null) return null;
+  return `Line ${lineNumber} (${preview(line)}) is one the controller rejects whole: ${rejected}. The Frame would trace it as if it ran, so fix it in the program.`;
+}
+
+function controllerCommand(line: string, lineNumber: number, form: '$' | 'bracket'): string {
+  const kind =
+    form === '$'
+      ? 'a $ controller command'
+      : 'a bracket controller command, which FluidNC runs as a $ command and stock GRBL rejects';
+  return `Line ${lineNumber} is ${kind} (${preview(line)}). KerfDesk does not send those inside a job: the controller runs them only while Idle, and the Frame cannot trace what they move. Send it from the Console instead.`;
 }
 
 function preview(line: string): string {
