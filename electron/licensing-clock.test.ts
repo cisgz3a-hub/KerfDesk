@@ -2,14 +2,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkGrantTime,
+  checkInDueAt,
   checkInOverdue,
   clockErrorMessage,
-  clockWarningMessage,
   clockRolledBack,
+  grantTimeChecked,
   LicenceClockError,
   nextClockMark,
   nextPaidMark,
-  paidClockOffset,
 } from './licensing-clock';
 import type { LicenceClaims } from './licensing-verification';
 
@@ -54,27 +54,23 @@ describe('licence clock rules (ADR-523 Amendment 2)', () => {
     expect(nextPaidMark(claims('developer'), NOW, NOW + 86_400)).toBeNull();
     expect(nextPaidMark(claims('trial'), NOW, NOW + 86_400)).toBeNull();
   });
-  it('keeps only a paid offset within one check-in period (ADR-592)', () => {
-    expect(paidClockOffset(claims('paid'), 3600)).toBe(3600);
-    expect(paidClockOffset(claims('paid'), -30 * 86_400)).toBe(-30 * 86_400);
-    expect(paidClockOffset(claims('paid'), 30 * 86_400 + 1)).toBeNull();
-    expect(paidClockOffset(claims('trial'), 3600)).toBeNull();
-    expect(paidClockOffset(claims('developer'), 3600)).toBeNull();
+  it('holds only a trial to a check-in, never paid or developer rights (ADR-623 Amendment 2)', () => {
+    const trial = claims('trial');
+    expect(checkInOverdue(trial, NOW, NOW + 3 * 86_400)).toBe(false);
+    expect(checkInOverdue(trial, NOW, NOW + 3 * 86_400 + 1)).toBe(true);
+    expect(checkInOverdue(trial, NOW + 3 * 86_400 + 1, NOW)).toBe(true);
+    expect(checkInOverdue(trial, NOW, NOW - 301)).toBe(true);
+    expect(checkInDueAt(trial)).toBe(NOW + 3 * 86_400);
+    for (const tier of ['paid', 'developer'] as const) {
+      expect(checkInOverdue(claims(tier), NOW, NOW + 1000 * 86_400)).toBe(false);
+      expect(checkInOverdue(claims(tier), NOW + 1000 * 86_400, NOW - 1000 * 86_400)).toBe(false);
+      expect(checkInDueAt(claims(tier))).toBeNull();
+    }
   });
-  it('times a paid check-in from when an offset grant arrived, never moving a trial', () => {
-    const paid = claims('paid');
-    const limit = 30 * 86_400;
-    // Ahead by an hour: the grant arrived at NOW + 3600 here.
-    expect(checkInOverdue(paid, NOW + 3600, NOW + 3600 + limit, 3600)).toBe(false);
-    expect(checkInOverdue(paid, NOW + 3600, NOW + 3601 + limit, 3600)).toBe(true);
-    // Behind by an hour: not earlier than the grant on this clock.
-    expect(checkInOverdue(paid, NOW - 3600, NOW - 3600)).toBe(true);
-    expect(checkInOverdue(paid, NOW - 3600, NOW - 3600, -3600)).toBe(false);
-    expect(checkInOverdue(paid, NOW - 3600, NOW - 3901, -3600)).toBe(true);
-    // An edited offset moves the check-in by at most one period.
-    expect(checkInOverdue(paid, NOW, NOW + 2 * limit, 10 * limit)).toBe(false);
-    expect(checkInOverdue(paid, NOW, NOW + 2 * limit + 1, 10 * limit)).toBe(true);
-    expect(checkInOverdue(claims('trial'), NOW, NOW + 3 * 86_400 + 1, 86_400)).toBe(true);
+  it('holds a trial or developer grant to the clock, never a paid one', () => {
+    expect(grantTimeChecked(claims('trial'))).toBe(true);
+    expect(grantTimeChecked(claims('developer'))).toBe(true);
+    expect(grantTimeChecked(claims('paid'))).toBe(false);
   });
   it('refuses a fresh grant more than five minutes from this clock, with the offset', () => {
     expect(() => checkGrantTime(NOW, NOW + 300)).not.toThrow();
@@ -107,7 +103,6 @@ describe('licence clock rules (ADR-523 Amendment 2)', () => {
     ['linux', 'automatic date and time in your desktop’s date and time settings'],
   ])('names where %s keeps its automatic time setting', (platform, setting) => {
     expect(clockErrorMessage(600, platform)).toContain(`Turn on ${setting}, check the time zone`);
-    expect(clockWarningMessage(-600, platform)).toContain(`but turn on ${setting} and check`);
     if (platform !== 'win32') expect(clockErrorMessage(600, platform)).not.toContain('Windows');
   });
 });
