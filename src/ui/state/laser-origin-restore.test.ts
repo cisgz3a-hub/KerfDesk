@@ -13,7 +13,12 @@ import {
 } from './laser-controller-status-wait';
 import { consumeControllerCommandResponse } from './laser-interactive-command';
 import { OriginTransactionCancelledError } from './laser-origin-transaction';
-import { restoreWorkOrigin, setOriginAtProgramPoint } from './laser-origin-restore';
+import {
+  BOARD_ORIGIN_UNCONFIRMED_MESSAGE,
+  restoreWorkOrigin,
+  setOriginAtMachinePoint,
+  setOriginAtProgramPoint,
+} from './laser-origin-restore';
 import { statusPositionPatch } from './laser-status-position';
 import { useLaserStore, type LaserState, type LiveRefs } from './laser-store';
 
@@ -331,4 +336,52 @@ describe('Restore saved origin controller evidence and units', () => {
       expect(h.refs.controllerStatusWait).toBeNull();
     });
   }
+});
+
+// ADR-636: Place Board's origin at a machine point (a corner sighted with the
+// positioning light, or a custom shape's front-left) without moving the head.
+describe('Set board origin at a machine point', () => {
+  it('writes one G92 that makes the point the work origin and confirms it', async () => {
+    const h = harness();
+    const writes: string[] = [];
+    const write = async (line: string) => {
+      writes.push(line);
+      queueMicrotask(() => {
+        h.report({ x: 30, y: 50, z: 4 });
+        consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok');
+      });
+    };
+    await setOriginAtMachinePoint(h.set, h.get, h.refs, write, { x: 30, y: 50 });
+    // The head stays at machine (100, 200): its work position becomes (70, 150).
+    expect(writes).toEqual(['G54 G21 G92 X70.000 Y150.000\n']);
+    expect(h.get().wcoCache).toEqual({ x: 30, y: 50, z: 4 });
+    expect(h.get().workOriginVersion).toBe(2);
+  });
+
+  it('refuses an unconfirmed offset but still counts the write as an origin change', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    const write = async () => {
+      queueMicrotask(() => consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok'));
+    };
+    const pending = setOriginAtMachinePoint(h.set, h.get, h.refs, write, { x: 30, y: 50 }).catch(
+      (error: unknown) => error,
+    );
+    await vi.advanceTimersByTimeAsync(3_100);
+    expect(((await pending) as Error).message).toBe(BOARD_ORIGIN_UNCONFIRMED_MESSAGE);
+    // The acknowledged G92 may have landed, so captures made before it are stale.
+    expect(h.get().workOriginVersion).toBe(2);
+    expect(h.get().log.join('\n')).toContain('Board origin written, but the controller has not');
+    expect(h.refs.controllerStatusWait).toBeNull();
+  });
+
+  it('writes nothing for a non-finite point', async () => {
+    const h = harness();
+    const write = vi.fn(async () => undefined);
+    await expect(
+      setOriginAtMachinePoint(h.set, h.get, h.refs, write, { x: Number.NaN, y: 50 }),
+    ).rejects.toThrow('finite machine coordinates');
+    expect(write).not.toHaveBeenCalled();
+    expect(h.get().workOriginVersion).toBe(1);
+  });
 });

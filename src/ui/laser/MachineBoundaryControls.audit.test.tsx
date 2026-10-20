@@ -107,14 +107,11 @@ describe('Machine boundary control audit', () => {
     expect(details.open).toBe(false);
   });
 
-  it('board panel Close clears only its visibility when no motion is active', () => {
+  it('board page Done clears only its visibility when no motion is active', () => {
     useUiStore.setState({ boardCapturePanelOpen: true });
     const project = useStore.getState().project;
     render(<BoardCapturePanel />);
-    const close = host.querySelector<HTMLButtonElement>(
-      '[aria-label="Close board capture panel"]',
-    )!;
-    act(() => close.click());
+    act(() => button('Done').click());
     expect(useUiStore.getState().boardCapturePanelOpen).toBe(false);
     expect(useStore.getState().project).toBe(project);
   });

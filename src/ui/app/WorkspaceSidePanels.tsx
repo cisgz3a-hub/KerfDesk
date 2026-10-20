@@ -7,6 +7,7 @@ import { Icon, type IconName } from '../kit';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { jigPageHoldsJobActions } from '../workspace/registration-jig/jig-run-phase';
+import { sceneHasCapturedBoard } from '../laser/board-capture/captured-board-outline';
 import { useWorkspaceLayoutStore } from '../state/workspace-layout-store';
 import { useMachineRailVisibility } from '../state/use-machine-rail-visibility';
 import type { RailPanelId } from '../state/ui-rail-panel';
@@ -23,9 +24,15 @@ export function WorkspaceSidePanels(): JSX.Element {
   // Jig mode (ADR-641) shows only the machine panel: the jig page has its own
   // artwork and laser settings, and its burn steps hold Frame and Start. When
   // the page has no burn panel to hold them, the machine panel keeps its own.
-  const jigOpen = useUiStore((state) => state.registrationPanelOpen);
+  // Place Board mode (ADR-636) is a page like the jig's: the machine panel
+  // alone, with Frame and Start in its burn step once a board is captured.
+  const jigPage = useUiStore((state) => state.registrationPanelOpen);
+  const boardPage = useUiStore((state) => state.boardCapturePanelOpen);
+  const jigOpen = jigPage || boardPage;
   const jigHoldsJobActions = useStore(
-    (state) => jigOpen && jigPageHoldsJobActions(state.project.scene),
+    (state) =>
+      (jigPage && jigPageHoldsJobActions(state.project.scene)) ||
+      (boardPage && sceneHasCapturedBoard(state.project.scene)),
   );
   const panelId = useId();
   useWorkspacePanelFocus(setActive, setCutsOpen, setMachineOpen);

@@ -1,6 +1,7 @@
 // One geometric plan for both the live board preview and the applied array.
 // Footprints are scene-space rectangles, including rotated artwork's AABB.
 import { boardFitRegion } from './board-fit-region';
+import { boardRegionOf, boxInsideBoardRegion } from './board-region';
 import { transformedBBox } from './hit-test';
 import type { Bounds, ShapeObject } from './scene-object';
 import { applyTransform } from './transform';
@@ -60,7 +61,14 @@ export function planBoardArray(
   const fittingRows = Math.floor((regionH + gapY) / (height + gapY));
   const { cols, rows } = requestedGrid(layout, fittingCols, fittingRows);
   if (!circular) {
-    const offsets = tileIntoRegion(cell, usableBounds, layout);
+    const grid = tileIntoRegion(cell, usableBounds, layout);
+    // A custom-shape board tiles its bounding box, then keeps only the slots
+    // that sit on the material with the edge margin (ADR-636).
+    const region = boardRegionOf(board);
+    const offsets =
+      region.kind === 'polygon'
+        ? grid.filter((slot) => boxInsideBoardRegion(region, shifted(cell, slot), margin))
+        : grid;
     return { ...base, offsets, limited: offsets.length < cols * rows };
   }
 
@@ -160,6 +168,15 @@ function requestedGrid(
   return layout.kind === 'grid'
     ? { cols: Math.min(count(layout.cols), cols), rows: Math.min(count(layout.rows), rows) }
     : { cols, rows };
+}
+
+function shifted(cell: Bounds, slot: TileOffset): Bounds {
+  return {
+    minX: cell.minX + slot.dx,
+    minY: cell.minY + slot.dy,
+    maxX: cell.maxX + slot.dx,
+    maxY: cell.maxY + slot.dy,
+  };
 }
 
 function nonNegative(value: number): number {

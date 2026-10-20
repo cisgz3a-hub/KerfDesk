@@ -15,6 +15,7 @@ import {
   clientToCanvasPx,
   zoomAtCursorPx,
   type ViewState,
+  type ViewTransform,
 } from '../view-transform';
 import { useJigCanvasPaint } from './jig-canvas-paint';
 import { fitJigCanvasView, JIG_BED_VIEW } from './jig-canvas-view';
@@ -33,6 +34,13 @@ export type RegistrationJigCanvasProps = {
   readonly onCommit: (project: Project) => void;
   /** Artwork files dropped on the canvas, with the outline under the drop point. */
   readonly onDropFiles?: (files: ReadonlyArray<File>, outlineId: string | null) => void;
+  /** Extra marks painted over the scene in screen space, e.g. Place Board's
+   *  captured points and live head crosshair (ADR-636). */
+  readonly paintOverlay?: (ctx: CanvasRenderingContext2D, view: ViewTransform) => void;
+  /** Canvas name, help line and fit button for a page other than the jig. */
+  readonly label?: string;
+  readonly help?: string;
+  readonly fitLabel?: string;
 };
 
 const CANVAS_HELP =
@@ -63,7 +71,13 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
     setPreview,
     spaceHeld,
   });
-  useJigCanvasPaint(ref, preview ?? project, { selectedIds, marquee, dropOutlineId }, size, view);
+  useJigCanvasPaint(
+    ref,
+    preview ?? project,
+    { selectedIds, marquee, dropOutlineId, paintOverlay: props.paintOverlay },
+    size,
+    view,
+  );
   useJigCanvasWheel({ ref, gesture, view, size, project, setView });
 
   return (
@@ -72,7 +86,7 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
         ref={ref}
         width={size.width}
         height={size.height}
-        aria-label="Registration jig editing canvas"
+        aria-label={props.label ?? 'Registration jig editing canvas'}
         aria-describedby="registration-jig-canvas-help"
         tabIndex={0}
         style={canvasStyle}
@@ -107,9 +121,11 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
       />
       <div style={footerStyle}>
         <span id="registration-jig-canvas-help" role="status">
-          {notice === '' ? CANVAS_HELP : notice}
+          {notice === '' ? (props.help ?? CANVAS_HELP) : notice}
         </span>
-        <Button onClick={() => setView(fitJigCanvasView(project, size))}>Fit jig</Button>
+        <Button onClick={() => setView(fitJigCanvasView(project, size))}>
+          {props.fitLabel ?? 'Fit jig'}
+        </Button>
         <Button onClick={() => setView(JIG_BED_VIEW)}>Fit bed</Button>
       </div>
     </div>

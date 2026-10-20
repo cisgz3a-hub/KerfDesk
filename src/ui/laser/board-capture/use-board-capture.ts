@@ -1,11 +1,13 @@
 import { useReducer, useRef } from 'react';
+import { assertNever, type BoardShapeKind, type Vec2 } from '../../../core/scene';
 import {
-  assertNever,
-  boardCornersFromOrigin,
-  type BoardShapeKind,
-  type Vec2,
-} from '../../../core/scene';
-import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
+  MAX_BOARD_POLYGON_POINTS,
+  MIN_BOARD_POLYGON_POINTS,
+} from '../../../core/scene/board-polygon';
+import {
+  boardVerificationPoint,
+  type CapturedBoardGeometry,
+} from '../../../core/scene/board-verification';
 
 const MIN_CAPTURE_SEPARATION_MM = 1;
 export const CIRCLE_RIM_POINT_COUNT = 4;
@@ -21,7 +23,8 @@ export type BoardCaptureState = {
   readonly shapeKind: BoardShapeKind;
   readonly circleMethod: CircleCaptureMethod;
   // Capture-phase samples only. A committed rectangle is canonical BL/BR/TR/TL;
-  // a committed circle keeps its resolved center as the sole point.
+  // a committed circle keeps its resolved center as the sole point; a committed
+  // custom shape keeps its corners in outline order.
   readonly corners: ReadonlyArray<Vec2>;
   readonly captureEpoch: BoardRegistrationEpoch | null;
   readonly geometry: CapturedBoardGeometry | null;
@@ -47,6 +50,7 @@ export type BoardCaptureAction =
       readonly registrationEpoch: BoardRegistrationEpoch;
       readonly outlineId: string;
       readonly expectedSessionRevision: number;
+      readonly originAdvance?: number;
     }
   | {
       readonly type: 'update-geometry';
@@ -71,13 +75,7 @@ export function boardCaptureReducer(
     case 'undo':
       return undoCapturePoint(state);
     case 'commit':
-      return applyCommit(
-        state,
-        action.geometry,
-        action.registrationEpoch,
-        action.outlineId,
-        action.expectedSessionRevision,
-      );
+      return applyCommit(state, action);
     case 'update-geometry':
       return applyGeometryUpdate(state, action.geometry, action.registrationEpoch);
     case 'reset':
@@ -148,20 +146,26 @@ function applyCapture(
 }
 
 function maxCaptures(state: BoardCaptureState): number {
-  if (state.shapeKind === 'rect') return 4;
-  return state.circleMethod === 'rim-fit' ? CIRCLE_RIM_POINT_COUNT : 2;
+  switch (state.shapeKind) {
+    case 'rect':
+      return 4;
+    case 'polygon':
+      return MAX_BOARD_POLYGON_POINTS;
+    case 'circle':
+      return state.circleMethod === 'rim-fit' ? CIRCLE_RIM_POINT_COUNT : 2;
+    default:
+      return assertNever(state.shapeKind, 'BoardShapeKind');
+  }
 }
 
 function applyCommit(
   state: BoardCaptureState,
-  geometry: CapturedBoardGeometry,
-  registrationEpoch: BoardRegistrationEpoch,
-  outlineId: string,
-  expectedSessionRevision: number,
+  action: Extract<BoardCaptureAction, { readonly type: 'commit' }>,
 ): BoardCaptureState {
+  const { geometry, registrationEpoch, outlineId } = action;
   if (
-    state.sessionRevision !== expectedSessionRevision ||
-    !boardCaptureCanCommit(state, geometry, registrationEpoch)
+    state.sessionRevision !== action.expectedSessionRevision ||
+    !boardCaptureCanCommit(state, geometry, registrationEpoch, action.originAdvance ?? 0)
   ) {
     return state;
   }
@@ -175,10 +179,18 @@ function applyCommit(
   };
 }
 
+/**
+ * Whether `geometry` may become this session's board. Captured points are
+ * machine coordinates, so the controller session and position trust must be
+ * unchanged. The work origin may have moved only by the G92s this commit wrote
+ * itself (`originAdvance`): a custom shape, or a rectangle whose first corner
+ * was not its front-left, sets the origin as it commits (ADR-636).
+ */
 export function boardCaptureCanCommit(
   state: BoardCaptureState,
   geometry: CapturedBoardGeometry,
   registrationEpoch: BoardRegistrationEpoch,
+  originAdvance = 0,
 ): boolean {
   if (state.committed || geometry.kind !== state.shapeKind || !captureCanCommit(state))
     return false;
@@ -189,7 +201,7 @@ export function boardCaptureCanCommit(
   if (!sameMachineFrame) return false;
   return (
     isRimFitCircle(state) ||
-    state.captureEpoch.workOriginVersion === registrationEpoch.workOriginVersion
+    registrationEpoch.workOriginVersion - state.captureEpoch.workOriginVersion === originAdvance
   );
 }
 
@@ -202,6 +214,7 @@ function captureCanCommit(state: BoardCaptureState): boolean {
   // the origin was captured. The measured path still requires all four corners
   // before it can construct geometry; both paths retain the epoch checks above.
   if (state.shapeKind === 'rect') return state.corners.length >= 1 && state.corners.length <= 4;
+  if (state.shapeKind === 'polygon') return state.corners.length >= MIN_BOARD_POLYGON_POINTS;
   return state.circleMethod === 'rim-fit'
     ? state.corners.length === CIRCLE_RIM_POINT_COUNT
     : state.corners.length >= 1;
@@ -216,10 +229,20 @@ function applyGeometryUpdate(
   return { ...state, geometry, registrationEpoch, corners: canonicalPoints(geometry) };
 }
 
+const CANONICAL_RECT_CORNERS = ['bottom-left', 'bottom-right', 'top-right', 'top-left'] as const;
+
 function canonicalPoints(geometry: CapturedBoardGeometry): ReadonlyArray<Vec2> {
-  return geometry.kind === 'rect'
-    ? boardCornersFromOrigin(geometry.origin, geometry.widthMm, geometry.heightMm)
-    : [geometry.center];
+  switch (geometry.kind) {
+    case 'rect':
+      // BL, BR, TR, TL — around the board from its origin corner.
+      return CANONICAL_RECT_CORNERS.map(
+        (anchor) => boardVerificationPoint(geometry, { kind: 'rect', anchor }) ?? geometry.origin,
+      );
+    case 'circle':
+      return [geometry.center];
+    case 'polygon':
+      return geometry.polygon.points;
+  }
 }
 
 export type BoardCapture = {
@@ -232,6 +255,7 @@ export type BoardCapture = {
     geometry: CapturedBoardGeometry,
     registrationEpoch: BoardRegistrationEpoch,
     outlineId: string,
+    originAdvance?: number,
   ) => void;
   readonly updateGeometry: (
     geometry: CapturedBoardGeometry,
@@ -261,13 +285,14 @@ export function useBoardCapture(): BoardCapture {
         expectedSessionRevision: state.sessionRevision,
       }),
     undo: () => dispatch({ type: 'undo' }),
-    commit: (geometry, registrationEpoch, outlineId) =>
+    commit: (geometry, registrationEpoch, outlineId, originAdvance = 0) =>
       dispatch({
         type: 'commit',
         geometry,
         registrationEpoch,
         outlineId,
         expectedSessionRevision: state.sessionRevision,
+        originAdvance,
       }),
     updateGeometry: (geometry, registrationEpoch) =>
       dispatch({ type: 'update-geometry', geometry, registrationEpoch }),

@@ -111,6 +111,7 @@ import {
 } from './selection-transform-actions';
 import { registrationActions, type RegistrationActions } from './registration-actions';
 import { boardCaptureActions } from './board-capture-actions';
+import { boardPlacementActions, type BoardPlacementActions } from './board-placement-actions';
 import { boardTileActions, type BoardTileActions } from './board-tile-actions';
 import {
   pathNodeEditActions,
@@ -198,6 +199,7 @@ export type AppState = PartGeneratorActions &
   CncLiveCapsActions &
   MachineActions &
   BoardTileActions &
+  BoardPlacementActions &
   AirAssistDefaultActions &
   ProjectActions & {
     readonly project: Project;
@@ -323,7 +325,9 @@ export type AppState = PartGeneratorActions &
     // (rect or circle) from the measured size, center + lock it, keep it out of
     // the burn, and switch placement to user-origin so the next Start lands on the
     // real board. addCapturedBoardBox is the rectangle back-compat wrapper.
-    readonly addCapturedBoard: (shape: BoardShape) => void;
+    // `at`: the outline's top-left on the canvas, where the board sits on the
+    // bed (ADR-636); omitted or off the bed, the outline is centred.
+    readonly addCapturedBoard: (shape: BoardShape, at?: { x: number; y: number }) => void;
     readonly addCapturedBoardBox: (widthMm: number, heightMm: number) => void;
     // Resize a captured board after a physical anchor check while preserving the
     // canvas anchor that corresponds to its work origin (rect bottom-left or
@@ -475,6 +479,7 @@ export const useStore = create<AppState>((rawSet, get) => {
     ...registrationActions(set),
     ...boardCaptureActions(set),
     ...boardTileActions(proOperationMutationSetter(set, get)),
+    ...boardPlacementActions(set),
     ...pathNodeEditActions(set),
     ...pathNodeCurveCommandActions(set),
     ...objectDeleteActions(set),

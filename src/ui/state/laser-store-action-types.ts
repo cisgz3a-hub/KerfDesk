@@ -150,4 +150,10 @@ export type LaserStoreActions = {
     readonly x: number;
     readonly y: number;
   }) => Promise<{ readonly x: number; readonly y: number }>;
+  /** Make a machine point the XY work origin with one G92 at the live machine
+   *  position, without moving the head; rejects when unconfirmed (ADR-636). */
+  readonly setOriginAtMachinePoint: (pointMm: {
+    readonly x: number;
+    readonly y: number;
+  }) => Promise<void>;
 };

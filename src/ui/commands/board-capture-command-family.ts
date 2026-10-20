@@ -1,7 +1,7 @@
 // board-capture-command-family — the single Tools-menu / toolbar command for
-// Capture Board Corners (ADR-124): a toggle that opens or closes the floating
-// board-capture panel. Every capture action (jog to a corner, set origin, draw
-// the outline, place artwork) lives in the panel itself (BoardCapturePanel).
+// Place Board (ADR-124): a toggle that opens or closes Place Board mode, whose
+// page takes the main canvas's place (ADR-636). Every capture, placement and
+// burn action lives on that page itself (BoardCapturePanel).
 
 import { enabled, type AppCommand, type AppCommandContext } from './command-types';
 
@@ -12,8 +12,8 @@ export function placeBoardCommand(ctx: AppCommandContext): AppCommand {
       'tools',
       'Place Board',
       ctx.boardCapturePanelOpen
-        ? 'Close the board-capture panel'
-        : 'Open the board-capture panel — jog to each corner of a placed board to draw it on the canvas',
+        ? 'Leave Place Board and return to the main canvas'
+        : 'Open Place Board: capture a board, place the artwork and burn it, with the machine panel beside it',
       ctx.toggleBoardCapturePanel,
     ),
     active: ctx.boardCapturePanelOpen,

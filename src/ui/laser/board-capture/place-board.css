@@ -1,0 +1,266 @@
+/* Place Board page (ADR-636) — the sidebar widgets of the page that takes the
+ * main canvas's place in Place Board mode. The page shell (header, sidebar,
+ * canvas, footer) is jig mode's, from registration-jig.css. Theme tokens only,
+ * so light and dark both work. */
+.lf-place-board {
+  font-size: var(--lf-text-md);
+}
+.lf-place-board p {
+  margin: 0;
+  line-height: 1.35;
+}
+.lf-place-board .lf-jig-fields {
+  gap: var(--lf-space-3);
+}
+
+/* ---------- Messages ---------- */
+.lf-place-board__message {
+  padding: var(--lf-space-2) var(--lf-space-3);
+  border-radius: var(--lf-radius-md);
+  font-size: var(--lf-text-sm);
+  line-height: 1.35;
+}
+.lf-place-board__message--hint {
+  background: var(--lf-bg-2);
+  color: var(--lf-text-muted);
+}
+.lf-place-board__message--error {
+  background: var(--lf-tint-danger);
+  color: var(--lf-danger-fg);
+}
+.lf-place-board__message--notice {
+  background: var(--lf-tint-warning);
+  color: var(--lf-warning-fg);
+}
+.lf-place-board__message--ok {
+  background: var(--lf-tint-success);
+  color: var(--lf-success-fg);
+}
+
+/* ---------- Shape tiles ---------- */
+.lf-place-board__shapes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--lf-space-2);
+}
+.lf-place-board__shape {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--lf-space-2) var(--lf-space-1);
+  font-size: var(--lf-text-sm);
+  line-height: 1.2;
+}
+
+/* ---------- Cards and sections ---------- */
+.lf-place-board__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space-2);
+  padding: var(--lf-space-3);
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-bg-1);
+}
+.lf-place-board__card--accent {
+  border-color: var(--lf-accent);
+}
+.lf-place-board__card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+  font-weight: 600;
+}
+.lf-place-board__card-title > span:last-child {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: var(--lf-text-xs);
+  color: var(--lf-text-faint);
+}
+.lf-place-board__muted {
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-sm);
+}
+.lf-place-board__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lf-space-2);
+}
+.lf-place-board__row--end {
+  justify-content: flex-end;
+}
+.lf-place-board__big {
+  flex: 1;
+  min-height: 30px;
+  font-weight: 600;
+}
+.lf-place-board__readout {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--lf-space-2);
+  font-family: var(--lf-font-mono);
+  font-size: var(--lf-text-sm);
+  color: var(--lf-text-muted);
+}
+.lf-place-board .lf-section {
+  margin-top: 0;
+}
+.lf-place-board .lf-section-body {
+  padding-bottom: var(--lf-space-2);
+}
+
+/* ---------- Pointer bar ---------- */
+.lf-place-board__pointer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space-1);
+  padding: var(--lf-space-2) var(--lf-space-3);
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-bg-2);
+  font-size: var(--lf-text-sm);
+}
+.lf-place-board__pointer-status {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+}
+.lf-place-board__pointer-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--lf-text-faint);
+}
+.lf-place-board__pointer-dot[data-on='true'] {
+  background: var(--lf-danger);
+  box-shadow: 0 0 0 3px var(--lf-tint-danger);
+}
+.lf-place-board__pointer-status > span:nth-child(2) {
+  flex: 1;
+}
+.lf-place-board__pointer label {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+  color: var(--lf-text-muted);
+}
+.lf-place-board__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lf-accent-fg);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---------- Anchor picker ---------- */
+.lf-place-board__anchors {
+  display: grid;
+  grid-template-columns: repeat(3, 34px);
+  grid-template-rows: repeat(3, 34px);
+  gap: 4px;
+  padding: 6px;
+  border: 2px solid var(--lf-border-strong);
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-bg-input);
+}
+.lf-place-board__anchors[data-shape='circle'] {
+  border-radius: 50%;
+}
+.lf-place-board__anchor {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px dashed var(--lf-border);
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+.lf-place-board__anchor::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--lf-text-faint);
+}
+.lf-place-board__anchor:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--lf-accent);
+  background: var(--lf-tint-accent);
+}
+.lf-place-board__anchor:hover:not(:disabled)::after,
+.lf-place-board__anchor[aria-pressed='true']::after {
+  background: var(--lf-accent);
+}
+.lf-place-board__anchor[aria-pressed='true'] {
+  border-style: solid;
+  border-color: var(--lf-accent);
+}
+.lf-place-board__anchor:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.lf-place-board__placement {
+  display: flex;
+  gap: var(--lf-space-4);
+  align-items: flex-start;
+}
+.lf-place-board__placement-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space-2);
+  min-width: 0;
+}
+.lf-place-board__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--lf-text-sm);
+  color: var(--lf-text-muted);
+}
+
+/* ---------- Corner list (custom shape) ---------- */
+.lf-place-board__corners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lf-place-board__corners > li {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--lf-tint-accent);
+  color: var(--lf-accent-fg);
+  font-family: var(--lf-font-mono);
+  font-size: var(--lf-text-xs);
+}
+
+/* ---------- Step 3 laser settings ---------- */
+.lf-place-board__layer {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--lf-space-2);
+  margin: 0;
+  padding: var(--lf-space-2) var(--lf-space-3) var(--lf-space-3);
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-md);
+}
+.lf-place-board__layer legend {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+  padding: 0 var(--lf-space-1);
+  font-weight: 600;
+}
+.lf-place-board__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--lf-border-strong);
+}

@@ -1,6 +1,6 @@
 import {
-  CIRCLE_BOARD_VERIFICATION_ANCHORS,
-  RECTANGLE_BOARD_VERIFICATION_ANCHORS,
+  boardVerificationTargetKey,
+  boardVerificationTargets,
   type BoardVerificationTarget,
   type CapturedBoardGeometry,
 } from '../../../core/scene/board-verification';
@@ -16,20 +16,20 @@ export function BoardVerificationControls(props: {
   readonly disabled: boolean;
   readonly controller: BoardVerificationController;
 }): JSX.Element {
-  const targets = verificationTargets(props.geometry);
+  const targets = boardVerificationTargets(props.geometry);
   const active = props.controller.activeTarget;
   const checksDisabled = props.disabled || !props.controller.epochValid || active !== null;
 
   return (
     <section aria-label="Physically check board" style={sectionStyle}>
       <p style={hintStyle}>
-        Check the physical board: choose a highlighted point on the outline or a button below. Zoom
-        in or use the buttons when points are crowded.
+        Move to a point beam-off and check it sits on the physical board: choose a highlighted point
+        on the outline or a button below. With the pointer on, the pointer is moved onto the point.
       </p>
       <div aria-label="Board check points" role="group" style={buttonRowStyle}>
         {targets.map((target) => (
           <Button
-            key={target.anchor}
+            key={boardVerificationTargetKey(target)}
             disabled={checksDisabled}
             title={`Move the laser head beam-off to the ${boardVerificationTargetLabel(target).toLowerCase()}`}
             onClick={() => props.controller.selectTarget(target)}
@@ -96,7 +96,10 @@ function ActiveVerification(props: {
     return (
       <div style={activeStyle}>
         <strong>Adjust the {label}</strong>
-        <p style={hintStyle}>Fine-jog until the laser head is exactly on the physical point.</p>
+        <p style={hintStyle}>
+          Fine-jog until the laser head (or the pointer, while it is on) is exactly on the physical
+          point.
+        </p>
         <BoardFineJogControls disabled={props.disabled || props.controller.saving} />
         <div style={buttonRowStyle}>
           <Button
@@ -119,7 +122,7 @@ function ActiveVerification(props: {
   }
   return (
     <div style={activeStyle}>
-      <strong>Is the laser head on the physical {label}?</strong>
+      <strong>Is the head (or pointer) on the physical {label}?</strong>
       <div style={buttonRowStyle}>
         <Button variant="primary" onClick={props.controller.acceptTarget}>
           Yes, correct
@@ -144,14 +147,6 @@ function SavingVerification({ label }: { readonly label: string }): JSX.Element 
   );
 }
 
-function verificationTargets(
-  geometry: CapturedBoardGeometry,
-): ReadonlyArray<BoardVerificationTarget> {
-  return geometry.kind === 'rect'
-    ? RECTANGLE_BOARD_VERIFICATION_ANCHORS.map((anchor) => ({ kind: 'rect', anchor }))
-    : CIRCLE_BOARD_VERIFICATION_ANCHORS.map((anchor) => ({ kind: 'circle', anchor }));
-}
-
 function shortTargetLabel(target: BoardVerificationTarget): string {
   switch (target.anchor) {
     case 'bottom-left':
@@ -172,16 +167,12 @@ function shortTargetLabel(target: BoardVerificationTarget): string {
       return 'Bottom rim';
     case 'rim-left':
       return 'Left rim';
+    case 'vertex':
+      return target.kind === 'polygon' ? `Corner ${target.index + 1}` : 'Corner';
   }
 }
 
-const sectionStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 6,
-  paddingTop: 6,
-  borderTop: '1px solid var(--lf-border)',
-};
+const sectionStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 const activeStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',

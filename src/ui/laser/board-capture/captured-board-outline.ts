@@ -18,23 +18,47 @@ export function capturedBoardOutlineMatches(
   );
   if (outline === undefined || !outlineKindMatches(outline.spec.kind, geometry.kind)) return false;
   const bounds = transformedBBox(outline);
-  const expected =
-    geometry.kind === 'rect'
-      ? { width: geometry.widthMm, height: geometry.heightMm }
-      : { width: geometry.radiusMm * 2, height: geometry.radiusMm * 2 };
+  const expected = expectedOutlineSize(geometry);
   return (
     closeEnough(bounds.maxX - bounds.minX, expected.width) &&
     closeEnough(bounds.maxY - bounds.minY, expected.height)
   );
 }
 
+function expectedOutlineSize(geometry: CapturedBoardGeometry): {
+  readonly width: number;
+  readonly height: number;
+} {
+  switch (geometry.kind) {
+    case 'rect':
+      return { width: geometry.widthMm, height: geometry.heightMm };
+    case 'circle':
+      return { width: geometry.radiusMm * 2, height: geometry.radiusMm * 2 };
+    case 'polygon':
+      return { width: geometry.polygon.widthMm, height: geometry.polygon.heightMm };
+  }
+}
+
 function outlineKindMatches(
   specKind: string,
   geometryKind: CapturedBoardGeometry['kind'],
 ): boolean {
-  return geometryKind === 'rect' ? specKind === 'rect' : specKind === 'ellipse';
+  switch (geometryKind) {
+    case 'rect':
+      return specKind === 'rect';
+    case 'circle':
+      return specKind === 'ellipse';
+    case 'polygon':
+      return specKind === 'polyline';
+  }
 }
 
 function closeEnough(actual: number, expected: number): boolean {
   return Number.isFinite(actual) && Math.abs(actual - expected) <= OUTLINE_SIZE_TOLERANCE_MM;
+}
+
+/** The project holds a Place Board outline (ADR-636): its burn step then holds
+ *  Frame and Start while the Place Board page is open. */
+export function sceneHasCapturedBoard(scene: Scene): boolean {
+  return findRegistrationBoxes(scene).some((box) => box.provenance === 'captured-board');
 }

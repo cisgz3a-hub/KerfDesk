@@ -8,6 +8,7 @@ import {
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
 import { useLaserStore } from '../../state/laser-store';
 import { jogFrameCommandBlockMessage } from '../../state/laser-store-helpers';
+import { headTargetForSight, sightedPoint } from './board-sight';
 import type { BoardRegistrationEpoch } from './use-board-capture';
 
 type VerificationSession = {
@@ -138,7 +139,9 @@ function createMoveAction(
     state.setError(null);
     state.setFeedback(null);
     state.setSession(newVerificationSession(requestId, target));
-    void jog(point.x, point.y, args.feed)
+    // With the positioning light on, put the light (not the beam) on the point.
+    const head = headTargetForSight(point);
+    void jog(head.x, head.y, args.feed)
       .then(() => markMoveDispatched(state, requestId))
       .catch((cause: unknown) => reportMoveFailure(state, requestId, cause));
   };
@@ -179,7 +182,7 @@ function createCorrectionAction(
       state.setError('A fresh machine position is not available yet. Wait for Idle and try again.');
       return;
     }
-    saveCorrection(args, state, state.session.target, position);
+    saveCorrection(args, state, state.session.target, sightedPoint(position));
   };
 }
 
@@ -303,6 +306,8 @@ export function boardVerificationTargetLabel(target: BoardVerificationTarget): s
       return 'Bottom rim';
     case 'rim-left':
       return 'Left rim';
+    case 'vertex':
+      return target.kind === 'polygon' ? `Corner ${target.index + 1}` : 'Corner';
   }
 }
 

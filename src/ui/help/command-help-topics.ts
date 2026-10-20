@@ -111,7 +111,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'tools.place-board': {
     family: 'tools',
     tooltip:
-      'Capture a rectangle from its corners or find a circle from four rim points, then verify and fine-adjust points on the drawn outline.',
+      'Capture a rectangle, a circle or any custom shape from its corners (aiming with the red-dot pointer when the machine has one), then place artwork at any of nine spots and check the outline.',
   },
   'tools.box-generator': {
     family: 'tools',
