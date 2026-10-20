@@ -100,6 +100,12 @@ release before it is tagged.
   after KerfDesk restarts, so Connect automatically connects when the app opens, as it does in
   Chrome. Forget Controller removes it
   ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Calmer connecting.** When another program holds the port, the automatic connect shows a
+  quiet note instead of a red error. After you click Disconnect, KerfDesk waits for your next
+  Connect instead of reconnecting when the machine is power-cycled. The red "Connection lost"
+  banner now appears only when the machine may still be moving, and a drop during a jog or Frame
+  says "Connection lost while moving"
+  ([#1294](https://github.com/cisgz3a-hub/KerfDesk/pull/1294)).
 
 ### All changes
 
@@ -422,6 +428,7 @@ release before it is tagged.
 - **Design and import:** Seam traced closed curves G1 at index 0 (kill the trace cusp) ([#388](https://github.com/cisgz3a-hub/KerfDesk/pull/388))
 - **Design and import:** Round-trip CNC profileLead through project save/load ([#384](https://github.com/cisgz3a-hub/KerfDesk/pull/384))
 - **Design and import:** Lighten completed job-progress trail ([#336](https://github.com/cisgz3a-hub/KerfDesk/pull/336))
+- **Machine and connection:** Send EEPROM-writing lines one at a time, judge FluidNC alarms by FluidNC's own table, and show a grblHAL E-stop or motor fault on the machine rail ([#1315](https://github.com/cisgz3a-hub/KerfDesk/pull/1315))
 - **Machine and connection:** Make saving a selected machine profile easy to find ([#961](https://github.com/cisgz3a-hub/KerfDesk/pull/961))
 - **Machine and connection:** Offer corrected presets and bits in one click, and pin preset versions ([#931](https://github.com/cisgz3a-hub/KerfDesk/pull/931))
 - **Machine and connection:** Send the program to the worker once per run ([#928](https://github.com/cisgz3a-hub/KerfDesk/pull/928))

@@ -487,6 +487,9 @@ jobs:
           gh release view "${GITHUB_REF_NAME}" --json assets --jq '.assets[].name' | sort > actual-assets.txt
           diff -u expected-assets.txt actual-assets.txt
 
+      - name: Verify delivery browser is available before publication
+        run: node --input-type=module -e "const { chromium } = await import('@playwright/test'); const browser = await chromium.launch({ channel:'chrome', headless:true, timeout:30000 }); await browser.close();"
+
       - name: Publish as immutable prerelease, never latest
         if: steps.draft.outputs.already_published != 'true'
         env:
@@ -595,3 +598,20 @@ jobs:
           DESKTOP_PREVIEW_MANIFEST_PRIVATE_KEY: ${{ secrets.DESKTOP_PREVIEW_MANIFEST_PRIVATE_KEY }}
           DESKTOP_PREVIEW_MANIFEST_KEY_ID: ${{ vars.DESKTOP_PREVIEW_MANIFEST_KEY_ID }}
         run: node scripts/publish-preview-release.mjs published-release-assets "${VERSION}" published-preview-release.json
+
+      - name: Verify public Preview manifests, every artifact and rendered downloads
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+        run: |
+          node scripts/verify-public-preview-release.mjs --expected-version "${VERSION}" \
+            --expected-source-sha "${SOURCE_SHA}" --output-dir "${RUNNER_TEMP}/preview-public-delivery" --website
+
+      - name: Retain public Preview delivery evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: preview-public-delivery-${{ steps.release.outputs.version }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-public-delivery/
+          retention-days: 90
+          if-no-files-found: warn

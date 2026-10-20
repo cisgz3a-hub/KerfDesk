@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { selectControllerDriver } from '../../../core/controllers';
 import { usePlatform } from '../../app/platform-context';
+import { pauseAutoConnect } from '../../state/auto-connect-session';
 import { waitForControllerQueueSettled } from '../../state/controller-queue-settle';
 import { useLaserStore, type ConnectControllerOptions } from '../../state/laser-store';
 import { useToastStore } from '../../state/toast-store';
@@ -136,10 +137,15 @@ function findConnectionActions(deps: {
       stopScan();
       void openForFind(requestFind).catch(showError);
     },
+    // The operator's Disconnect, also the one before choosing a port, pauses
+    // auto-connect until a port opens; the baud scan and Reconnect do not (ADR-639).
     choosePort: (): void => {
       stopScan();
       void (async () => {
-        if (useLaserStore.getState().connection.kind === 'connected') await disconnect();
+        if (useLaserStore.getState().connection.kind === 'connected') {
+          pauseAutoConnect();
+          await disconnect();
+        }
         await openForFind(requestFind, { portSelection: 'choose' });
       })().catch(showError);
     },
@@ -150,6 +156,7 @@ function findConnectionActions(deps: {
     },
     disconnect: (): void => {
       stopScan();
+      pauseAutoConnect();
       void disconnect().catch(showError);
     },
     // Find's follow-up reconnect with the adopted firmware keeps Find's claim.

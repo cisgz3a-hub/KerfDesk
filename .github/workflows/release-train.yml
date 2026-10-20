@@ -14,6 +14,8 @@ name: Release train
 # - Daily (Linux): the newest beta reaches the stable ring after 4 quiet days,
 #   unless a newer beta replaced it, an open issue is labelled release-hold or
 #   the repository variable KERFDESK_RELEASE_HOLD is `on`.
+# - Explicit recovery only (Linux): observe records missing visibility evidence
+#   for the reviewed newest beta; it never builds or promotes a release.
 #
 # The train never tags (release tags stay with the maintainer, ADR-248), never
 # pushes, and never uploads to GitHub: installers and update files go only to
@@ -27,13 +29,23 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: status reports both rings; cut builds a beta if one is due; promote moves a quiet beta to everyone
+        description: status reports rings; cut builds a due beta; promote moves a quiet beta; observe recovers missing beta visibility evidence
         type: choice
-        options: [status, cut, promote]
+        options: [status, cut, promote, observe]
         default: status
+      version:
+        description: Exact newest beta version to observe (required only for observe)
+        type: string
+        required: false
+        default: ''
+      beta_catalog_sha256:
+        description: Reviewed beta catalogue SHA-256 from status (required only for observe)
+        type: string
+        required: false
+        default: ''
 
-# One cut, one promotion and one report at a time; a newer run waits and is
-# never cancelled. Publishing jobs also share kerfdesk-commercial-publication.
+# One run of each action at a time; a newer run waits and is never cancelled.
+# Publishing and observation jobs share kerfdesk-commercial-publication.
 concurrency:
   group: release-train-${{ inputs.action || (github.event.schedule == '17 7 * * 2' && 'cut') || 'promote' }}
   cancel-in-progress: false
@@ -402,6 +414,57 @@ jobs:
           "release/commercial/${VERSION}"
           "${RUNNER_TEMP}/commercial-release/commercial-release-identity.json"
           "release/commercial/${VERSION}/win-unpacked/resources"
+
+  observe:
+    name: Recover public beta observation for the reviewed release
+    if: >-
+      vars.KERFDESK_RELEASE_TRAIN == 'on' && github.repository == 'cisgz3a-hub/KerfDesk' &&
+      github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' &&
+      inputs.action == 'observe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: desktop-commercial
+    concurrency:
+      group: kerfdesk-commercial-publication
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the dispatched main commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The command validates the exact version and reviewed catalogue before
+      # storage access, authenticates the newest public beta, and writes only
+      # its missing observation receipt. Retries retain the original timestamp.
+      # The real observation clock cannot be overridden from this workflow.
+      - name: Observe the exact reviewed beta without rebuilding or promoting
+        env:
+          VERSION: ${{ inputs.version }}
+          BETA_CATALOG_SHA256: ${{ inputs.beta_catalog_sha256 }}
+          DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: ${{ secrets.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY }}
+          DESKTOP_STABLE_MANIFEST_KEY_ID: ${{ vars.DESKTOP_STABLE_MANIFEST_KEY_ID }}
+          COMMERCIAL_R2_API_TOKEN: ${{ secrets.COMMERCIAL_R2_API_TOKEN }}
+          COMMERCIAL_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          node scripts/release-train.mjs observe
+          --version="${VERSION}"
+          --expected-catalog-sha256="${BETA_CATALOG_SHA256}"
+          --summary="${GITHUB_STEP_SUMMARY}"
 
   promote:
     name: Promote the newest beta once it has been quiet

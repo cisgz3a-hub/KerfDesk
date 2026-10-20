@@ -8,6 +8,7 @@ import { useStore } from '../state';
 import { CutPowerModeField } from './CutPowerModeField';
 import { Field, NumberInput } from './CutSettingsInputs';
 import { LaserProcessField } from './LaserProcessField';
+import { LineLeadFields } from './LineLeadFields';
 import { LineTabFields } from './LineTabFields';
 
 export function CutSettingsCommonFields(props: {
@@ -116,7 +117,10 @@ function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
   return (
     <fieldset className="lf-fieldset lf-cut-settings-group">
       <legend className="lf-legend">Line detail</legend>
-      <p className="lf-laser-help">Refine the cut path and leave bridges to hold parts in place.</p>
+      <p className="lf-laser-help">
+        Refine the cut path, start and stop it in the scrap, and leave bridges to hold parts in
+        place.
+      </p>
       <Field label="Contour entry">
         <NumberInput
           name="fillOverscanMm"
@@ -137,7 +141,7 @@ function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
           max={10}
           step={0.01}
           label="kerf offset"
-          title="Compensate laser beam width on closed Line cuts. Positive cuts outside outer shapes and inside holes, and a shape inside another shape of this operation counts as a hole; source artwork is unchanged."
+          title="Compensate laser beam width on closed Line cuts. Positive cuts outside outer shapes and inside holes. A shape inside another shape on this operation, or on one with a kerf offset, leads or tabs, counts as a hole; source artwork is unchanged."
         />
         <span className="lf-field-unit">mm</span>
       </Field>
@@ -153,6 +157,7 @@ function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
         />
         <span className="lf-field-unit">mm</span>
       </Field>
+      <LineLeadFields layer={props.layer} />
       <LineTabFields layer={props.layer} />
       <LinePerforationFields layer={props.layer} />
     </fieldset>

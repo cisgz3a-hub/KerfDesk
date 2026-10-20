@@ -44,14 +44,21 @@ export type GrblState =
   | 'Tool';
 
 // Active input pins, decoded from the `Pn:` field. GRBL flags limit switches
-// per axis (X/Y/Z), plus probe (P) and door (D). Other Pn letters (hold/reset/
-// cycle-start) are not decoded — they aren't safety-relevant to framing.
+// per axis (X/Y/Z), plus probe (P) and door (D). grblHAL adds E (E-stop
+// asserted), M (motor warning) and F (motor fault); FluidNC reports its
+// estop_pin and fault_pin as E and F too. Those three are set only when
+// present, since stock GRBL never sends them (ADR-644). Other Pn letters
+// (hold/reset/cycle-start) are not decoded — they aren't safety-relevant to
+// framing.
 export type GrblPins = {
   readonly limitX: boolean;
   readonly limitY: boolean;
   readonly limitZ: boolean;
   readonly probe: boolean;
   readonly door: boolean;
+  readonly estop?: true;
+  readonly motorWarning?: true;
+  readonly motorFault?: true;
 };
 
 // Controller buffer occupancy from the `Bf:` field (grbl 1.1 and grblHAL
@@ -280,6 +287,9 @@ function pickPins(fields: ReadonlyArray<string>): GrblPins | null {
       limitZ: body.includes('Z'),
       probe: body.includes('P'),
       door: body.includes('D'),
+      ...(body.includes('E') ? { estop: true as const } : {}),
+      ...(body.includes('M') ? { motorWarning: true as const } : {}),
+      ...(body.includes('F') ? { motorFault: true as const } : {}),
     };
   }
   return null;

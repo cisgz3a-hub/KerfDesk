@@ -288,11 +288,20 @@ export function withoutArcMoves<T extends CutSegment>(segment: T): T {
   return rest as unknown as T;
 }
 
-/** Translates the polyline and any arc moves together. */
+/** Translates the polyline and any arc moves together, and a final pass's own
+ * burn (ADR-626) with them. */
 export function translateCutSegment<T extends CutSegment>(segment: T, dx: number, dy: number): T {
-  const polyline = segment.polyline.map((point) => ({ x: point.x + dx, y: point.y + dy }));
+  const shift = (point: Vec2): Vec2 => ({ x: point.x + dx, y: point.y + dy });
+  const polyline = segment.polyline.map(shift);
   const moves = validCutArcMoves(segment);
-  const moved = { ...withoutArcMoves(segment), polyline };
+  const finalPass = segment.finalPassBurn;
+  const moved = {
+    ...withoutArcMoves(segment),
+    polyline,
+    ...(finalPass === undefined
+      ? {}
+      : { finalPassBurn: { polyline: finalPass.polyline.map(shift) } }),
+  };
   return moves === null ? moved : withCutArcMoves(moved, translateArcMoves(moves, dx, dy));
 }
 
