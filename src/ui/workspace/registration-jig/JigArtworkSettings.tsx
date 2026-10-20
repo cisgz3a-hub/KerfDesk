@@ -27,7 +27,7 @@ export function JigArtworkSettings(props: {
   };
   return (
     <section className="lf-jig-fields" aria-label="Jig artwork burn settings">
-      <strong>Line / Fill settings</strong>
+      <strong>Artwork laser settings</strong>
       {operations.length > 1 && (
         <label>
           Operation
@@ -53,8 +53,16 @@ export function JigArtworkSettings(props: {
         maxFeed={props.draft.project.device.maxFeed}
         onChange={change}
       />
-      {operation.mode === 'fill' && <FillOptions operation={operation} onChange={change} />}
-      <p className="lf-jig-muted">Applies to selected artwork using this operation.</p>
+      {operation.mode === 'fill' && (
+        <details>
+          <summary title="Show the Fill spacing, angle and style">More settings</summary>
+          <div className="lf-jig-fields">
+            <FillNumericFields operation={operation} onChange={change} />
+            <FillOptions operation={operation} onChange={change} />
+          </div>
+        </details>
+      )}
+      <p className="lf-jig-muted">Applies to the artwork on this operation.</p>
     </section>
   );
 }
@@ -118,24 +126,27 @@ function BurnNumericFields({
         integer
         onCommit={(passes) => onChange({ passes })}
       />
-      {operation.mode === 'fill' && (
-        <>
-          <BurnNumber
-            label="Line interval (mm)"
-            value={operation.hatchSpacingMm}
-            min={0.05}
-            max={10}
-            onCommit={(hatchSpacingMm) => onChange({ hatchSpacingMm })}
-          />
-          <BurnNumber
-            label="Scan angle (degrees)"
-            value={operation.hatchAngleDeg}
-            min={0}
-            max={180}
-            onCommit={(hatchAngleDeg) => onChange({ hatchAngleDeg })}
-          />
-        </>
-      )}
+    </div>
+  );
+}
+
+function FillNumericFields({ operation, onChange }: OperationFieldsProps): JSX.Element {
+  return (
+    <div className="lf-jig-pair">
+      <BurnNumber
+        label="Line interval (mm)"
+        value={operation.hatchSpacingMm}
+        min={0.05}
+        max={10}
+        onCommit={(hatchSpacingMm) => onChange({ hatchSpacingMm })}
+      />
+      <BurnNumber
+        label="Scan angle (degrees)"
+        value={operation.hatchAngleDeg}
+        min={0}
+        max={180}
+        onCommit={(hatchAngleDeg) => onChange({ hatchAngleDeg })}
+      />
     </div>
   );
 }

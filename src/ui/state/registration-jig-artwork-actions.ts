@@ -75,8 +75,11 @@ type JigArtworkState = Pick<
   'project' | 'undoStack' | 'selectedObjectId' | 'additionalSelectedIds'
 >;
 
+/** `grow: false` keeps artwork that already fits at its size (a jig import or
+ *  new text copied to every piece, ADR-641); Centre on every piece grows it. */
 export function applyCenterArtworkInRegistrationJigSet(
   state: JigArtworkState,
+  options: { readonly grow?: boolean } = {},
 ): JigArtworkState | Partial<AppState> {
   const boxes = findRegistrationBoxes(state.project.scene);
   const selected = selectedArtwork(state);
@@ -84,7 +87,7 @@ export function applyCenterArtworkInRegistrationJigSet(
   if (firstBox === undefined) return state;
   const fitted = fitSelectionToRegion(selected, boardFitRegion(firstBox), {
     marginFraction: REGISTRATION_JIG_ARTWORK_FIT_FRACTION,
-    grow: true,
+    grow: options.grow ?? true,
   });
   const selectionBounds = combinedBBox(fitted);
   if (selectionBounds === null) return state;

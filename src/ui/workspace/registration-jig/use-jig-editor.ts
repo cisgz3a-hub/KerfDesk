@@ -13,8 +13,10 @@ import { useLaserStore } from '../../state/laser-store';
 import { useUiStore } from '../../state/ui-store';
 import { jobControlsBusy, jobNeedsRecovery } from '../../laser/job-controls-busy';
 import { reportDependencyRepairs } from '../../state/object-delete-actions';
+import { useToastStore } from '../../state/toast-store';
 import type { RegistrationJigSetSpec } from '../../state/registration-jig-set-actions';
 import {
+  centerJigArtwork,
   changeJigDraft,
   createJigEditorSession,
   jigSessionView,
@@ -27,8 +29,10 @@ import {
   type JigViewOptions,
 } from './jig-editor-session';
 import {
+  clearJigArtwork,
   deleteJigArtworkWithRepairs,
   importJigArtwork,
+  jigArtworkIds,
   nudgeJigSelection,
   traceJigImage,
   upsertJigText,
@@ -68,7 +72,6 @@ export function useJigEditor(onClose: () => void) {
   const [step, setStep] = useJigStep(runPhase);
   useJigOpening(created, onClose);
   const working = useJigWorking();
-  const [pendingLayout, setPendingLayout] = useState(false);
   const edits = useJigEditCallbacks(setSession);
   const artworkImport = useJigArtworkImport(edits.onImport, working.onImportBusy);
   return {
@@ -81,8 +84,6 @@ export function useJigEditor(onClose: () => void) {
     readOnly: useMachineMoving(),
     outlinesUnlocked,
     unlockOutlines: () => setOutlinesUnlocked(true),
-    pendingLayout,
-    setPendingLayout,
     busy: working.busy,
     captured: findRegistrationBoxes(draft.project.scene).some(
       (box) => box.provenance === 'captured-board',
@@ -90,6 +91,7 @@ export function useJigEditor(onClose: () => void) {
     importing: artworkImport.busy,
     importFiles: artworkImport.importFiles,
     ids: selectedJigIds(session.draft),
+    clearCount: useMemo(() => jigArtworkIds(session.draft.project.scene).size, [session]),
     onTextBusy: working.onTextBusy,
     onTraceBusy: working.onTraceBusy,
     // Escape drops the selection, as on the main canvas. Leaving jig mode is
@@ -144,8 +146,12 @@ function useJigEditCallbacks(setSession: (edit: JigEdit) => JigEditorSession) {
     [setSession],
   );
   const onRemoveLayout = useCallback(() => setSession(removeJigLayout), [setSession]);
+  const onCentre = useCallback(() => setSession(centerJigArtwork), [setSession]);
+  const onClear = useCallback(() => clearJigCanvas(setSession), [setSession]);
   return {
     fitRequest,
+    onCentre,
+    onClear,
     onCommit,
     onSelect,
     onImport,
@@ -361,8 +367,31 @@ function handleJigCommandKey(event: React.KeyboardEvent, editor: JigEditorContro
   }
   if (key !== 'a' || event.shiftKey) return false;
   event.preventDefault();
+  const target = editor.step === 'outlines' ? 'outlines' : 'artwork';
   editor.setSession((current) =>
-    selectJigObjects(current, jigSelectAll(current.draft.project.scene)),
+    selectJigObjects(current, jigSelectAll(current.draft.project.scene, target)),
   );
   return true;
+}
+
+// Clear canvas (ADR-641): one undoable edit that empties the pieces and says so.
+function clearJigCanvas(setSession: (edit: JigEdit) => JigEditorSession): void {
+  let cleared = 0;
+  let repairs: ReturnType<typeof clearJigArtwork>['repairs'] = null;
+  setSession((current) => {
+    const before = current.draft.project.scene.objects.length;
+    const deletion = clearJigArtwork(current);
+    cleared = before - deletion.session.draft.project.scene.objects.length;
+    repairs = deletion.repairs;
+    return deletion.session;
+  });
+  if (repairs !== null) reportDependencyRepairs(repairs);
+  if (cleared > 0) {
+    useToastStore
+      .getState()
+      .pushToast(
+        `Cleared ${cleared} artwork object${cleared === 1 ? '' : 's'} from the jig. Undo brings ${cleared === 1 ? 'it' : 'them'} back.`,
+        'info',
+      );
+  }
 }

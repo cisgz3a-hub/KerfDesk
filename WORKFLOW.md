@@ -2704,46 +2704,59 @@ authorization, Frame proof, controller command, or safety boundary.
    round handle above it to rotate it about its centre (Shift snaps to 15°). Each drag
    is one undoable edit. Drag on empty canvas to box-select: left to right selects
    what the box encloses, right to left what it touches. Shift-drag or Shift-click adds
-   to the selection, and Ctrl+A selects all the artwork (not the outlines) unless a field
-   has focus. Locked or hidden objects, including locked outlines, are never selected.
+   to the selection. Ctrl+A selects the movable outlines in step 1 and all the artwork
+   in the other steps, unless a field has focus. Locked or hidden objects, including
+   locked outlines, are never selected. While something is selected, a bar above the
+   canvas shows its X, Y, W and H, a **Keep proportions** lock and its rotation, and for
+   artwork **Centre on every piece**. **Clear canvas** beside **Fit jig** and **Fit bed**
+   removes the artwork in the jig's pieces, keeping the outlines and every design
+   outside them, as one undoable edit (ADR-641 Amendment 1).
    As on the main canvas, drag with the right or middle mouse button, or hold Space and
    drag, to pan; the wheel zooms.
 2. In **1 Burn outlines**, choose Rectangle or Circle, enter the outline size, then enter
-   rows, columns, and horizontal/vertical spacing, and click **Apply layout**. Until
-   then the step reads **1 Burn outlines •** and its burn panel asks for the layout to
-   be applied first. A 1 x 5 grid creates five independently visible outlines as one
+   rows, columns, and horizontal/vertical spacing. A change applies when you press
+   Enter, pick the shape, or leave the fields; Escape returns the fields to the
+   outlines, and an invalid value says why and goes back. With no outlines, **Create
+   outlines** makes them from the fields. A 1 x 5 grid creates five independently visible outlines as one
    fixture set, and the canvas refits to the new grid. A jig created in this visit of
    jig mode stays centred where it was; an existing jig keeps its first outline in
    place. Either way, a grid that would cross the bed edge is moved back just far
-   enough to stay on the bed. The outline laser settings sit below the layout.
-3. In **2 Place pieces & artwork**, click **Import artwork…**, drop SVG or image files onto an outline
-   on the jig canvas, use the existing writing styles for text, or use the existing
-   tracers directly in the editor under **Trace an image**, which starts open. Imported
-   artwork and traces of uploaded images fit inside the outline the files were dropped
-   on, else the selected outline, else the outline holding the selected artwork, else
-   the first outline. Several files at once fill consecutive outlines in grid order
-   from there. While files are dragged over the canvas, the outline that would receive
+   enough to stay on the bed. The outline laser settings sit below the layout, with
+   power, speed and passes in view and air assist and **Advanced outline settings**
+   under **More outline settings**.
+3. In **2 Place pieces & artwork**, add artwork from one row: **Import…**, **Text** (the
+   existing writing styles; it also opens when a text is selected) and **Trace image**
+   (the existing tracers; a loaded image stays while the tracer is hidden). Files can
+   also be dropped onto an outline on the jig canvas. Imported artwork and traces of
+   uploaded images fit inside the outline the files were dropped on, else the selected
+   outline, else the outline holding the selected artwork, else the first outline. One
+   file, a trace or new text is one design for every piece: it is centred in the first
+   outline and copied into every other one at its own size, in the same edit; a design
+   larger than an outline shrinks to fit. A file dropped on one outline goes on that
+   piece only, and several files at once fill consecutive
+   outlines in grid order instead. Editing one copy of text changes only that copy. While files are dragged over the canvas, the outline that would receive
    them is highlighted. To trace an image that is already on the jig, select it and click
    **Trace selected image**; **Replace image with trace** lays the trace exactly over
-   the image and removes the image (ADR-633). If Centre + copy already copied that
-   image to the other outlines, the button reads **Replace all N images with trace**
-   and every copy is replaced the same way.
-   In **3 Burn artwork**, **Line / Fill settings** controls the selected artwork's
-   operation, power, speed and passes; Fill also exposes line interval, scan angle, fill
-   style and cross-hatch. Use Line for open traced paths.
-4. Select one artwork or artwork group and click **Centre + copy artwork to all N**.
-   The original is proportionally fitted into 90% of the first outline's usable
-   region, preserving aspect ratio, and one identical operation-preserving copy is
-   centered in every remaining outline. Circle outlines use their inscribed-square
-   fit region so the artwork remains inside the arc.
-5. To use a different exact size, enter the desired **W** or **H** under **Artwork
-   size - all N copies**. **AR locked** is the default and updates the paired
-   dimension proportionally. Click **AR locked** to switch to **AR unlocked** when
-   W and H must be entered independently, then click **Apply size to all N**. Every
-   jig instance is resized around its centre and recentered in its own outline; the
-   grid spacing does not scale. For rotated artwork, W and H follow the artwork's
-   rotated local axes; the rotation is preserved and the shared resize remains
-   available without inventing shear or asking the operator to relock AR.
+   the image and removes the image (ADR-633). If the image was already copied to the
+   other outlines, the button reads **Replace all N images with trace** and every copy
+   is replaced the same way.
+   In **3 Burn artwork**, **Artwork laser settings** controls the selected artwork's
+   operation, Line or Fill, power, speed and passes; for Fill, **More settings** holds
+   line interval, scan angle, fill style and cross-hatch. Use Line for open traced paths.
+4. To re-centre artwork after moving it, select it and click **Centre on every piece**
+   on the selection bar (**Centre in outline** for a single outline). The original is
+   proportionally fitted into 90% of the first outline's usable region, preserving
+   aspect ratio, and one identical operation-preserving copy is centered in every
+   remaining outline. Circle outlines use their inscribed-square fit region so the
+   artwork remains inside the arc.
+5. To use a different exact size, enter the desired **W** or **H** under **Size on
+   every piece**; it applies on Enter or when you leave the field. The **Keep
+   proportions** lock is on by default and updates the paired dimension
+   proportionally; click it to enter W and H independently. Every jig instance is
+   resized around its centre and recentered in its own outline; the grid spacing does
+   not scale. For rotated artwork, W and H follow the artwork's rotated local axes; the
+   rotation is preserved and the shared resize remains available without inventing
+   shear or asking the operator to relock the proportions.
 6. Frame and Start sit in the burn panels of steps 1 and 3, and only in the step whose
    run is next; while jig mode is open the machine panel does not show its own copy.
    With the outlines next, step 3 says to burn them in step 1 first and offers
@@ -2787,7 +2800,7 @@ authorization, Frame proof, controller command, or safety boundary.
    grid changes, also after **Burn outlines again**.
 4. A captured-board outline remains owned by **Place Board** and is not replaced
    from Registration Jig; the existing provenance explanation remains in the panel.
-5. Repeating **Centre + copy artwork to all N** replaces the generated copies
+5. Repeating **Centre on every piece** replaces the generated copies
    instead of layering another set on the canvas.
 6. Reopened projects retain per-jig output order and shared-size controls because
    generated artwork retains its source ancestry and physical outline. Existing
@@ -2798,10 +2811,11 @@ authorization, Frame proof, controller command, or safety boundary.
    copy in the remaining outlines. Repeating the action replaces those copies once.
 8. Changing the jig grid carries linked artwork with each surviving outline, retaining
    its size, rotation and local offset. New positions start empty. When reducing the
-   count, choose **Keep as ordinary artwork** or **Remove with their slots**. Kept
-   artwork stays in place and can still output; removed artwork and group/order edits
-   are restored together by Undo. A retained relief's linked source cannot be silently
-   removed. Exact artwork-size controls also appear for a single fitted jig (ADR-599).
+   count, artwork in the removed pieces is kept as ordinary artwork and the step offers
+   **Remove them**. Kept artwork stays in place and can still output; removed artwork
+   and its group/order edits are restored together by Undo. Artwork a retained relief
+   still uses as its source is never removed this way. Exact artwork-size controls also
+   appear for a single fitted jig (ADR-599).
 9. Jig mode edits the open project, so changes the project makes meanwhile, such as
    variable text advancing after a job, simply appear on the jig page. Opening another
    project leaves jig mode.

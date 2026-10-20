@@ -1,5 +1,7 @@
-import { Button } from '../kit';
+import { IconButton } from '../kit';
 
+/** The shared artwork size (ADR-057 2026-08-25, ADR-641): W and H apply on
+ *  Enter or when the field is left, and one lock keeps the proportions. */
 export function RegistrationJigArtworkSizeFields(props: {
   readonly count: number;
   readonly heightDraft: string;
@@ -11,18 +13,22 @@ export function RegistrationJigArtworkSizeFields(props: {
   readonly onToggleAspect: () => void;
   readonly onWidthChange: (value: string) => void;
 }): JSX.Element {
+  const scope = props.count === 1 ? 'artwork' : `artwork on all ${props.count} pieces`;
   const widthTitle = props.isAspectLocked
-    ? 'Set the shared artwork width; height stays proportional'
-    : 'Set the shared artwork width independently';
+    ? `Width of the ${scope}; the height follows. Applies on Enter or when you leave the field.`
+    : `Width of the ${scope}. Applies on Enter or when you leave the field.`;
   const heightTitle = props.isAspectLocked
-    ? 'Set the shared artwork height; width stays proportional'
-    : 'Set the shared artwork height independently';
+    ? `Height of the ${scope}; the width follows. Applies on Enter or when you leave the field.`
+    : `Height of the ${scope}. Applies on Enter or when you leave the field.`;
+  const applyOnEnter = (event: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key === 'Enter') event.currentTarget.blur();
+  };
   return (
     <fieldset aria-label="Jig artwork size" style={fieldsetStyle}>
       <legend style={legendStyle}>
-        {props.count === 1 ? 'Artwork size' : `Artwork size — all ${props.count} copies`}
+        {props.count === 1 ? 'Artwork size' : `Size on every piece (${props.count})`}
       </legend>
-      <div style={fieldsStyle}>
+      <div style={rowStyle}>
         <label style={fieldStyle}>
           <span>W</span>
           <input
@@ -34,8 +40,9 @@ export function RegistrationJigArtworkSizeFields(props: {
             step="0.1"
             value={props.widthDraft}
             onInput={(event) => props.onWidthChange(event.currentTarget.value)}
+            onBlur={props.onApply}
+            onKeyDown={applyOnEnter}
           />
-          <span>mm</span>
         </label>
         <label style={fieldStyle}>
           <span>H</span>
@@ -48,29 +55,27 @@ export function RegistrationJigArtworkSizeFields(props: {
             step="0.1"
             value={props.heightDraft}
             onInput={(event) => props.onHeightChange(event.currentTarget.value)}
+            onBlur={props.onApply}
+            onKeyDown={applyOnEnter}
           />
-          <span>mm</span>
         </label>
-      </div>
-      <div style={aspectRowStyle}>
-        <Button
+        <span style={hintStyle}>mm</span>
+        <IconButton
+          icon={props.isAspectLocked ? 'lock' : 'unlock'}
+          label="Keep proportions"
+          title={
+            props.isAspectLocked
+              ? 'Proportions kept: changing W or H changes the other. Click to set them separately.'
+              : 'W and H are set separately. Click to keep the proportions.'
+          }
           pressed={props.isAspectLocked}
-          title={props.isAspectLocked ? 'Unlock width and height' : 'Lock artwork proportions'}
+          size="sm"
           onClick={props.onToggleAspect}
-        >
-          {props.isAspectLocked ? 'AR locked' : 'AR unlocked'}
-        </Button>
-        <span style={aspectHintStyle}>
-          {props.isAspectLocked
-            ? 'proportions preserved'
-            : props.usesArtworkAxes
-              ? 'W and H are independent along the artwork axes'
-              : 'W and H are independent'}
-        </span>
+        />
       </div>
-      <Button onClick={props.onApply}>
-        {props.count === 1 ? 'Apply artwork size' : `Apply size to all ${props.count}`}
-      </Button>
+      {!props.isAspectLocked && props.usesArtworkAxes && (
+        <span style={hintStyle}>W and H follow the artwork&apos;s own rotated axes.</span>
+      )}
     </fieldset>
   );
 }
@@ -79,18 +84,18 @@ const fieldsetStyle: React.CSSProperties = {
   border: '1px solid var(--lf-border)',
   borderRadius: 6,
   display: 'grid',
-  gap: 8,
+  gap: 6,
   margin: 0,
   padding: 8,
 };
 
 const legendStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', padding: '0 4px' };
-const fieldsStyle: React.CSSProperties = { display: 'grid', gap: 6 };
+const rowStyle: React.CSSProperties = { alignItems: 'center', display: 'flex', gap: 6 };
 const fieldStyle: React.CSSProperties = {
   alignItems: 'center',
   display: 'grid',
+  flex: 1,
   gap: 4,
-  gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+  gridTemplateColumns: 'auto minmax(0, 1fr)',
 };
-const aspectRowStyle: React.CSSProperties = { alignItems: 'center', display: 'flex', gap: 8 };
-const aspectHintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 12 };
+const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 12 };

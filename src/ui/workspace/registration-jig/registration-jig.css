@@ -185,3 +185,36 @@
 .lf-jig-tabs {
   flex-wrap: wrap;
 }
+.lf-jig-add {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+/* The selection's position and size, on one wrapping row above the canvas footer. */
+.lf-jig-selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 12px;
+  border: 0;
+  border-top: 1px solid var(--lf-border);
+  background: var(--lf-bg-1);
+  font-size: 12px;
+}
+.lf-jig-selection-bar > strong {
+  align-self: center;
+}
+.lf-jig-selection-bar label {
+  display: grid;
+  gap: 2px;
+  color: var(--lf-text-muted);
+}
+.lf-jig-selection-bar input {
+  width: 72px;
+}
+.lf-jig-selection-bar [role='alert'] {
+  flex-basis: 100%;
+  margin: 0;
+}

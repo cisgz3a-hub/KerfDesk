@@ -70,7 +70,7 @@ describe('RegistrationJigArtworkSizeControls', () => {
     });
     const before = useStore.getState().project;
     setInputValue(inputByLabel('Jig artwork width'), '30');
-    clickButton('Apply artwork size');
+    leave(inputByLabel('Jig artwork width'));
     const resized = useStore
       .getState()
       .project.scene.objects.find((object) => object.id === 'single-art');
@@ -101,7 +101,7 @@ describe('RegistrationJigArtworkSizeControls', () => {
       ),
     );
     setInputValue(inputByLabel('Jig artwork width'), '25');
-    clickButton('Apply size to all 2');
+    pressEnter(inputByLabel('Jig artwork width'));
     expect(useStore.getState().project).toBe(liveProject);
     const artwork = draftProject.scene.objects.filter((object) => !isRegistrationBox(object));
     expect(artwork).toHaveLength(2);
@@ -111,10 +111,10 @@ describe('RegistrationJigArtworkSizeControls', () => {
     }
   });
 
-  it('keeps the other dimension unchanged while aspect ratio is unlocked', () => {
-    expect(buttonByLabel('AR locked').getAttribute('aria-pressed')).toBe('true');
-    clickButton('AR locked');
-    expect(buttonByLabel('AR unlocked').getAttribute('aria-pressed')).toBe('false');
+  it('keeps the other dimension unchanged while proportions are unlocked', () => {
+    expect(buttonByLabel('Keep proportions').getAttribute('aria-pressed')).toBe('true');
+    clickButton('Keep proportions');
+    expect(buttonByLabel('Keep proportions').getAttribute('aria-pressed')).toBe('false');
 
     const width = inputByLabel('Jig artwork width');
     const height = inputByLabel('Jig artwork height');
@@ -124,7 +124,7 @@ describe('RegistrationJigArtworkSizeControls', () => {
 
     setInputValue(height, '10');
     expect(width.value).toBe('30');
-    clickButton('Apply size to all 2');
+    leave(height);
 
     const artwork = useStore
       .getState()
@@ -135,6 +135,12 @@ describe('RegistrationJigArtworkSizeControls', () => {
       expect(bounds.maxY - bounds.minY).toBeCloseTo(10);
     }
   });
+
+  it('adds no undo step when a field is left unchanged', () => {
+    const undo = useStore.getState().undoStack.length;
+    leave(inputByLabel('Jig artwork width'));
+    expect(useStore.getState().undoStack).toHaveLength(undo);
+  });
 });
 
 function inputByLabel(label: string): HTMLInputElement {
@@ -144,9 +150,8 @@ function inputByLabel(label: string): HTMLInputElement {
 }
 
 function buttonByLabel(label: string): HTMLButtonElement {
-  const button = [...container.querySelectorAll('button')].find(
-    (candidate) => candidate.textContent?.trim() === label,
-  );
+  const button =
+    container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`) ?? undefined;
   if (button === undefined) throw new Error(`button not found: ${label}`);
   return button;
 }
@@ -161,5 +166,18 @@ function setInputValue(input: HTMLInputElement, value: string): void {
   act(() => {
     setter.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+function leave(input: HTMLInputElement): void {
+  act(() => {
+    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+  });
+}
+
+function pressEnter(input: HTMLInputElement): void {
+  input.focus();
+  act(() => {
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   });
 }

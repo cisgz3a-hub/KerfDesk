@@ -9,12 +9,19 @@ import type { JigImportPlacement } from './jig-editor-artwork';
 export const JIG_ARTWORK_ACCEPT = '.svg,.png,.jpg,.jpeg,.webp,.bmp';
 const JIG_ARTWORK_EXTENSIONS = JIG_ARTWORK_ACCEPT.split(',');
 
+export type JigImportOptions = {
+  /** Dropped on one outline: put the design on that piece only. */
+  readonly onlyThisPiece?: boolean;
+};
+
 export type JigArtworkImporter = {
   readonly busy: boolean;
-  /** Import files one by one; file N fits into the Nth outline from the anchor. */
+  /** Import files one by one; file N fits into the Nth outline from the anchor.
+   *  One file goes on every piece unless it was dropped on one outline. */
   readonly importFiles: (
     files: ReadonlyArray<File>,
     anchorIds: ReadonlySet<string>,
+    options?: JigImportOptions,
   ) => Promise<void>;
 };
 
@@ -42,7 +49,11 @@ export function useJigArtworkImport(
     };
   }, []);
   const importFiles = useCallback(
-    async (files: ReadonlyArray<File>, anchorIds: ReadonlySet<string>): Promise<void> => {
+    async (
+      files: ReadonlyArray<File>,
+      anchorIds: ReadonlySet<string>,
+      options: JigImportOptions = {},
+    ): Promise<void> => {
       if (pending.current || files.length === 0) return;
       pending.current = true;
       const controller = new AbortController();
@@ -52,7 +63,10 @@ export function useJigArtworkImport(
       const toast = useToastStore.getState().pushToast;
       let batchIndex = 0;
       const add = (object: SceneObject): { readonly kind: 'added' } => {
-        onImport(object, { anchorIds, batchIndex });
+        // One file is one design for every piece; several fill one outline each,
+        // and a file dropped on one outline stays on that piece (ADR-641).
+        const copyToEveryOutline = files.length === 1 && options.onlyThisPiece !== true;
+        onImport(object, { anchorIds, batchIndex, copyToEveryOutline });
         batchIndex += 1;
         return { kind: 'added' };
       };
@@ -93,25 +107,26 @@ export function useJigArtworkImport(
   return { busy, importFiles };
 }
 
+/** The Import button of the jig's Add artwork row; drops on the canvas use
+ *  the same importer. */
 export function JigArtworkImport(props: {
   readonly busy: boolean;
   readonly onFiles: (files: ReadonlyArray<File>) => void;
 }): JSX.Element {
   const input = useRef<HTMLInputElement>(null);
   return (
-    <div className="lf-jig-import">
+    <>
       <Button
-        variant="primary"
         disabled={props.busy}
-        title="Choose SVG or image files. Each file is fitted into its own outline, starting at the selected one."
+        title="Choose an SVG or image file to put on every piece, or several files for one piece each"
         onClick={() => input.current?.click()}
       >
-        {props.busy ? 'Importing artwork…' : 'Import artwork…'}
+        {props.busy ? 'Importing…' : 'Import…'}
       </Button>
       <input
         ref={input}
         hidden
-        title="Import SVG or image artwork into the jig, fitted inside the selected outline"
+        title="Import SVG or image artwork into the jig, fitted inside the outlines"
         type="file"
         accept={JIG_ARTWORK_ACCEPT}
         multiple
@@ -123,7 +138,6 @@ export function JigArtworkImport(props: {
           props.onFiles(files);
         }}
       />
-      <p className="lf-jig-muted">Or drop SVG or image files onto an outline on the jig canvas.</p>
-    </div>
+    </>
   );
 }

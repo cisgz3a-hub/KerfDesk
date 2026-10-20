@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
+import { findRegistrationBoxes } from '../../../core/scene';
 import { Button } from '../../kit';
 import { TutorialButton } from '../../tutorials/TutorialButton';
 import { RegistrationJigCanvas } from './RegistrationJigCanvas';
 import { JigEditorSidebar } from './JigEditorSidebar';
+import { JigSelectionBar } from './JigSelectionFields';
 import { handleJigEditorKey, useJigEditor, type JigEditorController } from './use-jig-editor';
 import './registration-jig.css';
 
@@ -45,7 +47,21 @@ export function RegistrationJigEditor(props: { readonly onClose: () => void }): 
             onSelectionChange={editor.onSelect}
             onCommit={editor.onCommit}
             onDropFiles={(files, outlineId) =>
-              void editor.importFiles(files, outlineId === null ? editor.ids : new Set([outlineId]))
+              void (outlineId === null
+                ? editor.importFiles(files, editor.ids)
+                : editor.importFiles(files, new Set([outlineId]), { onlyThisPiece: true }))
+            }
+            clearCount={editor.clearCount}
+            onClear={editor.onClear}
+            selectionBar={
+              <JigSelectionBar
+                project={editor.session.draft.project}
+                selectedIds={editor.ids}
+                outlineCount={findRegistrationBoxes(editor.session.draft.project.scene).length}
+                disabled={editor.readOnly}
+                onCommit={editor.onCommit}
+                onCentre={editor.onCentre}
+              />
             }
           />
         </div>
