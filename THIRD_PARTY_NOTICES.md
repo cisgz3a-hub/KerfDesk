@@ -168,7 +168,7 @@ electron-userland/electron-builder-binaries release `appimage@1.0.3`, file
 `appimage-tools-runtime-20251108.tar.gz`, SHA-256
 `84021a78ee214ae6fd33a2d62a92ba25542dd10bc86bf117a9b2d0bba44e7665`). KerfDesk's own
 code does not link, import or call any of them. The `.deb` carries none of them. Their
-complete notices, the full LGPL-2.1 and GPL-3.0 texts and their source locations are in
+complete notices, the full LGPL-2.1 text and their source locations are in
 `docs/licensing/appimage-runtime-notices.txt` and the generated
 `public/third-party-notices.txt`; `scripts/verify-linux-package.sh` fails if the
 AppImage's `usr/lib` holds a library not listed here. ADR-017 Amendment 1 records the
@@ -202,9 +202,11 @@ copies from the same toolset; source: the Ubuntu 18.04 source package named, at
 | `libXss.so.1` | libXScrnSaver 1.2.2 | MIT/X11 | libxss |
 | `libXtst.so.6` | libXtst 1.2.3 | MIT/X11 and HPND | libxtst |
 | `libnotify.so.4` | libnotify 0.7.7 | LGPL-2.1-or-later | libnotify |
-| `libgconf-2.so.4` | GConf 3.2.6 | LGPL-2.0-or-later (shipped under 2.1) | gconf |
-| `libappindicator3.so.1` | libappindicator 12.10.1 | LGPL-2.1 and GPL-3.0 | libappindicator |
-| `libindicator3.so.7` | libindicator 16.10.0 | GPL-3.0 | libindicator |
 
-The two GPL-3.0 libraries are listed because they ship today. ADR-017 Amendment 1 does
-not approve them: the maintainer decides before the first Linux AppImage release.
+**Left out.** The same toolset folder also holds `libappindicator3.so.1` (LGPL-2.1 with
+GPL-3.0 files) and `libindicator3.so.7` (GPL-3.0), which show a tray icon, and GConf's
+`libgconf-2.so.4`, an old GNOME settings store. KerfDesk has no tray icon and uses neither,
+and nothing in the AppImage links them. The build's `artifactBuildStarted` hook,
+`scripts/appimage-toolset.mjs`, gives electron-builder a copy of its toolset without
+them, and `scripts/verify-linux-package.sh` fails if the AppImage carries one or links one
+(ADR-017 Amendment 2).
