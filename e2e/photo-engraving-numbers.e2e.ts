@@ -23,6 +23,7 @@ test('photo form accepts fractional resolution and tone values and persists them
     ['Photo brightness', '1000', '100'],
     ['Photo midtones (gamma)', '0', '0.1'],
     ['Photo engraving DPI', '10', '127'],
+    ['Photo sharpen radius (lines)', '9', '3'],
   ] as const) {
     const field = dialog.getByRole('spinbutton', { name, exact: true });
     await field.fill(entered);
@@ -34,6 +35,8 @@ test('photo form accepts fractional resolution and tone values and persists them
     ['Photo contrast', '-2.75'],
     ['Photo midtones (gamma)', '1.23'],
     ['Photo engraving DPI', '203.2'],
+    ['Photo sharpen amount (%)', '37.5'],
+    ['Photo sharpen radius (lines)', '0.85'],
   ] as const;
   for (const [name, value] of fields) {
     const field = dialog.getByRole('spinbutton', { name, exact: true });
@@ -55,7 +58,13 @@ test('photo form accepts fractional resolution and tone values and persists them
   await expect(dialog).toBeHidden();
   const saved = await savePhotoProject(page, kerfdesk);
   const image = photoIn(saved);
-  expect(image).toMatchObject({ brightness: 1.25, contrast: -2.75, gamma: 1.23 });
+  expect(image).toMatchObject({
+    brightness: 1.25,
+    contrast: -2.75,
+    gamma: 1.23,
+    sharpenAmount: 37.5,
+    sharpenRadius: 0.85,
+  });
   const operation = primaryOperationForObject(image, saved.scene.layers);
   if (operation === null) throw new Error('Missing photo operation');
   expect(effectiveOperationForObject(operation, image).linesPerMm).toBe(8);
