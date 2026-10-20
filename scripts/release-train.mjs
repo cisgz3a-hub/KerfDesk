@@ -11,6 +11,8 @@
 //   promote    Copies the newest beta into the stable ring once it has had
 //              QUIET_DAYS quiet days and nothing holds it.
 //   status     No secrets: reports both rings and the promotion decision.
+//   observe    Recover a missing public beta receipt after an interrupted
+//              publication, without rebuilding or changing either catalogue.
 //
 // usage: node scripts/release-train.mjs <command> [--name=value ...]
 //   decide    --green=<file>... [--github-output=<file>] [--summary=<file>] [--now=<ISO>]
@@ -18,6 +20,7 @@
 //   terms     --sha256=<hex> --output=<file>
 //   promote   [--hold-variable=on] [--open-holds=<n>] [--summary=<file>] [--now=<ISO>]
 //   status    [--hold-variable=on] [--open-holds=<n>] [--summary=<file>] [--now=<ISO>]
+//   observe   --version=<version> --expected-catalog-sha256=<hex>
 
 import { execFileSync } from 'node:child_process';
 import { createHash, createPrivateKey, createPublicKey } from 'node:crypto';
@@ -39,6 +42,12 @@ import {
 } from './commercial-release-rings.mjs';
 import { publicKeyRecord } from './prepare-commercial-desktop.mjs';
 import { createStableReleaseStore } from './stable-release-store.mjs';
+import {
+  betaObservationKey,
+  publicBetaObservedAt,
+  readBetaObservation,
+  recordBetaObservation,
+} from './commercial-beta-observation.mjs';
 import {
   QUIET_DAYS,
   cutDecision,
@@ -257,6 +266,33 @@ export async function preflight({
   });
 }
 
+/** Run only while the commercial publication writer is idle, as for manual promotion. */
+export async function observeBeta({
+  env,
+  keySet,
+  version,
+  expectedCatalogSha256,
+  createStore = createStableReleaseStore,
+  fetchImpl = fetch,
+  clock = () => new Date(),
+}) {
+  betaObservationKey(version);
+  if (!/^[a-f0-9]{64}$/u.test(expectedCatalogSha256 ?? ''))
+    throw new CommercialReleaseError('Beta observation needs the reviewed beta catalogue SHA-256.');
+  requirePinnedSigningKey(env, keySet);
+  const store = await createStore(commercialStoreInput(env));
+  return recordBetaObservation({
+    store,
+    keySet,
+    version,
+    expectedCatalogSha256,
+    privateKeyPem: env.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY,
+    keyId: env.DESKTOP_STABLE_MANIFEST_KEY_ID,
+    fetchImpl,
+    clock,
+  });
+}
+
 function ringsOf(betaBytes, stableBytes, keySet) {
   return {
     beta: readCommercialCatalog(betaBytes, keySet),
@@ -271,7 +307,16 @@ export async function runPromotion({ store, keySet, now, held }) {
     await store.get(COMMERCIAL_CATALOG_KEY),
     keySet,
   );
-  const decision = promotionDecision({ ...rings, now, held });
+  const newest = rings.beta[0];
+  const betaObservedAt = newest
+    ? readBetaObservation(
+        await store.get(betaObservationKey(newest.payload.version)),
+        newest,
+        keySet,
+        now,
+      )
+    : null;
+  const decision = promotionDecision({ ...rings, betaObservedAt, now, held });
   // The train states the stable catalogue it decided from.
   const result = decision.due
     ? await promoteCommercialRelease({
@@ -281,7 +326,7 @@ export async function runPromotion({ store, keySet, now, held }) {
         expectedCatalogSha256: rings.catalogs.stable,
       })
     : null;
-  return { ...rings, decision, result };
+  return { ...rings, betaObservedAt, decision, result };
 }
 
 export async function ringStatus({ keySet, now, held, fetchImpl = fetch }) {
@@ -290,7 +335,15 @@ export async function ringStatus({ keySet, now, held, fetchImpl = fetch }) {
     await readPublicCatalogueBytes(COMMERCIAL_CATALOG_KEY, fetchImpl),
     keySet,
   );
-  return { ...rings, decision: promotionDecision({ ...rings, now, held }), result: null };
+  const betaObservedAt = rings.beta[0]
+    ? await publicBetaObservedAt(rings.beta[0], keySet, now, fetchImpl)
+    : null;
+  return {
+    ...rings,
+    betaObservedAt,
+    decision: promotionDecision({ ...rings, betaObservedAt, now, held }),
+    result: null,
+  };
 }
 
 const describe = (entry) =>
@@ -299,7 +352,7 @@ const describe = (entry) =>
     : `${entry.payload.version}, released ${entry.payload.publishedAt}, from ${entry.payload.sourceSha.slice(0, 9)}`;
 
 // The catalogue SHA-256s are what an operator states to publish or promote by hand.
-export function ringsSummary(title, { beta, stable, catalogs, decision, result }) {
+export function ringsSummary(title, { beta, stable, betaObservedAt, catalogs, decision, result }) {
   const outcome =
     result === null
       ? `Nothing promoted: ${decision.reason}`
@@ -311,6 +364,7 @@ export function ringsSummary(title, { beta, stable, catalogs, decision, result }
     '',
     `- Newest beta: ${describe(beta[0])}`,
     `- Newest stable: ${describe(stable[0])}`,
+    `- Public beta observed: ${betaObservedAt ?? 'not yet verified'}`,
     `- Promotion: ${decision.due ? 'due' : 'not due'}. ${decision.reason}`,
     `- Quiet days before promotion: ${QUIET_DAYS}`,
     `- Beta catalogue SHA-256: ${catalogs.beta}`,
@@ -393,6 +447,20 @@ const COMMANDS = {
   async status({ options, now, keySet, held }) {
     report(options, ringsSummary('Release train: rings', await ringStatus({ keySet, now, held })));
   },
+  async observe({ options, keySet }) {
+    const versions = options('version');
+    const catalogs = options('expected-catalog-sha256');
+    // An observation always uses the real clock, never the planning/status override.
+    if (versions.length !== 1 || catalogs.length !== 1 || options('now').length !== 0)
+      throw new Error('observe needs one --version and --expected-catalog-sha256, without --now.');
+    const observedAt = await observeBeta({
+      env: process.env,
+      keySet,
+      version: versions[0],
+      expectedCatalogSha256: catalogs[0],
+    });
+    report(options, `${versions[0]} public beta observation confirmed at ${observedAt}.`);
+  },
 };
 
 export async function runCli(argv) {
@@ -401,7 +469,7 @@ export async function runCli(argv) {
     rest.filter((arg) => arg.startsWith(`--${name}=`)).map((arg) => arg.slice(name.length + 3));
   if (!Object.hasOwn(COMMANDS, command ?? ''))
     throw new Error(
-      'usage: release-train.mjs decide|preflight|terms|promote|status [--name=value]',
+      'usage: release-train.mjs decide|preflight|terms|promote|status|observe [--name=value]',
     );
   const [nowArg] = options('now');
   const now = nowArg === undefined ? new Date() : new Date(nowArg);

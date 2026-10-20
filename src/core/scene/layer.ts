@@ -74,7 +74,22 @@ export type LayerOperationSettings = {
   // runway from its speed and the machine's acceleration at compile time; an
   // older build uses the stored overscan instead.
   readonly autoOverscan?: boolean | undefined;
+  // ADR-626 (LBG-C14). Optional for the same reason: absent means no lead-in
+  // or lead-out, which compiles byte-identically to the output before them.
+  // An older build ignores them and cuts the same contours without leads.
+  readonly leadInEnabled?: boolean | undefined;
+  readonly leadOutEnabled?: boolean | undefined;
+  readonly leadStyle?: LaserLeadStyle | undefined;
+  readonly leadLengthMm?: number | undefined;
+  readonly leadAngleDeg?: number | undefined;
+  readonly leadSide?: LaserLeadSide | undefined;
 };
+
+// ADR-626: an arc meets the cut tangentially; a line meets it at an angle.
+export type LaserLeadStyle = 'arc' | 'line';
+// ADR-626: 'auto' puts each lead on the scrap side, outside an outer contour
+// and inside a hole; the other two put every lead of the operation on that side.
+export type LaserLeadSide = 'auto' | 'outside' | 'inside';
 
 // ADR-494: 'count' puts tabsPerShape tabs on every contour; 'spacing' puts one
 // tab per tabSpacingMm of perimeter, at most tabMaxPerShape when that is set.
@@ -188,6 +203,12 @@ const LAYER_OPERATION_SETTING_KEYS = [
   'imageCrossHatch',
   'passAngleStepDeg',
   'autoOverscan',
+  'leadInEnabled',
+  'leadOutEnabled',
+  'leadStyle',
+  'leadLengthMm',
+  'leadAngleDeg',
+  'leadSide',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -274,6 +295,12 @@ export const OPTIONAL_CUT_SETTING_KEYS = [
   'imageCrossHatch',
   'passAngleStepDeg',
   'autoOverscan',
+  'leadInEnabled',
+  'leadOutEnabled',
+  'leadStyle',
+  'leadLengthMm',
+  'leadAngleDeg',
+  'leadSide',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 // Written only when set, so a capture of an operation that never used them
@@ -286,6 +313,67 @@ function captureOptionalCutSettings(
     if (layer[key] !== undefined) out[key] = layer[key];
   }
   return out as Partial<LayerOperationSettings>;
+}
+
+const LASER_LEAD_SETTING_KEYS = [
+  'leadInEnabled',
+  'leadOutEnabled',
+  'leadStyle',
+  'leadLengthMm',
+  'leadAngleDeg',
+  'leadSide',
+] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
+
+const LASER_LEAD_SETTING_KEY_SET: ReadonlySet<string> = new Set(LASER_LEAD_SETTING_KEYS);
+
+/** ADR-626: whether a setting key is one of the lead settings. */
+export function isLaserLeadSettingKey(key: string): boolean {
+  return LASER_LEAD_SETTING_KEY_SET.has(key);
+}
+
+/** ADR-626: whether two operations cut alike. With both lead switches off on
+ * both, lead shape and side change nothing, so artwork that differs only there
+ * is cut as one process, as with leads off. */
+export function layerOperationOutputEqual(
+  left: LayerOperationSettings,
+  right: LayerOperationSettings,
+): boolean {
+  const leadsAsked = [left, right].some(
+    (settings) => settings.leadInEnabled === true || settings.leadOutEnabled === true,
+  );
+  return LAYER_OPERATION_SETTING_KEYS.every(
+    (key) => left[key] === right[key] || (!leadsAsked && LASER_LEAD_SETTING_KEY_SET.has(key)),
+  );
+}
+
+/** ADR-626: the settings without leads. A stored setting set (saved defaults,
+ * a recipe) holds lead fields only when it has leads, so before one is laid
+ * over an operation its own leads are cleared: absent means no leads. */
+export function withoutLaserLeadSettings<T extends Partial<LayerOperationSettings>>(
+  settings: T,
+): T {
+  if (LASER_LEAD_SETTING_KEYS.every((key) => !(key in settings))) return settings;
+  const {
+    leadInEnabled: _leadIn,
+    leadOutEnabled: _leadOut,
+    leadStyle: _style,
+    leadLengthMm: _length,
+    leadAngleDeg: _angle,
+    leadSide: _side,
+    ...rest
+  } = settings;
+  return rest as T;
+}
+
+/** ADR-626: the settings without their lead fields when neither lead is on,
+ * because those fields then change nothing: a recipe step or comparison taken
+ * from them matches one without leads. */
+export function withoutInactiveLaserLeadSettings<T extends Partial<LayerOperationSettings>>(
+  settings: T,
+): T {
+  return settings.leadInEnabled === true || settings.leadOutEnabled === true
+    ? settings
+    : withoutLaserLeadSettings(settings);
 }
 
 export function createLayerSubLayer(

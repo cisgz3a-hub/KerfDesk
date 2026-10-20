@@ -10,7 +10,7 @@ import {
   type PreparedCncCompilationArtifact,
 } from '../../core/cnc/cnc-compilation-artifact';
 import { compileJob } from '../../core/job';
-import type { Project } from '../../core/scene';
+import type { Project, Scene } from '../../core/scene';
 import {
   isProgramMaterializationRangeError,
   programMaterializationFailure,
@@ -56,7 +56,7 @@ export async function prepareOutputAsync(
   try {
     const input = prepareOutputInput(project, options);
     if (!input.ok) return input.prepared;
-    const compiled = await compileOutputProject(input.project, context);
+    const compiled = await compileOutputProject(input.project, input.sourceProject.scene, context);
     if (compiled.kind === 'relief-materialization-failed') {
       return { ok: false, preflight: reliefMaterializationFailure(compiled) };
     }
@@ -74,11 +74,16 @@ export async function prepareOutputAsync(
 
 async function compileOutputProject(
   project: Project,
+  sideScene: Scene,
   context: PrepareOutputAsyncContext,
 ): Promise<CncJobCompilationResult> {
   const machine = project.machine;
+  // ADR-486 Amd 3: the whole scene, output scope aside, decides kerf sides.
   if (machine === undefined || machine.kind !== 'cnc')
-    return { kind: 'compiled', job: compileJob(project.scene, project.device) };
+    return {
+      kind: 'compiled',
+      job: compileJob(project.scene, project.device, undefined, { sideScene }),
+    };
   throwIfAborted(context.signal);
   emitProgress(context, 'normalizing', 'direct', 0, 0, 0, 0);
   const compilationId = `${context.jobId}:cnc`;
