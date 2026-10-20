@@ -12,7 +12,7 @@ export function FontUsageHint(props: {
 }): JSX.Element | null {
   const csv = useStore((state) => state.project.variables?.csv);
   const singleLine = findFontEntry(props.fontKey)?.geometry === 'single-line';
-  const missing = useMissingCharacters({
+  const { missing, unchecked } = useMissingCharacters({
     fontKey: props.fontKey,
     embeddedFonts: props.embeddedFonts,
     content: props.content,
@@ -20,7 +20,7 @@ export function FontUsageHint(props: {
     csv,
     enabled: props.fontAvailable,
   });
-  if (!singleLine && missing.length === 0) return null;
+  if (!singleLine && missing.length === 0 && unchecked === null) return null;
   return (
     <small style={hintStyle}>
       {singleLine && (
@@ -35,6 +35,11 @@ export function FontUsageHint(props: {
       {missing.length > 0 && (
         <span role="status" style={warningStyle}>
           {missingCharactersMessage(missing, singleLine, props.variable)}
+        </span>
+      )}
+      {unchecked !== null && (
+        <span role="status" style={warningStyle}>
+          Could not check this font for missing characters. {unchecked}
         </span>
       )}
     </small>

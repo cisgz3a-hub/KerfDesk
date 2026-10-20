@@ -69,7 +69,13 @@ const SILENT_HOME_MARGIN = 1.5;
 const SILENT_HOME_EXTRA_MS = 30_000;
 const SILENT_HOME_BACKSTOP_MS = 30 * 60_000;
 
-function homeLineTimeoutMs(state: LaserState, driver: ControllerDriver): number {
+/** How long Home waits for its reply. It also bounds how long a line still owed
+ * its reply may keep the connection bar from reading Not responding
+ * (controller-recovery-status.ts, ADR-610 Amendment 2). */
+export function homeLineTimeoutMs(
+  state: Pick<LaserState, 'grblSettingsRows'>,
+  driver: ControllerDriver,
+): number {
   if (driver.capabilities.statusWhileHoming !== false) return HOME_COMMAND_TIMEOUT_MS;
   const bound = grblHomingDurationBoundMs(state.grblSettingsRows, driver.homingCycle);
   if (bound === null) return SILENT_HOME_BACKSTOP_MS;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   EditionContext,
   LICENCE_SETTINGS_EVENT,
@@ -13,33 +13,24 @@ import { BrowserDesktopWelcome } from './BrowserDesktopWelcome';
 /**
  * Pro requests in a build that cannot take a licence only explain (ADR-544).
  * `shown` is the Pro tool being explained, or 'all' for the notice that every
- * Pro feature is in the desktop app.
+ * Pro feature is in the desktop app. Neither notice keeps the tool's edit:
+ * nothing here can unlock Pro, so there is no edit to run afterwards, and it
+ * is never an open Pro prompt for background work (ADR-609).
  */
 export function useProInDesktop(): {
   readonly shown: ProFeature | 'all' | null;
   readonly request: (feature: ProFeature) => boolean;
   readonly showAll: () => void;
   readonly close: () => void;
-  readonly hasPrompt: () => boolean;
 } {
   const [shown, setShown] = useState<ProFeature | 'all' | null>(null);
-  const shownRef = useRef<ProFeature | 'all' | null>(null);
   const request = useCallback((next: ProFeature): boolean => {
-    shownRef.current = next;
     setShown(next);
     return false;
   }, []);
-  const showAll = useCallback(() => {
-    shownRef.current = 'all';
-    setShown('all');
-  }, []);
-  const close = useCallback(() => {
-    shownRef.current = null;
-    setShown(null);
-  }, []);
-  // The all-features notice holds no tool request or pending edit.
-  const hasPrompt = useCallback(() => shownRef.current !== null && shownRef.current !== 'all', []);
-  return { shown, request, showAll, close, hasPrompt };
+  const showAll = useCallback(() => setShown('all'), []);
+  const close = useCallback(() => setShown(null), []);
+  return { shown, request, showAll, close };
 }
 
 /** Runs `show` whenever Help > Licence is chosen. */
@@ -53,7 +44,7 @@ export function useLicenceSettingsEvent(show: () => void): void {
 /** KerfDesk Free for builds without a desktop licence adapter. */
 export function FreeOnlyEdition({ children }: { readonly children: ReactNode }): JSX.Element {
   const desktop = useProInDesktop();
-  const { hasPrompt, request, showAll } = desktop;
+  const { request, showAll } = desktop;
   const browserWelcome = BROWSER_FREE_BUILD && window.location.protocol !== 'app:';
   useLicenceSettingsEvent(showAll);
   const value = useMemo<EditionValue>(
@@ -62,13 +53,12 @@ export function FreeOnlyEdition({ children }: { readonly children: ReactNode }):
       licensed: false,
       pro: false,
       proInDesktop: true,
-      get proPromptOpen() {
-        return hasPrompt();
-      },
+      // The desktop notice never holds an edit to run (see useProInDesktop).
+      proPromptOpen: false,
       requestPro: request,
       openLicence: showAll,
     }),
-    [hasPrompt, request, showAll],
+    [request, showAll],
   );
   useEffect(() => {
     setActiveEdition(value);
