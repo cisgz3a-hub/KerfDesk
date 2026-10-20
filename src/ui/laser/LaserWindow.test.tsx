@@ -11,6 +11,7 @@ import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { LaserWindow } from './LaserWindow';
 import { MachineConnectionToolbar } from './MachineConnectionToolbar';
+import { WorkspaceSafetyNotice } from './WorkspaceSafetyNotice';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -109,6 +110,7 @@ describe('LaserWindow autofocus busy controls', () => {
             <>
               <MachineConnectionToolbar />
               <LaserWindow />
+              <WorkspaceSafetyNotice />
             </>
           </PlatformProvider>,
         );

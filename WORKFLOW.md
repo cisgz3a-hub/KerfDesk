@@ -2750,12 +2750,17 @@ authorization, Frame proof, controller command, or safety boundary.
    outline in place. Either way, a grid that would cross the bed edge is moved back
    just far enough to stay on the bed.
 3. In **Artwork**, click **Import artwork…**, drop SVG or image files onto an outline
-   on the jig canvas, use the existing writing styles for text, or open **Trace an
-   image** and use the existing tracers directly in the editor. Imported and traced
-   artwork fits inside the outline it was dropped on, else the selected outline, else
-   the outline holding the selected artwork, else the first outline. Several files at
-   once fill consecutive outlines in grid order from there. While files are dragged
-   over the canvas, the outline that would receive them is highlighted.
+   on the jig canvas, use the existing writing styles for text, or use the existing
+   tracers directly in the editor under **Trace an image**, which starts open. Imported
+   artwork and traces of uploaded images fit inside the outline the files were dropped
+   on, else the selected outline, else the outline holding the selected artwork, else
+   the first outline. Several files at once fill consecutive outlines in grid order
+   from there. While files are dragged over the canvas, the outline that would receive
+   them is highlighted. To trace an image that is already on the jig, select it and click
+   **Trace selected image**; **Replace image with trace** lays the trace exactly over
+   the image and removes the image (ADR-633). If Centre + copy already copied that
+   image to the other outlines, the button reads **Replace all N images with trace**
+   and every copy is replaced the same way.
    **Line / Fill settings** controls the selected artwork's operation, power, speed and
    passes; Fill also exposes line interval, scan angle, fill style and cross-hatch.
    Use Line for open traced paths. These edits remain in the draft until saved.

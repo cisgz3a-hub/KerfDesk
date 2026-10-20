@@ -122,6 +122,23 @@ function electronSection(rootDir) {
   ].join('\n');
 }
 
+// The Linux AppImage's runtime and the libraries electron-builder copies into
+// it come from electron-builder's toolset, not node_modules, so they are
+// pinned by hand (ADR-017 Amendment 1). verify-linux-package.sh fails when the
+// AppImage carries a library this notice does not name.
+export function appImageRuntimeSections(rootDir = REPO_ROOT) {
+  const read = (file) => fs.readFileSync(path.join(rootDir, file), 'utf8').trim();
+  return [
+    '== Linux AppImage runtime (in the .AppImage download only) ==',
+    read('docs/licensing/appimage-runtime-notices.txt'),
+    ...['LGPL-2.1', 'GPL-3.0'].map(
+      (spdx) =>
+        `=== ${spdx} full license text (AppImage components above) ===\n\n` +
+        read(`scripts/license-texts/${spdx}.txt`),
+    ),
+  ];
+}
+
 function pdfResourceLicenseSections(rootDir) {
   const pdfRoot = path.join(rootDir, 'node_modules/pdfjs-dist');
   return [
@@ -179,6 +196,7 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
     ...offlineEngineNotices(rootDir),
     '== Electron desktop runtime package ==',
     electronSection(rootDir),
+    ...appImageRuntimeSections(rootDir),
     standardTexts,
   ]
     .join('\n\n')

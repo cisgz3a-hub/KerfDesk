@@ -2,6 +2,7 @@ import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { useTutorialStore } from '../tutorials/tutorial-store';
 import { openCommandSearch } from './command-search-store';
+import { LICENSE_NOTICE_EVENT, LICENSE_NOTICE_TITLE } from '../help/license-notice';
 
 export function findCommandCommand(): AppCommand {
   return enabled(
@@ -51,5 +52,18 @@ export function safetyHelpCommand(ctx: AppCommandContext): AppCommand {
     'Safety & liability',
     'Show machine-safety and liability information — read before running a job',
     ctx.showSafety,
+  );
+}
+
+// The bundled licence and safety terms: the text the Windows installer shows.
+// The Mac and Linux packages show no installer page, so their operators read
+// the terms here (ADR-613 Amendment 1).
+export function licenseNoticeCommand(): AppCommand {
+  return enabled(
+    'help.license-notice',
+    'help',
+    LICENSE_NOTICE_TITLE,
+    'Read the KerfDesk License & Safety Notice, the terms the installer shows',
+    () => window.dispatchEvent(new Event(LICENSE_NOTICE_EVENT)),
   );
 }
