@@ -1,6 +1,6 @@
 ## ADR-646 Amendment 1 - Cut Settings and operation rows light up their artwork too (2026-10-20)
 
-**Status:** Accepted. Amends ADR-646 (Consequences) and ADR-620 (operation row pulse). | **Date:** 2026-10-20
+**Status:** Accepted. Amends ADR-646 (decisions 3 and 5, Consequences) and ADR-620 (operation row pulse). | **Date:** 2026-10-20
 
 ### Context
 
@@ -37,9 +37,20 @@ each before changing it:
    holds the canvas, that row releases its hover and does not set it again, even when the pointer
    settles on it. Another row, or artwork on the canvas, still wins over the edit as before. When
    the edit ends with focus on a plain control of the row, the row pulse returns.
+5. **Operation-wide controls light the whole operation.** In the Operation editor, Include in
+   output, Show on canvas and Remove Focus Test Z change the operation itself, even while the
+   selection has its own settings. Focus on them lights every piece the operation runs; focus
+   back on a setting returns to the selected pieces. They are marked `data-operation-wide`.
+6. **The multi-operation CNC depth lights up too.** With several CNC artworks that share no
+   operation, the bulk Cut depth (or Insert depth) field sets the depth of each of their
+   operations. Focus there lights every piece those operations run, selected or not.
+7. **Another editor is another edit.** The edit's identity includes its editor, so focus moving
+   straight from one editor to another on the same artwork still pulses once, as an edit beginning.
+8. **An outside press ends the edit at once.** The press releases the edit before React renders
+   again, so an action that press starts (another row's eye, a drag) can never pulse the old edit.
 
-The canvas side and the store are unchanged. Display only, session only: no selection, output,
-Frame or Start behaviour changes.
+The store is unchanged; the canvas only carries the editor into the edit's identity. Display
+only, session only: no selection, output, Frame or Start behaviour changes.
 
 ### Consequences
 
@@ -57,5 +68,11 @@ Frame or Start behaviour changes.
   not the same-settings operation; a change keeps the glow; focus on the activation button
   brings back the row pulse; the row's hover steps aside under a settled pointer; a press
   outside and unmounting end the glow.
+- `SelectedOperationInspector.edit-glow.test.tsx`: Include in output and Show light both pieces
+  of the operation while the selected piece has its own settings, and Power and Speed only the
+  selected one; an outside press releases the edit during the press; the multi-operation CNC
+  depth lights every piece of its operations, including an unselected one, and not a third
+  operation's piece.
+- `artwork-pulse.test.ts`: focus moving straight to another editor of the same artwork pulses.
 - `LayerRow.hover.test.tsx` unchanged and passing.
 - **NOT verified:** on hardware (display only).

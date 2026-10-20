@@ -167,9 +167,11 @@ function SelectedOperationEditor(props: {
 /**
  * Lights up what an edit here changes (ADR-646): the selected artwork's own
  * settings while it overrides the operation, otherwise every piece the
- * operation runs. The Cut Settings dialog renders inside this editor and
- * applies to the same target, so it lights the same pieces; moved to a
- * portal, it would need these handlers on its own root (Amendment 1).
+ * operation runs. Controls marked `data-operation-wide` (Include in output,
+ * Show on canvas, Focus Test removal) change the operation itself, so they
+ * light every piece either way. The Cut Settings dialog renders inside this
+ * editor and applies to the same target, so it lights the same pieces; moved
+ * to a portal, it would need these handlers on its own root (Amendment 1).
  */
 function useOperationEditGlow(
   operation: Layer,
@@ -177,14 +179,26 @@ function useOperationEditGlow(
   editsOwnSettings: boolean,
 ): ReturnType<typeof useSettingsEditGlow> {
   const allObjects = useStore((state) => state.project.scene.objects);
-  const changed = editsOwnSettings
-    ? selected
-    : allObjects.filter((object) => sceneObjectUsesOperation(object, operation));
-  return useSettingsEditGlow({
+  const [operationWide, setOperationWide] = useState(false);
+  const changed =
+    editsOwnSettings && !operationWide
+      ? selected
+      : allObjects.filter((object) => sceneObjectUsesOperation(object, operation));
+  const glow = useSettingsEditGlow({
     owner: `operation-editor:${operation.id}`,
     objectIds: changed.map((object) => object.id),
     operationIds: [operation.id],
   });
+  return {
+    onFocus: (event) => {
+      const target = event.target;
+      setOperationWide(
+        target instanceof Element && target.closest('[data-operation-wide]') !== null,
+      );
+      glow.onFocus(event);
+    },
+    onBlur: glow.onBlur,
+  };
 }
 
 function OperationChoice(props: {

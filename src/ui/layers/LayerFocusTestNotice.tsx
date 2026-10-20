@@ -8,7 +8,13 @@ export function LayerFocusTestNotice(props: { readonly layer: Layer }): JSX.Elem
   if (focus === undefined) return null;
   const offset = `${focus.offsetMm >= 0 ? '+' : ''}${focus.offsetMm.toFixed(3)}`;
   return (
-    <div role="note" aria-label={`Focus Test Z for ${props.layer.name}`} style={noticeStyle}>
+    <div
+      role="note"
+      aria-label={`Focus Test Z for ${props.layer.name}`}
+      style={noticeStyle}
+      // Removing it changes the operation for all its artwork (edit glow, ADR-646 Amendment 1).
+      data-operation-wide
+    >
       <span>
         Focus Test: Z {offset} mm. Artwork on this operation moves Z relative to the starting focus.
       </span>

@@ -73,7 +73,7 @@ export function ArtworkPulseOverlay(props: {
       : hoveredObjectId !== null && props.canvasHoverEnabled
         ? { kind: 'object', objectId: hoveredObjectId }
         : edited !== null
-          ? { kind: 'edit', objectIds: edited.objectIds, operationIds: edited.operationIds }
+          ? { kind: 'edit', ...edited }
           : null;
   usePulseLoop(ref, props.project, view, seed, hoveredObjectId);
   // Holding Alt shows every operation in its own colour on the canvas below;

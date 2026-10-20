@@ -60,7 +60,9 @@ export function OperationFooter(props: {
   const setLayerParam = useStore((state) => state.setLayerParam);
   return (
     <div className="lf-operation-output">
-      <div className="lf-operation-output__toggles">
+      {/* These change the operation for all its artwork, even while the
+          selection has its own settings: the edit glow lights all of it. */}
+      <div className="lf-operation-output__toggles" data-operation-wide>
         <label title="Include artwork using this operation in preview and machine output">
           <input
             type="checkbox"

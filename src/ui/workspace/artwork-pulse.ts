@@ -77,6 +77,8 @@ export type PulseSeed =
   /** A settings edit (ADR-646): exactly the artwork it changes, never widened to same settings. */
   | {
       readonly kind: 'edit';
+      /** The editor holding it: focus moving to another editor is a new edit, even on the same artwork. */
+      readonly owner: string;
       readonly objectIds: ReadonlyArray<string>;
       readonly operationIds: ReadonlyArray<string>;
     };
@@ -86,7 +88,7 @@ export function pulseSeedKey(seed: PulseSeed | null): string {
   if (seed === null) return '';
   if (seed.kind === 'object') return `o:${seed.objectId}`;
   if (seed.kind === 'operation') return `r:${seed.operationId}`;
-  return `e:${JSON.stringify([seed.objectIds, seed.operationIds])}`;
+  return `e:${JSON.stringify([seed.owner, seed.objectIds, seed.operationIds])}`;
 }
 
 /**

@@ -39,11 +39,15 @@ export function useSettingsEditGlow(target: SettingsEditGlowTarget): {
     // A focused control that re-renders away takes focus with it and sends
     // no blur, so a press anywhere outside the editor also ends the edit.
     const pressOutside = (event: PointerEvent): void => {
-      if (!(event.target instanceof Node) || !editor.contains(event.target)) setEditor(null);
+      if (event.target instanceof Node && editor.contains(event.target)) return;
+      // Released now, not after the next render: the press may change the
+      // scene (another row's eye, a drag), which must not pulse this edit.
+      release(owner);
+      setEditor(null);
     };
     document.addEventListener('pointerdown', pressOutside, true);
     return () => document.removeEventListener('pointerdown', pressOutside, true);
-  }, [editor]);
+  }, [editor, owner, release]);
   useEffect(() => {
     if (editor === null) release(owner);
   }, [editor, owner, release]);
