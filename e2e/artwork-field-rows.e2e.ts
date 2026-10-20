@@ -137,7 +137,7 @@ test('Image dither swatches fit and stay keyboard-operable at every panel width'
     .getByRole('radio', { name: /^Image/ })
     .check({ force: true });
   const dither = panel.getByRole('radiogroup', { name: /^Dither for/ });
-  await expect(dither.getByRole('radio')).toHaveCount(11);
+  await expect(dither.getByRole('radio')).toHaveCount(12);
 
   for (const width of [240, 260, 280, 300, 320, 360, 400]) {
     await setPanelWidth(page, panel, width);
