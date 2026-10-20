@@ -14,7 +14,10 @@ OpenClipart CC0 assets. Desktop packaging separately fails closed unless the
 artifact retains Electron's native Windows notices and the explicitly bundled
 `Contents/Resources/legal/electron/LICENSE` plus
 `Contents/Resources/legal/electron/LICENSES.chromium.html` runtime notices on
-macOS; JS license banners also remain in shipped assets.
+macOS, or `LICENSE.electron.txt` and `LICENSES.chromium.html` beside the
+executable in the Linux `.deb` and AppImage; JS license banners also remain in
+shipped assets. The Linux AppImage's own runtime and libraries are listed in
+the last section below.
 
 ---
 
@@ -156,3 +159,52 @@ The pinned source is
 [notofonts/noto-fonts at ffebf8c1ee449e544955a7e813c54f9b73848eac](https://github.com/notofonts/noto-fonts/blob/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf).
 The unmodified font SHA-256 is
 `ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b`.
+
+## Linux AppImage runtime and libraries (AppImage download only)
+
+The Linux `.AppImage` carries components that are not npm packages: electron-builder
+26.17.0 adds them from its AppImage toolset (`toolsets.appimage: 1.0.3`,
+electron-userland/electron-builder-binaries release `appimage@1.0.3`, file
+`appimage-tools-runtime-20251108.tar.gz`, SHA-256
+`84021a78ee214ae6fd33a2d62a92ba25542dd10bc86bf117a9b2d0bba44e7665`). KerfDesk's own
+code does not link, import or call any of them. The `.deb` carries none of them. Their
+complete notices, the full LGPL-2.1 and GPL-3.0 texts and their source locations are in
+`docs/licensing/appimage-runtime-notices.txt` and the generated
+`public/third-party-notices.txt`; `scripts/verify-linux-package.sh` fails if the
+AppImage's `usr/lib` holds a library not listed here. ADR-017 Amendment 1 records the
+licence decision.
+
+**The AppImage runtime** is the program at the start of the `.AppImage` file. It mounts
+the image through FUSE and starts the launcher; it is a separate executable, not part of
+KerfDesk or Electron. It is AppImage type2-runtime release `20251108`, built on Alpine
+Linux 3.21; source:
+https://github.com/AppImage/type2-runtime/tree/dd6cebedcbddde9c82f89b011e8e1d40b6e43868.
+
+| Component (statically linked into the runtime) | License | Source |
+|---|---|---|
+| type2-runtime 20251108 | MIT | © 2004-23 probonopd — https://github.com/AppImage/type2-runtime |
+| libfuse 3.15.0, patched (`lib/mount.c`, by the runtime's `patches/libfuse/mount.c.diff`) | LGPL-2.1 | https://github.com/libfuse/libfuse/releases/tag/fuse-3.15.0 |
+| squashfuse 0.5.2 | BSD-2-Clause | © 2012 Dave Vasilevsky, Phillip Lougher — https://github.com/vasi/squashfuse |
+| Zstandard 1.5.6 | BSD-3-Clause (offered as BSD-3-Clause OR GPL-2.0) | © Meta Platforms, Inc. and affiliates — https://github.com/facebook/zstd |
+| zlib 1.3 | Zlib | © Jean-loup Gailly and Mark Adler — https://zlib.net |
+| musl libc 1.2.5 | MIT | © 2005-2020 Rich Felker, et al. — https://musl.libc.org |
+| mimalloc 2.1.7 | MIT | © 2018-2021 Microsoft Corporation, Daan Leijen — https://github.com/microsoft/mimalloc |
+
+**The AppRun launcher** is a shell script electron-builder 26.17.0 writes from its MIT
+template (© 2015 Loopline Systems).
+
+**Shared libraries in `usr/lib`**, unmodified Ubuntu 18.04 builds that electron-builder
+copies from the same toolset; source: the Ubuntu 18.04 source package named, at
+`https://launchpad.net/ubuntu/bionic/+source/<package>`.
+
+| Library | Upstream | License | Ubuntu source package |
+|---|---|---|---|
+| `libXss.so.1` | libXScrnSaver 1.2.2 | MIT/X11 | libxss |
+| `libXtst.so.6` | libXtst 1.2.3 | MIT/X11 and HPND | libxtst |
+| `libnotify.so.4` | libnotify 0.7.7 | LGPL-2.1-or-later | libnotify |
+| `libgconf-2.so.4` | GConf 3.2.6 | LGPL-2.0-or-later (shipped under 2.1) | gconf |
+| `libappindicator3.so.1` | libappindicator 12.10.1 | LGPL-2.1 and GPL-3.0 | libappindicator |
+| `libindicator3.so.7` | libindicator 16.10.0 | GPL-3.0 | libindicator |
+
+The two GPL-3.0 libraries are listed because they ship today. ADR-017 Amendment 1 does
+not approve them: the maintainer decides before the first Linux AppImage release.
