@@ -2725,8 +2725,15 @@ authorization, Frame proof, controller command, or safety boundary.
 ### F-B15a. Burn a multi-outline registration jig set (ADR-057 amendment)
 
 1. Open **Registration Jig** or **Edit jig** to enter jig mode (ADR-641). The jig page
-   takes the place of the tool strip and the main canvas; the machine panel stays docked
-   beside it, and dialogs, alarms and the live motion bar appear above it as usual. When
+   is a full page: it takes the whole window except the machine panel, which stays docked
+   beside it with Stop, the alarm banner and jogging. The menu bar, toolbar,
+   object/placement bar, tool strip, Artwork panel and status bar are hidden; dialogs such
+   as Job Review, alarms and the live motion bar appear above the page as usual. The
+   page's header has a primary **Done** (with a back arrow), the title **Registration
+   jig** and its tutorial, the three steps with the current one marked, Undo and Redo,
+   and the machine connection (Connect, the machine picker and the safety notice), which
+   moves there from the top bar. Ctrl+K and the main canvas's tool and view keys do
+   nothing on the page; Save and the machine shortcuts still work. When
    the page has no burn step to hold Frame and Start (a captured board, no outline, or
    outlines and artwork set to burn together), the machine panel keeps its own. Its
    canvas opens fitted to the jig, with **Fit jig** and **Fit bed** available. The page
@@ -2735,9 +2742,10 @@ authorization, Frame proof, controller command, or safety boundary.
    Opening jig mode without a jig creates its first outline, in **Outline only**, as one
    undoable edit; so does applying a layout to a project without outlines. Every edit
    goes straight into the project with the ordinary Undo (Ctrl+Z, Ctrl+Shift+Z, or
-   Ctrl+Y on the jig page); there is nothing to save or discard. **Done**, or
-   **Registration Jig** in the Tools menu, returns to the main canvas and drops the
-   outlines from the selection. Escape in a field only leaves the field; otherwise
+   Ctrl+Y on the jig page); there is nothing to save or discard. **Done** returns
+   to the workspace exactly as it was when the page opened: the bars and panels, the
+   main canvas's zoom and pan, and the selection (less anything deleted on the page).
+   Outlines never come back selected. Escape in a field only leaves the field; otherwise
    Escape clears the selection and never leaves jig mode. While the machine runs a job,
    Frames or moves, the page says editing is paused: the canvas only pans and zooms and
    the step fields are disabled. An import, trace or text that is ready only then is
@@ -2838,7 +2846,7 @@ authorization, Frame proof, controller command, or safety boundary.
 3. Outlines are always locked in the project, so the main canvas cannot move them; jig
    mode shows them movable until they are burned. With **Artwork only** selected the
    outlines may already be burned, so jig mode shows them locked, with the layout fields,
-   **Apply layout** and **Remove all outlines** disabled. **Unlock outlines** in step 1
+   and **Remove all outlines** disabled. **Unlock outlines** in step 1
    makes them movable again until **Done**. Once a job has run or **Artwork only** was
    selected, even a jig created in this visit keeps its first outline in place when its
    grid changes, also after **Burn outlines again**.
@@ -4687,17 +4695,20 @@ preview and applied copies use the same plan; this is not optimal nesting (ADR-5
 offcut), aim with the machine's red-dot pointer instead of the beam, and put the
 artwork exactly where it belongs: a corner, the middle of an edge or the centre.
 
-**Where in the UI.** **Tools → Place Board** opens Place Board mode, a page
-built like jig mode: it takes the place of the tool strip and the main canvas,
-and the machine panel (connect, jog, positioning light) stays docked on the right.
-The left sidebar has three steps: **1 Capture board** (Rectangle, Circle, Custom
+**Where in the UI.** **Tools → Place Board** opens Place Board mode, a full page
+built like jig mode: it takes the whole window except the machine panel (jog,
+positioning light, Stop, alarms), which stays docked on the right; the menu bar,
+toolbars, tool strip, Artwork panel and status bar are hidden. The page header has
+**Done**, the title **Place board**, the three steps, Undo/Redo and the machine
+connection (Connect and the machine picker). The left sidebar holds the steps: **1 Capture board** (Rectangle, Circle, Custom
 shape tiles, the pointer bar, **Capture corner**, Undo last, Start over; then the
 measured board, its checks, Capture a new board, Remove board), **2 Place artwork**
 (Import artwork, the 3x3 placement grid with an edge margin, Fit to board, Fill
 with copies) and **3 Burn** (power, speed and passes for the artwork's operations,
 then Frame and Start). The canvas shows the captured points as they are taken, the
 outline they make and a red crosshair at the head or pointer; artwork is dragged,
-resized and rotated on it. **Done** returns to the main canvas.
+resized and rotated on it. **Done** returns to the workspace as it was when the page
+opened (bars, panels, zoom, pan and selection).
 
 **The happy path.**
 1. Open Place Board and choose **Custom shape**.

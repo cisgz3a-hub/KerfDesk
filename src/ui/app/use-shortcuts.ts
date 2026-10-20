@@ -13,6 +13,7 @@
 
 import { useEffect, useRef } from 'react';
 import { canvasKeysOwnedByJig, keyboardOwnedElsewhere } from '../common/keyboard-owner';
+import { toolPageOpen } from '../state/tool-page';
 import { usePlatform } from './platform-context';
 import { editingToolShortcutContext, handleEditingToolShortcut } from './editing-tool-shortcuts';
 import { arrangeShortcutContext, handleArrangeShortcut } from './arrange-shortcuts';
@@ -45,21 +46,25 @@ export function useShortcuts(): void {
     const onFileEditKey = (e: KeyboardEvent): void => {
       if (keyboardOwnedElsewhere()) return;
       if (handleSettingsShortcut(e, openSettings)) return;
-      if (handleCommandSearchShortcut(e, openCommandSearch)) return;
+      // A full page (ADR-641, ADR-636) hides the menus, the tools and the main
+      // canvas, so command search, tool and view keys have nothing on screen.
+      const pageOpen = toolPageOpen();
+      if (!pageOpen && handleCommandSearchShortcut(e, openCommandSearch)) return;
       if (handleFileShortcut(e, fileShortcutContext(platformRef.current))) return;
       if (canvasKeysOwnedByJig()) {
         handleHistoryShortcut(e, editShortcutContext());
         return;
       }
-      if (handleToolShortcut(e, TOOL_SHORTCUT_CONTEXT)) return;
+      if (!pageOpen && handleToolShortcut(e, TOOL_SHORTCUT_CONTEXT)) return;
       handleEditShortcut(e, editShortcutContext());
     };
     const onTransformViewKey = (e: KeyboardEvent): void => {
       if (keyboardOwnedElsewhere() || canvasKeysOwnedByJig()) return;
+      const pageOpen = toolPageOpen();
       if (handleArrangeShortcut(e, arrangeShortcutContext)) return;
-      if (handleEditingToolShortcut(e, editingToolShortcutContext())) return;
+      if (!pageOpen && handleEditingToolShortcut(e, editingToolShortcutContext())) return;
       if (handleTransformShortcut(e, transformShortcutContext())) return;
-      handleViewShortcut(e, VIEW_SHORTCUT_CONTEXT);
+      if (!pageOpen) handleViewShortcut(e, VIEW_SHORTCUT_CONTEXT);
     };
     window.addEventListener('keydown', onFileEditKey);
     window.addEventListener('keydown', onTransformViewKey);

@@ -32,8 +32,8 @@ import './place-board.css';
 
 const BOARD_JOG_FEED_MM_PER_MIN = 3000;
 
-// Place Board mode (ADR-636): like jig mode, the page takes the main canvas's
-// place while the machine panel stays docked beside it. This host is always
+// Place Board mode (ADR-636): like jig mode, a full page that takes the whole
+// window except the machine panel, docked beside it. This host is always
 // mounted, and reads only `open` and a few booleans, so it costs nothing while
 // a job streams. It owns the capture session, so Done and reopening resumes
 // it, and the positioning-light automation, so a light switched on for capture
@@ -107,7 +107,7 @@ function PlaceBoardPage({
   if (!open) return null;
   return (
     <section aria-label="Place board" className="lf-jig-editor">
-      <PlaceBoardHeader disabled={panelLocked} onDone={close} />
+      <PlaceBoardHeader step={step} onStep={setStep} disabled={panelLocked} onDone={close} />
       <div className="lf-jig-body">
         <PlaceBoardSidebar
           step={step}

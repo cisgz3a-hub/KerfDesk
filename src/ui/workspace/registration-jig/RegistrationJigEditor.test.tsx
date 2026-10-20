@@ -158,6 +158,29 @@ describe('Registration Jig mode', () => {
     expect(close).toHaveBeenCalledOnce();
     expect(useStore.getState().project).toBe(project);
   });
+  it('redraws the outlines as soon as the shape is switched, both ways', () => {
+    render();
+    const shapes = (): ReadonlyArray<string> =>
+      findRegistrationBoxes(useStore.getState().project.scene).map((box) => box.spec.kind);
+    const pick = (shape: 'circle' | 'rectangle'): void => {
+      const select = container.querySelector<HTMLSelectElement>(
+        'select[aria-label="Registration jig shape"]',
+      );
+      if (select === null) throw new Error('Missing shape picker');
+      act(() => {
+        select.value = shape;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    };
+    expect(shapes()).toEqual(['rect']);
+    pick('circle');
+    expect(shapes()).toEqual(['ellipse']);
+    expect(container.textContent).toContain('1 outlines');
+    pick('rectangle');
+    expect(shapes()).toEqual(['rect']);
+    pick('circle');
+    expect(shapes()).toEqual(['ellipse']);
+  });
   it('opens on the page itself so canvas keys reach it', () => {
     render();
     expect(document.activeElement?.getAttribute('aria-label')).toBe('Registration Jig');

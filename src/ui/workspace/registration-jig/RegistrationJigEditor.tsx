@@ -1,17 +1,16 @@
 import { useEffect, useRef } from 'react';
 import { findRegistrationBoxes } from '../../../core/scene';
-import { Button } from '../../kit';
-import { TutorialButton } from '../../tutorials/TutorialButton';
+import { ToolPageHeader } from '../ToolPageHeader';
 import { RegistrationJigCanvas } from './RegistrationJigCanvas';
-import { JigEditorSidebar } from './JigEditorSidebar';
+import { JIG_STEPS, JigEditorSidebar } from './JigEditorSidebar';
 import { JigSelectionBar } from './JigSelectionFields';
 import { handleJigEditorKey, useJigEditor, type JigEditorController } from './use-jig-editor';
 import './registration-jig.css';
 
 /**
- * Jig mode (ADR-641): the jig page takes the place of the main canvas while the
- * machine panel stays docked beside it, so the whole job, from laying out the
- * outlines to the last artwork burn, happens here. Edits go straight into the
+ * Jig mode (ADR-641): the jig page is a full page. It takes the whole window
+ * except the machine panel, docked beside it, so the whole job, from laying out
+ * the outlines to the last artwork burn, happens here. Edits go straight into the
  * open project with the ordinary Undo; there is nothing to save or discard.
  */
 export function RegistrationJigEditor(props: { readonly onClose: () => void }): JSX.Element {
@@ -79,20 +78,18 @@ function stopDrop(event: React.DragEvent): void {
 }
 
 function JigEditorHeader(props: { readonly editor: JigEditorController }): JSX.Element {
+  const { editor } = props;
   return (
-    <header className="lf-jig-header">
-      <strong>Registration Jig</strong>
-      <TutorialButton tutorialId="registration" compact label="Registration jig" />
-      <div className="lf-jig-actions">
-        <Button
-          variant="primary"
-          title="Go back to the main canvas. Your jig is already part of the project."
-          onClick={props.editor.done}
-        >
-          Done
-        </Button>
-      </div>
-    </header>
+    <ToolPageHeader
+      title="Registration jig"
+      tutorialId="registration"
+      steps={JIG_STEPS}
+      stepsLabel="Jig steps"
+      step={editor.step}
+      onStep={editor.setStep}
+      doneTitle="Back to the workspace as you left it. Your jig is already part of the project."
+      onDone={editor.done}
+    />
   );
 }
 

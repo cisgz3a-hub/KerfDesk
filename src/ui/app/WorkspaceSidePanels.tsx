@@ -62,29 +62,30 @@ export function WorkspaceSidePanels(): JSX.Element {
       data-layout="spacious"
       className="lf-workspace-panels"
     >
-      <div className="lf-workspace-panel-toggles">
-        {!jigOpen && (
+      {/* A full page keeps the machine panel docked: nothing to show or hide. */}
+      {!jigOpen && (
+        <div className="lf-workspace-panel-toggles">
           <PanelToggle
             label="Artwork"
             icon="panel-left"
             expanded={cutsOpen}
             onToggle={() => setCutsOpen((open) => !open)}
           />
-        )}
-        <PanelToggle
-          label="Machine"
-          icon="panel-right"
-          expanded={machineOpen}
-          onToggle={() => setMachineOpen((open) => !open)}
-        />
-      </div>
+          <PanelToggle
+            label="Machine"
+            icon="panel-right"
+            expanded={machineOpen}
+            onToggle={() => setMachineOpen((open) => !open)}
+          />
+        </div>
+      )}
       <div className="lf-workspace-desktop-panels">
         {cutsOpen && !jigOpen ? (
           <ResizablePanel label="Artwork" collapsed={!layersExpanded}>
             <CutsLayersPanel />
           </ResizablePanel>
         ) : null}
-        {machineOpen ? (
+        {machineOpen || jigOpen ? (
           <ResizablePanel label="Machine controls" collapsed={!machinePanel.isExpanded}>
             <div className="lf-workspace-machine-body">
               <LaserWindow dockedJobActions />

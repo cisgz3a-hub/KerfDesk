@@ -10,6 +10,7 @@ import { CommandShell } from '../commands';
 import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
 import { useUiStore } from '../state/ui-store';
+import { useToolPageOpen } from '../state/tool-page';
 import { useEdition } from '../licensing/edition';
 import { UpdatePrompt } from '../licensing/UpdatePrompt';
 import { LiveMotionBar, useJobShortcuts } from '../laser';
@@ -51,6 +52,7 @@ import { useShortcuts } from './use-shortcuts';
 import { useSingleArtworkSelection } from './use-single-artwork-selection';
 import { useOperationColorPeek } from './use-operation-color-peek';
 import { useSpacePan } from './use-space-pan';
+import { useToolPageRestore } from './use-tool-page-restore';
 import { useUnloadStop } from './use-unload-stop';
 import { useUnsavedChangesGuard } from './use-unsaved-changes-guard';
 import { useWindowTitle } from './use-window-title';
@@ -90,9 +92,7 @@ export function App(): JSX.Element {
         */}
         <WorkspaceSidePanels />
       </main>
-      <StatusBar>
-        <AutosaveRecoveryControl />
-      </StatusBar>
+      <WorkspaceStatusBar />
       {/* Window-level popups (ADR-207 amendment). Both are `position: fixed`,
           so they take no layout space anywhere: mounting either one cannot
           resize the workspace or shift the rails. Neither may overlay the
@@ -141,6 +141,7 @@ function AppLifecycle(): null {
   useJobShortcuts();
   useShortcuts();
   useSpacePan();
+  useToolPageRestore();
   useOperationColorPeek();
   useActiveJobWakeLock();
   useJobWatch();
@@ -153,11 +154,13 @@ function AppLifecycle(): null {
   return null;
 }
 
-// Jig mode (ADR-641) and Place Board mode (ADR-636) put their page where the
-// tool strip and the main canvas are. The side panels stay, so the machine
-// panel is docked beside the page from the first capture to the last burn.
-// The Place Board host is always mounted: it owns the capture session, so
-// leaving and reopening the page resumes it.
+// The Registration jig (ADR-641) and Place Board (ADR-636) are full pages: the
+// page takes the place of the tool strip and the main canvas, and the bars
+// above and below the workspace stand down (WorkspaceChromeBars,
+// WorkspaceStatusBar). The side panels show only the machine panel, docked
+// beside the page from the first capture to the last burn. The Place Board host
+// is always mounted: it owns the capture session, so leaving and reopening the
+// page resumes it.
 function WorkspaceCentre(): JSX.Element {
   const jigOpen = useUiStore((state) => state.registrationPanelOpen);
   const boardOpen = useUiStore((state) => state.boardCapturePanelOpen);
@@ -173,6 +176,17 @@ function WorkspaceCentre(): JSX.Element {
         </>
       )}
     </>
+  );
+}
+
+// The status bar reports on the main canvas (cursor, selection, zoom), which a
+// full page replaces, so it is not shown while the jig or Place Board is open.
+function WorkspaceStatusBar(): JSX.Element | null {
+  if (useToolPageOpen()) return null;
+  return (
+    <StatusBar>
+      <AutosaveRecoveryControl />
+    </StatusBar>
   );
 }
 

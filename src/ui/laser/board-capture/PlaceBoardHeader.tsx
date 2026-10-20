@@ -1,36 +1,33 @@
-// PlaceBoardHeader — the Place Board page's title bar (ADR-636), laid out like
-// jig mode's: the tool's name, its tutorial, and Done, which returns to the
-// main canvas. There is nothing to save: the board, the artwork and the
-// settings are already part of the project, with the ordinary Undo.
+// PlaceBoardHeader — the Place Board page's header (ADR-636), the same full-page
+// header as the jig's: Done, the page's name and tutorial, its three steps,
+// Undo/Redo and the machine connection. Done returns to the workspace as it
+// was; there is nothing to save: the board, the artwork and the settings are
+// already part of the project, with the ordinary Undo.
 
-import { Button } from '../../kit';
-import { TutorialButton } from '../../tutorials/TutorialButton';
+import { ToolPageHeader } from '../../workspace/ToolPageHeader';
+import { PLACE_BOARD_STEPS, type PlaceBoardStepId } from './PlaceBoardSidebar';
 
 export function PlaceBoardHeader(props: {
+  readonly step: PlaceBoardStepId;
+  readonly onStep: (step: PlaceBoardStepId) => void;
   readonly disabled: boolean;
   readonly onDone: () => void;
 }): JSX.Element {
   return (
-    <header className="lf-jig-header">
-      <strong>Place Board</strong>
-      <TutorialButton tutorialId="board" compact label="Place board" />
-      <span className="lf-jig-muted">
-        Capture the board, place the artwork and burn it, with the machine panel beside you
-      </span>
-      <div className="lf-jig-actions">
-        <Button
-          variant="primary"
-          disabled={props.disabled}
-          title={
-            props.disabled
-              ? 'Wait for the current capture or move to finish'
-              : 'Go back to the main canvas. The board and artwork are already part of the project.'
-          }
-          onClick={props.onDone}
-        >
-          Done
-        </Button>
-      </div>
-    </header>
+    <ToolPageHeader
+      title="Place board"
+      tutorialId="board"
+      steps={PLACE_BOARD_STEPS}
+      stepsLabel="Place board steps"
+      step={props.step}
+      onStep={props.onStep}
+      doneDisabled={props.disabled}
+      doneTitle={
+        props.disabled
+          ? 'Wait for the current capture or move to finish'
+          : 'Back to the workspace as you left it. The board and artwork are already part of the project.'
+      }
+      onDone={props.onDone}
+    />
   );
 }

@@ -1,16 +1,13 @@
-import { Button } from '../../kit';
 import { JigArtworkSettings } from './JigArtworkSettings';
 import { JigArtworkStep } from './JigArtworkStep';
 import { JigBurnPanel } from './JigBurnPanel';
 import { JigOutlinesStep } from './JigOutlinesStep';
 import { changeJigDraft } from './jig-editor-session';
+import type { ToolPageStep } from '../ToolPageHeader';
 import type { JigEditorController, JigStep } from './use-jig-editor';
 
-const STEPS: ReadonlyArray<{
-  readonly id: JigStep;
-  readonly label: string;
-  readonly title: string;
-}> = [
+/** The page header's step indicator, in the order of the job. */
+export const JIG_STEPS: ReadonlyArray<ToolPageStep<JigStep>> = [
   {
     id: 'outlines',
     label: '1 Burn outlines',
@@ -29,8 +26,9 @@ const STEPS: ReadonlyArray<{
 ];
 
 /**
- * The three steps of a jig job (ADR-641). Each step stays mounted while hidden,
- * so half-typed layout fields or a loaded trace survive a look at another step.
+ * The three steps of a jig job (ADR-641), chosen in the page header. Each step
+ * stays mounted while hidden, so half-typed layout fields or a loaded trace
+ * survive a look at another step.
  * Editing pauses while the machine runs; Frame and Start stay in reach. The
  * selection's position and size sit on a bar above the jig canvas.
  */
@@ -42,7 +40,6 @@ export function JigEditorSidebar({
   const step = editor.step;
   return (
     <aside className="lf-jig-sidebar">
-      <JigStepTabs editor={editor} />
       {editor.readOnly && (
         <p className="lf-jig-notice" role="status">
           Editing is paused while the machine runs.
@@ -73,22 +70,5 @@ export function JigEditorSidebar({
         <JigBurnPanel editor={editor} run="artwork" />
       </section>
     </aside>
-  );
-}
-
-function JigStepTabs({ editor }: { readonly editor: JigEditorController }): JSX.Element {
-  return (
-    <div className="lf-jig-tabs" role="group" aria-label="Jig steps">
-      {STEPS.map((step) => (
-        <Button
-          key={step.id}
-          pressed={editor.step === step.id}
-          title={step.title}
-          onClick={() => editor.setStep(step.id)}
-        >
-          {step.label}
-        </Button>
-      ))}
-    </div>
   );
 }

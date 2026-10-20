@@ -20,20 +20,17 @@ import { PhotoEngravingDialogHost } from '../raster/PhotoEngravingDialogHost';
 import { type ConvertibleVector } from '../raster/vector-to-bitmap';
 import { usePlatform } from '../app/platform-context';
 import { useImportDragDrop } from '../app/use-import-drag-drop';
-import { Toolbar } from '../common/Toolbar';
-import { AppMenuBar } from './AppMenuBar';
 import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
 import { ConvertBitmapDialogHost } from './ConvertBitmapDialogHost';
 import { runImagePickAction } from './image-pick-action';
 import { MultiFileTraceDialogHost } from './MultiFileTraceDialog';
 import { MultiFileTraceProgressPanel } from './MultiFileTraceProgress';
-import { WorkspaceTopBar } from './WorkspaceTopBar';
 import { ProjectNotesDialog } from './ProjectNotesDialog';
 import { selectedConvertibleVectors, selectedObjectIds } from './selection-command-state';
 import { UndoHistoryDialog } from './UndoHistoryDialog';
 import { useAppCommands } from './use-app-commands';
 import { useGcodeInspectorSlot } from './use-gcode-inspector-slot';
-import { WorkspaceContextBar } from './WorkspaceContextBar';
+import { WorkspaceChromeBars } from './WorkspaceChromeBars';
 import { ArrayDialogHost } from './ArrayDialogHost';
 import { CopyAlongPathDialogHost } from './CopyAlongPathDialogHost';
 import { OptimizeShapesDialogHost } from './OptimizeShapesDialogHost';
@@ -120,10 +117,7 @@ export function CommandShell(): JSX.Element {
   });
   return (
     <>
-      <AppMenuBar commands={commands} machineKind={machineKind} />
-      <Toolbar commands={commands} machineKind={machineKind} />
-      <WorkspaceTopBar />
-      <WorkspaceContextBar commands={commands} />
+      <WorkspaceChromeBars commands={commands} machineKind={machineKind} />
       <BitmapDialog />
       {adjustDialogOpen && selectedRaster !== null ? (
         <AdjustDialog image={selectedRaster} onClose={() => setAdjustDialogOpen(false)} />

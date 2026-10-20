@@ -26,19 +26,35 @@ would open behind it. It covered the machine panel and suspended the app's short
 
 ### Decision
 
-1. **Jig mode replaces the main canvas, not the app.** Registration Jig and **Edit jig** put the
-   jig page where the tool strip and the main canvas are. The menu bar, the status bar and the
-   machine panel stay. Dialogs, alarms and the live motion bar stack above the page as they do
-   over the main canvas. The page is not a modal, so machine shortcuts work. The main canvas's
-   tool, edit and view shortcuts stand down while the page handles its own canvas keys. Undo and
-   Redo stay the project's own. The side panels show only the machine panel: the jig page has its
-   own artwork and laser settings, and the Artwork panel would offer a second way to change them.
+1. **Jig mode is a full page beside the machine panel.** Registration Jig and **Edit jig** open
+   the jig page over the whole window except the machine panel, which stays docked beside it with
+   all its controls. The app menu bar, the toolbar, the object/placement bar, the tool strip, the
+   Artwork panel, the canvas context bar and the status bar are not shown, and the main canvas is
+   not mounted, so the page reads as a page of its own, not a different canvas. The page's header
+   stands in for the bars: a primary **Done** with a back arrow, the title **Registration jig** and
+   its tutorial, the step indicator (the three steps of item 4, the current one marked), the
+   project's Undo and Redo, and the workspace's own machine connection (Connect, the machine
+   picker and the safety notice), moved from the top bar rather than copied, so there is still
+   one of each. **Done** restores the workspace exactly as it was when the page opened: the bars,
+   the panels, the main canvas's zoom and pan, and the selection (less anything deleted on the
+   page; a project opened meanwhile keeps its own). Dialogs (Job Review among them), alarms and
+   the live motion bar stack above the page as they do over the main canvas, and the machine
+   panel keeps Stop, the alarm banner and jogging in view. The page is not a modal, so machine
+   shortcuts work. The main canvas's tool, edit and view shortcuts and the command search
+   (Ctrl+K) stand down while the page handles its own canvas keys; file shortcuts such as Save
+   still work. Undo and Redo stay the project's own. The jig page has its own artwork and laser
+   settings, and the Artwork panel would offer a second way to change them.
+   **The menu bar is hidden, not reduced.** Every menu acts on the main canvas or opens a tool of
+   its own, and a reduced menu would be a second, smaller copy of the header. What the page needs
+   from it is in the header (Done, Undo, Redo, the tutorial) or on the keyboard (Save, Open). On
+   macOS the system menu bar keeps its standard App, File, Edit and Window roles.
 2. **Edits go straight into the open project.** There is no draft, so **Save to canvas**,
    **Close without saving**, the **Save jig changes?** prompt, the unsaved-changes footer and the
    ADR-606 Amendment 1 rebase are removed. Each jig edit is one ordinary undoable project edit.
    A selection change adds no undo step, and an edit that changes nothing is not recorded.
-   **Done** returns to the main canvas, as does **Registration Jig** in the Tools menu; either way
-   the outlines leave the selection, which the main canvas cannot edit. Escape only clears the
+   **Done** returns to the workspace as item 1 describes (leaving any other way, such as the
+   Registration Jig command, does the same); either way the outlines leave the selection,
+   which the main canvas cannot edit. Escape only clears the
    selection; it never leaves jig mode. Opening another project leaves jig mode.
 3. **Outlines stay locked in the project.** Every jig edit locks the outlines again before it
    reaches the project, so a stray drag on the main canvas still cannot move them. The jig page
@@ -101,7 +117,13 @@ for another project or by the Tools menu with the outlines dropped from the sele
 panels test keeps the machine panel's job actions when the jig page has no burn panel, and
 otherwise shows only the
 machine panel without its job actions in jig mode; the shortcut test shows the canvas keys
-standing down while Undo still works. The completion simulator test checks the run phase after a
+standing down while Undo still works. The full-page test mounts the app and checks, for the jig
+page and Place Board, that the menu bar, toolbar, tool strip, Artwork panel and status bar are
+gone while the machine panel stays, that the header holds the title, three steps with one
+current, a primary Done, Undo and the only machine connection, that the live motion bar still
+shows, that Ctrl+K and the view keys stand down, and that Done brings back the bars, the zoom,
+the pan and the selection. A jig page test switches the outline shape between rectangle and
+circle and checks the project's outlines change each time. The completion simulator test checks the run phase after a
 clean and a rejected outline run. No hardware was run.
 
 ### Amendment 1 - Fewer controls, and Clear canvas (2026-10-19)

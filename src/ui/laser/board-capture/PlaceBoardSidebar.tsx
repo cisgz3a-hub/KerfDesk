@@ -1,11 +1,12 @@
 // PlaceBoardSidebar — the Place Board page's three steps (ADR-636), laid out
-// like jig mode's: 1 capture the board, 2 place the artwork, 3 burn. Each step
-// stays mounted while hidden, so a half-typed size or margin survives a look
-// at another step.
+// like jig mode's: 1 capture the board, 2 place the artwork, 3 burn, chosen in
+// the page header. Each step stays mounted while hidden, so a half-typed size
+// or margin survives a look at another step.
 
 import { Button } from '../../kit';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
+import type { ToolPageStep } from '../../workspace/ToolPageHeader';
 import { BoardCapturePhase } from './BoardCapturePhase';
 import { BoardPointerBar } from './BoardPointerBar';
 import { BoardShapeToggle } from './BoardShapeToggle';
@@ -20,11 +21,8 @@ import type { BoardVerificationController } from './use-board-verification';
 
 export type PlaceBoardStepId = 'board' | 'artwork' | 'burn';
 
-const STEPS: ReadonlyArray<{
-  readonly id: PlaceBoardStepId;
-  readonly label: string;
-  readonly title: string;
-}> = [
+/** The page header's step indicator, in the order of the job. */
+export const PLACE_BOARD_STEPS: ReadonlyArray<ToolPageStep<PlaceBoardStepId>> = [
   {
     id: 'board',
     label: '1 Capture board',
@@ -59,18 +57,6 @@ export function PlaceBoardSidebar(props: PlaceBoardSidebarProps): JSX.Element {
   const geometry = props.capture.state.committed ? props.capture.state.geometry : null;
   return (
     <aside className="lf-jig-sidebar lf-place-board">
-      <div className="lf-jig-tabs" role="group" aria-label="Place board steps">
-        {STEPS.map((entry) => (
-          <Button
-            key={entry.id}
-            pressed={step === entry.id}
-            title={entry.title}
-            onClick={() => onStep(entry.id)}
-          >
-            {entry.label}
-          </Button>
-        ))}
-      </div>
       <PanelMessages connected={props.connected} handlers={props.handlers} />
       <section className="lf-jig-fields" aria-label="Capture the board" hidden={step !== 'board'}>
         <BoardPointerBar pointer={props.pointer} connected={props.connected} />

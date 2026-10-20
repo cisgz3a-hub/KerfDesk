@@ -70,9 +70,13 @@ board.
    use the device origin's axis directions, so they match the physical board on every origin
    corner. Front-left and centre origins behave exactly as before.
 8. **Place Board mode.** A floating card over the canvas covered the artwork it was meant to place,
-   so Place Board became a page, built like jig mode (ADR-641): it takes the place of the tool
-   strip and the main canvas while the machine panel (connect, jog, positioning light) stays
-   docked beside it, and the whole job happens there, from the first capture to the last burn.
+   so Place Board became a full page, built like jig mode (ADR-641 item 1): it takes the whole
+   window except the machine panel (jog, positioning light, Stop and alarms), which stays docked
+   beside it. The menu bar, toolbar, object/placement bar, tool strip, Artwork panel and status
+   bar are not shown, and the whole job happens on the page, from the first capture to the last
+   burn. Its header is the jig page's: a primary **Done** with a back arrow, the title **Place
+   board** and its tutorial, the step indicator, Undo and Redo, and the workspace's machine
+   connection (Connect, the machine picker and the safety notice), moved from the top bar.
    Its three steps are **1 Capture board** (shape tiles, the pointer bar, the capture card, then
    the measured board and its checks), **2 Place artwork** (Import artwork, the placement grid,
    Fit to board, Fill with copies) and **3 Burn** (power, speed and passes for the operations the
@@ -83,7 +87,10 @@ board.
    editing canvas on the open project, so artwork is moved, resized and rotated on the board
    with ordinary Undo; over it the page paints the points captured so far, the outline they
    make, the live head or pointer crosshair and the board's check points. Done returns to the
-   main canvas; there is nothing to save. Opening Place Board closes jig mode and the reverse.
+   workspace exactly as it was when the page opened (bars, panels, the main canvas's zoom and
+   pan, and the selection); there is nothing to save. The main canvas's tool and view keys and
+   the command search stand down while the page is open; selection edits, arrange and nudge keys
+   still act on the artwork shown on the page's canvas. Opening Place Board closes jig mode and the reverse.
 9. **The outline where the board is.** The captured outline is drawn where the board sits on the
    bed, from its machine position, so it lines up with the captured points and the head marker.
    This is display only, since the burn is anchored to the work origin; when the position is
@@ -113,5 +120,6 @@ correction), the rectangle and circle check points, rectangle corrections, the f
 and the pointer offset on every origin corner, the offset G92 and its refusal when unconfirmed,
 the nine-point placement on rectangles, circles, a triangle and an L-shape, the
 reducer's origin-advance rule, and the panel flows, including the pointer switching on for capture
-and off after it. The panel was checked in the browser build. It has not been run on hardware:
+and off after it. The app-level full-page test covers the page's hidden workspace bars, its
+header and the Done round trip, as for the jig page. The page was checked in the browser build. It has not been run on hardware:
 the positioning light and the offset G92 still need an air test on a machine.

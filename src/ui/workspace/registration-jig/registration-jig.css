@@ -35,11 +35,43 @@
 .lf-jig-footer {
   border-top: 1px solid var(--lf-border);
 }
-.lf-jig-actions {
+/* A full page's header (ADR-641, ADR-636) stands in for the workspace's bars:
+   Done and the page's title, its steps, then Undo/Redo and the machine
+   connection on the right, where the workspace keeps them. */
+.lf-tool-page-header {
+  padding: 8px 12px;
+  gap: 8px 16px;
+}
+.lf-tool-page-lead {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
+}
+.lf-tool-page-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.lf-tool-page-steps {
+  flex: 1 1 auto;
+  justify-content: center;
   flex-wrap: wrap;
+}
+.lf-tool-page-steps [aria-current='step'] {
+  font-weight: 600;
+}
+.lf-tool-page-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-left: auto;
+  min-width: 0;
+}
+.lf-tool-page-tools .lf-machine-toolbar {
+  flex: 0 1 auto;
+  padding: 0;
 }
 .lf-jig-body {
   display: flex;
@@ -159,7 +191,7 @@
     gap: 6px;
     padding: 8px;
   }
-  .lf-jig-actions {
+  .lf-tool-page-tools {
     margin-left: 0;
   }
 }

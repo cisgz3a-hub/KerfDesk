@@ -66,7 +66,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Create a rectangle for the keychain’s bounds',
         examplePhase: 0,
         instruction:
-          'Registration Jig opens jig mode on 1 Burn outlines, with the machine panel beside it. For this rounded rectangular leather blank, choose Rectangle and enter its measured overall W and H. Keep one row and one column; each change applies when you press Enter or leave the field. Drag the outline over the fixed wood if needed. Establish the job’s placement and origin before either run.',
+          'Registration Jig opens the jig as its own page on 1 Burn outlines: the toolbars and Artwork panel step aside, the machine panel stays beside it, and Connect sits in the page header. For this rounded rectangular leather blank, choose Rectangle and enter its measured overall W and H. Keep one row and one column; each change applies when you press Enter or leave the field. Drag the outline over the fixed wood if needed. Establish the job’s placement and origin before either run.',
         focus: 'Rectangle = the leather blank’s overall bounds',
         result:
           'The rectangle locates the blank’s outside edges; it does not copy its rounded corners.',
@@ -99,7 +99,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
           'The artwork is engraved on the leather keychain; the locating outline remains on the wood underneath.',
       },
     ],
-    tip: 'For a batch, create a Rows × Columns grid, burn all outlines, place one blank in each, and import one design: it is copied onto every piece. Each of the two output jobs needs its own completed Frame.',
+    tip: 'For a batch, create a Rows × Columns grid, burn all outlines, place one blank in each, and import one design: it is copied onto every piece. Each of the two output jobs needs its own completed Frame. Done, top left of the page, brings back the workspace as you left it.',
     keywords: [
       'registration',
       'jig',
@@ -123,7 +123,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 4,
-    location: 'Tools → Place Board (its own page, beside the machine panel)',
+    location: 'Tools → Place Board (a full page, beside the machine panel)',
     prerequisites:
       'A connected machine with a current position and the actual board secured in place.',
     visual: 'board',
@@ -131,7 +131,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Step 1: choose the board shape',
         instruction:
-          'Open Tools → Place Board; the page replaces the canvas and the machine panel stays on the right for jogging. Choose Rectangle, Circle or Custom shape. If Machine Setup has a positioning light, it switches on so you can aim with the red dot. For a rectangle, capture the front-left corner first when you can; it sets the work origin. For a circle, choose Find center from rim or Center already marked.',
+          'Open Tools → Place Board; it opens as its own page, with Connect in its header and the machine panel on the right for jogging. Done, top left, brings back the workspace as you left it. Choose Rectangle, Circle or Custom shape. If Machine Setup has a positioning light, it switches on so you can aim with the red dot. For a rectangle, capture the front-left corner first when you can; it sets the work origin. For a circle, choose Find center from rim or Center already marked.',
         focus: 'Rectangle, circle or custom shape',
         result: 'The chosen capture method matches how you can locate the physical board.',
       },
