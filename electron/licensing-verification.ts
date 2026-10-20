@@ -18,6 +18,8 @@ export type LicenceClaims = {
   readonly updatesUntil: number | null;
   readonly perpetualUpdates: boolean;
   readonly maxDevices: 3;
+  /** The nonce of the refresh request this grant answers; older services sign none (ADR-592 Amendment 1). */
+  readonly refreshNonce?: string;
 };
 
 export type PublicKeys = Readonly<Record<string, string>>;
@@ -80,7 +82,15 @@ export function verifyEntitlement(
     value.maxDevices !== 3
   )
     return null;
-  return validRights(value) ? (value as LicenceClaims) : null;
+  return validRights(value) && validNonce(value) ? (value as LicenceClaims) : null;
+}
+
+/** 32 random bytes as 43 base64url characters, like the device ID, when a refresh sent one. */
+function validNonce(value: Record<string, unknown>): boolean {
+  return (
+    value.refreshNonce === undefined ||
+    (typeof value.refreshNonce === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value.refreshNonce))
+  );
 }
 
 function validRights(value: Record<string, unknown>): boolean {
