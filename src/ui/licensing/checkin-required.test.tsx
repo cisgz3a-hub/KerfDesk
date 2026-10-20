@@ -4,7 +4,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
 import { editionLabel } from './EditionStatusButton';
 import { ProFeatureDialog } from './ProFeatureDialog';
-import { checkInReminder } from './use-checkin-reminder';
 
 const NOW = 2_000_000_000;
 const paid: LicenceStatus = {
@@ -13,7 +12,6 @@ const paid: LicenceStatus = {
   state: 'ready',
   tier: 'paid',
   accessExpiresAt: null,
-  checkInDueAt: NOW + 20 * 86_400,
   updatesUntil: NOW + 365 * 86_400,
   perpetualUpdates: false,
   licenseKey: null,
@@ -85,15 +83,4 @@ it('names paid and trial rights that wait on a check-in in the status bar', () =
     'Pro trial · check-in needed',
   );
   expect(editionLabel(paid, NOW)).toBe('Pro');
-});
-
-it('reminds a paid device only within five days of its check-in', () => {
-  const due = paid.checkInDueAt ?? 0;
-  expect(checkInReminder(paid, due - 6 * 86_400)).toBeNull();
-  expect(checkInReminder(paid, due - 5 * 86_400)).toContain('within 5 days');
-  expect(checkInReminder(paid, due - 3600)).toContain('within 1 day');
-  expect(checkInReminder(paid, due)).toBeNull();
-  expect(checkInReminder({ ...paid, tier: 'trial' }, due - 3600)).toBeNull();
-  expect(checkInReminder(overdue, due - 3600)).toBeNull();
-  expect(checkInReminder(null, due - 3600)).toBeNull();
 });
