@@ -368,4 +368,9 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'help',
     tooltip: 'Machine-safety and liability information — read before running a job.',
   },
+  'help.license-notice': {
+    family: 'help',
+    tooltip:
+      'Read the KerfDesk License & Safety Notice: the licence and safety terms the installer shows, on every system.',
+  },
 };

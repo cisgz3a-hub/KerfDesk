@@ -1,7 +1,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createProject, IDENTITY_TRANSFORM, type TracedImage } from '../../../core/scene';
+import {
+  createProject,
+  IDENTITY_TRANSFORM,
+  type RasterImage,
+  type TracedImage,
+} from '../../../core/scene';
 import { DEFAULT_TRACE_OPTIONS } from '../../../core/trace';
 import { useJigTraceCommit } from './jig-trace-commit';
 import { buildJigTraceObject } from './jig-trace-import';
@@ -26,6 +31,19 @@ const preparedTrace = {
   result: { paths: [], bounds: traced.bounds, width: 10, height: 10 },
 };
 const onImport = vi.fn();
+const onTraceImage = vi.fn();
+const image: RasterImage = {
+  kind: 'raster-image',
+  id: 'photo',
+  source: 'logo.png',
+  pixelWidth: 10,
+  pixelHeight: 10,
+  bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+  transform: IDENTITY_TRANSFORM,
+  color: '#123456',
+  dither: 'threshold',
+  linesPerMm: 10,
+};
 let host: HTMLDivElement;
 let root: Root;
 let state: ReturnType<typeof useJigTraceCommit>;
@@ -38,6 +56,7 @@ function Harness(): null {
 }
 beforeEach(() => {
   onImport.mockClear();
+  onTraceImage.mockClear();
   vi.mocked(buildJigTraceObject).mockImplementation(
     () =>
       new Promise((done) => {
@@ -48,7 +67,9 @@ beforeEach(() => {
     project: createProject(),
     source,
     options,
+    selectedIds: new Set(),
     onImport,
+    onTraceImage,
     onBusyChange: vi.fn(),
     preview: { kind: 'ready', svg: '<svg/>', paths: [], width: 10, height: 10, preparedTrace },
   };
@@ -103,5 +124,44 @@ describe('inline jig trace commit fencing', () => {
       await pending;
     });
     expect(onImport).not.toHaveBeenCalled();
+  });
+});
+
+describe('tracing an image already on the jig', () => {
+  function withImage(): void {
+    const project = createProject();
+    props = {
+      ...props,
+      project: { ...project, scene: { ...project.scene, objects: [image] } },
+      source: { ...source, image },
+    };
+    act(() => root.render(<Harness />));
+  }
+
+  it('replaces that image instead of adding the trace as new artwork', async () => {
+    withImage();
+    let pending!: Promise<void>;
+    act(() => {
+      pending = state.commit();
+    });
+    await act(async () => {
+      resolve(traced);
+      await pending;
+    });
+    expect(onTraceImage).toHaveBeenCalledExactlyOnceWith(image.id, traced);
+    expect(onImport).not.toHaveBeenCalled();
+    expect(state.success).toBe(true);
+  });
+
+  it('refuses before tracing when the image has left the jig', async () => {
+    withImage();
+    props = { ...props, project: createProject() };
+    act(() => root.render(<Harness />));
+    await act(async () => {
+      await state.commit();
+    });
+    expect(buildJigTraceObject).not.toHaveBeenCalled();
+    expect(onTraceImage).not.toHaveBeenCalled();
+    expect(state.error).toContain('no longer on the jig');
   });
 });

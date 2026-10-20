@@ -4,6 +4,7 @@ import {
   type Project,
   type SceneObject,
   type TextObject,
+  type TracedImage,
 } from '../../../core/scene';
 import { useStore } from '../../state';
 import { reportDependencyRepairs } from '../../state/object-delete-actions';
@@ -25,6 +26,7 @@ import {
   deleteJigArtworkWithRepairs,
   importJigArtwork,
   nudgeJigSelection,
+  traceJigImage,
   upsertJigText,
   type JigImportPlacement,
 } from './jig-editor-artwork';
@@ -52,6 +54,11 @@ export function useJigEditor(onClose: () => void) {
   );
   const onUpsert = useCallback(
     (object: TextObject) => setSession((current) => upsertJigText(current, object)),
+    [],
+  );
+  const onTraceImage = useCallback(
+    (imageId: string, traced: TracedImage) =>
+      setSession((current) => traceJigImage(current, imageId, traced)),
     [],
   );
   const artworkImport = useJigArtworkImport(onImport, working.onImportBusy);
@@ -87,6 +94,7 @@ export function useJigEditor(onClose: () => void) {
     onSelect,
     onImport,
     onUpsert,
+    onTraceImage,
     onReplaceLayout,
     onRemoveLayout,
     onTextBusy: working.onTextBusy,

@@ -32,7 +32,10 @@ import { provisionalResetCanvasPatch } from './laser-reset-terminal-state';
 import { DISCONNECT_WRITE_TIMEOUT_MS } from './laser-reset-ownership';
 import { publishControllerIncident } from './laser-incident-publish';
 import type { TranscriptSource } from './laser-transcript';
-import { positioningLightDisconnectOff } from './positioning-light-actions';
+import {
+  falconPointerOffOnDisconnect,
+  positioningLightDisconnectOff,
+} from './positioning-light-actions';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -57,6 +60,8 @@ export async function stopBeforeDisconnect(
   // A light KerfDesk switched on over this connection is switched off with the
   // other cleanup lines, best effort: it never blocks or fails Disconnect.
   const lightOff = positioningLightDisconnectOff(get(), refs);
+  // The Falcon pointer has no G-code: it goes off over the network (ADR-635).
+  falconPointerOffOnDisconnect(get(), refs);
   if (isGrblFamilyDriver(refs.driver)) {
     await runGrblDisconnectTransaction(set, refs, safeWrite, {
       keepErroredStreamer: true,
