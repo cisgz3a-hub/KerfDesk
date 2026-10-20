@@ -18,7 +18,7 @@ it('keeps Z-only point-Frame programs runnable with their warning and exact byte
     });
   });
   if (result.kind !== 'ready') throw new Error(result.reasons.join());
-  expect(result.run.gcode).toBe('G21G90\nG21G90\nG1Z-1F100\nM5\n');
+  expect(result.run.gcode).toBe('G17G21G90G94G0\nG21G90\nG1Z-1F100\nM5\n');
   expect(result.run.start).toEqual(start);
   expect(result.run.envelope).toEqual({ minX: 0, minY: 0, maxX: 0, maxY: 0 });
   const warnings = result.review.warnings.join();

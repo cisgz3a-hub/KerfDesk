@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   createExternalProgramNormalizer,
+  externalProgramBaseline,
   sourceLines,
   type ExternalProgramResult,
 } from '../../core/external-program';
@@ -22,8 +23,9 @@ const LINES_PER_SLICE = 20_000;
 export async function normalizeInSlices(
   text: string,
   live: () => boolean,
+  baseline?: string,
 ): Promise<ExternalProgramResult | null> {
-  const normalizer = createExternalProgramNormalizer();
+  const normalizer = createExternalProgramNormalizer(baseline);
   let count = 0;
   for (const line of sourceLines(text)) {
     normalizer.push(line);
@@ -36,22 +38,25 @@ export async function normalizeInSlices(
   return normalizer.finish();
 }
 
-/** The normalized program, or null while it is being made. */
+/** The normalized program, or null while it is being made. Its baseline
+ * line is the one the active controller accepts (externalProgramBaseline). */
 export function useNormalizedProgram(text: string): ExternalProgramResult | null {
+  const baseline = externalProgramBaseline(useLaserStore((state) => state.activeControllerKind));
   const [result, setResult] = useState<{
     readonly text: string;
+    readonly baseline: string;
     readonly value: ExternalProgramResult;
   } | null>(null);
   useEffect(() => {
     let live = true;
-    void normalizeInSlices(text, () => live).then((value) => {
-      if (live && value !== null) setResult({ text, value });
+    void normalizeInSlices(text, () => live, baseline).then((value) => {
+      if (live && value !== null) setResult({ text, baseline, value });
     });
     return () => {
       live = false;
     };
-  }, [text]);
-  return result?.text === text ? result.value : null;
+  }, [text, baseline]);
+  return result?.text === text && result.baseline === baseline ? result.value : null;
 }
 
 // A thousandth of a millimetre, the reports' own resolution, so report noise

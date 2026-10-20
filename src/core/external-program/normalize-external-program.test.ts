@@ -3,6 +3,7 @@ import {
   EXTERNAL_PROGRAM_BASELINE,
   canonicalLine,
   createExternalProgramNormalizer,
+  externalProgramBaseline,
   normalizeExternalProgram,
   sourceLines,
   stripComments,
@@ -70,6 +71,34 @@ describe('external G-code program normalization (ADR-630)', () => {
     expect(reasons('/$J=G91 G21 X100 F600\n')[0]).toContain('Line 1 is a $ controller command');
     expect(reasons('G0 X0\n / $H\n')[0]).toContain('Line 2 is a $ controller command ($H)');
     expect(sent('/G1 X10 F100\n')).toBe(`${BASE}G1X10F100\n`);
+  });
+
+  it('sets every mode the review assumes, in a form each controller accepts', () => {
+    // GRBL keeps plane, units, distance, feed and motion modes between
+    // programs, so G19 or a modal G2 left by the Console would bend the path.
+    expect(EXTERNAL_PROGRAM_BASELINE).toBe('G17G21G90G94G0');
+    for (const kind of ['grbl-v1.1', 'grblhal', 'fluidnc'] as const) {
+      expect(externalProgramBaseline(kind)).toBe(EXTERNAL_PROGRAM_BASELINE);
+    }
+    // Marlin stops a job at G94 (and G17 without CNC_WORKSPACE_PLANES).
+    expect(externalProgramBaseline('marlin')).toBe('G21G90');
+    expect(externalProgramBaseline('smoothieware')).toBe('G17G21G90G0');
+    expect(normalizeExternalProgram('X1\n', 'G21G90')).toMatchObject({
+      kind: 'ok',
+      program: { gcode: 'G21G90\nX1\n', baseline: 'G21G90' },
+    });
+  });
+
+  it('removes realtime bytes inside a comment with the comment, so they never reach the controller', () => {
+    expect(sent('G1 X10 F100 ; hold!\n(feed ~ ?)\nM5\n')).toBe(`${BASE}G1X10F100\nM5\n`);
+    // Outside a comment they are refused.
+    expect(reasons('G1 X10 F100 !\n')[0]).toContain('realtime command');
+  });
+
+  it('refuses a checksum-framed line, which normalizing would break', () => {
+    expect(reasons('N1 G1 X10 F100*42\n')[0]).toContain(
+      'Line 1 (N1G1X10F100*42) carries a checksum',
+    );
   });
 
   it("refuses FluidNC's bracket commands, which run as $ commands", () => {

@@ -241,7 +241,7 @@ function envelopeOf(model: ReviewModel): ExternalProgramEnvelope | null {
   return { minX: bounds.minX, minY: bounds.minY, maxX: bounds.maxX, maxY: bounds.maxY };
 }
 
-// The run's first line is KerfDesk's G21G90 baseline (EXTERNAL_PROGRAM_BASELINE),
+// The run's first line is KerfDesk's baseline (externalProgramBaseline),
 // so it is not one of the program's own unit choices.
 function programUnitEvents(model: ReviewModel): ReadonlyArray<'mm' | 'inch'> {
   return model.events.flatMap((event) =>

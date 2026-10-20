@@ -62,7 +62,9 @@ describe('Run G-code file dialog (ADR-630)', () => {
   it('reviews what will be sent and keeps Start locked until a Frame', async () => {
     const body = await show('(job)\nG21 G90\nG0 X10 Y5\nM4 S500\nG1 X60 Y45 F1000\nM5\n');
     expect(body.textContent).toContain('6 lines');
-    expect(body.textContent).toContain('G21 G90 first');
+    expect(body.textContent).toContain(
+      'G17 G21 G90 G94 G0 (XY plane, millimetres, absolute moves, feed per minute, rapid motion) first',
+    );
     expect(body.textContent).toContain('/ marks, % markers and blank lines left out');
     expect(body.textContent).toContain('50 mm × 40 mm');
     expect(body.textContent).toContain('millimetres (G21)');
@@ -98,7 +100,7 @@ describe('Run G-code file dialog (ADR-630)', () => {
     await act(async () => button(body, 'Frame').click());
     expect(frame).toHaveBeenCalledWith(
       expect.objectContaining({
-        gcode: 'G21G90\nG21G90\nG0X0Y0\nM4S500\nG1X10F600\nG1X100\nM5\n',
+        gcode: 'G17G21G90G94G0\nG21G90\nG0X0Y0\nM4S500\nG1X10F600\nG1X100\nM5\n',
         envelope: { minX: 0, minY: 0, maxX: 100, maxY: 0 },
       }),
     );
@@ -132,7 +134,7 @@ describe('Run G-code file dialog (ADR-630)', () => {
     await act(async () => button(body, 'Start').click());
     expect(startJob).toHaveBeenCalledTimes(1);
     const [gcode] = startJob.mock.calls[0] as unknown as [string];
-    expect(gcode).toBe('G21G90\nG21G90\nG0X0Y0\nM4S500\nG1X10F600\nM5\n');
+    expect(gcode).toBe('G17G21G90G94G0\nG21G90\nG0X0Y0\nM4S500\nG1X10F600\nM5\n');
     expect(onStarted).toHaveBeenCalledTimes(1);
   });
 
@@ -198,7 +200,7 @@ describe('Run G-code file dialog (ADR-630)', () => {
     await act(async () => button(body, 'Frame').click());
     expect(frame).toHaveBeenCalledWith(
       expect.objectContaining({
-        gcode: 'G21G90\nG21G90\nG0X10Y0\nG10L20P1X0Y0\nM4S500\nG1X20F600\nM5\n',
+        gcode: 'G17G21G90G94G0\nG21G90\nG0X10Y0\nG10L20P1X0Y0\nM4S500\nG1X20F600\nM5\n',
       }),
     );
   });

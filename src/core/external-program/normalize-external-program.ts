@@ -5,7 +5,9 @@
 // the same words the controller runs (`G 1 X1 0 0` is `G1X100`). Other control
 // characters GRBL discards the same way (a DOS end-of-file Ctrl-Z, a form
 // feed) go too. '%' tape markers and blank lines are dropped, and one baseline
-// line, `G21G90`, goes first, so a millimetre/absolute mode left by an earlier
+// line goes first, setting every mode the review reads the program in that the
+// controller keeps between programs (`G17G21G90G94G0` on GRBL), so a plane,
+// unit, distance, feed or motion mode left by the Console or an earlier
 // program cannot change what was framed.
 //
 // Refusals are factual (what the controller would act on, or cannot take as a
@@ -27,11 +29,14 @@
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/grbl.h
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L291-L328
 
+import type { ControllerKind } from '../devices';
 import { controllerBlockRejection } from './controller-block-check';
 
 export type ExternalProgram = {
   /** One line per sent line, each ending in '\n', the baseline first. */
   readonly gcode: string;
+  /** The baseline line sent first (externalProgramBaseline). */
+  readonly baseline: string;
   readonly lineCount: number;
   readonly byteCount: number;
   /** Source lines dropped because they held only a comment, '%' or nothing. */
@@ -43,8 +48,36 @@ export type ExternalProgramResult =
   | { readonly kind: 'ok'; readonly program: ExternalProgram }
   | { readonly kind: 'refused'; readonly reasons: ReadonlyArray<string> };
 
-/** Millimetres and absolute distance, the modes the review parses from. */
-export const EXTERNAL_PROGRAM_BASELINE = 'G21G90';
+/**
+ * The modes the review parses from, on a GRBL-family controller: XY plane,
+ * millimetres, absolute distance, feed per minute and rapid motion. GRBL keeps
+ * all five between programs, and a bare axis line moves in the kept motion
+ * mode, so a G2/G3 or G19 left behind would bend a path the review read as
+ * straight.
+ */
+export const EXTERNAL_PROGRAM_BASELINE = 'G17G21G90G94G0';
+
+/**
+ * The baseline a controller accepts. Marlin stops a job at a command its
+ * build lacks (G94 always, G17 without CNC_WORKSPACE_PLANES) and keeps no
+ * motion or plane mode, so millimetres and absolute distance are all it
+ * needs; Smoothieware keeps plane and motion modes but has no G94.
+ */
+export function externalProgramBaseline(kind: ControllerKind): string {
+  if (kind === 'grbl-v1.1' || kind === 'grblhal' || kind === 'fluidnc') {
+    return EXTERNAL_PROGRAM_BASELINE;
+  }
+  return kind === 'smoothieware' ? 'G17G21G90G0' : 'G21G90';
+}
+
+/** The baseline's words with what each sets, for the Run review. */
+export const BASELINE_WORD_MEANINGS: Readonly<Record<string, string>> = {
+  G17: 'XY plane',
+  G21: 'millimetres',
+  G90: 'absolute moves',
+  G94: 'feed per minute',
+  G0: 'rapid motion',
+};
 
 /** The refusals listed before "and more", so a bad file stays readable. */
 const MAX_REASONS = 5;
@@ -63,9 +96,11 @@ export type ExternalProgramNormalizer = {
 };
 
 /** Line-at-a-time normalization, so a large file can be fed in chunks. */
-export function createExternalProgramNormalizer(): ExternalProgramNormalizer {
+export function createExternalProgramNormalizer(
+  baseline: string = EXTERNAL_PROGRAM_BASELINE,
+): ExternalProgramNormalizer {
   const reasons: string[] = [];
-  const lines: string[] = [EXTERNAL_PROGRAM_BASELINE];
+  const lines: string[] = [baseline];
   let lineNumber = 0;
   let droppedLineCount = 0;
   let commentsRemoved = false;
@@ -101,6 +136,7 @@ export function createExternalProgramNormalizer(): ExternalProgramNormalizer {
         kind: 'ok',
         program: {
           gcode,
+          baseline,
           lineCount: lines.length,
           byteCount: gcode.length,
           droppedLineCount,
@@ -111,8 +147,11 @@ export function createExternalProgramNormalizer(): ExternalProgramNormalizer {
   };
 }
 
-export function normalizeExternalProgram(text: string): ExternalProgramResult {
-  const normalizer = createExternalProgramNormalizer();
+export function normalizeExternalProgram(
+  text: string,
+  baseline: string = EXTERNAL_PROGRAM_BASELINE,
+): ExternalProgramResult {
+  const normalizer = createExternalProgramNormalizer(baseline);
   for (const line of sourceLines(text)) normalizer.push(line);
   return normalizer.finish();
 }
@@ -185,6 +224,11 @@ function characterRefusal(line: string, lineNumber: number): string | null {
 function lineRefusalOf(line: string, lineNumber: number): string | null {
   if (line.startsWith('$')) return controllerCommand(line, lineNumber, '$');
   if (line.startsWith('[')) return controllerCommand(line, lineNumber, 'bracket');
+  // Marlin's line-number checksum framing (`N1 G1 X10*42`): GRBL rejects the
+  // '*', and normalizing the line breaks the checksum Marlin would verify.
+  if (line.includes('*')) {
+    return `Line ${lineNumber} (${preview(line)}) carries a checksum (*), framing for a line protocol KerfDesk does not stream. GRBL rejects the line and Marlin would ask for it again, so save the program without checksums.`;
+  }
   const rejected = controllerBlockRejection(line);
   if (rejected === null) return null;
   return `Line ${lineNumber} (${preview(line)}) is one the controller rejects whole: ${rejected}. The Frame would trace it as if it ran, so fix it in the program.`;

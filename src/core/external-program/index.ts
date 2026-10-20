@@ -2,9 +2,11 @@
 // and Start (ADR-630): the exact bytes to send, and what its review shows.
 
 export {
+  BASELINE_WORD_MEANINGS,
   EXTERNAL_PROGRAM_BASELINE,
   canonicalLine,
   createExternalProgramNormalizer,
+  externalProgramBaseline,
   normalizeExternalProgram,
   sourceLines,
   stripComments,

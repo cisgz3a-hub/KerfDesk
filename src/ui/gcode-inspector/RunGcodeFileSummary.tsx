@@ -2,7 +2,7 @@
 // what is sent, how long it should take, the outline the Frame traces, its
 // units and machine mode, and the warnings. Display only.
 
-import type { ExternalProgramUnits } from '../../core/external-program';
+import { BASELINE_WORD_MEANINGS, type ExternalProgramUnits } from '../../core/external-program';
 import type { MachineKind } from '../../core/scene';
 import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
 import type { PreparedExternalRun } from './prepare-external-run';
@@ -33,10 +33,10 @@ export function RunGcodeFileSummary(props: {
       <dl>
         <dt>Sends</dt>
         <dd>
-          {program.lineCount} lines, {program.byteCount} bytes: G21 G90 first (millimetres and
-          absolute moves, the modes the review reads the program in), then each line as GRBL itself
-          reads it, with comments, spaces, tabs and other control characters it discards, / marks, %
-          markers and blank lines left out and LF line endings. Nothing else is changed.
+          {program.lineCount} lines, {program.byteCount} bytes: {baselineText(program.baseline)}{' '}
+          first, the modes the review reads the program in, then each line as GRBL itself reads it,
+          with comments, spaces, tabs and other control characters it discards, / marks, % markers
+          and blank lines left out and LF line endings. Nothing else is changed.
         </dd>
         <dt>Estimated time</dt>
         <dd>
@@ -75,4 +75,14 @@ export function RunGcodeFileSummary(props: {
       )}
     </div>
   );
+}
+
+// "G21 G90 (millimetres, absolute moves)" from the baseline line `G21G90`.
+function baselineText(baseline: string): string {
+  const words = baseline.match(/[A-Z][0-9.]+/g) ?? [];
+  const meanings = words.flatMap((word) => {
+    const meaning = BASELINE_WORD_MEANINGS[word];
+    return meaning === undefined ? [] : [meaning];
+  });
+  return `${words.join(' ')} (${meanings.join(', ')})`;
 }

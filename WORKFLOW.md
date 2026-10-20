@@ -9094,7 +9094,8 @@ The G-code Inspector is free in every edition (ADR-627).
    connected, Idle and with nothing else running; its tooltip says why otherwise. The project's
    own program (Inspect G-code) does not offer it: it already has Frame and Start.
 2. **Run on machine...** opens **Run *file name***. It lists what is sent (lines and bytes:
-   `G21 G90` first, then each line as GRBL itself reads it, with comments, spaces, tabs and the
+   a baseline line first (`G17 G21 G90 G94 G0` on GRBL: the modes the review reads the program
+   in), then each line as GRBL itself reads it, with comments, spaces, tabs and the
    other control characters GRBL discards, `/` marks, `%` markers and blank lines left out and
    LF line endings), the estimated time, the Frame outline (its size and lowest corner in work
    coordinates, travel moves included), where it starts, the units the program declares (an
