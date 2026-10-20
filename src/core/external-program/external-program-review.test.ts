@@ -307,10 +307,15 @@ describe('external program words the review cannot follow (ADR-630 Amendment 1)'
     expect(warnings).not.toContain('interpret G43.1, G53');
   });
 
-  it('says when the laser or spindle is switched on with no S anywhere', () => {
-    expect(review('G21\nM3\nG1 X10 F600\nM5\n').warnings.join()).toContain('never sets S');
-    expect(review('G21\nM4 S0\nG1 X10 F600 S300\nM5\n').warnings.join()).not.toContain(
-      'never sets S',
-    );
+  it('says when the laser or spindle is switched on before any S', () => {
+    const stale = 'before it sets S';
+    expect(review('G21\nM3\nG1 X10 F600\nM5\n').warnings.join()).toContain(stale);
+    // A later S does not cover the moves before it.
+    const lateS = 'G21\nM3\nG1 X10 F600\nS100\nG1 X20\nM5\n';
+    expect(review(lateS).warnings.join()).toContain(stale);
+    // An S on the same block, or on an earlier one, does.
+    expect(review('G21\nM4 S0\nG1 X10 F600 S300\nM5\n').warnings.join()).not.toContain(stale);
+    expect(review('G21\nS500\nM3\nG1 X10 F600\nM5\n').warnings.join()).not.toContain(stale);
+    expect(review('G21\nG1 X1 F600\nM5\n').warnings.join()).not.toContain(stale);
   });
 });

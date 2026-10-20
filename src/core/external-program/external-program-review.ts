@@ -44,8 +44,8 @@ type Commands = {
   readonly g: ReadonlySet<number>;
   readonly m: ReadonlySet<number>;
   readonly offsetWrites: ReadonlySet<number>;
-  /** An S word appears somewhere in the program. */
-  readonly setsSpeed: boolean;
+  /** An M3 or M4 runs before any S word: a later S does not cover it. */
+  readonly onBeforeSpeed: boolean;
 };
 
 const PROBE_CODES: ReadonlyArray<number> = [38.2, 38.3, 38.4, 38.5];
@@ -101,9 +101,9 @@ const COMMAND_WARNINGS: ReadonlyArray<{
       'The program uses relative moves (G91). Its outline is read from where the head stands now; Start runs it from that same spot.',
   },
   {
-    matches: (c) => (c.m.has(3) || c.m.has(4)) && !c.setsSpeed,
+    matches: (c) => c.onBeforeSpeed,
     warning:
-      'The program switches the laser or spindle on (M3 or M4) but never sets S, so it runs at the S value the controller already holds, which may be left from an earlier program.',
+      'The program switches the laser or spindle on (M3 or M4) before it sets S, so it starts at the S value the controller already holds, which may be left from an earlier program.',
   },
   {
     matches: (c) => c.m.has(6),
@@ -172,21 +172,38 @@ function commandsIn(gcode: string): Commands {
   const g = new Set<number>();
   const m = new Set<number>();
   const offsetWrites = new Set<number>();
-  let setsSpeed = false;
+  const speed = createSpeedTracker();
   for (const line of gcode.split('\n')) {
     const words = scanGcodeWords(line);
     for (const word of words) {
       const code = Math.round(word.value * 10) / 10;
       if (word.letter === 'G') g.add(code);
       else if (word.letter === 'M') m.add(code);
-      else if (word.letter === 'S') setsSpeed = true;
     }
+    speed.block(words);
     if (words.some((word) => word.letter === 'G' && Math.round(word.value * 10) === 100)) {
       const mode = words.find((word) => word.letter === 'L')?.value;
       if (mode === 2 || mode === 20) offsetWrites.add(mode);
     }
   }
-  return { g, m, offsetWrites, setsSpeed };
+  return { g, m, offsetWrites, onBeforeSpeed: speed.onBeforeSpeed() };
+}
+
+// GRBL keeps S across blocks and programs, so an S on the M3/M4 block or on
+// any earlier one sets the speed it starts at; a later S does not.
+function createSpeedTracker() {
+  let speedSet = false;
+  let onBeforeSpeed = false;
+  return {
+    block: (words: ReadonlyArray<{ readonly letter: string; readonly value: number }>): void => {
+      if (words.some((word) => word.letter === 'S')) speedSet = true;
+      const switchesOn = words.some(
+        (word) => word.letter === 'M' && (word.value === 3 || word.value === 4),
+      );
+      if (switchesOn && !speedSet) onBeforeSpeed = true;
+    },
+    onBeforeSpeed: (): boolean => onBeforeSpeed,
+  };
 }
 
 // Offset writes lead: a program that moves its own origin runs somewhere the
