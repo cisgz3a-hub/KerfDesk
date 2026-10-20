@@ -17,7 +17,8 @@ export function SketchParameterEditor({ sketch, onChange }: SketchEditorProps): 
       <legend>Named dimensions and expressions</legend>
       <p>
         Use named parameters, + − × / and parentheses. Constants in expressions need units, for
-        example width/4 + 2mm.
+        example width/4 + 2mm. Put a name containing a hyphen in brackets, for example
+        [stock-width]/4.
       </p>
       {sketch.parameters.map((parameter, index) => (
         <SketchParameterRow

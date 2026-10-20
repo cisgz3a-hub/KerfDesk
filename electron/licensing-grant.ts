@@ -167,8 +167,10 @@ export function grantedRecord(
     ...rest,
     schemaVersion: 1,
     // A freshly signed online grant can recover a corrected system clock.
-    lastSeenAt: now,
-    refreshedAt: now,
+    // A paid grant also works before the Unix epoch (ADR-623 Amendment 2),
+    // while the persisted local clock marks must remain nonnegative.
+    lastSeenAt: Math.max(0, now),
+    refreshedAt: Math.max(0, now),
     credential: grant.credential,
     ...(payment === undefined || stale ? {} : { payment }),
     ...(action === 'activate' && validLicenceKey(licenseKey) ? { licenseKey } : {}),
@@ -188,7 +190,9 @@ export function revokedRecord(
   // A released seat keeps its activation key; a revoked licence's key is useless.
   return {
     ...rest,
-    refreshedAt: now,
+    // A wrong paid-device clock must not prevent a received revocation
+    // from surviving the next launch.
+    refreshedAt: Math.max(0, now),
     ...(revoked || licenseKey === undefined ? {} : { licenseKey }),
   };
 }
