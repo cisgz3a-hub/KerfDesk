@@ -5,8 +5,10 @@ Audited 20 October 2026, initially against `origin/main` at
 During verification, main advanced to
 `3f3f529bfee89355500fef0708358e58f4decf7b` through PR #1317.
 The isolated branch was fast-forwarded without discarding any repairs; the
-licensing delta received separate review and fresh checks. Final integration
-checks use this later base plus the local repairs.
+licensing delta received separate review and fresh checks. Before PR creation,
+main advanced again to `3d9ef34d74322bdb086cf6bf207a32af0ba5fb01` through #1293's
+safety-notice UI change. That update was merged without conflicts, with fresh
+controller/safety-notice, browser and renderer verification.
 Local repairs are on `codex/major-pr-current-audit-20261020`.
 
 ## Scope and result
@@ -20,9 +22,12 @@ current evidence.
 
 The reviewed merged feature families remain present. Their implementation has
 often evolved substantially since the original PR. Confirmed defects and local
-repairs are listed below: seven repaired defect families, six remaining lead
-defects with proposed fixes in open #1285, and stale paid-offline wording in two
-privacy sources. An open PR is not automatically an absent feature:
+repairs are listed below. The initial audit repaired seven defect families and
+identified six further lead defects plus stale paid-offline privacy wording.
+The requested follow-up integrates the lead corrections from #1285 into this
+branch, corrects the privacy sources, repairs two additional native-arc and
+Cut Settings integration defects, and adds independent verification of the
+combined changes. An open PR is not automatically an absent feature:
 stacked commits can already have reached main through another merged PR.
 
 This is a broad, bounded audit of those milestones, not a claim that every line
@@ -158,38 +163,88 @@ out of three to three passes.
 
 Production file: `electron/licensing-grant.ts`.
 
-## Confirmed outstanding defects already covered by PR #1285
+## Lead defects repaired in the combined audit branch
 
 These were independently reproduced against the frozen main baseline. The
-existing PR already contains their proposed repairs, so this audit does not
-create a duplicate patch or claim those repairs have landed.
+initial audit left them with their proposed repairs in open #1285. At the user's
+request, the combined branch now incorporates commits `6b28e3237` and
+`bc5bfc8b3` with their original authorship and cherry-pick provenance. This does
+not merge or close #1285 on GitHub.
 
-| Current-main defect | Reproduced consequence |
+| Defect | Reproduction and repair |
 | --- | --- |
-| Line lead-out can retrace lead-in | A 10 mm square with 2 mm, 45-degree line leads traverses the same 2 mm segment in both directions. |
-| Contour start editing targets the free lead endpoint | Clicking the outline midpoint (5, 0) selects approximately (-1.414, -1.414), while the unled outline correctly selects (5, 0). |
-| Artwork-level “leads off” is not represented in group settings | Geometry correctly omits the lead, but the group has no override settings to distinguish it from its lead-enabled operation. |
-| Warnings merge distinct holders | Two holders named Score and Border produce one count-two warning naming only Score. |
-| Inactive lead fields prevent recipe reseeding on a mode change | Switching a Birch cut operation to Fill retains 90% power, 400 mm/min and the cut preset. The otherwise identical control adopts the engraving preset: 35%, 3,000 mm/min. |
-| Canonical curves omit lead work from routing estimates | For 6,000 triangles with 20 mm leads, equivalent polylines choose the background worker, while canonical curve-backed paths choose direct preparation. This proves a routing discrepancy, not a measured browser freeze. |
+| Line lead-out retraced lead-in | A 10 mm square with 2 mm, 45-degree line leads traversed the same 2 mm segment in both directions. A retracing pair now triggers the existing edge-restart search; the independent square probe has distinct endpoints 2.828427 mm apart. |
+| Contour start editing targeted the free lead endpoint | Clicking an outline midpoint selected the free lead endpoint. Prepared segments now retain their contour range, and the editor reconstructs the closed outline. Independent midpoint selection matches the requested outline point. |
+| Artwork-level “leads off” was absent from group settings | Geometry correctly omitted the lead, but the group lost the explicit override in review/output provenance. Explicit lead switches now count as overrides while inactive shape-only fields remain ignored. |
+| Warnings merged distinct holders | Score and Border produced one count-two warning naming Score. Each holder now receives its own warning and count. |
+| Inactive lead fields prevented recipe reseeding | A Birch cut switched to Fill retained 90% power at 400 mm/min. Inactive lead fields are now excluded from recipe-equivalence comparisons; the independent probe adopts the engraving recipe at 35% and 3,000 mm/min, while an actual manual speed edit remains preserved. |
+| Canonical curves omitted lead work from routing estimates | For 6,000 triangles with 20 mm leads, equivalent polylines used the worker but canonical curves used direct preparation. Counting canonical contours now routes both representations to the worker. This verifies routing, not a worst-case performance guarantee. |
 
 The base lead commits `625f300db` and `d2250f502` are already ancestors of this
-baseline through #1318. Follow-up `6b28e3237` and latest #1285 head `bc5bfc8b3`
-are not. The first five fixes belong to the former; the curve-work estimate fix
-belongs to the latter. Pure reproductions and source locations are recorded in
-`leads-report.md` and `leads-reproduction.log`.
+baseline through #1318. The first five additional fixes belong to `6b28e3237`;
+the curve-work estimate fix belongs to `bc5bfc8b3`. Original failing-behaviour
+probes and source locations remain in `leads-report.md` and
+`leads-reproduction.log`; all six corrected independent probes pass in
+`leads-integrated-probe.log`.
 
-## Remaining documentation inconsistency
+### Additional start-editor mismatch found during integration — P2, repaired
+
+The proposed contour reconstruction discarded native arc metadata. For an
+arc-capable GRBL disc centred at (40, 40), radius 10 mm, targeting 15 degrees
+offered the sampled-chord point (49.656678, 42.587476). Saving that preference
+and preparing again actually joined the contour at (50, 40), a 2.610154 mm
+disagreement. ADR-594 already restricts native-arc starts to existing move
+boundaries; the editor was incorrectly presenting a broader choice.
+
+Prepared leads now retain the original validated contour arc fingerprint.
+Reconstruction validates that same fingerprint before using it, translation
+carries its coordinates, and rotary Y mapping discards it with ordinary native
+arcs. No arc refitting or new output policy is introduced. The independent
+preparation/emission probe now reports zero disagreement and retains G2/G3.
+Eleven regression cases cover one/three passes, zero/one-mm overcut, mirrored
+and rotated geometry, machine origins, program offsets, Save/reopen, translated
+metadata, rotary mapping and rejection after an untracked contour rewrite.
+Two independent source reviews found no additional actionable defect in this
+bounded repair.
+
+Production files:
+`src/core/job/{job,cut-segment-geometry,apply-laser-leads,led-contours,cut-arc-moves,rotary-transform}.ts`.
+
+### Full Cut Settings Apply still prevented recipe switching — P2, repaired
+
+The real browser workflow exposed an integration gap beyond the direct-state
+lead regression. Applying the full Cut Settings form wrote six untouched
+optional defaults into a sparse linked operation: zero overcut, disabled
+perforation with 3/1 mm distances, count-based tabs and zero tab cutting power.
+The recipe snapshot had those values absent. After enabling and disabling
+leads through the dialog, changing to Fill therefore retained the cutting
+recipe at 90% / 400 mm/min. Even a no-op Apply caused this mismatch.
+
+Ordinary operation submission now omits those defaults only when the original
+value was absent and its control was untouched. Existing values, nondefault
+changes and explicitly entered defaults remain edits. Selected-artwork
+submission retains its existing changed-control path, so explicit zero/false
+overrides still apply across mixed artwork. Recipe equality, material bindings
+and output policy are unchanged.
+
+Real-dialog/store regressions reproduce the failed no-op and two-Apply flows,
+exercise independently sparse settings, preserve deliberate edits and check
+explicit zero/false on mixed artwork. The browser regression additionally checks
+Undo/Redo, Save/reopen and subsequent manual power edits.
+
+Production files: `src/ui/layers/CutSettingsDialog.tsx` and
+`src/ui/layers/cut-settings-field-edits.ts`.
+
+## Privacy wording corrected
 
 After #1317, paid licences work indefinitely offline, with quiet weekly online
-confirmation attempts. The source privacy notice still says paid Pro pauses
-after 30 days without confirmation:
-`docs/legal/kerfdesk-privacy-notice.md:84` and
-`website/pages/privacy.mjs:236–238`. This conflicts with the current
-implementation and ADR-623 Amendment 2, which explicitly leaves the owner
-privacy wording update as a before-release follow-up. These legal/website
-sources were not rewritten during the code audit. This is a source-content
-finding; the live hosted privacy page was not checked.
+confirmation attempts. The initial audit found that the privacy sources still
+described a 30-day paid deadline. The user explicitly authorised the correction:
+`docs/legal/kerfdesk-privacy-notice.md` and `website/pages/privacy.mjs` now describe
+paid offline continuity, while preserving trial confirmation/expiry and the
+effect of a received revocation. The generated app privacy page is regenerated
+from its source. This changes repository content; it does not publish the
+hosted website.
 
 ## Feature retention matrix
 
@@ -235,12 +290,13 @@ was exercised and does not imply physical qualification.
   are pending. This audit did not inspect newly packaged AppImage bytes.
 - **#1285:** its open status is not evidence that laser leads are missing.
   Stacked history reached main through #1318; the lead-specific report records
-  the precise current implementation and any remaining difference.
+  the initial current-main findings. Its two pending corrective commits are now
+  included in this combined audit branch and receive fresh verification here.
 - The old #27 checkpoint and reverted #572/#581/#589 V-carve paths were
   intentionally replaced. The current recovery and #622 V-carve paths were
   audited instead.
 
-## Verification ledger
+## Initial audit verification ledger
 
 The completed runs below cover different layers and contain overlapping tests.
 Cohorts must not be summed into a unique test count.
@@ -251,7 +307,7 @@ Cohorts must not be summed into a unique test count.
 | Same-ID vector-to-raster retracing | Final 5 files / 24 tests passed, including actual dialog commit, masks/guides, persistence, group identity and normal deletion warning behavior. |
 | Curve/node editing | Existing 13 files / 116 tests passed before the missing cases were added. Repaired anchor/store cohort: 14 files / 120 passed. Final smoothing/store/command cohort: 3 files / 19 passed. |
 | Print & Cut | 14 files / 113 tests and 8 files / 66 calibration tests passed. Independent complex-ratio/composition oracle passed 2,000 registrations / 8,000 point comparisons; maximum error 7.10e-12 mm. |
-| LightBurn/DXF/PDF follow-up | 120 tests passed with two CLB streaming cases exceeding the default five-second test budget. Isolated 30-second-budget run passed all 18 streaming tests; this does not erase the default-budget timing failures. |
+| LightBurn/DXF/PDF follow-up | Initial audit: 120 tests passed with two CLB streaming cases exceeding the default five-second budget; all 18 passed with a larger budget. The requested follow-up resolved the harness cause: cold dependency transforms now occur during collection, while all 18 original functional tests pass at the unchanged five-second timeout. Historical failures remain recorded. |
 | CNC/sketch/relief/Inspector | 12 files / 73, 11 files / 83, and 7 files / 61 passed in focused cohorts; post-peer-review wall/parameter checks 4 files / 18 and final lexer 1 file / 3 passed. Cohorts overlap. |
 | Camera/rotary/jig | Initial 98-file / 616-test run had 615 passes and the newly reproduced camera defect. After repair, the affected camera/component/browser-adapter cohort passed 3 files / 12 tests. |
 | Raster and second pass | 25 files / 252 tests passed. |
@@ -273,6 +329,43 @@ typecheck/build and the two node browser workflows use `3f3f529bf` plus the
 local repairs. The 30-workflow browser run preceded the final node/licensing
 delta; those changes received the separate node and licensing checks above.
 
+## Combined-PR follow-up verification
+
+The follow-up starts from GitHub main `3f3f529bf` and includes the earlier
+repairs, both lead correction commits, the additional native-arc repair
+and the privacy/test-harness updates. Final integration also includes the
+subsequent `3d9ef34d7` main update through #1293, as recorded above.
+
+| Check | Result |
+| --- | --- |
+| Combined regressions | 68 files / 638 tests passed, covering every original audit regression plus lead, output, contour-start, recipe, review and rotary paths. |
+| Latest-main integration | 6 files / 30 tests passed after merging #1293, covering reconnect, recovery, warning acknowledgement, LaserWindow and the workspace safety notice. |
+| Native-arc follow-up | 8 files / 54 tests passed after the arc repair, including all 11 new cases. This closes the metadata change made while the broader cohort was running. |
+| Full-dialog recipe regression | All 7 mounted dialog/store cases passed after the final filter change and fixture corrections. The earlier broader run's single invalid fixture is recorded separately, not counted as a passing cohort. |
+| Final browser integration | 8/8 passed on a fresh post-freeze renderer: line and native-arc pointer editing, both recipe workflows with history/persistence/manual edits, and safety-notice layout at 1920/1280/640/360 px. No skipped or flaky cases; source/test fingerprints stayed unchanged throughout. |
+| Independent lead reproductions | All six corrected original probes pass; the additional actual-preparation/native-output start mismatch is zero. |
+| CLB streaming | All 18 existing functional assertions pass at the unchanged five-second timeout after test collection setup is corrected. |
+| Privacy | 40 website tests passed; four generated assets match the generator; app/website pages rendered and inspected at desktop/mobile sizes. |
+| TypeScript | Renderer/core and E2E checks passed on the final integrated source. Electron production typecheck passed on its final unchanged source. |
+| Renderer build | Desktop renderer bundle passed after final production changes. Existing Rollup dependency-annotation and large-chunk warnings remain. |
+| Source checks | Scoped ESLint and Prettier passed for changed supported source/tests. ADR-number, source-file-size and public-export-ratchet checks passed; no new dependencies were added. Markdown follows the repository's existing manual formatting policy. |
+
+The added browser workflow and its final receipts are recorded with the
+follow-up evidence below. These cohorts overlap and are not a unique aggregate
+test count. The final behavioural source change was 20 October 2026, 16:02:05 UTC,
+after incorporating the latest main and the dialog correction.
+A type-only extraction moved `CutArcMoves` and `LeadContour` into
+`cut-segment-geometry.ts` to keep `job.ts` within the repository's 600-line limit,
+preserving the existing public type import. Its generated, minified JavaScript
+is byte-identical before and after extraction. The final renderer build,
+typecheck and browser cohort run after both changes. Subsequent changes are
+tests, documentation and commits.
+
+The final browser run took 108.511 seconds and used source recorded by
+`f0f953342`, with the new E2E test and this report pending their final commit.
+The owned test renderer was stopped after completion. The final desktop renderer
+build completed in 1m 59s; its PWA generation succeeded with 425 entries.
+
 ### Test-environment findings
 
 Sandbox temporary-cache renames and loopback socket access initially prevented
@@ -293,6 +386,14 @@ The final browser run uses that fresh, warmed server and unchanged test timeouts
 Neither issue was classified as a customer defect or “fixed” by weakening
 production safeguards.
 
+The CLB follow-up reproduced the default-budget failure and isolated the cold
+Vitest transformation of `clb-import` and its material-library graph inside
+the first functional test. A test-only static import now loads that dependency
+during collection. No parser is pre-run, no assertions or mocks change, and no
+timeout is raised. The same cold transformation still takes 18.84 seconds,
+recorded as setup; all 18 functional cases together take 1.000 second and pass.
+This is a test-harness correction, not a claimed production import speedup.
+
 ## Evidence and manual coverage
 
 Detailed current-path, inspected-file, test-command and limitation records:
@@ -304,6 +405,11 @@ Detailed current-path, inspected-file, test-command and limitation records:
 - `build/major-pr-audit-20261020/print-cut-report.md`
 - `build/major-pr-audit-20261020/leads-report.md`
 - `build/major-pr-audit-20261020/node-edit-report.md`
+- `build/major-pr-audit-20261020/leads-integration-peer-report.md`
+- `build/major-pr-audit-20261020/privacy-update-report.md`
+- `build/major-pr-audit-20261020/lead-browser-report.md`
+- `build/major-pr-audit-20261020/cut-settings-recipe-report.md`
+- `build/major-pr-audit-20261020/job-type-extraction-proof.log`
 
 Coordinator source review additionally covered the controller command/stream
 and serial-worker paths; cancellation, Start and completed Frame ownership;
@@ -324,6 +430,10 @@ New analytic/regression coverage is in:
 - additions to `src/core/scene/curve-edit.test.ts` and the new real-store
   `src/ui/state/path-node-implicit-closure.audit.test.ts`.
 - `electron/licensing-runtime-persistence-clock.audit.test.ts`.
+- `src/ui/state/canvas-start-editing-leads-arcs.audit.test.ts`.
+- `src/ui/layers/CutSettingsDialog.recipe-reseed.audit.test.tsx`.
+- `e2e/laser-lead-start-reseed.e2e.ts`.
+- Follow-up setup correction in `src/ui/import/document-import-lightburn-stream.test.ts`.
 
 Logs, JSON reports, failing reproductions and browser traces/screenshots are
 retained under the ignored `build/major-pr-audit-20261020/` directory. The
@@ -331,9 +441,12 @@ historical inventory is `build/pr-history-20261020/inventory.json`.
 
 ## Delivery boundary
 
-Repairs are local working-tree changes. No audit commit was created, no branch
-was pushed, and no GitHub PR was merged, released or deployed by this audit.
-The local fast-forward adopted the already-merged #1317 from GitHub.
+The user requested one PR containing the audit repairs, remaining lead
+corrections and privacy wording update. The changes are committed on
+`codex/major-pr-current-audit-20261020`; the two incorporated lead commits retain
+their original authorship. Creating that PR does not merge #1285 or publish a
+release. The earlier local fast-forward adopted the already-merged #1317;
+the final integration merge adopts the already-merged #1293.
 No hardware, real payment/provider state or installed application was operated.
 
 Passing source/tests/browser checks establish the recorded software paths only.
