@@ -173,6 +173,8 @@ function extendBoundsForCut(
       arcMovesEnabled: arcMovesEnabled ?? true,
       entryRunwayMm: group.entryRunwayMm,
     });
+    // ADR-626: a final pass with an overcut leaves by a lead-out of its own.
+    for (const p of seg.finalPassBurn?.polyline ?? []) extendBoundsForPoint(b, p);
     const first = seg.polyline[0];
     if (arcMoves !== null && first !== undefined) {
       extendBoundsByEmittedArcMoves(b, first, arcMoves);

@@ -13,6 +13,16 @@ import {
   imageOverscanMmFor,
   MAX_IMAGE_OVERSCAN_MM,
 } from '../../core/job/operation-cut-extras';
+import {
+  DEFAULT_ARC_LEAD_ANGLE_DEG,
+  DEFAULT_LEAD_LENGTH_MM,
+  leadAngleDegFor,
+  leadLengthMmFor,
+  MAX_LEAD_LENGTH_MM,
+  maxLeadAngleDeg,
+  MIN_LEAD_ANGLE_DEG,
+  MIN_LEAD_LENGTH_MM,
+} from '../../core/job/laser-lead-settings';
 import { DITHER_ALGORITHMS, type Layer, type LayerMode } from '../../core/scene';
 
 export type LayerPatch = Partial<Omit<Layer, 'id' | 'color'>>;
@@ -67,6 +77,7 @@ export function readCutSettingsPatch(
     ...lineSettings,
     ...readLineExtrasPatch(data, layer, mode),
     ...readLineTabPatch(data, layer, mode),
+    ...readLineLeadPatch(data, layer, mode),
     ...readImageOverscanPatch(data, layer, mode),
     ...readScanPatternPatch(data, layer, mode),
     ...readAutoOverscanPatch(data, mode),
@@ -217,6 +228,53 @@ function readLineTabPatch(data: FormData, layer: Layer, mode: LayerMode): LayerP
     ),
   };
 }
+
+// ADR-626, like the ADR-415 controls: only a form with them changes them. An
+// operation that never had leads stays without lead fields while the form
+// leaves them off at their defaults, so it still matches its linked recipe.
+function readLineLeadPatch(data: FormData, layer: Layer, mode: LayerMode): LayerPatch {
+  if (mode !== 'line' || !data.has('leadStyle')) return {};
+  const style = data.get('leadStyle') === 'line' ? 'line' : 'arc';
+  const side = String(data.get('leadSide') ?? '');
+  const patch = {
+    leadInEnabled: data.has('leadInEnabled'),
+    leadOutEnabled: data.has('leadOutEnabled'),
+    leadStyle: style,
+    leadLengthMm: numberField(
+      data,
+      'leadLengthMm',
+      leadLengthMmFor(layer),
+      MIN_LEAD_LENGTH_MM,
+      MAX_LEAD_LENGTH_MM,
+    ),
+    leadAngleDeg: numberField(
+      data,
+      'leadAngleDeg',
+      leadAngleDegFor(layer, style),
+      MIN_LEAD_ANGLE_DEG,
+      maxLeadAngleDeg(style),
+    ),
+    leadSide: side === 'outside' || side === 'inside' ? side : 'auto',
+  } satisfies LayerPatch;
+  return untouchedLeads(layer, patch) ? {} : patch;
+}
+
+function untouchedLeads(layer: Layer, patch: LayerPatch): boolean {
+  const keys = Object.keys(UNTOUCHED_LEADS) as Array<keyof typeof UNTOUCHED_LEADS>;
+  return (
+    keys.every((key) => layer[key] === undefined) &&
+    keys.every((key) => patch[key] === UNTOUCHED_LEADS[key])
+  );
+}
+
+const UNTOUCHED_LEADS = {
+  leadInEnabled: false,
+  leadOutEnabled: false,
+  leadStyle: 'arc',
+  leadLengthMm: DEFAULT_LEAD_LENGTH_MM,
+  leadAngleDeg: DEFAULT_ARC_LEAD_ANGLE_DEG,
+  leadSide: 'auto',
+} as const satisfies LayerPatch;
 
 function readImageOverscanPatch(data: FormData, layer: Layer, mode: LayerMode): LayerPatch {
   if (mode !== 'image' || !data.has('imageOverscanMm')) return {};
