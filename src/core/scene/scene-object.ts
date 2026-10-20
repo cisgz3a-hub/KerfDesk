@@ -22,7 +22,7 @@ export type { ColoredPath, SubpathNesting } from './colored-path';
 import type { VariableTemplate } from './variable-template';
 import type { ReliefHeightfield } from './relief/relief-heightfield';
 import type { ReliefAuthoringDocument } from './relief/relief-authoring';
-import type { LayerPowerMode, TabLayoutMode } from './layer';
+import type { LaserLeadSide, LaserLeadStyle, LayerPowerMode, TabLayoutMode } from './layer';
 import type { LaserTabAnchor } from './laser-tab-anchor';
 import type { PhotoEditorDocument } from './photo-editor-document';
 
@@ -144,6 +144,12 @@ export type ObjectOperationSettingsOverride = {
   readonly imageCrossHatch?: boolean | undefined;
   readonly passAngleStepDeg?: number | undefined;
   readonly autoOverscan?: boolean | undefined;
+  readonly leadInEnabled?: boolean | undefined;
+  readonly leadOutEnabled?: boolean | undefined;
+  readonly leadStyle?: LaserLeadStyle | undefined;
+  readonly leadLengthMm?: number | undefined;
+  readonly leadAngleDeg?: number | undefined;
+  readonly leadSide?: LaserLeadSide | undefined;
 };
 
 export type ObjectOperationOverride = ObjectOperationSettingsOverride & {

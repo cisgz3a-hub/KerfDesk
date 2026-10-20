@@ -7,6 +7,26 @@ import {
 } from './layer-default-settings';
 
 describe('layer default settings helpers', () => {
+  it('does not revive inactive leads from captured or previously saved defaults', () => {
+    const inactive = {
+      leadInEnabled: false,
+      leadOutEnabled: false,
+      leadStyle: 'arc' as const,
+      leadLengthMm: 8,
+      leadAngleDeg: 45,
+      leadSide: 'inside' as const,
+    };
+    const layer = { ...createLayer({ id: 'L', color: '#ff0000' }), ...inactive };
+    const captured = captureLayerDefaultSettings(layer);
+    const applied = applyLayerDefaultSettings(layer, inactive);
+    for (const key of Object.keys(inactive)) {
+      expect(captured).not.toHaveProperty(key);
+      expect(applied).not.toHaveProperty(key);
+    }
+    const active = captureLayerDefaultSettings({ ...layer, leadInEnabled: true });
+    expect(active).toMatchObject({ leadInEnabled: true, leadLengthMm: 8 });
+  });
+
   it('captures backed settings without id or color', () => {
     const layer = {
       ...createLayer({ id: '#ff0000', color: '#ff0000', mode: 'fill' }),

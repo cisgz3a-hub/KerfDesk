@@ -2,13 +2,11 @@ import {
   addLayer,
   bindSceneObjectToOperations,
   createLayer,
-  layerOperationSettingsEqual,
   operationIdsForObject,
   removeSceneObjectOperationBinding,
   sceneObjectHasVisibleLayer,
   sceneObjectUsesOperation,
   type Layer,
-  type LayerSubLayer,
   type Project,
   type Scene,
   updateLayer,
@@ -20,15 +18,20 @@ import { seedFreshCncLayer } from './cnc-auto-seeding';
 import { seedFreshLaserLayer } from './laser-recipe-seeding';
 import type { MaterialLibraryDocument } from '../../io/material-library';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
-import { cncSettingsForArtworkPaste } from './cnc-settings-clipboard';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
 import { defaultSettingsForOperation, type LayerDefaultsState } from './layer-default-actions';
 import { layerSubLayerActions, type LayerSubLayerPatch } from './layer-sub-layer-actions';
+import {
+  layerSettingsEqual,
+  layerSettingsForPaste,
+  layerSettingsFrom,
+  type LayerSettingsClipboard,
+} from './layer-settings-clipboard';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 const HEX_LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
-export type LayerSettingsClipboard = Omit<Layer, 'id' | 'name' | 'color'>;
+export type { LayerSettingsClipboard } from './layer-settings-clipboard';
 export type { LayerSubLayerPatch } from './layer-sub-layer-actions';
 
 type LayerActionState = StateSlice &
@@ -278,141 +281,6 @@ function removeDeletedIdsFromSelection(
         : state.selectedObjectId,
     additionalSelectedIds,
   };
-}
-
-const LAYER_SETTING_KEYS = [
-  'mode',
-  'powerMode',
-  'minPower',
-  'power',
-  'speed',
-  'passes',
-  'airAssist',
-  'kerfOffsetMm',
-  'tabsEnabled',
-  'tabSizeMm',
-  'tabsPerShape',
-  'tabSkipInnerShapes',
-  'visible',
-  'output',
-  'hatchAngleDeg',
-  'hatchSpacingMm',
-  'fillOverscanMm',
-  'fillStyle',
-  'fillBidirectional',
-  'fillCrossHatch',
-  'ditherAlgorithm',
-  'linesPerMm',
-  'imageBidirectional',
-  'negativeImage',
-  'passThrough',
-  'dotWidthCorrectionMm',
-  'perforationEnabled',
-  'perforationCutMm',
-  'perforationSkipMm',
-  'overcutMm',
-  'imageOverscanMm',
-  'tabLayout',
-  'tabSpacingMm',
-  'tabMaxPerShape',
-  'tabCutPowerPercent',
-  'imageScanAngleDeg',
-  'imageCrossHatch',
-  'passAngleStepDeg',
-  'autoOverscan',
-  'subLayers',
-] as const satisfies ReadonlyArray<keyof LayerSettingsClipboard>;
-
-function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
-  return {
-    mode: layer.mode,
-    ...(layer.powerMode !== undefined ? { powerMode: layer.powerMode } : {}),
-    minPower: layer.minPower,
-    power: layer.power,
-    speed: layer.speed,
-    passes: layer.passes,
-    airAssist: layer.airAssist,
-    kerfOffsetMm: layer.kerfOffsetMm,
-    tabsEnabled: layer.tabsEnabled,
-    tabSizeMm: layer.tabSizeMm,
-    tabsPerShape: layer.tabsPerShape,
-    tabSkipInnerShapes: layer.tabSkipInnerShapes,
-    visible: layer.visible,
-    output: layer.output,
-    hatchAngleDeg: layer.hatchAngleDeg,
-    hatchSpacingMm: layer.hatchSpacingMm,
-    fillOverscanMm: layer.fillOverscanMm,
-    fillStyle: layer.fillStyle,
-    fillBidirectional: layer.fillBidirectional,
-    fillCrossHatch: layer.fillCrossHatch,
-    ditherAlgorithm: layer.ditherAlgorithm,
-    linesPerMm: layer.linesPerMm,
-    imageBidirectional: layer.imageBidirectional,
-    negativeImage: layer.negativeImage,
-    passThrough: layer.passThrough,
-    dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
-    // Explicitly undefined when unset, so pasting settings that never used
-    // perforation, overcut, image overscan, a tab layout or tab power
-    // (ADR-494), a scan pattern (ADR-492) or automatic overscan (ADR-495)
-    // turns them off on the target.
-    perforationEnabled: layer.perforationEnabled,
-    perforationCutMm: layer.perforationCutMm,
-    perforationSkipMm: layer.perforationSkipMm,
-    overcutMm: layer.overcutMm,
-    imageOverscanMm: layer.imageOverscanMm,
-    tabLayout: layer.tabLayout,
-    tabSpacingMm: layer.tabSpacingMm,
-    tabMaxPerShape: layer.tabMaxPerShape,
-    tabCutPowerPercent: layer.tabCutPowerPercent,
-    imageScanAngleDeg: layer.imageScanAngleDeg,
-    imageCrossHatch: layer.imageCrossHatch,
-    passAngleStepDeg: layer.passAngleStepDeg,
-    autoOverscan: layer.autoOverscan,
-    subLayers: layer.subLayers,
-    ...(layer.materialBinding === undefined ? {} : { materialBinding: layer.materialBinding }),
-    ...(layer.cnc === undefined ? {} : { cnc: layer.cnc }),
-  };
-}
-
-function layerSettingsForPaste(
-  target: Layer,
-  copied: LayerSettingsClipboard,
-): LayerSettingsClipboard {
-  return copied.cnc === undefined
-    ? copied
-    : { ...copied, cnc: cncSettingsForArtworkPaste(copied.cnc, target.cnc) };
-}
-
-function layerSettingsEqual(layer: Layer, settings: LayerSettingsClipboard): boolean {
-  return (
-    LAYER_SETTING_KEYS.every((key) =>
-      key === 'subLayers'
-        ? subLayersEqual(layer.subLayers, settings.subLayers)
-        : layer[key] === settings[key],
-    ) &&
-    (settings.materialBinding === undefined ||
-      JSON.stringify(layer.materialBinding) === JSON.stringify(settings.materialBinding)) &&
-    (settings.cnc === undefined || JSON.stringify(layer.cnc) === JSON.stringify(settings.cnc))
-  );
-}
-
-function subLayersEqual(
-  left: ReadonlyArray<LayerSubLayer>,
-  right: ReadonlyArray<LayerSubLayer>,
-): boolean {
-  return (
-    left.length === right.length &&
-    left.every((subLayer, index) => {
-      const other = right[index];
-      return (
-        other !== undefined &&
-        subLayer.id === other.id &&
-        subLayer.label === other.label &&
-        subLayer.enabled === other.enabled &&
-        layerOperationSettingsEqual(subLayer.settings, other.settings)
-      );
-    })
-  );
 }
 
 function usedOperationIds(scene: Scene): ReadonlySet<string> {
