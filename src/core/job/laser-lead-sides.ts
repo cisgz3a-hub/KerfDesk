@@ -63,13 +63,21 @@ export type LeadSideVerdict = {
   readonly aroundName?: string;
 };
 
+/** A scene contour with the operation that cuts it, as the artwork runs it,
+ * and its path, for the kerf offset's side (kerf-scene-sides.ts). */
+export type SceneLineContour = LeadSideContour & {
+  readonly operation: Layer;
+  /** The artwork id and path index; the key adds the polyline index. */
+  readonly path: string;
+};
+
 /** Every closed contour of every burning Line operation in the scene, output
  * scope and output switches aside. */
 export function sceneLeadSideContours(
   scene: Pick<Scene, 'layers' | 'objects'>,
   device?: DeviceProfile,
-): LeadSideContour[] {
-  const contours: LeadSideContour[] = [];
+): SceneLineContour[] {
+  const contours: SceneLineContour[] = [];
   for (const layer of scene.layers) {
     const operations = [layer, ...layer.subLayers.map((sub) => layerFromSubLayer(layer, sub))];
     for (const operation of operations) {
@@ -80,7 +88,7 @@ export function sceneLeadSideContours(
 }
 
 function appendContours(
-  contours: LeadSideContour[],
+  contours: SceneLineContour[],
   operation: Layer,
   object: SceneObject,
   device: DeviceProfile | undefined,
@@ -99,6 +107,8 @@ function appendContours(
         points: polyline.points.map((point) => applyTransform(point, object.transform)),
         decides,
         operationName: effective.name,
+        operation: effective,
+        path: `${object.id}#${pathIndex}`,
       });
     }
   }

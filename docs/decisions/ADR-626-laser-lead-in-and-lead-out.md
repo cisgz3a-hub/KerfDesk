@@ -266,11 +266,12 @@ Decision:
 
 Consequences: a burning sheet border or score ring on an operation without leads costs the leads of
 the shapes inside it, with a warning, where it used to risk a lead into a part; a guide outline only
-stops counting at 0% power or when deleted. Line kerf compensation still judges a contour's side
-among its own operation's contours (`compile-line-topology.ts`), so a hole cut by its own
-operation with a kerf offset is offset as an outline, as before this ADR. Leads do not make that
-worse: they are fitted to the path actually cut and go only to the side the scene's lead operations
-say is scrap.
+stops counting at 0% power or when deleted. Line kerf compensation judged a contour's side among
+its own operation's contours only, so a hole cut by its own operation with a kerf offset was offset
+as an outline; [ADR-486 Amendment 3](ADR-486-amendment-3-kerf-sides-across-the-scene.md) judges it
+among the same scene contours, counting operations with a kerf offset, leads or tabs as part edges,
+so wherever leads know the side the kerf offset goes to the same side. Leads are fitted to the path
+actually cut and go only to the side the scene's lead operations say is scrap.
 
 Verification: `io/gcode/laser-leads-scrap-side.test.ts` prepares real projects and checks where
 every lead ends: a separate hole selected alone, the plate's operation output off (with and without

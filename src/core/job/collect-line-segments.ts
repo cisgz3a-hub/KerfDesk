@@ -136,11 +136,8 @@ function appendPathSegments(
     const nesting = segmentNesting(path, `${object.id}#${pathIndex}`);
     const kerfArcSource = kerfArcSourceRings(path, object.transform, layer, device);
     for (const [index, polyline] of compilationPolylines(path, object.transform).entries()) {
-      const source = leadSourceOf(
-        leadSources,
-        polyline,
-        laserLeadSourceKey(object.id, pathIndex, index),
-      );
+      const sceneContour = laserLeadSourceKey(object.id, pathIndex, index);
+      const source = leadSourceOf(leadSources, polyline, sceneContour);
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, object.transform), device),
       );
@@ -156,6 +153,7 @@ function appendPathSegments(
           points: placed,
           ...(known === undefined ? {} : { nesting: known }),
           ...source,
+          sceneContour,
         });
       } else {
         const segment = sourceLineSegment(

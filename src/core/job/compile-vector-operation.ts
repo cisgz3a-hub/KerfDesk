@@ -16,6 +16,7 @@ import { vectorCompilation, type VectorCompilation } from './vector-compilation'
 import { vectorProcessBuckets, type VectorProcessBucket } from './vector-process-buckets';
 import { stableFillArtworkSubset } from './stable-fill-artwork-subset';
 import { lineTopologyCollections } from './compile-line-topology';
+import type { KerfSceneSides } from './kerf-scene-sides';
 import { ownedFillMaterial } from './fill-material-ownership';
 import { normalizeClosedPolylinesNonZeroChecked } from '../geometry/polygon-difference';
 import type { LineSegmentCollection } from './collect-line-segments';
@@ -29,11 +30,18 @@ export function compileVectorGroupsForLayer(
   priorityObjectId: string,
   scope: string,
   keepLeadRings = false,
+  kerfSides?: () => KerfSceneSides,
 ): VectorCompilation {
   const buckets = vectorProcessBuckets(objects, layer);
   const fillBuckets = buckets.filter((bucket) => bucket.layer.mode === 'fill');
   const lineBuckets = buckets.filter((bucket) => bucket.layer.mode === 'line');
-  const lines = lineTopologyCollections(lineBuckets, device, scope, keepLeadRings);
+  const lines = lineTopologyCollections(
+    lineBuckets,
+    device,
+    scope,
+    keepLeadRings,
+    kerfSides === undefined ? undefined : { operationId: layer.id, sides: kerfSides },
+  );
   const fill = resolveFillContext(objects, fillBuckets, device);
   const output = vectorCompilation(
     buckets.map((bucket) =>

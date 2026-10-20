@@ -35,6 +35,7 @@ import type { IslandFillMotionPolicy } from './island-fill-motion';
 import type { FillRunwayPolicy } from './fill-runway-policy';
 import type { EffectiveScanDirection } from './scan-direction-policy';
 import type { CutGroupLaserLeads } from './laser-lead-settings';
+import type { KerfSideAssumedDiagnostic } from './kerf-scene-sides';
 
 export type CutSegment = {
   /** Timing-only CNC projection already uses the CNC emitter's coordinate
@@ -452,6 +453,8 @@ export type JobDiagnostic =
       readonly count: number;
       readonly kerfOffsetMm: number;
     }
+  // ADR-486 amendment 3: a closed shape taken for a score line or border.
+  | KerfSideAssumedDiagnostic
   // Hatch geometry existed, but every sweep rounded to a stationary point at
   // emitted G-code precision. Keep this advisory so microscopic fill loss is
   // visible without turning it into a Start, Frame, or export refusal.
