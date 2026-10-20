@@ -15,7 +15,7 @@ import { useStore } from '../state';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { imageDensityBounds } from '../raster/image-density-bounds';
 import { dotWidthCorrectionMax } from './cut-settings-draft';
-import { DitherSwatchPicker, originalPixelsNotice } from './DitherSwatchPicker';
+import { burnsAsGrayscale, DitherSwatchPicker, originalPixelsNotice } from './DitherSwatchPicker';
 import { ImageScanPatternFields } from './CutSettingsScanPatternFields';
 import { AutoOverscanSwitch, automaticOverscanNote } from './CutSettingsAutoOverscan';
 import { normalizedScanAngleDeg } from '../../core/raster/raster-scan-frame';
@@ -46,7 +46,7 @@ export function CutSettingsImageFields(props: {
         passThrough={passThrough}
         onChange={props.onDitherChange}
       />
-      {props.dither === 'grayscale' ? (
+      {burnsAsGrayscale(passThrough, props.dither) ? (
         <Field label="Min Power">
           <MinPowerInput initialValue={props.layer.minPower} maxPower={maxPower} />
           <span className="lf-field-unit">%</span>

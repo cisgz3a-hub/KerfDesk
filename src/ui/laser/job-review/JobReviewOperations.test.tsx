@@ -24,7 +24,7 @@ import {
   buildEffectiveOperationReview,
   type JobReviewEffectiveOperation,
 } from './job-review-effective-operations';
-import { JobReviewLayersTable } from './JobReviewLayersTable';
+import { JobReviewOperations } from './JobReviewOperations';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -63,24 +63,17 @@ async function render(
   root = createRoot(host);
   await act(async () => {
     root?.render(
-      <JobReviewLayersTable machineKind={machineKind} effectiveOperations={effectiveOperations} />,
+      <JobReviewOperations machineKind={machineKind} effectiveOperations={effectiveOperations} />,
     );
   });
 }
 
-function numberInput(label: string): HTMLInputElement {
-  const input = host.querySelector(`input[aria-label="${label}"]`);
-  if (!(input instanceof HTMLInputElement)) throw new Error(`Input "${label}" not found`);
-  return input;
+function shownValue(label: string): string | null | undefined {
+  return host.querySelector(`output[aria-label="${label}"]`)?.textContent;
 }
 
-async function typeAndBlur(input: HTMLInputElement, value: string): Promise<void> {
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-    setter?.call(input, value);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
-  });
+function compiledSummaries(): ReadonlyArray<string> {
+  return [...host.querySelectorAll('details li')].map((item) => item.textContent ?? '');
 }
 
 function storedLayer(id: string): Layer {
@@ -89,8 +82,8 @@ function storedLayer(id: string): Layer {
   return layer;
 }
 
-function cellTexts(): ReadonlyArray<string | null> {
-  return [...host.querySelectorAll('td')].map((cell) => cell.textContent);
+function detailLines(): ReadonlyArray<string | null> {
+  return [...host.querySelectorAll('[data-review-detail]')].map((line) => line.textContent);
 }
 
 // A 20 mm relief with a flat floor `depthMm` down, moved `xMm` along X.
@@ -163,47 +156,14 @@ function cncGroup(cutType: CncGroup['cutType'], passes: CncGroup['passes']): Cnc
   };
 }
 
-describe('JobReviewLayersTable', () => {
-  it('edits laser power/speed/passes through the store with clamping, and toggles air', async () => {
-    const layer = createLayer({ id: 'red', color: '#ff0000' });
-    seedLayers([layer], 'laser');
-    await render('laser');
-
-    await typeAndBlur(numberInput(`Power % for ${layer.name}`), '55');
-    expect(storedLayer('red').power).toBe(55);
-
-    await typeAndBlur(numberInput(`Speed mm/min for ${layer.name}`), '999999');
-    expect(storedLayer('red').speed).toBe(useStore.getState().project.device.maxFeed);
-
-    await typeAndBlur(numberInput(`Passes for ${layer.name}`), '2.7');
-    expect(storedLayer('red').passes).toBe(2);
-
-    const air = host.querySelector(`input[aria-label="Air assist for ${layer.name}"]`);
-    if (!(air instanceof HTMLInputElement)) throw new Error('Air checkbox not found');
-    await act(async () => air.click());
-    expect(storedLayer('red').airAssist).toBe(true);
-  });
-
-  it('rejects non-decimal English number syntax with accessible feedback and preserves the value', async () => {
-    const layer = createLayer({ id: 'red', color: '#ff0000' });
-    seedLayers([layer], 'laser');
-    await render('laser');
-    const input = numberInput(`Power % for ${layer.name}`);
-
-    await typeAndBlur(input, '1e2');
-
-    expect(storedLayer('red').power).toBe(layer.power);
-    expect(input.getAttribute('aria-invalid')).toBe('true');
-    expect(host.textContent).toContain('decimal point');
-  });
-
+describe('JobReviewOperations', () => {
   it('shows only output-enabled operations', async () => {
     const on = createLayer({ id: 'on', color: '#ff0000' });
     const off = { ...createLayer({ id: 'off', color: '#00ff00' }), output: false };
     seedLayers([on, off], 'laser');
     await render('laser');
 
-    expect(host.querySelectorAll('input[aria-label^="Power % for"]')).toHaveLength(1);
+    expect(host.querySelectorAll('output[aria-label^="Power % for"]')).toHaveLength(1);
   });
 
   it('shows CNC operation values read-only without mutating the store', async () => {
@@ -216,7 +176,8 @@ describe('JobReviewLayersTable', () => {
       host.querySelector(`output[aria-label="Feed mm/min for ${layer.name}"]`)?.textContent,
     ).toBe('1,000');
     expect(storedLayer('red').cnc).toBeUndefined();
-    expect(host.textContent).toContain('read-only — edit operation values in Artwork settings');
+    expect(host.textContent).toContain('read-only — change them in Artwork settings');
+    expect([...host.querySelectorAll('button')].map((b) => b.textContent)).not.toContain('Edit');
   });
 
   it('shows compiled actual depth instead of an inert cut-depth editor for flowing V-carve', async () => {
@@ -243,9 +204,7 @@ describe('JobReviewLayersTable', () => {
       `output[aria-label="Actual compiled max depth mm for ${layer.name}"]`,
     );
     expect(actual?.textContent).toBe('3.175 mm actual');
-    expect(host.textContent).toContain(
-      'Partial compiled summary (groups with matching shown values are combined): Actual max depth 3.175 mm',
-    );
+    expect(compiledSummaries()).toEqual(['Actual max depth 3.175 mm']);
     expect(
       host.querySelector(`output[aria-label="Depth per pass mm for ${layer.name}"]`)?.textContent,
     ).toBe('1.5');
@@ -263,7 +222,7 @@ describe('JobReviewLayersTable', () => {
     seedLayers([createLayer({ id: 'red', color: '#ff0000' })], 'laser');
     await render('laser');
 
-    expect(host.textContent).toContain('Artwork settings');
+    expect(host.textContent).toContain('Edit saves to your Artwork settings');
     expect(host.textContent).toContain(
       'Kerf 0 mm · stored contour entry target 5 mm · tabs off · min power 0%',
     );
@@ -290,7 +249,7 @@ describe('JobReviewLayersTable', () => {
     await render('laser');
 
     expect(host.textContent).toContain('Registration jig outline operation (2 outlines)');
-    expect(numberInput('Power % for Registration jig').value).toBe(String(registration.power));
+    expect(shownValue('Power % for Registration jig')).toBe(String(registration.power));
   });
 
   it('keeps editable base values while labeling combined compiled summaries as partial', async () => {
@@ -312,10 +271,9 @@ describe('JobReviewLayersTable', () => {
     });
     await render('laser', summaries);
 
-    expect(numberInput(`Power % for ${layer.name}`).value).toBe('30');
-    expect(host.textContent).toContain(
-      'Partial compiled summary (groups with matching shown values are combined): Line · 15% power',
-    );
+    expect(shownValue(`Power % for ${layer.name}`)).toBe('30');
+    expect(host.querySelector('details summary')?.textContent).toBe('Partial compiled summary');
+    expect(compiledSummaries().some((line) => line.startsWith('Line · 15% power'))).toBe(true);
     expect(host.textContent?.match(/Line · 15% power/g)).toHaveLength(1);
     expect(host.textContent).toContain('Line · 30% power');
   });
@@ -332,9 +290,9 @@ describe('JobReviewLayersTable', () => {
     ]);
 
     expect(host.textContent).toContain('Second pass');
-    expect(host.textContent).toContain(
-      'Partial compiled summary (groups with matching shown values are combined): Line · 21% power',
-    );
+    expect(compiledSummaries()).toEqual([
+      'Line · 21% power · 900 mm/min · 1 pass · air off · constant power',
+    ]);
   });
 
   it('shows the strategy detail line under a CNC operation', async () => {
@@ -367,7 +325,7 @@ describe('JobReviewLayersTable', () => {
 
     // 1.5 mm per pass to the 3 mm floor, less the 0.5 mm roughing allowance.
     // The operation's 1 mm Cut depth and its tabs reach no relief.
-    expect(cellTexts()).toContain(
+    expect(detailLines()).toContain(
       'relief roughing 2 levels to 2.5 mm · stepover 40% · Manual feeds',
     );
   });
@@ -376,7 +334,7 @@ describe('JobReviewLayersTable', () => {
     await renderCompiledReliefs([flatRelief('floor', 3, 0), flatRelief('deep', 5, 30)]);
 
     // 1.5 and 2.5 mm for the first relief; 1.5, 3 and 4.5 mm for the second.
-    expect(cellTexts()).toContain(
+    expect(detailLines()).toContain(
       'relief roughing at 4 depths to 4.5 mm across 2 reliefs · stepover 40% · Manual feeds',
     );
   });
@@ -407,7 +365,7 @@ describe('JobReviewLayersTable', () => {
     };
     await render('cnc', buildEffectiveOperationReview(job));
 
-    expect(cellTexts()).toContain(
+    expect(detailLines()).toContain(
       'relief roughing 2 levels to 2.5 mm · 1 pass on the other shapes · stepover 40% · tabs 4 per shape (6 × 2 mm), none on reliefs · Manual feeds',
     );
   });

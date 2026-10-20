@@ -4,7 +4,7 @@ param(
   [ValidateSet('App', 'Installer')]
   [string]$Kind = 'App',
   # An already published installer keeps the description it was built with;
-  # releases up to 1.0.19 predate the macOS and Linux wording (ADR-606).
+  # releases up to 1.0.19 predate the macOS and Linux wording (ADR-607).
   [switch]$Historical
 )
 
