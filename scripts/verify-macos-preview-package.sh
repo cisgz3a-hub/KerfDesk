@@ -78,6 +78,12 @@ test "$(lipo -archs "${executable}")" = "${expected_macho_arch}"
 if [[ -n "${identity}" ]]; then
   node scripts/verify-packaged-commercial-metadata.mjs \
     "${app_dir}/Contents/Resources/app.asar" "${version}" "${identity}"
+  # The unsigned commercial lane has no Mac update feed (ADR-613); the Linux
+  # check refuses the same file.
+  if [[ -e "${app_dir}/Contents/Resources/app-update.yml" ]]; then
+    echo "${package_label} app names an update feed: ${app_dir}/Contents/Resources/app-update.yml" >&2
+    exit 1
+  fi
 else
   node scripts/verify-packaged-preview-metadata.mjs \
     "${app_dir}/Contents/Resources/app.asar" "${version}"
