@@ -31,7 +31,7 @@ const DECISION_DIR = join('docs', 'decisions');
 const HEADING_PATTERN = /^## ADR-(\d+)(.*)$/;
 const AMENDMENT_PATTERN = /^\s+Amendment\b/;
 // `ADR-344-slug.md`, or `ADR-311-amendment-1-slug.md` for an amendment file.
-const FILENAME_PATTERN = /^ADR-(\d+)(?:-amendment-\d+)?-[a-z0-9-]+\.md$/u;
+const FILENAME_PATTERN = /^ADR-(\d+)(-amendment-\d+)?-[a-z0-9-]+\.md$/u;
 
 /** @type {Map<number, {file: string, line: number}[]>} */
 const decisionLines = new Map();
@@ -84,12 +84,23 @@ for (const name of decisionFiles()) {
     continue;
   }
   const expected = Number(claimed[1]);
-  collectHeadings(join(DECISION_DIR, name), join(DECISION_DIR, name), (number, line) => {
-    if (number === expected) return;
+  let claimsItsNumber = false;
+  collectHeadings(join(DECISION_DIR, name), join(DECISION_DIR, name), (number, line, amendment) => {
+    if (number === expected) {
+      if (!amendment) claimsItsNumber = true;
+      return;
+    }
     misnamed.push(
       `  ${join(DECISION_DIR, name)}:${line}  heading says ADR-${number}, filename says ADR-${expected}`,
     );
   });
+  // A decision file whose heading the pattern cannot see (`# ADR-638`, one `#`)
+  // claimed no number, so a second ADR-638 on another branch passed this gate.
+  if (claimed[2] === undefined && !claimsItsNumber) {
+    misnamed.push(
+      `  ${join(DECISION_DIR, name)}  has no "## ADR-${expected} - ..." heading, so its number is not counted`,
+    );
+  }
 }
 
 if (misnamed.length > 0) {

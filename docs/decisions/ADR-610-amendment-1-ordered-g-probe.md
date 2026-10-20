@@ -2,6 +2,13 @@
 
 **Status:** Accepted by the maintainer's request to audit and upgrade the controller fixes. **Date:** 2026-10-18.
 
+**Amended by [ADR-610 Amendment 2](ADR-610-amendment-2-unidentified-firmware-and-owed-replies.md):**
+a GRBL-family board that did not identify itself (no banner, no stock `$I`) is
+no longer finished on 15 s of Idle alone; it gets the same `$G` probe after that
+window. "Never finished early" below holds only for firmware that answers `$G`
+in order, and the Falcon's ordering rests on its GRBL-family command contract,
+not on a test of its firmware.
+
 Replaces ADR-610's two timed proofs for GRBL-family controllers. Everything
 else in ADR-610 stands: nothing acts until the whole program is on the wire and
 only job lines are owed replies, the missing replies are applied as

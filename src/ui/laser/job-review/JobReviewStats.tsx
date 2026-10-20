@@ -1,7 +1,9 @@
 // The Job Review stat-tile band: estimated time (hero tile), job size,
-// operations / cutters, G-code size, and the read-only origin, computed
-// from the exact prepared program (ADR-224). Dims with aria-busy while the
-// gate re-prepares after an edit.
+// operations / cutters, G-code size, the read-only origin and output scope,
+// computed from the exact prepared program (ADR-224). Each tile shows its
+// whole detail under the value, wrapping when long, so it reads the same by
+// keyboard and touch as by pointer (ADR-638 Amendment 1). Dims with aria-busy
+// while the gate re-prepares after an edit.
 
 import type { JobReviewStatTile } from './job-review-model';
 import {

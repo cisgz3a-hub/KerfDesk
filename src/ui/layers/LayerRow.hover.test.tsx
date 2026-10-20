@@ -57,4 +57,41 @@ describe('LayerRow canvas pulse (ADR-620)', () => {
     await act(async () => root.unmount());
     expect(useUiStore.getState().hoveredOperationId).toBeNull();
   });
+
+  it('pulses for keyboard focus within the row, as for the pointer', async () => {
+    useStore.getState().importSvgObject(svgObj('Focus operation', ['#ff0000']));
+    const layer = useStore.getState().project.scene.layers[0];
+    if (layer === undefined) throw new Error('operation fixture missing');
+    const outside = document.createElement('button');
+    const host = document.createElement('div');
+    document.body.append(outside, host);
+    const root = createRoot(host);
+    await act(async () =>
+      root.render(<LayerRow layer={layer} canMoveUp={false} canMoveDown={false} />),
+    );
+    const buttons = host.querySelectorAll<HTMLElement>(
+      '[aria-label="Operation Focus operation"] button',
+    );
+    const [first, second] = [buttons[0], buttons[1]];
+    if (first === undefined || second === undefined) throw new Error('row buttons missing');
+    const settle = (): Promise<void> =>
+      act(async () => new Promise((resolve) => setTimeout(resolve, PULSE_HOVER_DWELL_MS + 30)));
+
+    await act(async () => first.focus());
+    await settle();
+    expect(useUiStore.getState().hoveredOperationId).toBe(layer.id);
+    // Moving between the row's own controls keeps the pulse's edge.
+    await act(async () => second.focus());
+    await settle();
+    expect(useUiStore.getState().hoveredOperationId).toBe(layer.id);
+    await act(async () => outside.focus());
+    expect(useUiStore.getState().hoveredOperationId).toBeNull();
+
+    // Tabbing past the row without settling pulses nothing.
+    await act(async () => first.focus());
+    await act(async () => outside.focus());
+    await settle();
+    expect(useUiStore.getState().hoveredOperationId).toBeNull();
+    await act(async () => root.unmount());
+  });
 });

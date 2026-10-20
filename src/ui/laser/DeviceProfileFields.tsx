@@ -11,7 +11,7 @@ import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { BedCornerPicker, bedPositionLabel } from './BedCornerPicker';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
 
-const MAX_BED_MM = 1500;
+export const MAX_BED_MM = 1500;
 const MAX_FEED_MM_PER_MIN = 100000;
 
 /** The origin corner as the bed diagram names it ("Front left"). */

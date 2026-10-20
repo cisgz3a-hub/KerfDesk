@@ -118,7 +118,7 @@ function ControllerContract(props: {
 // A setup that includes CNC marks the controllers that cannot run KerfDesk
 // CNC jobs (`cncJobs` false), so the operator learns it before a CNC setup on
 // one is refused at save (device-setup-flow.ts; controller audit CN-2).
-function controllerOptionLabel(
+export function controllerOptionLabel(
   guide: { readonly label: string; readonly cncSupported: boolean },
   includesCnc: boolean,
 ): string {

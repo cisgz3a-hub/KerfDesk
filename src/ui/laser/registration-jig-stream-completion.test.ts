@@ -13,6 +13,7 @@ import { initialLaserState } from '../state/laser-store-helpers';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
+import { useUiStore } from '../state/ui-store';
 import {
   armRegistrationJigCompletion,
   cancelRegistrationJigCompletion,
@@ -288,6 +289,29 @@ describe('registration jig completion', () => {
     expect(registrationRunState(useStore.getState().project.scene)).toBe('box');
     expect(useToastStore.getState().toasts).toHaveLength(1);
     expect(useToastStore.getState().toasts[0]!.message).toContain('Outline only stays selected');
+  });
+
+  it('keeps Outline only and says so when run numbering refuses the switch', () => {
+    const observer = armRegistrationJigCompletion(args())!;
+    observer.accept();
+    // Numbering opened from the Run order panel while the outline burned.
+    useStore.getState().beginInteraction();
+    useUiStore.getState().startArtworkNumbering([]);
+    try {
+      settle();
+      expect(outlineEnabled()).toBe(true);
+      expect(registrationRunState(useStore.getState().project.scene)).toBe('box');
+      const messages = useToastStore.getState().toasts.map((toast) => toast.message);
+      expect(messages.some((message) => message.includes('Artwork only is now selected'))).toBe(
+        false,
+      );
+      expect(messages.some((message) => message.includes('Outline only stays selected'))).toBe(
+        true,
+      );
+    } finally {
+      useUiStore.getState().finishArtworkNumbering();
+      useStore.getState().cancelInteraction();
+    }
   });
 
   it('does not arm for CNC output', () => {

@@ -145,13 +145,16 @@ function keptStretch(
   if (options.keepRemoved === undefined) return null;
   const copy = preservedStretch(state.project, trimmed, edit, options.keepRemoved.color);
   if (copy === null) return null;
+  const source = trimmed.paths[edit.pathIndex];
+  // With no layer in the drawing colour, the copy keeps the binding its stretch
+  // had: the trimmed path's own, which wins over the artwork's.
+  const binding = source?.operationIds ?? trimmed.operationIds;
   const placed =
-    copy.operationIds === undefined && trimmed.operationIds !== undefined
-      ? { ...copy, operationIds: trimmed.operationIds }
+    copy.operationIds === undefined && binding !== undefined
+      ? { ...copy, operationIds: binding }
       : copy;
   // Compare what each actually cuts by: a path binding wins over the artwork's.
   const operations = state.project.scene.layers;
-  const source = trimmed.paths[edit.pathIndex];
   const copyPath = placed.paths[0];
   const trimmedIds = new Set(
     source === undefined ? [] : pathBoundOperationIds(trimmed, source, operations),
