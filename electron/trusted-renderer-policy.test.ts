@@ -267,6 +267,26 @@ describe('Electron trusted renderer policy', () => {
     ).toBe(false);
   });
 
+  // ADR-628: window.queryLocalFonts arrives as local-fonts, for the trusted
+  // main frame only.
+  it('grants local font access only to the trusted main renderer', () => {
+    const request = (isMainFrame: boolean, url: string): boolean =>
+      shouldGrantPermissionRequest(
+        { permission: 'local-fonts', isMainFrame, requestingUrl: url, currentUrl: url },
+        trustedOrigins,
+      );
+    expect(request(true, 'app://app/index.html')).toBe(true);
+    expect(request(false, 'app://app/index.html')).toBe(false);
+    expect(request(true, 'https://evil.example/')).toBe(false);
+    const check = (requestingOrigin: string): boolean =>
+      shouldGrantPermissionCheck(
+        { permission: 'local-fonts', requestingOrigin, currentUrl: `${requestingOrigin}/` },
+        trustedOrigins,
+      );
+    expect(check('app://app')).toBe(true);
+    expect(check('https://evil.example')).toBe(false);
+  });
+
   // ADR-482: navigator.clipboard.writeText arrives as clipboard-sanitized-write.
   // Plain-text copy is granted to the trusted main frame; reads stay denied.
   it('grants clipboard writes, not reads, to the trusted main renderer', () => {

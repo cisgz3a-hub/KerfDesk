@@ -192,7 +192,7 @@ describe('compact machine connection', () => {
       qualification: { kind: 'qualifying', epoch: 4, phase: 'settings-read' },
     });
     expect(host.textContent).not.toContain('Reading controller settings…');
-    expect(host.querySelectorAll('[role="status"]')).toHaveLength(2);
+    expect(host.querySelectorAll('[role="status"]')).toHaveLength(1);
     await openMenu(host);
     await act(async () => menuItem('Controller info')?.click());
     expect(document.body.textContent).toContain('Reading controller settings…');

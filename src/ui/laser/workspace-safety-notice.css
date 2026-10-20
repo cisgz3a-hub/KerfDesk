@@ -32,6 +32,37 @@
   border-radius: 4px;
   box-shadow: var(--lf-shadow);
   pointer-events: auto;
+  /* The safety notice, then the controller recovery card (ADR-642). */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lf-safety-notice-toast > * {
+  flex-shrink: 0;
+}
+
+/* The folded recovery card: one full-width row that stays while recovery is
+   needed (ADR-642). */
+.lf-btn.lf-controller-recovery-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 12px;
+  color: var(--lf-warning-fg);
+  background: var(--lf-bg-1);
+  border: 1px solid var(--lf-warning);
+  border-radius: 8px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.lf-controller-recovery-pill__action {
+  margin-left: auto;
+  font-weight: 400;
+  text-decoration: underline;
 }
 
 /* A canvas narrower than the card (a phone with a side panel open) would

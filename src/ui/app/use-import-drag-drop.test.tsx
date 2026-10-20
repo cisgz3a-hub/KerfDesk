@@ -162,7 +162,11 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
       await dropFiles([file]);
 
       await vi.waitFor(() => {
-        expect(openGcodeInspector).toHaveBeenCalledWith(name, { kind: 'blob', blob: file });
+        expect(openGcodeInspector).toHaveBeenCalledWith(name, {
+          kind: 'blob',
+          blob: file,
+          openedFile: true,
+        });
       });
       expect(file.text).not.toHaveBeenCalled();
       expect(toastMessages().some((message) => message.includes('Drop ignored'))).toBe(false);
@@ -183,6 +187,7 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
       expect(openGcodeInspector).toHaveBeenCalledWith('part.gcode', {
         kind: 'blob',
         blob: gcode,
+        openedFile: true,
       });
     });
     expect(imageMocks.importImageFile).toHaveBeenCalledTimes(1);
@@ -203,7 +208,11 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
 
     await dropFiles([file]);
 
-    expect(openGcodeInspector).toHaveBeenCalledWith('broken.nc', { kind: 'blob', blob: file });
+    expect(openGcodeInspector).toHaveBeenCalledWith('broken.nc', {
+      kind: 'blob',
+      blob: file,
+      openedFile: true,
+    });
     expect(file.text).not.toHaveBeenCalled();
 
     await unmount();
@@ -242,6 +251,7 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
       expect(openGcodeInspector).toHaveBeenCalledWith('first.nc', {
         kind: 'blob',
         blob: first,
+        openedFile: true,
       });
     });
     expect(openGcodeInspector).toHaveBeenCalledTimes(1);

@@ -1,6 +1,7 @@
 ## ADR-017 Amendment 1 - An LGPL program that KerfDesk does not link may ship in the AppImage (2026-10-20)
 
-**Status:** Accepted on 2026-10-20, from the maintainer's request to copy what LightBurn does |
+**Status:** Accepted on 2026-10-20, from the maintainer's request to copy what LightBurn does;
+decision 4 settled, and libgconf-2 left out, by ADR-017 Amendment 2 |
 **Amends:** ADR-017 decision 2 (licences), and the GPL-family rejection ADR-017 keeps from
 ADR-008 and ADR-018 and ADR-120 restates, for the Linux AppImage only
 

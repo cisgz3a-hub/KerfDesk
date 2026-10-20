@@ -7,7 +7,10 @@
 //
 // The result is always in the internal unit — millimetres for lengths, degrees
 // for angles. Typing `1in` is the explicit input-boundary conversion PROJECT.md
-// non-negotiable 6 permits; nothing here shows inches back to the operator.
+// non-negotiable 6 permits. With the Inches display preference (ADR-629) a
+// length box passes `lengthUnit: 'in'`: a product with no unit anywhere in it
+// is then read in inches, while a typed unit still wins (`10mm` is 10 mm).
+// Inside brackets numbers stay bare, so `(1+2)` is 3 in, not 3 in squared.
 //
 // Grammar, loosest binding first (whitespace allowed between any tokens):
 //   sum     := product (('+' | '-') product)*
@@ -37,6 +40,8 @@ export type NumericEntryKind = 'length' | 'angle';
 
 export type NumericEntryOptions = {
   readonly kind: NumericEntryKind;
+  /** The unit a bare number means in a length box. Millimetres when omitted. */
+  readonly lengthUnit?: 'mm' | 'in';
   /** The current value `%` is a share of. Omit where a percentage means nothing. */
   readonly percentOf?: number;
 };
@@ -56,6 +61,10 @@ type Cursor = {
   readonly options: NumericEntryOptions;
   index: number;
   failure: string | null;
+  /** Bracket nesting; the default length unit applies only at depth 0. */
+  depth: number;
+  /** Explicit suffixes consumed, including those inside groups and powers. */
+  unitsRead: number;
 };
 
 const LENGTH_UNITS: ReadonlyMap<string, number> = new Map([
@@ -100,7 +109,14 @@ export function evaluateNumericEntry(
   const tokens = tokenize(text);
   if (tokens.kind === 'invalid') return tokens;
   if (tokens.tokens.length === 0) return invalid('the box is empty');
-  const cursor: Cursor = { tokens: tokens.tokens, options, index: 0, failure: null };
+  const cursor: Cursor = {
+    tokens: tokens.tokens,
+    options,
+    index: 0,
+    failure: null,
+    depth: 0,
+    unitsRead: 0,
+  };
   const value = parseSum(cursor);
   const extra = cursor.tokens[cursor.index];
   if (cursor.failure === null && extra !== undefined) fail(cursor, strayTokenMessage(extra, true));
@@ -189,6 +205,7 @@ type Factor = { readonly value: number; readonly scale: number | null };
 // without units while no factor has carried one; when the last factor brings
 // the only unit, `whole` applies it to that product instead (see the header).
 function parseProduct(cursor: Cursor): number {
+  const unitsBefore = cursor.unitsRead;
   const first = parseUnary(cursor);
   let value = scaled(first);
   let unitless = first.scale === null ? first.value : null;
@@ -203,7 +220,17 @@ function parseProduct(cursor: Cursor): number {
     unitless = right.scale === null ? combined : null;
     op = takeSymbol(cursor, PRODUCT_OPERATORS);
   }
+  // Groups, functions and powers return an already-scaled number rather than
+  // a suffix. Only a product that consumed no suffix anywhere is still bare.
+  if (cursor.unitsRead === unitsBefore) return value * defaultLengthScale(cursor);
   return whole ?? value;
+}
+
+// What a product with no unit in it is measured in: the box's unit at the top
+// level, plain numbers inside brackets.
+function defaultLengthScale(cursor: Cursor): number {
+  if (cursor.depth > 0 || cursor.options.kind !== 'length') return 1;
+  return cursor.options.lengthUnit === 'in' ? MM_PER_INCH : 1;
 }
 
 function applyProductOperator(op: string, left: number, right: number): number {
@@ -238,6 +265,7 @@ function parsePostfix(cursor: Cursor): Factor {
   const scale = unitScale(cursor, token);
   if (scale === null) return { value, scale: null };
   cursor.index += 1;
+  cursor.unitsRead += 1;
   return { value, scale };
 }
 
@@ -255,7 +283,9 @@ function parsePrimary(cursor: Cursor): number {
 
 function parseGroup(cursor: Cursor): number {
   takeSymbol(cursor, OPEN_BRACKET);
+  cursor.depth += 1;
   const value = parseSum(cursor);
+  cursor.depth -= 1;
   if (takeSymbol(cursor, CLOSE_BRACKET) !== null || cursor.failure !== null) return value;
   const next = cursor.tokens[cursor.index];
   return fail(

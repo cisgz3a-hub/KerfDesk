@@ -140,4 +140,18 @@ describe('programBounds', () => {
       maxZ: 10,
     });
   });
+
+  // ADR-630: a Frame built from these bounds must cover where the controller's
+  // finer arc interpolation goes, not only the display's sampled chords.
+  it('reaches an arc extreme that falls between its sampled points', () => {
+    const radius = Math.hypot(39.9318, 30.0908);
+    const job = model([
+      'G21 G90',
+      'G0 X39.9318 Y30.0908',
+      // 37° to 143° counter-clockwise about 0,0, over the top at Y = radius.
+      'G3 X-39.9318 Y30.0908 I-39.9318 J-30.0908 F600',
+    ]);
+    expect(job.stats.programBounds?.maxY).toBeCloseTo(radius, 9);
+    expect(job.stats.programBounds?.minY).toBeCloseTo(30.0908, 9);
+  });
 });

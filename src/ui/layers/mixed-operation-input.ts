@@ -9,6 +9,7 @@ export function useMixedOperationNumber(args: {
   readonly reconcileKey?: unknown;
   readonly commitOnBlur?: boolean;
   readonly parse: (value: string) => number;
+  readonly validate?: ((value: string) => string | null) | undefined;
   readonly commit: (value: number) => void;
 }) {
   const debounced = useDebouncedCommit<number | null>({
@@ -17,7 +18,7 @@ export function useMixedOperationNumber(args: {
     commitOnBlur: args.commitOnBlur === true,
     parse: (value) => (value.trim() === '' ? null : args.parse(value)),
     format: (value) => (value === null ? '' : String(value)),
-    validate: validateEnglishDecimalInput,
+    validate: args.validate ?? validateEnglishDecimalInput,
     commit: (value) => {
       if (value !== null) args.commit(value);
     },

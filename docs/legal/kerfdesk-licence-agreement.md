@@ -131,7 +131,7 @@ _Not open yet. The trial starts working when the desktop app for Windows is rele
 
 _Not on sale yet._
 
-**7.1 What Pro unlocks.** V-carve, 3D relief, adaptive clearing, advanced tracing, camera alignment, the box generator, Design Studio and the G-code Inspector, and any new tools we mark as Pro in future versions. The current split between Free and Pro is at https://kerfdesk.com/pricing/, and the app marks Pro tools.
+**7.1 What Pro unlocks.** V-carve, 3D relief, adaptive clearing, advanced tracing, camera alignment, the box generator and Design Studio, and any new tools we mark as Pro in future versions. The current split between Free and Pro is at https://kerfdesk.com/pricing/, and the app marks Pro tools.
 
 **7.2 Where this licence works.** The paid Pro entitlement and trial apply to the approved commercial Windows desktop app (Windows 10 or 11, 64-bit). The browser runs Free. Source and Preview builds keep the capabilities and terms with which they are supplied; this draft does not change their release channel (section 5.3).
 
