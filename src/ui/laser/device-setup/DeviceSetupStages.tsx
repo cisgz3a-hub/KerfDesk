@@ -5,7 +5,6 @@ import { machineSetupValidationIssues } from './device-setup-flow';
 import { deviceSetupStage } from './device-setup-steps';
 import type { DeviceSetupHighlight } from './machine-setup-dialog-store';
 import type { MachineSetupConnection } from './machine-setup-connection';
-import { DeviceSetupMachineCapability } from './DeviceSetupMachineCapability';
 import { DeviceSetupIdentifyStep } from './DeviceSetupIdentifyStep';
 import { DeviceSetupConnectStep } from './DeviceSetupConnectStep';
 import { DeviceSetupConfirmStep } from './DeviceSetupConfirmStep';
@@ -30,8 +29,9 @@ export function DeviceSetupStages(props: DeviceSetupStagesProps): JSX.Element {
   return <DeviceSetupReviewStep {...props} operationDrafts={props.cncSetup.operationDrafts} />;
 }
 
-// Find my machine leads (ADR-420): connecting first lets the controller fill
-// in the type and values below it; each choice stays editable after.
+// The machine list leads (ADR-637). The connection strip above it reports
+// the controller and fills a new machine's values in (ADR-420); connecting is
+// never needed to choose.
 function MachineStage(props: DeviceSetupStagesProps): JSX.Element {
   return (
     <div className="lf-setup-stack">
@@ -42,8 +42,7 @@ function MachineStage(props: DeviceSetupStagesProps): JSX.Element {
         connection={props.connection}
         openOptions={props.state.step === 'connect'}
       />
-      <DeviceSetupMachineCapability {...props} />
-      <DeviceSetupIdentifyStep {...props} />
+      <DeviceSetupIdentifyStep state={props.state} dispatch={props.dispatch} />
     </div>
   );
 }

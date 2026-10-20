@@ -49,6 +49,16 @@ function button(label: string): HTMLButtonElement {
   return found;
 }
 
+/** A button in Machine Setup's connection strip, not the toolbar's. */
+function stripButton(label: string): HTMLButtonElement {
+  const strip = document.querySelector('section[aria-label="Controller connection"]');
+  const found = [...(strip?.querySelectorAll('button') ?? [])].find(
+    (node) => node.textContent?.trim() === label,
+  );
+  if (!found) throw new Error(`Missing strip button: ${label}`);
+  return found;
+}
+
 function controlsText(): string {
   return document.querySelector('.lf-setup-find')?.textContent ?? '';
 }
@@ -203,8 +213,8 @@ describe('first FluidNC network Connect setup recovery', () => {
     await act(async () => button('Try again').click());
     expect(useLaserStore.getState().connection.kind).toBe('disconnected');
     expect(controlsText()).toContain('Network target: 192.0.2.5:23');
-    expect(controlsText()).not.toContain('Plug it in by USB');
-    await act(async () => button('Find my machine').click());
+    expect(controlsText()).not.toContain('Connect by USB');
+    await act(async () => stripButton('Connect').click());
     expect(link.tcpRequest).toHaveBeenCalledTimes(3);
     expect(link.usbRequest).not.toHaveBeenCalled();
     await act(async () => closeMachineSetup());

@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { createLicensingRuntime } from './licensing-runtime';
 import {
+  answering,
   claims,
   grant,
   harness,
@@ -69,7 +70,7 @@ it.each([
     const local = served + offset * 1000;
     const h = harness({ ...saved(), refreshedAt: NOW / 1000 });
     h.clock(local);
-    h.fetch.mockResolvedValue(grant(claims({ issuedAt: served / 1000 })));
+    h.fetch.mockImplementation(answering(claims({ issuedAt: served / 1000 })));
     const refreshed = await h.runtime.refresh();
     expect(refreshed).toMatchObject({ state: 'ready', edition: 'pro', tier: 'paid' });
     expect(refreshed.message).toContain(text);
@@ -85,7 +86,8 @@ it.each([
       state: 'checkin-required',
       edition: 'free',
     });
-    // A clock-correct refresh drops the offset and its warning.
+    // A clock-correct refresh drops the offset and its warning, even from an
+    // older service that signs no nonce.
     h.clock(served + 31 * DAY_MS);
     h.fetch.mockResolvedValue(grant(claims({ issuedAt: served / 1000 + 31 * 86_400 })));
     const corrected = await h.runtime.refresh();
@@ -93,9 +95,41 @@ it.each([
     expect(h.saved()?.clockOffset).toBeUndefined();
   },
 );
+// The desktop app ships for macOS and Linux too (ADR-623 Amendment 1).
+it.each([
+  { platform: 'darwin', setting: 'System Settings > General > Date & Time' },
+  { platform: 'linux', setting: 'your desktop’s date and time settings' },
+])('names $platform’s own clock settings in every clock message', async ({ platform, setting }) => {
+  const on = (h: ReturnType<typeof harness>) => createLicensingRuntime({ ...h.options, platform });
+  const overdue = harness(saved());
+  overdue.clock(NOW + 31 * DAY_MS);
+  const rolledBack = harness(saved(trialClaims()));
+  rolledBack.clock(NOW - 600_000);
+  const refused = harness();
+  refused.fetch.mockResolvedValue(grant(claims({ issuedAt: NOW / 1000 + 2 * 3600 })));
+  const keptOffset = harness({ ...saved(), refreshedAt: NOW / 1000 });
+  keptOffset.clock(NOW + 8 * DAY_MS + 3_600_000);
+  keptOffset.fetch.mockResolvedValue(grant(claims({ issuedAt: NOW / 1000 + 8 * 86_400 })));
+  const messages = [
+    await on(overdue).status(),
+    await on(rolledBack).status(),
+    await on(refused).activate(TEST_KEY),
+    await on(keptOffset).refresh(),
+  ].map((status) => `${status.state}: ${status.message}`);
+  expect(messages.map((message) => message.split(':')[0])).toEqual([
+    'checkin-required',
+    'clock-error',
+    'clock-error',
+    'ready',
+  ]);
+  for (const message of messages) {
+    expect(message).toContain(setting);
+    expect(message).not.toContain('Windows');
+  }
+});
 it('still refuses a trial, an activation or a paid offset beyond one check-in period', async () => {
   const trial = harness({ ...saved(trialClaims()), refreshedAt: NOW / 1000 });
-  trial.fetch.mockResolvedValue(grant(trialClaims({ issuedAt: NOW / 1000 - 3600 })));
+  trial.fetch.mockImplementation(answering(trialClaims({ issuedAt: NOW / 1000 - 3600 })));
   expect(await trial.runtime.refresh()).toMatchObject({ state: 'clock-error', tier: 'trial' });
   expect(trial.saved()?.clockOffset).toBeUndefined();
   expect(trial.saved()?.credential).toEqual(saved(trialClaims()).credential);
@@ -104,7 +138,7 @@ it('still refuses a trial, an activation or a paid offset beyond one check-in pe
   expect(await activation.runtime.activate(TEST_KEY)).toMatchObject({ state: 'clock-error' });
   expect(activation.saved()).toBeNull();
   const far = harness({ ...saved(), refreshedAt: NOW / 1000 });
-  far.fetch.mockResolvedValue(grant(claims({ issuedAt: NOW / 1000 - 31 * 86_400 })));
+  far.fetch.mockImplementation(answering(claims({ issuedAt: NOW / 1000 - 31 * 86_400 })));
   const refused = await far.runtime.refresh();
   expect(refused).toMatchObject({ state: 'clock-error' });
   expect(refused.message).toContain('could not be confirmed');

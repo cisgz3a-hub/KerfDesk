@@ -6,7 +6,11 @@
 
 import type { VectorSceneObject } from '../../core/geometry';
 import { unpackSceneObjectsMessage } from '../packed-scene-objects-transfer';
-import type { VectorOpRequest, VectorOpResponse } from './vector-op-worker-protocol';
+import type {
+  VectorOpMessage,
+  VectorOpRequest,
+  VectorOpResponse,
+} from './vector-op-worker-protocol';
 import { vectorOpResponse } from './vector-op-worker-runtime';
 
 let sources: ReadonlyArray<VectorSceneObject> = [];
@@ -30,3 +34,7 @@ self.onmessage = (event: MessageEvent<VectorOpRequest>): void => {
     self.postMessage(response);
   }
 };
+
+// The client counts an error before this as a worker that never started.
+const ready: VectorOpMessage = { kind: 'ready' };
+self.postMessage(ready);

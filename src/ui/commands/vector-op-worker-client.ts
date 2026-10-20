@@ -20,10 +20,14 @@
 // reply) reports `failed`: running it again in thread would repeat the failure
 // and freeze the window while it did. Every failure retires the worker, so a
 // later request never meets a worker whose sources the client no longer knows.
+// A module worker whose script cannot be fetched or evaluated (a chunk gone
+// after a deploy, a CSP block) still constructs and reports that later through
+// onerror, so the worker announces itself once its script has run; an error
+// before that is `unavailable`.
 
 import type { VectorSceneObject } from '../../core/geometry';
 import { packSceneObjectsMessage } from '../packed-scene-objects-transfer';
-import type { VectorOpRequest, VectorOpResponse, VectorOpTask } from './vector-op-worker-protocol';
+import type { VectorOpMessage, VectorOpRequest, VectorOpTask } from './vector-op-worker-protocol';
 import {
   runVectorOpTask,
   vectorOpResult,
@@ -69,6 +73,8 @@ export function createVectorOpSession(
 
 class VectorOpWorkerSession {
   private worker: Worker | null = null;
+  /** The current worker's script has run (it posted `ready`). */
+  private started = false;
   private loaded: ReadonlyArray<VectorSceneObject> | null = null;
   private active: ActiveRequest | null = null;
   private nextId = 0;
@@ -119,6 +125,7 @@ class VectorOpWorkerSession {
     worker.onmessageerror = null;
     worker.terminate();
     this.worker = null;
+    this.started = false;
     this.loaded = null;
   }
 
@@ -127,7 +134,12 @@ class VectorOpWorkerSession {
     this.settleActive(outcome);
   }
 
-  private receive(response: VectorOpResponse): void {
+  private receive(message: VectorOpMessage): void {
+    if (message.kind === 'ready') {
+      this.started = true;
+      return;
+    }
+    const response = message;
     const current = this.active;
     if (current === null || response.id !== current.id) return;
     if (response.kind === 'fatal') {
@@ -148,8 +160,13 @@ class VectorOpWorkerSession {
     if (this.worker !== null) return this.worker;
     const created = this.spawn();
     if (created === null) return null;
-    created.onmessage = (event: MessageEvent<VectorOpResponse>) => this.receive(event.data);
-    created.onerror = () => this.end({ kind: 'failed', message: WORKER_ERROR_MESSAGE });
+    created.onmessage = (event: MessageEvent<VectorOpMessage>) => this.receive(event.data);
+    created.onerror = () =>
+      this.end(
+        this.started
+          ? { kind: 'failed', message: WORKER_ERROR_MESSAGE }
+          : { kind: 'unavailable', message: UNAVAILABLE_MESSAGE },
+      );
     created.onmessageerror = () => this.end({ kind: 'failed', message: MESSAGE_ERROR_MESSAGE });
     this.worker = created;
     return created;

@@ -36,7 +36,7 @@ test('pins the installer description that package.json builds', () => {
 });
 
 // Upgrade qualification installs the published release first; its installer
-// was built before ADR-606 and keeps the Windows-only description.
+// was built before ADR-607 and keeps the Windows-only description.
 test('accepts the earlier description only for the published baseline installer', () => {
   const qualifier = readFileSync(
     new URL('./qualify-windows-installer.ps1', import.meta.url),

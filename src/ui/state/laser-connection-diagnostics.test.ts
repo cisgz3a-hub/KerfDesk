@@ -64,24 +64,21 @@ function logMentionsBaud(): boolean {
 // The state Find my machine shows for the live connection (ADR-420).
 function findMachineShows(): string {
   const laser = useLaserStore.getState();
-  return findMachinePhase(
-    {
-      supportsSerial: true,
-      driver: { capabilities: { transport: 'serial' } },
-      guide: { label: 'GRBL v1.1', writeExplanation: '' },
-      baudRate: 115200,
-      laser: {
-        connection: laser.connection,
-        qualification: laser.controllerQualification,
-        statusReport: laser.statusReport,
-        detectedControllerKind: laser.detectedControllerKind,
-        serialPortInfo: laser.serialPortInfo ?? null,
-        connectedBaudRate: laser.connectedBaudRate ?? null,
-      },
-      scan: { status: { kind: 'idle' } },
+  return findMachinePhase({
+    supportsSerial: true,
+    driver: { capabilities: { transport: 'serial' } },
+    guide: { label: 'GRBL v1.1', writeExplanation: '' },
+    baudRate: 115200,
+    laser: {
+      connection: laser.connection,
+      qualification: laser.controllerQualification,
+      statusReport: laser.statusReport,
+      detectedControllerKind: laser.detectedControllerKind,
+      serialPortInfo: laser.serialPortInfo ?? null,
+      connectedBaudRate: laser.connectedBaudRate ?? null,
     },
-    false,
-  ).kind;
+    scan: { status: { kind: 'idle' } },
+  }).kind;
 }
 
 // A Marlin board that does not reboot on open (native USB): no `start`

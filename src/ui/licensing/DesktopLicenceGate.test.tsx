@@ -100,6 +100,40 @@ it.each([0, 10_000])(
     if (budget === 0) expect(licenceWindow()).not.toBeNull();
   },
 );
+// ADR-623 Amendment 1: a renderer reloaded after a crash, in a session the window
+// already let in, reaches its workspace and job recovery though the trial ended.
+it.each([
+  { opening: 'a reload in an admitted session', sessionAdmitted: true },
+  { opening: 'a fresh launch', sessionAdmitted: undefined },
+])('after the trial ended, $opening opens the right screen', async ({ sessionAdmitted }) => {
+  const workspaceAdmitted = vi.fn(async () => undefined);
+  const ended: LicenceStatus = {
+    ...trial,
+    edition: 'free',
+    state: 'trial-expired',
+    accessExpiresAt: 1_700_000_000,
+    admissionGeneration: 4,
+    ...(sessionAdmitted === undefined ? {} : { sessionAdmitted }),
+  };
+  await act(async () =>
+    root.render(
+      <EditionProvider client={{ ...client(ended), workspaceAdmitted }}>
+        <div data-workspace />
+      </EditionProvider>,
+    ),
+  );
+  if (sessionAdmitted) {
+    expect(licenceWindow()).toBeNull();
+    expect(host.querySelector('[data-workspace]')).not.toBeNull();
+    expect(workspaceAdmitted).toHaveBeenCalledWith(4);
+  } else {
+    expect(licenceWindow()?.dataset.licenceState).toBe('trial-expired');
+    expect(host.querySelector('[data-workspace]')).toBeNull();
+    expect(workspaceAdmitted).not.toHaveBeenCalled();
+  }
+  // Either way, new Pro tool choices stay paused.
+  expect(proFeaturesUnlocked()).toBe(false);
+});
 it('opens a commercial build behind the licence window until a trial starts', async () => {
   const api = client();
   const mounted = vi.fn();

@@ -18,6 +18,12 @@ export function createStartupSignals(alwaysAdmitted: boolean) {
   let admitted = alwaysAdmitted;
   // Each opening renderer is a new generation; replies to an older one admit nothing.
   let generation = 0;
+  // Once a mounted workspace acknowledges, the window has let this app session
+  // in until KerfDesk quits (ADR-623 Amendment 1). Services still follow each renderer.
+  let sessionAdmitted = false;
+  // Whether the current renderer was sent a Pro status, the only status its
+  // licence window admits on. Its acknowledgement latches the session only then.
+  let proSent = false;
   const listeners = new Set<(admitted: boolean) => void>();
   const setAdmitted = (next: boolean): void => {
     if (admitted === next) return;
@@ -30,6 +36,7 @@ export function createStartupSignals(alwaysAdmitted: boolean) {
   });
   const resetRenderer = (): void => {
     generation += 1;
+    proSent = false;
     if (!alwaysAdmitted) setAdmitted(false);
   };
   const admission: WorkspaceAdmission = {
@@ -49,8 +56,9 @@ export function createStartupSignals(alwaysAdmitted: boolean) {
      */
     observeRequest: (): ((status: { readonly edition: string }) => number | null) => {
       const requested = generation;
-      return () => {
+      return (status) => {
         if (requested !== generation) return null;
+        if (status.edition === 'pro') proSent = true;
         markStatusRead();
         return requested;
       };
@@ -58,8 +66,16 @@ export function createStartupSignals(alwaysAdmitted: boolean) {
     /** The mounted renderer acknowledges admission after its own trial-time
      * normalization. A status sent before expiry alone never starts services. */
     admitWorkspace: (acknowledged: number): void => {
-      if (acknowledged === generation) setAdmitted(true);
+      if (acknowledged !== generation) return;
+      if (proSent) sessionAdmitted = true;
+      setAdmitted(true);
     },
+    /**
+     * Whether a workspace was let in during this app session, sent with each
+     * status so a reloaded renderer or a reopened window opens to its workspace
+     * again even after rights ended. A new launch starts behind the window.
+     */
+    sessionAdmitted: (): boolean => sessionAdmitted,
     /** Resolves once a status has been read, or after `ms` if none is. */
     afterFirstStatusRead: (ms: number): Promise<void> => {
       let timer: ReturnType<typeof setTimeout> | undefined;

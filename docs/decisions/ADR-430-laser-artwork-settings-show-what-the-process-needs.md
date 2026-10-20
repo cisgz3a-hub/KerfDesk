@@ -50,7 +50,8 @@ assist has no Cut Settings field.
    A mixed selection checks none of them and says so. Cut Settings keeps its dropdown.
 4. Power, Speed and Passes share one row of three equal columns with one-line labels.
 5. Only the settings that matter for the process follow: Fill shows Line spacing and Angle, and
-   Image shows Dither, Line interval and, for Grayscale, Min power. Line shows none.
+   Image shows Dither, Line interval and, for Grayscale, Min power. Line shows none. Use original
+   pixels burns as Grayscale whatever the dither, so it shows Min power too (2026-10-20 audit fix).
 6. Scan both ways (Fill and Image) and Air assist are one-line switches.
 7. A quiet **More cut settings** row opens Cut Settings and names what it holds for the current
    process.

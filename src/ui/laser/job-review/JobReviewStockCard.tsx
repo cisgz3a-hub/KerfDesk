@@ -13,7 +13,7 @@ import {
   stockItemStyle,
   stockLabelStyle,
   stockValueStyle,
-} from './job-review-table.styles';
+} from './job-review-card.styles';
 import { sectionHeadingStyle, sectionStyle } from './job-review.styles';
 
 const NO_PROJECT_MATERIAL = MANUAL_FEEDS_LABEL;

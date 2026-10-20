@@ -123,7 +123,14 @@ describe('existing material recipe roundtrips', () => {
       expect(ditherSwatch(view.host, 'grayscale').checked).toBe(true);
       expect(view.host.querySelector('input[name="minPower"]')).not.toBeNull();
       await act(async () => ditherSwatch(view.host, 'stucki').click());
+      // This preset uses original pixels, which burn as Grayscale whatever the
+      // dither, so Min Power still applies; it goes only with them off.
+      expect(view.host.querySelector('input[name="minPower"]')).not.toBeNull();
+      const originalPixels = view.host.querySelector<HTMLInputElement>('input[name="passThrough"]');
+      await act(async () => originalPixels?.click());
       expect(view.host.querySelector('input[name="minPower"]')).toBeNull();
+      await act(async () => originalPixels?.click());
+      expect(view.host.querySelector('input[name="minPower"]')).not.toBeNull();
       await back(view.host);
       await next(view.host);
       expect(ditherSwatch(view.host, 'stucki').checked).toBe(true);
