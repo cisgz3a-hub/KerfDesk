@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOARD_CORNER_COUNT,
+  boardFrontLeftCorner,
   bestFitRectangleFromCorners,
   boardCornersFromOrigin,
   boardMachinePoints,
@@ -173,5 +174,24 @@ describe('firstCornerOffsetMm (wrong-first-corner plausibility — CAM-05)', () 
   it('returns null for anything other than four finite corners', () => {
     expect(firstCornerOffsetMm([BL, BR, TR])).toBeNull();
     expect(firstCornerOffsetMm([BL, BR, TR, { x: Number.NaN, y: 0 }])).toBeNull();
+  });
+});
+
+// ADR-636: the board's physical front-left corner, and how far the first
+// captured corner is from it, on every origin corner.
+describe('boardFrontLeftCorner and firstCornerOffsetMm on every origin corner', () => {
+  it.each([
+    ['front-left', { x: 1, y: 1 }, BL],
+    ['front-right', { x: -1, y: 1 }, BR],
+    ['rear-left', { x: 1, y: -1 }, TL],
+    ['rear-right', { x: -1, y: -1 }, TR],
+  ] as const)('finds the physical front-left on a %s origin', (_, signs, frontLeft) => {
+    expect(boardFrontLeftCorner([TR, BL, TL, BR], signs)).toEqual(frontLeft);
+    // Captured from that corner: no re-anchor; from the opposite corner: the diagonal.
+    const others = [BL, BR, TR, TL].filter((corner) => corner !== frontLeft);
+    expect(firstCornerOffsetMm([frontLeft, ...others], signs)).toBeCloseTo(0, 9);
+    const opposite = { x: 300 - frontLeft.x, y: 200 - frontLeft.y };
+    const rest = [BL, BR, TR, TL].filter((c) => c.x !== opposite.x || c.y !== opposite.y);
+    expect(firstCornerOffsetMm([opposite, ...rest], signs)).toBeCloseTo(Math.hypot(300, 200), 6);
   });
 });

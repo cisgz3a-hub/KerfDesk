@@ -1,9 +1,11 @@
 import type { BestFitRectangle, BoardShapeKind, Vec2 } from '../../../core/scene';
+import type { BoardPolygonResult } from '../../../core/scene/board-polygon';
 import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
 import { BoardCaptureSteps } from './BoardCaptureSteps';
 import { BoardPlacementControls } from './BoardPlacementControls';
-import { CircleBoardPlacementControls } from './CircleBoardPlacementControls';
+import type { BoardSightView } from './CaptureCard';
 import { CircleCaptureSteps } from './CircleCaptureSteps';
+import { PolygonCaptureSteps } from './PolygonCaptureSteps';
 import type { CircleCaptureMethod } from './use-board-capture';
 import type { BoardVerificationController } from './use-board-verification';
 
@@ -14,7 +16,8 @@ export function BoardCapturePhase(props: {
   readonly corners: ReadonlyArray<Vec2>;
   readonly geometry: CapturedBoardGeometry | null;
   readonly rect: BestFitRectangle | null;
-  readonly livePosition: Vec2 | null;
+  readonly polygon: BoardPolygonResult | null;
+  readonly sight: BoardSightView;
   readonly disabled: boolean;
   readonly sessionDisabled: boolean;
   readonly verification: BoardVerificationController;
@@ -24,18 +27,14 @@ export function BoardCapturePhase(props: {
   readonly onUndo: () => void;
   readonly onFinishRect: () => void;
   readonly onManualSize: (widthMm: number, heightMm: number) => void;
+  readonly onFinishPolygon: () => void;
   readonly onFinishCircle: (center: Vec2, diameterMm: number) => Promise<void>;
   readonly onReset: () => void;
+  /** Clear the points captured so far but keep the chosen shape. */
+  readonly onRestartCapture: () => void;
 }): JSX.Element {
   if (props.committed && props.geometry !== null) {
-    return props.geometry.kind === 'circle' ? (
-      <CircleBoardPlacementControls
-        geometry={props.geometry}
-        disabled={props.disabled}
-        verification={props.verification}
-        onReset={props.onReset}
-      />
-    ) : (
+    return (
       <BoardPlacementControls
         geometry={props.geometry}
         disabled={props.disabled}
@@ -44,34 +43,50 @@ export function BoardCapturePhase(props: {
       />
     );
   }
-  if (props.shapeKind === 'circle') {
-    return (
-      <CircleCaptureSteps
-        method={props.circleMethod}
-        corners={props.corners}
-        livePosition={props.livePosition}
-        disabled={props.disabled}
-        sessionDisabled={props.sessionDisabled}
-        onMethodChange={props.onCircleMethodChange}
-        onMoveToPoint={props.onMoveToPoint}
-        onCapture={props.onCapture}
-        onUndo={props.onUndo}
-        onFinish={props.onFinishCircle}
-      />
-    );
+  switch (props.shapeKind) {
+    case 'circle':
+      return (
+        <CircleCaptureSteps
+          method={props.circleMethod}
+          corners={props.corners}
+          sight={props.sight}
+          disabled={props.disabled}
+          sessionDisabled={props.sessionDisabled}
+          onMethodChange={props.onCircleMethodChange}
+          onMoveToPoint={props.onMoveToPoint}
+          onCapture={props.onCapture}
+          onUndo={props.onUndo}
+          onFinish={props.onFinishCircle}
+        />
+      );
+    case 'polygon':
+      return (
+        <PolygonCaptureSteps
+          corners={props.corners}
+          sight={props.sight}
+          polygon={props.polygon}
+          disabled={props.disabled}
+          sessionDisabled={props.sessionDisabled}
+          onCapture={props.onCapture}
+          onUndo={props.onUndo}
+          onFinish={props.onFinishPolygon}
+          onReset={props.onRestartCapture}
+        />
+      );
+    case 'rect':
+      return (
+        <BoardCaptureSteps
+          corners={props.corners}
+          sight={props.sight}
+          rect={props.rect}
+          disabled={props.disabled}
+          sessionDisabled={props.sessionDisabled}
+          onCapture={props.onCapture}
+          onUndo={props.onUndo}
+          onFinish={props.onFinishRect}
+          onManualSize={props.onManualSize}
+          onReset={props.onReset}
+        />
+      );
   }
-  return (
-    <BoardCaptureSteps
-      corners={props.corners}
-      livePosition={props.livePosition}
-      rect={props.rect}
-      disabled={props.disabled}
-      sessionDisabled={props.sessionDisabled}
-      onCapture={props.onCapture}
-      onUndo={props.onUndo}
-      onFinish={props.onFinishRect}
-      onManualSize={props.onManualSize}
-      onReset={props.onReset}
-    />
-  );
 }

@@ -45,6 +45,8 @@ test('Place Board: four captures, outline, point correction and stale epoch refu
   await expect(panel).toContainText('100.0 × 60.0 mm');
   await panel.getByRole('button', { name: 'Create board outline', exact: true }).click();
   await expect(page.getByTestId('board-result')).toContainText('captured-board');
+  // Creating the outline moves on to step 2; the checks are in step 1.
+  await panel.getByRole('button', { name: '1 Capture board', exact: true }).click();
   const verification = panel.getByRole('region', { name: 'Physically check board', exact: true });
   await verification.getByRole('button', { name: 'Top-right', exact: true }).click();
   await panel.getByRole('button', { name: 'No, adjust it', exact: true }).click();
@@ -56,6 +58,23 @@ test('Place Board: four captures, outline, point correction and stale epoch refu
   await page.getByRole('button', { name: 'Invalidate position epoch', exact: true }).click();
   await expect(verification.getByRole('button', { name: 'Top-right', exact: true })).toBeDisabled();
   await expect(panel).toContainText('machine coordinates changed');
+});
+
+test('Place Board: a custom shape sets its origin at the front-left without moving', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Place Board workflow' }).click();
+  const panel = page.getByRole('region', { name: 'Place board', exact: true });
+  await panel.getByRole('button', { name: 'Custom shape', exact: true }).click();
+  for (const point of ['10,20', '110,20', '110,80', '60,110', '10,80']) {
+    await page.getByRole('button', { name: `Position ${point}`, exact: true }).click();
+    await panel.getByRole('button', { name: 'Capture corner', exact: true }).click();
+  }
+  await expect(panel).toContainText('Shape: 100.0 × 90.0 mm');
+  await panel.getByRole('button', { name: 'Create board outline', exact: true }).click();
+  await expect(page.getByTestId('board-result')).toContainText('"kind": "polyline"');
+  await expect(page.locator('pre').last()).toContainText('simulated set work origin at 10,20');
+  await expect(panel).toContainText('Custom shape · 5 corners');
 });
 
 test('Print and Cut: capture both marks, apply mapping, reopen and disable', async ({ page }) => {

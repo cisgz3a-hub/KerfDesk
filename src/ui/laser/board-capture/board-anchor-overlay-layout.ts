@@ -1,4 +1,9 @@
-import type { AABB, BoardVerificationTarget, CapturedBoardGeometry } from '../../../core/scene';
+import type {
+  AABB,
+  BoardVerificationTarget,
+  CapturedBoardGeometry,
+  Vec2,
+} from '../../../core/scene';
 import type { ViewTransform } from '../../workspace/view-transform';
 
 export type BoardAnchorOverlayHandle = {
@@ -15,8 +20,21 @@ export type BoardAnchorOverlayHandle = {
 export function boardAnchorOverlayHandles(
   kind: CapturedBoardGeometry['kind'],
   bounds: AABB,
+  outline: ReadonlyArray<Vec2> = [],
 ): ReadonlyArray<BoardAnchorOverlayHandle> {
-  return kind === 'rect' ? rectangleHandles(bounds) : circleHandles(bounds);
+  switch (kind) {
+    case 'rect':
+      return rectangleHandles(bounds);
+    case 'circle':
+      return circleHandles(bounds);
+    case 'polygon':
+      // A custom-shape outline is drawn from its bounding box's top-left.
+      return outline.map((point, index) => ({
+        target: { kind: 'polygon', anchor: 'vertex', index },
+        label: `Verify board corner ${index + 1}`,
+        scenePoint: { x: bounds.minX + point.x, y: bounds.minY + point.y },
+      }));
+  }
 }
 
 export function scenePointToOverlayPosition(

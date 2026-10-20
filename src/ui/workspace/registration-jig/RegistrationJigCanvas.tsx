@@ -16,6 +16,7 @@ import {
   clientToCanvasPx,
   zoomAtCursorPx,
   type ViewState,
+  type ViewTransform,
 } from '../view-transform';
 import { useJigCanvasPaint } from './jig-canvas-paint';
 import { fitJigCanvasView, JIG_BED_VIEW } from './jig-canvas-view';
@@ -39,6 +40,13 @@ export type RegistrationJigCanvasProps = {
   /** How much jig artwork Clear canvas would remove, and the action itself. */
   readonly clearCount?: number;
   readonly onClear?: () => void;
+  /** Extra marks painted over the scene in screen space, e.g. Place Board's
+   *  captured points and live head crosshair (ADR-636). */
+  readonly paintOverlay?: (ctx: CanvasRenderingContext2D, view: ViewTransform) => void;
+  /** Canvas name, help line and fit button for a page other than the jig. */
+  readonly label?: string;
+  readonly help?: string;
+  readonly fitLabel?: string;
 };
 
 const CANVAS_HELP =
@@ -69,7 +77,13 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
     setPreview,
     spaceHeld,
   });
-  useJigCanvasPaint(ref, preview ?? project, { selectedIds, marquee, dropOutlineId }, size, view);
+  useJigCanvasPaint(
+    ref,
+    preview ?? project,
+    { selectedIds, marquee, dropOutlineId, paintOverlay: props.paintOverlay },
+    size,
+    view,
+  );
   useJigCanvasWheel({ ref, gesture, view, size, project, setView });
 
   return (
@@ -78,7 +92,7 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
         ref={ref}
         width={size.width}
         height={size.height}
-        aria-label="Registration jig editing canvas"
+        aria-label={props.label ?? 'Registration jig editing canvas'}
         aria-describedby="registration-jig-canvas-help"
         tabIndex={0}
         style={canvasStyle}
@@ -113,7 +127,8 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
       />
       {props.selectionBar}
       <JigCanvasFooter
-        notice={notice}
+        notice={notice === '' ? (props.help ?? CANVAS_HELP) : notice}
+        fitLabel={props.fitLabel ?? 'Fit jig'}
         clearDisabled={props.readOnly === true || (props.clearCount ?? 0) === 0}
         onFitJig={() => setView(fitJigCanvasView(project, size))}
         onFitBed={() => setView(JIG_BED_VIEW)}
@@ -125,6 +140,7 @@ export function RegistrationJigCanvas(props: RegistrationJigCanvasProps): JSX.El
 
 function JigCanvasFooter(props: {
   readonly notice: string;
+  readonly fitLabel: string;
   readonly clearDisabled: boolean;
   readonly onFitJig: () => void;
   readonly onFitBed: () => void;
@@ -133,10 +149,10 @@ function JigCanvasFooter(props: {
   return (
     <div style={footerStyle}>
       <span id="registration-jig-canvas-help" role="status">
-        {props.notice === '' ? CANVAS_HELP : props.notice}
+        {props.notice}
       </span>
-      <Button title="Fit the view to the jig outlines" onClick={props.onFitJig}>
-        Fit jig
+      <Button title="Fit the view to the outlines" onClick={props.onFitJig}>
+        {props.fitLabel}
       </Button>
       <Button title="Fit the view to the whole bed" onClick={props.onFitBed}>
         Fit bed

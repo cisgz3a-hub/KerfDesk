@@ -64,13 +64,7 @@ function isValidDimension(raw: string): boolean {
   return raw.trim() !== '' && Number.isFinite(value) && value >= MIN_BOARD_DIMENSION_MM;
 }
 
-const formStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 6,
-  borderTop: '1px solid var(--lf-border)',
-  paddingTop: 6,
-};
+const formStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 const hintStyle: React.CSSProperties = { margin: 0, fontSize: 12, lineHeight: 1.3 };
 const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
 const inputStyle: React.CSSProperties = { width: 64 };

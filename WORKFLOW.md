@@ -4436,6 +4436,9 @@ The operator can accept the point or fine-jog to the physical corner and confirm
 confirmation updates the locked outline. Correcting bottom-left also updates the
 work origin, while the other corners update the measured dimensions.
 
+Since ADR-636 any corner may be captured first: if it is not the front-left one,
+creating the outline moves the work origin there (see F-BC4).
+
 **Manual size (know your dimensions?).** After capturing the bottom-left
 corner (which sets the origin), the panel also shows a **type the board size**
 form: enter width × height and **Draw board at this size** instead of jogging
@@ -4585,6 +4588,79 @@ artwork bounds; a verified parametric ellipse can use its major radius. Array
 offers **Use the round boundary**, which centres rows and checks every footprint
 corner against the usable circle, or the conservative inscribed square. The
 preview and applied copies use the same plan; this is not optimal nesting (ADR-599).
+
+---
+
+### F-BC4. Custom-shape boards, the pointer and nine-point placement (ADR-636)
+
+**ADR:** [ADR-636](docs/decisions/ADR-636-place-board-upgrade.md).
+
+**Operator intent.** Capture any straight-edged board (a hexagon, a shield, an
+offcut), aim with the machine's red-dot pointer instead of the beam, and put the
+artwork exactly where it belongs: a corner, the middle of an edge or the centre.
+
+**Where in the UI.** **Tools → Place Board** opens Place Board mode, a page
+built like jig mode: it takes the place of the tool strip and the main canvas,
+and the machine panel (connect, jog, positioning light) stays docked on the right.
+The left sidebar has three steps: **1 Capture board** (Rectangle, Circle, Custom
+shape tiles, the pointer bar, **Capture corner**, Undo last, Start over; then the
+measured board, its checks, Capture a new board, Remove board), **2 Place artwork**
+(Import artwork, the 3x3 placement grid with an edge margin, Fit to board, Fill
+with copies) and **3 Burn** (power, speed and passes for the artwork's operations,
+then Frame and Start). The canvas shows the captured points as they are taken, the
+outline they make and a red crosshair at the head or pointer; artwork is dragged,
+resized and rotated on it. **Done** returns to the main canvas.
+
+**The happy path.**
+1. Open Place Board and choose **Custom shape**.
+2. If Machine Setup has a positioning light, it switches on by itself (beam off,
+   fresh Idle check) and the panel says **Pointer on**. Jog the red dot to any
+   corner of the board and **Capture corner**; work round the edge, capturing each
+   corner in order. The map draws the outline as it grows.
+3. From three corners the page shows the shape's size and area. **Create board
+   outline** sets the work origin at the front-left of the shape's bounding box
+   with one G92 (the head does not move), draws the locked outline where the board
+   sits on the bed and switches placement to User Origin, front-left. The pointer
+   switches off again and the page moves on to step 2.
+4. **Import artwork…** (or select artwork already in the project), choose an edge
+   margin, and click a cell of the placement grid. On a rectangle it aligns exactly;
+   on a circle or custom shape it slides from the centre toward that spot until it
+   meets the margin, so it stays on the material. Each click is one undo step.
+5. In step 3, set power, speed and passes, then Frame and Start.
+
+**Rectangles captured from another corner.** If the first corner captured is more
+than 5 mm from the front-left corner, **Create board outline** moves the work
+origin to the front-left corner and says so; there is no need to start over.
+
+**Pointer.** The light comes on as soon as Place Board is open with a board still
+to capture, so the first corner can be aimed with it. Only a light Place Board
+switched on is switched off again; a light the operator turned on stays on. If the
+automatic switch-off fails, a toast says so (the page may already be closed).
+**Switch on automatically while capturing** can be unticked (remembered in this
+browser). While the light is on, every capture, the calculated circle centre and
+every board check use the light's spot, allowing for its Machine Setup offset.
+Machines without a light see **Set it up**. Laser mode only: in CNC mode the light's
+command can be coolant (M7/M8), so Place Board neither switches it nor allows for
+its offset, and captures use the spindle position. The cutting beam is never used
+as a pointer.
+
+**Edge / empty / error.** Fewer than three corners, corners almost in a line, or an
+outline that crosses itself cannot be created; a crossed capture order is re-sorted
+round the board when that gives a clean outline; the map draws that outline, with a
+notice to check it. If the controller does not confirm the new origin (or the write
+fails), the outline is not created: the G92 may still have landed, so the panel says
+the work origin may have moved and asks for **Start over** instead of writing a
+second G92. A design larger than the board inside the margin is still aligned,
+with a warning to use Fit to board. Array on board keeps only the copies that sit
+on a custom shape; nesting still uses its bounding box.
+
+**Hardware verification checklist (user-driven, not yet done).**
+1. With a positioning light configured, open Place Board: the light comes on.
+2. Capture a five-corner shape with the light; the outline and its size match the board.
+3. Create the outline: the head does not move, the controller's work offset is the
+   shape's front-left corner, and the light goes off.
+4. Place artwork bottom-middle with a 5 mm margin, Frame, and check the trace sits
+   5 mm above the board's front edge.
 
 ---
 

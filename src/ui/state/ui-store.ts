@@ -256,10 +256,12 @@ export type UiState = ArtworkRunOrderUiState &
     readonly openRegistrationPanel: () => void;
     readonly closeRegistrationPanel: () => void;
     readonly setRegistrationPanelPosition: (next: FloatingPanelPosition | null) => void;
-    // ADR-124 Capture Board Corners panel — same NON-modal floating pattern as the
-    // registration jig, toggled from the toolbar (top-left of the canvas).
+    // Place Board mode (ADR-124, ADR-636): like jig mode, its page takes the
+    // main canvas's place beside the docked machine panel. Opening one of the
+    // two pages closes the other.
     readonly boardCapturePanelOpen: boolean;
     readonly toggleBoardCapturePanel: () => void;
+    readonly openBoardCapturePanel: () => void;
     readonly closeBoardCapturePanel: () => void;
   };
 
@@ -272,6 +274,45 @@ function uiLibrarySlice(
   return {
     libraryDialogOpen: false,
     setLibraryDialogOpen: (open) => set({ libraryDialogOpen: open }),
+  };
+}
+
+// Jig mode and Place Board mode (ADR-641, ADR-636): each page takes the main
+// canvas's place, so opening one closes the other.
+function uiPageSlice(
+  set: UiStateSetter,
+): Pick<
+  UiState,
+  | 'registrationPanelOpen'
+  | 'registrationPanelPosition'
+  | 'toggleRegistrationPanel'
+  | 'openRegistrationPanel'
+  | 'closeRegistrationPanel'
+  | 'setRegistrationPanelPosition'
+  | 'boardCapturePanelOpen'
+  | 'toggleBoardCapturePanel'
+  | 'openBoardCapturePanel'
+  | 'closeBoardCapturePanel'
+> {
+  return {
+    registrationPanelOpen: false,
+    registrationPanelPosition: null,
+    toggleRegistrationPanel: () =>
+      set((s) => ({
+        registrationPanelOpen: !s.registrationPanelOpen,
+        ...(s.registrationPanelOpen ? {} : { boardCapturePanelOpen: false }),
+      })),
+    openRegistrationPanel: () => set({ registrationPanelOpen: true, boardCapturePanelOpen: false }),
+    closeRegistrationPanel: () => set({ registrationPanelOpen: false }),
+    setRegistrationPanelPosition: (next) => set({ registrationPanelPosition: next }),
+    boardCapturePanelOpen: false,
+    toggleBoardCapturePanel: () =>
+      set((s) => ({
+        boardCapturePanelOpen: !s.boardCapturePanelOpen,
+        ...(s.boardCapturePanelOpen ? {} : { registrationPanelOpen: false }),
+      })),
+    openBoardCapturePanel: () => set({ boardCapturePanelOpen: true, registrationPanelOpen: false }),
+    closeBoardCapturePanel: () => set({ boardCapturePanelOpen: false }),
   };
 }
 
@@ -406,15 +447,7 @@ export const useUiStore = create<UiState>((set) => ({
   setPenDraft: (next) => set({ penDraft: next }),
   measureDraft: null,
   setMeasureDraft: (next) => set({ measureDraft: next }),
-  registrationPanelOpen: false,
-  registrationPanelPosition: null,
-  toggleRegistrationPanel: () => set((s) => ({ registrationPanelOpen: !s.registrationPanelOpen })),
-  openRegistrationPanel: () => set({ registrationPanelOpen: true }),
-  closeRegistrationPanel: () => set({ registrationPanelOpen: false }),
-  setRegistrationPanelPosition: (next) => set({ registrationPanelPosition: next }),
-  boardCapturePanelOpen: false,
-  toggleBoardCapturePanel: () => set((s) => ({ boardCapturePanelOpen: !s.boardCapturePanelOpen })),
-  closeBoardCapturePanel: () => set({ boardCapturePanelOpen: false }),
+  ...uiPageSlice(set),
 }));
 
 export function isModalOpen(

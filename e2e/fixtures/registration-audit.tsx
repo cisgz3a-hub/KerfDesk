@@ -63,6 +63,12 @@ function reset(): void {
         workOriginVersion: (state.workOriginVersion ?? 0) + 1,
       }));
     },
+    setOriginAtMachinePoint: async (point) => {
+      commands.push(`simulated set work origin at ${point.x},${point.y}`);
+      useLaserStore.setState((state) => ({
+        workOriginVersion: (state.workOriginVersion ?? 0) + 1,
+      }));
+    },
     jogToMachinePosition: async (x, y) => {
       commands.push(`simulated beam-off move ${x},${y}`);
       position(x, y);
@@ -182,6 +188,7 @@ function Harness(): JSX.Element {
         <button onClick={() => position(110, 80)}>Position 110,80</button>{' '}
         <button onClick={() => position(10, 80)}>Position 10,80</button>{' '}
         <button onClick={() => position(111, 80)}>Corrected position 111,80</button>{' '}
+        <button onClick={() => position(60, 110)}>Position 60,110</button>{' '}
         <button onClick={() => position(390, 20)}>Second print mark 390,20</button>{' '}
         <button
           onClick={() =>

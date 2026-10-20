@@ -23,6 +23,10 @@ export type JigCanvasOverlay = {
   readonly marquee: JigMarquee | null;
   /** Outline that files dragged over the canvas would import into. */
   readonly dropOutlineId: string | null;
+  /** Marks a host page paints over everything else (ADR-636). */
+  readonly paintOverlay?:
+    | ((ctx: CanvasRenderingContext2D, view: ViewTransform) => void)
+    | undefined;
 };
 
 export function useJigCanvasPaint(
@@ -32,7 +36,7 @@ export function useJigCanvasPaint(
   size: { readonly width: number; readonly height: number },
   viewState: ViewState,
 ): void {
-  const { selectedIds, marquee, dropOutlineId } = overlay;
+  const { selectedIds, marquee, dropOutlineId, paintOverlay } = overlay;
   const [paintRevision, setPaintRevision] = useState(0);
   const cache = useRef(createDisplayPolylineCache());
   useEffect(() => {
@@ -57,9 +61,20 @@ export function useJigCanvasPaint(
         viewState,
       );
       drawJigCanvasOverlay(ctx, displayed, { selectedIds, marquee, dropOutlineId }, view);
+      paintOverlay?.(ctx, view);
     });
     return () => cancelAnimationFrame(frame);
-  }, [ref, displayed, selectedIds, marquee, dropOutlineId, size, viewState, paintRevision]);
+  }, [
+    ref,
+    displayed,
+    selectedIds,
+    marquee,
+    dropOutlineId,
+    paintOverlay,
+    size,
+    viewState,
+    paintRevision,
+  ]);
 }
 
 export function drawJigCanvasOverlay(

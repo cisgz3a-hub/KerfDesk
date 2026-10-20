@@ -8,10 +8,14 @@
 
 import {
   IDENTITY_TRANSFORM,
+  polylineToCurveSubpath,
   REGISTRATION_LAYER_COLOR,
   REGISTRATION_LAYER_ID,
   type ShapeObject,
+  type Vec2,
 } from '../scene';
+import { CURRENT_POLYLINE_FAIRING_VERSION } from './create-polyline';
+import { polylineToPolylines } from './polyline';
 import { createEllipse } from './primitives/create-ellipse';
 import { createRectangle } from './primitives/create-rectangle';
 
@@ -58,6 +62,47 @@ export function createRegistrationCircle(args: {
     transform: { ...IDENTITY_TRANSFORM, x: args.x ?? 0, y: args.y ?? 0 },
   });
   return { ...circle, operationIds: [REGISTRATION_LAYER_ID] };
+}
+
+/**
+ * A custom-shape board outline (ADR-636): a closed straight-edged polyline
+ * through the captured corners. `points` are canvas millimetres relative to the
+ * outline's own top-left; `x`/`y` place that corner in the scene. Stamped at the
+ * current fairing version so the pen-drawing upgrade never rounds its corners.
+ */
+export function createRegistrationPolygon(args: {
+  readonly points: ReadonlyArray<Vec2>;
+  readonly x?: number;
+  readonly y?: number;
+  readonly id?: string;
+}): ShapeObject {
+  const spec = { points: args.points, closed: true };
+  // Closed outlines repeat their first point, like every materialized shape.
+  const polylines = polylineToPolylines(spec);
+  const xs = args.points.map((point) => point.x);
+  const ys = args.points.map((point) => point.y);
+  return {
+    kind: 'shape',
+    id: args.id ?? REGISTRATION_BOX_OBJECT_ID,
+    spec: { kind: 'polyline', ...spec },
+    color: REGISTRATION_LAYER_COLOR,
+    bounds: {
+      minX: Math.min(...xs),
+      minY: Math.min(...ys),
+      maxX: Math.max(...xs),
+      maxY: Math.max(...ys),
+    },
+    transform: { ...IDENTITY_TRANSFORM, x: args.x ?? 0, y: args.y ?? 0 },
+    paths: [
+      {
+        color: REGISTRATION_LAYER_COLOR,
+        polylines,
+        curves: polylines.map(polylineToCurveSubpath),
+      },
+    ],
+    fairingVersion: CURRENT_POLYLINE_FAIRING_VERSION,
+    operationIds: [REGISTRATION_LAYER_ID],
+  };
 }
 
 function sanitizeSize(value: number): number {

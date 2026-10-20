@@ -13,6 +13,7 @@ export function useBoardPlacement() {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const alignToBox = useStore((s) => s.alignSelectionToRegistrationBox);
+  const placeOnBoard = useStore((s) => s.placeSelectionOnBoard);
   const fitToBoard = useStore((s) => s.fitSelectionToBoard);
   const arrayToBoard = useStore((s) => s.tileSelectionIntoBoard);
   const removeBoard = useStore((s) => s.removeRegistrationBox);
@@ -35,6 +36,7 @@ export function useBoardPlacement() {
     arrayBoard: findRegistrationBoxes(scene)[0],
     arrayDesign,
     alignToBox,
+    placeOnBoard,
     fitToBoard,
     arrayToBoard,
     removeBoard,

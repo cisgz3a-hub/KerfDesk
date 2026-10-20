@@ -5,6 +5,7 @@ import { Button } from '../../kit';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
 import { useLaserStore } from '../../state/laser-store';
 import { BoardFineJogControls } from './BoardFineJogControls';
+import { sightedPoint } from './board-sight';
 import { MIN_BOARD_DIMENSION_MM } from './constants';
 
 const CIRCLE_FIT_WARNING_MM = 2;
@@ -106,8 +107,9 @@ function useCircleCenterController(props: CircleCenterConfirmationProps): Circle
     }
     setSaving(true);
     setError(null);
+    // With the positioning light on, the centre is where the light points.
     void props
-      .onFinish(currentPosition, props.fit.diameterMm)
+      .onFinish(sightedPoint(currentPosition), props.fit.diameterMm)
       .catch((cause: unknown) =>
         setError(errorMessage(cause, 'Could not create the circle at the current head position.')),
       )
@@ -191,7 +193,8 @@ function CircleCenterAction(props: {
   return (
     <>
       <p style={stepStyle}>
-        The head is at the calculated center. Fine-jog if needed, then use its current position.
+        The head (or the pointer, while it is on) is at the calculated center. Fine-jog if needed,
+        then use its current position.
       </p>
       <BoardFineJogControls disabled={confirmation.disabled || controller.saving} />
       <Button
