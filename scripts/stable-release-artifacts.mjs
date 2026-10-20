@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { JSON_SCHEMA, load } from 'js-yaml';
+import { createRequire } from 'node:module';
 
 const STABLE_VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
 export const STABLE_FEED_KEY = 'desktop/latest.yml';
@@ -28,6 +28,9 @@ export function parseStableFeed(bytes) {
   if (!Buffer.isBuffer(bytes) || bytes.length > 64 * 1024) {
     throw new Error('Stable feed is missing or too large.');
   }
+  // Receipt recovery uses version/artifact helpers before dependencies are installed.
+  // Load the unchanged YAML parser only when a caller actually reads a feed.
+  const { JSON_SCHEMA, load } = createRequire(import.meta.url)('js-yaml');
   // JSON schema avoids YAML timestamp/coercion surprises; duplicate keys fail.
   const feed = load(bytes.toString('utf8'), { schema: JSON_SCHEMA });
   if (feed === null || typeof feed !== 'object') throw new Error('Invalid stable feed.');
