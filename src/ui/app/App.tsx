@@ -16,6 +16,7 @@ import { MachineSetupDialogHost } from '../laser/device-setup';
 import { BoardCapturePanel } from '../laser/board-capture';
 import { JobReviewDialog } from '../laser/job-review';
 import { SecondPassHost } from '../laser/second-pass/SecondPassHost';
+import { WorkspaceSafetyNotice } from '../laser/WorkspaceSafetyNotice';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { DesignLibraryHost } from '../library/DesignLibraryHost';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
@@ -169,6 +170,7 @@ function CanvasArea(): JSX.Element {
       {!showGcode ? <CncStockCanvasHud /> : null}
       <MachineSetupBanner />
       <UpdatePrompt />
+      <WorkspaceSafetyNotice />
     </>
   );
   return (

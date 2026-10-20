@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadJigTraceSource, type JigTraceSource } from './jig-trace-import';
+import type { RasterImage, SceneObject } from '../../../core/scene';
+import {
+  loadJigImageTraceSource,
+  loadJigTraceSource,
+  type JigTraceSource,
+} from './jig-trace-import';
 
 export function useJigTraceSource() {
   const [source, setSource] = useState<JigTraceSource | null>(null);
@@ -13,13 +18,14 @@ export function useJigTraceSource() {
     [],
   );
 
-  const load = async (file: File): Promise<void> => {
+  // The newest request wins: an older upload or image finishing last is dropped.
+  const loadFrom = async (read: () => Promise<JigTraceSource>): Promise<void> => {
     const ticket = ++request.current;
     setSource(null);
     setError(null);
     setLoading(true);
     try {
-      const next = await loadJigTraceSource(file);
+      const next = await read();
       if (ticket === request.current) setSource(next);
     } catch (reason) {
       if (ticket === request.current)
@@ -28,5 +34,8 @@ export function useJigTraceSource() {
       if (ticket === request.current) setLoading(false);
     }
   };
-  return { source, loading, error, load };
+  const load = (file: File): Promise<void> => loadFrom(() => loadJigTraceSource(file));
+  const loadImage = (image: RasterImage, maskObject: SceneObject | undefined): Promise<void> =>
+    loadFrom(() => loadJigImageTraceSource(image, maskObject));
+  return { source, loading, error, load, loadImage };
 }

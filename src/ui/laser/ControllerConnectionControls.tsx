@@ -1,24 +1,21 @@
 import { useState } from 'react';
-import { selectControllerDriver } from '../../core/controllers';
 import type { MachineKind } from '../../core/scene';
 import { usePlatform } from '../app/platform-context';
-import { connectOptionsForDevice } from '../commands/connect-options';
 import { machineNoun } from '../machine/machine-labels';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { browserLocalStorage } from '../state/browser-local-storage';
 import { controllerStoppedResponding } from '../state/controller-recovery-status';
 import { useLaserStore } from '../state/laser-store';
-import type { ConnectControllerOptions } from '../state/laser-store';
 import { motionOwnerAwaitsMissingReply } from '../state/laser-motion-release';
 import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
 import { pauseAutoConnect, useAutoConnectSession } from '../state/auto-connect-session';
 import { ConnectionBar, type ConnectionBarProps } from './ConnectionBar';
 import { connectMachine } from './connect-machine';
+import { isFileOnlyController, useControllerReconnect } from './controller-reconnect';
 import { ConnectedMachineProfile } from './ConnectedMachineProfile';
 import { LaserModuleRow } from './LaserModuleRow';
 import { DeviceSetupControls } from './device-setup';
-import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { MachineNetworkConnect } from './MachineNetworkConnect';
 import { useControllerWentSilent } from './use-controller-went-silent';
@@ -41,29 +38,18 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   );
   const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
   const stoppedResponding = useLaserStore((state) => controllerStoppedResponding(state));
-  const locks = useConnectionLocks(props);
+  const controlsBusy = useConnectionControlsBusy(props);
   const wentSilent = useControllerWentSilent(connection.kind === 'connected');
-  const connectController = useLaserStore((state) => state.connect);
   const disconnectController = useLaserStore((state) => state.disconnect);
   const retryQualification = useLaserStore((state) => state.retryControllerQualification);
   const controllerKind = useStore((state) => state.project.device.controllerKind);
   const machineName = useStore((state) => state.project.device.name || 'Unnamed machine');
   const supportsSerial = platform.serial.isSupported();
   const isFileOnlyProfile = isFileOnlyController(controllerKind);
-  // One builder with the menu Connect, read at click time, so the profile's
-  // "Stream in worker" opt-in (ADR-334) is honoured on every Connect surface;
-  // the rail used to rebuild the options without it (audit connect-6/ui-panel-7).
-  const connectOptions = (): ConnectControllerOptions =>
-    connectOptionsForDevice(useStore.getState().project.device);
   const connect = (): void => {
     void connectMachine(platform).catch(controllerActionFailureHandler('Connect'));
   };
-  const reconnect = (): void => {
-    if (!useLaserStore.getState().getControllerReconnectRecommended()) return;
-    void connectController(platform, connectOptions()).catch(
-      controllerActionFailureHandler('Reconnect'),
-    );
-  };
+  const reconnect = useControllerReconnect();
   const retryControllerInformation = (): void => {
     if (useLaserStore.getState().getMachineSettingsReadBlockReason() !== null) return;
     void retryQualification().catch(controllerActionFailureHandler('Check controller'));
@@ -83,11 +69,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const autoConnect = useAutoConnectPreference();
   return (
     <>
-      <SafetyNoticeBanner
-        onReconnect={reconnect}
-        reconnectRecommended={reconnectRecommended}
-        reconnectDisabled={!supportsSerial || locks.reconnect || isFileOnlyProfile}
-      />
+      {/* The safety notice floats over the canvas instead (ADR-634). */}
       <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
       <ConnectionBar
         machineName={machineName}
@@ -111,7 +93,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         controllerWentSilent={wentSilent}
         onRetryQualification={retryControllerInformation}
         onReconnectQualification={reconnect}
-        disabled={!supportsSerial || locks.controls || isFileOnlyProfile}
+        disabled={!supportsSerial || controlsBusy || isFileOnlyProfile}
       />
     </>
   );
@@ -168,27 +150,11 @@ function ConnectionHints(props: {
   return null;
 }
 
-function isFileOnlyController(
-  controllerKind: Parameters<typeof selectControllerDriver>[0],
-): boolean {
-  return selectControllerDriver(controllerKind).capabilities.transport === 'file-only';
-}
-
-// A motion owner locks Reconnect and the connection controls, except one that
-// only a missing reply holds on an Idle machine (ADR-640).
-function useConnectionLocks(props: Props): {
-  readonly reconnect: boolean;
-  readonly controls: boolean;
-} {
+// A motion owner locks the connection controls, except one that only a
+// missing reply holds on an Idle machine (ADR-640).
+function useConnectionControlsBusy(props: Props): boolean {
   const missingReply = useLaserStore(motionOwnerAwaitsMissingReply);
-  return {
-    reconnect: props.motionOperation !== null && !missingReply,
-    controls: connectionControlsBusy(
-      props.motionOperation,
-      props.controllerOperation,
-      missingReply,
-    ),
-  };
+  return connectionControlsBusy(props.motionOperation, props.controllerOperation, missingReply);
 }
 
 // Connection management is the escape hatch for a stale reset or startup
