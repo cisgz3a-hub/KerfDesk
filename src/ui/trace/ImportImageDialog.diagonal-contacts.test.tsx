@@ -105,7 +105,7 @@ describe('Diagonal contacts survives Re-trace Original (ADR-455)', () => {
 
     const loaded = deserializeProject(
       serializeProject(
-        projectWith({ ...seed, role: 'trace-source' }, { ...committed, traceSourceId: seed.id }),
+        projectWith(seed, { ...committed, traceSourceId: seed.id }),
       ),
     );
     expect(loaded.kind).toBe('ok');
@@ -139,7 +139,7 @@ describe('Diagonal contacts survives Re-trace Original (ADR-455)', () => {
         fillStyle: 'scanline',
       },
     };
-    const view = await retrace(projectWith({ ...seed, role: 'trace-source' }, older), older);
+    const view = await retrace(projectWith(seed, older), older);
     try {
       expect(contactsSelect(view.host)?.value).toBe('auto');
       const traced = vi.mocked(traceImageWithFallback).mock.calls.map((call) => call[1]);

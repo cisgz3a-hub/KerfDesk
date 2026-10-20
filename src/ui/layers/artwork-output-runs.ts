@@ -54,7 +54,6 @@ export function runUsesMinPower(effective: Layer): boolean {
 // (compileRasterGroupsForLayer).
 function runBurnsArtwork(object: SceneObject, run: Layer, effective: Layer): boolean {
   if (object.kind === 'relief') return false;
-  if (object.kind === 'raster-image')
-    return object.role !== 'trace-source' && effective.mode === 'image';
+  if (object.kind === 'raster-image') return effective.mode === 'image';
   return run.mode !== 'image' && effective.mode !== 'image';
 }

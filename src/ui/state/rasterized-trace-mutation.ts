@@ -19,7 +19,6 @@ import {
   type StateSlice,
   type TraceExistingImageOptions,
 } from './scene-mutations';
-import { releaseTraceSourcePalette } from './trace-source-palette';
 import {
   effectiveOperationForObject,
   operationOverrideForObject,
@@ -30,8 +29,9 @@ import {
  *
  * The derived bitmap shares the source photo's effective Image operations so
  * speed, power, dither, density, passes, and scan direction do not silently
- * change. A kept source is render-only; a deleted source's operation survives
- * because the result is added before orphan pruning.
+ * change. A kept source stays an ordinary image on those same operations, so
+ * both engrave (ADR-648); a deleted source's operation survives because the
+ * result is added before orphan pruning.
  */
 export function applyRasterizedTraceToExisting(
   s: StateSlice,
@@ -50,11 +50,8 @@ export function applyRasterizedTraceToExisting(
   if (options.replaceTraceId !== undefined && options.replaceTraceId !== raster.id) {
     scene = removeObject(scene, options.replaceTraceId);
   }
-  if (source !== undefined) {
-    scene =
-      options.deleteSourceAfterTrace === true
-        ? removeObject(scene, source.id)
-        : replaceObject(scene, source.id, { ...source, role: 'trace-source' });
+  if (source !== undefined && options.deleteSourceAfterTrace === true) {
+    scene = removeObject(scene, source.id);
   }
 
   const prepared = prepareRasterizedTrace(raster, sourceId, source);
@@ -95,22 +92,16 @@ type FreshRasterOperationContext = {
 
 // The no-reusable-Image-operation branch: allocate a fresh Image operation for
 // the rasterized trace. Extracted so applyRasterizedTraceToExisting stays under
-// the complexity cap once palette-freeing is added.
+// the complexity cap.
 function allocateFreshRasterOperation(
   scene: Scene,
   prepared: RasterImage,
   ctx: FreshRasterOperationContext,
 ): { readonly scene: Scene; readonly committed: RasterImage } {
-  // Free the source's palette slot before allocating (mirror of
-  // applyTraceToExisting) so the trace takes OPERATION_PALETTE[0], not the
-  // runner-up. A deleted source's operation is already orphaned — prune it so
-  // its slot frees too.
-  let working = scene;
-  if (ctx.source !== undefined) {
-    working = ctx.deleteSource
-      ? pruneOrphanLayers(working)
-      : releaseTraceSourcePalette(working, ctx.source);
-  }
+  // A deleted source's operation is already orphaned: prune it before
+  // allocating (mirror of applyTraceToExisting) so its colour frees. A kept
+  // source keeps its operation and colour.
+  const working = ctx.source !== undefined && ctx.deleteSource ? pruneOrphanLayers(scene) : scene;
   const created = createArtworkOperation(working, prepared, { mode: 'image' });
   const committed: RasterImage = {
     ...(created.object as RasterImage),
@@ -135,7 +126,6 @@ function prepareRasterizedTrace(
   source: RasterImage | undefined,
 ): RasterImage {
   const {
-    role: _role,
     operationIds: _operationIds,
     operationOverride: _operationOverride,
     powerScale: _powerScale,

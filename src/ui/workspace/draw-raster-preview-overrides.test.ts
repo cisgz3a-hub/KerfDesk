@@ -98,11 +98,10 @@ it('keeps enabled suboperations/multiple bindings and ignores ordinary visibilit
   expect(sink.drawn).toHaveLength(2);
   expect(sink.built).toHaveLength(1);
 });
-it('excludes trace-source, disabled outputs and effective non-image objects', () => {
+it('excludes disabled outputs and effective non-image objects', () => {
   const sink = previewSink(),
     layer = previewLayer();
   for (const p of [
-    previewProject([{ ...previewRaster(), role: 'trace-source' }]),
     previewProject([previewRaster()], [{ ...layer, output: false }]),
     previewProject([{ ...previewRaster(), operationOverride: { mode: 'line' } }]),
   ]) {

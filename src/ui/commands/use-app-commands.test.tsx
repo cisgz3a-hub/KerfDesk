@@ -157,7 +157,6 @@ describe('useAppCommands store subscriptions', () => {
 
   it.each<[string, Partial<RasterImage>, boolean, readonly string[]]>([
     ['ordinary image', {}, true, []],
-    ['trace source', { role: 'trace-source' }, false, []],
     ['locked image', { locked: true }, false, []],
     ['multiple images', {}, false, ['other-photo']],
   ])('offers Photo engraving for an eligible %s', (_name, patch, enabled, additional) => {

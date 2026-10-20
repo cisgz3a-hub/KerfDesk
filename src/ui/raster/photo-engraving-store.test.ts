@@ -157,7 +157,6 @@ describe('photo engraving sessions', () => {
 
   it.each([
     'locked',
-    'trace-source',
     'multi-selection',
     'deselected',
     'vector',
@@ -166,8 +165,6 @@ describe('photo engraving sessions', () => {
   ] as const)('does not open an unavailable %s selection', (kind) => {
     const { image, state } = setup();
     if (kind === 'locked') useStore.setState(withScene(state, [{ ...image, locked: true }]));
-    if (kind === 'trace-source')
-      useStore.setState(withScene(state, [{ ...image, role: 'trace-source' }]));
     if (kind === 'multi-selection')
       useStore.setState({ additionalSelectedIds: new Set(['another']) });
     if (kind === 'deselected') useStore.setState({ selectedObjectId: null });

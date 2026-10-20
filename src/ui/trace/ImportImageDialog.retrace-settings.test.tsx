@@ -125,7 +125,7 @@ describe('Re-trace Original keeps the committed trace settings (ADR-408)', () =>
 
     // 2. Save and reopen the project through the real .lf2 boundary.
     const saved: Project = projectWith(
-      { ...seed, role: 'trace-source' },
+      seed,
       { ...committed, traceSourceId: seed.id },
     );
     const loaded = deserializeProject(serializeProject(saved));
@@ -184,7 +184,7 @@ describe('Re-trace Original keeps the committed trace settings (ADR-408)', () =>
       transform: IDENTITY_TRANSFORM,
       paths: [{ color: '#000000', polylines: [] }],
     };
-    const project = projectWith({ ...seed, role: 'trace-source' }, legacy);
+    const project = projectWith(seed, legacy);
     useStore.setState({ project });
     retraceOriginalAction(project, legacy, useUiStore.getState().openImageDialog, vi.fn())();
     const view = await renderDialog();
@@ -216,7 +216,7 @@ describe('Re-trace Original keeps the committed trace settings (ADR-408)', () =>
         boundaryMode: 'enhance',
       },
     };
-    const project = projectWith({ ...seed, role: 'trace-source' }, trace);
+    const project = projectWith(seed, trace);
     useStore.setState({ project });
     retraceOriginalAction(project, trace, useUiStore.getState().openImageDialog, vi.fn())();
     const view = await renderDialog();

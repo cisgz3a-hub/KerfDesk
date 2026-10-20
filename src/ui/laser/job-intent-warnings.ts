@@ -235,7 +235,7 @@ function rasterUpsampleWarning(
   project: Project,
 ): string | null {
   const layer = outputLayers.find((operation) => sceneObjectUsesOperation(obj, operation));
-  if (layer === undefined || layer.mode !== 'image' || obj.role === 'trace-source') return null;
+  if (layer === undefined || layer.mode !== 'image') return null;
   return describeRasterUpsample(obj, layer, project);
 }
 

@@ -67,7 +67,6 @@ function extendBoundsForObject(
     case 'shape':
       return extendBoundsForVectorPaths(bounds, object, output, device);
     case 'raster-image': {
-      if (object.role === 'trace-source') return false;
       if (
         !output.some((layer) => layer.mode === 'image' && sceneObjectUsesOperation(object, layer))
       ) {

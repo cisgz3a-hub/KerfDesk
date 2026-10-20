@@ -83,7 +83,9 @@ function committedRaster(project: Project, id = 'raster-trace'): RasterImage {
 }
 
 describe('applyRasterizedTraceToExisting', () => {
-  it('keeps the source as render-only and reuses its complete Image operation', () => {
+  // ADR-648: the kept photo is an ordinary image on the operation the result
+  // reuses, so both engrave. This used to pin the photo as render-only.
+  it('keeps the source as an ordinary image and reuses its complete Image operation', () => {
     const project = projectWithSource();
     const originalOperation = project.scene.layers[0];
     const result = applyRasterizedTraceToExisting(
@@ -94,7 +96,7 @@ describe('applyRasterizedTraceToExisting', () => {
     const source = committedRaster(result.project, 'source-photo');
     const output = committedRaster(result.project);
 
-    expect(source.role).toBe('trace-source');
+    expect(source).toEqual(project.scene.objects[0]);
     expect(output).toMatchObject({
       traceSourceId: 'source-photo',
       color: source.color,
@@ -104,12 +106,14 @@ describe('applyRasterizedTraceToExisting', () => {
       dither: source.dither,
       linesPerMm: source.linesPerMm,
     });
-    expect(output.role).toBeUndefined();
     expect(result.project.scene.layers).toEqual([originalOperation]);
 
     const groups = compileJob(result.project.scene, result.project.device).groups;
-    expect(groups).toHaveLength(1);
-    expect(groups[0]).toMatchObject({
+    expect(groups.map((group) => group.kind === 'raster' && group.sourceObjectId)).toEqual([
+      source.id,
+      output.id,
+    ]);
+    expect(groups[1]).toMatchObject({
       kind: 'raster',
       sourceObjectId: output.id,
       layerId: 'photo-operation',

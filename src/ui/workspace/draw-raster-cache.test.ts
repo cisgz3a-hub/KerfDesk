@@ -23,38 +23,16 @@ afterEach(() => {
 });
 
 describe('drawScene raster cache lifecycle', () => {
-  it('prunes deleted raster images and trace-source tint canvases', () => {
+  it('prunes deleted raster images', () => {
     const images = completeImageInstances();
-    const createdCanvases: unknown[] = [];
-    const realCreateElement = document.createElement.bind(document);
-    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
-      if (tag !== 'canvas') return realCreateElement(tag);
-      const canvas = {
-        width: 0,
-        height: 0,
-        getContext: () => ({
-          drawImage: vi.fn(),
-          fillRect: vi.fn(),
-          putImageData: vi.fn(),
-          globalCompositeOperation: 'source-over',
-          globalAlpha: 1,
-          fillStyle: '#000000',
-        }),
-      };
-      createdCanvases.push(canvas);
-      return canvas as unknown as HTMLCanvasElement;
-    });
     const ctx = noOpContext();
-    const projectWithRaster = rasterProject(
-      traceSourceRaster('data:image/png;base64,trace-source-cache-a'),
-    );
+    const projectWithRaster = rasterProject(rasterImage('data:image/png;base64,raster-cache-a'));
 
     drawScene(ctx, 800, 600, projectWithRaster, { selectedId: null, preview: false });
     drawScene(ctx, 800, 600, emptyProject(), { selectedId: null, preview: false });
     drawScene(ctx, 800, 600, projectWithRaster, { selectedId: null, preview: false });
 
     expect(images).toHaveLength(2);
-    expect(createdCanvases).toHaveLength(2);
   });
 });
 
@@ -106,7 +84,7 @@ function emptyProject(): Project {
   return { ...project, scene: { layers: [], objects: [] } };
 }
 
-function traceSourceRaster(dataUrl: string): RasterImage {
+function rasterImage(dataUrl: string): RasterImage {
   return {
     kind: 'raster-image',
     id: 'raster-1',
@@ -119,6 +97,5 @@ function traceSourceRaster(dataUrl: string): RasterImage {
     color: '#808080',
     dither: 'threshold',
     linesPerMm: 10,
-    role: 'trace-source',
   };
 }

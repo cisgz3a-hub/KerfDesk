@@ -67,7 +67,7 @@ describe('previewHasBurnableContent', () => {
     expect(previewHasBurnableContent(project, emptyToolpath)).toBe(true);
   });
 
-  it('ignores trace-source backings and output-disabled image layers', () => {
+  it('ignores output-disabled image layers', () => {
     const offLayer = {
       ...createLayer({ id: 'img', color: '#808080', mode: 'image' }),
       output: false,
@@ -77,12 +77,6 @@ describe('previewHasBurnableContent', () => {
       layers: [offLayer],
     });
     expect(previewHasBurnableContent(project, emptyToolpath)).toBe(false);
-
-    const traceSource = projectWith({
-      objects: [rasterObject({ role: 'trace-source' } as Partial<SceneObject>)],
-      layers: [createLayer({ id: 'img', color: '#808080', mode: 'image' })],
-    });
-    expect(previewHasBurnableContent(traceSource, emptyToolpath)).toBe(false);
   });
 });
 

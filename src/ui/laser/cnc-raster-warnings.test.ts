@@ -58,12 +58,6 @@ describe('detectCncRasterWarnings (ADR-101 §4)', () => {
     expect(detectCncRasterWarnings(cncProject([rasterObject()], { output: false }))).toEqual([]);
   });
 
-  it('ignores trace-source reference rasters', () => {
-    expect(detectCncRasterWarnings(cncProject([rasterObject({ role: 'trace-source' })]))).toEqual(
-      [],
-    );
-  });
-
   it('is silent without rasters and for laser projects', () => {
     expect(detectCncRasterWarnings(cncProject([]))).toEqual([]);
     expect(detectCncRasterWarnings(createProject())).toEqual([]);

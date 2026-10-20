@@ -35,7 +35,7 @@ function hasOutputGeometry(obj: SceneObject): boolean {
     case 'shape':
       return obj.paths.length > 0;
     case 'raster-image':
-      return obj.role !== 'trace-source';
+      return true;
     case 'relief':
       return false;
     default:
@@ -51,7 +51,7 @@ function objectCanEmitOnLayer(obj: SceneObject, layer: Layer): boolean {
     case 'shape':
       return layer.mode !== 'image';
     case 'raster-image':
-      return obj.role !== 'trace-source' && layer.mode === 'image';
+      return layer.mode === 'image';
     case 'relief':
       return false;
     default:

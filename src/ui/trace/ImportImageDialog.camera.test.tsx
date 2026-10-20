@@ -51,7 +51,6 @@ describe('camera capture enters Trace as an atomic registered import', () => {
         remove
           ? undefined
           : expect.objectContaining({
-              role: 'trace-source',
               bounds: seed.bounds,
               transform: seed.transform,
             }),

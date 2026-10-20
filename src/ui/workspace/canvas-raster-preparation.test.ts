@@ -127,10 +127,7 @@ describe('interactive raster canvas preparation routing', () => {
     ).toBe('direct');
   });
 
-  it('ignores retained trace-source bitmaps and the laser-only raster pipeline in CNC', () => {
-    expect(
-      classifyCanvasPreparation(rasterProject([{ ...raster(4096), role: 'trace-source' }])),
-    ).toBe('direct');
+  it('ignores the laser-only raster pipeline in CNC', () => {
     expect(
       classifyCanvasPreparation({
         ...rasterProject([raster(4096)]),
