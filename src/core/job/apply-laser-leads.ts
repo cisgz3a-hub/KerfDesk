@@ -38,7 +38,7 @@ import { isEmittableCutSegment } from './cut-emission-resolution';
 import type { CutGroup, CutSegment, Job, JobDiagnostic } from './job';
 import type { CutGroupLaserLeads } from './laser-lead-settings';
 import type { JobBounds } from './job-bounds';
-import { fitLead, type LeadFit, type LeadFitContext } from './laser-lead-fit';
+import { fitLead, retracesLeadIn, type LeadFit, type LeadFitContext } from './laser-lead-fit';
 import { LeadObstacles } from './laser-lead-obstacles';
 import {
   backwardTangent,
@@ -92,9 +92,9 @@ type LeadCounts = {
   readonly layerName: string;
   shortened: number;
   omitted: number;
-  /** Contours left without leads because their scrap side is unknown. */
-  sideUnknown: number;
-  aroundName: string;
+  /** Contours left without leads because their scrap side is unknown, by
+   * the operation whose shape holds them: each must be looked at. */
+  readonly sideUnknown: Map<string, number>;
 };
 
 export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
@@ -150,7 +150,7 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
 function countsFor(counts: Map<string, LeadCounts>, layerId: string, name: string): LeadCounts {
   const existing = counts.get(layerId);
   if (existing !== undefined) return existing;
-  const created = { layerName: name, shortened: 0, omitted: 0, sideUnknown: 0, aroundName: '' };
+  const created = { layerName: name, shortened: 0, omitted: 0, sideUnknown: new Map() };
   counts.set(layerId, created);
   return created;
 }
@@ -168,17 +168,13 @@ function leadDiagnostics(counts: ReadonlyMap<string, LeadCounts>): JobDiagnostic
           },
         ]
       : []),
-    ...(tally.sideUnknown > 0
-      ? [
-          {
-            kind: 'laser-leads-side-unknown' as const,
-            layerId,
-            layerName: tally.layerName,
-            count: tally.sideUnknown,
-            aroundName: tally.aroundName,
-          },
-        ]
-      : []),
+    ...[...tally.sideUnknown].map(([aroundName, count]) => ({
+      kind: 'laser-leads-side-unknown' as const,
+      layerId,
+      layerName: tally.layerName,
+      count,
+      aroundName,
+    })),
   ]);
 }
 
@@ -193,8 +189,7 @@ function leadSegment(
   // may be a part, so no side is safe.
   const unknown = unknownSide(group, key, world);
   if (unknown !== null) {
-    tally.sideUnknown += 1;
-    if (tally.aroundName === '') tally.aroundName = unknown;
+    tally.sideUnknown.set(unknown, (tally.sideUnknown.get(unknown) ?? 0) + 1);
     return segment;
   }
   const planned = leadAttempt(segment, group, key, world);
@@ -254,8 +249,12 @@ function leadAttempt(
   const ordinaryOutBurns = group.passes > 1 || finalPass === null;
   const context = ordinaryOutBurns ? plan.context : asChords(plan.context);
   const leadIn = spec.leadIn ? fitLead('in', plan.startJoin, shape, context) : null;
-  const leadOut =
+  const fitted =
     spec.leadOut && ordinaryOutBurns ? fitLead('out', plan.endJoin, shape, context) : null;
+  // A lead-out back along the lead-in would burn it twice: the contour is
+  // started elsewhere instead (leadSegment), where the two part.
+  const leadOut =
+    fitted !== null && leadIn !== null && retracesLeadIn(fitted, leadIn) ? null : fitted;
   return {
     segment,
     ringId: plan.ringId,
@@ -420,7 +419,10 @@ function leadedSegment(
   const ring = segment.polyline;
   const head = leadIn === null ? ring.slice(0, 1) : leadIn.path.points;
   const polyline = [...head, ...ring.slice(1), ...(leadOut?.path.points.slice(1) ?? [])];
-  const open: CutSegment = { ...withoutArcMoves(segment), polyline, closed: false };
+  // The contour runs on from where the lead-in ends, so its range holds on
+  // the final pass's burn too, which starts with the same lead-in and ring.
+  const leadContour = { from: head.length - 1, to: head.length - 2 + ring.length };
+  const open: CutSegment = { ...withoutArcMoves(segment), polyline, closed: false, leadContour };
   const contourMoves = validCutArcMoves(segment);
   const withArcs =
     contourMoves === null
@@ -458,7 +460,9 @@ function fitContext(
 ): Omit<LeadFitContext, 'arcsEmitted'> {
   // The same outline cut again, by another operation or another group: its
   // lines run along the contour, so a lead cannot keep clear of them, and
-  // need not.
+  // need not. A copy offset by another kerf runs beside it: the sliver between
+  // two cuts of one outline is cut free of the part either way, so a lead
+  // crossing it burns nothing that stays, and the copy's leads lie beside these.
   const copies = world.copies[ringId] ?? [];
   const ignoredRings = new Set([ringId, ...copies]);
   const ignoredLines = new Set([

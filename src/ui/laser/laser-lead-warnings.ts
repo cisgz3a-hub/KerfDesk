@@ -41,19 +41,25 @@ export function isLaserLeadDiagnostic<T extends { readonly kind: string }>(
   );
 }
 
-/** One warning per operation (by id: names can repeat) and kind; an operation
- * compiled object by object reports once per object. */
+/** One warning per operation (by id: names can repeat) and kind, and for an
+ * unknown side per operation holding the shapes; an operation compiled object
+ * by object reports once per object. */
 export function laserLeadWarnings(diagnostics: ReadonlyArray<LeadDiagnostic>): string[] {
   const merged: LeadDiagnostic[] = [];
   for (const diagnostic of diagnostics) {
-    const index = merged.findIndex(
-      (earlier) => earlier.kind === diagnostic.kind && earlier.layerId === diagnostic.layerId,
-    );
+    const index = merged.findIndex((earlier) => sameWarning(earlier, diagnostic));
     const earlier = merged[index];
     if (earlier === undefined) merged.push(diagnostic);
     else merged[index] = mergedLeadDiagnostic(earlier, diagnostic);
   }
   return merged.map(laserLeadWarning);
+}
+
+function sameWarning(a: LeadDiagnostic, b: LeadDiagnostic): boolean {
+  if (a.kind !== b.kind || a.layerId !== b.layerId) return false;
+  return a.kind !== 'laser-leads-side-unknown' || b.kind !== 'laser-leads-side-unknown'
+    ? true
+    : a.aroundName === b.aroundName;
 }
 
 function mergedLeadDiagnostic(earlier: LeadDiagnostic, next: LeadDiagnostic): LeadDiagnostic {

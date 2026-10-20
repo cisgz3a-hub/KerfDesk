@@ -283,3 +283,40 @@ by identity and by shape, and kerf pieces of one group. `io/gcode/laser-leads-ou
 the G-code of an arc-capable GRBL disc with two passes and a 1 mm overcut: G2/G3 lead-in and
 lead-out on the first pass, and a chord final pass that runs past the start and leaves by its own
 lead-out. `ui/laser/laser-lead-warnings.test.ts` pins the new warning. Not qualified on a machine.
+
+### Amendment 2 — review of the scene-judged sides (2026-10-20)
+
+A review of Amendment 1 and the rest of the PR found five gaps, and one proposal this ADR declines:
+
+1. **A lead-out never runs back along its lead-in.** Line leads at a right-angle corner leave along
+   the very line they came in on, so one pass burned that stretch twice. A lead-out that leaves
+   within 30° of the way its lead-in came (`retracesLeadIn`) counts as not fitting, so the contour
+   is restarted mid-edge, where the two part at a right angle. Arc leads at a corner already part at
+   a right angle and meet again only at their free ends, in the scrap, so they are unchanged.
+2. **Each operation that leaves a side unknown is named on its own.** Shapes held by different
+   operations without leads were counted under the first one's name; Job Review now gives one
+   warning per holding operation, with its own count.
+3. **Turning leads off for one artwork is an override.** An artwork override that sets a lead
+   switch counts as an override (the group records its effective settings, and output and Job
+   Review show it), since it may turn off leads its operation has on. Only an override of lead
+   shape or side alone, with leads off, is still ignored.
+4. **Recipe reseeding ignores inactive lead fields.** A linked operation that had leads turned on
+   and off again still switches to the new mode's recipe, because lead fields with both leads off
+   are left out of that comparison, as of every other.
+5. **Job-start editing sees the closed outline.** A led contour is one open burn, so the start
+   editor saw only its leads' two ends. Each led segment records where its contour lies in the burn
+   (`CutSegment.leadContour`), and the editor reads the contours back (`jobWithoutLeads`), so any
+   point on the outline can be the start; preparation already moves the start on the contour itself
+   before leads are added.
+
+Declined: treating a copy offset by another kerf as a cut a lead must keep clear of. The sliver
+between two cuts of one outline is cut free of the part whichever way the offset goes, so a lead
+crossing it burns nothing that stays; and every lead from the inner cut must cross the outer one.
+As obstacles, such copies only cost leads: the kerf-copy plate of Amendment 1 lost its lead.
+
+Verification: `core/job/apply-laser-leads.test.ts` shows a square started at a corner with
+45-degree line leads restarted mid-edge, its leads parting; `io/gcode/laser-leads-scrap-side.test.ts`
+names a score ring and a border separately; `core/job/laser-leads-scope-and-wrap.test.ts` records an
+artwork override that turns leads off; `ui/state/laser-recipe-seeding.test.ts` reseeds after leads
+were turned on and off; `ui/state/canvas-start-editing-leads.test.ts` picks a start halfway along an
+edge of a led contour. Each failed before this amendment.
