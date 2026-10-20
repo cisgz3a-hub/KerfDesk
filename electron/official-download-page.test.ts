@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canonicalOfficialDesktopDownloadUrl,
   isOfficialDesktopDownloadUrl,
+  officialPlatformDownloadUrl,
 } from './official-download-page.js';
 
 const PAGE = 'https://kerfdesk.com/download.html?version=';
@@ -31,6 +32,14 @@ describe('official desktop download page policy', () => {
         'https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v1.2.3-preview.4',
       ),
     ).toBe(false);
+  });
+
+  it('builds a Mac or Linux section only for a dotted stable version', () => {
+    expect(officialPlatformDownloadUrl('1.0.21', 'macos')).toBe(`${PAGE}1.0.21#macos`);
+    for (const version of ['1x0x21', '1.0', '1.0.21-preview.1', '01.0.21'])
+      expect(() => officialPlatformDownloadUrl(version, 'linux'), version).toThrow(
+        'Invalid download page',
+      );
   });
 
   it('matches the page the Preview update notice opens', async () => {

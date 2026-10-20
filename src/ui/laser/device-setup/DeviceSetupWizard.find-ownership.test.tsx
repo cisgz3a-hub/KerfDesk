@@ -1,4 +1,4 @@
-// Only Find my machine owns the connection (ADR-420 rule 6). A new machine's
+// Only the setup connection strip owns the connection (ADR-420 rule 6). A new machine's
 // draft fills itself when setup opens, and that fill may adopt the firmware
 // the banner named, but opening setup must not drop and reopen a connection
 // made elsewhere. The 2026-09-26 review of #941 reproduced that reconnect.
@@ -60,7 +60,7 @@ function moveAttempt(): void {
   useLaserStore.setState((state) => ({ connectionAttempt: (state.connectionAttempt ?? 0) + 1 }));
 }
 
-describe('Find my machine owns the connection', () => {
+describe('the setup connection strip owns the connection', () => {
   it('fills a new machine on open but keeps a connection made elsewhere', async () => {
     const link = answeringController({ value: 1 });
     useLaserStore.setState({
@@ -89,7 +89,7 @@ describe('Find my machine owns the connection', () => {
     const link = answeringController({ value: 0 });
     const view = await renderWizard(undefined, mockPlatform(), { newMachine: true });
     try {
-      await act(async () => button(view.host, 'Find my machine').click());
+      await act(async () => button(view.host, 'Connect').click());
       expect(link.disconnect).toHaveBeenCalledTimes(1);
       expect(link.connect).toHaveBeenCalledTimes(2);
       expect(link.connect.mock.calls[1]?.[1]).toMatchObject({ controllerKind: 'grblhal' });
@@ -107,7 +107,7 @@ describe('Find my machine owns the connection', () => {
     );
     const view = await renderWizard(undefined, mockPlatform(), { newMachine: true });
     try {
-      await act(async () => button(view.host, 'Find my machine').click());
+      await act(async () => button(view.host, 'Connect').click());
       expect(link.connect).toHaveBeenCalledTimes(1);
       await act(async () => {
         // Reconnected elsewhere, and this controller reports grblHAL.

@@ -160,6 +160,7 @@ export function currentMachineReviewForApproval(
     current.state.kind !== 'open' ||
     current.state.isPreparing ||
     current.state.blocker !== null ||
+    current.editingOperationIds.size > 0 ||
     current.state.model !== review.model
   )
     throw new RemoteFault('stale_revision');
