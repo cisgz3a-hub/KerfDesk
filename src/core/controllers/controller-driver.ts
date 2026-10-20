@@ -31,11 +31,10 @@ export type ControllerRealtime = {
   readonly resume: string | null;
   /** Abort / soft reset (GRBL \x18). */
   readonly softReset: string | null;
-  /** Cancel the in-flight jog only (GRBL \x85). */
+  /** Cancel the in-flight jog only (GRBL \x85). grblHAL also discards,
+   *  unanswered, every line it has received but not parsed yet, so Cancel
+   *  waits briefly for owed replies before writing it (ADR-640). */
   readonly jogCancel: string | null;
-  /** True when the jog-cancel byte also discards, unanswered, every line the
-   *  controller has received but not parsed yet (grblHAL, in every state). */
-  readonly jogCancelDropsUnparsedLines?: boolean;
 };
 
 export type ControllerCommands = {

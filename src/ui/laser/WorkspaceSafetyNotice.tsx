@@ -9,6 +9,7 @@ import { useRef, type CSSProperties } from 'react';
 import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { motionOwnerAwaitsMissingReply } from '../state/laser-motion-release';
 import { isFileOnlyController, useControllerReconnect } from './controller-reconnect';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { useLiveMotionRoom } from './use-live-motion-room';
@@ -19,7 +20,11 @@ export function WorkspaceSafetyNotice(): JSX.Element | null {
   const platform = usePlatform();
   const active = useLaserStore((state) => state.safetyNotice !== null);
   const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
-  const motionBusy = useLaserStore((state) => state.motionOperation !== null);
+  // A motion owner locks Reconnect, except one that only a missing reply
+  // holds on an Idle machine: a new session is the way to clear it (ADR-640).
+  const motionBusy = useLaserStore(
+    (state) => state.motionOperation !== null && !motionOwnerAwaitsMissingReply(state),
+  );
   const fileOnly = useStore((state) => isFileOnlyController(state.project.device.controllerKind));
   const reconnect = useControllerReconnect();
   const recovery = useControllerRecovery();

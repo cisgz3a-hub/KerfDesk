@@ -6,6 +6,7 @@ import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { browserLocalStorage } from '../state/browser-local-storage';
 import { useLaserStore } from '../state/laser-store';
+import { motionOwnerAwaitsMissingReply } from '../state/laser-motion-release';
 import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
 import { pauseAutoConnect, useAutoConnectSession } from '../state/auto-connect-session';
 import { ConnectionBar, type ConnectionBarProps } from './ConnectionBar';
@@ -39,6 +40,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
     state.getMachineSettingsReadBlockReason(),
   );
   const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
+  const controlsBusy = useConnectionControlsBusy(props);
   const wentSilent = useControllerWentSilent(connection.kind === 'connected');
   const disconnectController = useLaserStore((state) => state.disconnect);
   const controllerKind = useStore((state) => state.project.device.controllerKind);
@@ -88,11 +90,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         controllerWentSilent={wentSilent}
         onRetryQualification={retryControllerInformation}
         onReconnectQualification={reconnect}
-        disabled={
-          !supportsSerial ||
-          connectionControlsBusy(props.motionOperation, props.controllerOperation) ||
-          isFileOnlyProfile
-        }
+        disabled={!supportsSerial || controlsBusy || isFileOnlyProfile}
       />
     </>
   );
@@ -149,14 +147,24 @@ function ConnectionHints(props: {
   return null;
 }
 
+// A motion owner locks the connection controls, except one that only a
+// missing reply holds on an Idle machine (ADR-640).
+function useConnectionControlsBusy(props: Props): boolean {
+  const missingReply = useLaserStore(motionOwnerAwaitsMissingReply);
+  return connectionControlsBusy(props.motionOperation, props.controllerOperation, missingReply);
+}
+
 // Connection management is the escape hatch for a stale reset or startup
 // handshake. Keep Disconnect/Reconnect available for those controller-owned
-// operations while motion and autofocus retain their stricter lockout.
+// operations while motion and autofocus retain their stricter lockout. A motion
+// owner that only a missing reply holds on an Idle machine is the exception:
+// a new session is the only way to clear it (ADR-640).
 export function connectionControlsBusy(
   motionOperation: unknown,
   controllerOperation: ReturnType<typeof useLaserStore.getState>['controllerOperation'],
+  motionAwaitsMissingReply = false,
 ): boolean {
-  if (motionOperation !== null) return true;
+  if (motionOperation !== null && !motionAwaitsMissingReply) return true;
   return (
     controllerOperation !== null &&
     controllerOperation.kind !== 'autofocus' &&
