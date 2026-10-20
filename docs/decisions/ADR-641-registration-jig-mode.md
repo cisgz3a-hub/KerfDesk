@@ -119,8 +119,9 @@ asked for a way to clear the jig canvas.
 1. **One design goes on every piece by itself.** A single imported file, a trace and new text are
    centred in the first outline and copied into every other one, in the same undoable edit. The
    copies keep the artwork's size; a design larger than an outline still shrinks to fit. Several
-   files imported together still fill one outline each (ADR-606), and editing one copy of text
-   changes only that copy, so each piece can carry its own name. The sidebar's **Centre + copy**
+   files imported together still fill one outline each (ADR-606), a file dropped on one outline
+   goes on that piece only, and editing one copy of text changes only that copy, so each piece
+   can carry its own name or design. The sidebar's **Centre + copy**
    becomes **Centre on every piece** (**Centre in outline** for one outline), shown with the
    selection, to re-centre artwork that was moved.
 2. **Layout applies without Apply layout.** Shape, size, grid and gap apply on Enter, when the

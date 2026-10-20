@@ -47,7 +47,9 @@ export function RegistrationJigEditor(props: { readonly onClose: () => void }): 
             onSelectionChange={editor.onSelect}
             onCommit={editor.onCommit}
             onDropFiles={(files, outlineId) =>
-              void editor.importFiles(files, outlineId === null ? editor.ids : new Set([outlineId]))
+              void (outlineId === null
+                ? editor.importFiles(files, editor.ids)
+                : editor.importFiles(files, new Set([outlineId]), { onlyThisPiece: true }))
             }
             clearCount={editor.clearCount}
             onClear={editor.onClear}

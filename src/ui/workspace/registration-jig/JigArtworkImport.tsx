@@ -9,12 +9,19 @@ import type { JigImportPlacement } from './jig-editor-artwork';
 export const JIG_ARTWORK_ACCEPT = '.svg,.png,.jpg,.jpeg,.webp,.bmp';
 const JIG_ARTWORK_EXTENSIONS = JIG_ARTWORK_ACCEPT.split(',');
 
+export type JigImportOptions = {
+  /** Dropped on one outline: put the design on that piece only. */
+  readonly onlyThisPiece?: boolean;
+};
+
 export type JigArtworkImporter = {
   readonly busy: boolean;
-  /** Import files one by one; file N fits into the Nth outline from the anchor. */
+  /** Import files one by one; file N fits into the Nth outline from the anchor.
+   *  One file goes on every piece unless it was dropped on one outline. */
   readonly importFiles: (
     files: ReadonlyArray<File>,
     anchorIds: ReadonlySet<string>,
+    options?: JigImportOptions,
   ) => Promise<void>;
 };
 
@@ -42,7 +49,11 @@ export function useJigArtworkImport(
     };
   }, []);
   const importFiles = useCallback(
-    async (files: ReadonlyArray<File>, anchorIds: ReadonlySet<string>): Promise<void> => {
+    async (
+      files: ReadonlyArray<File>,
+      anchorIds: ReadonlySet<string>,
+      options: JigImportOptions = {},
+    ): Promise<void> => {
       if (pending.current || files.length === 0) return;
       pending.current = true;
       const controller = new AbortController();
@@ -52,8 +63,10 @@ export function useJigArtworkImport(
       const toast = useToastStore.getState().pushToast;
       let batchIndex = 0;
       const add = (object: SceneObject): { readonly kind: 'added' } => {
-        // One file is one design for every piece; several fill one outline each.
-        onImport(object, { anchorIds, batchIndex, copyToEveryOutline: files.length === 1 });
+        // One file is one design for every piece; several fill one outline each,
+        // and a file dropped on one outline stays on that piece (ADR-641).
+        const copyToEveryOutline = files.length === 1 && options.onlyThisPiece !== true;
+        onImport(object, { anchorIds, batchIndex, copyToEveryOutline });
         batchIndex += 1;
         return { kind: 'added' };
       };

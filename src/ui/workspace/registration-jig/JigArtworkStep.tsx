@@ -47,8 +47,8 @@ export function JigArtworkStep({ editor }: { readonly editor: JigEditorControlle
         </Button>
       </div>
       <p className="lf-jig-muted">
-        One design goes on every piece. Several files fill one piece each; you can also drop files
-        on an outline.
+        One design goes on every piece. Several files fill one piece each, and a file dropped on an
+        outline goes on that piece only.
       </p>
       {textOpen && (
         <JigTextControls

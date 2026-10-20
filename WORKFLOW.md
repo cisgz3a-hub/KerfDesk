@@ -2732,7 +2732,8 @@ authorization, Frame proof, controller command, or safety boundary.
    outline, else the outline holding the selected artwork, else the first outline. One
    file, a trace or new text is one design for every piece: it is centred in the first
    outline and copied into every other one at its own size, in the same edit; a design
-   larger than an outline shrinks to fit. Several files at once fill consecutive
+   larger than an outline shrinks to fit. A file dropped on one outline goes on that
+   piece only, and several files at once fill consecutive
    outlines in grid order instead. Editing one copy of text changes only that copy. While files are dragged over the canvas, the outline that would receive
    them is highlighted. To trace an image that is already on the jig, select it and click
    **Trace selected image**; **Replace image with trace** lays the trace exactly over

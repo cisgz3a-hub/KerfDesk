@@ -16,6 +16,7 @@ import type { JigImportPlacement } from './jig-editor-artwork';
 import { jigRunPhase } from './jig-run-phase';
 import { RegistrationJigEditor } from './RegistrationJigEditor';
 
+const DROPPED = vi.hoisted(() => new File(['<svg/>'], 'logo.svg'));
 vi.mock('./RegistrationJigCanvas', () => ({
   RegistrationJigCanvas: (props: {
     project: Project;
@@ -23,6 +24,7 @@ vi.mock('./RegistrationJigCanvas', () => ({
     selectionBar?: React.ReactNode;
     clearCount?: number;
     onClear?: () => void;
+    onDropFiles?: (files: ReadonlyArray<File>, outlineId: string | null) => void;
   }) => (
     <div aria-label="Registration jig editing canvas" data-read-only={props.readOnly === true}>
       {findRegistrationBoxes(props.project.scene).length} outlines
@@ -30,16 +32,30 @@ vi.mock('./RegistrationJigCanvas', () => ({
       <button type="button" disabled={(props.clearCount ?? 0) === 0} onClick={props.onClear}>
         Clear canvas
       </button>
+      <button type="button" onClick={() => props.onDropFiles?.([DROPPED], 'outline-1')}>
+        Drop on outline
+      </button>
+      <button type="button" onClick={() => props.onDropFiles?.([DROPPED], null)}>
+        Drop on canvas
+      </button>
     </div>
   ),
 }));
 type JigImport = (object: SceneObject, placement: JigImportPlacement) => void;
-const importer = vi.hoisted(() => ({ onImport: null as JigImport | null }));
+const importer = vi.hoisted(() => ({
+  onImport: null as JigImport | null,
+  calls: [] as unknown[][],
+}));
 vi.mock('./JigArtworkImport', () => ({
   JigArtworkImport: () => <div>Import artwork</div>,
   useJigArtworkImport: (onImport: JigImport) => {
     importer.onImport = onImport;
-    return { busy: false, importFiles: async () => undefined };
+    return {
+      busy: false,
+      importFiles: async (...args: unknown[]) => {
+        importer.calls.push(args);
+      },
+    };
   },
 }));
 vi.mock('../../laser/WorkspaceJobActions', () => ({
@@ -211,6 +227,15 @@ describe('Registration Jig mode', () => {
     expect(findRegistrationBoxes(useStore.getState().project.scene)).toHaveLength(1);
     act(() => useStore.getState().undo());
     expect(useStore.getState().project).toBe(before);
+  });
+  it('puts a file dropped on one outline on that piece only', () => {
+    savedJigWithArtwork();
+    importer.calls.length = 0;
+    render();
+    click('Drop on outline');
+    click('Drop on canvas');
+    expect(importer.calls[0]).toEqual([[DROPPED], new Set(['outline-1']), { onlyThisPiece: true }]);
+    expect(importer.calls[1]).toHaveLength(2);
   });
   it('shows the selection bar only while something is selected', () => {
     savedJigWithArtwork();
