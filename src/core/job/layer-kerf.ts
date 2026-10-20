@@ -42,7 +42,7 @@ import { containmentDepths } from './containment-depth';
 import { laserArcFitForMachineChords } from './cut-arc-moves';
 import type { CutSegment, JobDiagnostic } from './job';
 import { countClosedUpRegions, kerfShrinksContour } from './kerf-closed-up';
-import { startKerfRingsAtSources } from './kerf-ring-start';
+import { kerfRingOwners, startKerfRingsAtSources } from './kerf-ring-start';
 import { placedTabPointsForKerfContours } from './laser-tab-anchors';
 import { perforationPatternFor } from './operation-cut-extras';
 
@@ -54,6 +54,11 @@ export type KerfSource = {
   readonly polyline: Polyline;
   readonly points: ReadonlyArray<Vec2>;
   readonly nesting?: CutSegment['nesting'];
+  /** The scene contour it comes from, for laser leads (ADR-626 Amd 1). */
+  readonly leadSource?: string;
+  /** The same key, always set by compile: the scene decides which side of
+   * it the offset goes to (ADR-486 Amd 3). */
+  readonly sceneContour?: string;
 };
 export type KerfContextDepth = { readonly total: number; readonly outside: number };
 
@@ -148,12 +153,33 @@ export function withLayerKerf(
     if (offset === null) failed = true;
     closedUp += offset?.closedUp ?? 0;
     const started = startKerfRingsAtSources(offset?.rings ?? [], sources, layer.kerfOffsetMm);
+    const leadSources = kerfLeadSources(started, group.sources, layer.kerfOffsetMm);
     return {
-      segments: started.map((ring) => fit({ polyline: ring.points, closed: true })),
+      segments: started.map((ring, ringIndex) => {
+        const segment = fit({ polyline: ring.points, closed: true });
+        const leadSource = leadSources?.[ringIndex];
+        return leadSource === undefined ? segment : { ...segment, leadSource };
+      }),
       tabs: placedTabPointsForKerfContours(started, group.sources),
     };
   });
   return { ...interleave(collected, pending, offsets), failed, closedUp };
+}
+
+// Each offset contour carries the scene contour it was offset from, when its
+// sources carry one (ADR-626 Amd 1); null when none does.
+function kerfLeadSources(
+  rings: ReadonlyArray<Polyline>,
+  sources: ReadonlyArray<KerfSource>,
+  kerfOffsetMm: number,
+): ReadonlyArray<string | undefined> | null {
+  if (!sources.some((source) => source.leadSource !== undefined)) return null;
+  const owners = kerfRingOwners(
+    rings,
+    sources.map((source) => source.polyline),
+    kerfOffsetMm,
+  );
+  return owners.map((owner) => sources[owner]?.leadSource);
 }
 
 /** What the offset lost, for Job Review: a failure, or holes it closed up. */

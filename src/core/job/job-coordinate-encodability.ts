@@ -24,11 +24,19 @@ function collectGroupCoordinates(
   switch (group.kind) {
     case 'cut':
     case 'fill':
-      group.segments.forEach((segment, segmentIndex) =>
+      group.segments.forEach((segment, segmentIndex) => {
         segment.polyline.forEach((point, pointIndex) =>
           pushPoint(values, `${path}.segments[${segmentIndex}].polyline[${pointIndex}]`, point),
-        ),
-      );
+        );
+        // ADR-626: the final pass's own lead-out after an overcut.
+        segment.finalPassBurn?.polyline.forEach((point, pointIndex) =>
+          pushPoint(
+            values,
+            `${path}.segments[${segmentIndex}].finalPassBurn.polyline[${pointIndex}]`,
+            point,
+          ),
+        );
+      });
       return;
     case 'raster':
       collectRasterCoordinates(group, path, values);
@@ -173,10 +181,20 @@ function everyJobCoordinateEncodable(job: Job): boolean {
       continue;
     }
     for (const segment of group.segments) {
-      for (const point of segment.polyline) {
-        if (!isEncodableCoordinate(point.x) || !isEncodableCoordinate(point.y)) return false;
-      }
+      if (!pointsEncodable(segment.polyline)) return false;
+      // ADR-626: a final pass with an overcut burns its own lead-out.
+      if (segment.finalPassBurn !== undefined && !pointsEncodable(segment.finalPassBurn.polyline))
+        return false;
     }
+  }
+  return true;
+}
+
+function pointsEncodable(
+  points: ReadonlyArray<{ readonly x: number; readonly y: number }>,
+): boolean {
+  for (const point of points) {
+    if (!isEncodableCoordinate(point.x) || !isEncodableCoordinate(point.y)) return false;
   }
   return true;
 }

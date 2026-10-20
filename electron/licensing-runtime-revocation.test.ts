@@ -1,5 +1,31 @@
 import { expect, it } from 'vitest';
-import { grant, harness, saved, TEST_KEY } from './licensing-runtime.test-support';
+import { createLicensingRuntime } from './licensing-runtime';
+import { grant, harness, NOW, saved, TEST_KEY } from './licensing-runtime.test-support';
+
+// A paid licence works offline indefinitely (ADR-623 Amendment 2), so a refund
+// reaches it only when the computer next reaches the licence service.
+it('applies a refund at the first successful refresh after months offline', async () => {
+  const h = harness({ ...saved(), licenseKey: TEST_KEY, refreshedAt: NOW / 1000 });
+  h.fetch.mockRejectedValue(new Error('offline'));
+  h.clock(NOW + 90 * 86_400_000);
+  expect(await h.runtime.status()).toMatchObject({ state: 'ready', edition: 'pro' });
+  expect(await h.runtime.refreshInBackground()).toMatchObject({ edition: 'pro' });
+  expect(h.saved()?.credential).toBeDefined();
+
+  h.fetch.mockResolvedValue(Response.json({ error: { code: 'license_revoked' } }, { status: 403 }));
+  expect(await h.runtime.refreshInBackground()).toMatchObject({
+    state: 'activation-required',
+    edition: 'free',
+    licenseKey: null,
+  });
+  expect(h.runtime.proUnlocked()).toBe(false);
+  expect(h.saved()?.credential).toBeUndefined();
+  // The next launch opens behind the licence window (ADR-623).
+  expect(await createLicensingRuntime(h.options).status()).toMatchObject({
+    state: 'activation-required',
+    edition: 'free',
+  });
+});
 
 it.each(['license_revoked', 'activation_inactive'])(
   'locks new Pro choices after %s, including an already unlocked paid session',

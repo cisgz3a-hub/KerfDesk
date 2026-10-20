@@ -11,6 +11,7 @@ import {
   digest,
 } from './commercial-release-manifest.mjs';
 import { publishCommercialRelease } from './commercial-release-publisher.mjs';
+import { betaObservationKey, recordBetaObservation } from './commercial-beta-observation.mjs';
 import { catalogState } from './commercial-release-rings.mjs';
 import { promoteFromCli, promotionFailureMessage } from './promote-commercial-release.mjs';
 import {
@@ -20,6 +21,7 @@ import {
   cutSummary,
   decideCut,
   fetchApprovedTerms,
+  observeBeta,
   preflight,
   publicationReserved,
   readPublicCatalogue,
@@ -42,7 +44,7 @@ const RESERVATION = 'desktop/commercial/releases/2026.40.0/publication-reservati
 
 async function publishedStore(...releases) {
   const f = memoryStore();
-  for (const release of releases)
+  for (const release of releases) {
     await publishCommercialRelease({
       release,
       store: f.store,
@@ -52,6 +54,18 @@ async function publishedStore(...releases) {
       verifyInstaller: async () => undefined,
       expectedCatalogSha256: catalogState(f.objects.get(COMMERCIAL_BETA_CATALOG_KEY) ?? null),
     });
+    const identity = JSON.parse(Buffer.from(release.identity.payload, 'base64').toString());
+    await recordBetaObservation({
+      store: f.store,
+      keySet,
+      privateKeyPem,
+      keyId,
+      version: identity.version,
+      expectedCatalogSha256: digest(f.objects.get(COMMERCIAL_BETA_CATALOG_KEY)),
+      clock: () => new Date(identity.publishedAt),
+      fetchImpl: host(Object.fromEntries(f.objects)).fetchImpl,
+    });
+  }
   return f;
 }
 // The download host: listed objects answer 200, everything else 404.
@@ -342,6 +356,7 @@ test('the daily promotion moves the newest beta once it has been quiet, and repo
     fetchImpl: host({
       [COMMERCIAL_BETA_CATALOG_KEY]: f.objects.get(COMMERCIAL_BETA_CATALOG_KEY),
       [COMMERCIAL_CATALOG_KEY]: f.objects.get(COMMERCIAL_CATALOG_KEY),
+      [betaObservationKey('1.2.3')]: f.objects.get(betaObservationKey('1.2.3')),
     }).fetchImpl,
   });
   assert.equal(status.decision.reason, '1.2.3 is already on the stable ring.');
@@ -349,6 +364,68 @@ test('the daily promotion moves the newest beta once it has been quiet, and repo
     beta: digest(f.objects.get(COMMERCIAL_BETA_CATALOG_KEY)),
     stable: digest(f.objects.get(COMMERCIAL_CATALOG_KEY)),
   });
+});
+
+test('an old build without public observation cannot promote; invalid evidence never writes stable', async () => {
+  const f = await publishedStore(fixture());
+  const receiptKey = betaObservationKey('1.2.3');
+  f.objects.delete(receiptKey);
+  const missing = await runPromotion({ store: f.store, keySet, now: NOW, held: null });
+  assert.equal(missing.result, null);
+  assert.match(missing.decision.reason, /awaiting verified public beta observation/u);
+  const status = await ringStatus({
+    keySet,
+    now: NOW,
+    held: null,
+    fetchImpl: host(Object.fromEntries(f.objects)).fetchImpl,
+  });
+  assert.equal(status.decision.due, false);
+  f.objects.set(receiptKey, Buffer.from('{}'));
+  await assert.rejects(
+    runPromotion({ store: f.store, keySet, now: NOW, held: null }),
+    /observation/u,
+  );
+  assert.equal(f.objects.has(COMMERCIAL_CATALOG_KEY), false);
+});
+
+test('observation recovery authenticates the newest public beta without rebuilding or moving catalogues', async () => {
+  const f = await publishedStore(fixture());
+  const receiptKey = betaObservationKey('1.2.3');
+  f.objects.delete(receiptKey);
+  f.writes.length = 0;
+  const env = {
+    COMMERCIAL_CLOUDFLARE_ACCOUNT_ID: 'b'.repeat(32),
+    COMMERCIAL_R2_API_TOKEN: 'test-token',
+    DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: privateKeyPem,
+    DESKTOP_STABLE_MANIFEST_KEY_ID: keyId,
+  };
+  const options = {
+    env,
+    keySet,
+    version: '1.2.3',
+    expectedCatalogSha256: digest(f.objects.get(COMMERCIAL_BETA_CATALOG_KEY)),
+    createStore: async () => f.store,
+    fetchImpl: host(Object.fromEntries(f.objects)).fetchImpl,
+    clock: () => NOW,
+  };
+  await assert.rejects(observeBeta({ ...options, env: {} }), /pinned stable release key/u);
+  await assert.rejects(observeBeta({ ...options, expectedCatalogSha256: 'none' }), /SHA-256/u);
+  await assert.rejects(
+    observeBeta({ ...options, expectedCatalogSha256: '0'.repeat(64) }),
+    /SHA-256/u,
+  );
+  await assert.rejects(observeBeta({ ...options, version: '1.2.2' }), /newest published beta/u);
+  assert.equal(f.writes.length, 0);
+  assert.equal(await observeBeta(options), NOW.toISOString());
+  assert.deepEqual(
+    f.writes.map((item) => item.key),
+    [receiptKey],
+  );
+  assert.equal((await runPromotion({ store: f.store, keySet, now: NOW, held: null })).result, null);
+  await assert.rejects(
+    runCli(['observe', '--version=1.2.3', '--now=2026-01-01T00:00:00Z']),
+    /without --now/u,
+  );
 });
 
 test('the operator promotes one named version by hand, and the CLIs refuse bad input', async () => {

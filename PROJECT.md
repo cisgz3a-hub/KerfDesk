@@ -710,15 +710,17 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   own model/license/runtime/privacy ADR. Externally produced relative-depth maps are accepted input
   under ADR-291/P2R.1 once their provenance and relative-not-metric UI lands; today's ADR-290 path
   imports qualified files only as explicit height maps and makes no AI or metric-depth claim.
-- Lead-in / lead-out, advanced fill patterns. Several
+- Advanced fill patterns. Several
   narrow parity features have since shipped and are no longer out of scope:
   Line-mode kerf compensation (`core/geometry/kerf-offset.ts`, per-layer
   `kerfOffsetMm`), automatic Line-mode hard-skip tabs
   (`core/geometry/tabs-bridges.ts`; by spacing, with a tab cut power and
   placed by hand since ADR-494), simple Cross-Hatch fill (per-layer
-  `fillCrossHatch`), simple Offset Fill output (`core/job/offset-fill.ts`), and
+  `fillCrossHatch`), simple Offset Fill output (`core/job/offset-fill.ts`),
   CNC profile arc/line lead-in/out (`core/cnc/profile-lead.ts`, ADR-250;
-  profile-outside/inside only — laser lead-in/out stays out of scope);
+  profile-outside/inside only), and laser Line lead-in/out on closed shapes,
+  off by default, with the scrap side found per contour
+  (`core/job/apply-laser-leads.ts`, ADR-626, explicitly requested 2026-10-18);
   a narrow ordered sub-layer "fill then line" operation stack is partially in
   place. **These landed without dedicated ADR headings** — the build plan
   reserved ADR-054..091 for its tickets, and the earlier citations here of

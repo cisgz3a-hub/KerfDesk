@@ -15,6 +15,8 @@ import {
   type Project,
   type SceneObject,
 } from '../scene';
+// Deep import: core/scene's barrel is ratcheted and may only shrink.
+import { withoutInactiveLaserLeadSettings } from '../scene/layer';
 import {
   canonicalProcessRecipe,
   type ProcessRecipe,
@@ -62,7 +64,8 @@ export function captureProcessRecipeStep(
   operation: Layer,
 ): ProcessRecipeStep {
   const effective = effectiveOperationForObject(operation, object);
-  const settings = captureLayerOperationSettings(effective);
+  // Lead fields with both leads off change nothing (ADR-626).
+  const settings = withoutInactiveLaserLeadSettings(captureLayerOperationSettings(effective));
   return {
     name: operation.name,
     color: operation.color,

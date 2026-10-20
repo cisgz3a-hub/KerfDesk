@@ -10,7 +10,12 @@ import * as controllerOperation from './laser-controller-operation';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import { disconnectedControllerQualification } from './laser-controller-qualification';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
-import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
+import {
+  disconnectDuringFireNotice,
+  disconnectDuringJobNotice,
+  disconnectDuringMotionNotice,
+  type LaserSafetyNotice,
+} from './laser-safety-notice';
 import { airOffLines, noResetStopLines } from './laser-quick-stop';
 import { sessionScopedJobStateReset } from './laser-session-reset';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
@@ -412,11 +417,7 @@ export function initialLaserState(): InitialLaserState {
 // commands already in its 127-byte buffer (P0-B).
 export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
   const wasActiveJob = isActiveJob(state.streamer);
-  const wasUnsafeActive =
-    wasActiveJob ||
-    state.fireActive ||
-    state.motionOperation !== null ||
-    controllerOperation.isUnsafeControllerOperation(state.controllerOperation);
+  const lostNotice = portCloseSafetyNotice(state, wasActiveJob);
   const stream: StreamerState | null =
     wasActiveJob && state.streamer !== null ? disconnectStreamer(state.streamer) : state.streamer;
   return {
@@ -466,10 +467,23 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     // late completion is intentionally unable to mutate the new ledger.
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,
-    ...(state.fireActive
-      ? { safetyNotice: disconnectDuringFireNotice() }
-      : wasUnsafeActive
-        ? { safetyNotice: disconnectDuringJobNotice() }
-        : {}),
+    ...(lostNotice === null ? {} : { safetyNotice: lostNotice }),
   };
+}
+
+// Only a link lost while the machine may still move raises the E-stop banner
+// (ADR-639, amending P0-B). A settings or build-info read, a reset the
+// controller already answered at rest, or the handshake moves nothing: its
+// incident is logged and the rail shows the ordinary disconnected state.
+function portCloseSafetyNotice(state: LaserState, wasActiveJob: boolean): LaserSafetyNotice | null {
+  if (state.fireActive) return disconnectDuringFireNotice();
+  const operationMotion = controllerOperation.controllerOperationMotion(
+    state.controllerOperation,
+    state.statusReport,
+  );
+  if (wasActiveJob || operationMotion === 'job') return disconnectDuringJobNotice();
+  if (state.motionOperation !== null || operationMotion === 'motion') {
+    return disconnectDuringMotionNotice();
+  }
+  return null;
 }

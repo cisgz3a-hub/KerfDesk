@@ -377,7 +377,10 @@ test('macOS and Linux follow the published Windows release, each behind its own 
   assert.ok(
     share > steps.findIndex((step) => step.run?.includes('publish-manual-commercial-release.mjs')),
   );
-  assert.equal(steps[share].if, "steps.plan.outputs.publish == 'true'");
+  assert.equal(
+    steps[share].if,
+    "steps.plan.outputs.publish == 'true' && steps.publish-windows.outcome == 'success'",
+  );
   assert.equal(publish.outputs.published, '${{ steps.share.outputs.published }}');
   assert.equal(publish.outputs.identity, '${{ steps.share.outputs.identity }}');
   assert.equal(publish.outputs.version, '${{ steps.plan.outputs.version }}');
@@ -389,7 +392,10 @@ test('macOS and Linux follow the published Windows release, each behind its own 
     const build = workflow.jobs[job];
     assert.equal(build.needs, 'publish');
     assert.equal(build['runs-on'], runner);
-    assert.equal(build.if, `needs.publish.outputs.published == 'true' && vars.${variable} == 'on'`);
+    assert.equal(
+      build.if,
+      `!cancelled() && needs.publish.outputs.published == 'true' && vars.${variable} == 'on'`,
+    );
     // Build jobs hold no secret and no protected environment.
     assert.equal(build.environment, undefined);
     assert.equal(JSON.stringify(build).includes('secrets.'), false);
@@ -423,6 +429,130 @@ test('macOS and Linux follow the published Windows release, each behind its own 
     assert.ok(step.run.includes('git fetch --no-tags origin main'));
     // Never the Windows publisher, so the Windows documents keep one writer.
     assert.equal(JSON.stringify(release).includes('publish-manual-commercial-release'), false);
+  }
+});
+
+// Evaluate this workflow's deliberately small conjunction-only condition grammar,
+// including Actions' implicit success() unless an explicit status function is used.
+function workflowCondition(expression, context, { success = true, cancelled = false } = {}) {
+  if (!/\b(?:success|failure|always|cancelled)\s*\(/u.test(expression) && !success) return false;
+  return expression.split('&&').every((raw) => {
+    const clause = raw.trim();
+    if (clause === '!cancelled()') return !cancelled;
+    const match = /^([A-Za-z0-9_.-]+) == '([^']*)'$/u.exec(clause);
+    assert.ok(match, `Unsupported workflow condition: ${clause}`);
+    const value = match[1].split('.').reduce((item, key) => item?.[key], context) ?? '';
+    return value === match[2];
+  });
+}
+
+test('confirmed Windows publication is shared before delivery or receipt failure can interrupt it', async () => {
+  const { jobs } = load(
+    await readFile(
+      new URL('../.github/workflows/release-desktop-unsigned.yml', import.meta.url),
+      'utf8',
+    ),
+  );
+  const { steps } = jobs.publish;
+  const publication = steps.findIndex((step) => step.id === 'publish-windows');
+  const share = steps.findIndex((step) => step.id === 'share');
+  const delivery = steps.findIndex((step) =>
+    step.run?.includes('verify-public-desktop-release.mjs'),
+  );
+  const receipt = steps.findIndex((step) =>
+    step.run?.includes('publish-desktop-release-receipt.mjs'),
+  );
+  assert.ok(
+    publication >= 0 && steps[publication].run.includes('publish-manual-commercial-release.mjs'),
+  );
+  assert.equal(share, publication + 1);
+  assert.ok(share < delivery && delivery < receipt);
+  assert.match(
+    steps[publication].run,
+    /if \(\$LASTEXITCODE -ne 0\) \{ throw 'Unsigned publication was not confirmed\.'/u,
+  );
+  assert.match(steps[share].run, /commercial-preparation\/commercial-release-identity\.json/u);
+  assert.match(steps[share].run, /ReadAllBytes\(\$identity\)/u);
+  assert.match(steps[share].run, /'published=true' >> \$env:GITHUB_OUTPUT/u);
+  assert.equal(jobs.publish.outputs['source-sha'], '${{ steps.plan.outputs.sourceSha }}');
+  for (const outcome of ['success', 'failure', 'skipped', 'cancelled']) {
+    const context = {
+      steps: { plan: { outputs: { publish: 'true' } }, 'publish-windows': { outcome } },
+    };
+    assert.equal(workflowCondition(steps[share].if, context), outcome === 'success');
+    assert.equal(workflowCondition(steps[share].if, context, { success: false }), false);
+    context.steps.plan.outputs.publish = 'false';
+    assert.equal(workflowCondition(steps[share].if, context), false);
+  }
+  for (const step of [steps[delivery], steps[receipt]]) {
+    assert.equal(step['continue-on-error'], undefined);
+    assert.equal(step.if, "steps.plan.outputs.publish == 'true'");
+    assert.match(step.run, /if \(\$LASTEXITCODE -ne 0\) \{ throw/u);
+  }
+});
+
+test('companion job graph survives post-publication audit failure without bypassing switches or qualification', async () => {
+  const { jobs } = load(
+    await readFile(
+      new URL('../.github/workflows/release-desktop-unsigned.yml', import.meta.url),
+      'utf8',
+    ),
+  );
+  for (const [platform, builds, variable] of [
+    ['macos', ['build-macos-arm64', 'build-macos-x64'], 'KERFDESK_UNSIGNED_MACOS_RELEASES'],
+    ['linux', ['build-linux'], 'KERFDESK_UNSIGNED_LINUX_RELEASES'],
+  ]) {
+    const affected = [...builds, `publish-${platform}`];
+    const context = {
+      needs: {
+        publish: { result: 'failure', outputs: { published: 'true' } },
+        ...Object.fromEntries(builds.map((build) => [build, { result: 'success' }])),
+      },
+      vars: { [variable]: 'on' },
+    };
+    // Read the actual YAML expressions. Removing !cancelled() restores implicit
+    // success() and reproduces the original skipped-companion regression.
+    for (const name of affected) {
+      assert.equal(workflowCondition(jobs[name].if, context, { success: false }), true, name);
+      assert.equal(
+        workflowCondition(jobs[name].if, context, { success: false, cancelled: true }),
+        false,
+        name,
+      );
+      for (const enabled of ['', 'off', 'true']) {
+        assert.equal(
+          workflowCondition(
+            jobs[name].if,
+            { ...context, vars: { [variable]: enabled } },
+            { success: false },
+          ),
+          false,
+          name,
+        );
+      }
+      for (const published of ['', 'false']) {
+        const needs = { ...context.needs, publish: { result: 'failure', outputs: { published } } };
+        assert.equal(
+          workflowCondition(jobs[name].if, { ...context, needs }, { success: false }),
+          false,
+          name,
+        );
+      }
+    }
+    for (const build of builds) {
+      for (const result of ['failure', 'skipped', 'cancelled', '']) {
+        const needs = { ...context.needs, [build]: { result } };
+        assert.equal(
+          workflowCondition(
+            jobs[`publish-${platform}`].if,
+            { ...context, needs },
+            { success: false },
+          ),
+          false,
+          `${platform}: ${build} ${result}`,
+        );
+      }
+    }
   }
 });
 
