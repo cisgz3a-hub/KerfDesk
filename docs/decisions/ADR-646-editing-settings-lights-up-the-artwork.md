@@ -1,4 +1,4 @@
-## ADR-645 - Editing settings lights up the artwork they change (2026-10-20)
+## ADR-646 - Editing settings lights up the artwork they change (2026-10-20)
 
 **Status:** Accepted. Extends ADR-620 and ADR-632 (operation colour pulse). | **Date:** 2026-10-20
 

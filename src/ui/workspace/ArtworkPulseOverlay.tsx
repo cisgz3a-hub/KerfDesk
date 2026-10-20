@@ -3,7 +3,7 @@
 // sharing those settings pulses once in that operation's colour, rippling
 // outward, and keeps a soft colour edge while the pointer stays. Editing a
 // piece's settings lights up the artwork the edit changes, the same way, and
-// each change pulses it again (ADR-645). Drawn on its own pointer-transparent
+// each change pulses it again (ADR-646). Drawn on its own pointer-transparent
 // canvas, so a pulse never redraws the scene.
 
 import { useEffect, useMemo, useRef, useState } from 'react';

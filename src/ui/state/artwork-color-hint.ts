@@ -1,7 +1,7 @@
 // Display-only operation colour hints (ADR-620). The workspace draws artwork
 // in plain ink; these say when to show the colours anyway: the operation row
 // the pointer is over (its artwork pulses on the canvas), the settings being
-// edited (the artwork they change lights up, ADR-645), and whether Alt is held
+// edited (the artwork they change lights up, ADR-646), and whether Alt is held
 // (every operation colour at once). Session-only, never project data.
 
 /** The artwork a settings edit changes, and the operations whose colour it lights up in. */

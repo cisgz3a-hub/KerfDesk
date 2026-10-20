@@ -1,4 +1,4 @@
-// Editing settings lights up the artwork they change (ADR-645). While focus is
+// Editing settings lights up the artwork they change (ADR-646). While focus is
 // anywhere inside a settings editor (a number field, a slider, a process
 // button), the canvas keeps the hover pulse's soft colour edge on exactly the
 // pieces an edit there changes, and pulses them as each change lands. Display

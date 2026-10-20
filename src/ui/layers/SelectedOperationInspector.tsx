@@ -165,7 +165,7 @@ function SelectedOperationEditor(props: {
 }
 
 /**
- * Lights up what an edit here changes (ADR-645): the selected artwork's own
+ * Lights up what an edit here changes (ADR-646): the selected artwork's own
  * settings while it overrides the operation, otherwise every piece the
  * operation runs.
  */

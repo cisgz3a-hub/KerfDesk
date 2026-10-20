@@ -3,7 +3,7 @@
 // operation row, swells one soft tint of that operation's colour across every
 // piece that shares its settings, rippling out from the piece under the
 // pointer. A soft colour edge stays while the pointer rests there. Editing
-// settings lights up only the artwork the edit changes (ADR-645). Pure: no
+// settings lights up only the artwork the edit changes (ADR-646). Pure: no
 // DOM, no canvas.
 
 import { operationIdsForObject, type Layer, type SceneObject } from '../../core/scene';
@@ -74,7 +74,7 @@ export function pulseColorSources(
 export type PulseSeed =
   | { readonly kind: 'object'; readonly objectId: string }
   | { readonly kind: 'operation'; readonly operationId: string }
-  /** A settings edit (ADR-645): exactly the artwork it changes, never widened to same settings. */
+  /** A settings edit (ADR-646): exactly the artwork it changes, never widened to same settings. */
   | {
       readonly kind: 'edit';
       readonly objectIds: ReadonlyArray<string>;
@@ -113,7 +113,7 @@ export class PulseTrigger {
       return !(sameHover || resumedPiece);
     }
     // An edit pulses when it begins and again with every change it makes
-    // (ADR-645). A hover over it and back is the same edit: its edge returns,
+    // (ADR-646). A hover over it and back is the same edit: its edge returns,
     // no pulse. The clock lets a running pulse finish, so dragging a slider
     // pulses at the pulse's own pace rather than restarting on every step.
     const editResumed = seedKey === this.pulsedEditKey;

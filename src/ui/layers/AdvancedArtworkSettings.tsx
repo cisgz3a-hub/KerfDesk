@@ -45,7 +45,7 @@ export function AdvancedArtworkSettings(props: {
   });
   const draftScale = parseEnglishDecimalInput(input.displayValue);
   const results = powerResults(props.objects, props.layers, draftScale);
-  // The multiplier scales every operation of the selected artwork (ADR-645).
+  // The multiplier scales every operation of the selected artwork (ADR-646).
   const glow = useSettingsEditGlow({
     owner: 'artwork-power-multiplier',
     objectIds: props.objects.map((object) => object.id),
