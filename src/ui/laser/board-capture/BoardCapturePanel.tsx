@@ -297,7 +297,9 @@ function useKeepBoardPanelOpenWhileBusy(
       verification.cancelling ||
       laser.motionOperation?.kind === 'jog'
     ) {
-      useUiStore.setState({ boardCapturePanelOpen: true });
+      // A busy session keeps its page, even against opening jig mode: the two
+      // pages share the workspace, so jig mode waits too.
+      useUiStore.setState({ boardCapturePanelOpen: true, registrationPanelOpen: false });
       return;
     }
     if (verification.activeTarget !== null) {

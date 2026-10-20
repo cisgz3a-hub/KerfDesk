@@ -77,7 +77,9 @@ board.
    the measured board and its checks), **2 Place artwork** (Import artwork, the placement grid,
    Fit to board, Fill with copies) and **3 Burn** (power, speed and passes for the operations the
    artwork uses, then the workspace's own Frame and Start, which leave the machine panel while
-   the page is open). Creating the outline moves on to step 2. The page's canvas is jig mode's
+   the page is open and the project holds a captured board; until then the machine panel keeps
+   them). Steps 2 and 3 work from the board in the project, so they still work after the
+   project is reopened; step 1 then says that capturing again replaces that board. Creating the outline moves on to step 2. The page's canvas is jig mode's
    editing canvas on the open project, so artwork is moved, resized and rotated on the board
    with ordinary Undo; over it the page paints the points captured so far, the outline they
    make, the live head or pointer crosshair and the board's check points. Done returns to the

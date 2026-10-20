@@ -100,3 +100,35 @@ describe('board array plan', () => {
     );
   });
 });
+
+// ADR-636: a custom-shape board keeps only the slots on the material; the
+// slots it drops are not the responsiveness cap, so `limited` stays false.
+describe('board array plan on a custom shape', () => {
+  const triangle: ShapeObject = {
+    ...board(),
+    spec: {
+      kind: 'polyline',
+      closed: true,
+      points: [
+        { x: 0, y: 100 },
+        { x: 100, y: 100 },
+        { x: 50, y: 0 },
+      ],
+    },
+  };
+
+  it('keeps only slots inside the shape and does not report the cap', () => {
+    const plan = planBoardArray(cell, triangle, fill);
+    const rectangular = planBoardArray(cell, board(), fill);
+    expect(plan.offsets.length).toBeGreaterThan(0);
+    expect(plan.offsets.length).toBeLessThan(rectangular.offsets.length);
+    expect(plan.limited).toBe(false);
+    for (const slot of plan.offsets) {
+      // Inside the triangle: the slot's top corners lie within the slanted edges.
+      const top = cell.minY + slot.dy;
+      const halfWidthAtTop = top / 2;
+      expect(cell.minX + slot.dx).toBeGreaterThanOrEqual(50 - halfWidthAtTop - 1e-6);
+      expect(cell.maxX + slot.dx).toBeLessThanOrEqual(50 + halfWidthAtTop + 1e-6);
+    }
+  });
+});
