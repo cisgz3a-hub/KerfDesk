@@ -5,6 +5,7 @@ Method: [METHOD.md](METHOD.md). Plan: [AREAS.md](AREAS.md).
 
 | Batch | # | Area | Tree | Report | Raised | Refuted | P1 | P2 | P3 | Known |
 |---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 01 | Remote control (phone + MCP) | 70c01e11f | [01-remote-control.md](01-remote-control.md) | 23 | 5 | 0 | 6 | 17 | 0 |
 | 1 | 02 | Licensing | 70c01e11f | [02-licensing.md](02-licensing.md) | 27 | 5 | 0 | 2 | 19 | 1 |
 | 1 | 03 | Laser output | 70c01e11f | [03-laser-output.md](03-laser-output.md) | 32 (29 unique) | 1 | 3 | 9 | 16 | 0 |
 | 1 | 04 | Electron main process | 70c01e11f | [04-electron-main.md](04-electron-main.md) | 33 (32 unique) | 2 | 0 | 1 | 27 | 2 |
@@ -16,6 +17,12 @@ Coordinator checks were made on `origin/main` @ `faf5a54f1`; no audited line cha
 
 | ID | Area | Summary | Coordinator evidence | Fix status |
 |---|---|---|---|---|
+| 01-P2-1 | remote-control | Phone Zero Z skips the PC's probed-Z overwrite warning, so the next CNC job can cut at the wrong depth | **READ**: `machine-actions.ts:138` calls `zeroZHere()` directly; PC hook `use-zero-z-action.ts:18-29` runs `zeroZOverwriteWarning` first. Session + refuter REPRO on a fake GRBL link (`G54 G92 Z0` sent, 0 confirms) | open |
+| 01-P2-2 | remote-control | Phone Set origin leaves Start-from on Absolute (ADR-327 item 4), so Frame and Start ignore the new origin | **READ**: `machine-actions.ts:139` calls only `setOriginHere()`; PC twin applies `placementAfterSetOrigin` | open |
+| 01-P2-3 | remote-control | Relay turns definite desktop refusals of machine commands into "outcome unconfirmed — do not repeat" | session + refuter REPRO (`device.ts:141`); not re-run by coordinator | open |
+| 01-P2-4 | remote-control | A failed encrypted save during Disable/Revoke loses the revocation; revoked phones regain control on next launch | **READ**: `runtime.ts:306-312` closes the relay on persist failure, never sends `client.revoke`; refuter REPRO with a real Windows file lock | open |
+| 01-P2-5 | remote-control | Held-jog releases spend the phone's Abort rate allowance (30/min), so remote Abort can get HTTP 429 | **READ**: `limits.ts` `priorityCommand` puts `jog_hold_stop` on `ABORT_LIMIT`. **Maintainer decision:** ADR-585 chose the shared lane; later fixes say routine stops must not spend Abort capacity | open |
+| 01-P2-6 | remote-control | One hold release runs Cancel twice; phone may briefly see "stop could not be confirmed" | PLAUSIBLE only (its refuter never returned) | open |
 | 02-P2-1 | licensing | "My artwork" Insert (and an edited `.lfart`) creates V-carve, relief or adaptive work in Free without asking for Pro | **READ**: `personal-artwork-actions.ts:62` calls zustand's public `useStore.setState`, which bypasses the `freeProArtworkSetter` wrapper applied only to the creator's `set` (`store.ts:425-433`). Session + refuter REPRO (`requestPro` 0 calls) | open |
 | 02-P2-2 | licensing | "Tapered V-bit pair" inlay runs V-carve passes but is classed as Free; browser Free then fails at Preview with the Pro message | **READ**: `operationProFeature` flags only v-carve/relief/adaptive; `tapered-inlay-operation.ts:41` calls `vcarveMedialPasses`, which `browser-free-build.ts:25` strips. Needs a maintainer tier decision | open |
 | 03-P1-1 | laser-output | A crafted `.lf2` layer id or colour injects an executable G-code line (e.g. a full-power `G1`) through unsanitised laser comments; Frame, preflight and Job Review never show it | **REPRO**: own Vitest (serialize → plant `\nG1 X300 Y10 F100 S1000\n` in layer id → `deserializeProject` ok → `emitGcode`) — the line is emitted on its own. Code: `grbl-strategy.ts:284` raw interpolation; CNC twin uses `sanitizeGcodeCommentValue`; validator only `requireString`; streamer sends every non-`;` line | open |
