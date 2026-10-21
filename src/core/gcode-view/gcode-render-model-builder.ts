@@ -30,6 +30,7 @@ import {
 import { computeProgramStats } from './program-stats';
 import { createProgramBoundsTracker, type ProgramBoundsTracker } from './program-bounds';
 import { createPlacementReader, placeBeforeMotion } from './render-model-placement';
+import { nonMotionCategory, recordUnplacedLine } from './render-model-line-accounting';
 import { ARC_RADIUS_TOLERANCE_MM, renderArcCenter } from './render-model-arc-center';
 import { createSegmentBuilder, type SegmentBuilder } from './segment-builder';
 import {
@@ -68,7 +69,7 @@ type BuildContext = {
 };
 
 export type GcodeRenderModelBuilder = {
-  readonly pushLine: (line: string) => void;
+  readonly pushLine: (line: string, unplaced?: 'position' | 'origin') => void;
   readonly finish: () => BuildRenderModelResult;
 };
 
@@ -98,8 +99,9 @@ export function createGcodeRenderModelBuilder(
   let junkLines = 0;
   let terminalResult: BuildRenderModelResult | null = null;
 
-  const pushLine = (raw: string): void => {
+  const pushLine = (raw: string, unplaced?: 'position' | 'origin'): void => {
     if (terminalResult !== null) return;
+    recordUnplacedLine(context, lineCount, unplaced);
     const category = processLine(context, raw, lineCount);
     categories.push(category);
     if (category === LINE_CATEGORY.junk) junkLines += 1;
@@ -200,16 +202,6 @@ function emitPlacedLineMotion(
     emitLineMotion(context, outcome, line, placement.motion !== 'unplaced');
   if (placement.unknownAfter.length > 0) context.program.forget(placement.unknownAfter);
   return moved;
-}
-
-function nonMotionCategory(
-  outcome: ReturnType<typeof applyLineWords>,
-  hasNativeEvent: boolean,
-): number {
-  if (outcome.sawEvent || hasNativeEvent) return LINE_CATEGORY.event;
-  if (outcome.sawModal) return LINE_CATEGORY.modalOnly;
-  if (outcome.sawUnsupported) return LINE_CATEGORY.unsupported;
-  return LINE_CATEGORY.modalOnly;
 }
 
 // Routes a line to the right emitter. Returns whether it produced motion.

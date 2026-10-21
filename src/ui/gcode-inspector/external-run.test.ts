@@ -101,6 +101,18 @@ describe('external run Start checks (ADR-630)', () => {
     expect(frame).not.toHaveBeenCalled();
   });
 
+  it('rejects a program interpreted for a different connected controller at Frame and Start', async () => {
+    vi.spyOn(frameAction, 'prepareTransientFrameController').mockResolvedValue({
+      laser: useLaserStore.getState(),
+    } as never);
+    const run = { ...RUN, controllerKind: 'marlin' as const };
+    const frame = vi.fn(async () => undefined);
+    useLaserStore.setState({ frame });
+    await expect(frameExternalProgram(run)).rejects.toThrow(EXTERNAL_FRAME_CHANGED);
+    expect(frame).not.toHaveBeenCalled();
+    expect(externalStartIssue({ ...framed(), run })).toBe(EXTERNAL_FRAME_CHANGED);
+  });
+
   // A CNC Frame begun below work Z0 leaves the bit at safe Z rather than
   // plunging back into the stock (ADR-192). Comparing Z with where the program
   // was read from kept Start locked for good.
