@@ -3275,7 +3275,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 1. Connection, reset/Abort cleanup, wake, probe recovery, reboot banner, and
    controller-setting writes start one epoch-bound qualification flow. GRBL-family
    controllers own one `$$` read after fresh Idle; unsupported dumps are
-   `not-required`, and late prior-epoch replies are ignored.
+   `not-required`, and late prior-epoch replies are ignored. The banner of a reset
+   KerfDesk sent on the same port (Abort, the error stop, the heartbeat and hold
+   stops, Disconnect) keeps the session's `$$` and `$I` snapshot and re-reads only
+   `$G`, unless a `$` setting was written since the last read (ADR-648).
 2. Frame-first: **ordinary Start on BOTH machine kinds never gates on qualification.** Known or
    unknown `$30`/`$32` state appears in Job Review as an advisory; it cannot refuse the physical
    Frame or invalidate the exact permit that Frame completion earns. Supervised recovery retains

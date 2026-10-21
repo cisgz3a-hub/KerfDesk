@@ -24,6 +24,11 @@ import {
   hasCoordinatedControllerReset,
   ownsResetOperation,
 } from './laser-owned-reset-recovery';
+import {
+  retainableControllerSettings,
+  type OwnedResetSettingsRefs,
+  type RetainedControllerSettings,
+} from './laser-owned-reset-settings';
 
 export type ResetSetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -44,6 +49,8 @@ export type ResetOwnership = {
   readonly operation: NonNullable<LaserState['controllerOperation']>;
   readonly writeEpoch: number;
   readonly oldResponseDebt: boolean;
+  /** Settings read before this reset, for its own banner only (ADR-648). */
+  retainedSettings: RetainedControllerSettings | null;
   canonicalWake: boolean;
   boundaryObserved: boolean;
   resetAccepted: boolean;
@@ -56,7 +63,8 @@ export type ResetOwnership = {
 };
 
 export type ResetTransactionRefs = ControllerLifecycleRefs &
-  ResetCleanupRefs & {
+  ResetCleanupRefs &
+  OwnedResetSettingsRefs & {
     readonly connection?: unknown | null;
     readonly driver: ControllerDriver;
     readonly settingsCollector?: { readonly kind: string };
@@ -81,7 +89,11 @@ export function claimResetOwnership(
     idleReports: 0,
   };
   let canonicalWake = false;
+  let retainedSettings: RetainedControllerSettings | null = null;
   set((state) => {
+    // A soft reset leaves EEPROM as it was: the settings read before it hold
+    // after its banner. Captured before the evidence below is invalidated.
+    retainedSettings = retainableControllerSettings(state, refs, connection);
     const continuation = canonicalRecoveryForReset(state, refs);
     canonicalWake = continuation !== null;
     if (continuation !== null) operation = continuation;
@@ -122,6 +134,7 @@ export function claimResetOwnership(
     operation,
     writeEpoch: refs.writeEpoch ?? 0,
     oldResponseDebt,
+    retainedSettings,
     canonicalWake,
     boundaryObserved: false,
     resetAccepted: false,

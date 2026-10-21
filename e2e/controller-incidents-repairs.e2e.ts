@@ -5,6 +5,7 @@ import {
   openMachineToolDropdown,
   selectWorkspacePanel,
 } from './fixtures/workspace-ui';
+import { expectControllerSettingsRead } from './fixtures/controller-settings-read';
 import type { SerialTranscriptEntry } from '../src/ui/state/laser-transcript';
 
 test('controller incidents survive acknowledgements and reconnect in the console and saved report', async ({
@@ -17,7 +18,7 @@ test('controller incidents survive acknowledgements and reconnect in the console
   await selectWorkspacePanel(page, 'Machine');
   await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
-  await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
+  await expectControllerSettingsRead(page);
   await kerfdesk.emitSerialLine('ALARM:2');
   await kerfdesk.emitSerialLine('error:20');
   await expect

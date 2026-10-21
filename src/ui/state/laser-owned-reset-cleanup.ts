@@ -68,8 +68,12 @@ function armCausalResetCleanup(owner: ResetOwnership, context: CleanupContext): 
   };
   armResetCleanup(owner.refs, write, context.lines, {
     requireResetBoundary: true,
+    retainedSettings: () => owner.retainedSettings,
     onResetBoundary: () => {
       owner.boundaryObserved = true;
+      // Only this reset's own banner carries the snapshot (ADR-648); a later
+      // boot this owner re-arms for is not one KerfDesk commanded.
+      owner.retainedSettings = null;
       owner.cleanupBoundaryUncertain = resetCleanupWritesPending(owner);
       // A boot proves the reset byte, but cannot erase an off write that is
       // still crossing the transport. Settle Abort before controls can reopen.

@@ -41,7 +41,7 @@ type SettingsWriteFn = (
   source?: TranscriptSource,
 ) => Promise<void>;
 
-const BUILD_INFO_READ_OPERATION_LABEL = 'Reading controller build information';
+export const BUILD_INFO_READ_OPERATION_LABEL = 'Reading controller build information';
 
 // Settings and build-info reads and $-setting writes move nothing (ADR-639).
 function settingsControllerOperation(label: string) {
@@ -145,7 +145,7 @@ async function readMachineSettingsAction(
   }
 }
 
-async function refreshControllerBuildInfo(
+export async function refreshControllerBuildInfo(
   set: SetFn,
   get: GetFn,
   refs: GrblSettingsActionRefs,
@@ -291,7 +291,7 @@ async function writeAndVerifySetting(
   }
 }
 
-function assertSettingsCommandOwnership(get: GetFn): void {
+export function assertSettingsCommandOwnership(get: GetFn): void {
   const mpgBlock = mpgCommandBlockMessage(get());
   if (mpgBlock !== null) throw new Error(mpgBlock);
 }
@@ -302,7 +302,7 @@ function settingWasVerified(get: GetFn, id: number, trimmed: string): boolean {
   );
 }
 
-function failSettingsOperation(
+export function failSettingsOperation(
   set: SetFn,
   refs: GrblSettingsActionRefs,
   expectedEpoch: number,
@@ -356,7 +356,7 @@ function finishSettingsQualification(
   );
 }
 
-function blockRead(set: SetFn, get: GetFn, reason: string): never {
+export function blockRead(set: SetFn, get: GetFn, reason: string): never {
   set({
     lastWriteError: reason,
     log: pushLog(get(), `[lf2] Machine settings read blocked: ${reason}`),
@@ -372,7 +372,7 @@ function blockWrite(set: SetFn, get: GetFn, reason: string): never {
   throw new Error(reason);
 }
 
-function clearInteractiveOperation(set: SetFn, expectedEpoch: number): void {
+export function clearInteractiveOperation(set: SetFn, expectedEpoch: number): void {
   set((state) =>
     state.controllerSessionEpoch === expectedEpoch &&
     state.controllerOperation?.kind === 'interactive-command'
