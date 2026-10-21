@@ -60,7 +60,7 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `abort_job` | `requestId` UUID | Canonical network Abort, independently admitted while another command waits; no artwork revision required. |
 | `connect_machine`, `disconnect_machine` | Machine write admission | ADR-585. Reconnect only to the port already chosen on the PC (`portSelection: 'remembered-only'`, ADR-639); disconnect refused during a job or motion. |
 | `home_machine` | Machine write admission | Desktop Home with all its guards. |
-| `set_work_origin` | Machine write admission, `axes` xy/z | Desktop Set origin here / Zero Z; no motion. |
+| `set_work_origin` | Machine write admission, `axes` xy/z | Desktop Set origin here (Absolute start becomes User Origin) / Zero Z, refused where the PC would ask to confirm (ADR-653); no motion. |
 | `pause_job`, `resume_job` | `requestId` UUID | Desktop Pause/Resume with controller confirmation; no artwork revision required. |
 | `get_camera_snapshot` | None | Control scope plus artwork sharing: one JPEG still ≤1024 px and ≤240000 base64 characters of the live PC camera. |
 
@@ -153,7 +153,7 @@ records with truthful total/truncated fields, rather than a raw store, licence
 status, connection or purchase object.
 
 Backend failures may throw `KerfDeskMcpError` or an object with one of
-`unavailable`, `stale_revision`, `needs_pro`, `unsupported_operation`,
+`unavailable`, `stale_revision`, `busy`, `needs_pro`, `unsupported_operation`,
 `invalid_input`, `cancelled`, `control_limit` or `failed`. Only a fixed
 code/message pair is returned. Exception messages, stacks and validation input values are excluded.
 Licence keys, payment records, device identities, native paths, serial ports
