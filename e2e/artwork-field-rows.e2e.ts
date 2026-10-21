@@ -164,7 +164,7 @@ test('Image dither swatches fit and stay keyboard-operable at every panel width'
     expect(layout.outside).toBe(0);
     // Three swatches a row even at 240 px keeps the picker to four rows.
     expect(layout.rows).toBeLessThanOrEqual(4);
-    expect(layout.thumbnails).toEqual(Array.from({ length: 11 }, () => 44));
+    expect(layout.thumbnails).toEqual(Array.from({ length: 12 }, () => 44));
   }
 
   const grayscale = dither.getByRole('radio', { name: 'Grayscale', exact: true });
