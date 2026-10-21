@@ -21,3 +21,10 @@ export { textToPolylines } from './text-to-polylines';
 export { placeTextOnPath, type PathTextResult } from './text-on-path';
 export { TEXT_BEND_MAX_DEG, TEXT_BEND_MIN_DEG, bendTextRender, clampBend } from './text-bend';
 export { MAX_EMBEDDED_FONT_BYTES, embeddedFontBuffer, encodeEmbeddedFont } from './embedded-font';
+export {
+  EMBEDDED_FONT_LIMIT_REASON,
+  MAX_EMBEDDED_FONTS,
+  embeddedFontChoice,
+  withReferencedEmbeddedFonts,
+  type EmbeddedFontChoice,
+} from './embedded-font-set';

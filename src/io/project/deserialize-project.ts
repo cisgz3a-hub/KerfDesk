@@ -1,6 +1,5 @@
 import { normalizeSceneObject } from './normalize-scene-object';
 import { normalizePositioningLight } from '../../core/devices/positioning-light';
-import { normalizeAutofocusCommand } from '../../core/devices/autofocus-command';
 import type { ReliefAuthoringResolutions } from './project-relief-authoring-validator';
 // deserializeProject - parses a .lf2 string and returns a typed Project, or a
 // structured error describing why it cannot be loaded.
@@ -353,10 +352,6 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     cameraModel: normalizeCameraModelRecord(dev['cameraModel']),
     otherCameraModels: normalizeOtherCameraModels(dev['otherCameraModels']),
     fireControl: normalizeLaserFireControl(dev['fireControl']),
-    // The file's Auto-focus line is vetted like the light commands: a move,
-    // burn or settings write is cleared, so the button is set up again
-    // (ADR-400 Amendment 1, audit 13-P1-1).
-    autofocusCommand: normalizeAutofocusCommand(dev['autofocusCommand']),
     // An invalid or since-tightened light mapping is dropped, not a reason to
     // refuse the whole project; it is configured again in Machine Setup.
     positioningLight: normalizePositioningLight(
