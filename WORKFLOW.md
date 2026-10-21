@@ -8738,7 +8738,9 @@ recorded below, and only step 4 remains deliberately open:
 1. [x] Create repo secrets `PAGES_CLOUDFLARE_API_TOKEN` (Pages-only scope) and
    `PAGES_CLOUDFLARE_ACCOUNT_ID` alongside the legacy names. Completed
    2026-07-22; both names exist (the legacy names were later deleted under
-   step 3).
+   step 3). Under ADR-651 (2026-10-21) the deploy job names the `production`
+   environment, and both names belong there, limited to main, not in the
+   repository.
 2. [x] `gh workflow disable 308419274` completed and the historical workflow is
    verified `disabled_manually`; this deliberately pauses the old stable/manual
    lane during cutover and is reversible. The workflow has since been removed
