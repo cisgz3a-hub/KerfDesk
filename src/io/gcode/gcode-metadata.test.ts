@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('focus-relative-z-air-timing-20261016-v21');
+    expect(EMITTER_REVISION).toBe('marlin-dark-air-changes-20261021-v22');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

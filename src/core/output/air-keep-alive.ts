@@ -9,6 +9,11 @@
 // A repeat cannot occur inside a long move or dwell. Under M3 it also waits
 // until a laser-off move has left the beam dark (OR-1), which can defer it
 // arbitrarily long. No motion is segmented or changed to force a repeat.
+// On Marlin (`stopKeepsPower`) the wait applies under M4 too: Marlin runs the
+// body as continuous power, which stays lit at a stop, and its M7/M8 always
+// synchronize, even when air is already on (M7-M9.cpp). A move to where the
+// head already is plans no block there (planner.cpp:2247-2248), so it leaves
+// the beam as it was (ADR-462 Amendment 1).
 // For ordinary short blocks, counting each move from rest to rest can make
 // repeats more frequent than a blended-motion estimate. Neither those profile
 // assumptions nor command-boundary opportunities bound actual elapsed time.
@@ -37,6 +42,8 @@ export type AirKeepAliveLimits = {
   /** Fastest feed the machine is assumed to reach, mm/min; also its rapid rate. */
   readonly maxFeedMmPerMin: number;
   readonly accelMmPerSec2: number;
+  /** The beam keeps its last power at a stop under M4 too (Marlin). */
+  readonly stopKeepsPower?: boolean;
 };
 
 type AirWord = 'M7' | 'M8';
@@ -83,7 +90,7 @@ export function withAirKeepAlive(
   const out: string[] = [];
   for (const line of program.split(LINE_END)) {
     const words = blockWords(line);
-    if (cursor.air !== null && repeatDue(cursor, words, intervalSeconds)) {
+    if (cursor.air !== null && repeatDue(cursor, words, intervalSeconds, limits)) {
       out.push(cursor.air);
       cursor.elapsed = 0;
     }
@@ -102,9 +109,10 @@ function repeatDue(
   cursor: KeepAliveCursor,
   words: ReadonlyArray<GcodeWordMatch>,
   intervalSeconds: number,
+  limits: AirKeepAliveLimits,
 ): boolean {
   if (cursor.elapsed < intervalSeconds || !hasMotionTarget(words)) return false;
-  return !(cursor.spindle === 'M3' && cursor.lit);
+  return !(cursor.lit && (cursor.spindle === 'M3' || limits.stopKeepsPower === true));
 }
 
 function hasMotionTarget(words: ReadonlyArray<GcodeWordMatch>): boolean {
@@ -129,6 +137,8 @@ function applyBlock(
   cursor.x = target.x;
   cursor.y = target.y;
   cursor.z = target.z;
+  // On Marlin a move that goes nowhere plans no block and changes no power.
+  if (limits.stopKeepsPower === true && !(distance > 0)) return;
   cursor.lit = cursor.motion !== 0 && cursor.power > 0 && cursor.spindle !== 'off';
 }
 
