@@ -110,6 +110,66 @@ describe('addCapturedBoard (circle)', () => {
   });
 });
 
+describe('addCapturedBoard (outline)', () => {
+  const outline = {
+    kind: 'outline' as const,
+    pointsMm: [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 70, y: 40 },
+      { x: 0, y: 60 },
+    ],
+    anchorIndices: [0, 1, 2, 3],
+  };
+
+  beforeEach(() => resetStore());
+
+  it('places an exact locked outline at a known scene top-left', () => {
+    useStore.getState().addCapturedBoard(outline, { x: 23, y: 41 });
+    const state = useStore.getState();
+    const box = findRegistrationBoxes(state.project.scene)[0]!;
+    expect(box.spec).toEqual({
+      kind: 'polyline',
+      points: outline.pointsMm,
+      closed: true,
+    });
+    expect(box.transform).toMatchObject({ x: 23, y: 41 });
+    expect(box).toMatchObject({ locked: true, provenance: 'captured-board' });
+    expect(box.operationIds).toEqual([REGISTRATION_LAYER_ID]);
+    expect(
+      state.project.scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID)?.output,
+    ).toBe(false);
+    expect(state.jobPlacement).toEqual({ startFrom: 'user-origin', anchor: 'front-left' });
+  });
+
+  it('centres an outline when physical bed placement is unknown', () => {
+    useStore.getState().addCapturedBoard(outline);
+    const state = useStore.getState();
+    const box = findRegistrationBoxes(state.project.scene)[0]!;
+    expect(box.transform.x).toBe((state.project.device.bedWidth - 100) / 2);
+    expect(box.transform.y).toBe((state.project.device.bedHeight - 60) / 2);
+  });
+
+  it('updates an outline while preserving its scene front-left', () => {
+    useStore.getState().addCapturedBoard(outline, { x: 20, y: 30 });
+    const before = transformedBBox(findRegistrationBoxes(useStore.getState().project.scene)[0]!);
+    useStore.getState().updateCapturedBoard({
+      ...outline,
+      pointsMm: [
+        { x: 0, y: 0 },
+        { x: 120, y: 0 },
+        { x: 80, y: 50 },
+        { x: 0, y: 70 },
+      ],
+    });
+    const box = findRegistrationBoxes(useStore.getState().project.scene)[0]!;
+    const after = transformedBBox(box);
+    expect(after.minX).toBeCloseTo(before.minX);
+    expect(after.maxY).toBeCloseTo(before.maxY);
+    expect(box).toMatchObject({ locked: true, provenance: 'captured-board' });
+  });
+});
+
 describe('updateCapturedBoard', () => {
   beforeEach(() => resetStore());
 

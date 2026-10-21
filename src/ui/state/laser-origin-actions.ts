@@ -35,7 +35,11 @@ import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { LiveRefs } from './laser-store';
 import { assertOriginActionReady, usesPrimaryWcs } from './laser-origin-readiness';
-import { restoreWorkOrigin, setOriginAtProgramPoint } from './laser-origin-restore';
+import {
+  restoreWorkOrigin,
+  setOriginAtMachinePoint,
+  setOriginAtProgramPoint,
+} from './laser-origin-restore';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -57,6 +61,7 @@ export function originActions(
   | 'clearPersistentOrigin'
   | 'releaseMotors'
   | 'restoreWorkOrigin'
+  | 'setOriginAtMachinePoint'
   | 'setOriginAtProgramPoint'
 > {
   return {
@@ -68,6 +73,8 @@ export function originActions(
     releaseMotors: () => releaseMotors(set, get, refs, safeWrite),
     restoreWorkOrigin: (savedOffsetMm) =>
       restoreWorkOrigin(set, get, refs, safeWrite, savedOffsetMm),
+    setOriginAtMachinePoint: (pointMm) =>
+      setOriginAtMachinePoint(set, get, refs, safeWrite, pointMm),
     setOriginAtProgramPoint: (pointMm) =>
       setOriginAtProgramPoint(set, get, refs, safeWrite, pointMm),
   };

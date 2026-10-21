@@ -4707,6 +4707,57 @@ preview and applied copies use the same plan; this is not optimal nesting (ADR-5
 
 ---
 
+### F-BC4. Place an irregular board from a photo (ADR-650)
+
+**ADR:** [ADR-650](docs/decisions/ADR-650-outline-board-from-photo.md).
+
+**Operator intent.** Trace the irregular edge of an offcut, live-edge slab or shaped blank from a
+phone photo, give it an exact ruler-measured size, and register that outline to the machine with
+head captures instead of guessing where the photograph lies on the bed.
+
+**Where in the UI.** Open **Tools → Place Board**, choose **Outline**, then **Outline from photo…**.
+The modal photo workflow straightens the picture from a sheet of A4, US Letter or custom-sized
+paper lying flat on the board. A rough skip-reference option is available for a genuinely
+straight-down photo.
+
+**The happy path.**
+
+1. Lay the reference sheet flat on the board, photograph the whole board and sheet straight down,
+   load the photo, and click the sheet's four corners.
+2. Straighten the photo, click the middle of the board, inspect the traced edge, and choose two to
+   six reachable outline anchors. Choose the first capture anchor; KerfDesk chooses the farthest
+   second anchor.
+3. Measure the board with a ruler and enter Width × Height. **Use this outline** scales the traced
+   bounding box to exactly those dimensions.
+4. Jog beam-off to highlighted anchor A and Capture, then anchor B and Capture. **Create board
+   outline** checks the measured scale, sets the physical front-left work origin arithmetically,
+   and adds the locked, non-output outline.
+5. Check every remaining anchor. Each accepted or adjusted point is measured and refits the
+   outline. These checks are accuracy advice, not a Start gate.
+6. Select artwork and use **Fit to board** or **Array on board**. Both use a conservative inscribed
+   rectangle so rectangular artwork stays inside the irregular edge.
+7. Preview, complete **Frame** for the exact placement, then Start. The completed Frame remains the
+   ordinary Start gate.
+
+**Edge / error cases.** A head-measured anchor spacing over 5% different from the typed outline is
+refused as a likely wrong anchor or size; over 1% shows a notice. If no contrasting board is found
+at the click, click farther from the reference sheet or retake against a plain background. A board
+touching the photo edge is marked partial. A very wide photographed area is marked coarse; move
+closer for detail. Skip-reference mode is deliberately rough and requires typed dimensions.
+Reconnect, reset/alarm, homing/manual-position or work-origin changes stale the capture epochs and
+require recapture. A checked anchor over 5 mm from prediction warns about the selected point; a
+least-squares miss over 1.5 mm warns about photo distortion and recommends an edge margin.
+
+**Hardware verification checklist (user-driven — hardware CLAIMED).**
+
+1. Secure scrap material and use S=0 / an air trace first.
+2. Capture A and B, confirm the displayed scale notice is plausible, and create the outline.
+3. Move beam-off to every verification anchor and confirm the head lands on the physical edge.
+4. Keep test artwork several millimetres inside the outline, then complete Frame and inspect the
+   air trace before enabling normal power.
+
+---
+
 ### F-F4. Convert a selected vector to a bitmap (Phase F.4)
 
 **ADR:** [ADR-029](DECISIONS.md#adr-029--convert-to-bitmap-vector--raster-engrave-source).

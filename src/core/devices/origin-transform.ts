@@ -32,6 +32,22 @@ export function toSceneCoords(p: Vec2, device: DeviceProfile): Vec2 {
   return inverseOriginTransform(p, device.origin, device.bedWidth, device.bedHeight);
 }
 
+export function sceneAxisSigns(origin: Origin): { readonly x: 1 | -1; readonly y: 1 | -1 } {
+  switch (origin) {
+    case 'front-left':
+    case 'center':
+      return { x: 1, y: -1 };
+    case 'front-right':
+      return { x: -1, y: -1 };
+    case 'rear-left':
+      return { x: 1, y: 1 };
+    case 'rear-right':
+      return { x: -1, y: 1 };
+    default:
+      return assertNever(origin, 'Origin');
+  }
+}
+
 function inverseOriginTransform(p: Vec2, origin: Origin, bedW: number, bedH: number): Vec2 {
   switch (origin) {
     case 'front-left':

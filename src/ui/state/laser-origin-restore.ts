@@ -77,6 +77,16 @@ export async function restoreWorkOrigin(
   await writeXyOffset(set, get, refs, safeWrite, RESTORE_ORIGIN_WRITE, () => savedMm);
 }
 
+export async function setOriginAtMachinePoint(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: OriginSafeWrite,
+  pointMm: SavedXyOffsetMm,
+): Promise<void> {
+  await writeXyOffset(set, get, refs, safeWrite, BOARD_ORIGIN_WRITE, () => pointMm);
+}
+
 /**
  * Continue from where the head stopped (ADR-341 Amendment 6): after a lost
  * link, if the controller received and finished every sent line, the head is
@@ -122,6 +132,13 @@ const HEAD_STOP_ORIGIN_WRITE: XyOffsetWrite = {
     '[lf2] Origin set from where the head stopped, but the controller has not confirmed the ' +
     'new work offset. The recovery review keeps its last reported offset, which may still ' +
     'differ. Wait for a new position report and frame the remaining area before you start.',
+};
+
+export const BOARD_ORIGIN_WRITE: XyOffsetWrite = {
+  label: 'Set board origin',
+  unconfirmedNotice:
+    '[lf2] Board origin set, but the controller has not confirmed the new work offset. ' +
+    'Its machine location is unconfirmed — jog once to refresh it before Start.',
 };
 
 /** One G92 at the live machine position that makes the XY work offset

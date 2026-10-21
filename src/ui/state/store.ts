@@ -320,14 +320,14 @@ export type AppState = PartGeneratorActions &
     // blanks. Diameter in mm; replacement keeps position and lock state.
     readonly addRegistrationCircle: (diameterMm: number) => void;
     // ADR-124 / ADR-126: commit a captured board — build the registration outline
-    // (rect or circle) from the measured size, center + lock it, keep it out of
+    // (rect, circle, or outline) from the measured size, place + lock it, keep it out of
     // the burn, and switch placement to user-origin so the next Start lands on the
     // real board. addCapturedBoardBox is the rectangle back-compat wrapper.
-    readonly addCapturedBoard: (shape: BoardShape) => void;
+    readonly addCapturedBoard: (shape: BoardShape, placeAt?: Vec2) => void;
     readonly addCapturedBoardBox: (widthMm: number, heightMm: number) => void;
     // Resize a captured board after a physical anchor check while preserving the
-    // canvas anchor that corresponds to its work origin (rect bottom-left or
-    // circle center).
+    // canvas anchor that corresponds to its work origin (rect/outline front-left
+    // or circle center).
     readonly updateCapturedBoard: (shape: BoardShape) => void;
     // ADR-057: delete the jig box(es) and the reserved registration layer. No-op
     // when no jig is present.

@@ -12,6 +12,21 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
     description:
       'Read the current unsaved desktop workspace, revision, selection and bounded artwork/operation summaries.',
   },
+  get_board: {
+    title: 'Read Place Board status',
+    description:
+      'Read bounded Place Board shape, size and capture progress without coordinates or artwork.',
+  },
+  set_board_photo: {
+    title: 'Send a board photo',
+    description:
+      "Send a JPEG or PNG photo of a board to the computer's Place Board → Outline workflow. Downscale to about 1200 px on the long side (at most 240000 base64 characters). The operator straightens, traces and sizes the outline on the computer; this tool does not create a board.",
+  },
+  place_on_board: {
+    title: 'Place artwork on the board',
+    description:
+      'Center, fit or array existing artwork inside the captured board. Requires Pro, expectedRevision and UUID requestId.',
+  },
   get_machine: {
     title: 'Read the selected machine',
     description:

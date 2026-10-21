@@ -53,6 +53,27 @@ export function applyHomography(matrix: Mat3, point: Vec2): Vec2 {
   };
 }
 
+export function invertMat3(matrix: Mat3): Mat3 | null {
+  const [a, b, c, d, e, f, g, h, i] = matrix;
+  const aa = e * i - f * h;
+  const ab = f * g - d * i;
+  const ac = d * h - e * g;
+  const determinant = a * aa + b * ab + c * ac;
+  if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-12) return null;
+  const inverse = [
+    aa,
+    c * h - b * i,
+    b * f - c * e,
+    ab,
+    a * i - c * g,
+    c * d - a * f,
+    ac,
+    b * g - a * h,
+    a * e - b * d,
+  ].map((value) => value / determinant);
+  return inverse.every(Number.isFinite) ? (inverse as unknown as Mat3) : null;
+}
+
 // Each correspondence (x, y) -> (u, v) contributes two rows of the 8x8 system
 // for the unknowns m0..m7 (m8 == 1):
 //   x*m0 + y*m1 + m2 - u*x*m6 - u*y*m7 = u

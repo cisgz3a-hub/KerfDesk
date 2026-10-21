@@ -1,6 +1,12 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { applyHomography, solveHomography, type Mat3, type PointPair } from './homography';
+import {
+  applyHomography,
+  invertMat3,
+  solveHomography,
+  type Mat3,
+  type PointPair,
+} from './homography';
 
 // Four well-separated corners used as the source quad for round-trip tests.
 const SOURCE_QUAD: ReadonlyArray<{ x: number; y: number }> = [
@@ -15,6 +21,18 @@ function pairsFrom(matrix: Mat3): PointPair[] {
 }
 
 describe('solveHomography', () => {
+  it('inverts a projective transform', () => {
+    const matrix: Mat3 = [1.2, 0.1, 5, -0.05, 1.1, 3, 0.0005, -0.0003, 1];
+    const inverse = invertMat3(matrix);
+    expect(inverse).not.toBeNull();
+    const point = { x: 53, y: 41 };
+    if (inverse !== null) {
+      const roundTrip = applyHomography(inverse, applyHomography(matrix, point));
+      expect(roundTrip.x).toBeCloseTo(point.x, 9);
+      expect(roundTrip.y).toBeCloseTo(point.y, 9);
+    }
+    expect(invertMat3([1, 0, 0, 0, 0, 0, 0, 0, 1])).toBeNull();
+  });
   it('rejects fewer than four correspondences', () => {
     const result = solveHomography([{ src: { x: 0, y: 0 }, dst: { x: 0, y: 0 } }]);
     expect(result.ok).toBe(false);

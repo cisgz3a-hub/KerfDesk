@@ -54,6 +54,16 @@ export const mcpMachineToolInfo = {
     description:
       'Set the work origin at the current head position using the ordinary desktop action: axes "xy" sets X/Y, "z" zeros Z where supported. No motion. Requires machine-control approval, expectedRevision and UUID requestId.',
   },
+  capture_board_point: {
+    title: 'Capture a Place Board point',
+    description:
+      "Record the laser head's current position as the next Place Board capture point (same as Capture on the computer). Jog the head onto the highlighted anchor first.",
+  },
+  finish_board: {
+    title: 'Create the captured board',
+    description:
+      'Finish the current Place Board capture. Check every anchor on the computer, then Frame before Start.',
+  },
   pause_job: {
     title: 'Pause the running job',
     description:

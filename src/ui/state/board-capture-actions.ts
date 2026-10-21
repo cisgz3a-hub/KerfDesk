@@ -12,8 +12,13 @@ import {
   transformedBBox,
   type BoardShape,
   type ShapeObject,
+  type Vec2,
 } from '../../core/scene';
-import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
+import {
+  createRegistrationBox,
+  createRegistrationCircle,
+  createRegistrationOutline,
+} from '../../core/shapes';
 import { DEFAULT_JOB_PLACEMENT, type JobPlacementSettings } from '../job-placement';
 import {
   applyAddRegistrationBox,
@@ -42,8 +47,8 @@ const CAPTURED_CIRCLE_PLACEMENT: JobPlacementSettings = {
 export function boardCaptureActions(
   set: Setter,
 ): Pick<AppState, 'addCapturedBoard' | 'addCapturedBoardBox' | 'updateCapturedBoard'> {
-  const addCapturedBoard = (shape: BoardShape): void => {
-    set((s) => commitCapturedBoard(s, buildBoardOutline(s, shape), placementFor(shape)));
+  const addCapturedBoard = (shape: BoardShape, placeAt?: Vec2): void => {
+    set((s) => commitCapturedBoard(s, buildBoardOutline(s, shape, placeAt), placementFor(shape)));
   };
   return {
     addCapturedBoard,
@@ -110,6 +115,13 @@ function resizedOutline(
         y: centerY - shape.diameterMm / 2,
       });
     }
+    case 'outline':
+      return createRegistrationOutline({
+        id,
+        pointsMm: shape.pointsMm,
+        x: bounds.minX,
+        y: bounds.maxY - outlineSize(shape.pointsMm).height,
+      });
     default:
       return assertNever(shape, 'BoardShape');
   }
@@ -119,7 +131,7 @@ function resizedOutline(
 // the bed (a capture is always a brand-new board, so no prior position is kept).
 // Locked so a stray drag can't shift it off registration — its canvas position
 // encodes the physical work origin.
-function buildBoardOutline(s: AppState, shape: BoardShape): ShapeObject {
+function buildBoardOutline(s: AppState, shape: BoardShape, placeAt?: Vec2): ShapeObject {
   const { bedWidth, bedHeight } = s.project.device;
   switch (shape.kind) {
     case 'rect': {
@@ -132,6 +144,12 @@ function buildBoardOutline(s: AppState, shape: BoardShape): ShapeObject {
       const at = registrationBoxDefaultPosition(bedWidth, bedHeight, diameterMm, diameterMm);
       return locked(createRegistrationCircle({ diameterMm, x: at.x, y: at.y }));
     }
+    case 'outline': {
+      const size = outlineSize(shape.pointsMm);
+      const at =
+        placeAt ?? registrationBoxDefaultPosition(bedWidth, bedHeight, size.width, size.height);
+      return locked(createRegistrationOutline({ pointsMm: shape.pointsMm, x: at.x, y: at.y }));
+    }
     default:
       return assertNever(shape, 'BoardShape');
   }
@@ -143,9 +161,23 @@ function placementFor(shape: BoardShape): JobPlacementSettings {
       return CAPTURED_RECT_PLACEMENT;
     case 'circle':
       return CAPTURED_CIRCLE_PLACEMENT;
+    case 'outline':
+      return CAPTURED_RECT_PLACEMENT;
     default:
       return assertNever(shape, 'BoardShape');
   }
+}
+
+function outlineSize(points: Extract<BoardShape, { readonly kind: 'outline' }>['pointsMm']): {
+  readonly width: number;
+  readonly height: number;
+} {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  return {
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys),
+  };
 }
 
 function locked(box: ShapeObject): ShapeObject {

@@ -20,6 +20,17 @@ const writeAdmission = {
 
 const toolExamples: Record<KerfDeskMcpCommand, Record<string, unknown>> = {
   get_workspace: {},
+  get_board: {},
+  set_board_photo: {
+    ...writeAdmission,
+    mimeType: 'image/png',
+    dataBase64: 'iVBORw0KGgo=',
+  },
+  place_on_board: {
+    ...writeAdmission,
+    artworkIds: ['art-1'],
+    action: 'center',
+  },
   get_machine: {},
   get_app_status: {},
   list_material_recipes: {},
@@ -82,6 +93,8 @@ const toolExamples: Record<KerfDeskMcpCommand, Record<string, unknown>> = {
   disconnect_machine: { ...writeAdmission },
   home_machine: { ...writeAdmission },
   set_work_origin: { ...writeAdmission, axes: 'xy' },
+  capture_board_point: { ...writeAdmission },
+  finish_board: { ...writeAdmission },
   pause_job: { requestId: writeAdmission.requestId },
   resume_job: { requestId: writeAdmission.requestId },
   // Phone-only held jogs are never registered as MCP tools (ADR-585).
@@ -118,6 +131,12 @@ const readResults: Partial<Record<KerfDeskMcpCommand, Record<string, unknown>>> 
     totalArtwork: 1,
     totalOperations: 1,
     truncated: false,
+  },
+  get_board: {
+    revision: 'revision-1',
+    panelOpen: false,
+    committed: false,
+    board: null,
   },
   get_machine: {
     revision: 'revision-1',
@@ -204,9 +223,21 @@ const readResults: Partial<Record<KerfDeskMcpCommand, Record<string, unknown>>> 
 
 function successfulBackend(): KerfDeskMcpBackend {
   return {
-    request: async (command) =>
-      structuredClone(
-        readResults[command as KerfDeskMcpCommand] ??
+    request: async (command) => {
+      const special =
+        command === 'set_board_photo'
+          ? { revision: 'revision-2', status: 'delivered' }
+          : command === 'place_on_board'
+            ? {
+                revision: 'revision-2',
+                status: 'placed',
+                action: 'center',
+                artworkCount: 1,
+              }
+            : null;
+      return structuredClone(
+        special ??
+          readResults[command as KerfDeskMcpCommand] ??
           (MCP_CONTROL_COMMANDS.has(command as KerfDeskMcpCommand)
             ? machineOperation
             : {
@@ -214,7 +245,8 @@ function successfulBackend(): KerfDeskMcpBackend {
                 changedArtworkIds: ['art-1'],
                 selection: ['art-1'],
               }),
-      ),
+      );
+    },
   };
 }
 
