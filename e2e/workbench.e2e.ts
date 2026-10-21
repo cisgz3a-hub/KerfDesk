@@ -7,11 +7,11 @@ import { join } from 'node:path';
 import { grayscaleTracePngBase64, writeQualifiedPngFixture } from './fixtures/png-fixture';
 import {
   connectMachineAndDismissFirstSetup,
-  expectControllerSettingsRead,
   openMachineToolDropdown,
   machineJogAction,
   toolbarCommand,
 } from './fixtures/workspace-ui';
+import { expectControllerSettingsRead } from './fixtures/controller-settings-read';
 import { confirmJobReview } from './fixtures/recovery-flow';
 import { acknowledgedStartControlLinesSince } from './fixtures/recovery-start-boundary';
 

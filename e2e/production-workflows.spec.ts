@@ -1,6 +1,5 @@
 import {
   connectMachineAndDismissFirstSetup,
-  expectControllerSettingsRead,
   connectMachineThroughToolbar,
   machineJogAction,
   openMachineToolDropdown,
@@ -8,6 +7,7 @@ import {
   toolbarCommand,
   expectToolbarCommandEnabled,
 } from './fixtures/workspace-ui';
+import { expectControllerSettingsRead } from './fixtures/controller-settings-read';
 import {
   expect,
   test,

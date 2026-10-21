@@ -2,10 +2,10 @@ import { writeFileSync } from 'node:fs';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 import {
   connectMachineAndDismissFirstSetup,
-  expectControllerSettingsRead,
   openMachineToolDropdown,
   selectWorkspacePanel,
 } from './fixtures/workspace-ui';
+import { expectControllerSettingsRead } from './fixtures/controller-settings-read';
 import type { SerialTranscriptEntry } from '../src/ui/state/laser-transcript';
 
 test('controller incidents survive acknowledgements and reconnect in the console and saved report', async ({
