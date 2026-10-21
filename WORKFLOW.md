@@ -1193,6 +1193,11 @@ that owns those fields, without changing the existing Frame/Start policy.
    score line, a sheet border, or a part whose operation has no leads) could be either, so the
    shapes inside it get no leads, and Job Review names that operation: turn on its leads if it cuts
    parts out, or choose a fixed side. One that burns nothing (0% power) does not count.
+   Open lines of a Line operation that close a region (their ends meet, cross, or stop up to
+   0.5 mm short, such as a plate drawn as separate lines) may be a part's outline too, so the
+   shapes inside that region get no leads either, and Job Review says to close the outline with
+   **Tools → Join paths** or choose a fixed side (ADR-626 Amendment 8). DXF import already joins
+   LINE and ARC pieces whose ends meet.
    **Always outside** and **Always inside** put every lead of the operation on that side.
 4. Leads join each closed shape where it really starts, so they follow **Start closed shapes**
    (F-A9e) and the job start point. Where no lead fits there (a hole that starts at a corner), the
@@ -1203,7 +1208,10 @@ that owns those fields, without changing the existing Frame/Start policy.
    how many shapes that affects. That shape is cut as it would be without leads.
 6. Every pass cuts lead-in, shape, lead-out. With **Overcut** the final pass runs past the start
    first and leaves by a lead-out from where the overcut ends. Leads follow the kerf-offset path.
-   Shapes with tabs and perforated lines get no leads, and Job Review says so. Open paths get none.
+   Shapes with tabs and perforated lines get no leads, and Job Review says so. Open paths get none,
+   including a shape that **Remove overlapping lines** opened up, but leads still keep out of it.
+   When open paths whose ends meet sit on an operation with a kerf offset or leads, or hold shapes
+   that inside-first would cut first, Job Review warns that they are cut as open lines.
 7. Preview, Frame, both time estimates, Job Review and every output format (GRBL, Marlin,
    Smoothieware, Ruida) show the leads. On machines that take arcs, a shape that goes out as arcs
    keeps them and its arc leads go out as arcs too. CNC output never changes.

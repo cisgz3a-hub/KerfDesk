@@ -494,13 +494,17 @@ export type JobDiagnostic =
     }
   // ADR-626 Amd 1: with Lead side automatic, `count` contours got no leads
   // because a closed shape on an operation without leads (`aroundName`) holds
-  // them, and it may be a part or only a score line or border.
+  // them, and it may be a part or only a score line or border. Amd 8: or
+  // because open lines of `aroundName` close a region round them.
   | {
       readonly kind: 'laser-leads-side-unknown';
       readonly layerId: string;
       readonly layerName: string;
       readonly count: number;
       readonly aroundName: string;
+      /** Open lines of `aroundName` close a region round them, rather than a
+       * closed shape holding them (ADR-626 Amd 8). */
+      readonly aroundOpenPaths?: true;
     };
 
 /** Complete compile evidence for one scheduled V-carve operation. */
