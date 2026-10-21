@@ -2769,8 +2769,11 @@ authorization, Frame proof, controller command, or safety boundary.
 ### F-B15a. Burn a multi-outline registration jig set (ADR-057 amendment)
 
 1. Open **Registration Jig** or **Edit jig** to enter its dedicated editor. Its own
-   canvas opens fitted to the jig, with **Fit jig** and **Fit bed** available. A new
-   jig opens on **Jig layout**; an existing jig opens on **Artwork**. Draft edits and
+   canvas opens fitted to the jig, with **Fit jig** and **Fit bed** available. The jig
+   canvas is clean (ADR-652): it shows only the jig's outlines and the artwork on them,
+   and opens with nothing from the main canvas selected. Other main-canvas artwork is not shown, selected or
+   changed there, and stays where it is when the jig is saved. A new jig opens with just
+   its first outline, on **Jig layout**; an existing jig opens on **Artwork**. Draft edits and
    Undo/Redo stay in the editor until **Save to canvas**, and the footer shows
    **Unsaved changes** while the draft differs. Escape in a field only leaves the
    field, and in a number field it drops the value typed there; Enter applies it.
@@ -2807,9 +2810,11 @@ authorization, Frame proof, controller command, or safety boundary.
    the image and removes the image (ADR-633). If Centre + copy already copied that
    image to the other outlines, the button reads **Replace all N images with trace**
    and every copy is replaced the same way.
-   **Line / Fill settings** controls the selected artwork's operation, power, speed and
-   passes; Fill also exposes line interval, scan angle, fill style and cross-hatch.
-   Use Line for open traced paths. These edits remain in the draft until saved.
+   The editor has no burn settings (ADR-652). Outlines burn with the reserved
+   **Registration jig** Line operation and artwork with the operation it gets on import,
+   both starting at the standard operation defaults. Job Review shows the exact settings
+   before Start, and **Edit** on an operation card there, the outline's included, changes
+   power, speed, passes and air assist for the project.
 4. Select one artwork or artwork group and click **Centre + copy artwork to all N**.
    The original is proportionally fitted into 90% of the first outline's usable
    region, preserving aspect ratio, and one identical operation-preserving copy is
