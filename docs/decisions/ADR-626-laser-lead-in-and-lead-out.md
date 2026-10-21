@@ -308,8 +308,10 @@ A review of Amendment 1 and the rest of the PR found five gaps, and one proposal
 5. **Job-start editing sees the closed outline.** A led contour is one open burn, so the start
    editor saw only its leads' two ends. Each led segment records where its contour lies in the burn
    (`CutSegment.leadContour`), and the editor reads the contours back (`jobWithoutLeads`), so any
-   point on the outline can be the start; preparation already moves the start on the contour itself
-   before leads are added.
+   supported point on the outline can be the start; preparation already moves the start on the
+   contour itself before leads are added. Native-arc contours retain their validated original
+   moves for editing and keep ADR-594's existing move-boundary snapping. The editor must not offer
+   an arbitrary sampled-chord point that the next prepared native-arc output cannot use.
 
 Declined: treating a copy offset by another kerf as a cut a lead must keep clear of. The sliver
 between two cuts of one outline is cut free of the part whichever way the offset goes, so a lead

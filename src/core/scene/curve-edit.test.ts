@@ -5,6 +5,7 @@ import {
   breakCurveAtNode,
   cornerCurveNode,
   convertCurveSegment,
+  curveControlPoint,
   curveNodeCount,
   moveCurveAnchor,
   moveCurveControl,
@@ -115,6 +116,66 @@ describe('curve editing', () => {
     expect(openedAtStart?.closed).toBe(false);
     expect(nodes(openedAtStart)).toEqual([a, b, c, d]);
     expect(nodes(breakCurveAtNode(implied, 2))).toEqual([c, d, a, b]);
+  });
+
+  it('moves the start without claiming the final cubic across an implicit closing line', () => {
+    const implied: CurveSubpath = {
+      ...CLOSED,
+      segments: [CLOSED.segments[0]!, { ...CLOSED.segments[1]!, to: p(0, 20) }],
+    };
+    expect(curveControlPoint(implied, 0, 'incoming')).toBeNull();
+    const moved = moveCurveAnchor(implied, 0, p(3, 4));
+    expect(moved?.start).toEqual(p(3, 4));
+    expect(moved?.segments[0]).toMatchObject({ control1: p(5, 4), to: p(10, 0) });
+    expect(moved?.segments[1]).toBe(implied.segments[1]);
+  });
+
+  it('moves both attached controls on a single-cubic closed loop', () => {
+    const loop: CurveSubpath = {
+      start: p(0, 0),
+      segments: [{ kind: 'cubic', control1: p(10, 0), control2: p(0, 10), to: p(0, 0) }],
+      closed: true,
+    };
+    const moved = moveCurveAnchor(loop, 0, p(3, 4));
+    expect(curveNodeCount(loop)).toBe(1);
+    expect(moved?.start).toEqual(p(3, 4));
+    expect(moved?.segments[0]).toEqual({
+      kind: 'cubic',
+      control1: p(13, 4),
+      control2: p(3, 14),
+      to: p(3, 4),
+    });
+  });
+
+  it('smooths both attached controls on a single-cubic closed loop', () => {
+    const loop: CurveSubpath = {
+      start: p(0, 0),
+      segments: [{ kind: 'cubic', control1: p(10, 0), control2: p(0, 10), to: p(0, 0) }],
+      closed: true,
+    };
+    const smoothed = smoothCurveNode(loop, 0);
+    const segment = smoothed?.segments[0];
+    expect(segment?.kind).toBe('cubic');
+    if (segment?.kind !== 'cubic') return;
+    expect(
+      segment.control1.x * segment.control2.y - segment.control1.y * segment.control2.x,
+    ).toBeCloseTo(0, 10);
+    expect(Math.hypot(segment.control1.x, segment.control1.y)).toBeCloseTo(10, 10);
+    expect(Math.hypot(segment.control2.x, segment.control2.y)).toBeCloseTo(10, 10);
+    expect(
+      segment.control1.x * segment.control2.x + segment.control1.y * segment.control2.y,
+    ).toBeLessThan(0);
+  });
+
+  it('retains closure when moving a degenerate closed point or explicit closing line', () => {
+    for (const segments of [[], [{ kind: 'line' as const, to: p(0, 0) }]]) {
+      const path: CurveSubpath = { start: p(0, 0), segments, closed: true };
+      const moved = moveCurveAnchor(path, 0, p(3, 4));
+      expect(moved?.start).toEqual(p(3, 4));
+      expect(moved?.closed).toBe(true);
+      expect(moved?.segments.length).toBe(segments.length);
+      if (segments.length > 0) expect(moved?.segments[0]?.to).toEqual(p(3, 4));
+    }
   });
 });
 

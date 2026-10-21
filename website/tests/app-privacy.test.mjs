@@ -42,7 +42,7 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
   const document = expected.get('index.html').toString('utf8');
   const text = textContent(document);
   assert.match(document, /href="https:\/\/kerfdesk.com\/privacy\/"/);
-  assert.match(document, /datetime="2026-10-12"/);
+  assert.match(document, /datetime="2026-10-20"/);
   assert.match(text, /Johannes Stephanus Stolk/);
   assert.match(text, /responsible for the personal information KerfDesk handles/);
   assert.match(text, /No cookies on this page/);

@@ -13,9 +13,10 @@ import type { CncTaperedInlaySettings } from '../scene/cnc-tapered-inlay';
 
 import type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
 export type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
+import type { CutArcMoves, LeadContour } from './cut-segment-geometry';
+export type { CutArcMoves } from './cut-segment-geometry';
 
 import { representedCncCoordinateMm } from '../cnc/coordinate-representation';
-import type { ArcMove } from '../geometry/arc-fit';
 import { sampleCircularArcPoints } from '../geometry/arc-representation';
 import type { RasterPowerValues } from '../raster/raster-power-values';
 import type { CncCuttingStage } from '../scene/cnc-stage-recipe';
@@ -75,21 +76,7 @@ export type CutSegment = {
    * scene's contours. Compile writes it only when some operation asks for
    * leads; preparation drops it once leads are placed. */
   readonly leadSource?: string;
-  /** ADR-626: on a contour given leads, where the closed contour lies in
-   * `polyline` (first and last index, inclusive), so editing where a job
-   * starts can still pick any point on it (jobWithoutLeads). */
-  readonly leadContour?: { readonly from: number; readonly to: number };
-};
-
-/** Fitted line/arc moves for a CutSegment (ADR-432), with a fingerprint of
- * the polyline they were fitted against: they start at `from` and the last
- * lands exactly on the polyline's last point. A reader trusts them only while
- * the polyline still matches the fingerprint. */
-export type CutArcMoves = {
-  readonly moves: ReadonlyArray<ArcMove>;
-  readonly from: Vec2;
-  readonly pointCount: number;
-  readonly lengthMm: number;
+  readonly leadContour?: LeadContour;
 };
 
 export type FillSegment = CutSegment & {

@@ -422,11 +422,17 @@ function leadedSegment(
   const ring = segment.polyline;
   const head = leadIn === null ? ring.slice(0, 1) : leadIn.path.points;
   const polyline = [...head, ...ring.slice(1), ...(leadOut?.path.points.slice(1) ?? [])];
+  const contourMoves = validCutArcMoves(segment);
   // The contour runs on from where the lead-in ends, so its range holds on
   // the final pass's burn too, which starts with the same lead-in and ring.
-  const leadContour = { from: head.length - 1, to: head.length - 2 + ring.length };
+  const leadContour = {
+    from: head.length - 1,
+    to: head.length - 2 + ring.length,
+    ...(contourMoves === null || segment.arcMoves === undefined
+      ? {}
+      : { arcMoves: segment.arcMoves }),
+  };
   const open: CutSegment = { ...withoutArcMoves(segment), polyline, closed: false, leadContour };
-  const contourMoves = validCutArcMoves(segment);
   const withArcs =
     contourMoves === null
       ? open
