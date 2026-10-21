@@ -22,6 +22,7 @@ import type {
 import type { PathTextAcrossAlign, PathTextAlongAlign } from '../../core/scene/scene-object';
 import { variableTemplateToSource } from '../../core/variables';
 import type { TextDialogState } from '../state/ui-store';
+import { embeddedFontChoice } from '../../core/text/embedded-font-set';
 import {
   initialTextBend,
   initialTextLetterSpacing,
@@ -80,7 +81,11 @@ export function useTextDialogFields(
   selectedObjectId: string | null,
 ): DialogFields {
   const basic = useBasicFields(state);
-  const font = useImportedFont(state.mode === 'edit' ? state.fontKey : DEFAULT_FONT_KEY);
+  const font = useImportedFont(
+    state.mode === 'edit' ? state.fontKey : DEFAULT_FONT_KEY,
+    project,
+    state.mode === 'edit' ? state.id : undefined,
+  );
   const path = usePathFields(state, textGuides(project, state), selectedObjectId);
   const [variableEnabled, setVariableEnabled] = useState(
     state.mode === 'edit' && state.variableTemplate !== undefined,
@@ -220,7 +225,7 @@ function useBasicFields(state: TextDialogState) {
   };
 }
 
-function useImportedFont(initialFontKey: string) {
+function useImportedFont(initialFontKey: string, project: Project, editingId: string | undefined) {
   const [fontKey, setFontKey] = useState(initialFontKey);
   const [importedFont, setImportedFont] = useState<EmbeddedFont | undefined>();
   const importFont = async (file: File): Promise<void> => {
@@ -230,8 +235,13 @@ function useImportedFont(initialFontKey: string) {
       fileName: file.name,
       buffer: await file.arrayBuffer(),
     });
-    setImportedFont(font);
-    setFontKey(font.key);
+    // ADR-628 Amendment 1: the same face chosen again is the font already in
+    // the project, and a font past the project limit is refused here, before
+    // it is embedded, rather than at Save.
+    const choice = embeddedFontChoice(project, font, editingId);
+    if (choice.kind === 'full') throw new Error(choice.reason);
+    setImportedFont(choice.kind === 'new' ? choice.font : undefined);
+    setFontKey(choice.kind === 'new' ? choice.font.key : choice.key);
   };
   return { fontKey, setFontKey, importedFont, importFont };
 }

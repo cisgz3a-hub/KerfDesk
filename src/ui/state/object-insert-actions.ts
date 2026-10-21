@@ -25,6 +25,11 @@ import { reportDependencyRepairs } from './object-delete-actions';
 import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { validateDesignStudioDocument } from '../../io/project/project-design-studio-validator';
 import { useToastStore } from './toast-store';
+import {
+  EMBEDDED_FONT_LIMIT_REASON,
+  MAX_EMBEDDED_FONTS,
+  withReferencedEmbeddedFonts,
+} from '../../core/text/embedded-font-set';
 import { saveUndoStepName } from './undo-step-names';
 import { prepareProjectInsertion, reportProjectInsertionFailure } from './project-insertion-budget';
 import type { DesignApplyRecord } from './design-apply-record';
@@ -271,17 +276,43 @@ function applyDesignSketchAction(set: Setter): AppState['applyDesignSketch'] {
   };
 }
 
+// ADR-628 Amendment 1: a font with the same bytes as one already embedded is
+// reused under that key, a font nothing names any more leaves with the commit
+// (undo restores the whole previous project, fonts included), and a commit
+// that would leave more fonts than a project can hold changes nothing.
 function applyTextAndEmbeddedFont(
   state: AppState,
   text: TextObject,
   embeddedFont?: EmbeddedFont,
   options?: TextInsertOptions,
 ) {
-  const next = applyUpsertText(state, text, options);
-  if (embeddedFont === undefined) return next;
-  const existing = next.project.embeddedFonts ?? [];
-  const embeddedFonts = [...existing.filter((font) => font.key !== embeddedFont.key), embeddedFont];
-  return { ...next, project: { ...next.project, embeddedFonts } };
+  const existing = state.project.embeddedFonts ?? [];
+  const same =
+    embeddedFont === undefined
+      ? undefined
+      : existing.find(
+          (font) => font.dataBase64 === embeddedFont.dataBase64 && font.key !== embeddedFont.key,
+        );
+  const placed =
+    same !== undefined && text.fontKey === embeddedFont?.key
+      ? { ...text, fontKey: same.key }
+      : text;
+  const next = applyUpsertText(state, placed, options);
+  const embeddedFonts =
+    embeddedFont === undefined || same !== undefined
+      ? next.project.embeddedFonts
+      : [
+          ...(next.project.embeddedFonts ?? []).filter((font) => font.key !== embeddedFont.key),
+          embeddedFont,
+        ];
+  const project = withReferencedEmbeddedFonts(
+    embeddedFonts === undefined ? next.project : { ...next.project, embeddedFonts },
+  );
+  if ((project.embeddedFonts ?? []).length > MAX_EMBEDDED_FONTS) {
+    useToastStore.getState().pushToast(EMBEDDED_FONT_LIMIT_REASON, 'warning');
+    return state;
+  }
+  return { ...next, project };
 }
 
 export function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }>(

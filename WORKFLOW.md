@@ -1484,6 +1484,9 @@ the completed physical Frame is the spatial source of truth.
    nothing. The desktop app allows it without asking.
 3. A LightBurn project (`.lbrn`, `.lbrn2`) opens as an import and is never written; its first Save
    asks where to save the `.lf2`, as it does for a template or a project dropped on the window.
+   One with more shapes than a project holds (10,000 objects) is not opened, since it could never
+   be saved: `Could not import <name>: This LightBurn project has <n> shapes, but a KerfDesk project
+   holds at most 10000 objects, …` (ADR-307 Amendment 2).
 4. The desktop app replaces an Explorer-opened file whole: it writes the new bytes beside it and
    then swaps them in, so a failed save leaves the old file as it was. A file that has gone, become
    read-only or stays held by another program reports why and stays unsaved; Save As still works.
@@ -1578,6 +1581,21 @@ the completed physical Frame is the spatial source of truth.
 
 #### Error — file is not a valid .lf2
 - Modal: `Could not open <filename>: not a valid KerfDesk project.` No load.
+
+#### Edge — the file carries an Auto-focus command (ADR-400 Amendment 1)
+1. On load, an Auto-focus command that is not a focus routine (a G0–G3 move, an X/Y word, an
+   M-code, `S` above 0, or a `$` settings write) is cleared, as a refused
+   positioning-light command is. Auto-focus then shows **Set up auto-focus**.
+2. A file for the machine already in use (same profile, name and bed) keeps that machine's own
+   Auto-focus command from Machine Setup. When the file's command differs, an info toast says
+   `This file's Auto-focus command was not used: Auto-focus keeps your machine's own command from
+   Machine Setup.`
+3. A file for another machine brings its vetted command with the rest of that machine, behind the
+   machine notice; **Keep current machine** restores the current command too.
+4. Whatever its source, the Auto-focus button sends only a focus routine: `$HZ1` on the Falcon
+   A1 Pro, `$HZ` on grblHAL or FluidNC, a Z-only `G38.2`–`G38.5` probe, or `G30` on Marlin or
+   Smoothieware. Stock GRBL gets no `$H…` command, which would leave it stuck homing. Any M-code and
+   anything else is refused with its reason and nothing is sent.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).
@@ -3719,7 +3737,9 @@ settings and Job Review keep their existing read-only setup references.
   on this computer. Nothing is read until you press it; the browser asks for permission the
   first time. Search by family or style, then choose a style: KerfDesk copies that face into the
   project, exactly like an imported `.ttf` / `.otf` (10 MB per font, 32 fonts per project), so
-  the project opens on computers without the font. A face inside a `.ttc` collection is copied
+  the project opens on computers without the font. A face already embedded is reused, not copied
+  again; a font no text uses any more leaves the project and is not saved; and a 33rd font in use
+  is refused when it is chosen (ADR-628 Amendment 1). A face inside a `.ttc` collection is copied
   out on its own. A font whose licence restricts embedding says so first; choose **Embed font**
   to use it anyway or **Back** to pick another. Firefox and Safari cannot list installed fonts:
   the dialog says so and **Import** still works. A browser that blocks font access may answer
