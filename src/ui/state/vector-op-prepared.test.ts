@@ -34,13 +34,13 @@ const REQUEST: OffsetShapesRequest = {
   deleteOriginals: false,
 };
 
-function load(): void {
+function load(objects: ReadonlyArray<VectorSceneObject> = parityObjects()): void {
   resetStore();
   useStore.setState({
     project: {
       ...createProject(),
       scene: {
-        objects: parityObjects(),
+        objects,
         layers: [createLayer({ id: 'cut', color: '#000000' })],
         groups: [],
       },
@@ -58,8 +58,8 @@ function targets(): ReadonlyArray<VectorSceneObject> {
 
 // The committed document after an action. Equal documents compile to equal
 // toolpaths and G-code, since compilation is a pure function of the project.
-function committed(run: () => void): string {
-  load();
+function committed(run: () => void, setup: () => void = () => load()): string {
+  setup();
   run();
   const project: Project = useStore.getState().project;
   return JSON.stringify(project);
@@ -73,6 +73,16 @@ function preparedOffset(options: OffsetShapesOptions = REQUEST): PreparedOffsetS
   return { sources, options, ids, result: result.value };
 }
 
+// The parity objects with shared output settings, so their overlapping outlines
+// fall in one Weld operation and actually merge.
+function loadWeldable(): void {
+  load(
+    parityObjects().map(
+      ({ powerScale: _power, operationOverride: _override, ...object }) => object,
+    ),
+  );
+}
+
 function sourceOf(object: SceneObject | undefined): string | undefined {
   return object !== undefined && 'source' in object ? object.source : undefined;
 }
@@ -82,7 +92,7 @@ function marked(object: ImportedSvg | null): ImportedSvg | null {
 }
 
 describe('committing a background vector result (ADR-609)', () => {
-  beforeEach(load);
+  beforeEach(() => load());
 
   it('Offset Shapes commits the same document as the in-thread offset', () => {
     const inThread = committed(() => useStore.getState().offsetShapesSelection(REQUEST));
@@ -155,7 +165,8 @@ describe('committing a background vector result (ADR-609)', () => {
   });
 
   it('Weld commits the same document as the in-thread weld', () => {
-    const inThread = committed(() => useStore.getState().weldSelection());
+    const inThread = committed(() => useStore.getState().weldSelection(), loadWeldable);
+    expect(useStore.getState().project.scene.objects).toHaveLength(1);
     const viaWorker = committed(() => {
       const scene = useStore.getState().project.scene;
       const sources = targets();
@@ -166,11 +177,12 @@ describe('committing a background vector result (ADR-609)', () => {
       useStore
         .getState()
         .weldSelection({ prepared: { kind: 'weld', scene, sources, plan: plan.value } });
-    });
+    }, loadWeldable);
     expect(viaWorker).toBe(inThread);
   });
 
   it('Weld ignores a plan prepared for another scene', () => {
+    loadWeldable();
     const scene = useStore.getState().project.scene;
     const sources = targets();
     const weld = prepareWeldSelection(scene, sources, uniqueWeldId(scene));

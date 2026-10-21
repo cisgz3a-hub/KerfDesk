@@ -12,6 +12,10 @@
 //   - 'jarvis' / 'stucki' / 'atkinson' / 'burkes' / 'sierra*'
 //                        alternate error-diffusion kernels exposed by
 //                        LightBurn-style image workflows.
+//   - 'blue-noise'       variable-coefficient diffusion with a modulated
+//                        threshold, for smooth portrait midtones without
+//                        worms or periodic patterns (dither-blue-noise.ts,
+//                        ADR-649).
 //   - 'ordered'          Bayer ordered dither, deterministic and crisp.
 //   - 'grayscale'        direct luma → S, no dithering. For lasers that
 //                        actually accept analogue S values; produces
@@ -28,6 +32,7 @@
 // deterministic — same input, same output, always.
 
 import type { DitherAlgorithm } from '../scene';
+import { diffuseBlueNoiseRow } from './dither-blue-noise';
 
 export type { DitherAlgorithm } from '../scene';
 
@@ -56,6 +61,7 @@ export type DitherOptions = {
 const DEFAULT_THRESHOLD = 128;
 
 export function dither(input: DitherInput, options: DitherOptions): Float64Array {
+  if (options.algorithm === 'blue-noise') return ditherBlueNoise(input, options);
   if (isErrorDiffusionMode(options.algorithm)) {
     return ditherErrorDiffusion(input, options, errorDiffusionKernel(options.algorithm));
   }
@@ -118,7 +124,8 @@ function independentDitherValue(
   }
 }
 
-export type ErrorDiffusionMode =
+/** Error diffusion with one fixed kernel table (errorDiffusionKernel). */
+export type KernelDiffusionMode =
   | 'floyd-steinberg'
   | 'jarvis'
   | 'stucki'
@@ -127,6 +134,8 @@ export type ErrorDiffusionMode =
   | 'sierra3'
   | 'sierra2'
   | 'sierra-lite';
+
+export type ErrorDiffusionMode = KernelDiffusionMode | 'blue-noise';
 
 export type DiffusionKernel = {
   readonly offsets: ReadonlyArray<readonly [number, number, number]>;
@@ -147,13 +156,14 @@ export function isErrorDiffusionMode(mode: DitherAlgorithm): mode is ErrorDiffus
     mode === 'burkes' ||
     mode === 'sierra3' ||
     mode === 'sierra2' ||
-    mode === 'sierra-lite'
+    mode === 'sierra-lite' ||
+    mode === 'blue-noise'
   );
 }
 
 /** Diffusion kernel table for a mode. Every kernel reaches at most 2 rows
  * ahead (dy <= 2), which is what makes the 3-row streamed ditherer possible. */
-export function errorDiffusionKernel(mode: ErrorDiffusionMode): DiffusionKernel {
+export function errorDiffusionKernel(mode: KernelDiffusionMode): DiffusionKernel {
   switch (mode) {
     case 'floyd-steinberg':
       return FLOYD_STEINBERG;
@@ -243,6 +253,28 @@ function ditherErrorDiffusion(
       out[i] = quantized === 0 ? options.sMax : 0;
       diffuseError(buf, width, height, x, y, ltr, err, kernel);
     }
+  }
+  return out;
+}
+
+// Rows are views of one full-image buffer, so error crosses rows exactly as
+// in the streamed window (dither-rows.ts), which runs the same row step.
+function ditherBlueNoise(input: DitherInput, options: DitherOptions): Float64Array {
+  const { width, height, luma } = input;
+  const buf = new Float32Array(luma.length);
+  for (let i = 0; i < luma.length; i += 1) buf[i] = luma[i] ?? TWO_FIFTY_FIVE;
+  const out = new Float64Array(luma.length);
+  for (let y = 0; y < height; y += 1) {
+    const start = y * width;
+    const below = y + 1 < height ? buf.subarray(start + width, start + 2 * width) : null;
+    diffuseBlueNoiseRow(
+      y,
+      luma.subarray(start, start + width),
+      buf.subarray(start, start + width),
+      below,
+      out.subarray(start, start + width),
+      options.sMax,
+    );
   }
   return out;
 }

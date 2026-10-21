@@ -3319,9 +3319,15 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    stopped answering status queries (re-checked every second, so a wedged
    transport counts), the recovery card with Retry and Reconnect opens by
    itself at the top of the canvas, under any safety notice.
-   Closing it folds it into a **Controller needs recovery** button that stays
+   Closing it folds it into a **Machine stopped answering** button that stays
    until the controller recovers; a new failure opens the card again (ADR-642,
-   replacing ADR-611's brief toolbar notice). A controller
+   replacing ADR-611's brief toolbar notice). The card and Controller info title
+   a failed read "Couldn’t read machine settings", or "Machine stopped
+   answering" when the controller has gone silent. While the read runs, the
+   status beside the dot reads "Connecting…", then "Reading settings…", and the
+   "Machine settings detected" toast appears only when the read offers profile
+   updates or its review items changed since the last read for that machine
+   profile (ADR-611 Amendment 2). A controller
    that answered and then goes quiet for 8 s, outside homing and other controller
    operations, turns the connection status to an amber **Not responding** until
    its next reply (ADR-611 Amendment 1). While a sent line is still owed its
@@ -4076,9 +4082,10 @@ or traced image) with at least one closed polyline.
 ### F-F2. Image-engrave a raster (Phase F.2 — code shipped through F.2.e; hardware burn pending)
 
 For portraits, import a sharp photograph, set its physical size, select it and choose
-**Photo engraving...** in the toolbar or Tools → Image (ADR-581). Compare the Jarvis and
-Stucki swatches under Photo processing, select whether the material marks dark or
-light, then adjust midtones before brightness and contrast. Higher gamma lightens
+**Photo engraving...** in the toolbar or Tools → Image (ADR-581). Compare the Blue Noise,
+Jarvis and Stucki swatches under Photo processing (Blue Noise keeps flat skin and
+backgrounds free of worms and repeating patterns, ADR-649), select whether the
+material marks dark or light, then adjust midtones before brightness and contrast. Higher gamma lightens
 midtones in KerfDesk. The preview
 uses the selected engraving grid and reports when its display has been reduced;
 it simulates relative marks, not material colour or beam/heat spread. **Apply photo
@@ -4128,8 +4135,9 @@ correct M4-mode raster G-code from Compile.
      shows **Mixed** with no swatch chosen. Default `floyd-steinberg`. **More cut
      settings → Image detail**, the material preset wizard's Image details and
      **Adjust Image** show the same swatches, and the checked swatch is the Dither
-     they save; the **Photo engraving** dialog shows only Jarvis, Stucki and
-     Floyd-Steinberg. While Use original pixels (Pass-through in Adjust Image) is
+     they save; the **Photo engraving** dialog shows only Blue Noise, Jarvis, Stucki
+     and Floyd-Steinberg. Blue Noise (ADR-649) is error diffusion whose weights
+     and threshold change with the tone, for portraits. While Use original pixels (Pass-through in Adjust Image) is
      on and a binary swatch is chosen, a note under the swatches says the image
      burns as Grayscale until that box is off.
    - **Lines/mm**: number input, 5..25, default 10.
@@ -6323,6 +6331,20 @@ and lifts the command's CNC-only gate.)*
 1. An Intersect of non-overlapping shapes produces nothing, leaves the
    scene untouched (empty results never replace the sources), and shows
    a warning toast explaining the result was empty.
+2. Weld joins only shapes that overlap or touch within the same operation
+   and output settings. When nothing would merge (one shape alone, separate
+   shapes, or overlapping shapes in different operations or settings), the
+   Combine Shapes review says "Nothing to weld", points to Tools → Union
+   silhouette for merging across operations, and keeps Apply disabled. Apply
+   never flattens editable shapes or text into an unchanged path object; the
+   in-thread fallback leaves the scene untouched and shows the same warning.
+
+#### Edge — Weld absorbs enclosed shapes
+1. Weld is a filled union, as in LightBurn: a shape lying wholly inside another
+   shape of the same operation (for example text inside a ring) disappears.
+   The review names each such source before Apply. Apply remains available,
+   because that union is valid; put the inner artwork on another operation,
+   or use Subtract, to keep it.
 
 #### Edge — transforms and z-order
 1. Object transforms are baked to world space before combining, so a

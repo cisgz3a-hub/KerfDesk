@@ -1,8 +1,10 @@
 // The operation colour pulse (ADR-620). Artwork rests in plain ink. When the
 // pointer settles on a piece (select tool) or on an operation row, every piece
 // sharing those settings pulses once in that operation's colour, rippling
-// outward, and keeps a soft colour edge while the pointer stays. Drawn on its
-// own pointer-transparent canvas, so a pulse never redraws the scene.
+// outward, and keeps a soft colour edge while the pointer stays. Editing a
+// piece's settings lights up the artwork the edit changes, the same way, and
+// each change pulses it again (ADR-646). Drawn on its own pointer-transparent
+// canvas, so a pulse never redraws the scene.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -16,11 +18,14 @@ import {
 } from '../../core/scene';
 import { usePrefersReducedMotion } from '../common/use-prefers-reduced-motion';
 import { useStore } from '../state';
+import type { EditedArtwork } from '../state/artwork-color-hint';
 import { useUiStore } from '../state/ui-store';
 import { useCanvasColorScheme } from '../theme/use-canvas-color-scheme';
 import {
   ArtworkPulseClock,
   PULSE_HOVER_DWELL_MS,
+  PulseTrigger,
+  pulseSeedKey,
   pulseTargetFor,
   type PulseSeed,
 } from './artwork-pulse';
@@ -52,6 +57,7 @@ export function ArtworkPulseOverlay(props: {
   );
   const cursor = useStore((state) => state.cursorMm);
   const rowOperationId = useUiStore((state) => state.hoveredOperationId);
+  const edited = useUiStore((state) => state.editedArtwork);
   const hoveredObjectId = useCanvasHoverObject(
     props.canvasRef,
     cursor,
@@ -60,12 +66,16 @@ export function ArtworkPulseOverlay(props: {
     props.canvasHoverEnabled,
     props.canvasHoverPaused ?? false,
   );
+  // Pointing at something is the more deliberate act, so a hover wins over
+  // an edit in progress; the edit's glow returns when the hover ends.
   const seed: PulseSeed | null =
     rowOperationId !== null
       ? { kind: 'operation', operationId: rowOperationId }
       : hoveredObjectId !== null && props.canvasHoverEnabled
         ? { kind: 'object', objectId: hoveredObjectId }
-        : null;
+        : edited !== null
+          ? { kind: 'edit', ...edited, serial: editSerial(edited) }
+          : null;
   usePulseLoop(ref, props.project, view, seed, hoveredObjectId);
   // Holding Alt shows every operation in its own colour on the canvas below;
   // a group pulsing in one shared colour would paint over exactly that.
@@ -80,6 +90,22 @@ export function ArtworkPulseOverlay(props: {
       data-testid="artwork-pulse-layer"
     />
   );
+}
+
+// The store keeps an edit's object while the same edit is set again, and makes
+// a new one for each edit that begins: its identity numbers the edit, even
+// while a hover hides it.
+const editSerials = new WeakMap<EditedArtwork, number>();
+let lastEditSerial = 0;
+
+function editSerial(edit: EditedArtwork): number {
+  let serial = editSerials.get(edit);
+  if (serial === undefined) {
+    lastEditSerial += 1;
+    serial = lastEditSerial;
+    editSerials.set(edit, serial);
+  }
+  return serial;
 }
 
 /** The artwork under a settled pointer; cleared as soon as the pointer leaves it. */
@@ -209,7 +235,7 @@ function usePulseLoop(
   const colorScheme = useCanvasColorScheme();
   const wireframe = useUiStore((state) => state.wireframeView);
   const displayMode = wireframe ? 'wireframe' : 'design';
-  const pulsedObjectId = useRef<string | null>(null);
+  const [trigger] = useState(() => new PulseTrigger());
   const latest = useRef<PulseLoopState>({ project, view, reducedMotion, displayMode });
   latest.current = { project, view, reducedMotion, displayMode };
   const [loop] = useState(() =>
@@ -218,22 +244,11 @@ function usePulseLoop(
       state: latest.current,
     })),
   );
-  const seedKey =
-    seed === null ? '' : seed.kind === 'object' ? `o:${seed.objectId}` : `r:${seed.operationId}`;
-  const lastSeedKey = useRef('');
+  const seedKey = pulseSeedKey(seed);
   const scene = project.scene;
   const machineKind = machineKindOf(project.machine);
   useEffect(() => {
-    // An edit during the hover (Paste settings on the hovered row, say) can
-    // change which operations share its settings: regroup without pulsing again.
-    const sameHover = seedKey !== '' && seedKey === lastSeedKey.current;
-    lastSeedKey.current = seedKey;
-    // A click or drag pauses the canvas hover. Coming back to the same piece
-    // is still the same hover: its edge returns without a second pulse.
-    const resumed =
-      sameHover || (seed?.kind === 'object' && seed.objectId === pulsedObjectId.current);
-    if (seed?.kind === 'object') pulsedObjectId.current = seed.objectId;
-    else if (canvasObjectId === null) pulsedObjectId.current = null;
+    const pulse = trigger.next(seed, canvasObjectId, scene);
     const target =
       seed === null
         ? null
@@ -241,7 +256,7 @@ function usePulseLoop(
             screenCenter(object, view),
           );
     if (target === null) loop.clock.leave();
-    else loop.clock.hover(target, performance.now(), { pulse: !resumed });
+    else loop.clock.hover(target, performance.now(), { pulse });
     loop.kick();
     // Keyed on the hover, scene and machine kind: a view change repaints through
     // the effect below and must not regroup or restart anything.

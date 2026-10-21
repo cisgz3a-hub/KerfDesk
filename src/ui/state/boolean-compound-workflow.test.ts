@@ -232,23 +232,22 @@ describe('durable compound workflow', () => {
     expect(useStore.getState().project).toBe(project);
   });
   it('retains isolated Weld output settings without recreating operations on source edits', () => {
-    const subject = {
-      ...compoundRectangle('subject'),
-      powerScale: 25,
-      operationOverride: { power: 80, speed: 321 },
-    };
+    const isolated = { powerScale: 25, operationOverride: { power: 80, speed: 321 } };
+    const subject = { ...compoundRectangle('subject'), ...isolated };
+    // Shares the subject's settings, so that isolated operation has geometry to weld.
+    const twin = { ...compoundRectangle('twin', 3), ...isolated };
     const clip = compoundRectangle('clip', 5);
     useStore.setState({
       project: {
         ...createProject(),
         scene: {
-          objects: [subject, clip],
+          objects: [subject, twin, clip],
           layers: [{ ...createLayer({ id: 'cut', color: '#000000' }), power: 10, speed: 100 }],
           groups: [],
         },
       },
       selectedObjectId: 'subject',
-      additionalSelectedIds: new Set(['clip']),
+      additionalSelectedIds: new Set(['twin', 'clip']),
     });
     useStore.getState().weldSelection({ retainCompound: true });
     const project = useStore.getState().project;

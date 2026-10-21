@@ -55,7 +55,7 @@ for (const viewport of [
     // Folding keeps a row on the canvas until the controller recovers.
     await card.getByRole('button', { name: 'Collapse controller recovery' }).click();
     await expect(card).toHaveCount(0);
-    const folded = page.getByRole('button', { name: /Controller needs recovery/ });
+    const folded = page.getByRole('button', { name: /Machine stopped answering/ });
     await expect(folded).toBeVisible();
     await expect(folded).toBeFocused();
     await unchanged();
@@ -69,7 +69,7 @@ for (const viewport of [
     const info = page.getByRole('menuitem', { name: 'Controller info', exact: true });
     await info.click();
     const details = page.getByRole('dialog', { name: 'Controller information', exact: true });
-    await expect(details).toContainText('Controller connection needs recovery');
+    await expect(details).toContainText('Machine stopped answering');
     await page.keyboard.press('Escape');
     await expect(details).toHaveCount(0);
     await unchanged();

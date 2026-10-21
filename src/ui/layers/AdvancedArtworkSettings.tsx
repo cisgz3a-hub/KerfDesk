@@ -1,5 +1,10 @@
 import { useId } from 'react';
-import { artworkOperationName, type Layer, type SceneObject } from '../../core/scene';
+import {
+  artworkOperationName,
+  sceneObjectUsesOperation,
+  type Layer,
+  type SceneObject,
+} from '../../core/scene';
 import {
   effectiveObjectMinPowerPercent,
   effectiveObjectPowerPercent,
@@ -10,6 +15,7 @@ import { useStore } from '../state';
 import { useMixedOperationNumber } from './mixed-operation-input';
 import { parseEnglishDecimalInput } from './english-decimal-input';
 import { artworkOutputRuns, runUsesMinPower } from './artwork-output-runs';
+import { useSettingsEditGlow } from './use-settings-edit-glow';
 
 export function AdvancedArtworkSettings(props: {
   readonly objects: ReadonlyArray<SceneObject>;
@@ -37,6 +43,14 @@ export function AdvancedArtworkSettings(props: {
   });
   const draftScale = parseEnglishDecimalInput(input.displayValue);
   const results = powerResults(props.objects, props.layers, draftScale);
+  // The multiplier scales every operation of the selected artwork (ADR-646).
+  const glow = useSettingsEditGlow({
+    owner: 'artwork-power-multiplier',
+    objectIds: props.objects.map((object) => object.id),
+    operationIds: props.layers
+      .filter((layer) => props.objects.some((object) => sceneObjectUsesOperation(object, layer)))
+      .map((layer) => layer.id),
+  });
   return (
     <details className="lf-artwork-disclosure">
       <summary title="Adjust power for this artwork without changing its operation settings">
@@ -45,7 +59,9 @@ export function AdvancedArtworkSettings(props: {
         </span>
         <Icon name="chevron-down" size={16} />
       </summary>
-      <div className="lf-artwork-disclosure__body">
+      {/* The glow covers the editor, not the toggle: opening or closing the
+          disclosure changes nothing. */}
+      <div className="lf-artwork-disclosure__body" onFocus={glow.onFocus} onBlur={glow.onBlur}>
         <label style={rowStyle}>
           <span>Power multiplier</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

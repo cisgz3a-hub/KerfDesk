@@ -92,7 +92,7 @@ function earlierCopy(
 // do not count, so an outline started mid-edge still matches its copy. Two
 // different shapes that share bounds and length (mirrored L shapes, or detours
 // between sampled points) stay apart.
-function outlinesAreCopies(a: LeadOutline, b: LeadOutline): boolean {
+export function outlinesAreCopies(a: LeadOutline, b: LeadOutline): boolean {
   return (
     Math.abs(a.bounds.minX - b.bounds.minX) <= COPY_MM &&
     Math.abs(a.bounds.minY - b.bounds.minY) <= COPY_MM &&

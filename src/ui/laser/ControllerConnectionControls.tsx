@@ -21,7 +21,10 @@ import { LaserModuleRow } from './LaserModuleRow';
 import { DeviceSetupControls } from './device-setup';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { MachineNetworkConnect } from './MachineNetworkConnect';
-import { useControllerWentSilent } from './use-controller-went-silent';
+import {
+  useControllerStoppedResponding,
+  useControllerWentSilent,
+} from './use-controller-went-silent';
 import { isApplePlatform, isLinuxDesktop } from '../common/operating-system';
 
 type Props = {
@@ -42,6 +45,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
   const controlsBusy = useConnectionControlsBusy(props);
   const wentSilent = useControllerWentSilent(connection.kind === 'connected');
+  const stoppedResponding = useControllerStoppedResponding(connection.kind === 'connected');
   const disconnectController = useLaserStore((state) => state.disconnect);
   const controllerKind = useStore((state) => state.project.device.controllerKind);
   const machineName = useStore((state) => state.project.device.name || 'Unnamed machine');
@@ -88,6 +92,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         qualificationReadBlockReason={qualificationReadBlockReason}
         reconnectRecommended={reconnectRecommended}
         controllerWentSilent={wentSilent}
+        controllerStoppedResponding={stoppedResponding}
         onRetryQualification={retryControllerInformation}
         onReconnectQualification={reconnect}
         disabled={!supportsSerial || controlsBusy || isFileOnlyProfile}

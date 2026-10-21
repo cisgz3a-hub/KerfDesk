@@ -11,7 +11,10 @@ name: Desktop package check
 #   the .deb and launches the installed app with Ubuntu's default sandbox
 #   restriction in place, then removes it (ADR-607). A third rehearses the
 #   commercial Linux build of the unsigned lane, and macOS rehearses its
-#   commercial build with the native jobs (ADR-613).
+#   commercial build with the native jobs (ADR-613). A pull request that
+#   changes only renderer, test or documentation source skips the installer
+#   and commercial jobs; they report as skipped, which passes their required
+#   checks, and every push to main still runs them (ADR-647).
 # - Windows and macOS build the unsigned Preview exactly as the Preview release
 #   lane does, and run that lane's package contract. Windows then installs it,
 #   launches the installed app and uninstalls it; macOS launches the app from
@@ -65,6 +68,7 @@ jobs:
     if: always()
     needs:
       [
+        packaging-scope,
         linux-package,
         linux-installers,
         commercial-linux,
@@ -90,7 +94,37 @@ jobs:
         env:
           NEEDS: ${{ toJSON(needs) }}
           NATIVE_PACKAGING: ${{ inputs.native == true }}
+          INSTALLER_PACKAGING: ${{ needs.packaging-scope.outputs.installers != 'false' }}
         run: node scripts/desktop-packaging-gate.mjs
+
+  packaging-scope:
+    name: Choose the packaging checks this change needs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      installers: ${{ steps.scope.outputs.installers }}
+    steps:
+      # The scope script runs from this workflow's own revision, not the commit
+      # being packaged: the release train may pass an older commit that
+      # predates the script, and every run but a pull request selects all jobs.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          # A pull request checks out GitHub's merge commit, whose first parent
+          # is the base branch the change is compared with.
+          fetch-depth: 2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+
+      - name: Choose the Linux installer and commercial checks
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/desktop-packaging-scope.mjs
 
   linux-package:
     name: Package, check and launch the desktop app
@@ -154,6 +188,10 @@ jobs:
 
   linux-installers:
     name: Package, install and launch the Linux AppImage and .deb
+    needs: packaging-scope
+    # Runs unless the scope job chose to skip it. A failed scope job leaves the
+    # output empty, so this job runs rather than passing unseen (ADR-647).
+    if: ${{ !cancelled() && needs.packaging-scope.outputs.installers != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -270,13 +308,16 @@ jobs:
   # this runner makes and pins in its own checkout, so a pull request proves the
   # build, package contract and launches long before a release depends on them.
   commercial-linux:
-    name: Rehearse the commercial Linux build (${{ matrix.arch }})
+    # A literal name and no matrix: a skipped matrix job reports its name
+    # unexpanded, and a running one gets the matrix value appended again, so
+    # either way the required "(x64)" check would never report.
+    name: Rehearse the commercial Linux build (x64)
+    needs: packaging-scope
+    if: ${{ !cancelled() && needs.packaging-scope.outputs.installers != 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 40
-    strategy:
-      matrix:
-        arch: [x64]
     env:
+      REHEARSAL_ARCH: x64
       # A strict X.Y.Z, as a commercial build requires; never a real release.
       VERSION: 0.0.${{ github.run_number }}
     steps: &commercial-rehearsal-steps
@@ -312,14 +353,14 @@ jobs:
       - name: Package and qualify exactly as the release does
         run: |
           platform="$(echo "${RUNNER_OS}" | tr "[:upper:]" "[:lower:]")"
-          bash scripts/build-commercial-platform.sh "${platform}" "${{ matrix.arch }}" \
+          bash scripts/build-commercial-platform.sh "${platform}" "${{ env.REHEARSAL_ARCH }}" \
             "${VERSION}" "$(git rev-parse HEAD)" "${RUNNER_TEMP}/rehearsal-identity.json"
 
       - name: Upload native smoke evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: desktop-package-check-commercial-${{ runner.os }}-${{ matrix.arch }}-${{ inputs.ref || github.sha }}
+          name: desktop-package-check-commercial-${{ runner.os }}-${{ env.REHEARSAL_ARCH }}-${{ inputs.ref || github.sha }}
           path: artifacts/native-smoke/
           if-no-files-found: warn
           retention-days: 14
@@ -339,6 +380,7 @@ jobs:
           - runner: macos-15-intel
             arch: x64
     env:
+      REHEARSAL_ARCH: ${{ matrix.arch }}
       VERSION: 0.0.${{ github.run_number }}
     steps: *commercial-rehearsal-steps
 

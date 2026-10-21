@@ -340,6 +340,9 @@ export const DITHER_ALGORITHMS = [
   'sierra3',
   'sierra2',
   'sierra-lite',
+  // Variable-coefficient diffusion with a modulated threshold (ADR-649). An
+  // older build refuses a project holding a value it does not list here.
+  'blue-noise',
   'ordered',
   'grayscale',
 ] as const;
