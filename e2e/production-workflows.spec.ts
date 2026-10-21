@@ -652,6 +652,7 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
 
   const abortEventBaseline = (await kerfdesk.events()).length;
   const settingsReadsBeforeAbort = exactSerialWriteCount(await kerfdesk.events(), '$$\n');
+  const modalReadsBeforeAbort = exactSerialWriteCount(await kerfdesk.events(), '$G\n');
   // Model this scenario's prompt reboot at the accepted reset write. Browser
   // scheduling must not turn it into the separate missing/late-boot workflow.
   await kerfdesk.setSerialStatusAfterCommand('\u0018', "Grbl 1.1h ['$' for help]");
@@ -683,9 +684,12 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   // fresh cleanup replies; enabling alone does not replay abandoned job ACKs.
   await kerfdesk.setAutoAcknowledge(true);
   await kerfdesk.acknowledgeSerial(2);
+  // Abort's own reboot keeps the settings: only the modal state is read
+  // again, never `$$` (ADR-648).
   await expect
-    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), '$$\n'))
-    .toBeGreaterThan(settingsReadsBeforeAbort);
+    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), '$G\n'))
+    .toBeGreaterThan(modalReadsBeforeAbort);
+  expect(exactSerialWriteCount(await kerfdesk.events(), '$$\n')).toBe(settingsReadsBeforeAbort);
   const readyResetSession = {
     sessionEpoch: resetSessionEpoch,
     qualifiedSession: true,
