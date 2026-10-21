@@ -69,7 +69,8 @@ its cutter reaches three radii (1.5 bit diameters) past the part edge. Reproduce
 6. **Existing checks stay.** The bed, own-contour and same-operation sibling checks run first and
    are unchanged. The new check can only remove a lead, so a job whose leads already clear every
    kept part emits the same bytes.
-7. `EMITTER_REVISION` advances to `cnc-leads-clear-kept-parts-20261021-v22`.
+7. `EMITTER_REVISION` advances to `cnc-leads-clear-kept-parts-20261021-v23`, carrying forward
+   `marlin-dark-air-changes-20261021-v22` from PR #1342 (ADR-398 Amendment 1).
 
 Not chosen:
 
