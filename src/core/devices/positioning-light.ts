@@ -41,7 +41,7 @@ export function isFalconPointerLight(
 export const MAX_POSITIONING_LIGHT_OFFSET_MM = 1000;
 
 // Never accept cutting-beam, motion, program control, reset, SD deletion or firmware commands.
-const RESERVED_M_CODES = new Set([
+export const RESERVED_M_CODES: ReadonlySet<number> = new Set([
   0, 1, 2, 3, 4, 5, 6, 18, 20, 21, 22, 23, 24, 25, 26, 28, 29, 30, 32, 48, 81, 84, 98, 99, 104, 109,
   110, 112, 125, 140, 141, 143, 190, 191, 192, 226, 280, 290, 303, 360, 361, 362, 363, 364, 400,
   401, 402, 410, 500, 501, 502, 600, 605, 701, 702, 915, 997, 999,
@@ -229,7 +229,7 @@ export function normalizePositioningLight(
 // enforcement, feedrate/flow overrides, acceleration and jerk, home and probe
 // offsets, microstepping, serial baud and motor current (babystepping M290 is
 // a reserved motion code above).
-const STATE_CHANGING_M_CODES = new Set([
+export const STATE_CHANGING_M_CODES: ReadonlySet<number> = new Set([
   42, 43, 80, 92, 120, 121, 201, 202, 203, 204, 205, 206, 211, 220, 221, 350, 351, 428, 575, 851,
   906, 907,
 ]);

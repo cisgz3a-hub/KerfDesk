@@ -20,6 +20,7 @@ import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model
 import { normalizeOtherCameraModels } from '../../core/camera/model/saved-cameras';
 import { laserArcMovesEntry, validateMachineProfileShape } from './machine-profile-shape';
 import { recoverPositioningLight } from './machine-profile-positioning-light';
+import { recoverAutofocusCommand } from './machine-profile-autofocus';
 import { optionalRotarySetup } from '../project/project-device-profile-validator';
 import { firstError } from '../project/project-shape-primitives';
 
@@ -181,8 +182,9 @@ function parseProfile(
     'profile.cncSubProfile',
   );
   const lightRecovery = recoverPositioningLight(value);
+  const autofocusRecovery = recoverAutofocusCommand(lightRecovery.value);
   const recoveredValue: Record<string, unknown> = {
-    ...lightRecovery.value,
+    ...autofocusRecovery.value,
     ...(value['cncSubProfile'] === undefined ? {} : { cncSubProfile: cncRecovery.value }),
   };
   const profileShapeError = validateMachineProfileShape(recoveredValue);
@@ -222,6 +224,7 @@ function parseProfile(
           `CNC settings recovery: ${issue}; a default was applied. Review in Device Setup.`,
       ),
       ...lightRecovery.notes,
+      ...autofocusRecovery.notes,
       ...calibration.notes,
     ],
   };

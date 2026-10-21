@@ -14,6 +14,7 @@ import { validateScanOffsetProfile } from './scan-offset-profile';
 import { cncSubProfileIssues } from './cnc-sub-profile-validation';
 import { machineProfileControllerIssues } from './machine-profile-controller-validation';
 import { devicePositioningLightIssue } from './positioning-light';
+import { autofocusCommandIssue } from './autofocus-command';
 import {
   XTOOL_D1_PRO_PROFILES,
   SCULPFUN_S30_PROFILE,
@@ -247,6 +248,8 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   const errors: string[] = [];
   const lightIssue = devicePositioningLightIssue(profile);
   if (lightIssue !== null) errors.push(lightIssue);
+  const autofocusIssue = autofocusCommandIssue(profile.autofocusCommand, profile.controllerKind);
+  if (autofocusIssue !== null) errors.push(autofocusIssue);
   requireNonEmpty(profile.name, 'name', errors);
   if (profile.profileId !== undefined) requireNonEmpty(profile.profileId, 'profileId', errors);
   errors.push(...machineProfileControllerIssues(profile));
