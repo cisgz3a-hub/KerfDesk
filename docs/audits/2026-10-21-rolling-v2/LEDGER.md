@@ -3,6 +3,31 @@
 One row per audited area. Counts are after the refuter and the coordinator's re-verification.
 Method: [METHOD.md](METHOD.md). Plan: [AREAS.md](AREAS.md).
 
+## Summary (2026-10-22)
+
+All 28 areas audited between 2026-10-21 and 2026-10-22, on `origin/main` from `70c01e11f` to
+`902f1d0c0`. Every finding passed an independent refuter; every P1/P2 was then re-checked by the
+coordinator in code, by repro or against a primary source.
+
+- **P1: 6.** 03-P1-1 (layer-label G-code injection), 03-P1-2 and 03-P1-3 (laser leads into kept
+  parts), 09-P1-1 (CNC leads into kept parts), 13-P1-1 (project Auto-focus command injection),
+  21-P1-1 (Starter Presets deletes edited presets).
+- **P2: 58** (including two KNOWN items raised to P2: 10-K1 Dogbone holes, 26-K1 Frame gap for
+  G18/G19 arcs).
+- **P3: 213.**
+- **Clean areas (no P1/P2):** controller changes (17), raster dithering (20), docs-vs-code guards (24).
+
+**Fix PRs opened from this audit (state on 2026-10-22):** #1340 (03-P1-1), #1342 **merged**
+(03-P2-1/2), #1343 (09-P1-1), #1345 (03-P1-2/3, P2-9), #1346 (02-P2-1), #1347 (01-P2-1..4),
+#1349 (03-P2-4/5), #1352 (13-P1-1, P2-1/2), #1339 (11-P2-1). Proposed but not started: fixes for
+05, 06, 07, 08, 10, 12, 14 (needs DPI decision), 15, 16 (needs decision), 18, 19, 21, 22, 23,
+25/28, 26, 27.
+
+**Maintainer decisions raised:** tapered inlay tier (02-P2-2); Abort rate lane (01-P2-5,
+ADR-585); Illustrator SVG DPI (14-P2-1); relief V-bit finishing cell (16-P2-1); 26-K1 severity
+(borderline P1 for R-form arcs); ruleset vs ADR-621 (11-P3-4); privacy-page wording (22);
+ADR-653 collision between #1347 and #1351 (24-P3-8).
+
 | Batch | # | Area | Tree | Report | Raised | Refuted | P1 | P2 | P3 | Known |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 01 | Remote control (phone + MCP) | 70c01e11f | [01-remote-control.md](01-remote-control.md) | 23 | 5 | 0 | 6 | 17 | 0 |
@@ -28,6 +53,7 @@ Method: [METHOD.md](METHOD.md). Plan: [AREAS.md](AREAS.md).
 | 6 | 24 | Docs vs code drift | 902f1d0c0 | [24-docs-drift.md](24-docs-drift.md) | 8 | 0 | 0 | 0 | 8 | 13 |
 | 7 | 25 | Design generators (box, barcode, Design Studio) | 902f1d0c0 | [25-design-generators.md](25-design-generators.md) | 4 | 0 | 0 | 1 | 3 | 7 |
 | 7 | 26 | G-code Inspector and 3D viewers | 902f1d0c0 | [26-gcode-viewers.md](26-gcode-viewers.md) | 10 | 0 | 0 | 1 (known WA-4 raised) | 10 | 11 |
+| 7 | 28 | AI features | 902f1d0c0 | [28-ai-features.md](28-ai-features.md) | 5 | 0 | 0 | 1 | 4 | 4 |
 | 7 | 27 | App shell, settings, support, a11y | 902f1d0c0 | [27-app-shell.md](27-app-shell.md) | 8 | 0 | 0 | 3 | 5 | 5 |
 | 6 | 22 | Website | 902f1d0c0 | [22-website.md](22-website.md) | 10 | 0 | 0 | 1 | 9 | 5 |
 | 4 | 14 | Vector importers | 2c8d988db | [14-vector-importers.md](14-vector-importers.md) | 9 | 0 | 0 | 1 | 8 | 7 |
@@ -93,6 +119,7 @@ Coordinator checks were made on `origin/main` @ `faf5a54f1`; no audited line cha
 | 23-P2-3 | image-editor | Close promises "the editing session is kept and resumes on reopen", but any later change to the image (a 1 mm nudge) silently drops all unapplied edits, layers and Undo on reopen | refuter REPRO (`image-editor-lifecycle.ts:85`; identity rule is ADR-313, the silent drop is the defect) | open |
 | 25-P2-1 | design-generators | CNC Box Generator / Box Fit Test (Neotronics 4040, no stock material) size dogbones for the active bit, but the inserted "Box panels" operation is pinned to the starter 1/8" bit, so with a 1/16" active bit no seat corner is reached and tabs cannot seat (Job Review warns about uncut gaps; the dialog misleads; ADR-106 Amd 1) | **READ**: `BoxGeneratorHost.tsx` passes `activeCncTool(machine).diameterMm` for relief, while the operation keeps the seeded `toolId`; Design Studio strips it (`design-apply-mutation.ts` `toolId: _seededTool`). Auditor + refuter REPRO (`em-3175` pinned) | open |
 | 26-K1 (WA-4) | gcode-viewers | Opened programs run since ADR-630, but skipped G18/G19 arcs are left out of the external-run Frame outline and the bed/no-go checks: Frame traces X 0–10 while GRBL moves to X 20 (10–30 mm short on real-shaped Fusion output). IJK arcs get only a generic "could not be drawn" warning; R-form arcs get none mentioning the Frame | refuter REPRO through the real Open → Run → Frame (`run.envelope`) chain. **Coordinator:** P2, borderline P1 for R-form arcs under NN 21 / ADR-565 (Frame is the sole Start gate) — **maintainer decision** | open |
+| 28-P2-1 | ai-features | "Add reviewed design" ignores Make Default, the job material's auto-recipe (ADR-496 D4) and CNC starter/stock feeds (ADR-416 D2): AI artwork gets 30%/1500/1 where a drawn shape gets 85%/350/3 (linked); laser shows no warning | refuter REPRO in the real dialog (`ai-artwork.ts:54`); values visible and editable before Start | open |
 | 27-P2-1 | app-shell | Ctrl+. (documented Abort key) does nothing while typing canvas text or with Image Studio Adjust/Colour/Resize/Text dialogs or the Editors panel open; modals also trap Tab, so no keyboard route to Abort during a job (NN 9, WCAG 2.1.1). Mouse ABORT stays reachable | **READ**: `CanvasTextEditor.tsx` `handleEditorKey` calls `event.stopPropagation()` on every key first. Refuter REPRO (plain input stops the job 1×; canvas text 0, colour picker 0) | open |
 | 27-P2-2 | app-shell | A render crash anywhere in the workspace disables wake lock, recovery checkpoints, tab-close laser-off, unsaved prompt, autosave and the desktop close-handshake Abort while the job keeps streaming; crash screen has no Save (still offers ABORT) | refuter REPRO (real App, one panel throws mid-job) | open |
 | 27-P2-3 | app-shell | Support report copies grblHAL `$$` password settings ($75 WiFi, $77 AP, $533 MQTT, $330/$331) in plain text under a header claiming it holds no passwords | refuter REPRO through the real parser/formatter; **SOURCE** grblHAL prints them over USB `$$` | open |
