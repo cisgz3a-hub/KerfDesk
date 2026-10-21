@@ -1,4 +1,9 @@
-import { DEFAULT_CNC_LAYER_SETTINGS, type Layer, type SceneObject } from '../../core/scene';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  sceneObjectUsesOperation,
+  type Layer,
+  type SceneObject,
+} from '../../core/scene';
 import { useStore } from '../state';
 import {
   CNC_BULK_DEPTH_MAX_MM,
@@ -8,6 +13,7 @@ import {
 } from '../state/operation-actions';
 import { inputStyle, Row, unitStyle } from './CncLayerPrimitives';
 import { useDebouncedCommit } from './use-debounced-commit';
+import { useSettingsEditGlow } from './use-settings-edit-glow';
 
 export function CncSelectionDepthField(props: {
   readonly objects: ReadonlyArray<SceneObject>;
@@ -61,6 +67,7 @@ function CompatibleCncSelectionDepthField(props: {
   );
   const commonDepth = depths.every((depth) => depth === depths[0]) ? (depths[0] ?? null) : null;
   const label = props.role === 'insert' ? 'Insert depth' : 'Cut depth';
+  const glow = useOperationsEditGlow(props.operations, props.operationIds);
   const debounced = useDebouncedCommit<number | null>({
     value: commonDepth,
     format: (value) => (value === null ? '' : String(value)),
@@ -74,7 +81,7 @@ function CompatibleCncSelectionDepthField(props: {
     },
   });
   return (
-    <>
+    <div style={contentsStyle} onFocus={glow.onFocus} onBlur={glow.onBlur}>
       <Row label={label}>
         <input
           type="number"
@@ -95,9 +102,29 @@ function CompatibleCncSelectionDepthField(props: {
         Changes only {label} across {props.operationIds.length} independent operations. Bit, feeds,
         Depth per pass, and other settings stay separate.
       </p>
-    </>
+    </div>
   );
 }
+
+/** The depth changes in each operation, so every piece they run lights up (ADR-646 Amendment 1). */
+function useOperationsEditGlow(
+  operations: ReadonlyArray<Layer>,
+  operationIds: ReadonlyArray<string>,
+): ReturnType<typeof useSettingsEditGlow> {
+  const objects = useStore((state) => state.project.scene.objects);
+  return useSettingsEditGlow({
+    owner: 'cnc-selection-depth',
+    objectIds: objects
+      .filter((object) =>
+        operations.some((operation) => sceneObjectUsesOperation(object, operation)),
+      )
+      .map((object) => object.id),
+    operationIds,
+  });
+}
+
+// The field and its note stay direct items of the inspector's layout.
+const contentsStyle: React.CSSProperties = { display: 'contents' };
 
 const noteStyle: React.CSSProperties = {
   margin: 0,

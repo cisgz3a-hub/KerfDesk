@@ -222,7 +222,7 @@ describe('settings edit glow', () => {
       objects,
       [engrave, sameEngrave],
       'laser',
-      { kind: 'edit', objectIds: ['heart'], operationIds: ['engrave'] },
+      { kind: 'edit', owner: 'editor', serial: 1, objectIds: ['heart'], operationIds: ['engrave'] },
       centre,
     );
     expect(target?.objectIds).toEqual(['heart']);
@@ -235,7 +235,13 @@ describe('settings edit glow', () => {
       objects,
       [engrave],
       'laser',
-      { kind: 'edit', objectIds: ['right', 'left'], operationIds: ['engrave'] },
+      {
+        kind: 'edit',
+        owner: 'editor',
+        serial: 1,
+        objectIds: ['right', 'left'],
+        operationIds: ['engrave'],
+      },
       centre,
     );
     expect(target?.objectIds).toEqual(['right', 'left']);
@@ -244,14 +250,26 @@ describe('settings edit glow', () => {
   });
 
   it('lights nothing once the edited artwork no longer uses the operation', () => {
-    const seed = { kind: 'edit', objectIds: ['heart'], operationIds: ['engrave'] } as const;
+    const seed = {
+      kind: 'edit',
+      owner: 'editor',
+      serial: 1,
+      objectIds: ['heart'],
+      operationIds: ['engrave'],
+    } as const;
     const moved = [artwork('heart', 'engrave-2', 0)];
     expect(pulseTargetFor(moved, [engrave, sameEngrave], 'laser', seed, centre)).toBeNull();
   });
 });
 
 describe('when a hover pulses', () => {
-  const edit = { kind: 'edit', objectIds: ['heart'], operationIds: ['engrave'] } as const;
+  const edit = {
+    kind: 'edit',
+    owner: 'editor',
+    serial: 1,
+    objectIds: ['heart'],
+    operationIds: ['engrave'],
+  } as const;
   const sceneA = {};
   const sceneB = {};
 
@@ -269,6 +287,21 @@ describe('when a hover pulses', () => {
     expect(trigger.next(edit, null, sceneA)).toBe(false);
     trigger.next(null, null, sceneA);
     expect(trigger.next(edit, null, sceneA)).toBe(true);
+  });
+
+  it('pulses an edit that ended and began again while a hover hid it', () => {
+    const trigger = new PulseTrigger();
+    expect(trigger.next(edit, null, sceneA)).toBe(true);
+    expect(trigger.next({ kind: 'operation', operationId: 'engrave' }, null, sceneA)).toBe(true);
+    // Under the hover the edit ended and began again: the store made a new edit.
+    expect(trigger.next({ ...edit, serial: 2 }, null, sceneA)).toBe(true);
+  });
+
+  it('pulses when focus moves straight to another editor of the same artwork', () => {
+    const trigger = new PulseTrigger();
+    expect(trigger.next(edit, null, sceneA)).toBe(true);
+    expect(trigger.next({ ...edit, owner: 'operation-row:engrave' }, null, sceneA)).toBe(true);
+    expect(trigger.next({ ...edit, owner: 'operation-row:engrave' }, null, sceneA)).toBe(false);
   });
 
   it('still regroups a row hover without pulsing when the scene changes under it', () => {

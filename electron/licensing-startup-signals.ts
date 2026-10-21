@@ -1,3 +1,18 @@
+import { DESKTOP_LICENCE_WINDOW } from './licence-window.js';
+
+/**
+ * Whether desktop services run without waiting for a workspace to be let in: a
+ * build without licensing never shows the licence window, and while ADR-623
+ * Amendment 3 holds the window off a commercial build opens straight into its
+ * workspace, so the camera bridge starts with the app as in 1.0.20 (ADR-540).
+ */
+export function servicesAlwaysAdmitted(
+  channel: string,
+  licenceWindow = DESKTOP_LICENCE_WINDOW,
+): boolean {
+  return channel === 'free' || !licenceWindow;
+}
+
 export type WorkspaceAdmission = {
   /** Calls `listener` now with the current admission, and again on each change. */
   readonly onChange: (listener: (admitted: boolean) => void) => () => void;

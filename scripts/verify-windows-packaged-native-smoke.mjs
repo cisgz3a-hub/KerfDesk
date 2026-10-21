@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { nativeSmokeLaunchOptions, runIsolatedNativeSmoke } from './native-smoke-runner.mjs';
+import { DESKTOP_LICENCE_WINDOW } from '../public/desktop-licence-window.mjs';
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
@@ -10,12 +11,18 @@ export function validateNativeSmokeResult(result, expectedUserData, options = {}
   const renderer = object(result?.renderer);
   const failures = Array.isArray(result?.failures) ? result.failures : ['invalid failures field'];
   const freshSandbox = options.expectFreshSandbox === true;
-  const expectLicenceWindow = options.expectLicenceWindow === true;
+  // `expectLicenceWindow` names an unlicensed commercial package. It opens behind
+  // its licence window only while that window is on; while ADR-623 Amendment 3
+  // holds it off, the package must open its KerfDesk Free workspace instead.
+  const licenceWindow = options.licenceWindow ?? DESKTOP_LICENCE_WINDOW;
+  const unlicensedCommercial = options.expectLicenceWindow === true;
+  const expectLicenceWindow = unlicensedCommercial && licenceWindow;
+  const freshSandboxWindow = freshSandbox && licenceWindow;
   // Fresh commercial packages and a qualification profile still signing out
   // open behind a licence window, with no workspace to import into or save from
   // (ADR-623). The commercial-package expectation also rejects workspace evidence.
   const behindLicence =
-    (freshSandbox || expectLicenceWindow || options.acceptLicenceWindow === true) &&
+    (freshSandboxWindow || expectLicenceWindow || options.acceptLicenceWindow === true) &&
     renderer?.licenceWindow === true;
   const problems = [
     ...(result?.ok === true ? [] : ['result was not ok']),
@@ -28,7 +35,8 @@ export function validateNativeSmokeResult(result, expectedUserData, options = {}
     ...(renderer?.readyToShow === true ? [] : ['ready-to-show was not reached']),
     ...(behindLicence ? noWorkspaceProblems(renderer) : workspaceProblems(renderer)),
     ...(expectLicenceWindow ? licenceWindowProblems(renderer) : []),
-    ...(freshSandbox && !behindLicence
+    ...(unlicensedCommercial && !licenceWindow ? unlicensedFreeProblems(renderer) : []),
+    ...(freshSandboxWindow && !behindLicence
       ? ['fresh sandbox must open behind the licence window, not the workspace']
       : []),
     ...(renderer?.url === 'app://app/index.html' ? [] : ['unexpected renderer URL']),
@@ -67,6 +75,25 @@ function licenceWindowProblems(renderer) {
     licensing.state === 'activation-required'
     ? []
     : ['commercial licence window must report unlicensed commercial status and no workspace I/O'];
+}
+
+/**
+ * While the licence window is held off (ADR-623 Amendment 3), an unlicensed
+ * commercial package opens straight into KerfDesk Free, as 1.0.20 did, and a
+ * trial or key can still unlock Pro there. Its import and save are checked as
+ * for any workspace.
+ */
+function unlicensedFreeProblems(renderer) {
+  const licensing = renderer?.licensing;
+  return renderer?.licenceWindow !== true &&
+    licensing?.channel === 'commercial' &&
+    licensing.edition === 'free' &&
+    licensing.proEnabled === false &&
+    licensing.state === 'activation-required'
+    ? []
+    : [
+        'unlicensed commercial package must open its Free workspace with unlicensed commercial status',
+      ];
 }
 
 function workspaceProblems(renderer) {
@@ -204,6 +231,8 @@ export function parseNativeSmokeArgs(args) {
     timeoutMs,
     expectFreshSandbox: args.includes('--expect-fresh-sandbox'),
     expectLicenceWindow: args.includes('--expect-licence-window'),
+    // What an unlicensed commercial package opens into (ADR-623 Amendment 3).
+    licenceWindow: DESKTOP_LICENCE_WINDOW,
   };
 }
 

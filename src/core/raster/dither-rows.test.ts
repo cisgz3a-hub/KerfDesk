@@ -12,6 +12,7 @@ const ALL_MODES: ReadonlyArray<ErrorDiffusionMode> = [
   'sierra3',
   'sierra2',
   'sierra-lite',
+  'blue-noise',
 ];
 
 const S_MAX = 1000;
@@ -102,6 +103,35 @@ describe('createErrorDiffusionRowDitherer', () => {
       ),
       { numRuns: 60 },
     );
+  });
+
+  it('streams blue-noise bit-for-bit on a photo-sized field with every tone', () => {
+    // Wider than the property test reaches, with a ramp under hashed detail so
+    // every weight row and modulation strength is exercised on both scan
+    // directions, and an odd height so the last row runs right-to-left.
+    const width = 301;
+    const height = 77;
+    const luma = new Uint8Array(width * height);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const detail = ((x * 7919) ^ (y * 104_729)) % 41;
+        luma[y * width + x] = Math.min(
+          255,
+          Math.max(0, Math.round((x / (width - 1)) * 255) + detail - 20),
+        );
+      }
+    }
+    const rowAt = createErrorDiffusionRowDitherer({
+      width,
+      height,
+      algorithm: 'blue-noise',
+      sMax: S_MAX,
+      lumaRowAt: lumaRowAtFor(luma, width),
+    });
+    const forward = Array.from({ length: height }, (_, y) => y);
+    const reference = materialized(luma, width, height, 'blue-noise');
+    expect(collectRows(rowAt, width, height, forward)).toEqual(reference);
+    expect(collectRows(rowAt, width, height, forward.reverse())).toEqual(reference);
   });
 
   it('replays deterministically on rewind: repeated and descending access match forward', () => {
