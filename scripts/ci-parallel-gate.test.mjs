@@ -35,7 +35,9 @@ function gateOf(workflow, name) {
   assert.equal(gate.if, 'always()');
   const verdict = gate.steps.find((step) => step.env?.NEEDS === '${{ toJSON(needs) }}');
   assert.ok(verdict, `${name} reads every needed job's result`);
-  assert.match(verdict.run, /select\(\.value\.result != "success"\)/u);
+  // Browser smoke also lets the suite job its event does not use be skipped
+  // (ADR-647); run-pr-browser-smoke.test.mjs pins that exception.
+  assert.match(verdict.run, /select\(\.value\.result != "success"[) ]/u);
   assert.match(verdict.run, /exit 1/u);
   return gate;
 }

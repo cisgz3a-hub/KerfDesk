@@ -32,6 +32,11 @@ permissions:
 # one Playwright worker and its own Vite server, beside one job for the checks
 # that run once. The last job keeps the "Chrome UX smoke" check name and passes
 # only when every other job passed (ADR-557).
+#
+# A pull request runs a focused part of the suite in one job instead of the
+# shards: fixed core files plus every spec the pull request changed. Pushes to
+# main, merge queue entries and manual runs still run the whole suite, so a
+# breakage only the rest of the suite sees shows up on main's run (ADR-647).
 jobs:
   checks:
     name: Browser test checks and production-bundle smoke
@@ -82,6 +87,7 @@ jobs:
 
   suite:
     name: Chrome UX smoke (${{ matrix.shard }}/${{ strategy.job-total }})
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     strategy:
       # Every shard reports, so one failure does not hide another shard's.
@@ -128,9 +134,53 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  pull-request-suite:
+    name: Chrome UX smoke (pull request core and changed specs)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # GitHub's merge commit and its first parent, the base branch, so
+          # Playwright can tell which specs the pull request changed.
+          fetch-depth: 2
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chrome
+        run: pnpm exec playwright install --with-deps chrome
+
+      - name: Check cold startup
+        run: pnpm test:e2e:cold
+
+      - name: Run the core specs and the specs this pull request changed
+        run: pnpm test:e2e:pull-request HEAD^1
+
+      - name: Upload browser artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-report-pull-request
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
   chrome:
     name: Chrome UX smoke
-    needs: [checks, suite]
+    needs: [checks, suite, pull-request-suite]
     # Runs whatever the jobs above did, so a failed or cancelled job fails
     # this check instead of skipping it: GitHub counts a skipped required
     # check as passed.
@@ -158,8 +208,10 @@ jobs:
         id: browser_smoke
         env:
           NEEDS: ${{ toJSON(needs) }}
+          # The one suite job this event does not run; it alone may be skipped.
+          UNSELECTED_SUITE: ${{ github.event_name == 'pull_request' && 'suite' || 'pull-request-suite' }}
         run: |
-          not_passed="$(jq -r 'to_entries[] | select(.value.result != "success") | "\(.key): \(.value.result)"' <<< "${NEEDS}")"
+          not_passed="$(jq -r --arg unselected "${UNSELECTED_SUITE}" 'to_entries[] | select(.value.result != "success" and (.key != $unselected or .value.result != "skipped")) | "\(.key): \(.value.result)"' <<< "${NEEDS}")"
           if [ -n "${not_passed}" ]; then
             echo "Browser smoke passes only when every browser job passed. Not passed:"
             echo "${not_passed}"
@@ -171,6 +223,7 @@ jobs:
         if: always()
         env:
           BROWSER_STATE: ${{ steps.browser_smoke.outcome }}
+          SUITE_SCOPE: ${{ github.event_name == 'pull_request' && 'pull request core and changed specs' || 'full dev suite in shards' }}
           WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: >-
           pnpm report:release-readiness
@@ -180,7 +233,7 @@ jobs:
           --state=packaged-runtime=not-run
           --state=perceptual-reference-cam=not-run
           --state=hardware=not-run
-          "--evidence=browser=4 checks: cold dev start, viewer responsiveness, full dev suite in shards, production dist/web bundle; result=${BROWSER_STATE}; run=${WORKFLOW_RUN_URL}"
+          "--evidence=browser=4 checks: cold dev start, viewer responsiveness, ${SUITE_SCOPE}, production dist/web bundle; result=${BROWSER_STATE}; run=${WORKFLOW_RUN_URL}"
 
       - name: Upload readiness report
         if: always()

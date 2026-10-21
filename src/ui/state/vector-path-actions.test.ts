@@ -101,11 +101,12 @@ describe('vector path actions', () => {
   it('welds mixed output metadata into distinct effective operations', () => {
     loadObjects([
       { ...shapeObject('left', '#222222', squarePath('#222222', 0, 0, 10)), powerScale: 50 },
+      { ...shapeObject('left-twin', '#222222', squarePath('#222222', -5, 0, 10)), powerScale: 50 },
       { ...shapeObject('right', '#222222', squarePath('#222222', 5, 0, 10)), powerScale: 80 },
     ]);
     useStore.setState({
       selectedObjectId: 'left',
-      additionalSelectedIds: new Set(['right']),
+      additionalSelectedIds: new Set(['left-twin', 'right']),
       dirty: false,
     });
     useStore.getState().weldSelection();
