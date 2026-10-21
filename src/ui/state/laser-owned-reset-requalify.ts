@@ -1,7 +1,8 @@
-// Qualification after the banner of a reset KerfDesk sent (ADR-648). The `$$`
-// and `$I` snapshot that reset kept still describes EEPROM, so only the modal
-// state and active WCS the reset restarted are read again. Without that
-// snapshot it falls back to the full settings read.
+// The scheduler's qualification run (ADR-648). After the banner of a reset
+// KerfDesk sent, the `$$` and `$I` snapshot that reset kept still describes
+// EEPROM, so only the modal state and active WCS the reset restarted are read
+// again, however often the session's qualification is rescheduled. Without
+// that snapshot it falls back to the full settings read.
 
 import {
   assertSettingsCommandOwnership,

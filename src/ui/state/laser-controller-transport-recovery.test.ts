@@ -54,6 +54,7 @@ describe('bounded recovery while a realtime write remains in transport', () => {
       message: expect.stringContaining('still in transport'),
     });
     expect(message).not.toContain('acknowledgement');
+    const modalReads = f.writes.filter((write) => write === '$G\n').length;
 
     f.settleStatusWrites();
     await statusRequest;
@@ -65,7 +66,10 @@ describe('bounded recovery while a realtime write remains in transport', () => {
     expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
     expect(useLaserStore.getState().getControllerReconnectRecommended()).toBe(false);
     expect(useLaserStore.getState().controllerSessionEpoch).toBe(epoch);
-    expect(f.writes.filter((write) => write === '$$\n')).toHaveLength(reads + 1);
+    // Abort's own reboot kept the settings, so the resumed qualification
+    // reads only `$G` (ADR-648).
+    expect(f.writes.filter((write) => write === '$$\n')).toHaveLength(reads);
+    expect(f.writes.filter((write) => write === '$G\n')).toHaveLength(modalReads + 1);
     expect(f.close).not.toHaveBeenCalled();
     expect(useLaserStore.getState().frameVerification).toBeNull();
   });

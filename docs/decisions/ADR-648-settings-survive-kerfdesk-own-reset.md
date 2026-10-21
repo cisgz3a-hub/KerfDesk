@@ -40,7 +40,9 @@ new read time, which the "Machine settings detected" toast announced.
 2. **Only `$G` is read again.** Qualification after that banner waits for the same reset cleanup
    and fresh Idle as before, then reads `$G` (modal state and active WCS), plus `$I` only if this
    session never read it. It marks the controller qualified with its settings verified and logs
-   that the settings were kept.
+   that the settings were kept. The scheduler decides this when the run starts, from whether the
+   session still holds the kept `$$` read, so a qualification that times out and resumes on a
+   fresh status stays `$G`-only.
 3. **Full invalidation stays everywhere else.** These banners still discard the snapshot and
    re-read `$$`, `$I` and `$G`:
    - a banner no owned reset is waiting for: an uncommanded reboot, `$RST=`'s own reset, or a
@@ -49,7 +51,8 @@ new read time, which the "Machine settings detected" toast announced.
    - a banner on a new connection;
    - a banner after any setting write went out since the last `$$` read: a `$` assignment
      (`$N=`, `$RST=`, `$I=`, `$N0=`) or FluidNC's `[key]value` form of one, in any whitespace
-     form and other than a `$J=`/`[J]` jog, or FluidNC `$NVX` (`$Settings/Erase`, which erases
+     form or behind GRBL's ignored `/` block delete, other than a `$J=`/`[J]` jog, or FluidNC
+     `$NVX` (`$Settings/Erase`, which erases
      every stored setting with or without a value). This covers writes from the Console, Machine
      Settings and macros, and a job whose program carries one.
    Nothing is retained when no `$$` read completed in the current session or one is in flight.

@@ -36,7 +36,10 @@ export type ControllerQualificationScheduleRefs = TranscriptBufferRefs &
     qualificationDeadline?: number | null;
     qualificationRevision?: number;
     runControllerQualification?: (() => Promise<void>) | null;
-    /** Re-reads only the modal state after an owned reset (ADR-648). */
+    /** The scheduler's preferred run: it reads only `$G` (and `$I` if needed)
+     * while this session still holds the `$$` read an owned reset kept, and
+     * the full read otherwise (ADR-648). Decided when it runs, so every
+     * reschedule of the same session keeps it. */
     runModalStateQualification?: (() => Promise<void>) | null;
   };
 
@@ -108,8 +111,6 @@ type QualificationScheduleOptions = {
   readonly afterAlarm?: boolean;
   /** Preserve connect-time diagnostics while continuing to listen for recovery. */
   readonly onSilent?: () => void;
-  /** The `$$`/`$I` snapshot survived an owned reset: re-read `$G` only. */
-  readonly modalStateOnly?: boolean;
 };
 
 type QualificationReadiness = { alarmSeen: boolean };
@@ -153,7 +154,7 @@ export function scheduleControllerQualification(
     }
     if (!timeout.busy && ready) {
       refs.qualificationDeadline = null;
-      startQualificationRun(refs, options.modalStateOnly === true);
+      startQualificationRun(refs);
       return;
     }
     readinessFailure = reportQualificationReadinessTimeout(
@@ -344,12 +345,8 @@ function qualificationScheduleIsCurrent(
   );
 }
 
-function startQualificationRun(
-  refs: ControllerQualificationScheduleRefs,
-  modalStateOnly: boolean,
-): void {
-  const run =
-    (modalStateOnly ? refs.runModalStateQualification : null) ?? refs.runControllerQualification;
+function startQualificationRun(refs: ControllerQualificationScheduleRefs): void {
+  const run = refs.runModalStateQualification ?? refs.runControllerQualification;
   if (run != null) void run().catch(() => undefined);
 }
 
