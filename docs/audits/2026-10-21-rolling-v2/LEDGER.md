@@ -13,6 +13,7 @@ Method: [METHOD.md](METHOD.md). Plan: [AREAS.md](AREAS.md).
 | 2 | 06 | Laser and layer settings UI | faf5a54f1 | [06-laser-ui-settings.md](06-laser-ui-settings.md) | 14 | 0 | 0 | 4 | 10 | 1 |
 | 2 | 07 | Image trace | faf5a54f1 | [07-trace.md](07-trace.md) | 8 | 0 | 0 | 3 | 5 | 3 |
 | 2 | 08 | Canvas and commands | faf5a54f1 | [08-canvas-commands.md](08-canvas-commands.md) | 12 | 0 | 0 | 4 | 7 | 1 |
+| 3 | 12 | Camera | 2c8d988db | [12-camera.md](12-camera.md) | 9 | 0 | 0 | 3 | 6 | 2 |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
@@ -54,4 +55,7 @@ Coordinator checks were made on `origin/main` @ `faf5a54f1`; no audited line cha
 | 08-P2-2 | canvas-commands | Width/Height boxes refuse every horizontal or vertical line ("Numeric edit could not be applied") | **READ**: `selection-transform.ts:172` returns `degenerate-selection` for any zero-extent selection; refuter REPRO | open |
 | 08-P2-3 | canvas-commands | Arrow keys on the Artwork panel's tabs switch the tab and also nudge the selected artwork (1/10 mm, one Undo step each) | refuter REPRO in the mounted panel (plain-button part refuted by ADR-493) | open |
 | 08-P2-4 | canvas-commands | Esc while drawing a shape hides the preview, but releasing the mouse still creates it | **READ**: `use-esc-cancels-drag.ts` clears the draft visuals but not the drag; refuter REPRO (rectangle created as one Undo step) | open |
+| 12-P2-2 | camera | A calibration does not record the origin, bed size or native frame it was fitted under; changing them later keeps it silently, so overlay, camera trace and camera Print and Cut marks shift against the burn (bed 400→410 moves Y200 to Y210) | **READ**: `camera-model-record.ts` stores lens, pose, capture and accuracy only; Print and Cut's head captures already key on `nativeBedCaptureFrameKey`. Refuter REPRO (10 mm offset; Check camera reports 0 mm drift) | open |
+| 12-P2-3 | camera | Head-camera Capture bed / Capture selection jog exactly onto the homing-side bed edge, skipping the ADR-375 pull-off limit; on GRBL with hard limits this can trip the switch (ALARM) | **READ**: `head-capture-store.ts` `jogHeadTo` sends `bedPointToNative(positionLaserTarget(...))`; Move laser here (`position-laser-click.ts:70-71`) clamps to `resolveManualMotionLimits(frame, laser)`. Refuter REPRO (6 of 48 stops on the switch) + GRBL source | open |
+| 12-P2-4 | camera | The burn check grades jobs whose bed position KerfDesk itself marks unknown (no-homing machine, User Origin), against the canvas artwork, contrary to ADR-490 §4 | refuter REPRO (`job-burn-route.ts:22` guard passes) | open |
 | 04-P2-1 | electron-main | Camera bridge's fixed loopback port has no server identity check: a squatter receives RTSP logins; operator told the wrong reason | READ `camera-bridge.ts:11,96` (fixed origin, credentials in query, no token); `camera-bridge-lifecycle.ts:19-21` only logs bind failure | open |
