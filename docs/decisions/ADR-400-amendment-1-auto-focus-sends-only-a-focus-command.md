@@ -32,15 +32,15 @@ showed what that left open:
      there;
    - a Z-only probe: `G38.2`–`G38.5` with a Z target and an optional feed;
    - `G30` on Marlin and Smoothieware, their single Z probe at the current XY. On GRBL-family
-     controllers `G30` moves to a stored position, so it is refused there;
-   - one vendor M-code with numeric P, Q, R, L, I, J, K or `S0` parameters, that is not a beam,
-     spindle, accessory, motion, program, probe, reset or machine-settings code (the
-     positioning-light reserved and state-changing lists, plus M7–M11, M62–M68, M106/M107, and the
-     override and modal save/restore codes M49–M53, M56 and M70–M73).
+     controllers `G30` moves to a stored position, so it is refused there.
 
-   G0–G3 moves, X, Y or rotary axis words, M3/M4/M5, `S` above 0, `$n=` and other `$…=` writes,
-   `$J=` jogs, comments and several commands on one line are refused with a reason that names the
-   problem. A probe sequence still needs the Console, as ADR-092's 2026-08-02 amendment says.
+   Every M-code is refused. Firmware M-codes switch the beam, air, fans and motors (Marlin's `M17`
+   enables the steppers) or change machine settings. No machine in the catalogue or its sources
+   documents an M-code for focusing, so a list of "safe" codes could not be trusted. A documented
+   vendor focus form is added to the rule with its source. G0–G3 moves, X, Y or rotary axis words,
+   `S` above 0, `$n=` and other `$…=` writes, `$J=` jogs, comments and several commands on one line
+   are refused too, each with a reason that names the problem. A probe sequence or an M-code still
+   goes through the Console, as ADR-092's 2026-08-02 amendment says.
 2. **Load clears a refused command.** The project loader clears a file's refused Auto-focus command,
    as it drops a refused positioning light. The load check uses only the rules that do not depend
    on the controller. A later controller change therefore cannot make Save rewrite the value and

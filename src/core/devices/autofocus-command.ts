@@ -8,37 +8,30 @@
 //   - a GRBL-family `$HZ` vendor macro or Z-only homing (`$HZ1` is Creality's
 //     Falcon A1 Pro autofocus; grblHAL and FluidNC home Z alone with `$HZ`);
 //   - a Z-only probe, `G38.2`-`G38.5` with a Z target and an optional feed;
-//   - Marlin's and Smoothieware's single Z probe `G30` at the current XY;
-//   - one vendor M-code with numeric parameters that is not a beam, motion,
-//     accessory, program, reset or machine-state code.
-// Everything else is refused with its reason. Empty stays valid: it disables
-// Auto-focus.
+//   - Marlin's and Smoothieware's single Z probe `G30` at the current XY.
+// Every M-code is refused. Firmware M-codes switch the beam, air, fans and
+// motors or change machine settings, and no machine KerfDesk knows documents
+// one for focusing, so no list of "safe" codes could be trusted; a documented
+// vendor focus form is added here with its source. Everything else is refused
+// with its reason. Empty stays valid: it disables Auto-focus.
 
 import type { ControllerKind } from './device-profile';
-import { RESERVED_M_CODES, STATE_CHANGING_M_CODES } from './positioning-light';
 
 export const MAX_AUTOFOCUS_COMMAND_LENGTH = 100;
 
-// Accessory outputs a focus routine never switches: coolant/air (M7-M9),
-// Marlin's vacuum/blower (M10/M11), grblHAL/FluidNC digital and analog outputs
-// (M62-M68) and fans (M106/M107, where fan 0 can be a fan-wired laser).
-const ACCESSORY_M_CODES: ReadonlySet<number> = new Set([
-  7, 8, 9, 10, 11, 62, 63, 64, 65, 66, 67, 68, 106, 107,
+// The beam, spindle, coolant/air, Marlin vacuum/blower, grblHAL/FluidNC outputs
+// and fans (fan 0 can be a fan-wired laser): refused with the beam reason.
+const BEAM_M_CODES: ReadonlySet<number> = new Set([
+  3, 4, 5, 7, 8, 9, 10, 11, 62, 63, 64, 65, 66, 67, 68, 106, 107,
 ]);
-// Override switches (M49-M53, M56) and modal-state save/restore (M70-M73),
-// which in LinuxCNC-style dialects can restore a spindle state, change how
-// later jobs run; a focus routine needs neither.
-const MODAL_M_CODES: ReadonlySet<number> = new Set([49, 50, 51, 52, 53, 56, 70, 71, 72, 73]);
 const PROBE_G_CODES: ReadonlySet<number> = new Set([38.2, 38.3, 38.4, 38.5]);
-const BEAM_M_CODES: ReadonlySet<number> = new Set([3, 4, 5]);
-// Parameter words a vendor M-code may carry. Axis, feed, tool and extruder
-// words are left out: on GRBL-family firmware they act on any line.
-const VENDOR_PARAMETER_LETTERS = new Set(['P', 'Q', 'R', 'L', 'I', 'J', 'K', 'S']);
 const WORD_LINE_RE = /^(?:[A-Z][+-]?(?:\d+\.?\d*|\.\d+))+$/;
 const WORD_RE = /([A-Z])([+-]?(?:\d+\.?\d*|\.\d+))/g;
 
 const ACCEPTED_FORMS =
-  'Auto-focus accepts one focus command: a vendor macro such as $HZ1, a Z-only probe such as G38.2 Z-10 F100, Marlin or Smoothieware G30, or one vendor M-code.';
+  'Auto-focus accepts one focus command: a vendor macro such as $HZ1, a Z-only probe such as G38.2 Z-10 F100, or Marlin or Smoothieware G30.';
+const M_CODE_REASON =
+  'Auto-focus cannot send an M-code: M-codes switch the motors, outputs or machine settings, and no supported machine uses one to focus. Send it from the Console instead.';
 const MOTION_REASON =
   'Auto-focus cannot move the head: G0-G3 moves and X, Y or rotary axis words are not focus commands.';
 const BEAM_REASON =
@@ -99,9 +92,7 @@ function wordsIssue(words: ReadonlyArray<Word>, kind: ControllerKind | undefined
   const commands = words.filter((word) => word.letter === 'G' || word.letter === 'M');
   const [first] = commands;
   if (commands.length !== 1 || first === undefined || words[0] !== first) return ACCEPTED_FORMS;
-  return first.letter === 'G'
-    ? probeIssue(first.value, words, kind)
-    : vendorMCodeIssue(first.value, words);
+  return first.letter === 'G' ? probeIssue(first.value, words, kind) : mCodeIssue(first.value);
 }
 
 function probeIssue(
@@ -125,18 +116,6 @@ function probeIssue(
     : 'On GRBL-family controllers G30 moves to a stored position; it is not a focus probe.';
 }
 
-function vendorMCodeIssue(code: number, words: ReadonlyArray<Word>): string | null {
-  if (code < 0) return ACCEPTED_FORMS;
-  const whole = Math.trunc(code);
-  if (BEAM_M_CODES.has(whole) || ACCESSORY_M_CODES.has(whole)) return BEAM_REASON;
-  if (
-    RESERVED_M_CODES.has(whole) ||
-    STATE_CHANGING_M_CODES.has(whole) ||
-    MODAL_M_CODES.has(whole)
-  ) {
-    return `M${whole} is a motion, program, probe, reset or machine-settings code, not a focus command.`;
-  }
-  return words.slice(1).every((word) => VENDOR_PARAMETER_LETTERS.has(word.letter))
-    ? null
-    : ACCEPTED_FORMS;
+function mCodeIssue(code: number): string {
+  return BEAM_M_CODES.has(Math.trunc(code)) ? BEAM_REASON : M_CODE_REASON;
 }

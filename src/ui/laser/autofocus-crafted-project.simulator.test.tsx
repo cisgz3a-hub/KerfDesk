@@ -22,7 +22,7 @@ import { JobSetupControls } from './JobSetupControls';
 
 const original = useLaserStore.getState();
 
-const PAYLOADS = ['G1 X300 Y10 F100 S1000 M3', 'G0 X400 Y400', '$32=0', 'M3 S1000'] as const;
+const PAYLOADS = ['G1 X300 Y10 F100 S1000 M3', 'G0 X400 Y400', '$32=0', 'M3 S1000', 'M17'] as const;
 
 async function pump(ms: number): Promise<void> {
   await act(async () => {

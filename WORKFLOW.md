@@ -1581,8 +1581,8 @@ the completed physical Frame is the spatial source of truth.
 - Modal: `Could not open <filename>: not a valid KerfDesk project.` No load.
 
 #### Edge — the file carries an Auto-focus command (ADR-400 Amendment 1)
-1. On load, an Auto-focus command that is not a focus routine (a G0–G3 move, an X/Y word, a laser,
-   spindle or air command, `S` above 0, or a `$` settings write) is cleared, as a refused
+1. On load, an Auto-focus command that is not a focus routine (a G0–G3 move, an X/Y word, an
+   M-code, `S` above 0, or a `$` settings write) is cleared, as a refused
    positioning-light command is. Auto-focus then shows **Set up auto-focus**.
 2. A file for the machine already in use (same profile, name and bed) keeps that machine's own
    Auto-focus command from Machine Setup. When the file's command differs, an info toast says
@@ -1591,8 +1591,8 @@ the completed physical Frame is the spatial source of truth.
 3. A file for another machine brings its vetted command with the rest of that machine, behind the
    machine notice; **Keep current machine** restores the current command too.
 4. Whatever its source, the Auto-focus button sends only a focus routine: a `$HZ` macro on
-   GRBL-family controllers, a Z-only `G38.2`–`G38.5` probe, `G30` on Marlin or Smoothieware, or one
-   vendor M-code. Anything else is refused with its reason and nothing is sent.
+   GRBL-family controllers, a Z-only `G38.2`–`G38.5` probe, or `G30` on Marlin or Smoothieware. Any
+   M-code and anything else is refused with its reason and nothing is sent.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).
