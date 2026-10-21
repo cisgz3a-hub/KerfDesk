@@ -2793,8 +2793,9 @@ authorization, Frame proof, controller command, or safety boundary.
    and every copy is replaced the same way.
    The editor has no burn settings (ADR-652). Outlines burn with the reserved
    **Registration jig** Line operation and artwork with the operation it gets on import,
-   both starting at the standard operation defaults; Job Review shows the exact settings
-   before Start, and the operations can be changed on the main canvas like any other.
+   both starting at the standard operation defaults. Job Review shows the exact settings
+   before Start, and **Edit** on an operation card there, the outline's included, changes
+   power, speed, passes and air assist for the project.
 4. Select one artwork or artwork group and click **Centre + copy artwork to all N**.
    The original is proportionally fitted into 90% of the first outline's usable
    region, preserving aspect ratio, and one identical operation-preserving copy is

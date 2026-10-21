@@ -227,9 +227,11 @@ function JigSharedArtworkSize({ editor }: { readonly editor: JigEditorController
 }
 
 // The jig keeps burn settings out of the way (ADR-652): outlines and artwork use
-// the standard operation defaults, which Job Review shows before every Start.
+// the standard operation defaults, which Job Review shows and edits before every Start.
 function JigBurnSettingsNote(): JSX.Element {
   return (
-    <p className="lf-jig-muted">Burns use standard settings. Job Review shows them before Start.</p>
+    <p className="lf-jig-muted">
+      Burns use standard settings. Job Review shows them before Start, and Edit there changes them.
+    </p>
   );
 }

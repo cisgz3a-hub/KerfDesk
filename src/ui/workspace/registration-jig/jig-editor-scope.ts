@@ -4,11 +4,13 @@ import {
   type AABB,
   type Project,
   type Scene,
+  type SceneObject,
+  type Vec2,
 } from '../../../core/scene';
 import { registrationJigArtworkInstances } from '../../../core/scene/registration-jig-artwork';
-import { sceneObjectCopyClosure } from '../../state/scene-object-copy-dependencies';
+import { sceneObjectCopyDependencyIds } from '../../state/scene-object-copy-dependencies';
 
-// The jig editor opens on a clean canvas (ADR-650): it shows the jig's outlines
+// The jig editor opens on a clean canvas (ADR-652): it shows the jig's outlines
 // and the artwork that belongs to them, never the rest of the main canvas. That
 // other artwork stays in the draft so a save still merges one whole project,
 // but the editor never draws, selects or changes it.
@@ -23,35 +25,85 @@ export function jigBackgroundIds(scene: Scene): ReadonlySet<string> {
     for (const object of instance.objects) members.add(object.id);
   // Artwork imported into an outline carries no jig identity until it is
   // copied, so artwork that sits on an outline belongs to the jig as well.
-  const outlines = boxes.map(transformedBBox);
   for (const object of scene.objects)
-    if (sitsOnOutline(transformedBBox(object), outlines)) members.add(object.id);
-  // Groups stay whole, and masks and path guides travel with what uses them.
-  for (const group of scene.groups ?? [])
-    if (group.objectIds.some((id) => members.has(id)))
-      for (const id of group.objectIds) members.add(id);
-  const shown = new Set(sceneObjectCopyClosure(scene.objects, members).map((object) => object.id));
+    if (boxes.some((box) => sitsOnOutline(object, box))) members.add(object.id);
+  closeOver(scene, members);
   return new Set(
-    scene.objects.filter((object) => !shown.has(object.id)).map((object) => object.id),
+    scene.objects.filter((object) => !members.has(object.id)).map((object) => object.id),
   );
+}
+
+// Nothing the editor can change may reach hidden artwork, so grow the jig until
+// it is closed: whole groups (overlapping ones too), the masks, path guides and
+// trace sources its artwork uses, and every other artwork that shares them.
+function closeOver(scene: Scene, members: Set<string>): void {
+  const uses = scene.objects.map((object) => ({
+    id: object.id,
+    dependencies: sceneObjectCopyDependencyIds(object),
+  }));
+  for (let grew = true; grew; ) {
+    const before = members.size;
+    for (const group of scene.groups ?? [])
+      if (group.objectIds.some((id) => members.has(id)))
+        for (const id of group.objectIds) members.add(id);
+    for (const { id, dependencies } of uses) {
+      if (members.has(id)) for (const dependency of dependencies) members.add(dependency);
+      else if (dependencies.some((dependency) => members.has(dependency))) members.add(id);
+    }
+    grew = members.size !== before;
+  }
 }
 
 const SIZE_TOLERANCE_MM = 1;
 
-// Centred inside an outline and no larger than it: a bigger design that merely
-// covers the jig is main-canvas artwork, not a piece's artwork.
-function sitsOnOutline(bounds: AABB, outlines: ReadonlyArray<AABB>): boolean {
-  const x = (bounds.minX + bounds.maxX) / 2;
-  const y = (bounds.minY + bounds.maxY) / 2;
-  return outlines.some(
-    (outline) =>
-      x >= outline.minX &&
-      x <= outline.maxX &&
-      y >= outline.minY &&
-      y <= outline.maxY &&
-      bounds.maxX - bounds.minX <= outline.maxX - outline.minX + SIZE_TOLERANCE_MM &&
-      bounds.maxY - bounds.minY <= outline.maxY - outline.minY + SIZE_TOLERANCE_MM,
+// Centred inside the outline's own rectangle or ellipse, and no larger than the
+// outline: a bigger design that merely covers the jig is main-canvas artwork.
+function sitsOnOutline(object: SceneObject, outline: SceneObject): boolean {
+  const bounds = transformedBBox(object);
+  const limit = transformedBBox(outline);
+  if (
+    bounds.maxX - bounds.minX > limit.maxX - limit.minX + SIZE_TOLERANCE_MM ||
+    bounds.maxY - bounds.minY > limit.maxY - limit.minY + SIZE_TOLERANCE_MM
+  )
+    return false;
+  const centre = toLocal(
+    { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 },
+    outline,
   );
+  if (centre === null) return false;
+  const local = outline.bounds;
+  if (outline.kind === 'shape' && outline.spec.kind === 'ellipse') {
+    const rx = (local.maxX - local.minX) / 2;
+    const ry = (local.maxY - local.minY) / 2;
+    if (rx <= 0 || ry <= 0) return false;
+    const dx = (centre.x - (local.minX + rx)) / rx;
+    const dy = (centre.y - (local.minY + ry)) / ry;
+    return dx * dx + dy * dy <= 1;
+  }
+  return inside(centre, local);
+}
+
+function inside(point: Vec2, bounds: AABB): boolean {
+  return (
+    point.x >= bounds.minX &&
+    point.x <= bounds.maxX &&
+    point.y >= bounds.minY &&
+    point.y <= bounds.maxY
+  );
+}
+
+// The inverse of applyTransform: translate, rotate, mirror, then scale back.
+function toLocal(point: Vec2, object: SceneObject): Vec2 | null {
+  const t = object.transform;
+  if (t.scaleX === 0 || t.scaleY === 0) return null;
+  const rad = (-t.rotationDeg * Math.PI) / 180;
+  const dx = point.x - t.x;
+  const dy = point.y - t.y;
+  let x = dx * Math.cos(rad) - dy * Math.sin(rad);
+  let y = dx * Math.sin(rad) + dy * Math.cos(rad);
+  if (t.mirrorX) x = -x;
+  if (t.mirrorY) y = -y;
+  return { x: x / t.scaleX, y: y / t.scaleY };
 }
 
 /** The project the jig canvas and sidebar see: the draft without the background. */

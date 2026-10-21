@@ -8,7 +8,10 @@ import {
   type SceneObject,
 } from '../../../core/scene';
 import { createRectangle } from '../../../core/shapes/primitives';
-import { createRegistrationBox } from '../../../core/shapes/registration-box';
+import {
+  createRegistrationBox,
+  createRegistrationCircle,
+} from '../../../core/shapes/registration-box';
 import { jigBackgroundIds, jigViewProject, withJigBackground } from './jig-editor-scope';
 
 function square(id: string, x: number, y: number): SceneObject {
@@ -78,6 +81,60 @@ describe('jig editor scope', () => {
       copy,
     ]);
     expect([...jigBackgroundIds(scene)].sort()).toEqual(['edge', 'outside', 'sign']);
+  });
+
+  it('closes over overlapping groups whatever their order', () => {
+    const { scene } = project(
+      [outline, square('inside', 130, 110), square('a', 5, 5), square('b', 20, 5)],
+      [
+        // Seen first, but joins the jig only through the second group.
+        { id: 'g1', name: 'First', objectIds: ['b', 'a'] },
+        { id: 'g2', name: 'Second', objectIds: ['inside', 'a'] },
+      ],
+    );
+    expect([...jigBackgroundIds(scene)]).toEqual([]);
+  });
+
+  it('shows hidden artwork that shares a mask with jig artwork, so editing it is safe', () => {
+    const raster = (id: string, x: number): SceneObject => ({
+      kind: 'raster-image',
+      id,
+      source: `${id}.png`,
+      pixelWidth: 10,
+      pixelHeight: 10,
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: { ...IDENTITY_TRANSFORM, x, y: 110 },
+      color: '#123456',
+      dither: 'threshold',
+      linesPerMm: 10,
+      imageMaskId: 'mask',
+    });
+    const { scene } = project([
+      outline,
+      raster('on-jig', 130),
+      raster('off-jig', 300),
+      square('mask', 5, 5),
+      square('unrelated', 300, 5),
+    ]);
+    expect([...jigBackgroundIds(scene)]).toEqual(['unrelated']);
+  });
+
+  it("tests the outline's own shape, not its bounding box", () => {
+    const circle = createRegistrationCircle({ diameterMm: 40, x: 100, y: 100, id: 'circle' });
+    const round = project([
+      circle,
+      // In the bounding box's corner, outside the circle.
+      square('corner', 97, 97),
+      square('centre', 115, 115),
+    ]);
+    expect([...jigBackgroundIds(round.scene)]).toEqual(['corner']);
+    // Turned a quarter about its corner, the 80 x 40 outline covers x 100..140, y 120..200.
+    const turned = {
+      ...outline,
+      transform: { ...outline.transform, x: 140, y: 120, rotationDeg: 90 },
+    };
+    const rotated = project([turned, square('under', 115, 150), square('beside', 150, 105)]);
+    expect([...jigBackgroundIds(rotated.scene)]).toEqual(['beside']);
   });
 
   it('keeps a group whole when one member belongs to the jig', () => {
