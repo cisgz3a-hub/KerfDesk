@@ -13,6 +13,11 @@ import { EditionProvider, LICENCE_SETTINGS_EVENT } from './EditionProvider';
 import { proFeaturesUnlocked, proPromptOpen, requestProFeature, useEdition } from './edition';
 import { editionLabel } from './EditionStatusButton';
 
+// These tests specify the licence window with it turned on (ADR-623). ADR-623
+// Amendment 3 holds it off in releases; EditionProvider.licence-window-off.test.tsx
+// covers that.
+vi.mock('../../../public/desktop-licence-window.mjs', () => ({ DESKTOP_LICENCE_WINDOW: true }));
+
 const free: LicenceStatus = {
   channel: 'commercial',
   edition: 'free',

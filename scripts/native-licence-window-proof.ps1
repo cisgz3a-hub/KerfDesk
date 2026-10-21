@@ -2,7 +2,8 @@
 param(
   [Parameter(Mandatory = $true)][int]$AppProcessId,
   [Parameter(Mandatory = $true)][string]$ExpectedExecutable,
-  [Parameter(Mandatory = $true)][ValidateSet('Licence needed', 'Pro')][string]$ExpectedEdition,
+  # Free: a deactivated device while ADR-623 Amendment 3 holds the licence window off.
+  [Parameter(Mandatory = $true)][ValidateSet('Licence needed', 'Free', 'Pro')][string]$ExpectedEdition,
   [Parameter(Mandatory = $true)][string]$Output
 )
 $ErrorActionPreference = 'Stop'
@@ -32,7 +33,10 @@ public static class NativeLicenceWindow {
 '@
 $app = Get-Process -Id $AppProcessId
 $started = $app.StartTime.ToUniversalTime()
-$label = "Edition: $ExpectedEdition. Open licence settings"
+# KerfDesk Free offers its trial as "Free, middle dot, Try Pro"; the dot is built
+# here so this file stays ASCII.
+$edition = if ($ExpectedEdition -eq 'Free') { "Free $([char]0x00B7) Try Pro" } else { $ExpectedEdition }
+$label = "Edition: $edition. Open licence settings"
 $condition = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, $label)
 $licenceCondition = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, 'KerfDesk licence')
 $deadline = [DateTime]::UtcNow.AddSeconds(10)

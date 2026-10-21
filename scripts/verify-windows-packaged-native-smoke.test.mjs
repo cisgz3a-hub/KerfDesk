@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { resolve } from 'node:path';
 import { validResult } from './native-smoke-test-support.mjs';
+import { DESKTOP_LICENCE_WINDOW } from '../public/desktop-licence-window.mjs';
 import {
   nativeSmokeLaunchOptions,
   parseNativeSmokeArgs,
@@ -71,7 +72,7 @@ test('fresh-sandbox expectation requires the commercial Free state and unavailab
     updateState: 'unavailable',
   };
   result.renderer.licensing = expected;
-  const options = { expectFreshSandbox: true };
+  const options = { expectFreshSandbox: true, licenceWindow: true };
   assert.equal(validateNativeSmokeResult(result, userData, options), result);
   for (const patch of [
     { channel: 'free' },
@@ -98,7 +99,11 @@ test('fresh-sandbox and default workspace smoke retain their distinct expectatio
   const workspace = validResult(userData);
   workspace.renderer.licensing = sandboxLicensing;
   assert.throws(
-    () => validateNativeSmokeResult(workspace, userData, { expectFreshSandbox: true }),
+    () =>
+      validateNativeSmokeResult(workspace, userData, {
+        expectFreshSandbox: true,
+        licenceWindow: true,
+      }),
     /behind the licence window/,
   );
   // Ordinary workspace smoke still requires import and save.
@@ -117,8 +122,8 @@ test('every licence-window expectation rejects workspace I/O reported behind the
     updateState: 'unavailable',
   };
   for (const options of [
-    { expectFreshSandbox: true },
-    { expectLicenceWindow: true },
+    { expectFreshSandbox: true, licenceWindow: true },
+    { expectLicenceWindow: true, licenceWindow: true },
     { acceptLicenceWindow: true },
   ]) {
     const clean = licenceWindowResult(userData);
@@ -218,18 +223,22 @@ test('rejects a legacy or mismatched profile before accepting UI evidence', () =
 test('commercial licence-window expectation accepts a settled unlicensed gate without workspace I/O', () => {
   const userData = resolve('tmp', 'native-smoke');
   const result = licenceWindowResult(userData);
-  const options = { expectLicenceWindow: true };
+  const options = { expectLicenceWindow: true, licenceWindow: true };
   assert.equal(validateNativeSmokeResult(result, userData, options), result);
   assert.throws(() => validateNativeSmokeResult(result, userData), /SVG import was not observed/);
   assert.throws(
-    () => validateNativeSmokeResult(result, userData, { expectFreshSandbox: true }),
+    () =>
+      validateNativeSmokeResult(result, userData, {
+        expectFreshSandbox: true,
+        licenceWindow: true,
+      }),
     /fresh sandbox/,
   );
 });
 
 test('a commercial package must be one a trial or key can open', () => {
   const userData = resolve('tmp', 'native-smoke');
-  const options = { expectLicenceWindow: true };
+  const options = { expectLicenceWindow: true, licenceWindow: true };
   const fresh = licenceWindowResult(userData);
   assert.equal(validateNativeSmokeResult(fresh, userData, options), fresh);
   // Unavailable: an unusable release identity, keychain or Linux keyring could never
@@ -247,7 +256,7 @@ test('a commercial package must be one a trial or key can open', () => {
 
 test('commercial licence-window expectation rejects wrong licensing and workspace evidence', () => {
   const userData = resolve('tmp', 'native-smoke');
-  const options = { expectLicenceWindow: true };
+  const options = { expectLicenceWindow: true, licenceWindow: true };
   for (const patch of [
     { channel: 'free' },
     { edition: 'pro', proEnabled: true },
@@ -296,5 +305,73 @@ test('CLI parsing selects an explicit licence-window expectation without weakeni
   assert.throws(
     () => parseNativeSmokeArgs([executable, '--expect-fresh-sandbox', '--expect-licence-window']),
     /choose one licensing expectation/,
+  );
+});
+
+/** An unlicensed commercial package opened in KerfDesk Free (ADR-623 Amendment 3). */
+function unlicensedFreeResult(userData, updateState = 'up-to-date') {
+  const result = validResult(userData);
+  result.renderer.licensing = {
+    kind: 'observed',
+    channel: 'commercial',
+    state: 'activation-required',
+    edition: 'free',
+    proEnabled: false,
+    updateState,
+  };
+  return result;
+}
+
+test('while the licence window is held off, an unlicensed package must open its Free workspace', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  const options = { expectLicenceWindow: true, licenceWindow: false };
+  const free = unlicensedFreeResult(userData);
+  assert.equal(validateNativeSmokeResult(free, userData, options), free);
+  // A package still behind a licence window, or without import and save, fails.
+  assert.throws(
+    () => validateNativeSmokeResult(licenceWindowResult(userData), userData, options),
+    /Free workspace/,
+  );
+  for (const patch of [{ imported: false }, { saved: false }]) {
+    const result = unlicensedFreeResult(userData);
+    Object.assign(result.renderer, patch);
+    assert.throws(() => validateNativeSmokeResult(result, userData, options));
+  }
+  for (const patch of [
+    { channel: 'free' },
+    { edition: 'pro', proEnabled: true },
+    { state: 'unavailable' },
+    { state: 'ready' },
+  ]) {
+    const result = unlicensedFreeResult(userData);
+    Object.assign(result.renderer.licensing, patch);
+    assert.throws(() => validateNativeSmokeResult(result, userData, options), /Free workspace/);
+  }
+});
+
+test('while the licence window is held off, a fresh sandbox opens its Free workspace', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  const options = { expectFreshSandbox: true, licenceWindow: false };
+  const free = unlicensedFreeResult(userData, 'unavailable');
+  assert.equal(validateNativeSmokeResult(free, userData, options), free);
+  const gated = licenceWindowResult(userData);
+  gated.renderer.licensing.updateState = 'unavailable';
+  assert.throws(
+    () => validateNativeSmokeResult(gated, userData, options),
+    /SVG import was not observed/,
+  );
+});
+
+test('the CLI and default validation follow the shared licence window setting', () => {
+  const executable = resolve('release', 'win-unpacked', 'KerfDesk.exe');
+  const args = parseNativeSmokeArgs([executable, '--expect-licence-window']);
+  assert.equal(args.licenceWindow, DESKTOP_LICENCE_WINDOW);
+  const userData = resolve('tmp', 'native-smoke');
+  const expected = DESKTOP_LICENCE_WINDOW
+    ? licenceWindowResult(userData)
+    : unlicensedFreeResult(userData);
+  assert.equal(
+    validateNativeSmokeResult(expected, userData, { expectLicenceWindow: true }),
+    expected,
   );
 });

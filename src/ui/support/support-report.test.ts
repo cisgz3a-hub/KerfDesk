@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LicenceStatus } from '../../platform/types';
+import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
 import { UNRESTRICTED_EDITION, type EditionValue } from '../licensing/edition';
 import {
   describeEdition,
@@ -179,7 +180,8 @@ describe('support report edition', () => {
           accessExpiresAt: NOW,
         }),
       }),
-      'Licence needed: trial ends 2026-09-29, licence state trial-expired',
+      // The desktop app runs Free while the licence window is held off (ADR-623 Amendment 3).
+      `${DESKTOP_LICENCE_WINDOW ? 'Licence needed' : 'KerfDesk Free'}: trial ends 2026-09-29, licence state trial-expired`,
     ],
     [
       edition({

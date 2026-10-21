@@ -6,6 +6,7 @@
 import type { ControllerKind } from '../../core/devices';
 import type { MachineKind } from '../../core/scene';
 import type { LicenceStatus } from '../../platform/types';
+import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
 import type { EditionValue } from '../licensing/edition';
 import type { RendererProblem } from './renderer-problems';
 import type { SerialTranscriptEntry } from '../state/laser-transcript';
@@ -115,7 +116,8 @@ export function describeEdition(edition: EditionValue): string {
 }
 
 function editionName(status: LicenceStatus): string {
-  if (status.edition === 'free') return 'Licence needed';
+  // The desktop app runs Free while the licence window is held off (ADR-623 Amendment 3).
+  if (status.edition === 'free') return DESKTOP_LICENCE_WINDOW ? 'Licence needed' : 'KerfDesk Free';
   if (status.tier === 'trial') return 'KerfDesk Pro trial';
   return status.tier === 'developer' ? 'KerfDesk Pro (developer licence)' : 'KerfDesk Pro';
 }
