@@ -1,22 +1,29 @@
 // Audit 13-P1-1: what the Auto-focus button may send (ADR-400 Amendment 1).
 
 import { describe, expect, it } from 'vitest';
-import { autofocusCommandIssue, normalizeAutofocusCommand } from './autofocus-command';
+import {
+  autofocusCommandIssue,
+  normalizeAutofocusCommand,
+  profileAutofocusIssue,
+  type AutofocusController,
+} from './autofocus-command';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE } from './falcon-profiles';
 import { validateMachineProfile } from './profile-catalog';
 
+const FALCON: AutofocusController = { kind: 'grblhal', commandSet: 'creality-falcon-a1-pro' };
+
 describe('autofocusCommandIssue', () => {
   it.each([
-    ['', undefined],
-    ['$HZ1', 'grblhal'],
-    ['$HZ', 'fluidnc'],
-    ['$ HZ 1', 'grbl-v1.1'],
-    ['G38.2 Z-10 F100', 'grblhal'],
-    ['G38.3Z-5', 'grbl-v1.1'],
-    ['G30', 'marlin'],
-    ['G30 Z1.5', 'smoothieware'],
-  ] as const)('accepts the focus form %j on %s', (command, kind) => {
-    expect(autofocusCommandIssue(command, kind)).toBeNull();
+    ['', { kind: 'grbl-v1.1' }],
+    ['$HZ1', FALCON],
+    ['$HZ', { kind: 'fluidnc' }],
+    ['$ HZ 1', { kind: 'grbl-v1.1', commandSet: 'creality-falcon-a1-pro' }],
+    ['G38.2 Z-10 F100', { kind: 'grblhal' }],
+    ['G38.3Z-5', { kind: 'grbl-v1.1' }],
+    ['G30', { kind: 'marlin' }],
+    ['G30 Z1.5', { kind: 'smoothieware' }],
+  ] as const)('accepts the focus form %j on %o', (command, controller) => {
+    expect(autofocusCommandIssue(command, controller)).toBeNull();
   });
 
   it.each([
@@ -49,15 +56,33 @@ describe('autofocusCommandIssue', () => {
     ['switch focus on', /accepts one focus command/],
     [`M2001 P${'1'.repeat(120)}`, /at most 100 characters/],
   ])('refuses %j', (command, reason) => {
-    expect(autofocusCommandIssue(command, 'grblhal')).toMatch(reason);
+    expect(autofocusCommandIssue(command, FALCON)).toMatch(reason);
   });
 
   it('applies the controller rules only when the controller is known', () => {
-    expect(autofocusCommandIssue('$HZ1', 'smoothieware')).toMatch(/GRBL-family command/);
-    expect(autofocusCommandIssue('$HZ1', 'marlin')).toMatch(/GRBL-family command/);
-    expect(autofocusCommandIssue('G30', 'grblhal')).toMatch(/stored position/);
+    // Stock GRBL starts homing on `$H`, then refuses the suffix and stays
+    // stuck (grbl-sim-lines.ts refuseHomeSuffix); Codex review on #1352.
+    expect(autofocusCommandIssue('$HZ1', { kind: 'grbl-v1.1' })).toMatch(/stuck until a reset/);
+    expect(autofocusCommandIssue('$HZ', { kind: 'grbl-v1.1' })).toMatch(/stuck until a reset/);
+    expect(autofocusCommandIssue('$HZ1', { kind: 'grblhal' })).toMatch(/Falcon A1 Pro's/);
+    expect(autofocusCommandIssue('$HZ', { kind: 'grblhal' })).toBeNull();
+    expect(autofocusCommandIssue('$HZ1', { kind: 'smoothieware' })).toMatch(/GRBL-family/);
+    expect(autofocusCommandIssue('$HZ1', { kind: 'marlin' })).toMatch(/GRBL-family/);
+    expect(autofocusCommandIssue('G30', { kind: 'grblhal' })).toMatch(/stored position/);
     expect(autofocusCommandIssue('$HZ1')).toBeNull();
     expect(autofocusCommandIssue('G30')).toBeNull();
+  });
+});
+
+describe('profileAutofocusIssue', () => {
+  it('checks a profile without a controller kind as the stock GRBL it connects with', () => {
+    expect(profileAutofocusIssue({ autofocusCommand: '$HZ1' })).toMatch(/stuck until a reset/);
+    expect(
+      profileAutofocusIssue({
+        autofocusCommand: '$HZ1',
+        controllerCommandSet: 'creality-falcon-a1-pro',
+      }),
+    ).toBeNull();
   });
 });
 

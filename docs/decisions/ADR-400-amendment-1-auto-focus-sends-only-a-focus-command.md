@@ -26,10 +26,13 @@ showed what that left open:
 1. **One rule for what Auto-focus may send** (`core/devices/autofocus-command.ts`). Empty still
    disables the button. Otherwise the line must be one of the forms machines document for
    focusing:
-   - a GRBL-family `$HZ` macro, with an optional number (`$HZ1` is the Creality Falcon A1 Pro's
-     autofocus; grblHAL and FluidNC home Z alone with `$HZ`). Smoothieware runs any `$H…` as a full
-     homing cycle (controller audit 2026-09-25 CG-9) and Marlin has no `$` commands, so it is refused
-     there;
+   - `$HZ1`, or another numbered `$HZ`, under the Creality Falcon A1 Pro command contract, whose
+     documented autofocus it is; and a bare `$HZ` on grblHAL and FluidNC, which home Z alone with
+     it. Stock GRBL enters its homing state on `$H` and, built without single-axis homing (the
+     default), answers the suffix with error:3 and stays stuck until a reset, so no `$H…` goes to
+     it. Smoothieware runs any `$H…` as a full homing cycle (controller audit 2026-09-25 CG-9), and
+     Marlin has no `$` commands. A profile with no controller kind is checked as the stock GRBL
+     driver it connects with;
    - a Z-only probe: `G38.2`–`G38.5` with a Z target and an optional feed;
    - `G30` on Marlin and Smoothieware, their single Z probe at the current XY. On GRBL-family
      controllers `G30` moves to a stored position, so it is refused there.
@@ -75,7 +78,8 @@ showed what that left open:
 - `io/project/project-autofocus-command.test.ts`: load clears the audit payloads and keeps a focus
   command byte for byte; a machine profile clears it with a review note.
 - `ui/laser/autofocus-crafted-project.simulator.test.tsx`: end to end through File > Open, the
-  Auto-focus button and the GRBL simulator. A crafted file for the operator's machine keeps the
+  Auto-focus button and the GRBL simulator. A crafted file for the operator's Falcon keeps the
   operator's `$HZ1`; one for another machine loses the command on load; a direct press with each
-  payload is refused. None of the payloads reaches the controller.
+  payload is refused. None of the payloads reaches the controller, and `$HZ1` never reaches stock
+  GRBL.
 - Not verified on hardware.

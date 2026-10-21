@@ -15,7 +15,9 @@
 // vendor focus form is added here with its source. Everything else is refused
 // with its reason. Empty stays valid: it disables Auto-focus.
 
-import type { ControllerKind } from './device-profile';
+import type { ControllerCommandSet, ControllerKind } from './device-profile';
+
+const FALCON_COMMAND_SET: ControllerCommandSet = 'creality-falcon-a1-pro';
 
 export const MAX_AUTOFOCUS_COMMAND_LENGTH = 100;
 
@@ -41,11 +43,18 @@ const SETTING_WRITE_REASON =
 
 type Word = { readonly letter: string; readonly value: number };
 
+/** The controller the command goes to: its firmware family and, when it has
+ *  one, the vendor command contract it runs under. */
+export type AutofocusController = {
+  readonly kind: ControllerKind;
+  readonly commandSet?: ControllerCommandSet | undefined;
+};
+
 /** Why `command` cannot be the Auto-focus command, or null. Without a
- *  controller kind only the controller-independent rules apply. */
+ *  controller only the controller-independent rules apply. */
 export function autofocusCommandIssue(
   command: string,
-  controllerKind?: ControllerKind,
+  controller?: AutofocusController,
 ): string | null {
   const trimmed = command.trim();
   if (trimmed === '') return null;
@@ -56,12 +65,25 @@ export function autofocusCommandIssue(
     return 'Auto-focus command must be one line of plain ASCII text.';
   }
   const compact = trimmed.replaceAll(/[ \t]/g, '').toUpperCase();
-  if (compact.startsWith('$')) return systemCommandIssue(compact, controllerKind);
+  if (compact.startsWith('$')) return systemCommandIssue(compact, controller);
   if (!WORD_LINE_RE.test(compact)) return ACCEPTED_FORMS;
   const words = [...compact.matchAll(WORD_RE)].map(
     (match): Word => ({ letter: match[1] ?? '', value: Number(match[2]) }),
   );
-  return wordsIssue(words, controllerKind);
+  return wordsIssue(words, controller?.kind);
+}
+
+/** The issue for a machine profile's own controller. A profile without a
+ *  controller kind connects with the stock GRBL driver (select-controller-driver). */
+export function profileAutofocusIssue(profile: {
+  readonly autofocusCommand: string;
+  readonly controllerKind?: ControllerKind | undefined;
+  readonly controllerCommandSet?: ControllerCommandSet | undefined;
+}): string | null {
+  return autofocusCommandIssue(profile.autofocusCommand, {
+    kind: profile.controllerKind ?? 'grbl-v1.1',
+    commandSet: profile.controllerCommandSet,
+  });
 }
 
 /** The project value KerfDesk keeps: a refused command is dropped (Auto-focus
@@ -72,16 +94,29 @@ export function normalizeAutofocusCommand(value: unknown): string {
   return typeof value === 'string' && autofocusCommandIssue(value) === null ? value : '';
 }
 
-function systemCommandIssue(compact: string, kind: ControllerKind | undefined): string | null {
+function systemCommandIssue(
+  compact: string,
+  controller: AutofocusController | undefined,
+): string | null {
   if (compact.startsWith('$J=')) return MOTION_REASON;
   if (compact.includes('=')) return SETTING_WRITE_REASON;
-  if (!/^\$HZ\d*$/.test(compact)) return ACCEPTED_FORMS;
-  // Smoothieware's shell runs any `$H...` as a full homing cycle and Marlin has
-  // no `$` commands (controller audit 2026-09-25 CG-9).
-  if (kind === 'smoothieware' || kind === 'marlin' || kind === 'ruida') {
-    return `${compact} is a GRBL-family command; this controller does not run it as a focus command.`;
+  const home = /^\$HZ(\d*)$/.exec(compact);
+  if (home === null) return ACCEPTED_FORMS;
+  if (controller === undefined || controller.commandSet === FALCON_COMMAND_SET) return null;
+  // grblHAL and FluidNC home Z alone with `$HZ`; a numbered `$HZ1` is
+  // Creality's vendor macro. Stock GRBL enters its homing state on `$H`, then
+  // answers a suffix it was not built for with error:3 and stays there until a
+  // reset; Smoothieware's shell runs any `$H...` as a full homing cycle and
+  // Marlin has no `$` commands (controller audit 2026-09-25 CG-9).
+  if (controller.kind === 'grblhal' || controller.kind === 'fluidnc') {
+    return home[1] === ''
+      ? null
+      : `${compact} is the Creality Falcon A1 Pro's autofocus macro. Choose the Falcon A1 Pro machine profile, or use $HZ to home Z on grblHAL and FluidNC.`;
   }
-  return null;
+  if (controller.kind === 'grbl-v1.1') {
+    return `Stock GRBL starts homing on ${compact} and then refuses it with error:3, which leaves the controller stuck until a reset. Choose the Falcon A1 Pro machine profile if this is a Falcon.`;
+  }
+  return `${compact} is a GRBL-family command; this controller does not run it as a focus command.`;
 }
 
 function wordsIssue(words: ReadonlyArray<Word>, kind: ControllerKind | undefined): string | null {

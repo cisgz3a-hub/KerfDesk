@@ -7,7 +7,9 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createGrblSimulator } from '../../__fixtures__/controllers';
+import { createGrblSimulator, type GrblSimulator } from '../../__fixtures__/controllers';
+// Deep import: the devices barrel is at its public-export ratchet.
+import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../core/devices/falcon-profiles';
 import { createProject } from '../../core/scene';
 import { serializeProject } from '../../io/project';
 import type { PlatformAdapter } from '../../platform/types';
@@ -90,6 +92,18 @@ function setOwnAutofocus(command: string): void {
   });
 }
 
+/** The operator's own Falcon A1 Pro, whose `$HZ1` is its documented autofocus. */
+async function connectOwnFalcon(): Promise<GrblSimulator> {
+  useStore.setState({ project: createProject(FALCON_A1_PRO_GRBLHAL_PROFILE) });
+  const sim = createGrblSimulator({ firmwareBanner: 'GrblHAL 1.1f' });
+  await useLaserStore.getState().connect(sim.adapter, {
+    controllerKind: 'grblhal',
+    controllerCommandSet: 'creality-falcon-a1-pro',
+  });
+  await pump(2_000);
+  return sim;
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -105,10 +119,7 @@ afterEach(async () => {
 
 describe('a crafted project Auto-focus command never reaches the controller', () => {
   it.each(PAYLOADS)('a file for this machine keeps the operator command: %s', async (payload) => {
-    setOwnAutofocus('$HZ1');
-    const sim = createGrblSimulator();
-    await useLaserStore.getState().connect(sim.adapter);
-    await pump(2_000);
+    const sim = await connectOwnFalcon();
 
     const toasts = await openText(craftedFile(payload));
     expect(useStore.getState().project.device.autofocusCommand).toBe('$HZ1');
@@ -119,7 +130,8 @@ describe('a crafted project Auto-focus command never reaches the controller', ()
     await pressAutofocus();
     const sent = sim.outbound().slice(sentFrom);
     expect(sent).not.toContain(`${payload}\n`);
-    expect(sent.filter((line) => line !== '?')).toEqual(['$HZ1\n']);
+    // Status polls and the blank lines the Falcon link writes are not commands.
+    expect(sent.filter((line) => line !== '?' && line.trim() !== '')).toEqual(['$HZ1\n']);
     expect(sim.state().settings.get(32)).not.toBe(0);
   });
 
@@ -159,5 +171,29 @@ describe('a crafted project Auto-focus command never reaches the controller', ()
         .filter((line) => line !== '?'),
     ).toEqual([]);
     expect(useLaserStore.getState().autofocusBusy).toBe(false);
+  });
+
+  // Codex review on #1352: stock GRBL starts homing on `$H`, then refuses the
+  // suffix with error:3 and stays stuck until a reset (grbl-sim-lines.ts).
+  it('refuses the Falcon $HZ1 on stock GRBL, which it would leave stuck homing', async () => {
+    setOwnAutofocus('$HZ1');
+    const sim = createGrblSimulator();
+    await useLaserStore.getState().connect(sim.adapter);
+    await pump(2_000);
+    const sentFrom = sim.outbound().length;
+
+    const result = await useLaserStore.getState().autofocus('$HZ1');
+
+    expect(result).toEqual({
+      kind: 'preflight-failed',
+      reason: expect.stringMatching(/stuck until a reset/),
+    });
+    expect(
+      sim
+        .outbound()
+        .slice(sentFrom)
+        .filter((line) => line !== '?'),
+    ).toEqual([]);
+    expect(sim.state().machine).toBe('Idle');
   });
 });

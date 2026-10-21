@@ -15,7 +15,7 @@
 // error:3 but is left in its homing state until a reset (controller audit
 // 2026-09-25 CG-9).
 
-import { autofocusCommandIssue } from '../../core/devices/autofocus-command';
+import { profileAutofocusIssue } from '../../core/devices/autofocus-command';
 import type { ControllerCommandSet, ControllerKind } from '../../core/devices/device-profile';
 import { inlineCodeStyle } from './device-settings-shared';
 
@@ -39,7 +39,11 @@ export function AutofocusEditor(props: {
   readonly controllerCommandSet?: ControllerCommandSet | undefined;
   readonly controllerKind?: ControllerKind | undefined;
 }): JSX.Element {
-  const issue = autofocusCommandIssue(props.value, props.controllerKind);
+  const issue = profileAutofocusIssue({
+    autofocusCommand: props.value,
+    controllerKind: props.controllerKind,
+    controllerCommandSet: props.controllerCommandSet,
+  });
   const presets = AUTOFOCUS_PRESETS.filter(
     (preset) => preset.commandSet === props.controllerCommandSet,
   );

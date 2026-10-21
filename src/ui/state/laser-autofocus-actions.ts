@@ -125,7 +125,7 @@ function autofocusDispatchIssue(
   refs: LiveRefs,
   policy: ConsoleCommandResult | null,
 ): string | null {
-  const issue = autofocusCommandIssue(command, refs.driver.kind);
+  const issue = autofocusCommandIssue(command, refs.driver);
   if (issue !== null) return issue;
   if (policy === null || !policy.ok) return null;
   return policy.command.kind !== 'gcode' || policy.command.requiresConfirmation

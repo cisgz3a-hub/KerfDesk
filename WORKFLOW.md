@@ -1590,9 +1590,10 @@ the completed physical Frame is the spatial source of truth.
    Machine Setup.`
 3. A file for another machine brings its vetted command with the rest of that machine, behind the
    machine notice; **Keep current machine** restores the current command too.
-4. Whatever its source, the Auto-focus button sends only a focus routine: a `$HZ` macro on
-   GRBL-family controllers, a Z-only `G38.2`–`G38.5` probe, or `G30` on Marlin or Smoothieware. Any
-   M-code and anything else is refused with its reason and nothing is sent.
+4. Whatever its source, the Auto-focus button sends only a focus routine: `$HZ1` on the Falcon
+   A1 Pro, `$HZ` on grblHAL or FluidNC, a Z-only `G38.2`–`G38.5` probe, or `G30` on Marlin or
+   Smoothieware. Stock GRBL gets no `$H…` command, which would leave it stuck homing. Any M-code and
+   anything else is refused with its reason and nothing is sent.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).

@@ -1,5 +1,5 @@
-import { autofocusCommandIssue } from '../../core/devices/autofocus-command';
-import { isKnownControllerKind } from '../../core/devices/device-profile';
+import { profileAutofocusIssue } from '../../core/devices/autofocus-command';
+import { isControllerCommandSet, isKnownControllerKind } from '../../core/devices/device-profile';
 import { recoverPositioningLight } from './machine-profile-positioning-light';
 
 type Recovery = {
@@ -22,7 +22,12 @@ export function recoverAutofocusCommand(value: Record<string, unknown>): Recover
   const command = value['autofocusCommand'];
   if (typeof command !== 'string') return { value, notes: [] };
   const kind = value['controllerKind'];
-  const issue = autofocusCommandIssue(command, isKnownControllerKind(kind) ? kind : undefined);
+  const commandSet = value['controllerCommandSet'];
+  const issue = profileAutofocusIssue({
+    autofocusCommand: command,
+    controllerKind: isKnownControllerKind(kind) ? kind : undefined,
+    controllerCommandSet: isControllerCommandSet(commandSet) ? commandSet : undefined,
+  });
   if (issue === null) return { value, notes: [] };
   return {
     value: { ...value, autofocusCommand: '' },
