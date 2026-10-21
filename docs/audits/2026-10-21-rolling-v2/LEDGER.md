@@ -12,6 +12,7 @@ Method: [METHOD.md](METHOD.md). Plan: [AREAS.md](AREAS.md).
 | 2 | 05 | Job lifecycle (store) | faf5a54f1 | [05-job-lifecycle.md](05-job-lifecycle.md) | 3 | 0 | 0 | 2 | 1 | 4 |
 | 2 | 06 | Laser and layer settings UI | faf5a54f1 | [06-laser-ui-settings.md](06-laser-ui-settings.md) | 14 | 0 | 0 | 4 | 10 | 1 |
 | 2 | 07 | Image trace | faf5a54f1 | [07-trace.md](07-trace.md) | 8 | 0 | 0 | 3 | 5 | 3 |
+| 2 | 08 | Canvas and commands | faf5a54f1 | [08-canvas-commands.md](08-canvas-commands.md) | 12 | 0 | 0 | 4 | 7 | 1 |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
@@ -49,4 +50,8 @@ Coordinator checks were made on `origin/main` @ `faf5a54f1`; no audited line cha
 | 07-P2-1 | trace | Sketch detection traces nothing (one corner triangle) on ~0.75–1.0 MP drawings with Line + fill; default Free Line Art adds a stray triangle and runs 4–6× slower at 1100–1200 px | **READ**: `trace-image.ts` `localMean` builds `x0/x1/y0/y1` from a fractional `radiusPx`, so typed-array reads at fractional indices return `undefined` and `?? 0` silently zeroes the box sums. Refuter REPRO at 900/950/1000 px | open |
 | 07-P2-2 | trace | Images larger than the 2048 px preview: the committed trace (finer grid, ADR-409) keeps Sketch windows in pixels, losing 22–44% of stroke ink the preview showed | refuter REPRO with the app's grid planner (3600×2700: 0.78 and 0.56 of 20/28 px strokes) | open |
 | 07-P2-3 | trace | Jig trace turns Line + fill into a Fill-only group; the pen line never burns | refuter REPRO through the jig builder and compiler (Edit jig → Trace an image, Pro) | open |
+| 08-P2-1 | canvas-commands | Ruler guide drags snapshot twice: a plain ruler click leaves a hidden stray guide and marks the project dirty; Esc and Undo never remove a pulled guide | refuter REPRO through the real drag hook (guide at −23.53 mm, no undo step) | open |
+| 08-P2-2 | canvas-commands | Width/Height boxes refuse every horizontal or vertical line ("Numeric edit could not be applied") | **READ**: `selection-transform.ts:172` returns `degenerate-selection` for any zero-extent selection; refuter REPRO | open |
+| 08-P2-3 | canvas-commands | Arrow keys on the Artwork panel's tabs switch the tab and also nudge the selected artwork (1/10 mm, one Undo step each) | refuter REPRO in the mounted panel (plain-button part refuted by ADR-493) | open |
+| 08-P2-4 | canvas-commands | Esc while drawing a shape hides the preview, but releasing the mouse still creates it | **READ**: `use-esc-cancels-drag.ts` clears the draft visuals but not the drag; refuter REPRO (rectangle created as one Undo step) | open |
 | 04-P2-1 | electron-main | Camera bridge's fixed loopback port has no server identity check: a squatter receives RTSP logins; operator told the wrong reason | READ `camera-bridge.ts:11,96` (fixed origin, credentials in query, no token); `camera-bridge-lifecycle.ts:19-21` only logs bind failure | open |
