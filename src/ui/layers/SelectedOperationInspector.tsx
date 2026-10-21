@@ -167,7 +167,12 @@ function SelectedOperationEditor(props: {
 /**
  * Lights up what an edit here changes (ADR-646): the selected artwork's own
  * settings while it overrides the operation, otherwise every piece the
- * operation runs.
+ * operation runs. The name, Include in output, Show on canvas and Focus Test
+ * removal change the operation itself (`data-edit-scope="operation"`); Make
+ * unique and Add operation change only the selected pieces (`"selection"`).
+ * The Cut Settings dialog renders inside this editor and applies to the same
+ * target, so it lights the same pieces; moved to a portal, it would need
+ * these handlers on its own root (Amendment 1).
  */
 function useOperationEditGlow(
   operation: Layer,
@@ -175,13 +180,18 @@ function useOperationEditGlow(
   editsOwnSettings: boolean,
 ): ReturnType<typeof useSettingsEditGlow> {
   const allObjects = useStore((state) => state.project.scene.objects);
-  const changed = editsOwnSettings
-    ? selected
-    : allObjects.filter((object) => sceneObjectUsesOperation(object, operation));
+  const operationIds = [operation.id];
+  const whole = {
+    objectIds: allObjects
+      .filter((object) => sceneObjectUsesOperation(object, operation))
+      .map((object) => object.id),
+    operationIds,
+  };
+  const selection = { objectIds: selected.map((object) => object.id), operationIds };
   return useSettingsEditGlow({
     owner: `operation-editor:${operation.id}`,
-    objectIds: changed.map((object) => object.id),
-    operationIds: [operation.id],
+    ...(editsOwnSettings ? selection : whole),
+    scopes: { operation: whole, selection },
   });
 }
 
@@ -207,7 +217,8 @@ function OperationIdentity(props: {
   readonly onRename: (id: string, name: string) => void;
 }): JSX.Element {
   return (
-    <label className="lf-operation-identity">
+    // A rename names the operation for all its artwork, whatever the selection overrides.
+    <label className="lf-operation-identity" data-edit-scope="operation">
       <span
         className="lf-operation-swatch"
         title={`Drawing colour ${props.operation.color}`}
