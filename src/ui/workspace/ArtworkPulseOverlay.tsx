@@ -18,6 +18,7 @@ import {
 } from '../../core/scene';
 import { usePrefersReducedMotion } from '../common/use-prefers-reduced-motion';
 import { useStore } from '../state';
+import type { EditedArtwork } from '../state/artwork-color-hint';
 import { useUiStore } from '../state/ui-store';
 import { useCanvasColorScheme } from '../theme/use-canvas-color-scheme';
 import {
@@ -73,7 +74,7 @@ export function ArtworkPulseOverlay(props: {
       : hoveredObjectId !== null && props.canvasHoverEnabled
         ? { kind: 'object', objectId: hoveredObjectId }
         : edited !== null
-          ? { kind: 'edit', ...edited }
+          ? { kind: 'edit', ...edited, serial: editSerial(edited) }
           : null;
   usePulseLoop(ref, props.project, view, seed, hoveredObjectId);
   // Holding Alt shows every operation in its own colour on the canvas below;
@@ -89,6 +90,22 @@ export function ArtworkPulseOverlay(props: {
       data-testid="artwork-pulse-layer"
     />
   );
+}
+
+// The store keeps an edit's object while the same edit is set again, and makes
+// a new one for each edit that begins: its identity numbers the edit, even
+// while a hover hides it.
+const editSerials = new WeakMap<EditedArtwork, number>();
+let lastEditSerial = 0;
+
+function editSerial(edit: EditedArtwork): number {
+  let serial = editSerials.get(edit);
+  if (serial === undefined) {
+    lastEditSerial += 1;
+    serial = lastEditSerial;
+    editSerials.set(edit, serial);
+  }
+  return serial;
 }
 
 /** The artwork under a settled pointer; cleared as soon as the pointer leaves it. */

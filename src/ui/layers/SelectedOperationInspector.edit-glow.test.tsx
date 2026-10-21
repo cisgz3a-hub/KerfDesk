@@ -138,6 +138,26 @@ describe('settings edit glow', () => {
     await unmount();
   });
 
+  it('lights only the selected piece from Make unique and Add operation', async () => {
+    loadFixture(false);
+    const { host, unmount } = await mount();
+    const button = (text: string) => {
+      const found = [...host.querySelectorAll('button')].find(
+        (each) => each.textContent?.trim() === text,
+      );
+      if (found === undefined) throw new Error(text + ' missing');
+      return found;
+    };
+    await act(async () => field(host, 'Power for ').focus());
+    expect(edited()?.objectIds).toEqual(['chosen', 'peer']);
+    // Both act on the selected artwork only.
+    await act(async () => button('Make unique').focus());
+    expect(edited()?.objectIds).toEqual(['chosen']);
+    await act(async () => button('Add operation').focus());
+    expect(edited()?.objectIds).toEqual(['chosen']);
+    await unmount();
+  });
+
   it('releases the glow during an outside press, before that press can change the scene', async () => {
     loadFixture(false);
     const { host, unmount } = await mount();

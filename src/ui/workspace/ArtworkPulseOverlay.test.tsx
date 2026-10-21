@@ -122,6 +122,7 @@ afterEach(async () => {
   useUiStore.setState({
     operationColorPeek: false,
     hoveredOperationId: null,
+    editedArtwork: null,
     wireframeView: false,
   });
   setAppThemePreference('light');
@@ -288,6 +289,19 @@ describe('ArtworkPulseOverlay (ADR-620)', () => {
     // The next small move on the same piece is still the same hover.
     await pointAt({ x: 5.5, y: 5 });
     expect(pulses()).toEqual([true, false]);
+  });
+
+  it('pulses an edit that ended and began again while a row hover hid it', async () => {
+    const edit = { owner: 'editor', objectIds: ['heart'], operationIds: ['engrave'] };
+    const ui = useUiStore.getState();
+    await render(true);
+    await act(async () => ui.setEditedArtwork(edit));
+    await act(async () => ui.setHoveredOperationId('engrave'));
+    await act(async () => ui.releaseEditedArtwork('editor'));
+    await act(async () => ui.setEditedArtwork(edit));
+    await act(async () => ui.setHoveredOperationId(null));
+    // Equal to the edit before the hover, but a new one: it pulses.
+    expect(pulses()).toEqual([true, true, true]);
   });
 
   it('pulses again after the pointer really leaves and comes back', async () => {

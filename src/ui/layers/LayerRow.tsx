@@ -51,7 +51,7 @@ export function LayerRow(props: {
         isActive={active}
         onActivate={activate}
       />
-      <LayerFocusTestNotice layer={props.layer} />
+      <LayerFocusTestNotice layer={props.layer} glow={menuGlow} />
       <button
         type="button"
         className="lf-btn lf-btn--ghost lf-operation-card__visibility"
@@ -69,17 +69,26 @@ export function LayerRow(props: {
 
 /**
  * The row pulses its operation and every operation with the same settings
- * (ADR-620). Its More controls act on this operation alone, so focus there
- * lights exactly this operation's artwork instead (ADR-646 Amendment 1).
+ * (ADR-620). Its More controls and Remove Focus Test Z act on this operation
+ * alone, so focus there lights exactly this operation's artwork instead;
+ * Show only changes every operation, so it lights all artwork (ADR-646
+ * Amendment 1).
  */
 function useOperationRowPulse(layer: Layer, objects: ReadonlyArray<SceneObject>) {
   const owner = `operation-row:${layer.id}`;
+  const layers = useStore((state) => state.project.scene.layers);
   const menuGlow = useSettingsEditGlow({
     owner,
     objectIds: objects
       .filter((object) => sceneObjectUsesOperation(object, layer))
       .map((object) => object.id),
     operationIds: [layer.id],
+    scopes: {
+      everything: {
+        objectIds: objects.map((object) => object.id),
+        operationIds: layers.map((each) => each.id),
+      },
+    },
   });
   const editing = useUiStore((state) => state.editedArtwork?.owner === owner);
   return { hover: useOperationRowHover(layer.id, editing), menuGlow };

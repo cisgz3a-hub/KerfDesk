@@ -10,6 +10,8 @@ export function ShowOnlyLayerButton({ layer }: { readonly layer: Layer }): JSX.E
       onClick={() => showOnlyLayer(layer.id)}
       aria-label={`Show only ${layer.name}`}
       title="Show this operation and hide every other operation on the workspace"
+      // It changes every operation's visibility (edit glow, ADR-646 Amendment 1).
+      data-edit-scope="everything"
     >
       Show only this
     </button>

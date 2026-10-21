@@ -25,6 +25,7 @@ export function OperationScope(props: {
           className="lf-btn"
           title="Give only this artwork a copy of the operation so it can be edited independently"
           onClick={props.onMakeUnique}
+          data-edit-scope="selection"
         >
           Make unique
         </button>
@@ -62,7 +63,7 @@ export function OperationFooter(props: {
     <div className="lf-operation-output">
       {/* These change the operation for all its artwork, even while the
           selection has its own settings: the edit glow lights all of it. */}
-      <div className="lf-operation-output__toggles" data-operation-wide>
+      <div className="lf-operation-output__toggles" data-edit-scope="operation">
         <label title="Include artwork using this operation in preview and machine output">
           <input
             type="checkbox"
@@ -99,6 +100,7 @@ export function OperationFooter(props: {
         className="lf-btn lf-btn--ghost lf-operation-add"
         title="Add another operation to this artwork, then edit its settings"
         onClick={props.onAdd}
+        data-edit-scope="selection"
       >
         <Icon name="plus" size={14} />
         Add operation

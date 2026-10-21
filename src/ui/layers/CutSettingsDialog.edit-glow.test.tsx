@@ -159,6 +159,21 @@ describe('Cut Settings dialog edit glow', () => {
     await unmount();
   });
 
+  it('keeps the glow when Cancel closes the dialog and focus returns to the editor', async () => {
+    loadFixture({ selected: ['chosen'], chosenOverridesPower: false });
+    const { dialog, more, unmount } = await mountWithDialog(['chosen']);
+    const before = edited();
+    const cancel = [...dialog.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Cancel',
+    );
+    await act(async () => cancel?.focus());
+    await act(async () => cancel?.click());
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
+    expect(document.activeElement).toBe(more);
+    expect(edited()).toBe(before);
+    await unmount();
+  });
+
   it('ends the glow when the dialog closes with its editor', async () => {
     loadFixture({ selected: ['chosen'], chosenOverridesPower: false });
     const { unmount } = await mountWithDialog(['chosen']);

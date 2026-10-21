@@ -39,12 +39,14 @@ export function artworkColorHintSlice(set: ArtworkColorHintSetter): ArtworkColor
       set((state) => (state.hoveredOperationId === id ? { hoveredOperationId: null } : {})),
     editedArtwork: null,
     // The same edit set again keeps its object, so the canvas does not regroup.
+    // Any other is a new object, even if equal to one released before: the
+    // canvas tells an edit that began again from one that never ended by it.
     setEditedArtwork: (next) =>
       set((state) =>
         state.editedArtwork !== null &&
         editedArtworkKey(state.editedArtwork) === editedArtworkKey(next)
           ? {}
-          : { editedArtwork: next },
+          : { editedArtwork: { ...next } },
       ),
     releaseEditedArtwork: (owner) =>
       set((state) => (state.editedArtwork?.owner === owner ? { editedArtwork: null } : {})),

@@ -167,11 +167,12 @@ function SelectedOperationEditor(props: {
 /**
  * Lights up what an edit here changes (ADR-646): the selected artwork's own
  * settings while it overrides the operation, otherwise every piece the
- * operation runs. Controls marked `data-operation-wide` (Include in output,
- * Show on canvas, Focus Test removal) change the operation itself, so they
- * light every piece either way. The Cut Settings dialog renders inside this
- * editor and applies to the same target, so it lights the same pieces; moved
- * to a portal, it would need these handlers on its own root (Amendment 1).
+ * operation runs. Include in output, Show on canvas and Focus Test removal
+ * change the operation itself (`data-edit-scope="operation"`); Make unique and
+ * Add operation change only the selected pieces (`"selection"`). The Cut
+ * Settings dialog renders inside this editor and applies to the same target,
+ * so it lights the same pieces; moved to a portal, it would need these
+ * handlers on its own root (Amendment 1).
  */
 function useOperationEditGlow(
   operation: Layer,
@@ -179,26 +180,19 @@ function useOperationEditGlow(
   editsOwnSettings: boolean,
 ): ReturnType<typeof useSettingsEditGlow> {
   const allObjects = useStore((state) => state.project.scene.objects);
-  const [operationWide, setOperationWide] = useState(false);
-  const changed =
-    editsOwnSettings && !operationWide
-      ? selected
-      : allObjects.filter((object) => sceneObjectUsesOperation(object, operation));
-  const glow = useSettingsEditGlow({
-    owner: `operation-editor:${operation.id}`,
-    objectIds: changed.map((object) => object.id),
-    operationIds: [operation.id],
-  });
-  return {
-    onFocus: (event) => {
-      const target = event.target;
-      setOperationWide(
-        target instanceof Element && target.closest('[data-operation-wide]') !== null,
-      );
-      glow.onFocus(event);
-    },
-    onBlur: glow.onBlur,
+  const operationIds = [operation.id];
+  const whole = {
+    objectIds: allObjects
+      .filter((object) => sceneObjectUsesOperation(object, operation))
+      .map((object) => object.id),
+    operationIds,
   };
+  const selection = { objectIds: selected.map((object) => object.id), operationIds };
+  return useSettingsEditGlow({
+    owner: `operation-editor:${operation.id}`,
+    ...(editsOwnSettings ? selection : whole),
+    scopes: { operation: whole, selection },
+  });
 }
 
 function OperationChoice(props: {

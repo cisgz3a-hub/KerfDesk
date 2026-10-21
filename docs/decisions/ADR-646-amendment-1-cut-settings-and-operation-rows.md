@@ -26,10 +26,13 @@ each before changing it:
    pieces while they override it; a press and typing in the dialog keep the glow; Apply changes
    exactly the lit pieces. If the dialog ever moves to a portal, it needs the edit glow handlers
    on its own root, because the press-outside check is DOM containment. The test catches that.
-2. **A row's More controls light exactly that operation's artwork.** Everything in the menu acts
-   on this one operation, so focus inside it uses the edit glow (owner `operation-row:<id>`): every
-   piece the operation runs, in its colour, and not same-settings lookalikes. Starting the edit
-   pulses, and each change it makes (Include in output, Paste, order) pulses again.
+2. **A row's More controls light exactly that operation's artwork.** The menu and the row's
+   Remove Focus Test Z act on this one operation, so focus there uses the edit glow (owner
+   `operation-row:<id>`): every piece the operation runs, in its colour, and not same-settings
+   lookalikes. Starting the edit pulses, and each change it makes (Include in output, Paste,
+   order) pulses again. Show only is the exception: it changes every operation's visibility, so
+   it lights all artwork, each piece in its own operation's colour; once it has hidden the others,
+   only this operation's artwork is drawn.
 3. **Plain focus on the row keeps the row pulse.** The activation button, the eye and the menu's
    own toggle still set the row hover, widened to same settings, as ADR-620 decided.
 4. **The row steps aside for its own edit.** ADR-646 decision 4 says a hover wins over an edit,
@@ -37,24 +40,36 @@ each before changing it:
    holds the canvas, that row releases its hover and does not set it again, even when the pointer
    settles on it. Another row, or artwork on the canvas, still wins over the edit as before. When
    the edit ends with focus on a plain control of the row, the row pulse returns.
-5. **Operation-wide controls light the whole operation.** In the Operation editor, Include in
-   output, Show on canvas and Remove Focus Test Z change the operation itself, even while the
-   selection has its own settings. Focus on them lights every piece the operation runs; focus
-   back on a setting returns to the selected pieces. They are marked `data-operation-wide`.
+5. **A control lights what it changes, not what its editor usually does.** A control whose reach
+   differs from its editor's carries `data-edit-scope`, and `useSettingsEditGlow` lights that
+   scope's artwork while it has focus:
+   - `operation`: Include in output, Show on canvas and Remove Focus Test Z change the operation
+     itself, so in the Operation editor they light every piece it runs, even while the selection
+     has its own settings.
+   - `selection`: Make unique and Add operation change only the selected artwork, so they light
+     only the selected pieces, even where an edit there would reach the whole operation.
+   - `everything`: Show only, as above.
 6. **The multi-operation CNC depth lights up too.** With several CNC artworks that share no
    operation, the bulk Cut depth (or Insert depth) field sets the depth of each of their
    operations. Focus there lights every piece those operations run, selected or not.
-7. **Another editor is another edit.** The edit's identity includes its editor, so focus moving
-   straight from one editor to another on the same artwork still pulses once, as an edit beginning.
-8. **An outside press ends the edit at once.** The press releases the edit before React renders
-   again, so an action that press starts (another row's eye, a drag) can never pulse the old edit.
+7. **Another edit pulses, the same edit does not.** The edit's identity includes its editor, and
+   the store makes a new edit object each time one begins (the same edit set again keeps its
+   object). The canvas numbers edits by that object, so focus moving straight to another editor
+   of the same artwork pulses, and so does an edit that ended and began again while a hover hid
+   it. One that only returns from under a hover brings its edge back without a pulse.
+8. **The edit ends with its focus.** An outside press releases the edit during the press, before
+   an action it starts (another row's eye, a drag) can change the scene and pulse the old edit.
+   After a click or key inside the editor, if focus has fallen out of it because the focused
+   control removed itself (Remove Focus Test Z), the edit ends too: that sends no blur.
 
-The store is unchanged; the canvas only carries the editor into the edit's identity. Display
-only, session only: no selection, output, Frame or Start behaviour changes.
+Display only, session only: no selection, output, Frame or Start behaviour changes.
 
 ### Consequences
 
 - `useOperationRowHover` takes whether the row's own edit holds the canvas.
+- `useSettingsEditGlow` takes optional `scopes`, the reach of controls marked `data-edit-scope`.
+  `LayerFocusTestNotice` takes the row's edit glow handlers, because in a row it sits outside
+  the menu.
 - The jig editor's outline settings (`RegistrationJigOperationSettings`), including its Advanced
   outline settings dialog, still do not light up; they edit the jig outline in Jig mode, not
   artwork.
@@ -73,6 +88,16 @@ only, session only: no selection, output, Frame or Start behaviour changes.
   selected one; an outside press releases the edit during the press; the multi-operation CNC
   depth lights every piece of its operations, including an unselected one, and not a third
   operation's piece.
-- `artwork-pulse.test.ts`: focus moving straight to another editor of the same artwork pulses.
+- `SelectedOperationInspector.edit-glow.test.tsx` also: Make unique and Add operation light only
+  the selected piece while Power lights both.
+- `LayerRow.edit-glow.test.tsx` also: Show only lights all artwork in every operation; Remove
+  Focus Test Z lights exactly its operation without the row pulse, and the glow ends once the
+  button removes itself.
+- `CutSettingsDialog.edit-glow.test.tsx` also: Cancel closes the dialog and the same glow stays
+  as focus returns to the editor.
+- `artwork-pulse.test.ts`: focus moving straight to another editor of the same artwork pulses;
+  an edit that began again under a hover pulses when the hover ends, and one that only returns
+  does not. `ArtworkPulseOverlay.test.tsx`: an edit released and set again under a row hover,
+  equal to the one before, pulses when the hover ends.
 - `LayerRow.hover.test.tsx` unchanged and passing.
 - **NOT verified:** on hardware (display only).

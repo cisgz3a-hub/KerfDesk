@@ -22,8 +22,11 @@ afterEach(() => {
 });
 
 // Two operations with the same settings: the row pulse would light both.
-function loadFixture(): void {
-  const edited = createLayer({ id: 'edited', color: '#000000' });
+function loadFixture(focusTest = false): void {
+  const edited = {
+    ...createLayer({ id: 'edited', color: '#000000' }),
+    ...(focusTest ? { focusTest: { offsetMm: 0.5, travelFeedMmPerMin: 600 } } : {}),
+  };
   const twin = createLayer({ id: 'twin', color: '#2563eb' });
   const objects: SceneObject[] = [
     { ...svgObj('first', ['#000000']), operationIds: ['edited'] },
@@ -137,6 +140,41 @@ describe('operation row edit glow', () => {
     expect(edited()).toBeNull();
     await view.unmount();
     expect(hovered()).toBeNull();
+  });
+
+  it('lights all artwork from Show only, which changes every operation', async () => {
+    loadFixture();
+    const view = await mount();
+    const showOnly = view.row.querySelector<HTMLButtonElement>('button[aria-label^="Show only"]');
+    await act(async () => showOnly?.focus());
+    expect(edited()).toEqual({
+      owner: 'operation-row:edited',
+      objectIds: ['first', 'second', 'lookalike'],
+      operationIds: ['edited', 'twin'],
+    });
+    await act(async () => view.output.focus());
+    expect(edited()).toEqual(lit);
+    await view.unmount();
+  });
+
+  it('lights its operation from Remove Focus Test Z, and ends once the button is gone', async () => {
+    loadFixture(true);
+    const view = await mount();
+    const remove = [...view.row.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Remove Focus Test Z',
+    );
+    if (remove === undefined) throw new Error('Remove Focus Test Z missing');
+    await act(async () => remove.focus());
+    await settle();
+    expect(edited()).toEqual(lit);
+    expect(hovered()).toBeNull();
+
+    // The button removes itself and takes focus with it, without a blur.
+    await act(async () => remove.click());
+    expect(useStore.getState().project.scene.layers[0]?.focusTest).toBeUndefined();
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
+    expect(edited()).toBeNull();
+    await view.unmount();
   });
 
   it('ends the glow when the row goes away', async () => {

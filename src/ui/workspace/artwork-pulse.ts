@@ -79,6 +79,11 @@ export type PulseSeed =
       readonly kind: 'edit';
       /** The editor holding it: focus moving to another editor is a new edit, even on the same artwork. */
       readonly owner: string;
+      /**
+       * New for each edit that begins, so one that ended and began again while
+       * a hover hid it still pulses when it shows (ADR-646 Amendment 1).
+       */
+      readonly serial: number;
       readonly objectIds: ReadonlyArray<string>;
       readonly operationIds: ReadonlyArray<string>;
     };
@@ -88,7 +93,7 @@ export function pulseSeedKey(seed: PulseSeed | null): string {
   if (seed === null) return '';
   if (seed.kind === 'object') return `o:${seed.objectId}`;
   if (seed.kind === 'operation') return `r:${seed.operationId}`;
-  return `e:${JSON.stringify([seed.owner, seed.objectIds, seed.operationIds])}`;
+  return `e:${JSON.stringify([seed.serial, seed.owner, seed.objectIds, seed.operationIds])}`;
 }
 
 /**
