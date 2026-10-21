@@ -573,6 +573,10 @@ the linked artwork.
   such as `50%`.
 - A typing mistake shows a notice with what was wrong and what to type, and the box goes back to
   the current value. An emptied box goes back silently. ArrowUp and ArrowDown nudge by 0.1 mm or 1°.
+  Escape drops the typed text, and leaving the box then applies nothing.
+- A horizontal or vertical line has no height or width. Its length can still be typed, with the
+  aspect lock on or off; typing the missing side is refused with a notice that says to change the
+  other one. Dragging a handle of several such lines in a row changes their length the same way.
 
 #### Edge — transform pushes object out of bed
 - Permitted (user may be temporarily repositioning).
@@ -1704,6 +1708,9 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - Arrow keys — Nudge 1 mm
 - Shift+Arrow — Nudge 10 mm
 - `Cmd/Ctrl+Arrow` — Nudge 0.1 mm (ADR-499; all three distances are set in Settings → Canvas)
+- Holding an arrow key slides the selection as one undo step. An arrow key on a focused tab strip,
+  slider, radio group, list or menu works that control and does not nudge (or align, with Alt);
+  from a plain button it still nudges (ADR-493, ADR-499 Amendment 1).
 - `Alt+Left` / `Alt+Right` / `Alt+Up` / `Alt+Down` — Align left / right / top / bottom (ADR-499)
 - `Alt+PgUp` / `Alt+PgDn` — Align centres on X / Y (ADR-499)
 - `Alt+Shift+H` / `Alt+Shift+V` — Distribute horizontal / vertical spacing (ADR-499)
@@ -9401,8 +9408,8 @@ is selected so it can be acted on immediately.
 #### Edge — Esc mid-drag
 
 1. Esc discards the draft outright and the following pointer-up does NOT commit
-   it. (The main workspace draw tool has the opposite behaviour today - see the
-   defects noted in the research document.)
+   it. The main workspace draw and measure tools do the same: Esc returns to
+   Select, and the release draws or measures nothing.
 
 ### F-DS5b. Draw a Polyline or Arc (DS-3)
 
