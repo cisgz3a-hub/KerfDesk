@@ -1,5 +1,7 @@
 import {
   operationIdsForObject,
+  polylineToCurveSubpath,
+  type ColoredPath,
   type Layer,
   type Project,
   type ReliefObject,
@@ -129,8 +131,20 @@ function sameArtwork(previous: SceneObject, next: SceneObject): boolean {
     return false;
   if (!('paths' in previous) || !('paths' in next)) return previous.kind === next.kind;
   return (
-    previous.paths === next.paths || JSON.stringify(previous.paths) === JSON.stringify(next.paths)
+    previous.paths === next.paths ||
+    JSON.stringify(previous.paths) === JSON.stringify(next.paths) ||
+    JSON.stringify(previous.paths.map(savedPathForm)) ===
+      JSON.stringify(next.paths.map(savedPathForm))
   );
+}
+
+// Saving fills in the curves an in-memory path leaves out, so the same outline
+// reopened from a save or an archive (a retained array's source) is the same
+// artwork. Differing curves still differ.
+function savedPathForm(path: ColoredPath): ColoredPath {
+  return path.curves === undefined
+    ? { ...path, curves: path.polylines.map(polylineToCurveSubpath) }
+    : path;
 }
 
 function sameReliefSource(previous: ReliefObject, next: ReliefObject): boolean {

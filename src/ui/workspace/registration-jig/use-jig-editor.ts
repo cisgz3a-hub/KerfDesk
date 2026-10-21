@@ -142,15 +142,26 @@ function useJigEditorClose(args: {
       onClose();
       return true;
     }
-    const result = commitJigEditorSession(useStore.getState(), session);
-    if (result.kind === 'refused') {
+    let refused: JigCommitRefusal | null = null;
+    // The draft may assign artwork to a Pro operation: without Pro that waits
+    // for the Pro prompt, and the editor closes once the change lands.
+    const committed = useStore.getState().commitProjectEdit(
+      (state) => {
+        const result = commitJigEditorSession(state, session);
+        if (result.kind === 'saved') return result.change;
+        refused = result.reason;
+        return {};
+      },
+      () => {
+        if (refused === null) onClose();
+      },
+    );
+    if (refused !== null) {
       setConfirmingClose(false);
-      setError(refusalMessage(result.reason));
+      setError(refusalMessage(refused));
       return false;
     }
-    useStore.setState(result.change);
-    onClose();
-    return true;
+    return committed;
   };
   const requestClose = (): void => {
     if (dirty && !captured) setConfirmingClose(true);
