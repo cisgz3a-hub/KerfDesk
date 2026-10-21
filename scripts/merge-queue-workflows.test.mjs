@@ -22,6 +22,10 @@ const REQUIRED_CHECKS = {
 
 // Pull-request and push data that a merge_group event does not carry.
 const EVENT_SPECIFIC = /github\.(event_name|head_ref|base_ref|event\.)/u;
+// The one event test a condition may make: whether this is a pull request.
+// Pull requests run the lighter checks (ADR-647); a merge queue entry, like a
+// push to main, runs them all.
+const PULL_REQUEST_TEST = /github\.event_name [!=]= 'pull_request'/gu;
 
 async function readWorkflow(path) {
   return load(await readFile(path, 'utf8'), { schema: JSON_SCHEMA });
@@ -67,7 +71,11 @@ for (const [path, checks] of Object.entries(REQUIRED_CHECKS)) {
     }
     for (const job of jobs) {
       for (const condition of [job.if, ...(job.steps ?? []).map((step) => step.if)]) {
-        assert.doesNotMatch(String(condition ?? ''), EVENT_SPECIFIC, `${job.name}: ${condition}`);
+        assert.doesNotMatch(
+          String(condition ?? '').replace(PULL_REQUEST_TEST, ''),
+          EVENT_SPECIFIC,
+          `${job.name}: ${condition}`,
+        );
       }
     }
   });

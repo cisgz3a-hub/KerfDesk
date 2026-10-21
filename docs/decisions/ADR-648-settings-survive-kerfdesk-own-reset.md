@@ -1,4 +1,4 @@
-## ADR-648 - Settings survive KerfDesk's own reset, and the settings toast speaks only when a read finds something new (2026-10-20)
+## ADR-648 - Settings survive KerfDesk's own reset (2026-10-20)
 
 **Status:** Accepted, at the maintainer's request to fix D-5 and F-5 first ("keep the settings
 across KerfDesk's own resets and only toast when a read finds something new").
@@ -7,7 +7,10 @@ across KerfDesk's own resets and only toast when a read finds something new").
 Amends [ADR-611](ADR-611-quiet-controller-information.md) (controller information stays out of
 the way) and the reboot-banner rule in WORKFLOW "Controller qualification and Forget Controller"
 item 1, under which every banner re-ran the full `$$`, `$I`, `$G` read. Fixes D-5 of
-`docs/audits/2026-10-20-controller-design-audit.md` and F-5 of the 2026-10-19 controller audit.
+`docs/audits/2026-10-20-controller-design-audit.md`. F-5 of the 2026-10-19 controller audit (the
+settings toast) is decided by
+[ADR-611 Amendment 2](ADR-611-amendment-2-reconnects-announce-only-news.md); this ADR only stops
+KerfDesk's own resets from producing a new read for that toast to announce.
 
 ### Context
 
@@ -21,11 +24,8 @@ unchanged. Only the parser's modal state and the active work coordinate system s
 CNCjs and LightBurn re-read nothing after a reset; LightBurn reads settings on connect only when
 asked. Because KerfDesk's automatic read waits for Idle, an Abort that raised `ALARM:3` left the
 settings unread until the operator unlocked. Meanwhile Home on stock GRBL fell back to its
-30-minute backstop instead of the `$$`-derived bound (ADR-400).
-
-Each completed read also pushed an 8 s "Machine settings detected" toast, with "controller
-settings were read successfully" when there was nothing to report. So every connect and every
-Abort that reset the board ended in a toast about a routine read.
+30-minute backstop instead of the `$$`-derived bound (ADR-400). Each of those re-reads also set a
+new read time, which the "Machine settings detected" toast announced.
 
 ### Decision
 
@@ -57,14 +57,10 @@ Abort that reset the board ended in a toast about a routine read.
    `$I` evidence until `$I` itself is read again. Until then an owned reset keeps the `$$` snapshot
    but not the `$I` evidence, and its `$G`-only qualification reads `$I` too.
    The operator's Wake and probe recovery resets keep their full re-read, unchanged.
-4. **The toast speaks only for something new.** A completed read pushes the "Machine settings
-   detected" toast only when it found a profile update or review item that the last read on the
-   same port did not report in this run of the app. A USB serial port is known by its vendor and
-   product IDs, so a reconnect to it stays quiet. A network target, or a port without USB IDs, has
-   no identity the app can see, so each connection counts as its own port: one controller never
-   silences another's first read. A read with nothing to report is silent. Its plain result is a log line, "Controller settings read
-   (N).", and Controller info's "Last read" time. Machine Setup's detected-settings lane is
-   unchanged.
+4. **No toast for a kept snapshot.** A kept snapshot keeps its original read time, so the "Machine
+   settings detected" toast, whose rules are ADR-611 Amendment 2's, has no new read to announce
+   after KerfDesk's own reset. A completed `$$` read logs "Controller settings read (N)." beside
+   Controller info's "Last read" time.
 
 ### Consequences
 
@@ -72,23 +68,22 @@ Abort that reset the board ended in a toast about a routine read.
   known through an `ALARM:3`. Home, and the "Not responding" window for a line still owed its
   reply (ADR-610 Amendment 2), keep the `$$`-derived bound instead of the 30-minute backstop.
   Only `$G` goes over the wire once the controller is Idle again.
-- Reconnecting to the same machine, or re-reading its settings, no longer repeats the toast.
+- An Abort no longer ends in a settings toast or a settings read.
 - The `$G` read still waits for Idle (F-4 of the 2026-10-19 audit stays open).
 
 ### Evidence and limits
 
 - `laser-owned-reset-settings.test.ts` pins that the line handler keeps the snapshot for the
   owned reset's banner. It also pins that an uncommanded banner clears it, that a `$` write since
-  the read clears it, and that only one banner carries it.
+  the read clears it, that a `$I=` write keeps `$I` outstanding, and that only one banner carries
+  it. `eeprom-write-line.test.ts` pins which lines count as setting and build-info writes.
 - `laser-store-controller-qualification.test.ts` pins Abort, then a `$G`-only re-read with no `$$`
   or `$I`, then qualification and a fresh job, and that an uncommanded banner re-reads `$$`.
-- `DetectedSettingsToast.test.ts` pins that the toast is silent on an unchanged or empty read and
-  reappears for a new item or another port. `MachineConnectionToolbar.test.tsx` pins the same for
-  the mounted toolbar.
 - The reset owner drops the snapshot when its 500 ms banner window ends without the banner, so
   `laser-stream-ack-stall.test.ts` and `laser-reset-response-ownership.test.ts` still see a full
   `$$` read at a late boot. `laser-reset-cleanup-interruption.test.ts`,
-  `laser-store-controller-recovery.test.ts` and the immediate-greeting case of
-  `laser-reset-response-ownership.test.ts` now expect `$G` only after Abort's or the error stop's
-  own greeting.
-- These are unit and store tests only. No machine was operated.
+  `laser-store-controller-recovery.test.ts`, the immediate-greeting case of
+  `laser-reset-response-ownership.test.ts` and the browser workflow in
+  `production-workflows.spec.ts` now expect `$G` only after Abort's or the error stop's own
+  greeting. Three browser specs wait for the settings read itself rather than its toast.
+- These are unit, store and browser tests only. No machine was operated.

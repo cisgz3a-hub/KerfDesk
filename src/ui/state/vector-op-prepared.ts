@@ -16,7 +16,11 @@ import {
 } from '../../core/geometry';
 import type { CutShapesError, CutShapesPlan } from '../../core/geometry/cut-shapes';
 import type { OffsetShapesOptions, OffsetShapesResult } from '../../core/geometry/offset-shapes';
-import { ok, type Result } from '../../core/result';
+import {
+  describeWeldChange,
+  NOTHING_TO_WELD_MESSAGE,
+} from '../../core/geometry/vector-path-weld-change';
+import { err, ok, type Result } from '../../core/result';
 import type { ImportedSvg, Scene } from '../../core/scene';
 import {
   objectIdStillFree,
@@ -155,9 +159,12 @@ export function weldPlanForSelection(
   background: PreparedVectorCombine | undefined,
 ): Result<WeldSelectionPlan, VectorOpError> {
   const reused = reusableWeld(background, scene, selected);
-  return reused === undefined
-    ? planWeldSelection(scene, selected, uniqueWeldId(scene))
-    : ok(reused);
+  const plan =
+    reused === undefined ? planWeldSelection(scene, selected, uniqueWeldId(scene)) : ok(reused);
+  // A weld that merges nothing would only flatten editable sources into one
+  // path object with the same outlines, so it is refused like a failed weld.
+  if (plan.kind === 'error' || describeWeldChange(selected, plan.value.object).changed) return plan;
+  return err({ kind: 'nothing-to-weld', message: NOTHING_TO_WELD_MESSAGE });
 }
 
 /** Combine's result for the selection: a matching background result, else computed here. */

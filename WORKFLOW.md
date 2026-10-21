@@ -3318,16 +3318,19 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    after a reset, and a read that failed while the controller still answers
    status queries, do not pop up anything, even when a reply still owed makes
    Reconnect the recommendation in Controller info: the machine runs without
-   them, as in other senders. The "Machine settings detected" toast appears only
-   when a read finds a profile update or review item that the last read on that
-   port did not; a routine read is a log line and Controller info's "Last read"
-   time (ADR-648). When a failed read meets a controller that
+   them, as in other senders. When a failed read meets a controller that
    stopped answering status queries (re-checked every second, so a wedged
    transport counts), the recovery card with Retry and Reconnect opens by
    itself at the top of the canvas, under any safety notice.
-   Closing it folds it into a **Controller needs recovery** button that stays
+   Closing it folds it into a **Machine stopped answering** button that stays
    until the controller recovers; a new failure opens the card again (ADR-642,
-   replacing ADR-611's brief toolbar notice). A controller
+   replacing ADR-611's brief toolbar notice). The card and Controller info title
+   a failed read "Couldn’t read machine settings", or "Machine stopped
+   answering" when the controller has gone silent. While the read runs, the
+   status beside the dot reads "Connecting…", then "Reading settings…", and the
+   "Machine settings detected" toast appears only when the read offers profile
+   updates or its review items changed since the last read for that machine
+   profile (ADR-611 Amendment 2). A controller
    that answered and then goes quiet for 8 s, outside homing and other controller
    operations, turns the connection status to an amber **Not responding** until
    its next reply (ADR-611 Amendment 1). While a sent line is still owed its
@@ -6329,6 +6332,20 @@ and lifts the command's CNC-only gate.)*
 1. An Intersect of non-overlapping shapes produces nothing, leaves the
    scene untouched (empty results never replace the sources), and shows
    a warning toast explaining the result was empty.
+2. Weld joins only shapes that overlap or touch within the same operation
+   and output settings. When nothing would merge (one shape alone, separate
+   shapes, or overlapping shapes in different operations or settings), the
+   Combine Shapes review says "Nothing to weld", points to Tools → Union
+   silhouette for merging across operations, and keeps Apply disabled. Apply
+   never flattens editable shapes or text into an unchanged path object; the
+   in-thread fallback leaves the scene untouched and shows the same warning.
+
+#### Edge — Weld absorbs enclosed shapes
+1. Weld is a filled union, as in LightBurn: a shape lying wholly inside another
+   shape of the same operation (for example text inside a ring) disappears.
+   The review names each such source before Apply. Apply remains available,
+   because that union is valid; put the inner artwork on another operation,
+   or use Subtract, to keep it.
 
 #### Edge — transforms and z-order
 1. Object transforms are baked to world space before combining, so a

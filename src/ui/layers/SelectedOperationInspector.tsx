@@ -3,6 +3,7 @@ import {
   captureLayerOperationSettings,
   operationArtworkCount,
   operationIdsForObject,
+  sceneObjectUsesOperation,
   type Layer,
   type SceneObject,
 } from '../../core/scene';
@@ -16,6 +17,7 @@ import { CncSelectionDepthField } from './CncSelectionDepthField';
 import { hasMixedFields, mixedOperationFields } from './selected-operation-mixed';
 import { LayerFocusTestNotice } from './LayerFocusTestNotice';
 import { LaserOperationFields } from './SelectedLaserOperationFields';
+import { useSettingsEditGlow } from './use-settings-edit-glow';
 import {
   OperationFooter,
   OperationNameInput,
@@ -99,12 +101,14 @@ function SelectedOperationEditor(props: {
   const activeObjects = props.objects.filter((object) =>
     operationIdsForObject(object, layers).includes(props.active.id),
   );
-  const { overrideEditing, effectiveOperation, mixedFields, selectionKey, reconcileKey } =
-    selectedOperationSettings(props.active, activeObjects);
+  const { editsOwnSettings, effectiveOperation, mixedFields, selectionKey, reconcileKey } =
+    selectedOperationSettings(props.active, activeObjects, props.machineKind);
+  const glow = useOperationEditGlow(props.active, activeObjects, editsOwnSettings);
   return (
     <section
       aria-label={props.selectionActive ? 'Selected artwork operation' : 'Artwork operation'}
       className="lf-operation-inspector"
+      {...glow}
     >
       <OperationChoice
         operations={props.candidates}
@@ -116,7 +120,7 @@ function SelectedOperationEditor(props: {
       <OperationScope
         affected={affected}
         selectedUsingActive={activeObjects.length}
-        overrideEditing={overrideEditing && props.machineKind === 'laser'}
+        overrideEditing={editsOwnSettings}
         mixed={hasMixedFields(mixedFields)}
         onMakeUnique={() =>
           inspectCreatedOperation(() => makeUnique(objectIds, props.active.id), props.onSelect)
@@ -136,7 +140,7 @@ function SelectedOperationEditor(props: {
           key={selectionKey}
           operation={effectiveOperation}
           baseOperation={props.active}
-          editObjectOverride={overrideEditing}
+          editObjectOverride={editsOwnSettings}
           objectIds={activeObjects.map((object) => object.id)}
           ariaContext={props.selectionActive ? 'selected objects' : 'inspected artwork'}
           mixedFields={mixedFields}
@@ -153,11 +157,32 @@ function SelectedOperationEditor(props: {
       <OperationFooter
         operation={props.active}
         affected={affected}
-        overrideEditing={overrideEditing && props.machineKind === 'laser'}
+        overrideEditing={editsOwnSettings}
         onAdd={() => inspectCreatedOperation(() => addOperation(objectIds), props.onSelect)}
       />
     </section>
   );
+}
+
+/**
+ * Lights up what an edit here changes (ADR-646): the selected artwork's own
+ * settings while it overrides the operation, otherwise every piece the
+ * operation runs.
+ */
+function useOperationEditGlow(
+  operation: Layer,
+  selected: ReadonlyArray<SceneObject>,
+  editsOwnSettings: boolean,
+): ReturnType<typeof useSettingsEditGlow> {
+  const allObjects = useStore((state) => state.project.scene.objects);
+  const changed = editsOwnSettings
+    ? selected
+    : allObjects.filter((object) => sceneObjectUsesOperation(object, operation));
+  return useSettingsEditGlow({
+    owner: `operation-editor:${operation.id}`,
+    objectIds: changed.map((object) => object.id),
+    operationIds: [operation.id],
+  });
 }
 
 function OperationChoice(props: {
@@ -207,13 +232,18 @@ function inspectCreatedOperation(create: () => void, onSelect: (id: string) => v
   if (added !== undefined) onSelect(added.id);
 }
 
-function selectedOperationSettings(operation: Layer, objects: ReadonlyArray<SceneObject>) {
+function selectedOperationSettings(
+  operation: Layer,
+  objects: ReadonlyArray<SceneObject>,
+  machineKind: 'laser' | 'cnc',
+) {
   const settings = objects.map((object) => effectiveOperationForObject(operation, object));
   const effectiveOperation = settings[0] ?? operation;
   return {
-    overrideEditing: objects.some(
-      (object) => operationOverrideForObject(operation, object) !== undefined,
-    ),
+    // Artwork-own settings are laser settings; a CNC edit always changes the operation.
+    editsOwnSettings:
+      machineKind === 'laser' &&
+      objects.some((object) => operationOverrideForObject(operation, object) !== undefined),
     effectiveOperation,
     mixedFields: mixedOperationFields(effectiveOperation, settings),
     selectionKey: JSON.stringify(objects.map((object) => object.id)),

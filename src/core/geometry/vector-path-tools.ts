@@ -31,6 +31,8 @@ export type VectorOpError = {
     | 'collapsed'
     | 'no-corners'
     | 'bad-distance'
+    // Weld would merge no contours and only flatten editable sources unchanged.
+    | 'nothing-to-weld'
     // The clipper2-ts engine threw on pathological/degenerate geometry. Before
     // ADR-131 the store's try/catch swallowed this; now the op catches the
     // third-party throw at the boundary and surfaces it as a Result so an

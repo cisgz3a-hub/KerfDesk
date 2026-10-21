@@ -12,8 +12,8 @@ import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import { forgetDetectedSettingsReads } from './DetectedSettingsToast';
 import { LaserWindow } from './LaserWindow';
+import { resetAnnouncedDetectedSettings } from './DetectedSettingsToast';
 import { MachineConnectionToolbar } from './MachineConnectionToolbar';
 import { MachineSetupDialogHost } from './device-setup';
 import { closeMachineSetup } from './device-setup/machine-setup-dialog-store';
@@ -47,7 +47,7 @@ beforeEach(() => {
   });
   useUiStore.getState().setRailPanelVisible('machine', true);
   dismissToasts();
-  forgetDetectedSettingsReads();
+  resetAnnouncedDetectedSettings();
   useStore.getState().replaceDeviceProfile(FALCON_A1_PRO_GRBLHAL_PROFILE);
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -236,13 +236,54 @@ describe('machine toolbar', () => {
     await act(async () => expand.click());
 
     expect(settingsNotifications()).toEqual([notification]);
-    // A re-read reporting the same update stays quiet; a new one speaks (ADR-648).
     await act(async () => completeControllerSettingsRead(124));
-    expect(settingsNotifications()).toEqual([notification]);
-    await act(async () => completeControllerSettingsRead(125, 500));
+    expect(settingsNotifications()).toHaveLength(2);
+  });
+
+  it('announces a reconnect that reads the same settings only once (ADR-611 Amendment 2)', async () => {
+    await renderToolbarAndRail();
+    await act(async () => completeUnchangedSettingsRead(123, true));
+    expect(settingsNotifications()).toHaveLength(1);
+    expect(settingsNotifications()[0]?.message).toContain('homing and limit settings');
+
+    await act(async () => completeUnchangedSettingsRead(124, true));
+    expect(settingsNotifications()).toHaveLength(1);
+
+    await act(async () => completeUnchangedSettingsRead(125, false));
+    expect(settingsNotifications()).toHaveLength(2);
+  });
+
+  it('announces every read that offers profile updates', async () => {
+    await renderToolbarAndRail();
+    await act(async () => completeControllerSettingsRead(123));
+    await act(async () => completeControllerSettingsRead(124));
+    expect(settingsNotifications()).toHaveLength(2);
+    expect(settingsNotifications()[1]?.message).toContain('safe profile updates');
+  });
+
+  it('confirms the first read for each machine profile', async () => {
+    await renderToolbarAndRail();
+    await act(async () => completeUnchangedSettingsRead(123, true));
+    await act(async () => {
+      useStore
+        .getState()
+        .replaceDeviceProfile({ ...FALCON_A1_PRO_GRBLHAL_PROFILE, bedWidth: 400, bedHeight: 400 });
+    });
+    await act(async () => completeUnchangedSettingsRead(124, true));
     expect(settingsNotifications()).toHaveLength(2);
   });
 });
+
+// A read whose values the profile already holds; only the homing review item
+// can differ between reads.
+function completeUnchangedSettingsRead(readAt: number, homingEnabled: boolean): void {
+  useLaserStore.setState({
+    detectedSettings: {},
+    controllerSettings: { homingEnabled },
+    grblSettingsRows: [],
+    lastSettingsReadAt: readAt,
+  });
+}
 
 async function renderToolbarAndRail(): Promise<void> {
   await act(async () => {
@@ -257,10 +298,10 @@ async function renderToolbarAndRail(): Promise<void> {
   });
 }
 
-function completeControllerSettingsRead(readAt: number, maxPowerS = 255): void {
+function completeControllerSettingsRead(readAt: number): void {
   useLaserStore.setState({
-    detectedSettings: { maxPowerS },
-    controllerSettings: { maxPowerS },
+    detectedSettings: { maxPowerS: 255 },
+    controllerSettings: { maxPowerS: 255 },
     grblSettingsRows: [],
     lastSettingsReadAt: readAt,
   });

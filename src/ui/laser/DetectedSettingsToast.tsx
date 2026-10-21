@@ -1,37 +1,31 @@
 import { useEffect, useRef } from 'react';
 import type { ControllerSettingsSnapshot, GrblSettingRow } from '../../core/controllers/grbl';
 import type { DeviceProfile } from '../../core/devices';
-import type { SerialPortIdentity } from '../../platform/types';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { describePatch, describeReviewItems } from './DetectedSettingsBanner';
+import { deviceProfileSignature } from './device-setup/device-setup-nudge';
 
-type DetectedSettingsRead = {
+type DetectedSettingsArgs = {
   readonly patch: Partial<DeviceProfile> | null;
   readonly current: DeviceProfile;
   readonly controllerSettings: ControllerSettingsSnapshot | null;
   readonly settingsRows: ReadonlyArray<GrblSettingRow>;
 };
 
-// What the last read on each port reported, for this run of the app. A read
-// that finds nothing new stays quiet: its plain result is in the log and in
-// Controller info (ADR-648, controller audit 2026-10-19 F-5).
-const itemsReadByPort = new Map<string, ReadonlySet<string>>();
-
-/** Tests start each case as a fresh run of the app. */
-export function forgetDetectedSettingsReads(): void {
-  itemsReadByPort.clear();
-}
+// The review items each machine profile last announced in this run. A
+// reconnect that reads the same settings again announces nothing (ADR-611
+// Amendment 2); a reload starts afresh, so the first read still confirms.
+const announcedReviews = new Map<string, string>();
 
 export function DetectedSettingsToast(): null {
   const detected = useLaserStore((s) => s.detectedSettings);
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const settingsRows = useLaserStore((s) => s.grblSettingsRows);
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
-  const portInfo = useLaserStore((s) => s.serialPortInfo);
-  const connectionAttempt = useLaserStore((s) => s.connectionAttempt);
   const current = useStore((s) => s.project.device);
+  const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const pushToast = useToastStore((s) => s.pushToast);
   const notifiedReadAt = useRef<number | null>(null);
 
@@ -39,19 +33,17 @@ export function DetectedSettingsToast(): null {
     if (lastSettingsReadAt === null) return;
     if (notifiedReadAt.current === lastSettingsReadAt) return;
     notifiedReadAt.current = lastSettingsReadAt;
-    const message = announceDetectedSettings(
-      { patch: detected, current, controllerSettings, settingsRows },
-      itemsReadByPort,
-      detectedSettingsPortKey(portInfo, connectionAttempt),
-    );
-    if (message !== null) pushToast(message, 'info');
+    const args = { patch: detected, current, controllerSettings, settingsRows };
+    if (!shouldAnnounceDetectedSettings(deviceProfileSignature(current, machineKind), args)) {
+      return;
+    }
+    pushToast(describeDetectedSettingsToast(args), 'info');
   }, [
-    connectionAttempt,
     controllerSettings,
     current,
     detected,
     lastSettingsReadAt,
-    portInfo,
+    machineKind,
     pushToast,
     settingsRows,
   ]);
@@ -59,75 +51,58 @@ export function DetectedSettingsToast(): null {
   return null;
 }
 
-/** A USB serial port is known by its vendor and product. A network target or a
- * port without USB IDs has no identity here, so each connection is its own
- * and one controller never silences another's first read. */
-export function detectedSettingsPortKey(
-  port: SerialPortIdentity | null | undefined,
-  connectionAttempt: number | undefined,
-): string {
-  const vendor = port?.usbVendorId;
-  const product = port?.usbProductId;
-  if (port?.transport !== 'tcp' && vendor !== undefined && product !== undefined) {
-    return `usb:${vendor}:${product}`;
-  }
-  return `${port?.transport ?? 'serial'}:connection:${connectionAttempt ?? 0}`;
-}
-
-/** The toast for a completed read, or null when it found no profile update or
- * review item that the last read on this port did not already report. The
- * read is remembered for the port either way. */
-export function announceDetectedSettings(
-  read: DetectedSettingsRead,
-  itemsByPort: Map<string, ReadonlySet<string>>,
-  portKey: string,
-): string | null {
-  const items = detectedSettingsItems(read);
-  const previous = itemsByPort.get(portKey);
-  itemsByPort.set(portKey, new Set([...items.updates, ...items.review, ...items.ignored]));
-  const isNew = (key: string): boolean => previous?.has(key) !== true;
-  return describeDetectedSettingsToast(
-    items.updates.filter(isNew).length,
-    items.review.filter(isNew).length,
-    items.ignored.filter(isNew).length,
-  );
-}
-
-function detectedSettingsItems(read: DetectedSettingsRead): {
-  readonly updates: ReadonlyArray<string>;
-  readonly review: ReadonlyArray<string>;
-  readonly ignored: ReadonlyArray<string>;
-} {
-  const patch = read.patch ?? {};
+/**
+ * A settings read is announced when it offers profile updates, or when its
+ * review items differ from the last read announced for this machine profile.
+ * Records the read it lets through.
+ */
+export function shouldAnnounceDetectedSettings(
+  profileSignature: string,
+  args: DetectedSettingsArgs,
+): boolean {
+  const patch = args.patch ?? {};
   const review = describeReviewItems(
     patch,
-    read.current,
-    read.controllerSettings ?? {},
-    read.settingsRows,
+    args.current,
+    args.controllerSettings ?? {},
+    args.settingsRows,
   );
-  return {
-    updates: describePatch(patch, read.current).map((row) => `update:${row.label}=${row.newText}`),
-    review: review.needsReview.map((item) => `review:${item.label}:${item.detail}`),
-    ignored: review.ignored.map((item) => `ignored:${item.label}`),
-  };
+  const reviewKey = JSON.stringify([
+    review.needsReview.map((item) => [item.label, item.detail]),
+    review.ignored.map((item) => item.label),
+  ]);
+  const hasUpdates = describePatch(patch, args.current).length > 0;
+  if (!hasUpdates && announcedReviews.get(profileSignature) === reviewKey) return false;
+  announcedReviews.set(profileSignature, reviewKey);
+  return true;
 }
 
-function describeDetectedSettingsToast(
-  updates: number,
-  review: number,
-  ignored: number,
-): string | null {
-  if (updates > 0 && review + ignored > 0) {
+/** Test seam: forget which reads this run already announced. */
+export function resetAnnouncedDetectedSettings(): void {
+  announcedReviews.clear();
+}
+
+export function describeDetectedSettingsToast(args: DetectedSettingsArgs): string {
+  const patch = args.patch ?? {};
+  const safeRows = describePatch(patch, args.current);
+  const review = describeReviewItems(
+    patch,
+    args.current,
+    args.controllerSettings ?? {},
+    args.settingsRows,
+  );
+  const reviewCount = review.needsReview.length + review.ignored.length;
+  if (safeRows.length > 0 && reviewCount > 0) {
     return 'Machine settings detected: profile updates and review items are ready in Machine Setup.';
   }
-  if (updates > 0) {
+  if (safeRows.length > 0) {
     return 'Machine settings detected: safe profile updates are ready in Machine Setup.';
   }
-  if (review > 0) {
+  if (review.needsReview.length > 0) {
     return 'Machine settings detected: review controller homing and limit settings in Machine Setup.';
   }
-  if (ignored > 0) {
+  if (review.ignored.length > 0) {
     return 'Machine settings detected: unknown GRBL settings were read; review Machine Setup.';
   }
-  return null;
+  return 'Machine settings detected: controller settings were read successfully in Machine Setup.';
 }
