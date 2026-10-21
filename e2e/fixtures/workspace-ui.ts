@@ -19,6 +19,34 @@ export async function connectMachineAndDismissFirstSetup(page: Page): Promise<vo
   }
 }
 
+/** The connect-time controller settings read has finished. A read with nothing
+ * new to report raises no "Machine settings detected" toast (ADR-648), so this
+ * waits on the store's own record of the read and the end of the handshake. */
+export async function expectControllerSettingsRead(page: Page): Promise<void> {
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const moduleUrl = '/src/ui/state/laser-store.ts';
+        const { useLaserStore } = (await import(moduleUrl)) as {
+          useLaserStore: {
+            getState: () => {
+              lastSettingsReadAt: number | null;
+              controllerQualification: { kind: string };
+              controllerOperation: unknown;
+            };
+          };
+        };
+        const state = useLaserStore.getState();
+        return (
+          state.lastSettingsReadAt !== null &&
+          state.controllerQualification.kind === 'qualified' &&
+          state.controllerOperation === null
+        );
+      }),
+    )
+    .toBe(true);
+}
+
 /** Ordinary machine setup and origin actions stay visible with jog controls. */
 export function machineJogAction(
   page: Page,

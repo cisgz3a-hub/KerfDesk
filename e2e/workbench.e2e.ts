@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { grayscaleTracePngBase64, writeQualifiedPngFixture } from './fixtures/png-fixture';
 import {
   connectMachineAndDismissFirstSetup,
+  expectControllerSettingsRead,
   openMachineToolDropdown,
   machineJogAction,
   toolbarCommand,
@@ -760,7 +761,7 @@ async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<vo
   await page.getByRole('tab', { name: 'Machine' }).click();
   await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
-  await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
+  await expectControllerSettingsRead(page);
   const home = machineJogAction(page, 'Home');
   await home.click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');

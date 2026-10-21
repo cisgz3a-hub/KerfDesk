@@ -1,5 +1,6 @@
 import {
   connectMachineAndDismissFirstSetup,
+  expectControllerSettingsRead,
   connectMachineThroughToolbar,
   machineJogAction,
   openMachineToolDropdown,
@@ -228,7 +229,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   await selectWorkspacePanel(page, 'Machine');
   await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
-  await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
+  await expectControllerSettingsRead(page);
   const home = machineJogAction(page, 'Home');
   await home.click();
   await expect

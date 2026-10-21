@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 import {
   connectMachineAndDismissFirstSetup,
+  expectControllerSettingsRead,
   openMachineToolDropdown,
   selectWorkspacePanel,
 } from './fixtures/workspace-ui';
@@ -17,7 +18,7 @@ test('controller incidents survive acknowledgements and reconnect in the console
   await selectWorkspacePanel(page, 'Machine');
   await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
-  await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
+  await expectControllerSettingsRead(page);
   await kerfdesk.emitSerialLine('ALARM:2');
   await kerfdesk.emitSerialLine('error:20');
   await expect
