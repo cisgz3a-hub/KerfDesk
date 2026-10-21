@@ -43,12 +43,15 @@ each before changing it:
 5. **A control lights what it changes, not what its editor usually does.** A control whose reach
    differs from its editor's carries `data-edit-scope`, and `useSettingsEditGlow` lights that
    scope's artwork while it has focus:
-   - `operation`: Include in output, Show on canvas and Remove Focus Test Z change the operation
-     itself, so in the Operation editor they light every piece it runs, even while the selection
-     has its own settings.
+   - `operation`: the operation name, Include in output, Show on canvas and Remove Focus Test Z
+     change the operation itself, so in the Operation editor they light every piece it runs, even
+     while the selection has its own settings.
    - `selection`: Make unique and Add operation change only the selected artwork, so they light
      only the selected pieces, even where an edit there would reach the whole operation.
    - `everything`: Show only, as above.
+
+   A toggle that only opens or closes an editor changes nothing, so it lights nothing: the power
+   multiplier's glow covers the disclosure's body, not its Advanced artwork settings summary.
 6. **The multi-operation CNC depth lights up too.** With several CNC artworks that share no
    operation, the bulk Cut depth (or Insert depth) field sets the depth of each of their
    operations. Focus there lights every piece those operations run, selected or not.
@@ -89,7 +92,9 @@ Display only, session only: no selection, output, Frame or Start behaviour chang
   depth lights every piece of its operations, including an unselected one, and not a third
   operation's piece.
 - `SelectedOperationInspector.edit-glow.test.tsx` also: Make unique and Add operation light only
-  the selected piece while Power lights both.
+  the selected piece while Power lights both; the operation name lights both pieces while the
+  selected one has its own settings; the Advanced artwork settings summary lights nothing, and
+  focus moving back to it from the power multiplier ends the glow.
 - `LayerRow.edit-glow.test.tsx` also: Show only lights all artwork in every operation; Remove
   Focus Test Z lights exactly its operation without the row pulse, and the glow ends once the
   button removes itself.

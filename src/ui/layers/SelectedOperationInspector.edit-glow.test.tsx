@@ -133,6 +133,9 @@ describe('settings edit glow', () => {
     expect(edited()?.objectIds).toEqual(['chosen', 'peer']);
     await act(async () => field(host, 'Show ').focus());
     expect(edited()?.objectIds).toEqual(['chosen', 'peer']);
+    // A rename names the operation for every piece using it.
+    await act(async () => field(host, 'Operation name').focus());
+    expect(edited()?.objectIds).toEqual(['chosen', 'peer']);
     await act(async () => field(host, 'Speed for ').focus());
     expect(edited()?.objectIds).toEqual(['chosen']);
     await unmount();
@@ -213,12 +216,20 @@ describe('settings edit glow', () => {
   it('lights the selected artwork in all its operations from the power multiplier', async () => {
     loadFixture(false);
     const { host, unmount } = await mount();
+    // Opening the disclosure changes nothing, so its toggle lights nothing.
+    const summary = host.querySelector<HTMLElement>('summary[title^="Adjust power"]');
+    await act(async () => summary?.focus());
+    expect(document.activeElement).toBe(summary);
+    expect(edited()).toBeNull();
     await act(async () => field(host, 'Power multiplier for ').focus());
     expect(edited()).toEqual({
       owner: 'artwork-power-multiplier',
       objectIds: ['chosen'],
       operationIds: ['shared'],
     });
+    // Closing it from the toggle ends the glow.
+    await act(async () => summary?.focus());
+    expect(edited()).toBeNull();
     await unmount();
   });
 });
