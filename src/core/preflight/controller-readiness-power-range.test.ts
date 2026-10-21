@@ -9,7 +9,7 @@ import {
   reportedMaxPowerS,
   settingsMapToControllerSettings,
   settingsMapToProfilePatch,
-} from '../controllers/grbl';
+} from '../controllers/grbl/parse-settings';
 import { DEFAULT_CNC_MACHINE_CONFIG, createProject } from '../scene';
 import { runControllerReadiness } from './controller-readiness';
 

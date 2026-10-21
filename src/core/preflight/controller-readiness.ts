@@ -1,8 +1,5 @@
-import {
-  laserPowerRangeIsEmpty,
-  reportedMaxPowerS,
-  type ControllerSettingsSnapshot as GrblControllerSettingsSnapshot,
-} from '../controllers/grbl';
+import type { ControllerSettingsSnapshot as GrblControllerSettingsSnapshot } from '../controllers/grbl';
+import { laserPowerRangeIsEmpty, reportedMaxPowerS } from '../controllers/grbl/parse-settings';
 import type { ControllerKind } from '../devices';
 import type { Project } from '../scene';
 import {
