@@ -132,6 +132,16 @@ File: `docs/audits/2026-10-21-rolling-v2/<NN>-<area-id>.md`
 Each report ends with a fenced `json` block listing its findings, one object per finding:
 `{"id","severity","area","file","line","anchor","evidence","verdict","known","summary"}`.
 
+## 9a. Runner change from batch 2
+
+Batch 1 ran as four Claude sessions, each with parallel lens subagents and refuters. The
+desktop app does not let an automated loop tick start new sessions, so from batch 2 the
+coordinator runs each area as two background subagents in the shared audit worktree. First an
+**auditor** runs every applicable lens and writes the draft report with verdicts `PENDING`.
+Then a fresh **refuter**, which never saw the auditor's reasoning, tries to break every finding
+and writes the verdicts. The coordinator still re-verifies every P1/P2. Auditors and refuters
+never commit; the coordinator commits the reports.
+
 ## 9. Coordinator loop
 
 1. Pick the next batch of four areas from `AREAS.md` (highest priority not yet audited).
