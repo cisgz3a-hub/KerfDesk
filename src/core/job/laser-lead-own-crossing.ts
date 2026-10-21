@@ -5,12 +5,25 @@
 // is also tested against the contour itself. Only a crossing within
 // JOIN_NEIGHBOURHOOD_MM of the join, measured along the contour, is allowed:
 // there a lead joins the contour and may ride its chords.
+//
+// A lead is fitted many times per contour (lengths, restarts), so each
+// contour's edges are put on a grid once, and a check reads only the edges near
+// the lead.
 
 import type { Vec2 } from '../scene';
 
 const JOIN_NEIGHBOURHOOD_MM = 0.2;
+const CELL_MM = 1;
+// An edge across more cells than this is checked by every query instead.
+const MAX_CELLS_PER_EDGE = 64;
 
-type RingWalk = { readonly cumulative: ReadonlyArray<number>; readonly lengthMm: number };
+type RingWalk = {
+  readonly cumulative: ReadonlyArray<number>;
+  readonly lengthMm: number;
+  /** Edge indices (1-based, edge i runs from point i-1 to i) by grid cell. */
+  readonly cells: ReadonlyMap<string, ReadonlyArray<number>>;
+  readonly wide: ReadonlyArray<number>;
+};
 
 const walks = new WeakMap<ReadonlyArray<Vec2>, RingWalk>();
 
@@ -23,7 +36,7 @@ export function crossesOwnContour(
   const walk = ringWalk(ring);
   const join = positionAlong(ring, walk, at);
   const box = boundsOf(lead);
-  for (let edge = 1; edge < ring.length; edge += 1) {
+  for (const edge of edgesNear(walk, box)) {
     const a = ring[edge - 1] as Vec2;
     const b = ring[edge] as Vec2;
     if (!edgeMeetsBox(a, b, box)) continue;
@@ -43,21 +56,74 @@ function ringWalk(ring: ReadonlyArray<Vec2>): RingWalk {
   const known = walks.get(ring);
   if (known !== undefined) return known;
   const cumulative = [0];
+  const cells = new Map<string, number[]>();
+  const wide: number[] = [];
   for (let index = 1; index < ring.length; index += 1) {
     const a = ring[index - 1] as Vec2;
     const b = ring[index] as Vec2;
     cumulative.push((cumulative[index - 1] ?? 0) + Math.hypot(b.x - a.x, b.y - a.y));
+    gridEdge(cells, wide, index, a, b);
   }
-  const walk = { cumulative, lengthMm: cumulative[cumulative.length - 1] ?? 0 };
+  const walk = { cumulative, lengthMm: cumulative[cumulative.length - 1] ?? 0, cells, wide };
   walks.set(ring, walk);
   return walk;
 }
 
-/** How far along the ring the point nearest `point` lies. */
+function gridEdge(cells: Map<string, number[]>, wide: number[], edge: number, a: Vec2, b: Vec2) {
+  const loX = cellOf(Math.min(a.x, b.x));
+  const hiX = cellOf(Math.max(a.x, b.x));
+  const loY = cellOf(Math.min(a.y, b.y));
+  const hiY = cellOf(Math.max(a.y, b.y));
+  const count = (hiX - loX + 1) * (hiY - loY + 1);
+  if (!Number.isFinite(count) || count > MAX_CELLS_PER_EDGE) {
+    wide.push(edge);
+    return;
+  }
+  for (let cx = loX; cx <= hiX; cx += 1) {
+    for (let cy = loY; cy <= hiY; cy += 1) {
+      const key = `${cx},${cy}`;
+      const list = cells.get(key);
+      if (list === undefined) cells.set(key, [edge]);
+      else list.push(edge);
+    }
+  }
+}
+
+function cellOf(value: number): number {
+  return Math.floor(value / CELL_MM);
+}
+
+/** The ring's edges in the grid cells `box` covers, and every wide one. */
+function edgesNear(walk: RingWalk, box: Box): ReadonlyArray<number> {
+  const loX = cellOf(box.minX);
+  const hiX = cellOf(box.maxX);
+  const loY = cellOf(box.minY);
+  const hiY = cellOf(box.maxY);
+  if ((hiX - loX + 1) * (hiY - loY + 1) > walk.cells.size) {
+    return [...new Set([...[...walk.cells.values()].flat(), ...walk.wide])];
+  }
+  const found = new Set<number>(walk.wide);
+  for (let cx = loX; cx <= hiX; cx += 1) {
+    for (let cy = loY; cy <= hiY; cy += 1) {
+      for (const edge of walk.cells.get(`${cx},${cy}`) ?? []) found.add(edge);
+    }
+  }
+  return [...found];
+}
+
+/** How far along the ring the point nearest `point` lies; the joins asked
+ * about lie on the ring, so the edges round it are enough. */
 function positionAlong(ring: ReadonlyArray<Vec2>, walk: RingWalk, point: Vec2): number {
+  const near = edgesNear(walk, {
+    minX: point.x - CELL_MM,
+    minY: point.y - CELL_MM,
+    maxX: point.x + CELL_MM,
+    maxY: point.y + CELL_MM,
+  });
+  const edges = near.length > 0 ? near : ring.map((_, index) => index).slice(1);
   let best = Number.POSITIVE_INFINITY;
   let position = 0;
-  for (let edge = 1; edge < ring.length; edge += 1) {
+  for (const edge of edges) {
     const a = ring[edge - 1] as Vec2;
     const b = ring[edge] as Vec2;
     const dx = b.x - a.x;

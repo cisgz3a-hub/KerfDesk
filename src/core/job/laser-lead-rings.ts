@@ -22,7 +22,7 @@ import { sampleArcMoves } from '../geometry/arc-fit';
 import type { Vec2 } from '../scene';
 import { emittedCutArcMoves } from './cut-arc-moves';
 import type { CutGroup, CutSegment, CutTopologyRing, Job } from './job';
-import { copyLists, copyRepresentatives, leadOutline } from './laser-lead-copies';
+import { copyLists, leadOutline, outlinesAreCopies } from './laser-lead-copies';
 import type { LeadRing } from './laser-lead-obstacles';
 import { leadSideVerdicts, type LeadSideContour, type LeadSideVerdict } from './laser-lead-sides';
 import { isBurningLineGroup } from './line-start-region';
@@ -144,69 +144,99 @@ function ringSides(
         aroundName: '',
       },
   );
-  const sourceClasses = sides.map((side) => side.copyClass);
-  splitKerfPieces(rings, owners, sides, fresh);
-  joinPiecesAcrossGroups(rings, owners, sides, sourceClasses);
+  pieceClasses(rings, owners, sides, fresh);
   return sides;
 }
 
-// A copy is the outline cut again, by another group or drawn twice. Two rings
-// of one group from one scene contour that are not the same outline are the
-// pieces a kerf offset split it into: each keeps clear of the other.
-function splitKerfPieces(
+// The rings of one scene contour. With one ring per group they are one outline
+// however each operation offsets it, and all keep the contour's class. When a
+// kerf offset split the contour into pieces, each piece is a part of its own,
+// cut by every operation that cuts the contour. A ring then takes the class of
+// the earlier ring of its own group it copies exactly (drawn twice), else of
+// the earlier ring of another group it overlaps most (its counterpart there,
+// whatever offset that operation applies), else a class of its own. Two
+// different pieces of one group never share a class: each keeps clear of the
+// other.
+function pieceClasses(
   rings: ReadonlyArray<LeadRing>,
   owners: ReadonlyArray<RingOwner>,
   sides: LeadSideVerdict[],
   fresh: number,
 ): void {
-  const members = new Map<string, number[]>();
+  const bySource = new Map<number, number[]>();
   sides.forEach((side, index) => {
-    const key = `${owners[index]?.group ?? -1}:${side.copyClass}`;
-    const list = members.get(key);
-    if (list === undefined) members.set(key, [index]);
+    const list = bySource.get(side.copyClass);
+    if (list === undefined) bySource.set(side.copyClass, [index]);
     else list.push(index);
   });
-  for (const list of members.values()) {
-    if (list.length < 2) continue;
-    const representatives = copyRepresentatives(list.map((index) => rings[index] as LeadRing));
+  for (const list of bySource.values()) {
+    const groups = list.map((index) => owners[index]?.group ?? -1);
+    if (new Set(groups).size === groups.length) continue;
+    const taken = new Map<number, Set<number>>();
     list.forEach((index, position) => {
-      const representative = representatives[position] ?? position;
       const side = sides[index];
-      if (representative === 0 || side === undefined) return;
-      sides[index] = { ...side, copyClass: fresh + (list[representative] ?? index) };
+      if (side === undefined) return;
+      const group = groups[position] ?? -1;
+      const used = taken.get(group) ?? new Set<number>();
+      const earlier = list.slice(0, position);
+      const ring = rings[index] as LeadRing;
+      const twin = earlier.find(
+        (other) =>
+          (owners[other]?.group ?? -1) === group &&
+          outlinesAreCopies(rings[other] as LeadRing, ring),
+      );
+      const counterpart =
+        twin ??
+        mostOverlapping(
+          rings,
+          ring,
+          earlier.filter(
+            (other) =>
+              (owners[other]?.group ?? -1) !== group &&
+              !used.has(sides[other]?.copyClass ?? Number.NaN),
+          ),
+        );
+      const match = counterpart === undefined ? undefined : sides[counterpart];
+      const copyClass =
+        match !== undefined ? match.copyClass : position === 0 ? side.copyClass : fresh + index;
+      sides[index] = { ...side, copyClass };
+      used.add(copyClass);
+      taken.set(group, used);
     });
   }
 }
 
-// Two operations with the same kerf offset split one scene contour into the
-// same pieces. Each group's first piece kept the contour's class, but a later
-// piece is matched by shape among the contour's rings of other groups, or it
-// would read as another part right at the join and block every lead.
-function joinPiecesAcrossGroups(
+// Counterpart pieces of two operations overlap nearly whole, and a piece lies
+// within the unsplit outline another operation cuts; different pieces of one
+// contour do not overlap at all.
+const MIN_PIECE_OVERLAP = 0.5;
+
+/** The candidate whose bounds overlap `ring`'s most, by share of the smaller. */
+function mostOverlapping(
   rings: ReadonlyArray<LeadRing>,
-  owners: ReadonlyArray<RingOwner>,
-  sides: LeadSideVerdict[],
-  sourceClasses: ReadonlyArray<number>,
-): void {
-  const bySource = new Map<number, number[]>();
-  sourceClasses.forEach((copyClass, index) => {
-    const list = bySource.get(copyClass);
-    if (list === undefined) bySource.set(copyClass, [index]);
-    else list.push(index);
-  });
-  for (const list of bySource.values()) {
-    if (list.every((index) => sides[index]?.copyClass === sourceClasses[index])) continue;
-    const representatives = copyRepresentatives(list.map((index) => rings[index] as LeadRing));
-    list.forEach((index, position) => {
-      const other = list[representatives[position] ?? position];
-      const side = sides[index];
-      if (other === undefined || other === index) return;
-      const match = sides[other];
-      if (side === undefined || match === undefined) return;
-      if (owners[other]?.group === owners[index]?.group) return;
-      sides[index] = { ...side, copyClass: match.copyClass };
-    });
+  ring: LeadRing,
+  candidates: ReadonlyArray<number>,
+): number | undefined {
+  let best: number | undefined;
+  let bestShare = MIN_PIECE_OVERLAP;
+  for (const candidate of candidates) {
+    const other = rings[candidate];
+    if (other === undefined) continue;
+    const share = boundsOverlapShare(ring.bounds, other.bounds);
+    if (share > bestShare) {
+      best = candidate;
+      bestShare = share;
+    }
   }
+  return best;
+}
+
+function boundsOverlapShare(a: LeadRing['bounds'], b: LeadRing['bounds']): number {
+  const width = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX);
+  const height = Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY);
+  if (!(width > 0) || !(height > 0)) return 0;
+  const area = (box: LeadRing['bounds']) => (box.maxX - box.minX) * (box.maxY - box.minY);
+  return (width * height) / Math.min(area(a), area(b));
 }
 
 type RingOwner = Pick<LeadSideContour, 'decides' | 'operationName'> & { readonly group: number };

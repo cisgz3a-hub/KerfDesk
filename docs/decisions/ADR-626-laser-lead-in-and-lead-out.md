@@ -349,3 +349,29 @@ Verification: `core/job/apply-laser-leads.test.ts` restarts a lap-long overcut s
 with the same kerf; `core/job/laser-leads-geometry-guards.test.ts` keeps a lead-in off a 0.01 mm
 tongue beside the join; `core/job/laser-leads-routing.test.ts` routes curve-backed triangles. Each
 failed before this amendment.
+
+### Amendment 4 — the crossing and pairing checks, reviewed (2026-10-21)
+
+1. **An overcut's lead-out keeps clear of the whole lead-in.** When it leaves the contour more than
+   the clearance from where the lead-in joins (an overcut that stops short of the seam), it must keep
+   the clearance from the lead-in along its whole length, or the two cross in the scrap and that
+   spot burns twice. Where both join at one point, the 30-degree retrace rule of Amendment 2 decides,
+   as before.
+2. **Arc leads are checked along the arc the machine runs.** On an arc machine the own-contour
+   crossing check of Amendment 3 follows the G2/G3 arcs, sampled to 0.001 mm, not the chords a lead
+   is drawn with, which the arcs bulge past by up to 0.005 mm.
+3. **The crossing check reads only nearby edges.** Each contour's edges go on a 1 mm grid once
+   (cached per contour), so every fit, length and restart reads only the edges round the lead; a
+   contour of tens of thousands of edges no longer costs a full scan per attempt.
+4. **Split pieces pair across operations whatever their kerf.** Amendment 3 matched a split piece to
+   another operation's only by shape within 0.01 mm, so two operations with different kerf offsets
+   lost the pairing. A piece now takes the class of the earlier piece of another operation whose
+   bounds overlap its own most (at least half of the smaller), which is its counterpart however that
+   operation offsets it, or which holds it when that operation cuts the contour whole. An exact copy
+   in the same operation (drawn twice) still shares its class, and two different pieces of one
+   operation never do.
+
+Verification: `core/job/apply-laser-leads.test.ts` gives a near-lap overcut no lead-out where it
+would cross the lead-in, and leaves an ordinary overcut alone; `core/job/laser-leads-geometry-guards.test.ts`
+keeps an arc lead-in off a spike between its chord and its arc; `io/gcode/laser-leads-scrap-side.test.ts`
+leads all four dumbbell pieces with kerfs of -0.25 and -0.3 mm. Each failed before this amendment.

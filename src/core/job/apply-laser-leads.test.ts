@@ -153,6 +153,23 @@ describe('applyLaserLeads (ADR-626)', () => {
     expect(done.diagnostics).toBeUndefined();
   });
 
+  it('keeps an overcut lead-out that leaves short of the seam off the whole lead-in', () => {
+    const job = (overcutMm: number) =>
+      applyLaserLeads(
+        {
+          groups: [group([square(0, 0, 10)], { laserLeads: LEADS, finalPassOvercutMm: overcutMm })],
+        },
+        NO_BED,
+      );
+    // 0.5 mm short of the seam, the lead-out arc crosses the lead-in arc in
+    // the scrap beside it, wherever the square starts: no lead-out fits.
+    expect(job(39.5).diagnostics).toEqual([
+      expect.objectContaining({ kind: 'laser-leads-adjusted', omitted: 1 }),
+    ]);
+    // An ordinary overcut leaves well clear of the lead-in.
+    expect(job(3).diagnostics).toBeUndefined();
+  });
+
   it('leads a hole from inside, also when the hole is cut by another operation', () => {
     const outer = square(0, 0, 40);
     const hole = square(10, 10, 20);

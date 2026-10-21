@@ -18,6 +18,7 @@
 // Full length first, then shorter steps down to a quarter; null when none fit.
 
 import { pointInPolygon } from '../geometry';
+import { sampleArcMoves } from '../geometry/arc-fit';
 import type { Vec2 } from '../scene';
 import { extendBoundsByEmittedArcMoves } from './cut-arc-moves';
 import type { JobBounds } from './job-bounds';
@@ -66,6 +67,10 @@ const FREE_END_REACH_SHARE = 0.9;
 // A lead-out leaving within this of the way its lead-in came retraces it
 // (retracesLeadIn).
 const RETRACE_DEG = 30;
+// A lead written as G2/G3 is checked against its own contour along the arcs
+// the machine follows, sampled this finely, not along the chords it is drawn
+// with, which the arcs bulge past.
+const EMITTED_ARC_SAGITTA_MM = 0.001;
 
 export function fitLead(
   kind: LeadKind,
@@ -88,7 +93,8 @@ export function leadFits(
 ): boolean {
   const { at } = join;
   if (!onBed(path, context.bed, context.arcsEmitted)) return false;
-  if (crossesOwnContour(path.points, at, context.ownRing)) return false;
+  if (crossesOwnContour(emittedPoints(path, context.arcsEmitted), at, context.ownRing))
+    return false;
   const outward = kind === 'in' ? [...path.points].reverse() : path.points;
   // An arc written as G2/G3 bulges up to the sampling sag past the chords
   // checked here, so it keeps that much more clearance from other cut lines.
@@ -191,28 +197,58 @@ function withinBounds(point: Vec2, bounds: JobBounds): boolean {
   );
 }
 
-/** Whether a lead-out runs back along its contour's lead-in, so one pass would
- * burn that stretch twice: line leads at a right-angle corner leave along the
- * very line they came in on. Judged where they meet: a lead-out leaving within
- * RETRACE_DEG of the way the lead-in came overlaps it for more than a kerf
- * width. Arc leads at a corner part at a right angle and meet again only at
- * their free ends, both in the scrap. A lead-out leaving more than `nearMm`
- * from where the lead-in joins (an overcut's, from where the overcut ends)
- * cannot run back along it. */
-export function retracesLeadIn(leadOut: LeadFit, leadIn: LeadFit, nearMm: number): boolean {
+/** Whether a lead-out would burn over its contour's lead-in on the same pass.
+ * Where both join the contour at one point, judged there: line leads at a
+ * right-angle corner leave along the very line they came in on, and a lead-out
+ * leaving within RETRACE_DEG of the way the lead-in came overlaps it for more
+ * than a kerf width. Arc leads at a corner part at a right angle and meet again
+ * only at their free ends, both in the scrap. A lead-out leaving from
+ * elsewhere (an overcut's, from where the overcut ends) must keep the
+ * clearance from the whole lead-in, or the two cross or run side by side. */
+export function retracesLeadIn(leadOut: LeadFit, leadIn: LeadFit, clearanceMm: number): boolean {
   const start = leadOut.path.points[0];
   const inPoints = leadIn.path.points;
   const join = inPoints[inPoints.length - 1];
   if (start === undefined || join === undefined) return false;
-  if (Math.hypot(start.x - join.x, start.y - join.y) > nearMm) return false;
+  if (Math.hypot(start.x - join.x, start.y - join.y) > clearanceMm) {
+    return walkSamples([start, ...leadOut.path.points.slice(1)]).some(
+      (sample) => distanceToPolylineMm(sample, inPoints) < clearanceMm,
+    );
+  }
   const outward = direction(start, leadOut.path.points[1]);
   const back = direction(join, inPoints[inPoints.length - 2]);
   if (outward === null || back === null) return false;
   return outward.x * back.x + outward.y * back.y > Math.cos((RETRACE_DEG * Math.PI) / 180);
 }
 
+function distanceToPolylineMm(point: Vec2, points: ReadonlyArray<Vec2>): number {
+  let nearest = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < points.length; index += 1) {
+    const a = points[index - 1] as Vec2;
+    const b = points[index] as Vec2;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const span = dx * dx + dy * dy;
+    const t =
+      span === 0
+        ? 0
+        : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / span));
+    nearest = Math.min(nearest, Math.hypot(point.x - (a.x + dx * t), point.y - (a.y + dy * t)));
+  }
+  return nearest;
+}
+
 function direction(from: Vec2 | undefined, to: Vec2 | undefined): Vec2 | null {
   if (from === undefined || to === undefined) return null;
   const length = Math.hypot(to.x - from.x, to.y - from.y);
   return length === 0 ? null : { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
+}
+
+/** The lead as the machine runs it: its arcs, finely sampled, when it goes out
+ * as G2/G3; else the chords it is written as. */
+function emittedPoints(path: LeadPath, arcsEmitted: boolean): ReadonlyArray<Vec2> {
+  const start = path.points[0];
+  return arcsEmitted && start !== undefined && path.moves.some((move) => move.kind === 'arc')
+    ? sampleArcMoves(start, path.moves, EMITTED_ARC_SAGITTA_MM)
+    : path.points;
 }
