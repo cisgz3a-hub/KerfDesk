@@ -57,7 +57,7 @@ export function RegistrationJigEditor(props: { readonly onClose: () => void }): 
         <div className="lf-jig-body">
           <JigEditorSidebar editor={editor} />
           <RegistrationJigCanvas
-            project={editor.session.draft.project}
+            project={editor.view}
             selectedIds={editor.ids}
             fitRequest={editor.fitRequest}
             onSelectionChange={editor.onSelect}

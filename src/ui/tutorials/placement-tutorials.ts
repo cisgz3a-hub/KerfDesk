@@ -75,7 +75,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Burn the outline onto the wood first',
         examplePhase: 0,
         instruction:
-          'Leave the leather keychain off the wood. Choose Outline only and set Jig outline laser settings for marking this wood. Inspect Preview, complete Frame for this exact outline job, then choose Start and Start job in Job Review.',
+          'Leave the leather keychain off the wood. Choose Outline only. The outline burns with standard Line settings; Job Review shows them, and the Registration jig operation on the main canvas changes them if this wood needs a lighter mark. Inspect Preview, complete Frame for this exact outline job, then choose Start and Start job in Job Review.',
         focus: 'Run 1: burn the outline on empty wood',
         result:
           'The wood now carries a physical outline at the same known coordinates as the canvas rectangle.',

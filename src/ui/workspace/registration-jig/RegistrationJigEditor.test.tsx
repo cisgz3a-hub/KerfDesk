@@ -15,7 +15,8 @@ import { RegistrationJigEditor } from './RegistrationJigEditor';
 vi.mock('./RegistrationJigCanvas', () => ({
   RegistrationJigCanvas: (props: { project: Project }) => (
     <div aria-label="Registration jig editing canvas">
-      {findRegistrationBoxes(props.project.scene).length} outlines
+      {findRegistrationBoxes(props.project.scene).length} outlines,{' '}
+      {props.project.scene.objects.map((object) => object.id).join(' ')}
     </div>
   ),
 }));
@@ -65,26 +66,35 @@ function confirmDialog(): Element | undefined {
     dialog.textContent?.includes('Save jig changes?'),
   );
 }
-function savedJigWithArtwork(): void {
-  useStore.getState().addRegistrationBox(80, 40);
+function square(id: string, x: number, y: number): void {
   useStore.getState().drawShape(
     createRectangle({
-      id: 'art',
+      id,
       color: '#0000ff',
       spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
-      transform: { ...IDENTITY_TRANSFORM, x: 5, y: 5 },
+      transform: { ...IDENTITY_TRANSFORM, x, y },
     }),
   );
+}
+/** Artwork at this offset from the bed centre, where the first outline is centred. */
+function squareOnOutline(id: string, dx = 0): void {
+  const { bedWidth, bedHeight } = useStore.getState().project.device;
+  square(id, bedWidth / 2 - 5 + dx, bedHeight / 2 - 5);
+}
+function savedJigWithArtwork(): void {
+  useStore.getState().addRegistrationBox(80, 40);
+  squareOnOutline('art');
   useStore.getState().setRegistrationBoxLocked(true);
+}
+function canvasText(): string | null | undefined {
+  return container.querySelector('[aria-label="Registration jig editing canvas"]')?.textContent;
 }
 describe('Registration Jig dedicated editor', () => {
   it('starts with an editable draft and isolates application shortcuts', () => {
     const project = useStore.getState().project;
     const depth = useUiStore.getState().modalDepth;
     render();
-    expect(
-      container.querySelector('[aria-label="Registration jig editing canvas"]')?.textContent,
-    ).toBe('1 outlines');
+    expect(canvasText()).toBe('1 outlines, registration-box');
     expect(useStore.getState().project).toBe(project);
     expect(useUiStore.getState().modalDepth).toBe(depth + 1);
   });
@@ -138,8 +148,8 @@ describe('Registration Jig dedicated editor', () => {
   });
   it('Escape clears the selection first, then asks before discarding edits', () => {
     savedJigWithArtwork();
-    useStore.getState().selectObject('art');
     render();
+    press('a', { ctrlKey: true });
     press('ArrowRight');
     expect(container.textContent).toContain('Unsaved changes');
     press('Escape');
@@ -151,16 +161,12 @@ describe('Registration Jig dedicated editor', () => {
   });
   it('Ctrl+A selects all the artwork but no outline, and not from a field', () => {
     savedJigWithArtwork();
-    useStore.getState().drawShape(
-      createRectangle({
-        id: 'more',
-        color: '#0000ff',
-        spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
-        transform: { ...IDENTITY_TRANSFORM, x: 40, y: 5 },
-      }),
-    );
-    useStore.getState().selectObject('art');
+    squareOnOutline('more', 20);
+    // Main-canvas artwork off the jig is never part of Select all.
+    square('main', 5, 5);
     render();
+    click('Jig layout');
+    click('Select all outlines');
     const field = container.querySelector<HTMLInputElement>('[aria-label="X (mm)"]');
     if (field === null) throw new Error('Missing selection field');
     act(() => field.focus());
@@ -169,13 +175,15 @@ describe('Registration Jig dedicated editor', () => {
     });
     expect(container.textContent).toContain('1 selected');
     expect(press('a', { ctrlKey: true }).defaultPrevented).toBe(true);
-    // The outline has not been burned, so it is editable, but Ctrl+A leaves it out.
+    // The outline has not been burned, so it is editable, but Ctrl+A leaves it out,
+    // and the main-canvas artwork is not on the jig canvas at all.
     expect(container.textContent).toContain('2 selected');
+    expect(canvasText()).not.toContain('main');
   });
   it('Escape in a field only leaves the field', () => {
     savedJigWithArtwork();
-    useStore.getState().selectObject('art');
     render();
+    press('a', { ctrlKey: true });
     const field = container.querySelector<HTMLInputElement>('[aria-label="X (mm)"]');
     if (field === null) throw new Error('Missing selection field');
     act(() => field.focus());
@@ -230,5 +238,38 @@ describe('Registration Jig dedicated editor', () => {
     expect(close).toHaveBeenCalledOnce();
     expect(findRegistrationBoxes(project.scene)).toHaveLength(1);
     expect(project.variables?.serialValue).toBe(5);
+  });
+  it('opens on a clean canvas without main-canvas artwork or its selection', () => {
+    square('main', 150, 180);
+    useStore.getState().selectObject('main');
+    render();
+    expect(canvasText()).not.toContain('main');
+    expect(press('a', { ctrlKey: true }).defaultPrevented).toBe(true);
+    expect(container.textContent).not.toMatch(/\d+ selected/);
+  });
+  it('saves jig edits and leaves main-canvas artwork exactly as it was', () => {
+    savedJigWithArtwork();
+    square('main', 5, 5);
+    const main = useStore.getState().project.scene.objects.find((item) => item.id === 'main');
+    render();
+    press('a', { ctrlKey: true });
+    press('ArrowRight');
+    press('Delete');
+    click('Save to canvas');
+    const { objects } = useStore.getState().project.scene;
+    expect(objects.find((item) => item.id === 'main')).toBe(main);
+    expect(objects.some((item) => item.id === 'art')).toBe(false);
+  });
+  it('has no power, speed or other burn settings', () => {
+    savedJigWithArtwork();
+    render();
+    press('a', { ctrlKey: true });
+    for (const tab of ['Artwork', 'Jig layout']) {
+      click(tab);
+      expect(container.textContent).toContain('Burns use standard settings');
+    }
+    const text = container.textContent ?? '';
+    for (const label of ['Power', 'Speed', 'Passes', 'Line / Fill', 'laser settings', 'Air assist'])
+      expect(text).not.toContain(label);
   });
 });
