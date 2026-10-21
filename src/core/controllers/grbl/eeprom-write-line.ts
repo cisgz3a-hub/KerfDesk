@@ -26,23 +26,36 @@ export function isEepromWriteLine(line: string): boolean {
   return false;
 }
 
-/** A `$` line that can change what `$$` or `$I` reports (ADR-648): any `$`
- * assignment, and FluidNC's `$NVX` (`$Settings/Erase`), which erases every
- * stored setting with or without a value (see fluidnc/driver.ts). */
+/** A line that can change what `$$` or `$I` reports (ADR-648): any setting
+ * command with a value except a jog, and FluidNC's `$NVX` (`$Settings/Erase`),
+ * which erases every stored setting with or without a value (fluidnc/driver.ts). */
 export function isStoredSettingWriteLine(line: string): boolean {
-  if (!line.includes('$')) return false;
-  const code = stripControllerComments(line);
-  if (!code.startsWith('$')) return false;
-  return isAssignment(code) || /^\$(NVX|Settings\/Erase)(=|$)/i.test(code.replace(/\s+/g, ''));
+  const command = settingCommand(line);
+  if (command === null) return false;
+  if (/^(NVX|Settings\/Erase)$/i.test(command.key)) return true;
+  return command.hasValue && !/^(J|Jog)$/i.test(command.key);
 }
 
 /** A write that can change what `$I` reports: `$I=` sets its build string, and
- * `$RST=` (FluidNC `$Settings/Restore=`) can restore it (ADR-648). GRBL drops
- * whitespace before it parses a line, so `$I =x` and `$RST = *` count too. */
+ * `$RST=` (FluidNC `$Settings/Restore=`) can restore it (ADR-648). */
 export function isBuildInfoWriteLine(line: string): boolean {
-  if (!isStoredSettingWriteLine(line)) return false;
-  const compacted = stripControllerComments(line).replace(/\s+/g, '');
-  return /^\$(I|RST|Settings\/Restore)=/i.test(compacted);
+  const command = settingCommand(line);
+  return command?.hasValue === true && /^(I|RST|Settings\/Restore)$/i.test(command.key);
+}
+
+/** A `$key=value` command, or FluidNC's `[key]value` form of the same
+ * (fluidnc-line-limit.ts). The firmware drops whitespace before it parses a
+ * line, so `$I =x`, `$ J = …` and `[ 13 ]1` are read like their compact forms. */
+function settingCommand(line: string): { readonly key: string; readonly hasValue: boolean } | null {
+  if (!line.includes('$') && !line.includes('[')) return null;
+  const code = stripControllerComments(line).replace(/\s+/g, '');
+  const separator = code.startsWith('$') ? '=' : code.startsWith('[') ? ']' : null;
+  if (separator === null) return null;
+  const end = code.indexOf(separator);
+  return {
+    key: code.slice(1, end < 0 ? undefined : end),
+    hasValue: end >= 0,
+  };
 }
 
 function isAssignment(code: string): boolean {

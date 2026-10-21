@@ -48,7 +48,7 @@ export type RetainedControllerSettings = {
 /** Any write, or a whole program: the streamer sends a program's `$` lines
  * alone (ADR-644), so once it starts any of them may have reached EEPROM. */
 export function noteControllerSettingWrite(refs: OwnedResetSettingsRefs, text: string): void {
-  if (!text.includes('$')) return;
+  if (!text.includes('$') && !text.includes('[')) return;
   const lines = text.split('\n');
   if (lines.some(isStoredSettingWriteLine)) {
     refs.settingsWriteRevision = (refs.settingsWriteRevision ?? 0) + 1;
