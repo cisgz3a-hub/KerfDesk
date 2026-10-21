@@ -297,17 +297,22 @@ describe('03-P1-3: Remove overlapping lines between two parts that share an edge
   const inA = (point: Vec2) => insideRect(point, { x: 20, y: 20 }, { x: 40, y: 40 }, 0.05);
   const inB = (point: Vec2) => insideRect(point, { x: 40, y: 20 }, { x: 60, y: 40 }, 0.05);
 
-  for (const [style, leads] of [
-    ['arc', ARC_LEADS],
-    ['line 90°', LINE_LEADS],
-    ['line 45°', { ...ARC_LEADS, leadStyle: 'line' }],
-  ] as const) {
-    it(`keeps every lead out of both parts (${style} leads)`, () => {
-      const input = sharedEdgeProject(leads);
-      const lit = litSamples(emitGcode(input).gcode);
-      expect(lit.length).toBeGreaterThan(0);
-      expect(lit.filter((point) => inA(point) || inB(point))).toEqual([]);
-    });
+  // One pass is routed alone; more passes go through the packet cleanup of
+  // inside-first ordering (topology-cut-cleanup.ts), which must keep the
+  // outline too.
+  for (const passes of [1, 2]) {
+    for (const [style, leads] of [
+      ['arc', ARC_LEADS],
+      ['line 90°', LINE_LEADS],
+      ['line 45°', { ...ARC_LEADS, leadStyle: 'line' }],
+    ] as const) {
+      it(`keeps every lead out of both parts (${style} leads, ${passes} pass)`, () => {
+        const input = sharedEdgeProject({ ...leads, passes });
+        const lit = litSamples(emitGcode(input).gcode);
+        expect(lit.length).toBeGreaterThan(0);
+        expect(lit.filter((point) => inA(point) || inB(point))).toEqual([]);
+      });
+    }
   }
 });
 
@@ -343,6 +348,38 @@ describe('03-P2-9: kerf and order of a DXF plate drawn as LINE entities', () => 
         'lines: no kerf offset and the shapes inside are not cut first. Select it and use ' +
         'Tools > Join paths (gap up to 0.5 mm) to close it.',
     );
+  });
+
+  it("takes an outline's settings from its own artwork, not the operation's other paths", () => {
+    // The open plate outline has its kerf turned off on the artwork; a loose
+    // line elsewhere on the operation keeps the operation's kerf.
+    const loose: SceneObject = {
+      kind: 'imported-svg',
+      id: 'loose',
+      source: 'loose.svg',
+      bounds: { minX: 250, minY: 100, maxX: 300, maxY: 100 },
+      transform: IDENTITY_TRANSFORM,
+      operationIds: ['cut'],
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            {
+              closed: false,
+              points: [
+                { x: 250, y: 100 },
+                { x: 300, y: 100 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const plate = { ...importedPlate(0.1), operationOverride: { kerfOffsetMm: 0 } };
+    const base = project([layer({ kerfOffsetMm: 0.2 })], [plate, loose]);
+    const input = { ...base, optimization: { ...base.optimization, insideFirst: false } };
+    const codes = emitGcode(input).preflight.issues.map((issue) => issue.code);
+    expect(codes).not.toContain('line-open-outline');
   });
 
   it('says nothing about an open outline no setting needs closed', () => {

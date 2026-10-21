@@ -35,6 +35,7 @@ import {
 } from '../scene';
 import type { PreflightIssue } from './preflight';
 
+/** Per operation, the outlines that miss a setting and which settings. */
 type OperationLines = {
   readonly name: string;
   kerf: boolean;
@@ -43,8 +44,17 @@ type OperationLines = {
   holdsShapes: boolean;
 };
 
+/** An open path, with the settings its artwork runs it with. Only paths
+ * with the same operation and settings join, as in Join paths, so each
+ * outline's settings are its own paths'. */
+type Source = JoinableCurve & {
+  readonly operationId: string;
+  readonly kerf: boolean;
+  readonly leads: boolean;
+};
+
 type Collected = {
-  readonly sources: Array<JoinableCurve & { readonly operationId: string }>;
+  readonly sources: Source[];
   readonly operations: Map<string, OperationLines>;
   /** One point of every closed Line contour, for what an outline holds. */
   readonly probes: Vec2[];
@@ -60,16 +70,26 @@ export function lineOpenOutlineIssues(project: Project): ReadonlyArray<Preflight
     const source = collected.sources[index];
     const operation =
       source === undefined ? undefined : collected.operations.get(source.operationId);
-    if (curve === null || !curve.closed || operation === undefined) continue;
-    operation.outlines += 1;
+    if (curve === null || !curve.closed || source === undefined || operation === undefined)
+      continue;
     const outline = [curve.start, ...curve.segments.map((segment) => segment.to)];
-    if (ordersInsideFirst && !operation.holdsShapes)
-      operation.holdsShapes = collected.probes.some((probe) => pointInPolygon(probe, outline));
+    const holds =
+      ordersInsideFirst && collected.probes.some((probe) => pointInPolygon(probe, outline));
+    tallyOutline(operation, source, holds);
   }
   return [...collected.operations.values()].flatMap((operation) => {
     const issue = outlineIssue(operation);
     return issue === null ? [] : [issue];
   });
+}
+
+// An outline counts only when one of its own settings needs it closed.
+function tallyOutline(operation: OperationLines, source: Source, holdsShapes: boolean): void {
+  if (!source.kerf && !source.leads && !holdsShapes) return;
+  operation.outlines += 1;
+  operation.kerf ||= source.kerf;
+  operation.leads ||= source.leads;
+  operation.holdsShapes ||= holdsShapes;
 }
 
 function collectLines(project: Project): Collected {
@@ -98,24 +118,28 @@ function collectObject(
     if (!pathUsesOperation(object, path, operation)) continue;
     collected.probes.push(...closedStarts(path, object));
     if (!subpaths(path).some((subpath) => !subpath.closed)) continue;
-    const lines = operationLines(collected, operation);
-    lines.kerf ||= effective.kerfOffsetMm !== 0;
-    lines.leads ||= laserLeadSpecFor(effective) !== null;
-    collectOpenLines(collected, operation, path, object);
+    operationLines(collected, operation);
+    const settings = {
+      operationId: operation.id,
+      kerf: effective.kerfOffsetMm !== 0,
+      leads: laserLeadSpecFor(effective) !== null,
+    };
+    collectOpenLines(collected, settings, path, object);
   }
 }
 
 function collectOpenLines(
   collected: Collected,
-  operation: Layer,
+  settings: Omit<Source, keyof JoinableCurve>,
   path: ColoredPath,
   object: SceneObject,
 ): void {
+  const signature = `${settings.operationId}\u0000${settings.kerf}\u0000${settings.leads}`;
   for (const polyline of compilationPolylines(path, object.transform)) {
     if (polyline.closed || polyline.points.length < 2) continue;
     const points = polyline.points.map((point) => applyTransform(point, object.transform));
     const curve = polylineToCurveSubpath({ points, closed: false });
-    collected.sources.push({ curve, signature: operation.id, operationId: operation.id });
+    collected.sources.push({ ...settings, curve, signature });
   }
 }
 

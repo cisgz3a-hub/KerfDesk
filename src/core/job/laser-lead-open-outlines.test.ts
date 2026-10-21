@@ -70,6 +70,19 @@ describe('openLineHolders (ADR-626 Amendment 8)', () => {
     expect(openLineHolders([HOLE], lines)).toEqual(['Plate']);
   });
 
+  it('reads 20,000 hatch lines across one span, which close nothing', () => {
+    // Lines 1 mm apart share their whole X span; they are clustered by grid
+    // cell, not compared pair by pair. The four sides round the hole still
+    // close it, and a dot between two hatch lines is not held.
+    const hatch = Array.from({ length: 20_000 }, (_, index) =>
+      line('Hatch', [-500, 100 + index], [500, 100 + index]),
+    );
+    expect(openLineHolders([HOLE, circle(0, 150.5, 0.2)], [...sides(0), ...hatch])).toEqual([
+      'Cut',
+      undefined,
+    ]);
+  }, 30_000);
+
   it('reads a contour inside a closed island within the region as held', () => {
     // An island the lines draw inside the region (a loop within the square)
     // closes a region of its own; a contour inside it is held as well.

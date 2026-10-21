@@ -485,26 +485,32 @@ Decision:
    leads and is cut as with leads off, and Job Review gives the side-unknown warning of Amendment 1
    D3 (`laser-leads-side-unknown` with `aroundOpenPaths`), naming the operation of the open lines and
    saying to close the outline with Tools > Join paths or to choose a fixed side. Where a closed shape
-   without leads also holds the contour, that shape is named. Only lines whose grown bounds connect
-   to a cluster that reaches a contour are united, after simplifying them to 0.05 mm (their ends
-   kept) and sampling the round caps to 0.01 mm, so ends up to 0.48 mm apart always close; line art
-   away from every contour costs nothing, and the work only runs when some operation asks for
-   leads. Open paths are still neither containers
+   without leads also holds the contour, that shape is named. Lines are clustered by the grid cells
+   their grown bounds cover (a cell size chosen so each line covers about eight, so the work grows
+   with the lines, not their pairs; lines that share a cell may join a cluster they need not, which
+   costs time only), and only clusters whose bounds reach a contour are united, after simplifying
+   the lines to 0.05 mm (their ends kept) and sampling the round caps to 0.01 mm, so ends up to
+   0.48 mm apart always close. Line art away from every contour costs nothing, and the work only
+   runs when some operation asks for leads. Open paths are still neither containers
    nor part edges for parity, as ADR-486 Amendment 2 holds for the kerf offset. The fixed sides are
    unchanged.
 3. **A part split by Remove overlapping lines keeps its outline** (`core/job/remove-cut-overlaps.ts`).
    When some operation asks for leads (compile then stamps each closed contour with its scene
    contour, `leadSource`), a closed contour that overlap removal, exact or with a merge tolerance,
    breaks into pieces keeps its whole outline on its group (`CutGroup.topologyRings`), as one broken
-   by tabs or perforation does (clause 3). Leads read it as a ring and as a cut line: they keep the
+   by tabs or perforation does (clause 3). That holds on every route overlap removal takes: inside-first
+   ordering cleans a multi-pass or tabbed operation packet by packet (`topology-cut-cleanup.ts`),
+   and the outline rides on the first part of its group that still cuts something, and survives
+   when parts are joined again. Leads read it as a ring and as a cut line: they keep the
    clearance from the removed edge and never end inside the part. The pieces still get no leads
    (clause 9). The outline is lead scaffolding and is dropped with it, so a job without leads emits
    the same bytes.
 4. **Line-layer advisory** (`core/preflight/line-open-outline-issues.ts`, `line-open-outline`).
    Open paths of one output Line operation that Join paths would close at 0.5 mm are named in Job
-   Review and on Save when the operation has a kerf offset or leads, or when the outline holds a
-   closed Line contour that inside-first would cut before it; the message says which of those the
-   outline misses. It is a warning only (rule 7, ADR-565): the lines are cut as drawn.
+   Review and on Save when their artwork runs them with a kerf offset or leads, or when the outline
+   holds a closed Line contour that inside-first would cut before it; the message says which of
+   those the outlines miss. As in Join paths, only paths cut with the same settings join, so each
+   outline is judged by its own artwork's settings, never by another path on the operation. It is a warning only (rule 7, ADR-565): the lines are cut as drawn.
 
 Not covered: open lines that close a region only together with a closed shape's edge, such as a
 part drawn by hand as three lines against another part's side, are not read by decision 2. Remove
@@ -521,15 +527,16 @@ G-code and reads it back. With arc and 90° line leads no lit G1, G2 or G3 sampl
 material; both joined contours get their leads, outward and inward; with a 0.1 mm corner gap, and
 with lines drawn past the corners, the hole gets no lead and one side-unknown warning. Two squares
 sharing an edge, with overlap removal on, keep every lit sample out of both parts with arc, 90° and
-45° leads. The joined plate is kerf-offset as a part with its hole as a hole (mean hole radius
+45° leads, in one pass and in two (the packet cleanup route). An outline whose artwork turns its
+kerf off gets no warning because of another path on the operation. The joined plate is kerf-offset as a part with its hole as a hole (mean hole radius
 4.8 mm, plate −0.2 to 80.2 mm) and the hole is cut first; the 0.1 mm-gap plate on a kerf layer gets
 the `line-open-outline` warning, while open lines that close nothing, or an open outline that no
 setting needs closed, get none. Every case except those last two and the 90° overlap case failed
 before this amendment. `io/dxf/dxf-join-touching.test.ts` covers LINEs drawn in any direction, a
 slot of LINEs and ARCs, a real gap, three ends at one point, two colours and closed entities, and
-`io/dxf/dxf-nested-insert.test.ts` now counts the 150,000 MINSERT instances as line pieces, since
-the few whose ends meet are joined;
+`io/dxf/dxf-nested-insert.test.ts` and `ui/import/parse-dxf-blob.test.ts` now count the 150,000
+MINSERT instances as line pieces, since the few whose ends meet are joined;
 `core/job/laser-lead-open-outlines.test.ts` the gap limit, crossing lines, a single looped path,
-nested contours and dangling lines; `core/job/remove-cut-overlaps.test.ts` the kept outline with and
+nested contours, dangling lines and 20,000 hatch lines across one span; `core/job/remove-cut-overlaps.test.ts` the kept outline with and
 without a merge tolerance and its absence without leads; `ui/laser/laser-lead-warnings.test.ts` the
 wording. Not qualified on a machine.

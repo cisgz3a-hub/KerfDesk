@@ -98,16 +98,17 @@ export function openLineHolders(
 
 // Lines whose strokes cannot meet cannot close a region together, and a
 // region some lines close lies within their bounds. So the lines fall into
-// clusters whose bounds, grown by the stroke radius, overlap, and only the
-// clusters whose bounds meet a contour are united: line art far from every
-// contour costs nothing.
+// clusters whose bounds, grown by the stroke radius, overlap (or merely share
+// a grid cell: joining more than needed costs time, never a region), and
+// only the clusters whose bounds meet a contour are united: line art far
+// from every contour costs nothing.
 function reachingStrokes(
   strokes: ReadonlyArray<SceneOpenLine>,
   contours: ReadonlyArray<Box>,
 ): SceneOpenLine[] {
   if (strokes.length === 0 || contours.length === 0) return [];
   const reach = strokes.map((line) => grown(boxOf(line.points), STROKE_RADIUS_MM));
-  const cluster = clustersByOverlap(reach);
+  const cluster = clustersByCell(reach);
   const extent = new Map<number, Box>();
   reach.forEach((box, index) => {
     const root = cluster(index);
@@ -121,8 +122,10 @@ function reachingStrokes(
   return strokes.filter((_, index) => kept.has(cluster(index)));
 }
 
-/** Union-find over boxes that overlap, by a sweep in X. */
-function clustersByOverlap(boxes: ReadonlyArray<Box>): (index: number) => number {
+/** Union-find over boxes that share a grid cell. Boxes that overlap always
+ * share one, so no overlapping pair is ever apart, and the work grows with the
+ * cells the boxes cover, never with pairs of boxes. */
+function clustersByCell(boxes: ReadonlyArray<Box>): (index: number) => number {
   const parent = boxes.map((_, index) => index);
   const find = (index: number): number => {
     let root = index;
@@ -134,19 +137,41 @@ function clustersByOverlap(boxes: ReadonlyArray<Box>): (index: number) => number
     }
     return root;
   };
-  const order = boxes
-    .map((_, index) => index)
-    .sort((a, b) => (boxes[a] as Box).minX - (boxes[b] as Box).minX);
-  let active: number[] = [];
-  for (const index of order) {
-    const box = boxes[index] as Box;
-    active = active.filter((other) => (boxes[other] as Box).maxX >= box.minX);
-    for (const other of active) {
-      if (overlaps(box, boxes[other] as Box)) parent[find(other)] = find(index);
+  const size = cellSize(boxes);
+  const first = new Map<string, number>();
+  boxes.forEach((box, index) => {
+    for (let x = Math.floor(box.minX / size); x <= Math.floor(box.maxX / size); x += 1) {
+      for (let y = Math.floor(box.minY / size); y <= Math.floor(box.maxY / size); y += 1) {
+        const key = `${x},${y}`;
+        const other = first.get(key);
+        if (other === undefined) first.set(key, index);
+        else parent[find(other)] = find(index);
+      }
     }
-    active.push(index);
-  }
+  });
   return find;
+}
+
+// The finest cell, doubling from MIN_CELL_MM, at which the boxes cover at most
+// CELLS_PER_BOX cells each on average: long lines get coarse cells rather than
+// thousands each.
+const MIN_CELL_MM = 1;
+const CELLS_PER_BOX = 8;
+
+function cellSize(boxes: ReadonlyArray<Box>): number {
+  let size = MIN_CELL_MM;
+  while (coveredCells(boxes, size) > CELLS_PER_BOX * boxes.length) size *= 2;
+  return size;
+}
+
+function coveredCells(boxes: ReadonlyArray<Box>, size: number): number {
+  let cells = 0;
+  for (const box of boxes) {
+    const columns = Math.floor(box.maxX / size) - Math.floor(box.minX / size) + 1;
+    const rows = Math.floor(box.maxY / size) - Math.floor(box.minY / size) + 1;
+    cells += columns * rows;
+  }
+  return cells;
 }
 
 function unitedStrokes(strokes: ReadonlyArray<SceneOpenLine>): Ring[] | null {
