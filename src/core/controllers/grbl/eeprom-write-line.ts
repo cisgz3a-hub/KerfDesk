@@ -35,10 +35,12 @@ export function isSettingAssignmentLine(line: string): boolean {
 }
 
 /** A write that can change what `$I` reports: `$I=` sets its build string, and
- * `$RST=` (FluidNC `$Settings/Restore=`) can restore it (ADR-648). */
+ * `$RST=` (FluidNC `$Settings/Restore=`) can restore it (ADR-648). GRBL drops
+ * whitespace before it parses a line, so `$I =x` and `$RST = *` count too. */
 export function isBuildInfoWriteLine(line: string): boolean {
   if (!isSettingAssignmentLine(line)) return false;
-  return /^\$(I|RST|Settings\/Restore)=/i.test(stripControllerComments(line));
+  const compacted = stripControllerComments(line).replace(/\s+/g, '');
+  return /^\$(I|RST|Settings\/Restore)=/i.test(compacted);
 }
 
 function isAssignment(code: string): boolean {

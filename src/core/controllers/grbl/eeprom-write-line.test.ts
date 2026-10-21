@@ -3,7 +3,11 @@
 // https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/doc/markdown/interface.md
 
 import { describe, expect, it } from 'vitest';
-import { isEepromWriteLine } from './eeprom-write-line';
+import {
+  isBuildInfoWriteLine,
+  isEepromWriteLine,
+  isSettingAssignmentLine,
+} from './eeprom-write-line';
 import { createStreamer, onAck, step } from './streamer';
 
 describe('isEepromWriteLine', () => {
@@ -41,6 +45,34 @@ describe('isEepromWriteLine', () => {
   ])('does not treat %s as an EEPROM write', (line) => {
     expect(isEepromWriteLine(line)).toBe(false);
   });
+});
+
+// ADR-648: `$` assignments retire a kept `$$` snapshot; only `$I=` and `$RST=`
+// can change what `$I` reports. GRBL drops whitespace before parsing a line.
+describe('isSettingAssignmentLine and isBuildInfoWriteLine', () => {
+  it.each(['$I=shop laser', '$I =shop laser', '$ I = shop', '$RST=*', '$RST = $', '$rst=#'])(
+    'treats %s as a build-info write',
+    (line) => {
+      expect(isSettingAssignmentLine(line)).toBe(true);
+      expect(isBuildInfoWriteLine(line)).toBe(true);
+    },
+  );
+
+  it.each(['$30=1000', '$130 = 400', '$N0=G21'])(
+    'treats %s as a setting write that leaves `$I` alone',
+    (line) => {
+      expect(isSettingAssignmentLine(line)).toBe(true);
+      expect(isBuildInfoWriteLine(line)).toBe(false);
+    },
+  );
+
+  it.each(['$I', '$$', '$J=G91 X1 F100', 'G10 L20 P1 X0', '($I=x) G0 X1'])(
+    'does not treat %s as a setting write',
+    (line) => {
+      expect(isSettingAssignmentLine(line)).toBe(false);
+      expect(isBuildInfoWriteLine(line)).toBe(false);
+    },
+  );
 });
 
 describe('streamer EEPROM sync point', () => {
