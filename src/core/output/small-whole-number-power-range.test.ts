@@ -8,6 +8,7 @@ import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { compileJob } from '../job/compile-job';
 import type { CutGroup, Job, RasterGroup } from '../job';
 import { createLayer, IDENTITY_TRANSFORM, type RasterImage } from '../scene';
+import { rescaleRasterValuesForVersion } from '../raster/controller-power-scale';
 import { grblStrategy } from './grbl-strategy';
 import { scaleS } from './grbl-laser-lines';
 import { CURRENT_LASER_POWER_SCALE_VERSION } from './laser-power-scale-version';
@@ -56,16 +57,24 @@ const grayRow: RasterImage = {
   linesPerMm: 1,
 };
 
-function grayscaleRaster(maxPowerS: number, version = CURRENT_LASER_POWER_SCALE_VERSION): Job {
+function grayscaleRaster(
+  maxPowerS: number,
+  version = CURRENT_LASER_POWER_SCALE_VERSION,
+  image: { readonly lumaBase64: string; readonly power: number; readonly minPower: number } = {
+    lumaBase64: 'AID/',
+    power: 30,
+    minPower: 10,
+  },
+): Job {
   const layer = {
     ...createLayer({ id: 'image', color: '#808080', mode: 'image' as const }),
     ditherAlgorithm: 'grayscale' as const,
     linesPerMm: 1,
-    minPower: 10,
-    power: 30,
+    minPower: image.minPower,
+    power: image.power,
   };
   return compileJob(
-    { objects: [grayRow], layers: [layer] },
+    { objects: [{ ...grayRow, lumaBase64: image.lumaBase64 }], layers: [layer] },
     { ...DEFAULT_DEVICE_PROFILE, maxPowerS },
     version,
   );
@@ -123,6 +132,21 @@ describe('small whole-number $30 power range', () => {
     });
     expect(gcode).toMatch(/S0\.3\b/);
     expect(gcode).toMatch(/S0\.2\b/);
+  });
+
+  it('spells rescaled raster samples to twelve significant digits', () => {
+    // Luma 0x10 compiles to 937 of 1000; 937 / 1000 * 20 is 18.740000000000002.
+    const image = { lumaBase64: 'EID/', power: 100, minPower: 0 };
+    expect(rasterValues(grayscaleRaster(20, 3, image))).toEqual([18.74, 9.96, 0]);
+    expect(rescaleRasterValuesForVersion(Float64Array.of(937), 1000, 20, 2)[0]).toBe(
+      18.740000000000002,
+    );
+    const gcode = grblStrategy.emit(grayscaleRaster(20, 3, image), {
+      ...DEFAULT_DEVICE_PROFILE,
+      maxPowerS: 20,
+    });
+    expect(gcode).toMatch(/S18\.74\b/);
+    expect(gcode).not.toMatch(/S\d+\.\d{6,}/);
   });
 
   it('keeps $30=1000 and $30=255 raster values in whole S', () => {

@@ -62,7 +62,7 @@ export function runControllerReadiness(
   project: Project,
   controller: ControllerSettingsSnapshot | null,
   settingsCapability: ReadinessSettingsCapability = 'grbl-dollar',
-  activeControllerKind?: ControllerKind,
+  firmwareKind?: ControllerKind,
 ): ControllerReadinessResult {
   const errors: Array<ControllerReadinessMessage<ControllerReadinessErrorCode>> = [];
   const warnings: Array<ControllerReadinessMessage<ControllerReadinessWarningCode>> = [];
@@ -92,7 +92,7 @@ export function runControllerReadiness(
     // matching controllers that expose no settings dump at all. CNC remains
     // strict because unknown $30/$32 changes spindle and plunge semantics.
     if (cncMachine === null) {
-      return laserReadiness(project, {}, 'warn', source, activeControllerKind);
+      return laserReadiness(project, {}, 'warn', source, firmwareKind);
     }
     errors.push({
       code: 'controller-settings-unknown',
@@ -125,7 +125,7 @@ export function runControllerReadiness(
   // demotes every error returned here to a Job Review warning (#291), and
   // since #482 the Save/export path states them as advisories rather than
   // refusing, so nothing returned here gates an action on its own.
-  return laserReadiness(project, controller, 'warn', source, activeControllerKind);
+  return laserReadiness(project, controller, 'warn', source, firmwareKind);
 }
 
 type ReadinessErrors = Array<ControllerReadinessMessage<ControllerReadinessErrorCode>>;
@@ -190,11 +190,11 @@ function cncReadiness(
 
 function powerRangeFirmware(
   source: ReadinessSettingsSource,
-  activeControllerKind: ControllerKind | undefined,
+  firmwareKind: ControllerKind | undefined,
 ): PowerRangeFirmware {
-  if (source === 'fluidnc-yaml' || activeControllerKind === 'fluidnc') return 'fluidnc';
-  if (activeControllerKind === 'grblhal') return 'grblhal';
-  return activeControllerKind === 'grbl-v1.1' ? 'grbl' : 'unknown';
+  if (source === 'fluidnc-yaml' || firmwareKind === 'fluidnc') return 'fluidnc';
+  if (firmwareKind === 'grblhal') return 'grblhal';
+  return firmwareKind === 'grbl-v1.1' ? 'grbl' : 'unknown';
 }
 
 // A router job with laser mode on or unconfirmed. GRBL's laser mode passes zero
@@ -221,7 +221,7 @@ function laserReadiness(
   controller: ControllerSettingsSnapshot,
   absentPolicy: AbsentSettingPolicy,
   source: ReadinessSettingsSource,
-  activeControllerKind: ControllerKind | undefined,
+  firmwareKind: ControllerKind | undefined,
 ): ControllerReadinessResult {
   const errors: ReadinessErrors = [];
   const warnings: ReadinessWarnings = [];
@@ -267,7 +267,7 @@ function laserReadiness(
     errors.push({ code: 'laser-mode-disabled', message: laserModeDisabledMessage(source) });
   }
 
-  const lowPower = lowPowerWarning(controller, source, activeControllerKind);
+  const lowPower = lowPowerWarning(controller, source, firmwareKind);
   if (lowPower !== null) warnings.push(lowPower);
 
   return { ok: errors.length === 0, errors, warnings };
@@ -278,7 +278,7 @@ function laserReadiness(
 function lowPowerWarning(
   controller: ControllerSettingsSnapshot,
   source: ReadinessSettingsSource,
-  activeControllerKind: ControllerKind | undefined,
+  firmwareKind: ControllerKind | undefined,
 ): ControllerReadinessMessage<ControllerReadinessWarningCode> | null {
   const reportedMaxS = reportedMaxPowerS(controller);
   if (reportedMaxS !== undefined && laserPowerRangeIsEmpty(controller)) {
@@ -287,7 +287,7 @@ function lowPowerWarning(
       message: laserPowerRangeEmptyMessage(
         reportedMaxS,
         controller.minPowerS,
-        powerRangeFirmware(source, activeControllerKind),
+        powerRangeFirmware(source, firmwareKind),
       ),
     };
   }

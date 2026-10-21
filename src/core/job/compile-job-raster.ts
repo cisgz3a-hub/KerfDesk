@@ -5,7 +5,10 @@ import { imageDitherAlgorithm, prepareImageLuma } from '../raster/image-processi
 import { burnGridKernel } from '../raster/luma-resample';
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
 import type { RasterPowerValues } from '../raster/raster-power-values';
-import { rasterCompilationPowerScale, rescaleRasterValues } from '../raster/controller-power-scale';
+import {
+  rasterCompilationPowerScale,
+  rescaleRasterValuesForVersion,
+} from '../raster/controller-power-scale';
 import { isAlongXScan, rasterScanFrame, type RasterScanFrame } from '../raster/raster-scan-frame';
 import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import {
@@ -233,7 +236,12 @@ function rasterValuesFor(
   const toDeviceUnits = (values: RasterPowerValues): RasterPowerValues =>
     compilationMaxS === input.device.maxPowerS
       ? values
-      : rescaleRasterValues(values, compilationMaxS, input.device.maxPowerS);
+      : rescaleRasterValuesForVersion(
+          values,
+          compilationMaxS,
+          input.device.maxPowerS,
+          input.laserPowerScaleVersion ?? CURRENT_LASER_POWER_SCALE_VERSION,
+        );
   // Streaming works for every dither algorithm and mask (ADR-243); only size
   // chooses between one-shot materialization and an O(width) row provider.
   if (input.pixelWidth * input.pixelHeight <= STREAMED_RASTER_PIXEL_THRESHOLD) {

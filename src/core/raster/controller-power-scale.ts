@@ -44,3 +44,18 @@ export function rescaleRasterValues(
     return round ? Math.round(scaled) : scaled;
   });
 }
+
+/** Power-scale version 3 keeps each rescaled sample to twelve significant
+ * digits, as scaleS does for vectors, so 937 of 1000 at $30=20 is S18.74
+ * rather than S18.740000000000002. Versions 1 and 2 keep the raw product. */
+export function rescaleRasterValuesForVersion(
+  values: RasterPowerValues,
+  sourceMax: number,
+  targetMax: number,
+  version: LaserPowerScaleVersion,
+): Float64Array {
+  if (version < 3) return rescaleRasterValues(values, sourceMax, targetMax);
+  return Float64Array.from(values, (value) =>
+    Number(((value / sourceMax) * targetMax).toPrecision(12)),
+  );
+}
