@@ -1,7 +1,12 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createLayer, createProject, type SceneObject } from '../../core/scene';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  type SceneObject,
+} from '../../core/scene';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { useUiStore } from '../state/ui-store';
@@ -118,15 +123,113 @@ describe('settings edit glow', () => {
     expect(edited()).toBeNull();
   });
 
+  it('lights every piece from Include in output, even while the selection has its own settings', async () => {
+    loadFixture(true);
+    const { host, unmount } = await mount();
+    await act(async () => field(host, 'Power for ').focus());
+    expect(edited()?.objectIds).toEqual(['chosen']);
+    // Output and visibility change the operation for every piece using it.
+    await act(async () => field(host, 'Output ').focus());
+    expect(edited()?.objectIds).toEqual(['chosen', 'peer']);
+    await act(async () => field(host, 'Show ').focus());
+    expect(edited()?.objectIds).toEqual(['chosen', 'peer']);
+    // A rename names the operation for every piece using it.
+    await act(async () => field(host, 'Operation name').focus());
+    expect(edited()?.objectIds).toEqual(['chosen', 'peer']);
+    await act(async () => field(host, 'Speed for ').focus());
+    expect(edited()?.objectIds).toEqual(['chosen']);
+    await unmount();
+  });
+
+  it('lights only the selected piece from Make unique and Add operation', async () => {
+    loadFixture(false);
+    const { host, unmount } = await mount();
+    const button = (text: string) => {
+      const found = [...host.querySelectorAll('button')].find(
+        (each) => each.textContent?.trim() === text,
+      );
+      if (found === undefined) throw new Error(text + ' missing');
+      return found;
+    };
+    await act(async () => field(host, 'Power for ').focus());
+    expect(edited()?.objectIds).toEqual(['chosen', 'peer']);
+    // Both act on the selected artwork only.
+    await act(async () => button('Make unique').focus());
+    expect(edited()?.objectIds).toEqual(['chosen']);
+    await act(async () => button('Add operation').focus());
+    expect(edited()?.objectIds).toEqual(['chosen']);
+    await unmount();
+  });
+
+  it('releases the glow during an outside press, before that press can change the scene', async () => {
+    loadFixture(false);
+    const { host, unmount } = await mount();
+    await act(async () => field(host, 'Power for ').focus());
+    let releasedDuringPress = false;
+    await act(async () => {
+      document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      releasedDuringPress = edited() === null;
+    });
+    expect(releasedDuringPress).toBe(true);
+    await unmount();
+  });
+
+  it('lights every piece of the operations a multi-operation CNC depth edit changes', async () => {
+    const cut = { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'engrave' as const, depthMm: 1 };
+    const objects: SceneObject[] = [
+      { ...svgObj('first', ['#000000']), operationIds: ['one'] },
+      { ...svgObj('second', ['#2563eb']), operationIds: ['two'] },
+      { ...svgObj('unselected', ['#000000']), operationIds: ['one'] },
+      { ...svgObj('bystander', ['#16a34a']), operationIds: ['three'] },
+    ];
+    useStore.getState().setMachineKind('cnc');
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          objects,
+          layers: [
+            { ...createLayer({ id: 'one', color: '#000000' }), cnc: cut },
+            { ...createLayer({ id: 'two', color: '#2563eb' }), cnc: { ...cut, depthMm: 2 } },
+            { ...createLayer({ id: 'three', color: '#16a34a' }), cnc: cut },
+          ],
+        },
+      },
+    }));
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const selected = objects.slice(0, 2);
+    await act(async () =>
+      root.render(<SelectedOperationInspector objects={selected} selectionActive />),
+    );
+    await act(async () => field(host, 'Cut depth for selected operations').focus());
+    expect(edited()).toEqual({
+      owner: 'cnc-selection-depth',
+      objectIds: ['first', 'second', 'unselected'],
+      operationIds: ['one', 'two'],
+    });
+    await act(async () => root.unmount());
+    expect(edited()).toBeNull();
+  });
+
   it('lights the selected artwork in all its operations from the power multiplier', async () => {
     loadFixture(false);
     const { host, unmount } = await mount();
+    // Opening the disclosure changes nothing, so its toggle lights nothing.
+    const summary = host.querySelector<HTMLElement>('summary[title^="Adjust power"]');
+    await act(async () => summary?.focus());
+    expect(document.activeElement).toBe(summary);
+    expect(edited()).toBeNull();
     await act(async () => field(host, 'Power multiplier for ').focus());
     expect(edited()).toEqual({
       owner: 'artwork-power-multiplier',
       objectIds: ['chosen'],
       operationIds: ['shared'],
     });
+    // Closing it from the toggle ends the glow.
+    await act(async () => summary?.focus());
+    expect(edited()).toBeNull();
     await unmount();
   });
 });

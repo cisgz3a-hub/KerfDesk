@@ -31,6 +31,9 @@ const moduleBoundaries = {
     // Dependency-free licence-key parsing shared with the Electron main process,
     // whose rootDir cannot reach src/ (ADR-578). It imports nothing, like core.
     { type: 'core', pattern: 'public/licence-key-text.{mjs,d.mts}', mode: 'file' },
+    // Whether the desktop app opens behind its licence window (ADR-623
+    // Amendment 3), read by the renderer, main process and release checks.
+    { type: 'core', pattern: 'public/desktop-licence-window.{mjs,d.mts}', mode: 'file' },
     // The License & Safety Notice, bundled as text so Help shows the installer's
     // terms on every platform (ADR-613 Amendment 1). Plain text, like core.
     { type: 'core', pattern: 'public/eula.txt', mode: 'file' },

@@ -7,11 +7,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { useUiStore } from '../state/ui-store';
 
-export type SettingsEditGlowTarget = {
-  /** Unique per editor, so one editor losing focus never clears another's glow. */
-  readonly owner: string;
+/** The artwork an edit changes, and the operations whose colour it lights up in. */
+export type EditReach = {
   readonly objectIds: ReadonlyArray<string>;
   readonly operationIds: ReadonlyArray<string>;
+};
+
+/**
+ * A control whose edit reaches other artwork than the rest of its editor is
+ * marked `data-edit-scope` (ADR-646 Amendment 1): "operation" (every piece of
+ * the operation), "selection" (the selected pieces) or "everything" (all
+ * artwork, in every operation).
+ */
+export type EditScope = 'operation' | 'selection' | 'everything';
+
+export type SettingsEditGlowTarget = EditReach & {
+  /** Unique per editor, so one editor losing focus never clears another's glow. */
+  readonly owner: string;
+  /** The reach of controls marked with a scope; unmarked controls use the editor's own. */
+  readonly scopes?: Partial<Record<EditScope, EditReach>>;
 };
 
 export function useSettingsEditGlow(target: SettingsEditGlowTarget): {
@@ -21,11 +35,13 @@ export function useSettingsEditGlow(target: SettingsEditGlowTarget): {
   const setEdited = useUiStore((state) => state.setEditedArtwork);
   const release = useUiStore((state) => state.releaseEditedArtwork);
   const [editor, setEditor] = useState<HTMLElement | null>(null);
+  const [scope, setScope] = useState<EditScope | null>(null);
   const { owner } = target;
-  const objectKey = JSON.stringify(target.objectIds);
-  const operationKey = JSON.stringify(target.operationIds);
-  const latest = useRef(target);
-  latest.current = target;
+  const reach = (scope === null ? undefined : target.scopes?.[scope]) ?? target;
+  const objectKey = JSON.stringify(reach.objectIds);
+  const operationKey = JSON.stringify(reach.operationIds);
+  const latest = useRef(reach);
+  latest.current = reach;
   useEffect(() => {
     if (editor === null) return;
     setEdited({
@@ -36,25 +52,58 @@ export function useSettingsEditGlow(target: SettingsEditGlowTarget): {
   }, [editor, owner, objectKey, operationKey, setEdited]);
   useEffect(() => {
     if (editor === null) return;
-    // A focused control that re-renders away takes focus with it and sends
-    // no blur, so a press anywhere outside the editor also ends the edit.
-    const pressOutside = (event: PointerEvent): void => {
-      if (!(event.target instanceof Node) || !editor.contains(event.target)) setEditor(null);
+    const end = (): void => {
+      // Released now, not after the next render: what ended the edit may
+      // change the scene (another row's eye, a drag), which must not pulse it.
+      release(owner);
+      setEditor(null);
     };
-    document.addEventListener('pointerdown', pressOutside, true);
-    return () => document.removeEventListener('pointerdown', pressOutside, true);
-  }, [editor]);
+    // A focused control that re-renders away takes focus with it and sends
+    // no blur, so a press anywhere outside the editor also ends the edit...
+    const pressOutside = (event: Event): void => {
+      if (!(event.target instanceof Node) || !editor.contains(event.target)) end();
+    };
+    // ...and so does focus falling back to the page once a click or key has
+    // removed the focused control (Remove Focus Test Z, say).
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const afterAction = (): void => {
+      if (pending !== null) clearTimeout(pending);
+      pending = setTimeout(() => {
+        pending = null;
+        if (!editor.contains(document.activeElement)) end();
+      }, 0);
+    };
+    const listeners = [
+      ['pointerdown', pressOutside],
+      ['click', afterAction],
+      ['keyup', afterAction],
+    ] as const;
+    for (const [type, listener] of listeners) document.addEventListener(type, listener, true);
+    return () => {
+      for (const [type, listener] of listeners) document.removeEventListener(type, listener, true);
+      if (pending !== null) clearTimeout(pending);
+    };
+  }, [editor, owner, release]);
   useEffect(() => {
     if (editor === null) release(owner);
   }, [editor, owner, release]);
   // An editor removed while focused (selection cleared, tab switched) sends no blur.
   useEffect(() => () => release(owner), [owner, release]);
   return {
-    onFocus: (event) => setEditor(event.currentTarget),
+    onFocus: (event) => {
+      setScope(editScopeOf(event.target));
+      setEditor(event.currentTarget);
+    },
     onBlur: (event) => {
       const next = event.relatedTarget;
       if (next instanceof Node && event.currentTarget.contains(next)) return;
       setEditor(null);
     },
   };
+}
+
+function editScopeOf(target: EventTarget): EditScope | null {
+  if (!(target instanceof Element)) return null;
+  const scope = target.closest('[data-edit-scope]')?.getAttribute('data-edit-scope');
+  return scope === 'operation' || scope === 'selection' || scope === 'everything' ? scope : null;
 }

@@ -52,14 +52,16 @@ export function AdvancedArtworkSettings(props: {
       .map((layer) => layer.id),
   });
   return (
-    <details className="lf-artwork-disclosure" onFocus={glow.onFocus} onBlur={glow.onBlur}>
+    <details className="lf-artwork-disclosure">
       <summary title="Adjust power for this artwork without changing its operation settings">
         <span>
           <strong>Advanced artwork settings</strong>
         </span>
         <Icon name="chevron-down" size={16} />
       </summary>
-      <div className="lf-artwork-disclosure__body">
+      {/* The glow covers the editor, not the toggle: opening or closing the
+          disclosure changes nothing. */}
+      <div className="lf-artwork-disclosure__body" onFocus={glow.onFocus} onBlur={glow.onBlur}>
         <label style={rowStyle}>
           <span>Power multiplier</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

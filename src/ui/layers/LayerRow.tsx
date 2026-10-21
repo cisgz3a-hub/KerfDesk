@@ -3,7 +3,9 @@ import {
   DEFAULT_CNC_LAYER_SETTINGS,
   machineKindOf,
   operationArtworkCount,
+  sceneObjectUsesOperation,
   type Layer,
+  type SceneObject,
 } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
@@ -15,6 +17,7 @@ import { LayerSettingsClipboardButtons } from './LayerSettingsClipboardButtons';
 import { SelectLayerObjectsButton } from './SelectLayerObjectsButton';
 import { ShowOnlyLayerButton } from './ShowOnlyLayerButton';
 import { useOperationRowHover } from './use-operation-row-hover';
+import { useSettingsEditGlow } from './use-settings-edit-glow';
 
 export function LayerRow(props: {
   readonly layer: Layer;
@@ -29,7 +32,7 @@ export function LayerRow(props: {
   const active = activeLayerColor === props.layer.color;
   const artworkCount = operationArtworkCount(objects, props.layer);
   const activate = (): void => setActiveLayerColor(props.layer.color);
-  const hover = useOperationRowHover(props.layer.id);
+  const { hover, menuGlow } = useOperationRowPulse(props.layer, objects);
   return (
     <section
       aria-label={`Operation ${props.layer.name}`}
@@ -48,7 +51,7 @@ export function LayerRow(props: {
         isActive={active}
         onActivate={activate}
       />
-      <LayerFocusTestNotice layer={props.layer} />
+      <LayerFocusTestNotice layer={props.layer} glow={menuGlow} />
       <button
         type="button"
         className="lf-btn lf-btn--ghost lf-operation-card__visibility"
@@ -59,9 +62,36 @@ export function LayerRow(props: {
       >
         <Icon name="eye" size={18} />
       </button>
-      <OperationManagement {...props} />
+      <OperationManagement {...props} glow={menuGlow} />
     </section>
   );
+}
+
+/**
+ * The row pulses its operation and every operation with the same settings
+ * (ADR-620). Its More controls and Remove Focus Test Z act on this operation
+ * alone, so focus there lights exactly this operation's artwork instead;
+ * Show only changes every operation, so it lights all artwork (ADR-646
+ * Amendment 1).
+ */
+function useOperationRowPulse(layer: Layer, objects: ReadonlyArray<SceneObject>) {
+  const owner = `operation-row:${layer.id}`;
+  const layers = useStore((state) => state.project.scene.layers);
+  const menuGlow = useSettingsEditGlow({
+    owner,
+    objectIds: objects
+      .filter((object) => sceneObjectUsesOperation(object, layer))
+      .map((object) => object.id),
+    operationIds: [layer.id],
+    scopes: {
+      everything: {
+        objectIds: objects.map((object) => object.id),
+        operationIds: layers.map((each) => each.id),
+      },
+    },
+  });
+  const editing = useUiStore((state) => state.editedArtwork?.owner === owner);
+  return { hover: useOperationRowHover(layer.id, editing), menuGlow };
 }
 
 // Visibility is not repeated here: the eye on the row owns it. Output stays,
@@ -71,6 +101,7 @@ function OperationManagement(props: {
   readonly layer: Layer;
   readonly canMoveUp: boolean;
   readonly canMoveDown: boolean;
+  readonly glow: ReturnType<typeof useSettingsEditGlow>;
 }): JSX.Element {
   return (
     <details className="lf-operation-card__management">
@@ -83,7 +114,11 @@ function OperationManagement(props: {
       >
         <Icon name="more" size={18} />
       </summary>
-      <div className="lf-operation-card__management-body lf-operation-menu">
+      <div
+        className="lf-operation-card__management-body lf-operation-menu"
+        onFocus={props.glow.onFocus}
+        onBlur={props.glow.onBlur}
+      >
         <div className="lf-operation-menu__group">
           <span className="lf-operation-menu__label">Order</span>
           <LayerOrderControls {...props} />

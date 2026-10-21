@@ -8,6 +8,7 @@ import {
   type EditionValue,
 } from './edition';
 import { UNLICENSED_BUILDS_RUN_FREE } from './edition-policy';
+import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
 import { FreeOnlyEdition, useLicenceSettingsEvent, useProInDesktop } from './FreeOnlyEdition';
 import { BrowserUpdatesNotice, CommercialUpdates } from './CommercialUpdates';
 import { DesktopLicenceGate } from './DesktopLicenceGate';
@@ -33,19 +34,24 @@ function openLicence(): void {
 }
 
 /**
- * Supplies the edition to the app. A commercial desktop build mounts the
- * workspace only once this device has an active trial or licence, and keeps it
- * mounted until KerfDesk closes (ADR-623). Builds without a licence adapter,
+ * Supplies the edition to the app. With the licence window on, a commercial
+ * desktop build mounts the workspace only once this device has an active trial
+ * or licence, and keeps it mounted until KerfDesk closes (ADR-623). While ADR-623
+ * Amendment 3 holds the window off, the workspace mounts at once in KerfDesk Free
+ * and a trial or licence unlocks Pro (ADR-540). Builds without a licence adapter,
  * and desktop builds that cannot take a licence, run Free (ADR-540). The browser
  * build's fixed capabilities cannot be unlocked by passing a desktop licence client.
  */
 export function EditionProvider({
   client,
   unlicensedRunsFree = UNLICENSED_BUILDS_RUN_FREE,
+  licenceWindow = DESKTOP_LICENCE_WINDOW,
   children,
 }: {
   readonly client?: LicenceAdapter;
   readonly unlicensedRunsFree?: boolean;
+  /** Whether a commercial build opens behind its licence window (ADR-623 Amendment 3). */
+  readonly licenceWindow?: boolean;
   readonly children: ReactNode;
 }): JSX.Element {
   if (BROWSER_FREE_BUILD || client === undefined)
@@ -60,7 +66,11 @@ export function EditionProvider({
       </>
     );
   return (
-    <LicensedEdition client={client} unlicensedRunsFree={unlicensedRunsFree}>
+    <LicensedEdition
+      client={client}
+      unlicensedRunsFree={unlicensedRunsFree}
+      licenceWindow={licenceWindow}
+    >
       {children}
     </LicensedEdition>
   );
@@ -69,10 +79,12 @@ export function EditionProvider({
 function LicensedEdition({
   client,
   unlicensedRunsFree,
+  licenceWindow,
   children,
 }: {
   readonly client: LicenceAdapter;
   readonly unlicensedRunsFree: boolean;
+  readonly licenceWindow: boolean;
   readonly children: ReactNode;
 }): JSX.Element {
   const session = useLicenceSession(client, unlicensedRunsFree);
@@ -82,8 +94,9 @@ function LicensedEdition({
   const channel = session.status?.channel;
   // A desktop build without commercial metadata cannot take a licence.
   const freeBuild = unlicensedRunsFree && channel === 'free';
-  // Until the first status, the build's channel is unknown, so nothing mounts.
-  const gated = !useSessionAdmission(session.status, client) && channel !== 'free';
+  // Behind the window, nothing mounts until the first status names the build's
+  // channel. With the window held off, the workspace mounts at once.
+  const gated = !useSessionAdmission(session.status, client, licenceWindow) && channel !== 'free';
   const { load } = session;
   const { showAll } = desktop;
   const { managing, closeManager } = useLicenceManager(
@@ -195,12 +208,17 @@ function PendingProDialog({
  * open project (ADR-623). The main process remembers that the app session was
  * let in, so a renderer reloaded after a crash, or a reopened macOS window,
  * reaches its workspace and job recovery even after rights ended (ADR-623
- * Amendment 1).
+ * Amendment 1). With the licence window held off, the workspace is in from the
+ * start, in Free or Pro, and acknowledges its first status (ADR-623 Amendment 3).
  */
-function useSessionAdmission(status: LicenceStatus | null, client: LicenceAdapter): boolean {
-  const [admitted, setAdmitted] = useState(false);
+function useSessionAdmission(
+  status: LicenceStatus | null,
+  client: LicenceAdapter,
+  licenceWindow: boolean,
+): boolean {
+  const [admitted, setAdmitted] = useState(!licenceWindow);
   const acknowledged = useRef<number | null>(null);
-  const admits = status?.edition === 'pro' || status?.sessionAdmitted === true;
+  const admits = !licenceWindow || status?.edition === 'pro' || status?.sessionAdmitted === true;
   if (!admitted && admits) setAdmitted(true);
   useEffect(() => {
     const generation = status?.admissionGeneration;

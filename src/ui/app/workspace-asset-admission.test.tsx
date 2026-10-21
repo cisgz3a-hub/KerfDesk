@@ -6,6 +6,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
 import { EditionProvider } from '../licensing/EditionProvider';
 
+// These tests specify the licence window with it turned on (ADR-623). ADR-623
+// Amendment 3 holds it off in releases; EditionProvider.licence-window-off.test.tsx
+// covers that.
+vi.mock('../../../public/desktop-licence-window.mjs', () => ({ DESKTOP_LICENCE_WINDOW: true }));
+
 const calls = vi.hoisted(() => {
   const stop = vi.fn();
   return { reconcile: vi.fn(), watch: vi.fn(() => stop), stop };

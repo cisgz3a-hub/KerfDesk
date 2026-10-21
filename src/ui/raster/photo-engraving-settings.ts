@@ -2,8 +2,9 @@ import { effectiveOperationForObject } from '../../core/effective-output';
 import type { DitherAlgorithm, Layer, RasterImage } from '../../core/scene';
 import type { PhotoEngravingApply } from './photo-engraving-apply';
 
-/** The dithers that suit photographs, smoothest first. */
+/** The dithers that suit photographs, smoothest first (ADR-649 measures it). */
 export const PHOTO_DITHERS = [
+  'blue-noise',
   'jarvis',
   'stucki',
   'floyd-steinberg',
@@ -34,8 +35,9 @@ export function initialPhotoEngravingDraft(
   };
 }
 
+/** A photo dither for a stored mode; other modes start with Jarvis (ADR-581). */
 export function photoDither(value: string): PhotoDither {
-  return value === 'stucki' || value === 'floyd-steinberg' ? value : 'jarvis';
+  return PHOTO_DITHERS.find((dither) => dither === value) ?? 'jarvis';
 }
 
 export function photoEngravingPatch(draft: PhotoEngravingDraft): PhotoEngravingApply {

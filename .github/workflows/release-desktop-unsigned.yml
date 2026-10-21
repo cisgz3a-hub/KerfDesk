@@ -185,7 +185,8 @@ jobs:
             Tee-Object -FilePath (Join-Path $evidence 'packaged-security.txt')
           if ($LASTEXITCODE -ne 0) { throw 'Packaged fuse or runtime closure verification failed.' }
           $before = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
-          # The unlicensed commercial baseline opens behind its licence window (ADR-623).
+          # The unlicensed commercial baseline opens behind its licence window (ADR-623),
+          # or in KerfDesk Free while Amendment 3 holds it off: the probe reads that setting.
           node scripts/verify-asar-integrity-enforced.mjs $executable $archive "--output=$evidence/asar-probe" --expect-licence-window 2>&1 |
             Tee-Object -FilePath (Join-Path $evidence 'asar-integrity.txt')
           $integrityExit = $LASTEXITCODE
@@ -202,6 +203,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.plan.outputs.version }}
           RELEASE_SHA: ${{ steps.plan.outputs.sourceSha }}
           # Opens a build behind the licence window, then releases the seat (ADR-623).
+          # Unused while ADR-623 Amendment 3 holds the window off: every build opens in Free.
           KERFDESK_NATIVE_QUALIFICATION_LICENCE: ${{ secrets.KERFDESK_NATIVE_QUALIFICATION_LICENCE }}
         shell: pwsh
         run: |
