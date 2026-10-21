@@ -1,8 +1,10 @@
 ## ADR-650 - Place Board: irregular outline boards from a photo, registered by the head (2026-10-21)
 
-**Status:** Accepted, at the maintainer's request ("take a photo of a board ... add measurements ... the
-canvas draws that shape ... it should know exactly where the board is on my laser", "capture the bottom
-left side of the board to know the board coordinates", irregular outlines, every corner verified).
+**Status:** Parked (2026-10-21). This branch does not work the way the maintainer wants; see "Known
+problems" at the end before resuming. Originally requested as: "take a photo of a board ... add
+measurements ... the canvas draws that shape ... it should know exactly where the board is on my
+laser", "capture the bottom left side of the board to know the board coordinates", irregular
+outlines, every corner verified.
 **Date:** 2026-10-21
 
 Extends [ADR-126](../../DECISIONS.md) (Place Board board-shape union) with a third arm, `outline`.
@@ -58,3 +60,29 @@ assistant reading one can say where the board lies on the bed.
   an outline board exactly as they invalidate rectangles and circles.
 - Output stays plain G-code with no transform: rotated artwork is rotated on the canvas, as Find pieces
   does.
+
+### Known problems (maintainer testing, 2026-10-21)
+
+Reported by the maintainer: "Clicking the 4 points on a photo is not drawing the board. It picks up
+other lines and just acts weird. No MCP button and no way to save to canvas, it's blocked."
+
+1. **The four clicks mean the wrong thing.** The operator expects to click the board's corners and
+   see the board drawn. This build uses those four clicks for the corners of a reference sheet. It
+   then needs a separate click on the board and traces the edge automatically. That trace is the ADR-442
+   piece mask (Otsu split on colour or brightness), and on a hand-held photo it locks onto the sheet,
+   shadows, grain and background edges. Next attempt: the operator clicks the board's own outline,
+   so the clicked points are the shape. Scale comes from the typed size. Any automatic edge snapping
+   only refines points the operator placed and never replaces them.
+2. **No MCP entry point in the app.** The MCP tools are only callable by a connected AI client on the
+   desktop build; there is no button, and the web dev server has no MCP at all. Next attempt: a
+   visible "Get photo from phone" action in the panel (for example through the existing phone
+   remote pairing), with MCP as an extra path rather than the only one.
+3. **Nothing reaches the canvas without a machine.** "Use this outline" stays disabled until the
+   draft validates (2–6 anchors, positive size, simple polygon). Even then the board is drawn only
+   after two head captures on a connected machine. Next attempt: put the sized shape on the canvas
+   straight away (locked, centred, unregistered), so artwork can be laid out on it, and register its
+   position with the head later.
+
+Still sound and worth keeping: the frame mapping and origin arithmetic (`board-outline-registration`,
+`sceneAxisSigns`, `setOriginAtMachinePoint`), the proper-similarity fit, the exact unfaired
+registration polyline, Fit/Array inside an outline, and the Pro gating with its tests.
