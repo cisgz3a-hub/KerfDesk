@@ -154,10 +154,16 @@ function edgesNear(walk: RingWalk, box: Box): ReadonlyArray<number> {
   const hiX = cellOf(box.maxX);
   const loY = cellOf(box.minY);
   const hiY = cellOf(box.maxY);
-  if ((hiX - loX + 1) * (hiY - loY + 1) > walk.cells.size) {
-    return [...new Set([...[...walk.cells.values()].flat(), ...walk.wide])];
-  }
   const found = new Set<number>(walk.wide);
+  // A box over more cells than the contour fills: read the filled cells in it.
+  if ((hiX - loX + 1) * (hiY - loY + 1) > walk.cells.size) {
+    for (const [key, edges] of walk.cells) {
+      const [cx, cy] = key.split(',').map(Number) as [number, number];
+      if (cx < loX || cx > hiX || cy < loY || cy > hiY) continue;
+      for (const edge of edges) found.add(edge);
+    }
+    return [...found];
+  }
   for (let cx = loX; cx <= hiX; cx += 1) {
     for (let cy = loY; cy <= hiY; cy += 1) {
       for (const edge of walk.cells.get(`${cx},${cy}`) ?? []) found.add(edge);

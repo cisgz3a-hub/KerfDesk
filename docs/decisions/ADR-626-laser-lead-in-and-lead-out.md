@@ -426,3 +426,23 @@ kerf width from the leads of the outline it was split from; `core/job/laser-lead
 catches a lead-out grazing the lead-in between samples and a tongue present only in the burned
 contour. `core/job/laser-lead-sides.test.ts` now expects the whole outline to be exempt from, not a
 copy of, its pieces.
+
+### Amendment 7 — edges of the edge cases (2026-10-21)
+
+1. **A large lead box reads only the filled cells in it.** When a lead's box spans more grid cells
+   than the contour fills, the crossing check reads the filled cells inside the box, not every edge.
+2. **The step across the clearance is clipped, not skipped.** For a lead-out from a distinct start,
+   the walking step that crosses the clearance from that start is measured from where it crosses.
+3. **A chord-only pass checks against its chords.** The context a chord-only final pass fits with
+   (Amendment 2) also swaps the burned contour of Amendment 6 for the chord ring that pass runs.
+4. **A probe point inside any piece.** A ring's probe point lies halfway along the inward normal
+   from the middle of an edge to the ring's next wall, edges tried longest first, so it stays inside
+   a piece only one output step wide.
+5. **Coincident artworks are one outline for exemptions too.** Pieces are exempt from rings of the
+   same scene copy class, not only of the same scene contour, so a whole outline cut from one artwork
+   and the pieces another, coincident artwork's operation splits are exempt from each other.
+
+Verification: `core/job/laser-lead-own-crossing.test.ts` finds a long lead crossing a small dense
+circle; `core/job/laser-lead-fit-continuous.test.ts` catches a graze on the step across the
+clearance; `core/job/laser-lead-pieces.test.ts` pairs a 0.001 mm sliver with its counterpart and
+two coincident artworks' rings.

@@ -219,13 +219,12 @@ export function retracesLeadIn(leadOut: LeadFit, leadIn: LeadFit, clearanceMm: n
   if (start === undefined || join === undefined) return false;
   if (Math.hypot(start.x - join.x, start.y - join.y) > SHARED_JOIN_MM) {
     // Step by step, the whole step: a lead-out only grazing the lead-in can
-    // come closest between two samples.
+    // come closest between two samples. The step across the clearance from
+    // its start is measured from where it crosses.
     let previous = start;
     for (const sample of walkSamples([start, ...leadOut.path.points.slice(1)])) {
-      const beyond =
-        Math.hypot(previous.x - start.x, previous.y - start.y) > clearanceMm &&
-        Math.hypot(sample.x - start.x, sample.y - start.y) > clearanceMm;
-      if (beyond && stepToPolylineMm(previous, sample, inPoints) < clearanceMm) return true;
+      const part = partBeyond(previous, sample, start, clearanceMm);
+      if (part !== null && stepToPolylineMm(part[0], part[1], inPoints) < clearanceMm) return true;
       previous = sample;
     }
     return false;
@@ -234,6 +233,27 @@ export function retracesLeadIn(leadOut: LeadFit, leadIn: LeadFit, clearanceMm: n
   const back = direction(join, inPoints[inPoints.length - 2]);
   if (outward === null || back === null) return false;
   return outward.x * back.x + outward.y * back.y > Math.cos((RETRACE_DEG * Math.PI) / 180);
+}
+
+/** The part of the step p-q farther than `radiusMm` from `centre`, or null. */
+function partBeyond(p: Vec2, q: Vec2, centre: Vec2, radiusMm: number): [Vec2, Vec2] | null {
+  const pInside = Math.hypot(p.x - centre.x, p.y - centre.y) <= radiusMm;
+  const qInside = Math.hypot(q.x - centre.x, q.y - centre.y) <= radiusMm;
+  if (pInside && qInside) return null;
+  if (!pInside && !qInside) return [p, q];
+  // Where |p + t (q - p) - centre| = radius: the larger root leaving the
+  // circle, the smaller entering it.
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  const ox = p.x - centre.x;
+  const oy = p.y - centre.y;
+  const a = dx * dx + dy * dy;
+  const b = 2 * (ox * dx + oy * dy);
+  const c = ox * ox + oy * oy - radiusMm * radiusMm;
+  const root = Math.sqrt(Math.max(0, b * b - 4 * a * c));
+  const t = Math.max(0, Math.min(1, (-b + (pInside ? root : -root)) / (2 * a)));
+  const crossing = { x: p.x + dx * t, y: p.y + dy * t };
+  return pInside ? [crossing, q] : [p, crossing];
 }
 
 /** The least distance from the step p-q to the polyline. */

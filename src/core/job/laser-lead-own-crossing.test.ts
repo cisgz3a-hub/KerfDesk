@@ -53,6 +53,26 @@ describe('own-contour crossings (ADR-626)', () => {
     ).toBe(true);
   });
 
+  it('reads the filled cells when a lead spans more cells than the contour fills', () => {
+    // A 0.5 mm circle, densely drawn, and a lead whose box spans many cells.
+    const small = ring(
+      Array.from({ length: 200 }, (_, index) => {
+        const angle = (index / 200) * 2 * Math.PI;
+        return { x: 0.25 + 0.25 * Math.cos(angle), y: 0.25 + 0.25 * Math.sin(angle) };
+      }),
+    );
+    const across = [
+      { x: -20, y: 0.25 },
+      { x: 20, y: 0.3 },
+    ];
+    expect(crossesOwnContour(across, small[0] as Vec2, small)).toBe(true);
+    const clear = [
+      { x: -20, y: 5 },
+      { x: 20, y: 5 },
+    ];
+    expect(crossesOwnContour(clear, small[0] as Vec2, small)).toBe(false);
+  });
+
   it('allows a crossing beside the join, where a lead meets its contour', () => {
     const square = ring([
       { x: 0, y: 0 },

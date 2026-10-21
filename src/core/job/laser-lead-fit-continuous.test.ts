@@ -32,6 +32,22 @@ describe('lead fitting between samples (ADR-626)', () => {
     expect(retracesLeadIn(leadOut, leadIn, 0.19)).toBe(false);
   });
 
+  it('measures the step that crosses the clearance from the lead-out start', () => {
+    // With a 0.22 mm clearance the walking step from 0.20 to 0.25 mm crosses
+    // it; the lead-in's corner 0.2195 mm above 0.225 mm is too close to that
+    // part of the step, though the next step is clear of it.
+    const leadOut = fit([
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+    ]);
+    const leadIn = fit([
+      { x: -1, y: 2 },
+      { x: 0.225, y: 0.2195 },
+      { x: -1, y: 5 },
+    ]);
+    expect(retracesLeadIn(leadOut, leadIn, 0.22)).toBe(true);
+  });
+
   it('checks the crossing against the contour as it burns, not its chords', () => {
     // The chords are a plain square; as it burns, a 0.01 mm tongue hangs from
     // its bottom edge just behind the join, which the lead-in would cut.

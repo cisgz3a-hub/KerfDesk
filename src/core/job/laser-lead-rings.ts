@@ -108,7 +108,7 @@ export function leadJobLines(
   }
   const parts = pieceLookup(rings);
   const groups = owners.map((owner) => owner.group);
-  const sides = ringSides(rings, owners, scene, parts);
+  const { sides, sceneClasses } = ringSides(rings, owners, scene, parts);
   const representatives = classRepresentatives(sides.map((side) => side.copyClass));
   const copies = copyLists(representatives);
   return {
@@ -119,7 +119,7 @@ export function leadJobLines(
     sides,
     holders: ringHolders(rings, representatives, copies),
     copies,
-    exempt: pieceExemptions(rings, groups, copies, parts),
+    exempt: pieceExemptions(rings, groups, copies, parts, sceneClasses),
   };
 }
 
@@ -130,7 +130,7 @@ function ringSides(
   owners: ReadonlyArray<RingOwner>,
   scene: ReadonlyArray<LeadSideContour> | undefined,
   parts: PieceLookup,
-): LeadSideVerdict[] {
+): { readonly sides: LeadSideVerdict[]; readonly sceneClasses: ReadonlyArray<number> } {
   if (scene === undefined) {
     const own = leadSideVerdicts(
       rings.map((ring, index) => ({
@@ -140,7 +140,8 @@ function ringSides(
         operationName: owners[index]?.operationName ?? '',
       })),
     );
-    return rings.map((_, index) => own.get(String(index)) as LeadSideVerdict);
+    const sides = rings.map((_, index) => own.get(String(index)) as LeadSideVerdict);
+    return { sides, sceneClasses: sides.map((side) => side.copyClass) };
   }
   const verdicts = leadSideVerdicts(scene);
   const fresh = verdicts.size;
@@ -152,6 +153,9 @@ function ringSides(
         aroundName: '',
       },
   );
+  // The class each ring's scene contour has, coincident contours sharing one,
+  // before the pieces some operation split them into are told apart.
+  const sceneClasses = sides.map((side) => side.copyClass);
   pieceClasses(
     rings,
     owners.map((owner) => owner.group),
@@ -159,7 +163,7 @@ function ringSides(
     fresh,
     parts,
   );
-  return sides;
+  return { sides, sceneClasses };
 }
 
 type RingOwner = Pick<LeadSideContour, 'decides' | 'operationName'> & { readonly group: number };

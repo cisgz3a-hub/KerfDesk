@@ -408,8 +408,12 @@ function finalPassLeadOut(
   };
 }
 
+// A pass that goes out as chords: its leads are fitted as chords, and the
+// contour they must not cross is the chords it runs, not the arcs.
 function asChords(context: LeadFitContext): LeadFitContext {
-  return context.arcsEmitted ? { ...context, arcsEmitted: false } : context;
+  return context.arcsEmitted || context.ownBurn !== context.ownRing
+    ? { ...context, arcsEmitted: false, ownBurn: context.ownRing }
+    : context;
 }
 
 function leadedSegment(

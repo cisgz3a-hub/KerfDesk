@@ -44,7 +44,7 @@ describe('kerf pieces of one contour (ADR-626)', () => {
         { x: 3, y: 10 },
       ]),
     ];
-    const exempt = pieceExemptions(rings, [0, 1, 1], [[], [], []], pieceLookup(rings));
+    const exempt = pieceExemptions(rings, [0, 1, 1], [[], [], []], pieceLookup(rings), [0, 0, 0]);
     expect(exempt[0]).toEqual([1]);
     expect(exempt[1]).toEqual([0]);
     expect(exempt[2]).toEqual([]);
@@ -59,7 +59,33 @@ describe('kerf pieces of one contour (ADR-626)', () => {
       ),
       ring(L_SHAPE.map((point) => ({ x: point.x * 0.99 + 0.05, y: point.y * 0.99 + 0.05 }))),
     ];
-    const exempt = pieceExemptions(rings, [0, 1, 0], [[], [], []], pieceLookup(rings));
+    const exempt = pieceExemptions(rings, [0, 1, 0], [[], [], []], pieceLookup(rings), [0, 1, 0]);
     expect(exempt).toEqual([[], [], []]);
+  });
+
+  it('pairs rings of two coincident scene contours as one outline', () => {
+    // Two artworks drawn on top of each other: different contours, one class.
+    const rings = [
+      ring(L_SHAPE, 'first'),
+      ring(
+        L_SHAPE.map((point) => ({ x: point.x * 0.99 + 0.05, y: point.y * 0.99 + 0.05 })),
+        'second',
+      ),
+    ];
+    const exempt = pieceExemptions(rings, [0, 1], [[], []], pieceLookup(rings), [0, 0]);
+    expect(exempt).toEqual([[1], [0]]);
+  });
+
+  it('finds the inside of a piece only one output step wide', () => {
+    const sliver = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 0.001 },
+      { x: 0, y: 0.001 },
+    ];
+    const rings = [ring(sliver), ring(sliver)];
+    const lookup = pieceLookup(rings);
+    expect(lookup.correspond(0, 1)).toBe(true);
+    expect(pieceExemptions(rings, [0, 1], [[], []], lookup, [0, 0])).toEqual([[1], [0]]);
   });
 });

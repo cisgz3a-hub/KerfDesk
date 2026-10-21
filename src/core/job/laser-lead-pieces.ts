@@ -19,9 +19,6 @@ import { outlinesAreCopies } from './laser-lead-copies';
 import type { LeadRing } from './laser-lead-obstacles';
 import type { LeadSideVerdict } from './laser-lead-sides';
 
-// How far inside a ring its probe point lies, beside its longest edge.
-const INSIDE_MM = 1e-3;
-
 export type PieceLookup = {
   /** The other rings whose bounds meet ring `index`'s, in ring order. */
   readonly near: (index: number) => ReadonlyArray<number>;
@@ -118,27 +115,26 @@ export function pieceClasses(
 }
 
 /** For each ring, the rings its leads may cross and end inside: its copies,
- * and every ring another operation cuts from the same scene contour that is
- * one part with it. Not a copy relation: the pieces of one operation are each
- * exempt from the whole outline, never from each other. */
+ * and every ring another operation cuts from the same scene contour, or from a
+ * coincident one (`sceneClasses` shared), that is one part with it. Not a copy
+ * relation: the pieces of one operation are each exempt from the whole
+ * outline, never from each other. */
 export function pieceExemptions(
   rings: ReadonlyArray<LeadRing>,
   groups: ReadonlyArray<number>,
   copies: ReadonlyArray<ReadonlyArray<number>>,
   lookup: PieceLookup,
+  sceneClasses: ReadonlyArray<number>,
 ): number[][] {
-  return rings.map((ring, index) => {
-    const parts =
-      ring.source === undefined
-        ? []
-        : lookup
-            .near(index)
-            .filter(
-              (other) =>
-                rings[other]?.source === ring.source &&
-                groups[other] !== groups[index] &&
-                lookup.correspond(index, other),
-            );
+  return rings.map((_, index) => {
+    const parts = lookup
+      .near(index)
+      .filter(
+        (other) =>
+          sceneClasses[other] === sceneClasses[index] &&
+          groups[other] !== groups[index] &&
+          lookup.correspond(index, other),
+      );
     return [...new Set([...(copies[index] ?? []), ...parts])];
   });
 }
@@ -187,29 +183,60 @@ function boundsOverlapShare(a: LeadRing['bounds'], b: LeadRing['bounds']): numbe
   return (width * height) / Math.min(area(a), area(b));
 }
 
-/** A point just inside the ring, beside the middle of its longest edge. */
+/** A point inside the ring: from the middle of an edge, halfway along the
+ * inward normal to the ring's next wall, so it stays inside however narrow the
+ * ring is. Edges are tried longest first. */
 function insidePoint(points: ReadonlyArray<Vec2>): Vec2 | null {
   const area = signedAreaMm2(points);
   if (area === 0 || !Number.isFinite(area)) return null;
-  let longest = 0;
-  let from: Vec2 | undefined;
-  let to: Vec2 | undefined;
+  // Counter-clockwise (positive area), the inside is on the left of each edge.
+  const side = area > 0 ? 1 : -1;
+  const edges = points
+    .slice(1)
+    .map((to, index) => ({ from: points[index] as Vec2, to }))
+    .filter(({ from, to }) => from.x !== to.x || from.y !== to.y)
+    .sort((a, b) => edgeLength(b) - edgeLength(a))
+    .slice(0, PROBE_EDGES);
+  for (const { from, to } of edges) {
+    const length = edgeLength({ from, to });
+    const middle = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+    const inward = { x: (-side * (to.y - from.y)) / length, y: (side * (to.x - from.x)) / length };
+    const wall = nearestWallMm(points, middle, inward);
+    if (wall === null) continue;
+    const point = { x: middle.x + (inward.x * wall) / 2, y: middle.y + (inward.y * wall) / 2 };
+    if (pointInPolygon(point, points)) return point;
+  }
+  return null;
+}
+
+// Edges tried for a probe point before giving up.
+const PROBE_EDGES = 8;
+
+function edgeLength(edge: { readonly from: Vec2; readonly to: Vec2 }): number {
+  return Math.hypot(edge.to.x - edge.from.x, edge.to.y - edge.from.y);
+}
+
+/** How far along the ray from `origin` in `direction` the ring is first met,
+ * past the origin's own edge; null when it is never met. */
+function nearestWallMm(points: ReadonlyArray<Vec2>, origin: Vec2, direction: Vec2): number | null {
+  let nearest: number | null = null;
   for (let index = 1; index < points.length; index += 1) {
     const a = points[index - 1] as Vec2;
     const b = points[index] as Vec2;
-    const length = Math.hypot(b.x - a.x, b.y - a.y);
-    if (length > longest) {
-      longest = length;
-      from = a;
-      to = b;
+    const sx = b.x - a.x;
+    const sy = b.y - a.y;
+    const determinant = direction.x * sy - direction.y * sx;
+    if (determinant === 0) continue;
+    const wx = a.x - origin.x;
+    const wy = a.y - origin.y;
+    const along = (wx * sy - wy * sx) / determinant;
+    const on = (wx * direction.y - wy * direction.x) / determinant;
+    if (along > SAME_EDGE_MM && on >= 0 && on <= 1 && (nearest === null || along < nearest)) {
+      nearest = along;
     }
   }
-  if (from === undefined || to === undefined) return null;
-  // Counter-clockwise (positive area), the inside is on the left of each edge.
-  const side = area > 0 ? 1 : -1;
-  const point = {
-    x: (from.x + to.x) / 2 - (side * (to.y - from.y) * INSIDE_MM) / longest,
-    y: (from.y + to.y) / 2 + (side * (to.x - from.x) * INSIDE_MM) / longest,
-  };
-  return pointInPolygon(point, points) ? point : null;
+  return nearest;
 }
+
+// A wall nearer than this along the ray is the edge the ray starts on.
+const SAME_EDGE_MM = 1e-9;
