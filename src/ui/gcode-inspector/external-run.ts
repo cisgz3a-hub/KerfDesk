@@ -9,7 +9,7 @@
 // program once through the ordinary streamer. Every other finding is a warning.
 
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
-import { streamingModeForController } from '../../core/devices';
+import { streamingModeForController, type ControllerKind } from '../../core/devices';
 import type { ExternalProgramEnvelope } from '../../core/external-program';
 import { machineKindOf, type MachineKind, type Project } from '../../core/scene';
 import { confirmCncSetup } from '../laser/cnc-setup-acknowledgement';
@@ -25,6 +25,7 @@ import { useLaserStore, type LaserState } from '../state/laser-store';
 import { jogFrameCommandBlockMessage } from '../state/laser-store-helpers';
 
 export type ExternalRun = {
+  readonly controllerKind?: ControllerKind;
   readonly name: string;
   /** The exact bytes Start streams (normalizeExternalProgram). */
   readonly gcode: string;
@@ -90,6 +91,9 @@ export async function frameExternalProgram(run: ExternalRun): Promise<ExternalFr
   const controller = await prepareTransientFrameController(project);
   if (controller === null) return null;
   const laser = useLaserStore.getState();
+  if (run.controllerKind !== undefined && run.controllerKind !== laser.activeControllerKind) {
+    throw new Error(EXTERNAL_FRAME_CHANGED);
+  }
   if (!headAtRunStart(run, laser)) throw new Error(EXTERNAL_HEAD_MOVED);
   frameSequence += 1;
   const verification: FrameVerification = {
@@ -186,6 +190,12 @@ export function externalStartIssue(
  * Frame record itself has been spent: same machine mode, same controller
  * session, origin and position, and the head at the program's start. */
 function externalHandoffIssue(frame: ExternalFrame, laser: LaserState, project: Project) {
+  if (
+    frame.run.controllerKind !== undefined &&
+    frame.run.controllerKind !== laser.activeControllerKind
+  ) {
+    return EXTERNAL_FRAME_CHANGED;
+  }
   if (machineKindOf(project.machine) !== frame.machineKind) return EXTERNAL_MODE_CHANGED;
   if (
     !controllerStartPreparationStillCurrent(frame.controller, laser, {

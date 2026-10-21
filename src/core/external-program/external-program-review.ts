@@ -10,7 +10,9 @@
 // coordinates the program starts in (ADR-630 Amendment 1).
 
 import type { GcodeRenderModel, ProgramFinding } from '../gcode-view';
+import type { ControllerKind } from '../devices';
 import { scanGcodeWords } from '../gcode/word-scan';
+import { createMarlinProgramReader } from './marlin-program-reader';
 
 export type ExternalProgramEnvelope = {
   readonly minX: number;
@@ -29,6 +31,7 @@ export type ExternalProgramReview = {
 };
 
 export type ExternalProgramContext = {
+  readonly controllerKind?: ControllerKind;
   readonly machineKind: 'laser' | 'cnc';
   /** The laser's S value for 100% power (`$30`). */
   readonly laserMaxPowerS: number;
@@ -124,17 +127,24 @@ export function reviewExternalProgram(
   context: ExternalProgramContext,
   findings: ReadonlyArray<ProgramFinding> = [],
 ): ExternalProgramReview {
-  const commands = commandsIn(gcode);
+  const interpreted =
+    context.controllerKind === 'marlin' ? marlinReviewText(gcode, context.machineKind) : null;
+  const reviewedText = interpreted?.gcode ?? gcode;
+  const scanned = commandsIn(reviewedText);
+  // Marlin's M3/M4 without S uses configured startup power; its reader names
+  // that separately. GRBL's retained-S warning would contradict it.
+  const commands = interpreted === null ? scanned : { ...scanned, onBeforeSpeed: false };
   // Motion the Inspector could not draw is not "never moves": it has no envelope.
   const still =
     model.stats.programBounds === null && model.skippedMotions.length === 0
       ? context.start
       : undefined;
   const warnings = [
+    ...(interpreted?.warnings ?? []),
     ...offsetWriteWarnings(commands),
     ...COMMAND_WARNINGS.filter((check) => check.matches(commands)).map((check) => check.warning),
     ...coordinateSystemWarnings(model),
-    ...(still === undefined ? pointEnvelopeWarnings(gcode, model) : [NEVER_MOVES]),
+    ...(still === undefined ? pointEnvelopeWarnings(reviewedText, model) : [NEVER_MOVES]),
     ...unitWarnings(model),
     ...toolLeftOnWarnings(model),
     ...machineModeWarnings(model, context),
@@ -148,6 +158,20 @@ export function reviewExternalProgram(
       ? envelopeOf(model)
       : { minX: still.x, minY: still.y, maxX: still.x, maxY: still.y };
   return { envelope, units: declaredUnits(model), warnings };
+}
+
+function marlinReviewText(
+  gcode: string,
+  machineKind: 'laser' | 'cnc',
+): { readonly gcode: string; readonly warnings: ReadonlyArray<string> } {
+  const read = createMarlinProgramReader(machineKind);
+  const warnings: string[] = [];
+  const lines = gcode.split('\n').map((line, index) => {
+    const result = read(line);
+    warnings.push(...result.warnings.map((warning) => `Line ${index + 1}: ${warning}`));
+    return result.line;
+  });
+  return { gcode: lines.join('\n'), warnings };
 }
 
 const NEVER_MOVES =

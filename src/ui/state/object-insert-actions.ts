@@ -26,6 +26,7 @@ import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { validateDesignStudioDocument } from '../../io/project/project-design-studio-validator';
 import { useToastStore } from './toast-store';
 import { saveUndoStepName } from './undo-step-names';
+import { prepareProjectInsertion, reportProjectInsertionFailure } from './project-insertion-budget';
 import type { DesignApplyRecord } from './design-apply-record';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
@@ -58,7 +59,7 @@ type Getter = () => AppState;
 const DESIGN_FEWER = 'Apply a smaller drawing, or delete some objects first.';
 
 export function objectInsertActions(
-  set: Setter,
+  rawSet: Setter,
   get: Getter,
 ): Pick<
   AppState,
@@ -75,11 +76,14 @@ export function objectInsertActions(
   | 'removeRegistrationBox'
   | 'setRegistrationBoxLocked'
 > {
+  const importSet: Setter = (update) =>
+    rawSet((state) => prepareProjectInsertion(state.project, () => update(state)));
+  const set: Setter = (update) => reportProjectInsertionFailure(() => importSet(update));
   return {
-    importSvgObject: importSvgObjectAction(set, get),
-    ...svgFragmentActions(set, get),
-    reimportSvgObject: reimportSvgObjectAction(set, get),
-    upsertTextObject: upsertTextObjectAction(set),
+    importSvgObject: importSvgObjectAction(importSet, get),
+    ...svgFragmentActions(importSet, get),
+    reimportSvgObject: reimportSvgObjectAction(importSet, get),
+    upsertTextObject: upsertTextObjectAction(importSet),
     drawShape: drawShapeAction(set),
     insertBoxPanels: insertBoxPanelsAction(set),
     applyDesignSketch: applyDesignSketchAction(set),

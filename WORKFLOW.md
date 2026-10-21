@@ -724,6 +724,8 @@ the linked artwork.
    copy asked for, in one undo step, up to the project's own limit of 10,000 objects (a copy counts
    everything it carries, such as an image's mask); a count, spacing or gap that would place more
    is refused with how many fit, and nothing changes. Nothing else caps the number of copies.
+   With **Last copy size**, gap mode measures the requested clearance between the final scaled
+   copies, including the closing seam. Centre-spacing and count modes keep their requested centres.
 5. When a selection gives a tool nothing to do, a notice says what to select, and nothing changes.
    None of these tools operates a machine or changes how other artwork compiles.
 
@@ -3421,6 +3423,9 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 - F-C3. Autosave + recovery
 - F-C4. Re-import changed SVG with diff
 - F-C5. Copy / paste / duplicate
+  Copy and Paste carry the imported fonts used by copied text across documents, so that text stays
+  editable after saving and reopening. Identical font data is reused; conflicting font keys are
+  kept distinct. A Paste exceeding the project's existing font or scene limit leaves it unchanged.
 - F-C6. Crash reporter
 - F-C7. Unified Machine Setup — specified below (ADR-205; supersedes the split ADR-092 surface)
 
@@ -9194,6 +9199,10 @@ The G-code Inspector is free in every edition (ADR-627).
    program changes its origin (`G92`, or `G10 L2`/`L20` on `G54`) on the axes it changes, and
    moves in `G55`-`G59` are left out and named in the warnings. A program that never moves
    frames the point where the head stands. A large file is prepared a slice at a time.
+   On Marlin, the baseline is two separate lines, `G21` then `G90`, and significant whitespace is
+   preserved. Review reads the first command on each line with that command's parameters; later
+   G/M words do not execute as extra commands. Firmware-dependent motion and its dependent
+   coordinates are disclosed as outside the known Frame outline (ADR-653).
 3. **Frame** is enabled while connected, Idle, with no other motion running, once the machine
    reports where the head is and every line fits the controller; its tooltip says why
    otherwise. It runs the ordinary Frame preparation (G54 selection, report units), traces the
