@@ -138,6 +138,68 @@ describe('Run G-code file dialog (ADR-630)', () => {
     expect(onStarted).toHaveBeenCalledTimes(1);
   });
 
+  it('uses the connected Marlin parser through review, Frame and the exact Start handoff', async () => {
+    useLaserStore.setState({
+      activeControllerKind: 'marlin',
+      connection: { kind: 'connected' },
+      statusReport: parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>'),
+    });
+    // The saved device remains GRBL: the connected driver owns interpretation.
+    const text = 'G0 X100\nG90 G0 X0\nG91\nM3 S100\nG1 X10 F600 M5\n';
+    const body = await show(text);
+    expect(body.textContent).toContain('110 mm × 0 mm');
+    expect(body.textContent).toContain('first on separate lines');
+    expect(body.textContent).toContain('still on when the program ends');
+    const frame = vi.spyOn(externalRun, 'frameExternalProgram').mockImplementation(async (run) => {
+      const verification = {
+        boundsSignature: 'external:marlin',
+        wco: null,
+        workOriginActive: false,
+      };
+      useLaserStore.setState({ frameVerification: verification });
+      return { run, machineKind: 'laser', verification, controller: useLaserStore.getState() };
+    });
+    await act(async () => button(body, 'Frame').click());
+    expect(frame).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gcode: `G21\nG90\n${text}`,
+        envelope: { minX: 0, minY: 0, maxX: 110, maxY: 0 },
+      }),
+    );
+    expect(button(body, 'Start').disabled).toBe(false);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const startJob = vi.fn(async () => undefined);
+    useLaserStore.setState({ startJob });
+    await act(async () => button(body, 'Start').click());
+    expect(startJob).toHaveBeenCalledOnce();
+    const [sent] = startJob.mock.calls[0] as unknown as [string];
+    expect(sent).toBe(`G21\nG90\n${text}`);
+  });
+
+  it('re-reads the program and drops its old Frame when the connected parser changes', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>'),
+    });
+    const body = await show('G0 X100\nG90 G0 X0\nG91\nG1 X10 F600\nM5');
+    expect(body.textContent).toContain('100 mm × 0 mm');
+    vi.spyOn(externalRun, 'frameExternalProgram').mockImplementation(async (run) => {
+      const verification = {
+        boundsSignature: 'external:old-driver',
+        wco: null,
+        workOriginActive: false,
+      };
+      useLaserStore.setState({ frameVerification: verification });
+      return { run, machineKind: 'laser', verification, controller: useLaserStore.getState() };
+    });
+    await act(async () => button(body, 'Frame').click());
+    expect(button(body, 'Start').disabled).toBe(false);
+    await act(async () => useLaserStore.setState({ activeControllerKind: 'marlin' }));
+    expect(body.textContent).toContain('110 mm × 0 mm');
+    expect(button(body, 'Start').disabled).toBe(true);
+    expect(button(body, 'Start').title).toBe(EXTERNAL_FRAME_FIRST);
+  });
+
   it('cannot be closed while Start is arming the controller', async () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },

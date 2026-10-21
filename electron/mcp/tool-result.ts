@@ -32,3 +32,26 @@ export function boundedRecipeToolResult(
   }
   return prefix(low);
 }
+
+/** Older backends may only cap item counts. Preserve complete records and selection IDs. */
+export function boundedWorkspaceToolResult(
+  data: KerfDeskMcpResult<'get_workspace'>,
+): CallToolResult {
+  const full = structuredToolResult(data);
+  if (toolResultBytes(full) <= MCP_MAX_RESULT_BYTES) return full;
+  const prefix = (count: number) =>
+    structuredToolResult({
+      ...data,
+      artwork: data.artwork.slice(0, count),
+      operations: data.operations.slice(0, count),
+      truncated: true,
+    });
+  let low = 0;
+  let high = Math.max(data.artwork.length, data.operations.length);
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (toolResultBytes(prefix(middle)) <= MCP_MAX_RESULT_BYTES) low = middle;
+    else high = middle - 1;
+  }
+  return prefix(low);
+}

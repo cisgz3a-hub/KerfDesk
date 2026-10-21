@@ -2,7 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
+import { createLayer, createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import type { HeightfieldReliefObject } from '../../core/scene/scene-object';
 import { materializeReliefAuthoring } from '../../core/relief/materialize-relief-authoring';
 import { deserializeProject, serializeProject } from '../../io/project';
@@ -47,6 +47,40 @@ function current(): HeightfieldReliefObject {
 }
 
 describe('editable relief creation in an empty project', () => {
+  it('retains the draft and allows retry after a refused operation-limit insertion', async () => {
+    const original = useStore.getState().project;
+    const project = {
+      ...original,
+      scene: {
+        ...original.scene,
+        layers: Array.from({ length: 256 }, (_, index) =>
+          createLayer({
+            id: `operation-${index}`,
+            color: `#${index.toString(16).padStart(6, '0')}`,
+          }),
+        ),
+      },
+    };
+    useStore.setState({ project });
+    const before = useStore.getState();
+    await act(async () => root.render(<CreateEditableReliefWorkflow onClose={() => undefined} />));
+    const width = host.querySelector('[aria-label="Relief width (mm)"]') as HTMLInputElement;
+    await act(async () => {
+      width.value = '125';
+      Simulate.change(width);
+    });
+    await act(async () => button('Create relief').click());
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('256 operations');
+    expect(host.querySelector('[role="status"]')).toBeNull();
+    expect(button('Create relief').disabled).toBe(false);
+    expect(width.value).toBe('125');
+    expect(useStore.getState().project).toBe(project);
+    expect(useStore.getState().undoStack).toBe(before.undoStack);
+    await act(async () => useStore.getState().deleteLayerAndObjects('operation-255'));
+    await act(async () => button('Create relief').click());
+    expect(current().targetWidthMm).toBe(125);
+    expect(host.querySelector('.lf-dialog-title')?.textContent).toBe('Edit relief components');
+  });
   it('opens a sculptable base component and retains the first stroke through undo and save/reopen', async () => {
     await act(async () => root.render(<CreateEditableReliefButton />));
     await act(async () => button('Create editable relief…').click());

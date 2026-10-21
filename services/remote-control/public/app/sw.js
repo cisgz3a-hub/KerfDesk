@@ -1,6 +1,6 @@
 // KerfDesk Remote service worker (ADR-582/583). Caches the app shell only; never API
 // responses, workspace data, previews or camera images.
-const VERSION = 'b4a2a17a554f';
+const VERSION = '94bf2cfaa87a';
 const CACHE = `kerfdesk-remote-${VERSION}`;
 const SHELL = [
   '/app/',
