@@ -111,7 +111,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'tools.place-board': {
     family: 'tools',
     tooltip:
-      'Capture a rectangle or circle, or trace an irregular board from a phone photo, then verify points on the drawn outline.',
+      'Capture a rectangle or circle, or draw an irregular board from a phone photo, then register and verify points on the outline.',
   },
   'tools.box-generator': {
     family: 'tools',

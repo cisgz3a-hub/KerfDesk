@@ -16,6 +16,8 @@ import { useBoardVerification, type BoardVerificationController } from './use-bo
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
+type OutlineShape = Extract<BoardShape, { readonly kind: 'outline' }>;
+
 const originalLaserState = useLaserStore.getState();
 let unmount: (() => Promise<void>) | null = null;
 
@@ -75,17 +77,18 @@ describe('createOutlineFinishHandler', () => {
     useLaserStore.setState(originalLaserState, true);
   });
 
-  it('sets the calculated front-left origin before addCapturedBoard', async () => {
+  it('sets the calculated front-left origin before registering the drawn outline', async () => {
     const calls: string[] = [];
     const setOriginAtMachinePoint = vi.fn(async (point) => {
       calls.push('origin');
       expect(point.x).toBeCloseTo(100);
       expect(point.y).toBeCloseTo(-260);
     });
-    const addCapturedBoard = vi.fn((shape: BoardShape, placeAt?: Vec2) => {
-      calls.push('addCapturedBoard');
-      useStore.getState().addCapturedBoard(shape, placeAt);
+    const registerCapturedBoardOutline = vi.fn((shape: OutlineShape, rotationDeg: number) => {
+      calls.push('register');
+      useStore.getState().registerCapturedBoardOutline(shape, rotationDeg);
     });
+    const addCapturedBoard = vi.fn();
     const capture = captureWith([
       { x: 100, y: -260 },
       { x: 180, y: -200 },
@@ -94,12 +97,14 @@ describe('createOutlineFinishHandler', () => {
       capture,
       setOriginAtMachinePoint,
       addCapturedBoard,
+      registerCapturedBoardOutline,
     });
     await act(async () => handlers().onFinishOutline());
 
-    expect(calls).toEqual(['origin', 'addCapturedBoard']);
+    expect(calls).toEqual(['origin', 'register']);
     expect(setOriginAtMachinePoint).toHaveBeenCalledOnce();
-    expect(addCapturedBoard).toHaveBeenCalledOnce();
+    expect(addCapturedBoard).not.toHaveBeenCalled();
+    expect(registerCapturedBoardOutline).toHaveBeenCalledOnce();
     expect(capture.commit).toHaveBeenCalledOnce();
   });
 
@@ -166,7 +171,8 @@ describe('createOutlineFinishHandler', () => {
 async function renderHandlers(args: {
   readonly capture: BoardCapture;
   readonly setOriginAtMachinePoint: (point: { x: number; y: number }) => Promise<void>;
-  readonly addCapturedBoard: (shape: BoardShape, placeAt?: Vec2) => void;
+  readonly addCapturedBoard: (shape: BoardShape) => void;
+  readonly registerCapturedBoardOutline: (shape: OutlineShape, rotationDeg: number) => void;
 }): Promise<() => BoardCaptureHandlers> {
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -179,8 +185,8 @@ async function renderHandlers(args: {
       device: { ...DEFAULT_DEVICE_PROFILE, origin: 'front-left' },
       setOriginHere: async () => undefined,
       setOriginAtMachinePoint: args.setOriginAtMachinePoint,
-      outlineSceneTopLeft: () => undefined,
       addCapturedBoard: args.addCapturedBoard,
+      registerCapturedBoardOutline: args.registerCapturedBoardOutline,
       updateCapturedBoard: vi.fn(),
     });
     return null;

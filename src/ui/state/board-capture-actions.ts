@@ -12,7 +12,6 @@ import {
   transformedBBox,
   type BoardShape,
   type ShapeObject,
-  type Vec2,
 } from '../../core/scene';
 import {
   createRegistrationBox,
@@ -24,6 +23,7 @@ import {
   applyAddRegistrationBox,
   registrationBoxDefaultPosition,
 } from './registration-box-actions';
+import { registerCapturedOutlineMutation } from './board-outline-register';
 import { applyRegistrationOutputToScene } from './registration-output-actions';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
@@ -46,9 +46,16 @@ const CAPTURED_CIRCLE_PLACEMENT: JobPlacementSettings = {
 
 export function boardCaptureActions(
   set: Setter,
-): Pick<AppState, 'addCapturedBoard' | 'addCapturedBoardBox' | 'updateCapturedBoard'> {
-  const addCapturedBoard = (shape: BoardShape, placeAt?: Vec2): void => {
-    set((s) => commitCapturedBoard(s, buildBoardOutline(s, shape, placeAt), placementFor(shape)));
+): Pick<
+  AppState,
+  | 'addCapturedBoard'
+  | 'addCapturedBoardBox'
+  | 'updateCapturedBoard'
+  | 'drawCapturedBoardOutline'
+  | 'registerCapturedBoardOutline'
+> {
+  const addCapturedBoard = (shape: BoardShape): void => {
+    set((s) => commitCapturedBoard(s, buildBoardOutline(s, shape), placementFor(shape)));
   };
   return {
     addCapturedBoard,
@@ -56,6 +63,16 @@ export function boardCaptureActions(
     addCapturedBoardBox: (widthMm, heightMm) =>
       addCapturedBoard({ kind: 'rect', widthMm, heightMm }),
     updateCapturedBoard: (shape) => set((s) => updateCapturedBoardMutation(s, shape) ?? {}),
+    // Canvas first (ADR-650): artwork is laid out on the drawn outline before the
+    // head registers it, so placement stays as it was until registration.
+    drawCapturedBoardOutline: (shape) =>
+      set((s) => commitCapturedBoard(s, buildBoardOutline(s, shape), s.jobPlacement)),
+    registerCapturedBoardOutline: (shape, rotationDeg) =>
+      set(
+        (s) =>
+          registerCapturedOutlineMutation(s, shape, rotationDeg, CAPTURED_RECT_PLACEMENT) ??
+          commitCapturedBoard(s, buildBoardOutline(s, shape), CAPTURED_RECT_PLACEMENT),
+      ),
   };
 }
 
@@ -131,7 +148,7 @@ function resizedOutline(
 // the bed (a capture is always a brand-new board, so no prior position is kept).
 // Locked so a stray drag can't shift it off registration — its canvas position
 // encodes the physical work origin.
-function buildBoardOutline(s: AppState, shape: BoardShape, placeAt?: Vec2): ShapeObject {
+function buildBoardOutline(s: AppState, shape: BoardShape): ShapeObject {
   const { bedWidth, bedHeight } = s.project.device;
   switch (shape.kind) {
     case 'rect': {
@@ -146,8 +163,7 @@ function buildBoardOutline(s: AppState, shape: BoardShape, placeAt?: Vec2): Shap
     }
     case 'outline': {
       const size = outlineSize(shape.pointsMm);
-      const at =
-        placeAt ?? registrationBoxDefaultPosition(bedWidth, bedHeight, size.width, size.height);
+      const at = registrationBoxDefaultPosition(bedWidth, bedHeight, size.width, size.height);
       return locked(createRegistrationOutline({ pointsMm: shape.pointsMm, x: at.x, y: at.y }));
     }
     default:

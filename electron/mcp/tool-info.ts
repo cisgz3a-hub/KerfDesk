@@ -20,7 +20,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   set_board_photo: {
     title: 'Send a board photo',
     description:
-      "Send a JPEG or PNG photo of a board to the computer's Place Board → Outline workflow. Downscale to about 1200 px on the long side (at most 240000 base64 characters). The operator straightens, traces and sizes the outline on the computer; this tool does not create a board.",
+      "Send a JPEG or PNG photo of a board to the computer's Place Board → Outline workflow. Downscale to about 1200 px on the long side (at most 240000 base64 characters). The operator clicks the board outline and enters its size on the computer; this tool does not create a board.",
   },
   place_on_board: {
     title: 'Place artwork on the board',

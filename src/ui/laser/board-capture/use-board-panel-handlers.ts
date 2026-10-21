@@ -4,7 +4,6 @@ import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import type { BoardCapture } from './use-board-capture';
 import { useBoardCaptureHandlers, type BoardCaptureHandlers } from './use-board-capture-handlers';
-import { useOutlineSceneTopLeft } from './use-outline-scene-top-left';
 
 export function useBoardPanelHandlers(
   capture: BoardCapture,
@@ -14,16 +13,16 @@ export function useBoardPanelHandlers(
   const setOriginHere = useLaserStore((state) => state.setOriginHere);
   const setOriginAtMachinePoint = useLaserStore((state) => state.setOriginAtMachinePoint);
   const addCapturedBoard = useStore((state) => state.addCapturedBoard);
+  const registerCapturedBoardOutline = useStore((state) => state.registerCapturedBoardOutline);
   const updateCapturedBoard = useStore((state) => state.updateCapturedBoard);
-  const outlineSceneTopLeft = useOutlineSceneTopLeft(device);
   return useBoardCaptureHandlers({
     capture,
     livePosition,
     device,
     setOriginHere,
     setOriginAtMachinePoint,
-    outlineSceneTopLeft,
     addCapturedBoard,
+    registerCapturedBoardOutline,
     updateCapturedBoard,
   });
 }

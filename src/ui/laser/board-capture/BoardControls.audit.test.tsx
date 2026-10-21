@@ -202,8 +202,8 @@ describe('Board control audit', () => {
       onInitialFileConsumed: vi.fn(),
     };
     act(() => root.render(<OutlineCaptureSteps {...props} />));
-    expect(host.textContent).toContain('anchor B');
-    expect(button('Create board outline').disabled).toBe(true);
+    expect(host.textContent).toContain('point B');
+    expect(button('Register board').disabled).toBe(true);
     act(() =>
       root.render(
         <OutlineCaptureSteps
@@ -215,7 +215,7 @@ describe('Board control audit', () => {
         />,
       ),
     );
-    expect(button('Create board outline').disabled).toBe(false);
+    expect(button('Register board').disabled).toBe(false);
   });
 
   it('outline placement reports checked anchors and exposes Fit and Array', () => {

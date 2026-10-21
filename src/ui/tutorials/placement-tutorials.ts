@@ -131,14 +131,14 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the board shape',
         instruction:
-          'Choose Rectangle, Circle or Outline. Outline opens a phone-photo workflow using a flat reference sheet before two head captures register it to the machine.',
+          'Choose Rectangle, Circle or Outline. For Outline, open a photo of the board, click its corners and type its size: the board goes on the canvas at once, and two head captures register it to the machine later.',
         focus: 'Rectangle or circle reference',
         result: 'The chosen capture method matches how you can locate the physical board.',
       },
       {
         title: 'Finish measuring the outline',
         instruction:
-          'Measure rectangles or circles as prompted. For an outline, straighten the photo, click the board, choose anchors, enter its ruler-measured size, then capture anchors A and B.',
+          'Measure rectangles or circles as prompted. For an outline, jog the head onto points A and B shown on the outline, capture each, then Register board.',
         focus: 'Measured points or known dimensions',
         result:
           'Create the board outline to obtain a locked placement reference excluded from the burn.',

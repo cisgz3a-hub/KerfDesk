@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { outlineBounds, type BoardOutlineDraft, type Vec2 } from '../../../core/scene';
 import { Button } from '../../kit';
+import { BoardArrayForm } from './BoardArrayForm';
+import { BoardFitControls } from './BoardFitControls';
 import { OutlinePhotoDialog } from './photo/OutlinePhotoDialog';
+import { useBoardPlacement } from './use-board-placement';
 
 const photoKeys = new WeakMap<File, number>();
 let nextPhotoKey = 1;
@@ -34,8 +37,15 @@ export function OutlineCaptureSteps(props: {
     <div style={columnStyle}>
       {props.draft === null ? (
         <>
-          <p style={hintStyle}>1. Photograph the board with a sheet of paper lying flat on it.</p>
-          <Button onClick={() => setDialogOpen(true)}>Outline from photo…</Button>
+          <p style={hintStyle}>
+            1. Take a photo of the board from straight above, then click its corners on the photo.
+          </p>
+          <Button
+            title="Open a photo of the board and click its outline"
+            onClick={() => setDialogOpen(true)}
+          >
+            Draw board from photo…
+          </Button>
         </>
       ) : (
         <DraftCapture {...props} draft={props.draft} onChange={() => setDialogOpen(true)} />
@@ -74,17 +84,25 @@ function DraftCapture(
   const count = props.corners.length;
   const guidance =
     count === 0
-      ? '2. Jog the head to anchor A, then Capture.'
+      ? 'Jog the head onto point A on the board, then press Capture.'
       : count === 1
-        ? '3. Jog the head to anchor B, then Capture.'
-        : 'Both registration anchors captured.';
+        ? 'Now jog the head onto point B, then press Capture.'
+        : 'Both points captured.';
   return (
     <>
       <OutlinePreview draft={props.draft} />
-      <Button variant="ghost" disabled={props.sessionDisabled} onClick={props.onChange}>
-        Change outline…
+      <Button
+        variant="ghost"
+        title="Open the photo window again and draw a new outline"
+        disabled={props.sessionDisabled}
+        onClick={props.onChange}
+      >
+        Redraw board…
       </Button>
-      <p style={hintStyle}>{guidance}</p>
+      <OutlineLayout />
+      <p style={hintStyle}>
+        <strong>3. Register on the laser.</strong> {guidance}
+      </p>
       <p style={liveStyle}>
         <strong>Head:</strong>{' '}
         {props.livePosition === null
@@ -109,15 +127,31 @@ function DraftCapture(
       </div>
       <Button
         variant="primary"
+        title="Work out where the board sits on the laser from points A and B"
         disabled={props.disabled || count !== 2}
         onClick={() => void props.onFinish().catch(() => undefined)}
       >
-        Create board outline
+        Register board
       </Button>
       <p style={mutedStyle}>
-        Anchors land where the head measures them. Between anchors the outline follows the photo,
-        usually within about 1 mm. Keep artwork a few mm inside the edge.
+        Register before you Frame and Start. If the board sits at an angle, the outline and the
+        artwork on it turn to match. Between points the outline follows the photo, so keep artwork a
+        few mm inside the edge.
       </p>
+    </>
+  );
+}
+
+function OutlineLayout(): JSX.Element {
+  const { canFit, fitToBoard, arrayToBoard } = useBoardPlacement();
+  return (
+    <>
+      <p style={hintStyle}>
+        <strong>2. Lay out artwork.</strong> The board is on the canvas. Select artwork, then fit or
+        repeat it on the board.
+      </p>
+      <BoardFitControls disabled={!canFit} onFit={fitToBoard} />
+      <BoardArrayForm disabled={!canFit} onArray={arrayToBoard} />
     </>
   );
 }
@@ -134,7 +168,7 @@ function OutlinePreview({ draft }: { readonly draft: BoardOutlineDraft }): JSX.E
       style={{ width: '100%', maxWidth: 240, maxHeight: 160, overflow: 'visible' }}
     >
       <polygon points={points} fill="var(--lf-accent-wash)" stroke="var(--lf-accent)" />
-      {draft.anchorIndices.map((index, ordinal) => {
+      {draft.anchorIndices.map((index) => {
         const point = draft.localPointsMm[index];
         if (point === undefined) return null;
         const capture = draft.captureOrder.indexOf(index);
@@ -152,7 +186,7 @@ function OutlinePreview({ draft }: { readonly draft: BoardOutlineDraft }): JSX.E
               fontSize={Math.max(width, height) / 14}
               textAnchor="middle"
             >
-              {capture === 0 ? 'A' : capture === 1 ? 'B' : ordinal + 1}
+              {capture === 0 ? 'A' : capture === 1 ? 'B' : index + 1}
             </text>
           </g>
         );

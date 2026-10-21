@@ -2,18 +2,37 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { StatusReport } from '../../../core/controllers/grbl';
+import { findRegistrationBoxes, type BoardOutlineDraft } from '../../../core/scene';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { useUiStore } from '../../state/ui-store';
 import { BoardCapturePanel } from './BoardCapturePanel';
 import { useBoardPhotoInbox } from './board-capture-remote';
 
+const DRAFT: BoardOutlineDraft = {
+  localPointsMm: [
+    { x: 0, y: 0 },
+    { x: 120, y: 0 },
+    { x: 90, y: 70 },
+    { x: 0, y: 70 },
+  ],
+  anchorIndices: [0, 1, 2, 3],
+  captureOrder: [3, 1],
+};
+
 vi.mock('./photo/OutlinePhotoDialog', () => ({
-  OutlinePhotoDialog: (props: { readonly initialFile?: File; readonly onClose: () => void }) => (
+  OutlinePhotoDialog: (props: {
+    readonly initialFile?: File;
+    readonly onClose: () => void;
+    readonly onUseOutline: (draft: BoardOutlineDraft) => void;
+  }) => (
     <div role="dialog">
       Outline from photo {props.initialFile?.name}
       <button type="button" onClick={props.onClose}>
         Close photo
+      </button>
+      <button type="button" onClick={() => props.onUseOutline(DRAFT)}>
+        Use test outline
       </button>
     </div>
   ),
@@ -82,7 +101,22 @@ describe('BoardCapturePanel outline mode', () => {
   it('offers the photo workflow after choosing Outline', async () => {
     const container = await renderPanel();
     await act(async () => button(container, 'Outline').click());
-    expect(container.textContent).toContain('Outline from photo');
+    expect(container.textContent).toContain('Draw board from photo…');
+  });
+
+  it('puts the drawn outline on the canvas straight away, before any head capture', async () => {
+    const container = await renderPanel();
+    const placement = useStore.getState().jobPlacement;
+    await act(async () => button(container, 'Outline').click());
+    await act(async () => button(container, 'Draw board from photo…').click());
+    await act(async () => button(container, 'Use test outline').click());
+    const board = findRegistrationBoxes(useStore.getState().project.scene).find(
+      (box) => box.provenance === 'captured-board',
+    );
+    expect(board?.spec).toEqual({ kind: 'polyline', points: DRAFT.localPointsMm, closed: true });
+    expect(useStore.getState().jobPlacement).toEqual(placement);
+    expect(container.textContent).toContain('Lay out artwork');
+    expect(button(container, 'Register board').disabled).toBe(true);
   });
 
   it('switches an uncommitted rectangle session to Outline and opens a delivered photo', async () => {
@@ -96,7 +130,7 @@ describe('BoardCapturePanel outline mode', () => {
     expect(container.textContent).toContain('Outline from photo remote-board.jpg');
     expect(useBoardPhotoInbox.getState().photo).toBeNull();
     await act(async () => button(container, 'Close photo').click());
-    await act(async () => button(container, 'Outline from photo…').click());
+    await act(async () => button(container, 'Draw board from photo…').click());
     expect(container.textContent).not.toContain('remote-board.jpg');
   });
 

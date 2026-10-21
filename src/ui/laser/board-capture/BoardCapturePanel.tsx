@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deviceForActiveHead } from '../../../core/cnc/cnc-head-feeds';
+import type { BoardOutlineDraft } from '../../../core/scene';
 import { Button, Icon } from '../../kit';
 import { TutorialButton } from '../../tutorials/TutorialButton';
 import { useStore } from '../../state';
@@ -164,6 +165,17 @@ function BoardCapturePanelContent(props: {
   const undoCapture = (): void => {
     if (!captureSessionMotionActive()) undo();
   };
+  // Canvas first (ADR-650): the drawn outline goes on the canvas at once, so
+  // artwork can be laid out on it before the head registers where it sits.
+  const drawOutline = (draft: BoardOutlineDraft): void => {
+    if (captureSessionMotionActive()) return;
+    setOutlineDraft(draft);
+    useStore.getState().drawCapturedBoardOutline({
+      kind: 'outline',
+      pointsMm: draft.localPointsMm,
+      anchorIndices: draft.anchorIndices,
+    });
+  };
   return (
     <>
       {!state.committed && (
@@ -193,7 +205,7 @@ function BoardCapturePanelContent(props: {
         onManualSize={props.handlers.onManualSize}
         onFinishCircle={props.handlers.onFinishCircle}
         onFinishOutline={props.handlers.onFinishOutline}
-        onOutlineDraft={setOutlineDraft}
+        onOutlineDraft={drawOutline}
         outlineInitialFile={props.outlineInitialFile}
         onOutlineInitialFileConsumed={props.onOutlineInitialFileConsumed}
         onReset={props.onReset}

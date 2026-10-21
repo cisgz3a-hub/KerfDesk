@@ -16,7 +16,7 @@ beforeEach(() => vi.mocked(loadImageAsRawData).mockReset());
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('OutlinePhotoDialog', () => {
-  it('shows photo and reference inputs and closes on Cancel', async () => {
+  it('offers file, paste and MCP photo sources, blocks drawing until outlined, and cancels', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const root = createRoot(host);
@@ -25,8 +25,12 @@ describe('OutlinePhotoDialog', () => {
       root.render(<OutlinePhotoDialog onUseOutline={vi.fn()} onClose={onClose} />);
     });
     expect(host.querySelector('input[type="file"]')).not.toBeNull();
-    expect(host.textContent).toContain('A4 sheet (210 × 297 mm)');
-    expect(host.textContent).toContain('US Letter sheet (215.9 × 279.4 mm)');
+    expect(host.textContent).toContain('paste a photo with Ctrl+V');
+    expect(host.textContent).toContain('From your AI assistant (MCP)');
+    const draw = [...host.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Draw on canvas',
+    );
+    expect(draw?.disabled).toBe(true);
     const cancel = [...host.querySelectorAll('button')].find(
       (button) => button.textContent === 'Cancel',
     );

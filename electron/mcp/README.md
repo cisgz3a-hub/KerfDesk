@@ -69,8 +69,8 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `pause_job`, `resume_job` | `requestId` UUID | Desktop Pause/Resume with controller confirmation; no artwork revision required. |
 | `get_camera_snapshot` | None | Control scope plus artwork sharing: one JPEG still ≤1024 px and ≤240000 base64 characters of the live PC camera. |
 
-Place Board photos are straightened, traced and sized by the operator on the computer. The operator
-checks outline anchors there, and a completed Frame remains the ordinary Start gate.
+Place Board photos open on the computer, where the operator clicks the board outline and sizes it.
+The operator checks outline points there, and a completed Frame remains the ordinary Start gate.
 
 Selection modes are advertised by `get_workspace.capabilities.selectionModes`.
 Without that capability, omit `mode` and use the original `artworkIds` replacement.

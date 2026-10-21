@@ -4711,48 +4711,58 @@ preview and applied copies use the same plan; this is not optimal nesting (ADR-5
 
 **ADR:** [ADR-650](docs/decisions/ADR-650-outline-board-from-photo.md).
 
-**Operator intent.** Trace the irregular edge of an offcut, live-edge slab or shaped blank from a
-phone photo, give it an exact ruler-measured size, and register that outline to the machine with
-head captures instead of guessing where the photograph lies on the bed.
+**Operator intent.** Draw the irregular edge of an offcut, live-edge slab or shaped blank from a
+phone photo at its exact ruler-measured size, lay artwork out on it straight away, and register it
+to the machine with two head captures before burning.
 
-**Where in the UI.** Open **Tools → Place Board**, choose **Outline**, then **Outline from photo…**.
-The modal photo workflow straightens the picture from a sheet of A4, US Letter or custom-sized
-paper lying flat on the board. A rough skip-reference option is available for a genuinely
-straight-down photo.
+**Where in the UI.** Open **Tools → Place Board**, choose **Outline**, then **Draw board from
+photo…**. The photo window takes a file, a pasted photo (Ctrl+V), or a photo an MCP assistant sends
+to the desktop app (`set_board_photo`), which opens the window by itself.
 
 **The happy path.**
 
-1. Lay the reference sheet flat on the board, photograph the whole board and sheet straight down,
-   load the photo, and click the sheet's four corners.
-2. Straighten the photo, click the middle of the board, inspect the traced edge, and choose two to
-   six reachable outline anchors. Choose the first capture anchor; KerfDesk chooses the farthest
-   second anchor.
-3. Measure the board with a ruler and enter Width × Height. **Use this outline** scales the traced
-   bounding box to exactly those dimensions.
-4. Jog beam-off to highlighted anchor A and Capture, then anchor B and Capture. **Create board
-   outline** checks the measured scale, sets the physical front-left work origin arithmetically,
-   and adds the locked, non-output outline.
-5. Check every remaining anchor. Each accepted or adjusted point is measured and refits the
-   outline. These checks are accuracy advice, not a Start gate.
-6. Select artwork and use **Fit to board** or **Array on board**. Both use a conservative inscribed
-   rectangle so rectangular artwork stays inside the irregular edge.
-7. Preview, complete **Frame** for the exact placement, then Start. The completed Frame remains the
+1. Photograph the board from straight above with the whole board in view, and open the photo.
+2. Click each corner of the board in order around its edge, adding points along curved edges.
+   Drag a point to move it. **Straighten edge** lines up points that are a little off: pick the
+   points at the two ends of an edge and the points between move onto the straight line joining
+   them. **Undo** reverses the last click, drag, straighten or clear; **Clear** starts over. The
+   dashed line shows the closing edge.
+3. Enter the board's ruler-measured width (left to right in the photo) and height (top to bottom).
+   The clicked outline is scaled to exactly that size. Every clicked corner is a check point, up
+   to six (more points pick the sharpest six); A is the point nearest the photo's bottom-left by
+   default and can be changed, and B is the point farthest from A.
+4. **Draw on canvas** puts the locked outline on the canvas at once, centred and out of the burn.
+   Placement is unchanged until the board is registered.
+5. Select artwork and use **Fit to board** or **Array on board** inside the outline (a conservative
+   inscribed rectangle).
+6. Jog beam-off onto point A and **Capture**, then point B and **Capture**. **Register board**
+   checks the measured scale, sets the work origin at the outline's physical front-left corner,
+   gives the drawn outline the shape and turn the head measured about its own centre, turns
+   unlocked artwork lying on it by the same angle, and switches placement to User Origin
+   front-left. This is one Undo step.
+7. Check every remaining point. Each accepted or adjusted point is measured and refits the outline.
+   These checks are accuracy advice, not a Start gate.
+8. Preview, complete **Frame** for the exact placement, then Start. The completed Frame remains the
    ordinary Start gate.
 
-**Edge / error cases.** A head-measured anchor spacing over 5% different from the typed outline is
-refused as a likely wrong anchor or size; over 1% shows a notice. If no contrasting board is found
-at the click, click farther from the reference sheet or retake against a plain background. A board
-touching the photo edge is marked partial. A very wide photographed area is marked coarse; move
-closer for detail. Skip-reference mode is deliberately rough and requires typed dimensions.
-Reconnect, reset/alarm, homing/manual-position or work-origin changes stale the capture epochs and
-require recapture. A checked anchor over 5 mm from prediction warns about the selected point; a
-least-squares miss over 1.5 mm warns about photo distortion and recommends an edge margin.
+**Edge / error cases.** **Draw on canvas** stays disabled, with the reason shown, until there are
+at least three points that do not cross and a width and height of at least 3 mm. A typed size whose
+proportions differ from the clicked outline by more than 10% shows a notice (width and height
+swapped, or a photo taken at an angle) without blocking. **Straighten edge** refuses neighbouring
+ends (there is nothing between them) and any edge whose points sit more than 15% of its length off
+the line, so it cannot collapse a corner. A head-measured spacing of A and B over 5%
+different from the drawn outline is refused as a likely wrong point or size; over 1% shows a
+notice. Locked artwork does not turn at registration. Without a connected machine the board can be
+drawn and laid out but not registered. Reconnect, reset/alarm, homing/manual-position or
+work-origin changes stale the capture epochs and require recapture. A checked point over 5 mm from
+prediction warns about the selected point; a least-squares miss over 1.5 mm warns about photo
+distortion and recommends an edge margin.
 
 **Hardware verification checklist (user-driven — hardware CLAIMED).**
 
 1. Secure scrap material and use S=0 / an air trace first.
-2. Capture A and B, confirm the displayed scale notice is plausible, and create the outline.
-3. Move beam-off to every verification anchor and confirm the head lands on the physical edge.
+2. Draw the board from a straight-down photo, lay out test artwork, capture A and B and register.
+3. Move beam-off to every check point and confirm the head lands on the physical edge.
 4. Keep test artwork several millimetres inside the outline, then complete Frame and inspect the
    air trace before enabling normal power.
 

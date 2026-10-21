@@ -5,7 +5,6 @@ import {
   outlineMachineCorner,
   type BestFitRectangle,
   type BoardShape,
-  type OutlineBoardGeometry,
   type Vec2,
 } from '../../../core/scene';
 import type { DeviceProfile } from '../../../core/devices';
@@ -28,6 +27,7 @@ import {
 import {
   createOutlineFinishHandler,
   outlineGeometryLargeEnough,
+  outlineRotationDeg,
 } from './use-board-outline-handlers';
 
 type SetMessage = Dispatch<SetStateAction<string | null>>;
@@ -39,8 +39,11 @@ type BoardCaptureHandlerArgs = {
   readonly device: DeviceProfile;
   readonly setOriginHere: () => Promise<void>;
   readonly setOriginAtMachinePoint: (pointMm: Vec2) => Promise<void>;
-  readonly outlineSceneTopLeft: (geometry: OutlineBoardGeometry) => Vec2 | undefined;
-  readonly addCapturedBoard: (shape: BoardShape, placeAt?: Vec2) => void;
+  readonly addCapturedBoard: (shape: BoardShape) => void;
+  readonly registerCapturedBoardOutline: (
+    shape: Extract<BoardShape, { readonly kind: 'outline' }>,
+    rotationDeg: number,
+  ) => void;
   readonly updateCapturedBoard: (shape: BoardShape) => void;
 };
 
@@ -147,10 +150,12 @@ function createGeometryCommit(
     if (!boardCaptureCanCommit(args.capture.state, geometry, registrationEpoch)) {
       throw new Error('Board coordinates changed during capture. Start over and capture it again.');
     }
-    args.addCapturedBoard(
-      capturedBoardShape(geometry),
-      geometry.kind === 'outline' ? args.outlineSceneTopLeft(geometry) : undefined,
-    );
+    const shape = capturedBoardShape(geometry);
+    if (geometry.kind === 'outline' && shape.kind === 'outline') {
+      args.registerCapturedBoardOutline(shape, outlineRotationDeg(geometry));
+    } else {
+      args.addCapturedBoard(shape);
+    }
     const outline = findRegistrationBoxes(useStore.getState().project.scene).find(
       (box) => box.provenance === 'captured-board',
     );

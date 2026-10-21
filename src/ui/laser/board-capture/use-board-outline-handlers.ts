@@ -5,6 +5,7 @@ import {
   outlineBoardShape,
   outlineBounds,
   outlineMachineCorner,
+  outlineRegistration,
   OUTLINE_SCALE_NOTICE_FRACTION,
   type CapturedBoardGeometry,
   type Vec2,
@@ -57,6 +58,12 @@ export function createOutlineFinishHandler(
       setBusy(false);
     }
   };
+}
+
+/** How far the head-measured board is turned from the outline as drawn from the photo. */
+export function outlineRotationDeg(geometry: OutlineBoardGeometry): number {
+  const registration = outlineRegistration(geometry);
+  return registration === null ? 0 : (registration.transform.rotationRad * 180) / Math.PI;
 }
 
 export function outlineGeometryLargeEnough(

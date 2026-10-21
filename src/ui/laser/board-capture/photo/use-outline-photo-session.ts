@@ -1,242 +1,183 @@
 import { useReducer, type Dispatch } from 'react';
-import { defaultCaptureOrder, type Vec2 } from '../../../../core/scene';
-import type { LoadedImage, ReferenceKind, TraceState } from './outline-photo-rectify';
+import type { Vec2 } from '../../../../core/scene';
+import { straightenOutlineRun } from './outline-straighten';
+
+export type LoadedImage = {
+  readonly data: Uint8ClampedArray;
+  readonly width: number;
+  readonly height: number;
+};
 
 export type OutlinePhotoSession = {
   readonly image: LoadedImage | null;
-  readonly corners: ReadonlyArray<Vec2>;
-  readonly reference: ReferenceKind;
-  readonly customWidth: string;
-  readonly customHeight: string;
-  readonly trace: TraceState | null;
-  readonly outline: ReadonlyArray<Vec2> | null;
-  readonly anchors: ReadonlyArray<number>;
-  readonly firstAnchor: number;
+  /** The board's outline as the operator clicked it, image pixels, in order around the board. */
+  readonly points: ReadonlyArray<Vec2>;
+  /** Earlier outlines, newest last, for Undo. */
+  readonly history: ReadonlyArray<ReadonlyArray<Vec2>>;
+  /** The Straighten edge tool: off, waiting for the first point, or holding it. */
+  readonly straighten: null | { readonly from: number | null };
   readonly width: string;
   readonly height: string;
-  readonly partial: boolean;
-  readonly busy: boolean;
-  readonly busyLabel: string;
+  /** Index into points of the anchor the head captures first; null uses the default. */
+  readonly firstAnchor: number | null;
   readonly error: string | null;
-  readonly anchorHint: string | null;
 };
 
 export type OutlinePhotoAction =
   | { readonly type: 'photo-loaded'; readonly image: LoadedImage }
-  | { readonly type: 'reference-changed'; readonly reference: ReferenceKind }
-  | {
-      readonly type: 'custom-size-changed';
-      readonly axis: 'width' | 'height';
-      readonly value: string;
-    }
-  | { readonly type: 'clear-corners' }
-  | { readonly type: 'corner-added'; readonly point: Vec2 }
-  | { readonly type: 'busy-start'; readonly label: string }
-  | { readonly type: 'busy-end' }
-  | { readonly type: 'error'; readonly error: string | null }
-  | { readonly type: 'trace-ready'; readonly trace: TraceState }
-  | { readonly type: 'retap-board' }
-  | {
-      readonly type: 'traced';
-      readonly outline: ReadonlyArray<Vec2>;
-      readonly anchors: ReadonlyArray<number>;
-      readonly firstAnchor: number;
-      readonly width: string;
-      readonly height: string;
-      readonly partial: boolean;
-    }
+  | { readonly type: 'point-added'; readonly point: Vec2 }
+  | { readonly type: 'drag-started' }
+  | { readonly type: 'point-moved'; readonly index: number; readonly point: Vec2 }
+  | { readonly type: 'undo' }
+  | { readonly type: 'points-cleared' }
+  | { readonly type: 'straighten-started' }
+  | { readonly type: 'straighten-cancelled' }
+  | { readonly type: 'straighten-point-picked'; readonly index: number }
   | { readonly type: 'width-edited'; readonly value: string }
   | { readonly type: 'height-edited'; readonly value: string }
   | { readonly type: 'first-anchor-selected'; readonly index: number }
-  | { readonly type: 'anchors-changed'; readonly anchors: ReadonlyArray<number> }
-  | { readonly type: 'anchor-hint'; readonly hint: string | null };
+  | { readonly type: 'error'; readonly error: string | null };
 
-const RESET_TRACE: Pick<
-  OutlinePhotoSession,
-  'trace' | 'outline' | 'anchors' | 'firstAnchor' | 'width' | 'height' | 'partial'
-> = {
-  trace: null,
-  outline: null,
-  anchors: [],
-  firstAnchor: 0,
-  width: '',
-  height: '',
-  partial: false,
-};
+export const MAX_PHOTO_OUTLINE_POINTS = 200;
+const MAX_UNDO_STEPS = 100;
 
 export const INITIAL_OUTLINE_PHOTO_SESSION: OutlinePhotoSession = {
   image: null,
-  corners: [],
-  reference: 'a4',
-  customWidth: '210',
-  customHeight: '297',
-  ...RESET_TRACE,
-  busy: false,
-  busyLabel: '',
+  points: [],
+  history: [],
+  straighten: null,
+  width: '',
+  height: '',
+  firstAnchor: null,
   error: null,
-  anchorHint: null,
 };
 
 export function outlinePhotoSessionReducer(
   state: OutlinePhotoSession,
   action: OutlinePhotoAction,
 ): OutlinePhotoSession {
-  if (isResetAction(action)) return reduceResetAction(state, action);
-  if (isRuntimeAction(action)) return reduceRuntimeAction(state, action);
-  return reduceEditAction(state, action);
+  // A new photo has new pixels: points from the old one mean nothing on it.
+  if (action.type === 'photo-loaded')
+    return { ...INITIAL_OUTLINE_PHOTO_SESSION, image: action.image };
+  if (isPointAction(action)) return reducePoints(state, action);
+  if (isStraightenAction(action)) return reduceStraighten(state, action);
+  return reduceFields(state, action);
 }
 
-type ResetAction = Extract<
-  OutlinePhotoAction,
-  {
-    readonly type:
-      | 'photo-loaded'
-      | 'reference-changed'
-      | 'custom-size-changed'
-      | 'clear-corners'
-      | 'corner-added';
-  }
->;
-type RuntimeAction = Extract<
-  OutlinePhotoAction,
-  {
-    readonly type: 'busy-start' | 'busy-end' | 'error' | 'trace-ready' | 'retap-board';
-  }
->;
-type EditAction = Exclude<OutlinePhotoAction, ResetAction | RuntimeAction>;
-
-const RESET_ACTIONS = new Set<OutlinePhotoAction['type']>([
-  'photo-loaded',
-  'reference-changed',
-  'custom-size-changed',
-  'clear-corners',
-  'corner-added',
+const POINT_ACTIONS = new Set<OutlinePhotoAction['type']>([
+  'point-added',
+  'drag-started',
+  'point-moved',
+  'undo',
+  'points-cleared',
 ]);
-const RUNTIME_ACTIONS = new Set<OutlinePhotoAction['type']>([
-  'busy-start',
-  'busy-end',
-  'error',
-  'trace-ready',
-  'retap-board',
+const STRAIGHTEN_ACTIONS = new Set<OutlinePhotoAction['type']>([
+  'straighten-started',
+  'straighten-cancelled',
+  'straighten-point-picked',
 ]);
 
-function isResetAction(action: OutlinePhotoAction): action is ResetAction {
-  return RESET_ACTIONS.has(action.type);
+function isPointAction(action: OutlinePhotoAction): action is PointAction {
+  return POINT_ACTIONS.has(action.type);
 }
 
-function isRuntimeAction(action: OutlinePhotoAction): action is RuntimeAction {
-  return RUNTIME_ACTIONS.has(action.type);
+function isStraightenAction(action: OutlinePhotoAction): action is StraightenAction {
+  return STRAIGHTEN_ACTIONS.has(action.type);
 }
 
-function reduceResetAction(state: OutlinePhotoSession, action: ResetAction): OutlinePhotoSession {
+type FieldAction = Extract<
+  OutlinePhotoAction,
+  { readonly type: 'width-edited' | 'height-edited' | 'first-anchor-selected' | 'error' }
+>;
+
+function reduceFields(state: OutlinePhotoSession, action: FieldAction): OutlinePhotoSession {
   switch (action.type) {
-    case 'photo-loaded':
-      return resetForPhoto(state, action.image);
-    case 'reference-changed':
-      return resetTrace({ ...state, reference: action.reference });
-    case 'custom-size-changed':
-      return resetTrace({
-        ...state,
-        [action.axis === 'width' ? 'customWidth' : 'customHeight']: action.value,
-      });
-    case 'clear-corners':
-      return { ...resetTrace(state), corners: [] };
-    case 'corner-added':
-      return state.corners.length >= 4
-        ? state
-        : { ...state, corners: [...state.corners, action.point] };
-  }
-}
-
-function reduceRuntimeAction(
-  state: OutlinePhotoSession,
-  action: RuntimeAction,
-): OutlinePhotoSession {
-  switch (action.type) {
-    case 'busy-start':
-      return { ...state, busy: true, busyLabel: action.label, error: null };
-    case 'busy-end':
-      return { ...state, busy: false, busyLabel: '' };
-    case 'error':
-      return { ...state, error: action.error };
-    case 'trace-ready':
-      return { ...resetOutline(state), trace: action.trace };
-    case 'retap-board':
-      return resetOutline(state);
-  }
-}
-
-function reduceEditAction(state: OutlinePhotoSession, action: EditAction): OutlinePhotoSession {
-  switch (action.type) {
-    case 'traced':
-      return tracedState(state, action);
     case 'width-edited':
       return { ...state, width: action.value };
     case 'height-edited':
       return { ...state, height: action.value };
     case 'first-anchor-selected':
       return { ...state, firstAnchor: action.index };
-    case 'anchors-changed':
-      return anchorsChanged(state, action.anchors);
-    case 'anchor-hint':
-      return { ...state, anchorHint: action.hint };
+    case 'error':
+      return { ...state, error: action.error };
   }
 }
 
-function tracedState(
+type PointAction = Extract<
+  OutlinePhotoAction,
+  { readonly type: 'point-added' | 'drag-started' | 'point-moved' | 'undo' | 'points-cleared' }
+>;
+
+function reducePoints(state: OutlinePhotoSession, action: PointAction): OutlinePhotoSession {
+  switch (action.type) {
+    case 'point-added':
+      return state.image === null || state.points.length >= MAX_PHOTO_OUTLINE_POINTS
+        ? state
+        : withPoints(remembered(state), [...state.points, action.point]);
+    case 'drag-started':
+      // One Undo puts a dragged point back where the drag began.
+      return remembered(state);
+    case 'point-moved':
+      return state.points[action.index] === undefined
+        ? state
+        : {
+            ...state,
+            points: state.points.map((point, index) =>
+              index === action.index ? action.point : point,
+            ),
+          };
+    case 'undo': {
+      const previous = state.history[state.history.length - 1];
+      return previous === undefined
+        ? state
+        : withPoints({ ...state, history: state.history.slice(0, -1) }, previous);
+    }
+    case 'points-cleared':
+      return state.points.length === 0 ? state : withPoints(remembered(state), []);
+  }
+}
+
+type StraightenAction = Extract<
+  OutlinePhotoAction,
+  { readonly type: 'straighten-started' | 'straighten-cancelled' | 'straighten-point-picked' }
+>;
+
+function reduceStraighten(
   state: OutlinePhotoSession,
-  action: Extract<OutlinePhotoAction, { readonly type: 'traced' }>,
+  action: StraightenAction,
 ): OutlinePhotoSession {
-  return {
-    ...state,
-    outline: action.outline,
-    anchors: action.anchors,
-    firstAnchor: action.firstAnchor,
-    width: action.width,
-    height: action.height,
-    partial: action.partial,
-    error: null,
-    anchorHint: null,
-  };
+  switch (action.type) {
+    case 'straighten-started':
+      return state.points.length < 3
+        ? state
+        : { ...state, straighten: { from: null }, error: null };
+    case 'straighten-cancelled':
+      return { ...state, straighten: null, error: null };
+    case 'straighten-point-picked':
+      return pickStraightenPoint(state, action.index);
+  }
 }
 
-function resetForPhoto(state: OutlinePhotoSession, image: LoadedImage): OutlinePhotoSession {
-  return {
-    ...INITIAL_OUTLINE_PHOTO_SESSION,
-    reference: state.reference,
-    customWidth: state.customWidth,
-    customHeight: state.customHeight,
-    image,
-  };
+function pickStraightenPoint(state: OutlinePhotoSession, index: number): OutlinePhotoSession {
+  const from = state.straighten?.from;
+  if (state.straighten === null || state.points[index] === undefined) return state;
+  if (from === null || from === undefined || from === index) {
+    return { ...state, straighten: { from: index }, error: null };
+  }
+  const result = straightenOutlineRun(state.points, from, index);
+  if (!result.ok) return { ...state, straighten: { from: null }, error: result.reason };
+  return { ...withPoints(remembered(state), result.points), straighten: null };
 }
 
-function resetTrace(state: OutlinePhotoSession): OutlinePhotoSession {
-  return { ...state, ...RESET_TRACE, error: null, anchorHint: null };
+function remembered(state: OutlinePhotoSession): OutlinePhotoSession {
+  return { ...state, history: [...state.history, state.points].slice(-MAX_UNDO_STEPS) };
 }
 
-function resetOutline(state: OutlinePhotoSession): OutlinePhotoSession {
-  return {
-    ...state,
-    outline: null,
-    anchors: [],
-    firstAnchor: 0,
-    width: '',
-    height: '',
-    partial: false,
-    error: null,
-    anchorHint: null,
-  };
-}
-
-function anchorsChanged(
-  state: OutlinePhotoSession,
-  anchors: ReadonlyArray<number>,
-): OutlinePhotoSession {
-  const order = state.outline === null ? null : defaultCaptureOrder(state.outline, anchors);
-  const firstAnchor = anchors.includes(state.firstAnchor)
-    ? state.firstAnchor
-    : (order?.[0] ?? anchors[0] ?? 0);
-  return { ...state, anchors, firstAnchor };
+function withPoints(state: OutlinePhotoSession, points: ReadonlyArray<Vec2>): OutlinePhotoSession {
+  const firstAnchor =
+    state.firstAnchor !== null && state.firstAnchor < points.length ? state.firstAnchor : null;
+  const straighten = points.length < 3 ? null : state.straighten;
+  return { ...state, points, firstAnchor, straighten, error: null };
 }
 
 export type OutlinePhotoDispatch = Dispatch<OutlinePhotoAction>;
