@@ -12,7 +12,7 @@ type Props = {
   readonly onRetry: (() => void) | undefined;
   readonly onReconnect: (() => void) | undefined;
   readonly disabled: boolean;
-  /** Names a controller that stopped answering when no reconnect is offered. */
+  /** The controller stopped answering status queries (ADR-611). */
   readonly stoppedResponding?: boolean;
   /** The canvas card collapses instead of closing (ADR-642). */
   readonly label?: string;
@@ -60,10 +60,11 @@ export function ControllerRecoveryToast(props: Props): JSX.Element {
   );
 }
 
+// Titles say what happened to the machine, not the internal check that
+// failed; Retry and Reconnect stay as offered (ADR-611 Amendment 2).
 function recoveryHeading(props: Props): string {
-  if (props.reconnectRecommended) return 'Controller connection needs recovery';
-  if (props.stoppedResponding === true) return 'Controller is not responding';
-  return 'Controller information unavailable';
+  if (props.stoppedResponding === true) return 'Machine stopped answering';
+  return 'Couldn’t read machine settings';
 }
 
 function RecoveryActions(props: Props): JSX.Element {

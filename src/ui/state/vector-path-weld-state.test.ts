@@ -7,10 +7,12 @@ import {
   IDENTITY_TRANSFORM,
   sceneLayerVisibility,
   type ImportedSvg,
+  type ShapeObject,
 } from '../../core/scene';
 import { deserializeProject, serializeProject } from '../../io/project';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { useToastStore } from './toast-store';
 
 function object(id: string, x: number): ImportedSvg {
   return {
@@ -46,7 +48,8 @@ describe('Weld state ownership and persistence', () => {
   it('replaces at the earliest scene/order positions and round-trips one undo step', () => {
     const a = object('a', 0);
     const untouched = object('untouched', 20);
-    const c = object('c', 40);
+    // Overlaps `a`, so Weld has geometry to merge.
+    const c = object('c', 4);
     const shared = { ...createLayer({ id: 'shared', color: '#ff0000' }), power: 42, speed: 420 };
     const original = {
       ...createProject(),
@@ -99,6 +102,55 @@ describe('Weld state ownership and persistence', () => {
     }
   });
 
+  it.each([
+    ['one parametric ellipse', ['ellipse']],
+    ['separate shapes', ['ellipse', 'apart']],
+  ])('leaves %s editable when Weld would merge nothing', (_name, ids) => {
+    const ellipse: ShapeObject = {
+      kind: 'shape',
+      id: 'ellipse',
+      spec: { kind: 'ellipse', widthMm: 100, heightMm: 160 },
+      color: '#ff0000',
+      bounds: { minX: 0, minY: 0, maxX: 100, maxY: 160 },
+      transform: IDENTITY_TRANSFORM,
+      operationIds: ['shared'],
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            {
+              closed: true,
+              points: Array.from({ length: 65 }, (_, index) => {
+                const angle = (index / 64) * Math.PI * 2;
+                return { x: 50 + 50 * Math.cos(angle), y: 80 + 80 * Math.sin(angle) };
+              }),
+            },
+          ],
+        },
+      ],
+    };
+    const original = {
+      ...createProject(),
+      scene: {
+        objects: [ellipse, object('apart', 200)],
+        layers: [createLayer({ id: 'shared', color: '#ff0000' })],
+        groups: [],
+      },
+    };
+    useStore.setState({
+      project: original,
+      selectedObjectId: ids[0]!,
+      additionalSelectedIds: new Set(ids.slice(1)),
+      dirty: false,
+    });
+
+    useStore.getState().weldSelection();
+
+    expect(useStore.getState().project).toBe(original);
+    expect(useStore.getState().undoStack).toEqual([]);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toContain('Nothing to weld');
+  });
+
   it('does not manufacture output for explicit-empty paths and survives reopen', () => {
     const blue = { ...createLayer({ id: 'blue', color: '#0000ff' }), power: 90, speed: 900 };
     const source: ImportedSvg = {
@@ -143,7 +195,11 @@ describe('Weld state ownership and persistence', () => {
   });
 
   it('keeps an orphan-only Weld fail-visible and output-inert through reopen', () => {
-    const source = { ...object('orphan', 0), operationIds: ['missing-operation'] };
+    const source = {
+      ...object('orphan', 0),
+      operationIds: ['missing-operation'],
+      paths: [object('orphan', 0).paths[0]!, object('orphan-overlap', 4).paths[0]!],
+    };
     const original = {
       ...createProject(),
       scene: { objects: [source], layers: [], groups: [], artworkOrder: ['orphan'] },
