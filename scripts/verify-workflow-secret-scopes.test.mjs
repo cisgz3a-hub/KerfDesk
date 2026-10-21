@@ -136,3 +136,33 @@ test('the run token and look-alike names are not secrets', () => {
     [],
   );
 });
+
+test('a doubled brace inside an expression string does not hide a later secret', () => {
+  const failures = verifyWorkflowSecretText(
+    'format.yml',
+    workflow(
+      [
+        '    steps:',
+        '      - run: echo "${{ format(\'{{{0}}}\', secrets.SOMETHING_NEW) }}"',
+        "      - run: echo \"${{ format('it''s }} here', secrets.PAGES_CLOUDFLARE_API_TOKEN) }}\"",
+        '      - run: echo "${{ contains(github.ref, \'secrets.NOT_A_READ\') }}"',
+      ].join('\n'),
+    ),
+  );
+  assert.equal(failures.length, 2);
+  assert.match(failures[0] ?? '', /steps\[0\]\.run: secrets\.SOMETHING_NEW is not a reviewed/u);
+  assert.match(failures[1] ?? '', /steps\[1\]\.run: .*no environment \(needs production\)/u);
+});
+
+test('secret names are matched without regard to case, as GitHub matches them', () => {
+  const step = (environment) =>
+    workflow(
+      `${environment}    steps:\n      - env:\n          A: \${{ Secrets.pages_cloudflare_api_token }}\n          B: \${{ secrets.github_token }}\n        run: echo`,
+    );
+  assert.deepEqual(
+    verifyWorkflowSecretText('cased.yml', step('    environment: production\n')),
+    [],
+  );
+  const [missing] = verifyWorkflowSecretText('cased.yml', step(''));
+  assert.match(missing ?? '', /secrets\.PAGES_CLOUDFLARE_API_TOKEN in a job with no environment/u);
+});

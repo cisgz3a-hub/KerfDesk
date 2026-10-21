@@ -38,11 +38,38 @@ export const SECRET_ENVIRONMENTS = new Map([
 
 // GitHub creates this token for each run and scopes it with `permissions:`.
 const RUN_TOKEN = 'GITHUB_TOKEN';
-const EXPRESSION = /\$\{\{([\s\S]*?)\}\}/gu;
-const SECRETS_CONTEXT = /(?<![\w.-])secrets\b(?:\s*\.\s*([A-Za-z_][A-Za-z0-9_]*))?/gu;
+// GitHub reads context and secret names without regard to case.
+const SECRETS_CONTEXT = /(?<![\w.-])secrets\b(?:\s*\.\s*([A-Za-z_][A-Za-z0-9_]*))?/giu;
+// A single-quoted expression string; '' is an escaped quote.
+const STRING_LITERAL = /'(?:[^']|'')*'/gu;
+
+// The body of each ${{ }} in a value. A `}}` inside a string, as in
+// format('{{{0}}}', …), does not end the expression; an unclosed one runs to
+// the end of the value.
+function expressionsIn(value) {
+  const expressions = [];
+  let start = value.indexOf('${{');
+  while (start >= 0) {
+    let index = start + 3;
+    let quoted = false;
+    while (index < value.length) {
+      if (value[index] === "'") {
+        if (quoted && value[index + 1] === "'") index += 1;
+        else quoted = !quoted;
+      } else if (!quoted && value.startsWith('}}', index)) {
+        break;
+      }
+      index += 1;
+    }
+    expressions.push(value.slice(start + 3, index));
+    start = value.indexOf('${{', index + 2);
+  }
+  return expressions;
+}
 
 // Every secrets-context reference in a parsed YAML value, with its YAML path.
-// `if:` conditions are expressions even without ${{ }}.
+// `if:` conditions are expressions even without ${{ }}. Text inside a string
+// literal is not a reference.
 function secretReferences(value, where, key) {
   if (Array.isArray(value)) {
     return value.flatMap((item, index) => secretReferences(item, `${where}[${index}]`, key));
@@ -53,12 +80,12 @@ function secretReferences(value, where, key) {
     );
   }
   if (typeof value !== 'string') return [];
-  const expressions =
-    key === 'if' && !value.includes('${{')
-      ? [value]
-      : [...value.matchAll(EXPRESSION)].map((match) => match[1] ?? '');
+  const expressions = key === 'if' && !value.includes('${{') ? [value] : expressionsIn(value);
   return expressions.flatMap((expression) =>
-    [...expression.matchAll(SECRETS_CONTEXT)].map((match) => ({ where, name: match[1] ?? null })),
+    [...expression.replace(STRING_LITERAL, "''").matchAll(SECRETS_CONTEXT)].map((match) => ({
+      where,
+      name: match[1]?.toUpperCase() ?? null,
+    })),
   );
 }
 
