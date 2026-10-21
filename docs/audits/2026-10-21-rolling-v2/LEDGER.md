@@ -9,6 +9,7 @@ Method: [METHOD.md](METHOD.md). Plan: [AREAS.md](AREAS.md).
 | 1 | 02 | Licensing | 70c01e11f | [02-licensing.md](02-licensing.md) | 27 | 5 | 0 | 2 | 19 | 1 |
 | 1 | 03 | Laser output | 70c01e11f | [03-laser-output.md](03-laser-output.md) | 32 (29 unique) | 1 | 3 | 9 | 16 | 0 |
 | 1 | 04 | Electron main process | 70c01e11f | [04-electron-main.md](04-electron-main.md) | 33 (32 unique) | 2 | 0 | 1 | 27 | 2 |
+| 2 | 05 | Job lifecycle (store) | faf5a54f1 | [05-job-lifecycle.md](05-job-lifecycle.md) | 3 | 0 | 0 | 2 | 1 | 4 |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
@@ -37,4 +38,6 @@ Coordinator checks were made on `origin/main` @ `faf5a54f1`; no audited line cha
 | 03-P2-7 | laser-output | Image overscan > 5 mm raises false "long blank feed … regenerate" warnings (raster runways unmarked) | READ `laser-off-motion-policy.ts:72` excuses only marked lines | open |
 | 03-P2-8 | laser-output | Motion manifest reads every Smoothieware burn as travel (live view, burn trail, camera check wrong) | READ `motion-manifest-parser.ts:156` arms only on M3/M4/M106 | open |
 | 03-P2-9 | laser-output (root cause in 14 vector-importers) | Open DXF `LINE` outlines silently lose kerf compensation and inside-first; no join on import, no Line-layer warning | Same DXF read as 03-P1-2 | open |
+| 05-P2-1 | job-lifecycle | Start-from-line is pre-filled with the automatic restart line of a resumed or second-pass run, then applied to the project's full program, so lines are burned twice | **READ**: `StartFromLineControl.tsx` `savedLaserRestart` uses `automaticRecoveryRestart(capsule).line` for any laser capsule, while `manual-restart-source.ts:100-107` already knows a resume/second-pass chain "is not the project's own program". Refuter REPRO (line 32 → project `G0 X13`, not resume `G0 X35`) | open |
+| 05-P2-2 | job-lifecycle | An alarm after the last `ok` (Smoothieware kill button) is saved as `unknown` with no planner step-back, so recovery skips the moves the controller discarded (breaks "recut, never skip") | **READ**: `checkpoint-interruption.ts` `interruptionCause` returns null unless the stream is cancelled/disconnected/errored, so a `done` stream with a late alarm records nothing. Refuter REPRO with the Smoothieware simulator (restart 40/40 vs 1); SOURCE Smoothieware `ok` before planning, 32-block queue | open |
 | 04-P2-1 | electron-main | Camera bridge's fixed loopback port has no server identity check: a squatter receives RTSP logins; operator told the wrong reason | READ `camera-bridge.ts:11,96` (fixed origin, credentials in query, no token); `camera-bridge-lifecycle.ts:19-21` only logs bind failure | open |
