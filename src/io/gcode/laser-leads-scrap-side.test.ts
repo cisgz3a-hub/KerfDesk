@@ -164,6 +164,26 @@ describe('the scrap side of laser leads (ADR-626 Amendment 1)', () => {
     }
   });
 
+  it('names each operation that leaves a side unknown, with its own count', () => {
+    const job = prepared(
+      project(
+        [layer('Score'), layer('Border'), layer('inner', LEADS)],
+        [
+          shape('ring', PLATE, ['Score']),
+          shape('hole', HOLE, ['inner']),
+          shape('frame', square(65, 95), ['Border']),
+          shape('slot', square(75, 85), ['inner']),
+        ],
+      ),
+    );
+    const unknown = (job.diagnostics ?? []).flatMap((diagnostic) =>
+      diagnostic.kind === 'laser-leads-side-unknown'
+        ? [`${diagnostic.aroundName}: ${diagnostic.count}`]
+        : [],
+    );
+    expect(unknown.sort()).toEqual(['Border: 1', 'Score: 1']);
+  });
+
   it("keeps the hole's leads out of the part when a score ring lies between", () => {
     const job = prepared(
       project(

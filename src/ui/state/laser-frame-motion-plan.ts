@@ -23,6 +23,7 @@ export function buildFrameDispatchPlan(
   feed: number,
   candidate: Parameters<LaserState['frame']>[2] | Parameters<LaserState['traceFrame']>[2],
   jobProject?: Parameters<LaserState['frame']>[3],
+  external?: Parameters<LaserState['frame']>[5],
 ): CncFrameMotionPlan {
   const state = get();
   const feeds = frameMotionFeeds(feed, state.controllerSettings);
@@ -34,7 +35,7 @@ export function buildFrameDispatchPlan(
     refs,
     frameBounds,
     feeds.xyMmPerMin,
-    candidate?.returnToWorkPosition,
+    frameReturnTarget(candidate, external),
   );
   // The framed job decides laser or CNC motion. A recovery or second-pass Frame
   // of a saved laser job must not pick up a CNC safe-Z wrap because the open
@@ -74,6 +75,15 @@ export function buildFrameDispatchPlan(
 function frameBoundsForProject(bounds: FrameBounds, project: Project): FrameBounds {
   const startPoint = project.startPoints?.frame;
   return { ...bounds, ...(startPoint === undefined ? {} : { startPoint }) };
+}
+
+// A project Frame returns to its candidate's pre-Frame position; an external
+// program's Frame (ADR-630) to where that program starts.
+function frameReturnTarget(
+  candidate: Parameters<typeof buildFrameDispatchPlan>[4],
+  external: Parameters<typeof buildFrameDispatchPlan>[6],
+): { readonly x: number; readonly y: number } | undefined {
+  return candidate?.returnToWorkPosition ?? external?.returnToWorkPosition;
 }
 
 function frameReturnLine(

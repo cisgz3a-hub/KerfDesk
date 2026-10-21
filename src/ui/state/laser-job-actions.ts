@@ -256,7 +256,10 @@ function prepareInitialStream(
 } {
   const streamOptions = normalizeStartJobOptions(options);
   const stepped = step(
-    createStreamer(gcode, { ...streamOptions, toolChangePause: options.machineKind === 'cnc' }),
+    createStreamer(gcode, {
+      ...streamOptions,
+      toolChangePause: options.toolChangePause ?? options.machineKind === 'cnc',
+    }),
   );
   return { stepped, ...toolChangeManifest(gcode, options) };
 }
@@ -268,7 +271,8 @@ function toolChangeManifest(
   readonly labels: ReadonlyArray<string>;
   readonly toolIds: ReadonlyArray<string | null>;
 } {
-  if (options.machineKind !== 'cnc') return { labels: [], toolIds: [] };
+  if (options.machineKind !== 'cnc' || options.toolChangePause === false)
+    return { labels: [], toolIds: [] };
   // Structured compile metadata carries stable IDs without changing G-code
   // bytes. Direct/imported callers retain the legacy comment-label fallback.
   const plannedChanges = options.cncToolPlan?.slice(1);

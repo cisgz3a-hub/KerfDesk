@@ -21,6 +21,8 @@ import {
   type Layer,
 } from '../../core/scene';
 import { useStore } from '../state';
+import { useLengthUnit } from '../state/display-units';
+import { formatLengthWithUnit } from '../display-length';
 import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
 import { useEdition } from '../licensing/edition';
 import { proChoiceLabel } from '../licensing/pro-features';
@@ -208,6 +210,7 @@ function CncDepthFields(props: {
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element {
   const { layer, settings, onCommit } = props;
+  const lengthUnit = useLengthUnit();
   const isVCarve = settings.cutType === 'v-carve';
   const flatDepthEnabled = settings.vCarveFlatDepthEnabled ?? true;
   const isTaperedInlay = settings.cutType === 'inlay-pair' && settings.taperedInlay !== undefined;
@@ -246,7 +249,7 @@ function CncDepthFields(props: {
             onClick={() => onCommit({ depthMm: props.stockThicknessMm })}
             title="Set exactly to the measured stock thickness. Add a verified overcut manually only when the setup needs it."
           >
-            Set to stock thickness ({props.stockThicknessMm} mm)
+            Set to stock thickness ({formatLengthWithUnit(props.stockThicknessMm, lengthUnit)})
           </button>
         ) : null}
       </div>
@@ -274,6 +277,7 @@ function CutDepthField(props: {
       layer={props.layer}
       label={label}
       unit="mm"
+      dimension="length"
       value={props.settings.depthMm}
       min={0.05}
       max={200}

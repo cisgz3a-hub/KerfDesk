@@ -7,6 +7,8 @@ import { THEME_CHOICES } from '../commands/window-panel-commands';
 import { LAYOUT_OPTIONS } from '../common/WorkspaceLayoutSelect';
 import { RecentProjectLimitField } from '../recent-projects/RecentProjectLimitField';
 import { AUTOSAVE_INTERVAL_MS } from '../state/autosave';
+import { useDisplayUnitsStore } from '../state/display-units';
+import type { DisplayLengthUnit } from '../display-length';
 import { useWorkspaceLayoutStore } from '../state/workspace-layout-store';
 import { setAppThemePreference } from '../theme/app-theme';
 import { useAppThemePreference } from '../theme/use-app-theme';
@@ -21,6 +23,7 @@ export function SettingsGeneralSection(): JSX.Element {
   return (
     <>
       <ThemeChoice />
+      <UnitsChoice />
       <LayoutChoice />
       <fieldset style={settingsGroupStyle}>
         <legend style={settingsHeadingStyle}>Recent projects</legend>
@@ -55,6 +58,53 @@ function ThemeChoice(): JSX.Element {
           <span>{choice.label}</span>
         </label>
       ))}
+    </fieldset>
+  );
+}
+
+const UNIT_CHOICES: ReadonlyArray<{
+  readonly unit: DisplayLengthUnit;
+  readonly label: string;
+  readonly title: string;
+}> = [
+  {
+    unit: 'mm',
+    label: 'Millimetres (mm, mm/min)',
+    title: 'Show lengths in millimetres and feeds in millimetres per minute.',
+  },
+  {
+    unit: 'in',
+    label: 'Inches (in, in/min)',
+    title: 'Show lengths in inches and feeds in inches per minute.',
+  },
+];
+
+// Display units (ADR-629): only what the screen shows and accepts. Projects,
+// machine settings and G-code stay in millimetres.
+function UnitsChoice(): JSX.Element {
+  const unit = useDisplayUnitsStore((state) => state.lengthUnit);
+  const setUnit = useDisplayUnitsStore((state) => state.setLengthUnit);
+  return (
+    <fieldset style={settingsGroupStyle}>
+      <legend style={settingsHeadingStyle}>Units</legend>
+      {UNIT_CHOICES.map((choice) => (
+        <label key={choice.unit} style={settingsRowStyle} title={choice.title}>
+          <input
+            type="radio"
+            name="settings-display-units"
+            checked={unit === choice.unit}
+            onChange={() => setUnit(choice.unit)}
+            title={choice.title}
+          />
+          <span>{choice.label}</span>
+        </label>
+      ))}
+      <p style={settingsNoteStyle}>
+        Changes what the selection boxes, rulers, status bar, measurements, machine position, jog
+        step, laser speed and CNC depth and feed show. Other boxes keep their own mm label. Type a
+        unit, like 10mm or 1in, to enter it in any box that takes one. Projects and G-code stay in
+        millimetres.
+      </p>
     </fieldset>
   );
 }

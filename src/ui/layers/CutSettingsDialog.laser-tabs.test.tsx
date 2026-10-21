@@ -146,7 +146,8 @@ describe('Cut Settings laser tabs (ADR-494)', () => {
     });
     await apply(view.form);
     const patch = view.onApply.mock.calls[0]?.[0] as Partial<Layer>;
-    expect(patch).toMatchObject({ tabLayout: 'count', tabCutPowerPercent: 100 });
+    expect(patch).toMatchObject({ tabCutPowerPercent: 100 });
+    expect(patch).not.toHaveProperty('tabLayout');
     expect(patch).not.toHaveProperty('tabSpacingMm');
     expect(patch).not.toHaveProperty('tabMaxPerShape');
     await view.close();

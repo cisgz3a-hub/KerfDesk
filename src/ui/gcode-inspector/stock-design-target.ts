@@ -8,6 +8,7 @@
 // with: other operations cut there, and only the relief says what it wants.
 
 import { reliefMachineSpaceGeometry } from '../../core/cnc/relief-machine-space';
+import { partialCellCenter } from '../../core/grid';
 import type { Heightmap } from '../../core/relief';
 import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
 import type { InspectionRelief, ProgramAffine } from './inspection-design';
@@ -92,8 +93,8 @@ const WALL_SLOPE = Math.tan((85 * Math.PI) / 180);
 function depthAt(map: Heightmap, at: { x: number; y: number }): number | null {
   if (at.x < 0 || at.y < 0 || at.x > map.widthMm || at.y > map.heightMm) return null;
   const last = { x: map.widthCells - 1, y: map.heightCells - 1 };
-  const fx = Math.min(Math.max(at.x / map.mmPerCell - 0.5, 0), last.x);
-  const fy = Math.min(Math.max(at.y / map.mmPerCell - 0.5, 0), last.y);
+  const fx = sampleCoordinate(map, 'x', at.x);
+  const fy = sampleCoordinate(map, 'y', at.y);
   const x0 = Math.floor(fx);
   const y0 = Math.floor(fy);
   const nearest = Math.round(fy) * map.widthCells + Math.round(fx);
@@ -102,11 +103,42 @@ function depthAt(map: Heightmap, at: { x: number; y: number }): number | null {
   const y1 = Math.min(y0 + 1, last.y);
   const cell = (x: number, y: number): number => map.depth[y * map.widthCells + x] ?? 0;
   const corners = [cell(x0, y0), cell(x1, y0), cell(x0, y1), cell(x1, y1)];
-  if (Math.max(...corners) - Math.min(...corners) > WALL_SLOPE * map.mmPerCell) return null;
+  if (spansWall(map, x0, x1, y0, y1, corners)) return null;
   const [a = 0, b = 0, c = 0, d = 0] = corners;
   const front = a + (b - a) * (fx - x0);
   const back = c + (d - c) * (fx - x0);
   return front + (back - front) * (fy - y0);
+}
+
+// A terminal cell can be shorter than mmPerCell. Interpolate between the
+// samples' physical centres, including when selecting the nearest mask cell.
+function sampleCoordinate(map: Heightmap, axis: 'x' | 'y', position: number): number {
+  const count = axis === 'x' ? map.widthCells : map.heightCells;
+  const low = Math.max(0, Math.min(count - 2, Math.floor(position / map.mmPerCell - 0.5)));
+  const high = Math.min(count - 1, low + 1);
+  const a = partialCellCenter(map, axis, low);
+  const b = partialCellCenter(map, axis, high);
+  return low + (b === a ? 0 : Math.max(0, Math.min(1, (position - a) / (b - a))));
+}
+
+function spansWall(
+  map: Heightmap,
+  x0: number,
+  x1: number,
+  y0: number,
+  y1: number,
+  corners: readonly number[],
+): boolean {
+  const [a = 0, b = 0, c = 0, d = 0] = corners;
+  const dx = partialCellCenter(map, 'x', x1) - partialCellCenter(map, 'x', x0);
+  const dy = partialCellCenter(map, 'y', y1) - partialCellCenter(map, 'y', y0);
+  // Keep the existing conservative whole-cell wall test, and also account
+  // for the shorter physical distance beside a partial terminal cell.
+  return (
+    Math.max(...corners) - Math.min(...corners) > WALL_SLOPE * map.mmPerCell ||
+    Math.max(Math.abs(b - a), Math.abs(d - c)) > WALL_SLOPE * dx ||
+    Math.max(Math.abs(c - a), Math.abs(d - b)) > WALL_SLOPE * dy
+  );
 }
 
 // The stock cells the heightmap's four corners reach, clamped to the stock.

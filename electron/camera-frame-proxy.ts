@@ -50,9 +50,19 @@ const inflightByUrl = new Map<string, Promise<FetchFrameResult>>();
 export function fetchFrameBytesQueued(url: string, timeoutMs: number): Promise<FetchFrameResult> {
   const inflight = inflightByUrl.get(url);
   if (inflight !== undefined) return inflight;
-  const host = hostOf(url);
+  const run = runQueuedForHost(hostOf(url), () => fetchFrameBytes(url, timeoutMs));
+  inflightByUrl.set(url, run);
+  void run.finally(() => {
+    if (inflightByUrl.get(url) === run) inflightByUrl.delete(url);
+  });
+  return run;
+}
+
+/** Run one request to a machine's embedded server after any in flight to the
+ * same `host` (host:port), so other requests (the Falcon pointer) never race a frame. */
+export function runQueuedForHost<T>(host: string, task: () => Promise<T>): Promise<T> {
   const previous = upstreamChainByHost.get(host) ?? Promise.resolve();
-  const run = previous.then(() => fetchFrameBytes(url, timeoutMs));
+  const run = previous.then(task);
   upstreamChainByHost.set(
     host,
     run.then(
@@ -60,10 +70,6 @@ export function fetchFrameBytesQueued(url: string, timeoutMs: number): Promise<F
       () => undefined,
     ),
   );
-  inflightByUrl.set(url, run);
-  void run.finally(() => {
-    if (inflightByUrl.get(url) === run) inflightByUrl.delete(url);
-  });
   return run;
 }
 

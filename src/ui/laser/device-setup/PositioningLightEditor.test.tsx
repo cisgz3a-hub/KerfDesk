@@ -3,6 +3,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
+import {
+  FALCON_A1_PRO_GRBLHAL_PROFILE,
+  FALCON_COMPATIBLE_PROFILE,
+} from '../../../core/devices/falcon-profiles';
 import type { PositioningLight } from '../../../core/devices/positioning-light';
 import { LASER_MACHINE_CONFIG } from '../../../core/scene';
 import { PositioningLightEditor } from './PositioningLightEditor';
@@ -76,5 +80,44 @@ describe('positioning light setup', () => {
     );
     expect(host.textContent).toContain('Live positioning and light control are unavailable');
     expect(host.querySelector('input')).toBeNull();
+  });
+
+  it('sets up the Falcon A1 Pro red pointer with one tick and nothing to type (ADR-635)', () => {
+    let state = initDeviceSetup(FALCON_A1_PRO_GRBLHAL_PROFILE, null, {
+      machine: LASER_MACHINE_CONFIG,
+    });
+    const onChange = (positioningLight: PositioningLight | undefined): void => {
+      state = deviceSetupReducer(state, { kind: 'edit', patch: { positioningLight } });
+    };
+    act(() => root.render(<PositioningLightEditor device={state.draft} onChange={onChange} />));
+    expect(host.textContent).toContain('Use the Falcon’s red pointer');
+    expect(host.textContent).not.toContain('Light on command');
+    act(() =>
+      Simulate.change(host.querySelector('input')!, { target: { checked: true } } as never),
+    );
+    expect(state.draft.positioningLight).toEqual({
+      kind: 'creality-falcon-pointer',
+      offsetXmm: 0,
+      offsetYmm: 0,
+    });
+    expect(machineSetupValidationIssues(state)).toEqual([]);
+  });
+
+  it('points a Falcon-compatible profile at the A1 Pro profile and refuses its pointer there', () => {
+    act(() =>
+      root.render(<PositioningLightEditor device={FALCON_COMPATIBLE_PROFILE} onChange={vi.fn()} />),
+    );
+    expect(host.textContent).toContain('Choose its own machine profile');
+    const state = initDeviceSetup(
+      {
+        ...FALCON_COMPATIBLE_PROFILE,
+        positioningLight: { kind: 'creality-falcon-pointer', offsetXmm: 0, offsetYmm: 0 },
+      },
+      null,
+      { machine: LASER_MACHINE_CONFIG },
+    );
+    expect(machineSetupValidationIssues(state)).toContain(
+      'The Falcon red pointer needs the Creality Falcon A1 Pro machine profile.',
+    );
   });
 });

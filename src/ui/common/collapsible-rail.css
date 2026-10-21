@@ -1,45 +1,66 @@
 /* Keep a collapsed workspace panel discoverable until it is reopened: a faint
-   accent tint with a slow heartbeat (two soft beats, then a long rest). It
-   must read as a hint, never as a filled button competing with the canvas.
-   Every hint runs on the document timeline (sync-panel-pulses.ts), so two
-   collapsed rails beat together whenever each was collapsed. */
+   accent tint with a soft glow that breathes in and out, slowly and evenly,
+   like a sleeping laptop's light. Only the glow layer moves, and only its
+   opacity; the border and label stay still, so nothing flashes. It must read
+   as a hint, never as a filled button competing with the canvas. Every hint
+   runs on the document timeline (sync-panel-pulses.ts), so two collapsed
+   rails breathe together whenever each was collapsed. */
 .lf-btn.lf-panel-expand-hint {
-  border-color: color-mix(in srgb, var(--lf-accent) 45%, var(--lf-border));
+  position: relative;
+  isolation: isolate;
+  border-color: color-mix(in srgb, var(--lf-accent) 35%, var(--lf-border));
   background: var(--lf-accent-wash);
   color: var(--lf-accent-fg);
-  animation: lf-panel-expand-pulse 3.2s ease-in-out infinite;
+}
+
+/* z-index -1 inside the isolated button paints the glow over the button's
+   own background but under its chevron and label. */
+.lf-btn.lf-panel-expand-hint::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--lf-accent) 11%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  animation: lf-panel-expand-pulse 5.6s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+/* A full-height rail glows around its chevron and label and fades out down
+   the strip, so the long empty run below them stays quiet. */
+.lf-btn.lf-panel-expand-hint--rail::before {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--lf-accent) 15%, transparent),
+    color-mix(in srgb, var(--lf-accent) 8%, transparent) 180px,
+    transparent 420px
+  );
 }
 
 .lf-btn.lf-panel-expand-hint:hover:not(:disabled),
 .lf-btn.lf-panel-expand-hint:focus-visible:not(:disabled) {
-  animation: none;
   border-color: var(--lf-accent);
   background: var(--lf-tint-accent);
   color: var(--lf-accent-fg);
 }
 
+/* Inhale, exhale, then a short rest. The easing applies to each step, so the
+   glow eases into and out of every turn and never snaps. */
 @keyframes lf-panel-expand-pulse {
   0%,
-  14%,
-  30%,
+  86%,
   100% {
-    border-color: color-mix(in srgb, var(--lf-accent) 45%, var(--lf-border));
-    background: var(--lf-accent-wash);
+    opacity: 0;
   }
 
-  7% {
-    border-color: var(--lf-accent);
-    background: color-mix(in srgb, var(--lf-accent) 18%, transparent);
-  }
-
-  21% {
-    border-color: color-mix(in srgb, var(--lf-accent) 80%, var(--lf-border));
-    background: color-mix(in srgb, var(--lf-accent) 13%, transparent);
+  40% {
+    opacity: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lf-btn.lf-panel-expand-hint {
+  .lf-btn.lf-panel-expand-hint::before {
     animation: none;
   }
 }

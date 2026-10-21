@@ -9,7 +9,11 @@ import {
 import { CutSettingsFillFields } from './CutSettingsFillFields';
 import { CutSettingsImageFields } from './CutSettingsImageFields';
 import { readCutSettingsPatch, type LayerPatch } from './cut-settings-draft';
-import { changedCutSettingsPatch, cutSettingField } from './cut-settings-field-edits';
+import {
+  changedCutSettingsPatch,
+  cutSettingField,
+  withoutUntouchedLineDefaults,
+} from './cut-settings-field-edits';
 import './laser-operation-settings.css';
 
 type CutSettingsDialogProps = {
@@ -39,7 +43,7 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
     props.onApply(
       props.selectionCount !== undefined
         ? changedCutSettingsPatch(form, patch, changedFields.current)
-        : patch,
+        : withoutUntouchedLineDefaults(form, patch, props.layer, changedFields.current),
     );
   };
   return (

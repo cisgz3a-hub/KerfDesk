@@ -95,7 +95,7 @@ function beforeEveryJob(ctx) {
       body: 'Press P to preview the toolpath. Cuts show as solid lines and travel moves as dashed lines, and you can play the route through from start to finish. Preview is a check on screen. It doesn’t take the place of a Frame on the real material.',
       points: [
         'Preview and play back the route before you connect a machine',
-        'With Pro, play the program back in 3D in the G-code Inspector',
+        'Play the program back in 3D in the G-code Inspector',
         'Save the G-code and check it in a separate viewer too',
       ],
       media: shot(ctx, 'preview'),

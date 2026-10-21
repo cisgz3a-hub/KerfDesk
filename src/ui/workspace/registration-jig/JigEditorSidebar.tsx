@@ -135,11 +135,13 @@ function JigArtworkSection(props: {
         onUpsert={editor.onUpsert}
         onBusyChange={editor.onTextBusy}
       />
-      <details className="lf-jig-trace">
+      <details className="lf-jig-trace" open>
         <summary title="Show or hide image tracing">Trace an image</summary>
         <JigTraceControls
           project={project}
+          selectedIds={editor.ids}
           onImport={editor.onImport}
+          onTraceImage={editor.onTraceImage}
           onBusyChange={editor.onTraceBusy}
         />
       </details>

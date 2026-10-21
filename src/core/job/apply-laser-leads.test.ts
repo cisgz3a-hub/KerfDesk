@@ -121,16 +121,20 @@ describe('applyLaserLeads (ADR-626)', () => {
     expect(pointInPolygon(first, square(0, 0, 10).polyline)).toBe(false);
   });
 
-  it('meets the cut at the set angle with a line lead', () => {
+  it('meets the cut at the set angle with a line lead, and never leaves along it', () => {
     const leads: CutGroupLaserLeads = { ...LEADS, style: 'line', angleDeg: 45 };
     const out = lead(
       applyLaserLeads({ groups: [group([square(0, 0, 10)], { laserLeads: leads })] }, NO_BED),
     );
-    // The square starts at (0, 0) heading +X; the scrap is below it.
-    const first = out.polyline[0] as Vec2;
-    expect(first.x).toBeCloseTo(-Math.SQRT2, 9);
-    expect(first.y).toBeCloseTo(-Math.SQRT2, 9);
-    expect(out.polyline[1]).toEqual({ x: 0, y: 0 });
+    // At the corner (0, 0) both 45-degree leads would run along one diagonal,
+    // in and straight back out, so the square starts mid-edge at (5, 0),
+    // heading +X with the scrap below, where the two part.
+    const points = out.polyline;
+    expect(points[1]).toEqual({ x: 5, y: 0 });
+    expect(points[0]?.x).toBeCloseTo(5 - Math.SQRT2, 9);
+    expect(points[0]?.y).toBeCloseTo(-Math.SQRT2, 9);
+    expect(points.at(-1)?.x).toBeCloseTo(5 + Math.SQRT2, 9);
+    expect(points.at(-1)?.y).toBeCloseTo(-Math.SQRT2, 9);
   });
 
   it('leads a hole from inside, also when the hole is cut by another operation', () => {

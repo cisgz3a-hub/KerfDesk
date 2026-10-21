@@ -756,6 +756,8 @@ test('the macOS and Linux configs keep the commercial identity, the Preview Mac 
   assert.equal(linux.publish, null);
   assert.equal(linux.electronFuses.enableCookieEncryption, true);
   assert.equal(linux.afterPack, 'scripts/verify-unsigned-commercial-package.mjs');
+  // The AppImage leaves out the toolset's GPL-3.0 libraries (ADR-017 Amendment 2).
+  assert.equal(linux.artifactBuildStarted, 'scripts/appimage-toolset.mjs');
   // Windows and Linux share one configuration, so the Windows build is unchanged.
   const windows = await prepared(undefined);
   const withoutRunValues = (config) => ({ ...config, extraMetadata: null, nsis: null });
