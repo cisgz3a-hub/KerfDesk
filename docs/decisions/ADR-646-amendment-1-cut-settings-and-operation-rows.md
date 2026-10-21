@@ -47,7 +47,9 @@ each before changing it:
      change the operation itself, so in the Operation editor they light every piece it runs, even
      while the selection has its own settings.
    - `selection`: Make unique and Add operation change only the selected artwork, so they light
-     only the selected pieces, even where an edit there would reach the whole operation.
+     only the selected pieces, even where an edit there would reach the whole operation. Either
+     one then opens the new operation in a new editor, without focus, so the glow ends there
+     (ADR-646 decision 5); the new operation's own edits light it once focus is back in it.
    - `everything`: Show only, as above.
 
    A toggle that only opens or closes an editor changes nothing, so it lights nothing: the power
@@ -60,10 +62,13 @@ each before changing it:
    object). The canvas numbers edits by that object, so focus moving straight to another editor
    of the same artwork pulses, and so does an edit that ended and began again while a hover hid
    it. One that only returns from under a hover brings its edge back without a pulse.
-8. **The edit ends with its focus.** An outside press releases the edit during the press, before
-   an action it starts (another row's eye, a drag) can change the scene and pulse the old edit.
-   After a click or key inside the editor, if focus has fallen out of it because the focused
-   control removed itself (Remove Focus Test Z), the edit ends too: that sends no blur.
+8. **The edit ends with its focus.** A press outside the editor ends the edit before the pressed
+   control acts on click, so another row's eye or a drag never pulses the old edit. With focus
+   still in the editor, the press blurs it next. A field that commits on blur (a typed value
+   inside its debounce, a rename) lands as the edit's last change and pulses, and the edit ends
+   with that blur. If no blur comes, the edit ends right after the press. After a click or key
+   inside the editor, if focus has fallen out of it because the focused control removed itself
+   (Remove Focus Test Z), the edit ends too: that sends no blur.
 
 Display only, session only: no selection, output, Frame or Start behaviour changes.
 
@@ -94,7 +99,10 @@ Display only, session only: no selection, output, Frame or Start behaviour chang
 - `SelectedOperationInspector.edit-glow.test.tsx` also: Make unique and Add operation light only
   the selected piece while Power lights both; the operation name lights both pieces while the
   selected one has its own settings; the Advanced artwork settings summary lights nothing, and
-  focus moving back to it from the power multiplier ends the glow.
+  focus moving back to it from the power multiplier ends the glow; a typed value committed by
+  the blur an outside press causes reaches the scene while the edit holds, and the edit ends
+  with that blur; Make unique and Add operation end the glow as the editor moves to the new
+  operation.
 - `LayerRow.edit-glow.test.tsx` also: Show only lights all artwork in every operation; Remove
   Focus Test Z lights exactly its operation without the row pulse, and the glow ends once the
   button removes itself.
