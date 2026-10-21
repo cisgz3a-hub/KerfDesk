@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Layer } from '../../../core/scene';
 import { NumberInput } from '../../kit';
 import type { JigDraft } from './jig-editor-session';
+import { jigNumberFieldKeys } from './jig-number-field-keys';
 import {
   applyJigArtworkSettings,
   jigArtworkOperations,
@@ -206,9 +207,7 @@ function BurnNumber(props: {
             if (value !== props.value) props.onCommit(value);
           } else event.currentTarget.value = String(props.value);
         }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') event.currentTarget.blur();
-        }}
+        {...jigNumberFieldKeys(String(props.value))}
       />
     </label>
   );
