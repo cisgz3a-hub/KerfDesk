@@ -37,6 +37,9 @@ export type LeadFitContext = {
   readonly obstacles: LeadObstacles;
   readonly ownLine: number;
   readonly ownRing: ReadonlyArray<Vec2>;
+  /** The contour as it burns: its G2/G3 arcs sampled when it goes out as arcs,
+   * else its chords. The crossing check reads this. */
+  readonly ownBurn: ReadonlyArray<Vec2>;
   /** Lines and rings the lead ignores: its own contour and its copies. */
   readonly ignoredLines: ReadonlySet<number>;
   readonly ignoredRings: ReadonlySet<number>;
@@ -96,7 +99,7 @@ export function leadFits(
 ): boolean {
   const { at } = join;
   if (!onBed(path, context.bed, context.arcsEmitted)) return false;
-  if (crossesOwnContour(emittedPoints(path, context.arcsEmitted), at, context.ownRing))
+  if (crossesOwnContour(emittedPoints(path, context.arcsEmitted), at, context.ownBurn))
     return false;
   const outward = kind === 'in' ? [...path.points].reverse() : path.points;
   // An arc written as G2/G3 bulges up to the sampling sag past the chords
@@ -215,11 +218,17 @@ export function retracesLeadIn(leadOut: LeadFit, leadIn: LeadFit, clearanceMm: n
   const join = inPoints[inPoints.length - 1];
   if (start === undefined || join === undefined) return false;
   if (Math.hypot(start.x - join.x, start.y - join.y) > SHARED_JOIN_MM) {
-    return walkSamples([start, ...leadOut.path.points.slice(1)]).some(
-      (sample) =>
-        Math.hypot(sample.x - start.x, sample.y - start.y) > clearanceMm &&
-        distanceToPolylineMm(sample, inPoints) < clearanceMm,
-    );
+    // Step by step, the whole step: a lead-out only grazing the lead-in can
+    // come closest between two samples.
+    let previous = start;
+    for (const sample of walkSamples([start, ...leadOut.path.points.slice(1)])) {
+      const beyond =
+        Math.hypot(previous.x - start.x, previous.y - start.y) > clearanceMm &&
+        Math.hypot(sample.x - start.x, sample.y - start.y) > clearanceMm;
+      if (beyond && stepToPolylineMm(previous, sample, inPoints) < clearanceMm) return true;
+      previous = sample;
+    }
+    return false;
   }
   const outward = direction(start, leadOut.path.points[1]);
   const back = direction(join, inPoints[inPoints.length - 2]);
@@ -227,21 +236,45 @@ export function retracesLeadIn(leadOut: LeadFit, leadIn: LeadFit, clearanceMm: n
   return outward.x * back.x + outward.y * back.y > Math.cos((RETRACE_DEG * Math.PI) / 180);
 }
 
-function distanceToPolylineMm(point: Vec2, points: ReadonlyArray<Vec2>): number {
+/** The least distance from the step p-q to the polyline. */
+function stepToPolylineMm(p: Vec2, q: Vec2, points: ReadonlyArray<Vec2>): number {
   let nearest = Number.POSITIVE_INFINITY;
   for (let index = 1; index < points.length; index += 1) {
-    const a = points[index - 1] as Vec2;
-    const b = points[index] as Vec2;
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const span = dx * dx + dy * dy;
-    const t =
-      span === 0
-        ? 0
-        : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / span));
-    nearest = Math.min(nearest, Math.hypot(point.x - (a.x + dx * t), point.y - (a.y + dy * t)));
+    nearest = Math.min(
+      nearest,
+      segmentsDistanceMm(p, q, points[index - 1] as Vec2, points[index] as Vec2),
+    );
   }
   return nearest;
+}
+
+// Crossing segments are 0 apart; otherwise the nearest pair has an endpoint.
+function segmentsDistanceMm(p: Vec2, q: Vec2, a: Vec2, b: Vec2): number {
+  const rx = q.x - p.x;
+  const ry = q.y - p.y;
+  const sx = b.x - a.x;
+  const sy = b.y - a.y;
+  const determinant = rx * sy - ry * sx;
+  if (determinant !== 0) {
+    const t = ((a.x - p.x) * sy - (a.y - p.y) * sx) / determinant;
+    const u = ((a.x - p.x) * ry - (a.y - p.y) * rx) / determinant;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return 0;
+  }
+  return Math.min(
+    pointToSegmentMm(p, a, b),
+    pointToSegmentMm(q, a, b),
+    pointToSegmentMm(a, p, q),
+    pointToSegmentMm(b, p, q),
+  );
+}
+
+function pointToSegmentMm(point: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const span = dx * dx + dy * dy;
+  const t =
+    span === 0 ? 0 : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / span));
+  return Math.hypot(point.x - (a.x + dx * t), point.y - (a.y + dy * t));
 }
 
 function direction(from: Vec2 | undefined, to: Vec2 | undefined): Vec2 | null {

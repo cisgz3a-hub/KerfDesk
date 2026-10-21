@@ -398,3 +398,31 @@ when one operation cuts it whole and the other splits it; `core/job/apply-laser-
 gives an overcut stopping 0.1 mm short of the seam no crossing lead-out;
 `core/job/laser-lead-own-crossing.test.ts` finds crossings of 100 mm diagonal edges walked either
 way. The first two failed before this amendment.
+
+### Amendment 6 — pieces by containment, leads between samples (2026-10-21)
+
+1. **Pieces correspond by containment, found through a box index** (`core/job/laser-lead-pieces.ts`).
+   Two rings that different operations cut from one scene contour are one part when a point just
+   inside one lies inside the other: a piece lies inside the whole outline it was split from, and
+   counterpart pieces at different kerf offsets nest. Bounds overlap alone, which Amendments 4 and 5
+   used, also paired unrelated pieces whose bounds interlock. Candidates come from a box index of the
+   rings, so a contour split into thousands of pieces costs each ring only its neighbours, not a scan
+   of every ring of the contour.
+2. **Only pieces are copies of pieces.** Copy classes pair a piece with its counterpart piece in
+   another operation that split the contour too, and a ring with its exact duplicate. A whole outline
+   is no longer a copy of the first piece split from it: they are different burns, so their leads
+   keep clear of each other. The piece is still exempt from the outline itself (Amendment 5), and
+   only a true copy's placed leads are ignored.
+3. **A lead-out from a distinct start is checked continuously.** Past the clearance from its own
+   start, each walking step of the lead-out is measured against the lead-in as a segment, so a graze
+   between two samples is caught.
+4. **The crossing check reads the contour as it burns.** For a contour that goes out as G2/G3 the
+   own-contour crossing check (Amendment 3) uses its arcs sampled to 0.002 mm (the obstacle line),
+   not its chords.
+
+Verification: `core/job/laser-lead-pieces.test.ts` pairs a piece with the L it lies in but not with
+a square in the L's corner; `io/gcode/laser-leads-scrap-side.test.ts` keeps each piece's leads a
+kerf width from the leads of the outline it was split from; `core/job/laser-lead-fit-continuous.test.ts`
+catches a lead-out grazing the lead-in between samples and a tongue present only in the burned
+contour. `core/job/laser-lead-sides.test.ts` now expects the whole outline to be exempt from, not a
+copy of, its pieces.
