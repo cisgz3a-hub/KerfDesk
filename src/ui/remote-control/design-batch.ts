@@ -44,7 +44,9 @@ export async function applyEditsBatch(
   try {
     for (const edit of edits) prepared.push(await prepareItem(edit, signal));
     assertCurrent();
-    return commit(() => runBatch(store, edits, prepared, signal));
+    const receipt = commit(() => runBatch(store, edits, prepared, signal));
+    for (const item of prepared) item.svg?.accept();
+    return receipt;
   } finally {
     await Promise.all(prepared.map((item) => item.svg?.dispose()));
   }

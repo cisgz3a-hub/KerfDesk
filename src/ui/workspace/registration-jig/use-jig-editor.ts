@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   findRegistrationBoxes,
   type Project,
@@ -32,6 +32,7 @@ import {
 } from './jig-editor-artwork';
 import { useJigArtworkImport } from './JigArtworkImport';
 import { jigSelectAll } from './jig-canvas-selection';
+import { jigViewProject, withJigBackground } from './jig-editor-scope';
 
 export function useJigEditor(onClose: () => void) {
   const [session, setSession] = useState(() => createJigEditorSession(useStore.getState()));
@@ -39,9 +40,20 @@ export function useJigEditor(onClose: () => void) {
   const working = useJigWorking();
   // Bumped when the outline layout is rebuilt, so the canvas refits to the new grid.
   const [fitRequest, setFitRequest] = useState(0);
+  // The canvas and sidebar edit the jig view; fold each edit back into the
+  // whole draft so main-canvas artwork outside the jig stays as it was.
   const onCommit = useCallback(
-    (project: Project) => setSession((current) => changeJigDraft(current, { project })),
+    (project: Project) =>
+      setSession((current) =>
+        changeJigDraft(current, {
+          project: withJigBackground(current.draft.project, project, current.background),
+        }),
+      ),
     [],
+  );
+  const view = useMemo(
+    () => jigViewProject(session.draft.project, session.background),
+    [session.draft.project, session.background],
   );
   const onSelect = useCallback(
     (ids: ReadonlySet<string>) => setSession((current) => selectJigObjects(current, ids)),
@@ -82,6 +94,8 @@ export function useJigEditor(onClose: () => void) {
     ...closing,
     session,
     setSession,
+    /** The draft as the editor shows it: the jig without main-canvas artwork. */
+    view,
     pendingLayout,
     setPendingLayout,
     busy: working.busy,

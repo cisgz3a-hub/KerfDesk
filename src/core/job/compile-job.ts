@@ -5,7 +5,10 @@ import { outputOperationLayers, type Layer, type Scene, type SceneObject } from 
 import { compileRasterGroupsForLayer } from './compile-job-raster';
 import { contourEntryBoundsForDevice, withContourEntryBounds } from './contour-entry';
 import { registrationJigCompilationRuns } from './registration-jig-compilation-runs';
-import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
+import {
+  CURRENT_LASER_POWER_SCALE_VERSION,
+  type LaserPowerScaleVersion,
+} from '../output/laser-power-scale-version';
 import type { Group, Job, JobDiagnostic } from './job';
 import { compileVectorGroupsForLayer } from './compile-vector-operation';
 import { focusTestProfileIssue } from './focus-test';
@@ -23,7 +26,7 @@ export type CompileJobOptions = {
 export function compileJob(
   scene: Scene,
   device: DeviceProfile,
-  laserPowerScaleVersion: LaserPowerScaleVersion = 2,
+  laserPowerScaleVersion: LaserPowerScaleVersion = CURRENT_LASER_POWER_SCALE_VERSION,
   options: CompileJobOptions = {},
 ): Job {
   const groups: Group[] = [];
