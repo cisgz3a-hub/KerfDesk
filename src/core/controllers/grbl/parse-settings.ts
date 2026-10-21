@@ -6,7 +6,7 @@
 //
 // The map of GRBL setting numbers we look at:
 //   $11   Junction deviation (mm)              → junctionDeviationMm
-//   $30   Max spindle/laser RPM (S-value top)  → maxPowerS
+//   $30   Max spindle/laser RPM (S-value top)  → maxPowerS (0 → maxPowerSReportedAsZero)
 //   $31   Min spindle/laser RPM (S-value floor)→ minPowerS
 //   $32   Mode of operation                    → machineMode + laserModeEnabled
 //   $110  Max rate X (mm/min)                  ┐
@@ -83,6 +83,10 @@ export type ControllerSettingsSnapshot = Partial<
   readonly stepsPerMmX?: number;
   readonly stepsPerMmY?: number;
   readonly stepsPerMmZ?: number;
+  // `$30=0` was reported. `maxPowerS` holds only a positive S range, because a
+  // zero top must never reach a profile, but the report itself is evidence:
+  // the controller has no S range at all (ADR-567 Amendment 1).
+  readonly maxPowerSReportedAsZero?: true;
 };
 
 export type SettingsCollectorState =
@@ -198,7 +202,35 @@ export function settingsMapToControllerSettings(
     ...machineModeField(map),
     ...g92PersistenceField(map),
     ...stepsPerMmFields(map),
+    ...zeroMaxPowerField(map),
   };
+}
+
+// A reported `$30=0`, which settingsMapToProfilePatch leaves out of `maxPowerS`.
+function zeroMaxPowerField(
+  map: ReadonlyMap<number, string>,
+): Pick<ControllerSettingsSnapshot, 'maxPowerSReportedAsZero'> {
+  return parseFiniteNumber(map.get(30)) === 0 ? { maxPowerSReportedAsZero: true } : {};
+}
+
+/** The `$30` the controller reported, including 0; undefined when it did not
+ *  report one. Use `maxPowerS` wherever a usable S range is needed. */
+export function reportedMaxPowerS(
+  settings: Pick<ControllerSettingsSnapshot, 'maxPowerS' | 'maxPowerSReportedAsZero'>,
+): number | undefined {
+  return settings.maxPowerS ?? (settings.maxPowerSReportedAsZero === true ? 0 : undefined);
+}
+
+/** True when the reported `$30` is not above `$31`, so no S value lies between
+ *  them. GRBL-family settings reject negative values, so an unreported `$31`
+ *  counts as 0. Stock GRBL then drives full PWM for every S, S0 included:
+ *  `spindle_compute_pwm_value` returns the maximum when `rpm_min >= rpm_max`
+ *  before its S0 branch (gnea/grbl spindle_control.c). */
+export function laserPowerRangeIsEmpty(
+  settings: Pick<ControllerSettingsSnapshot, 'maxPowerS' | 'maxPowerSReportedAsZero' | 'minPowerS'>,
+): boolean {
+  const maxS = reportedMaxPowerS(settings);
+  return maxS !== undefined && maxS <= (settings.minPowerS ?? 0);
 }
 
 // Kept out of settingsMapToControllerSettings' spread chain so that function

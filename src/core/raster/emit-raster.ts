@@ -40,6 +40,7 @@ import type { RasterControllerHead } from './emit-raster-travel';
 import type { RasterRowProviderOrder } from '../job/job';
 import type { RasterPowerValues } from './raster-power-values';
 import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
+import { gcodeCommentLabel } from '../gcode-comments';
 
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
@@ -298,8 +299,8 @@ function* inputRowsInProviderOrder(
 }
 
 function headerComment(input: EmitRasterInput): string {
-  const layer = input.layerId ?? '?';
-  const color = input.color ?? '?';
+  const layer = input.layerId === undefined ? '?' : gcodeCommentLabel(input.layerId);
+  const color = input.color === undefined ? '?' : gcodeCommentLabel(input.color);
   const power = input.powerPercent ?? '?';
   return [
     `; image layer ${layer} color ${color} power ${power}%`,

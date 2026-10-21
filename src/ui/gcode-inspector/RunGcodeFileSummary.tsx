@@ -34,9 +34,9 @@ export function RunGcodeFileSummary(props: {
         <dt>Sends</dt>
         <dd>
           {program.lineCount} lines, {program.byteCount} bytes: {baselineText(program.baseline)}{' '}
-          first, the modes the review reads the program in, then each line as GRBL itself reads it,
-          with comments, spaces, tabs and other control characters it discards, / marks, % markers
-          and blank lines left out and LF line endings. Nothing else is changed.
+          {program.controllerKind === 'marlin'
+            ? 'first on separate lines, then the program with comments, % markers, blank lines and outer whitespace removed and LF line endings. Spacing inside each line and command order are preserved; Marlin executes the first command on each line.'
+            : 'first, the modes the review reads the program in, then each line as GRBL itself reads it, with comments, spaces, tabs and other control characters it discards, / marks, % markers and blank lines left out and LF line endings. Nothing else is changed.'}
         </dd>
         <dt>Estimated time</dt>
         <dd>

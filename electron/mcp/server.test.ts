@@ -604,16 +604,17 @@ describe('projected and bounded desktop responses', () => {
   it('still refuses oversized output from other tools', async () => {
     const client = await connectedClient({
       request: async () => ({
-        ...readResults.get_workspace,
-        artwork: Array.from({ length: 200 }, (_, index) => ({
-          id: `art-${index}`,
-          type: 'rectangle',
+        ...readResults.list_fonts,
+        fonts: Array.from({ length: 200 }, (_, index) => ({
+          id: `font-${index}`,
+          geometry: 'outline',
+          style: 'sans',
           name: '材'.repeat(512),
         })),
-        totalArtwork: 200,
+        total: 200,
       }),
     });
-    const result = await client.callTool({ name: 'get_workspace', arguments: {} });
+    const result = await client.callTool({ name: 'list_fonts', arguments: {} });
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toMatchObject({ error: { code: 'failed' } });
     expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThan(MCP_MAX_RESULT_BYTES);

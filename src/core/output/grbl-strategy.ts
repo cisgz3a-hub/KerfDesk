@@ -27,6 +27,7 @@ import { emitRasterGroupWithEnd } from '../raster/emit-raster';
 import { assertNever } from '../scene';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { formatGcodePowerS } from '../gcode/decimal-word';
+import { gcodeCommentLabel } from '../gcode-comments';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 import { bridgedAirGapIndices } from './air-assist-hold';
 import { withAirKeepAlive } from './air-keep-alive';
@@ -281,7 +282,7 @@ function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
-    `; layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}${overcutComment(group.finalPassOvercutMm)}${leadComment(group.laserLeads)}${tabSpanComment(group.tabSpanPowerPercent)}`,
+    `; layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}${overcutComment(group.finalPassOvercutMm)}${leadComment(group.laserLeads)}${tabSpanComment(group.tabSpanPowerPercent)}`,
   );
   pushOperationProvenanceComment(chunks, group);
   const segmentContext = { ...context, s, feed, entryRunwayMm: group.entryRunwayMm };
@@ -308,7 +309,7 @@ function emitOffsetFillGroup(group: FillGroup, context: GroupEmissionContext): s
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
-    `; offset fill layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}`,
+    `; offset fill layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}`,
   );
   pushOperationProvenanceComment(chunks, group);
   const segmentContext = { ...context, s, feed, entryRunwayMm: group.entryRunwayMm };
@@ -392,7 +393,7 @@ function emitAnyGroup(group: Group, context: GroupEmissionContext): string {
       // CNC jobs are emitted by cncGrblStrategy; emit-gcode routes by the
       // project's machine kind. A cnc group reaching the laser strategy is a
       // pipeline bug — emit a visible marker instead of laser motion.
-      return `; cnc group ${group.layerId} skipped by laser strategy${LINE_END}`;
+      return `; cnc group ${gcodeCommentLabel(group.layerId)} skipped by laser strategy${LINE_END}`;
     default:
       return assertNever(group, 'Group');
   }
