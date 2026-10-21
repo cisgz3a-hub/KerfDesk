@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isBuildInfoWriteLine,
   isEepromWriteLine,
-  isSettingAssignmentLine,
+  isStoredSettingWriteLine,
 } from './eeprom-write-line';
 import { createStreamer, onAck, step } from './streamer';
 
@@ -47,29 +47,30 @@ describe('isEepromWriteLine', () => {
   });
 });
 
-// ADR-648: `$` assignments retire a kept `$$` snapshot; only `$I=` and `$RST=`
-// can change what `$I` reports. GRBL drops whitespace before parsing a line.
-describe('isSettingAssignmentLine and isBuildInfoWriteLine', () => {
+// ADR-648: `$` assignments and FluidNC's `$NVX` erase retire a kept `$$`
+// snapshot; only `$I=` and `$RST=` change what `$I` reports. GRBL drops
+// whitespace before parsing a line.
+describe('isStoredSettingWriteLine and isBuildInfoWriteLine', () => {
   it.each(['$I=shop laser', '$I =shop laser', '$ I = shop', '$RST=*', '$RST = $', '$rst=#'])(
     'treats %s as a build-info write',
     (line) => {
-      expect(isSettingAssignmentLine(line)).toBe(true);
+      expect(isStoredSettingWriteLine(line)).toBe(true);
       expect(isBuildInfoWriteLine(line)).toBe(true);
     },
   );
 
-  it.each(['$30=1000', '$130 = 400', '$N0=G21'])(
+  it.each(['$30=1000', '$130 = 400', '$N0=G21', '$NVX', '$Settings/Erase', '$nvx=1'])(
     'treats %s as a setting write that leaves `$I` alone',
     (line) => {
-      expect(isSettingAssignmentLine(line)).toBe(true);
+      expect(isStoredSettingWriteLine(line)).toBe(true);
       expect(isBuildInfoWriteLine(line)).toBe(false);
     },
   );
 
-  it.each(['$I', '$$', '$J=G91 X1 F100', 'G10 L20 P1 X0', '($I=x) G0 X1'])(
+  it.each(['$I', '$$', '$J=G91 X1 F100', 'G10 L20 P1 X0', '($I=x) G0 X1', '$NVXY'])(
     'does not treat %s as a setting write',
     (line) => {
-      expect(isSettingAssignmentLine(line)).toBe(false);
+      expect(isStoredSettingWriteLine(line)).toBe(false);
       expect(isBuildInfoWriteLine(line)).toBe(false);
     },
   );

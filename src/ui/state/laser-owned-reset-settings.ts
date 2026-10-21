@@ -5,15 +5,16 @@
 // GRBL keeps its `$` settings and `$I` build string in EEPROM, and a soft reset
 // reloads them unchanged. Only the parser's modal state and active WCS start
 // again, so the banner that closes an owned reset re-reads `$G` alone. Any
-// other banner, and any `$` assignment sent since the last `$$` read (`$N=`,
-// `$RST=`, `$I=`, a job line), still discards the snapshot and re-reads all.
+// other banner, and any `$` assignment or FluidNC `$NVX` erase sent since the
+// last `$$` read (`$N=`, `$RST=`, `$I=`, a job line), still discards the
+// snapshot and re-reads all.
 // `$$` does not report the `$I` string, so a `$I=` or `$RST=` write stays
 // outstanding for the `$I` evidence until `$I` itself is read again.
 
 import type { ControllerSettingsSnapshot, GrblSettingRow } from '../../core/controllers/grbl';
 import {
   isBuildInfoWriteLine,
-  isSettingAssignmentLine,
+  isStoredSettingWriteLine,
 } from '../../core/controllers/grbl/eeprom-write-line';
 import type { DeviceProfile } from '../../core/devices';
 import type { LaserState } from './laser-store';
@@ -49,7 +50,7 @@ export type RetainedControllerSettings = {
 export function noteControllerSettingWrite(refs: OwnedResetSettingsRefs, text: string): void {
   if (!text.includes('$')) return;
   const lines = text.split('\n');
-  if (lines.some(isSettingAssignmentLine)) {
+  if (lines.some(isStoredSettingWriteLine)) {
     refs.settingsWriteRevision = (refs.settingsWriteRevision ?? 0) + 1;
   }
   if (lines.some(isBuildInfoWriteLine)) {

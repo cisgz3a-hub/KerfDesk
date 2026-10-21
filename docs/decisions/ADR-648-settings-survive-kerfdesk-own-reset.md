@@ -47,9 +47,10 @@ Abort that reset the board ended in a toast about a routine read.
      late banner after the owner's 500 ms window, even while the owner still waits for a boot;
    - any banner after the first one an owned reset re-arms for;
    - a banner on a new connection;
-   - a banner after any `$` assignment (`$N=`, `$RST=`, `$I=`, `$N0=`) went out since the last
-     `$$` read. This covers writes from the Console, Machine Settings and macros, and a job whose
-     program carries one.
+   - a banner after any `$` assignment (`$N=`, `$RST=`, `$I=`, `$N0=`, in any whitespace form)
+     or FluidNC `$NVX` (`$Settings/Erase`, which erases every stored setting with or without a
+     value) went out since the last `$$` read. This covers writes from the Console, Machine
+     Settings and macros, and a job whose program carries one.
    Nothing is retained when no `$$` read completed in the current session or one is in flight.
    `$$` does not report the `$I` string, so a `$I=` or `$RST=` write stays outstanding for the
    `$I` evidence until `$I` itself is read again. Until then an owned reset keeps the `$$` snapshot

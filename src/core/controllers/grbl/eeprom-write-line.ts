@@ -26,19 +26,21 @@ export function isEepromWriteLine(line: string): boolean {
   return false;
 }
 
-/** A `$` assignment, the part of the list above that can change what `$$` or
- * `$I` reports (ADR-648). */
-export function isSettingAssignmentLine(line: string): boolean {
+/** A `$` line that can change what `$$` or `$I` reports (ADR-648): any `$`
+ * assignment, and FluidNC's `$NVX` (`$Settings/Erase`), which erases every
+ * stored setting with or without a value (see fluidnc/driver.ts). */
+export function isStoredSettingWriteLine(line: string): boolean {
   if (!line.includes('$')) return false;
   const code = stripControllerComments(line);
-  return code.startsWith('$') && isAssignment(code);
+  if (!code.startsWith('$')) return false;
+  return isAssignment(code) || /^\$(NVX|Settings\/Erase)(=|$)/i.test(code.replace(/\s+/g, ''));
 }
 
 /** A write that can change what `$I` reports: `$I=` sets its build string, and
  * `$RST=` (FluidNC `$Settings/Restore=`) can restore it (ADR-648). GRBL drops
  * whitespace before it parses a line, so `$I =x` and `$RST = *` count too. */
 export function isBuildInfoWriteLine(line: string): boolean {
-  if (!isSettingAssignmentLine(line)) return false;
+  if (!isStoredSettingWriteLine(line)) return false;
   const compacted = stripControllerComments(line).replace(/\s+/g, '');
   return /^\$(I|RST|Settings\/Restore)=/i.test(compacted);
 }
