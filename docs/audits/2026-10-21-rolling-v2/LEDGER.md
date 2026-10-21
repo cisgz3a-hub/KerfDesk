@@ -19,6 +19,7 @@ Method: [METHOD.md](METHOD.md). Plan: [AREAS.md](AREAS.md).
 | 4 | 13 | Project files and autosave | 2c8d988db | [13-project-io.md](13-project-io.md) | 8 | 0 | 1 | 2 | 5 | 3 |
 | 4 | 15 | Scene and text | 2c8d988db | [15-scene-text.md](15-scene-text.md) | 5 | 0 | 0 | 1 | 4 | 1 |
 | 4 | 16 | Relief | 2c8d988db | [16-relief.md](16-relief.md) | 5 | 0 | 0 | 1 | 4 | 5 |
+| 5 | 17 | Controller changes since 2026-10-20 | 902f1d0c0 | [17-controllers-delta.md](17-controllers-delta.md) | 3 | 0 | 0 | 0 | 3 | 4 |
 | 4 | 14 | Vector importers | 2c8d988db | [14-vector-importers.md](14-vector-importers.md) | 9 | 0 | 0 | 1 | 8 | 7 |
 | 3 | 12 | Camera | 2c8d988db | [12-camera.md](12-camera.md) | 9 | 0 | 0 | 3 | 6 | 2 |
 
