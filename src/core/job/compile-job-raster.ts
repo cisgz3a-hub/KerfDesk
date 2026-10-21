@@ -33,7 +33,10 @@ import {
 import { resolveImageScanDirection } from './scan-direction-policy';
 import { imageScanPassRuns, type ScanPassRun } from './scan-pass-angles';
 import { validatedScanOffsetMm } from './scan-offset';
-import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
+import {
+  CURRENT_LASER_POWER_SCALE_VERSION,
+  type LaserPowerScaleVersion,
+} from '../output/laser-power-scale-version';
 
 const WHITE_LUMA_BYTE = 255;
 
@@ -79,7 +82,7 @@ export function compileRasterGroupsForLayer(
     appendObjectRasterGroups(obj, effectiveLayer, device, out, {
       objects: sceneObjects,
       sourceLumaOverride: options.sourceLumaByObjectId?.get(obj.id),
-      laserPowerScaleVersion: options.laserPowerScaleVersion ?? 2,
+      laserPowerScaleVersion: options.laserPowerScaleVersion ?? CURRENT_LASER_POWER_SCALE_VERSION,
     });
   }
   return out;
@@ -178,7 +181,7 @@ function compileRasterGroup(
     sMax,
     sMin,
     scanFrame: options.scanFrame,
-    laserPowerScaleVersion: options.laserPowerScaleVersion ?? 2,
+    laserPowerScaleVersion: options.laserPowerScaleVersion ?? CURRENT_LASER_POWER_SCALE_VERSION,
   };
   const rasterValues = rasterValuesFor(rasterInput);
   return {

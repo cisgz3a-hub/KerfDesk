@@ -346,6 +346,7 @@ export function finalizeStartPreparation(
     prepared.project,
     options.controllerSettings,
     readinessMode(options.machine),
+    options.machine.activeControllerKind,
   );
   const controllerPolicy = startControllerPolicy(controller, gcode, options.machine);
   // Scoped scene/project, so a small selected-output slice of a huge design

@@ -34,7 +34,9 @@ export { CMD_MODAL_STATE, CMD_OFFSETS, prepareConsoleCommand } from './console-c
 export type { ControllerSettingsSnapshot, SettingsCollectorState } from './parse-settings';
 export {
   idleCollector,
+  laserPowerRangeIsEmpty,
   onResponse as collectorOnResponse,
+  reportedMaxPowerS,
   settingsMapToControllerSettings,
   settingsMapToProfilePatch,
   startCollecting,
