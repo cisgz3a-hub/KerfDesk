@@ -165,10 +165,16 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     const gatedJobs = packageCheck.match(/^ {4}if: \$\{\{ inputs\.native == true \}\}$/gm) ?? [];
     // Windows and macOS Preview, and the commercial macOS rehearsal (ADR-613).
     expect(gatedJobs).toHaveLength(3);
-    // The Linux jobs, the commercial Linux rehearsal included, run on every pull request.
-    expect(
-      packageCheck.split('\n  linux-package:')[1]?.split('\n  commercial-macos:')[0],
-    ).not.toMatch(/^ {4}if:/m);
+    // The Linux jobs, the commercial Linux rehearsal included, run on every push
+    // to main. A pull request skips the installer and commercial jobs only when
+    // the packaging scope finds no packaging or desktop change (ADR-647).
+    const linuxJobs = packageCheck
+      .split('\n  linux-package:')[1]
+      ?.split('\n  commercial-macos:')[0];
+    expect(linuxJobs?.match(/^ {4}if:.*$/gm)).toEqual([
+      "    if: ${{ !cancelled() && needs.packaging-scope.outputs.installers != 'false' }}",
+      "    if: ${{ !cancelled() && needs.packaging-scope.outputs.installers != 'false' }}",
+    ]);
     // A pull request builds the Preview exactly as the tag does, so the contract means the same.
     const releaseBuilds = previewBuildFlags(workflow);
     const pullRequestBuilds = previewBuildFlags(packageCheck);
