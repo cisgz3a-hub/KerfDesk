@@ -48,12 +48,12 @@ import {
 import {
   createLaserOutputCursor,
   emittedHead,
+  heldLinesAtJobEnd,
   heldLinesBeforeBurn,
   laserOffMoveLines,
   noteBurn,
   noteLaserOffMove,
   noteRasterGroupEnd,
-  releaseHeldLines,
   takeHeldLines,
   transitionLinesNow,
   type EmittedHead,
@@ -335,7 +335,7 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
   const { device, dialect, cursor } = context;
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const operationComment = operationProvenanceComment(group);
-  const deferEntry = cursor.litAtStop;
+  const handedOver = cursor.litAtStop ? takeHeldLines(cursor) : null;
   const emission = emitRasterGroupWithEnd({
     laserPowerScaleVersion: context.laserPowerScaleVersion,
     sValues: group.sValues,
@@ -367,10 +367,10 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
     color: group.color,
     powerPercent: group.power,
     ...(operationComment === undefined ? {} : { effectiveOperationComment: operationComment }),
-    ...(deferEntry ? { deferredEntry: { entryLines: takeHeldLines(cursor) } } : {}),
+    ...(handedOver === null ? {} : { deferredEntry: { entryLines: handedOver } }),
     deferClosingM5WhenLit: true,
   });
-  noteRasterGroupEnd(cursor, emission);
+  noteRasterGroupEnd(cursor, emission, handedOver ?? []);
   return emission.gcode;
 }
 
@@ -454,7 +454,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
   parts.push(preamble(dialect, arcMovesEnabled && jobWritesArcMoves(job)));
   let mode: 'M3' | 'M4' | 'off' = laserModeWord(dialect.cutPowerMode);
   let coolant: CoolantMode = 'off';
-  const cursor = createLaserOutputCursor(mode);
+  const cursor = createLaserOutputCursor(mode, options.stopKeepsPower === true);
   const plan = coolantPlan(job, device);
   const entryBounds =
     job.contourEntryBounds === undefined
@@ -482,13 +482,15 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
     );
     if (group.kind === 'raster') mode = 'off'; // raster ends in M5, written or held
   }
-  // Job end: held lines, air off and M5 follow the last burn, and the park
-  // runs after them. Under M3 that stops the head with the beam still lit:
-  // no laser-off move is left to take the drain before the laser is switched
-  // off. The stop is inherent to constant power and is deliberately left as is
-  // (OR-1).
-  parts.push(joinedLines(releaseHeldLines(cursor)));
-  parts.push(joinedLines(coolantTransitionLines(coolant, 'off')));
+  // Job end: air off and M5 follow the last burn, and the park runs after
+  // them. Under M3 that stops the head with the beam still lit: no laser-off
+  // move is left to take the drain before the laser is switched off. The stop
+  // is inherent to constant power and is deliberately left as is (OR-1). Held
+  // air changes are for groups that burned nothing and are dropped rather
+  // than drained lit (ADR-398 Amendment 1); the air off follows what was
+  // actually written.
+  parts.push(joinedLines(heldLinesAtJobEnd(cursor)));
+  parts.push(joinedLines(coolantTransitionLines(cursor.airInEffect, 'off')));
   // A raster group last in the job already issued its trailing M5, so the
   // postamble must not emit a redundant second one (mode === 'off').
   parts.push(postamble(mode === 'off', device, dialect, options.finishPosition));
@@ -499,6 +501,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
     ? withAirKeepAlive(program, {
         maxFeedMmPerMin: device.maxFeed,
         accelMmPerSec2: device.accelMmPerSec2,
+        stopKeepsPower: options.stopKeepsPower === true,
       })
     : program;
 }

@@ -2,6 +2,10 @@
 
 **Status:** Accepted. | **Date:** 2026-10-17
 
+**Amended by [ADR-648](ADR-648-settings-survive-kerfdesk-own-reset.md):** a reset KerfDesk sent
+keeps the `$$` and `$I` snapshot and re-reads only `$G`, so it brings no new settings read or
+toast.
+
 Amends the toolbar notice of the compact connection bar (ADR-420 Amendment 2)
 and the recovery offer of ADR-212 Amendment 1. Qualification itself, its
 read-readiness gates, Retry and Reconnect, and every safety notice are

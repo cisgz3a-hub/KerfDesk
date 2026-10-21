@@ -36,6 +36,11 @@ export type ControllerQualificationScheduleRefs = TranscriptBufferRefs &
     qualificationDeadline?: number | null;
     qualificationRevision?: number;
     runControllerQualification?: (() => Promise<void>) | null;
+    /** The scheduler's preferred run: it reads only `$G` (and `$I` if needed)
+     * while this session still holds the `$$` read an owned reset kept, and
+     * the full read otherwise (ADR-648). Decided when it runs, so every
+     * reschedule of the same session keeps it. */
+    runModalStateQualification?: (() => Promise<void>) | null;
   };
 
 type SetFn = (
@@ -341,7 +346,7 @@ function qualificationScheduleIsCurrent(
 }
 
 function startQualificationRun(refs: ControllerQualificationScheduleRefs): void {
-  const run = refs.runControllerQualification;
+  const run = refs.runModalStateQualification ?? refs.runControllerQualification;
   if (run != null) void run().catch(() => undefined);
 }
 

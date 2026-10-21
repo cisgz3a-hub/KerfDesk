@@ -261,10 +261,11 @@ describe('epoch-bound controller qualification', () => {
     });
   });
 
-  it('automatically re-reads settings after Abort and allows a fresh job', async () => {
+  it('keeps the settings after Abort, re-reads only $G, and allows a fresh job', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);
     await connectQualified(connection);
+    const before = useLaserStore.getState();
     await startTestLaserJob('G1 X1 S100\nG1 X2 S100');
     await useLaserStore.getState().stopJob();
 
@@ -279,16 +280,45 @@ describe('epoch-bound controller qualification', () => {
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await settleTimers();
 
-    expect(writes.filter((line) => line === '$$\n')).toHaveLength(1);
-    connection.emitLine('$30=1000');
-    connection.emitLine('$31=0');
-    connection.emitLine('$32=1');
-    connection.emitLine('ok');
-    await flush();
-    expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
+    // GRBL's settings live in EEPROM and survive its soft reset (ADR-648).
+    expect(writes).not.toContain('$$\n');
+    expect(writes).not.toContain('$I\n');
+    expect(writes.filter((line) => line === '$G\n')).toHaveLength(1);
+    const after = useLaserStore.getState();
+    expect(after).toMatchObject({
+      controllerQualification: {
+        kind: 'qualified',
+        epoch: after.controllerSessionEpoch,
+        settings: 'verified',
+      },
+      controllerSettingsObservation: { sessionEpoch: after.controllerSessionEpoch },
+      grblSettingsRows: before.grblSettingsRows,
+      lastSettingsReadAt: before.lastSettingsReadAt,
+      controllerBuildInfo: before.controllerBuildInfo,
+      activeWcs: 'G54',
+    });
 
     await expect(startTestLaserJob('G1 X9 S100')).resolves.toBeUndefined();
     expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+  });
+
+  it('re-reads every setting after a banner KerfDesk did not cause', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+    await connectQualified(connection);
+    writes.length = 0;
+
+    connection.emitLine('Grbl 1.1f');
+    await flush();
+    expect(useLaserStore.getState()).toMatchObject({
+      grblSettingsRows: [],
+      lastSettingsReadAt: null,
+      controllerSettingsObservation: null,
+    });
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await settleTimers();
+
+    expect(writes.filter((line) => line === '$$\n')).toHaveLength(1);
   });
 
   it('Forget Controller clears live and recovery state while preserving the project', async () => {
