@@ -1,7 +1,7 @@
 import { Blob as NodeBlob } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import { parseDxf } from '../../io/dxf';
-import { nestedMinsertDxf, nestedMinsertStartX } from '../../__fixtures__/nested-minsert';
+import { nestedMinsertDxf } from '../../__fixtures__/nested-minsert';
 import { parseDxfBlob } from './parse-dxf-blob';
 
 describe('parseDxfBlob', () => {
@@ -13,15 +13,17 @@ describe('parseDxfBlob', () => {
     });
     if (result.kind !== 'ok' || result.object === null)
       throw new Error('Expected imported geometry');
-    expect(result.pathCount).toBe(150_000);
     expect(result.notes).toEqual([]);
+    // Instance ends that meet exactly one other end are joined on import
+    // (ADR-626 Amendment 8), so a path may hold several instances; every one
+    // of the 150,000 is still there as a line piece.
     const path = result.object.paths[0];
-    expect(path?.polylines).toHaveLength(150_000);
-    expect(path?.curves).toHaveLength(150_000);
-    for (const index of [0, 499, 500, 149_999]) {
-      expect(path?.polylines[index]?.points[0]?.x).toBeCloseTo(nestedMinsertStartX(index), 8);
-      expect(path?.curves?.[index]?.start.x).toBeCloseTo(nestedMinsertStartX(index), 8);
-    }
+    const curves = path?.curves ?? [];
+    expect(result.pathCount).toBe(curves.length);
+    expect(path?.polylines).toHaveLength(curves.length);
+    expect(curves.length).toBeLessThan(150_000);
+    const pieces = curves.reduce((count, curve) => count + curve.segments.length, 0);
+    expect(pieces).toBe(150_000);
   });
 
   it('streams both semantic passes and matches the compatibility parser', async () => {
