@@ -59,12 +59,19 @@ export function useSettingsEditGlow(target: SettingsEditGlowTarget): {
       setEditor(null);
     };
     // A focused control that re-renders away takes focus with it and sends
-    // no blur, so a press anywhere outside the editor also ends the edit...
+    // no blur, so a press anywhere outside the editor also ends the edit.
+    // With focus still inside, the press blurs it next, and a field that
+    // commits on blur must land as this edit's last change: that blur ends
+    // the edit after the commit, still before the pressed control acts on
+    // click. Should no blur come, the edit ends right after the press.
+    let pressEnd: ReturnType<typeof setTimeout> | null = null;
     const pressOutside = (event: Event): void => {
-      if (!(event.target instanceof Node) || !editor.contains(event.target)) end();
+      if (event.target instanceof Node && editor.contains(event.target)) return;
+      if (!editor.contains(document.activeElement)) end();
+      else if (pressEnd === null) pressEnd = setTimeout(end, 0);
     };
-    // ...and so does focus falling back to the page once a click or key has
-    // removed the focused control (Remove Focus Test Z, say).
+    // Focus falling back to the page once a click or key has removed the
+    // focused control (Remove Focus Test Z, say) ends the edit too.
     let pending: ReturnType<typeof setTimeout> | null = null;
     const afterAction = (): void => {
       if (pending !== null) clearTimeout(pending);
@@ -82,8 +89,11 @@ export function useSettingsEditGlow(target: SettingsEditGlowTarget): {
     return () => {
       for (const [type, listener] of listeners) document.removeEventListener(type, listener, true);
       if (pending !== null) clearTimeout(pending);
+      if (pressEnd !== null) clearTimeout(pressEnd);
     };
   }, [editor, owner, release]);
+  // After the render that ends the edit, so a value a field commits on its
+  // blur reaches the canvas while the edit still holds, and pulses.
   useEffect(() => {
     if (editor === null) release(owner);
   }, [editor, owner, release]);

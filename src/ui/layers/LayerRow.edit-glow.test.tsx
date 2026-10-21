@@ -133,10 +133,11 @@ describe('operation row edit glow', () => {
     expect(hovered()).toBeNull();
     expect(edited()).toEqual(lit);
 
-    // A press outside ends the edit.
+    // A press outside ends the edit; with no blur after it, right after the press.
     await act(async () => {
       document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
     expect(edited()).toBeNull();
     await view.unmount();
     expect(hovered()).toBeNull();

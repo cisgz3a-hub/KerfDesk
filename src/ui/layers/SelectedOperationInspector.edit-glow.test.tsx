@@ -70,6 +70,14 @@ function field(host: HTMLElement, label: string): HTMLInputElement {
   return input;
 }
 
+function button(host: HTMLElement, text: string): HTMLButtonElement {
+  const found = [...host.querySelectorAll('button')].find(
+    (each) => each.textContent?.trim() === text,
+  );
+  if (found === undefined) throw new Error(`${text} button missing`);
+  return found;
+}
+
 const edited = () => useUiStore.getState().editedArtwork;
 
 describe('settings edit glow', () => {
@@ -111,9 +119,11 @@ describe('settings edit glow', () => {
     loadFixture(false);
     const { host, unmount } = await mount();
     await act(async () => field(host, 'Power for ').focus());
+    // No blur follows this press, so the edit ends right after it.
     await act(async () => {
       document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
     expect(edited()).toBeNull();
 
     await act(async () => field(host, 'Speed for ').blur());
@@ -144,35 +154,61 @@ describe('settings edit glow', () => {
   it('lights only the selected piece from Make unique and Add operation', async () => {
     loadFixture(false);
     const { host, unmount } = await mount();
-    const button = (text: string) => {
-      const found = [...host.querySelectorAll('button')].find(
-        (each) => each.textContent?.trim() === text,
-      );
-      if (found === undefined) throw new Error(text + ' missing');
-      return found;
-    };
     await act(async () => field(host, 'Power for ').focus());
     expect(edited()?.objectIds).toEqual(['chosen', 'peer']);
     // Both act on the selected artwork only.
-    await act(async () => button('Make unique').focus());
+    await act(async () => button(host, 'Make unique').focus());
     expect(edited()?.objectIds).toEqual(['chosen']);
-    await act(async () => button('Add operation').focus());
+    await act(async () => button(host, 'Add operation').focus());
     expect(edited()?.objectIds).toEqual(['chosen']);
     await unmount();
   });
 
-  it('releases the glow during an outside press, before that press can change the scene', async () => {
+  it('keeps the edit through the commit an outside press blurs, then ends it with the blur', async () => {
     loadFixture(false);
     const { host, unmount } = await mount();
-    await act(async () => field(host, 'Power for ').focus());
-    let releasedDuringPress = false;
+    const outside = button(host, 'Elsewhere');
+    const power = field(host, 'Power for ');
+    await act(async () => power.focus());
     await act(async () => {
-      document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
-      releasedDuringPress = edited() === null;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(power, '42');
+      power.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    expect(releasedDuringPress).toBe(true);
+    let heldAtCommit: boolean | null = null;
+    const stop = useStore.subscribe((state, previous) => {
+      if (state.project.scene !== previous.project.scene) heldAtCommit = edited() !== null;
+    });
+    // The press, then the blur it causes: the field commits on blur.
+    await act(async () => {
+      outside.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      outside.focus();
+    });
+    stop();
+    expect(useStore.getState().project.scene.layers[0]?.power).toBe(42);
+    expect(heldAtCommit).toBe(true);
+    // Ended with the blur, before the pressed control's click could act.
+    expect(edited()).toBeNull();
     await unmount();
   });
+
+  it.each(['Make unique', 'Add operation'])(
+    'ends the glow when %s moves the editor to the new operation',
+    async (action) => {
+      loadFixture(false);
+      const { host, unmount } = await mount();
+      const control = button(host, action);
+      await act(async () => control.focus());
+      expect(edited()?.objectIds).toEqual(['chosen']);
+      // The editor remounts on the new operation, without focus (ADR-646 rule 5).
+      await act(async () => control.click());
+      const chosen = useStore
+        .getState()
+        .project.scene.objects.find((object) => object.id === 'chosen');
+      expect(chosen?.operationIds).not.toEqual(['shared']);
+      expect(edited()).toBeNull();
+      await unmount();
+    },
+  );
 
   it('lights every piece of the operations a multi-operation CNC depth edit changes', async () => {
     const cut = { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'engrave' as const, depthMm: 1 };
