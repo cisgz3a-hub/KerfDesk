@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "cbc7a91fa00452f0b171172307ac3fe5e5d8457b",
+  "sinceSourceSha": "dfba62ae90e3fc2f23ebe05b0bc5624b3e790151",
   "highlights": [
-    "Registration Jig has its own editor page: add text, import or trace artwork, then Save to canvas. Escape no longer discards your edits, and after a complete outline burn the jig switches to Artwork only and reminds you to refocus.",
-    "With Absolute Coords on a flat bed, Centre & LED moves the pointer light to the centre of the selected artwork, and a Machine Setup option runs it after a clean Frame. Marlin fan-output laser profiles have no pointer light.",
-    "Find any command with Ctrl+K (Cmd+K on Mac). The workspace is denser and fits smaller screens, the jog pad is more compact, most dialogs keep their buttons visible, and Settings no longer changes size between sections.",
-    "Offset, Combine, Weld and Cut Shapes now run in the background so the app stays responsive. The artwork settings panel shows dither options as visual swatches, and the Material Test dialog previews its grid as you edit it.",
-    "On GRBL and Smoothieware controllers, jobs no longer hang when the last replies are lost. Reconnect pop-ups are quieter, speed sliders use realistic ranges, and a bed diagram sets the origin and records the homing corner.",
-    "Focus Test operations are clearly labelled, trim, node editing, shear and arrays are more accurate, paid licences keep checking in when the clock is off by up to 30 days, and Electron gets the latest Chromium security fixes."
+    "The desktop app now opens with a licence window, like LightBurn's: start a 30-day trial or enter your licence key. KerfDesk Free stays in the browser, and paid licences keep working offline.",
+    "New free tools: a G-code Inspector, your computer's installed fonts, inch display units, and running a G-code file made in another program.",
+    "Machine Setup starts with one machine list, Start shows a compact confirm sheet you can edit in place, and the artwork hover readout shows power and speed. The Falcon A1 Pro's red pointer switches on with one tick.",
+    "Controllers behave more safely: jog cancel waits for the machine's reply, failed auto-connects stay quiet, the safety notice and recovery card float over the canvas, and alarms are read per firmware.",
+    "Trace an image already on the Registration Jig. Centre & LED keeps the pointer light on until you press LED off, dither swatches appear wherever you pick a dither, and canvas text is laid out in the background.",
+    "The Artwork panel is tidier, collapsed panels breathe gently, the hover pulse stays smooth with many pieces, kerf offsets judge inner and outer edges more reliably, and the loading screen no longer pops in."
   ]
 }
