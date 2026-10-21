@@ -69,6 +69,9 @@ export type PreflightCode =
   // Advisory-only (ADR-471): a ramp entry left passes whose paths are too
   // short to ramp along to plunge.
   | 'cnc-ramp-entry-plunge'
+  // Advisory-only (ADR-250 Amendment 3): no profile lead fits without cutting
+  // a kept part, so those passes keep their straight plunge.
+  | 'cnc-profile-lead-plunge'
   | 'cnc-rest-machining-invalid'
   | 'cnc-adaptive-clearing-invalid'
   | 'cnc-inlay-invalid'

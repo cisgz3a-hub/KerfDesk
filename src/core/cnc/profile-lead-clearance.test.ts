@@ -96,7 +96,7 @@ describe('CNC profile lead segment clearance', () => {
       3.175,
       BED,
     );
-    expect(passes[0]).toBe(pass);
+    expect(passes[0]).toEqual({ ...pass, leadBlocked: true });
   });
 
   it('drops a line crossing a concave finger of its own kept part', () => {

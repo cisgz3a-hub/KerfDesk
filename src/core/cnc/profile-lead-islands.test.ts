@@ -75,7 +75,12 @@ describe('profile leads beside retained nested islands', () => {
     const unled = compile(shapes, { ...settings, profileLead: { shape: 'none' } });
     const passesPerContour = deep ? 4 : 1;
     const holePasses = led.passes.slice(passesPerContour, 2 * passesPerContour);
-    expect(holePasses).toEqual(unled.passes.slice(passesPerContour, 2 * passesPerContour));
+    // Same motion as no lead; the marker tells Job Review why (ADR-250 Amendment 3).
+    expect(holePasses).toEqual(
+      unled.passes
+        .slice(passesPerContour, 2 * passesPerContour)
+        .map((pass) => ({ ...pass, leadBlocked: true })),
+    );
     expect(led.passes.at(-1)?.kind).toBe('path3d');
     const gcode = cncGrblStrategy.emit({ groups: [led] }, DEFAULT_DEVICE_PROFILE);
     expect(gcode).not.toContain('G0 X80.001 Y61.588');
@@ -90,7 +95,7 @@ describe('profile leads beside retained nested islands', () => {
     const shapes = nestedShapes(true, reverse, translation);
     const led = compile(shapes, SETTINGS);
     const unled = compile(shapes, { ...SETTINGS, profileLead: { shape: 'none' } });
-    expect(led.passes[1]).toEqual(unled.passes[1]);
+    expect(led.passes[1]).toEqual({ ...unled.passes[1], leadBlocked: true });
   });
 
   it('preserves a clear hole lead beside a distant retained island', () => {
