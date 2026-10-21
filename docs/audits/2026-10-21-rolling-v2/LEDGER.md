@@ -17,11 +17,14 @@ coordinator in code, by repro or against a primary source.
 - **P3: 213.**
 - **Clean areas (no P1/P2):** controller changes (17), raster dithering (20), docs-vs-code guards (24).
 
-**Fix PRs opened from this audit (state on 2026-10-22):** #1340 (03-P1-1), #1342 **merged**
-(03-P2-1/2), #1343 (09-P1-1), #1345 (03-P1-2/3, P2-9), #1346 (02-P2-1), #1347 (01-P2-1..4),
-#1349 (03-P2-4/5), #1352 (13-P1-1, P2-1/2), #1339 (11-P2-1). Proposed but not started: fixes for
-05, 06, 07, 08, 10, 12, 14 (needs DPI decision), 15, 16 (needs decision), 18, 19, 21, 22, 23,
-25/28, 26, 27.
+**Fix PRs from this audit (state on 2026-10-22, morning):**
+- **Merged:** #1339 (11-P2-1), #1340 (03-P1-1), #1342 (03-P2-1/2, P3-1), #1349 (03-P2-4/5),
+  #1352 (13-P1-1, 13-P2-1/2), #1353 (follow-up to #1342).
+- **Open:** #1343 (09-P1-1), #1345 (03-P1-2/3, P2-9), #1346 (02-P2-1), #1347 (01-P2-1..4),
+  #1354 (10-P2-1, 10-K1), #1355 (22-P2-1).
+- **In progress (sessions running):** fixes for 05, 06, 07, 08, 12, 15, 18, 19, 21, 23, 25/28,
+  26-K1, 27.
+- **Awaiting decisions:** 02-P2-2, 01-P2-5, 14-P2-1, 16-P2-1.
 
 **Maintainer decisions raised:** tapered inlay tier (02-P2-2); Abort rate lane (01-P2-5,
 ADR-585); Illustrator SVG DPI (14-P2-1); relief V-bit finishing cell (16-P2-1); 26-K1 severity
