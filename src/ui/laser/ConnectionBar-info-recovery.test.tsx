@@ -61,20 +61,43 @@ describe('ConnectionBar controller information recovery', () => {
   // A controller that needs recovery says so over the canvas (ADR-642), not in
   // the toolbar; Controller info stays reachable from the menu.
   it('never announces a failed read in the toolbar', async () => {
-    const container = await render({ reconnectRecommended: true });
+    const container = await render({
+      reconnectRecommended: true,
+      controllerStoppedResponding: true,
+    });
     expect(container.querySelector('[aria-label="Controller notification"]')).toBeNull();
-    expect(container.textContent).not.toContain('Controller is not responding');
+    expect(container.textContent).not.toContain('Machine stopped answering');
     expect(container.textContent).not.toContain('needs recovery');
     expect(details()).toBeNull();
   });
 
-  it.each(['controller-response', 'reset-cleanup', 'settings-read'] as const)(
-    'reads controller settings after a reset without a notification: %s',
-    async (phase) => {
-      await render({ qualification: { kind: 'qualifying', epoch: 4, phase } });
+  // ADR-611 Amendment 2: the read is progress beside the dot, not a notice.
+  it.each([
+    ['controller-response', 'Connecting…'],
+    ['reset-cleanup', 'Reading settings…'],
+    ['settings-read', 'Reading settings…'],
+  ] as const)(
+    'reads controller settings after a reset as status text, without a notification: %s',
+    async (phase, status) => {
+      const container = await render({ qualification: { kind: 'qualifying', epoch: 4, phase } });
+      expect(container.querySelector('[aria-label="Controller notification"]')).toBeNull();
       expect(details()).toBeNull();
+      expect(container.textContent).toContain(status);
+      expect(container.textContent).not.toContain('Connected');
     },
   );
+
+  it('names a controller that stopped answering in the requested details', async () => {
+    await render({
+      reconnectRecommended: true,
+      controllerStoppedResponding: true,
+      onReconnectQualification: vi.fn(),
+    });
+    await openDetails();
+    expect(details()?.textContent).toContain('Machine stopped answering');
+    expect(details()?.textContent).toContain('The settings response was empty.');
+    expect(findButton(document.body, 'Reconnect controller')).not.toBeUndefined();
+  });
 
   it('closes requested details before opening the connection menu', async () => {
     const container = await render({});
@@ -205,14 +228,14 @@ describe('ConnectionBar controller information recovery', () => {
       onReconnectQualification: onReconnect,
     });
     await openDetails();
-    expect(details()?.textContent).toContain('Controller connection needs recovery');
+    expect(details()?.textContent).toContain('Couldn’t read machine settings');
     const reconnect = findButton(document.body, 'Reconnect controller');
     expect(reconnect?.title).toContain('ends any paused job');
     await act(async () => reconnect?.click());
     expect(onReconnect).toHaveBeenCalledOnce();
 
     await render({ reconnectRecommended: false, onReconnectQualification: onReconnect });
-    expect(details()?.textContent).toContain('Controller information unavailable');
+    expect(details()?.textContent).toContain('Couldn’t read machine settings');
     expect(findButton(document.body, 'Reconnect controller')).toBeUndefined();
   });
 
@@ -238,7 +261,7 @@ describe('ConnectionBar controller information recovery', () => {
     expect(details()?.textContent).not.toContain('Waiting for controller response…');
 
     await render({ connection: { kind: 'disconnected' } });
-    expect(container.textContent).not.toContain('Controller information unavailable');
+    expect(container.textContent).not.toContain('Couldn’t read machine settings');
     expect(container.querySelector('[role="alert"]')).toBeNull();
     expect(details()).toBeNull();
   });

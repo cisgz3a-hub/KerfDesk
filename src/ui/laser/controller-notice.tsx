@@ -65,6 +65,7 @@ type QualificationNoticeProps = {
   readonly qualification: ControllerQualification | undefined;
   readonly readBlockReason: string | null | undefined;
   readonly reconnectRecommended: boolean;
+  readonly stoppedResponding: boolean;
   readonly onRetry: (() => void) | undefined;
   readonly onReconnect: (() => void) | undefined;
   readonly disabled: boolean;
@@ -175,6 +176,7 @@ function QualificationDetails(props: QualificationNoticeProps): JSX.Element | nu
       message={qualification.message}
       readBlockReason={props.readBlockReason}
       reconnectRecommended={props.reconnectRecommended}
+      stoppedResponding={props.stoppedResponding}
       onRetry={props.onRetry}
       onReconnect={props.onReconnect}
       disabled={props.disabled}

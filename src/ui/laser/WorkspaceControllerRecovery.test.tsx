@@ -95,7 +95,7 @@ describe('WorkspaceControllerRecovery', () => {
   it('opens over the canvas by itself when the controller stops answering', () => {
     failRead({ answering: false });
 
-    expect(card()?.textContent).toContain('Controller connection needs recovery');
+    expect(card()?.textContent).toContain('Machine stopped answering');
     expect(card()?.textContent).toContain(`${MESSAGE} (4)`);
     expect(button('Reconnect controller')).toBeDefined();
     expect(button('Retry reading controller settings')).toBeDefined();
@@ -130,7 +130,7 @@ describe('WorkspaceControllerRecovery', () => {
       act(() => {
         vi.advanceTimersByTime(9_000);
       });
-      expect(card()?.textContent).toContain('Controller connection needs recovery');
+      expect(card()?.textContent).toContain('Machine stopped answering');
     } finally {
       vi.useRealTimers();
     }
@@ -154,7 +154,7 @@ describe('WorkspaceControllerRecovery', () => {
     act(() => button('Collapse controller recovery')?.click());
 
     expect(card()).toBeNull();
-    const show = button('Controller needs recovery');
+    const show = button('Machine stopped answering');
     expect(show).toBeDefined();
     expect(document.activeElement).toBe(show);
 

@@ -697,7 +697,7 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   await expect.poll(recoverySnapshot).toEqual(readyResetSession);
   const informationWarning = page
     .getByRole('alert')
-    .filter({ hasText: /Controller connection needs recovery|Controller information unavailable/ });
+    .filter({ hasText: /Machine stopped answering|Couldn’t read machine settings/ });
   await expect(informationWarning).toHaveCount(0);
   expect(await connectionEvents()).toEqual(originalConnection);
 

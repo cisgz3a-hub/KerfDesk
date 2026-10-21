@@ -3319,9 +3319,15 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    stopped answering status queries (re-checked every second, so a wedged
    transport counts), the recovery card with Retry and Reconnect opens by
    itself at the top of the canvas, under any safety notice.
-   Closing it folds it into a **Controller needs recovery** button that stays
+   Closing it folds it into a **Machine stopped answering** button that stays
    until the controller recovers; a new failure opens the card again (ADR-642,
-   replacing ADR-611's brief toolbar notice). A controller
+   replacing ADR-611's brief toolbar notice). The card and Controller info title
+   a failed read "Couldn’t read machine settings", or "Machine stopped
+   answering" when the controller has gone silent. While the read runs, the
+   status beside the dot reads "Connecting…", then "Reading settings…", and the
+   "Machine settings detected" toast appears only when the read offers profile
+   updates or its review items changed since the last read for that machine
+   profile (ADR-611 Amendment 2). A controller
    that answered and then goes quiet for 8 s, outside homing and other controller
    operations, turns the connection status to an amber **Not responding** until
    its next reply (ADR-611 Amendment 1). While a sent line is still owed its

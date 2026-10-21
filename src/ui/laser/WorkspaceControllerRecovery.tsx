@@ -86,11 +86,8 @@ export function WorkspaceControllerRecovery(props: {
         title="Show Retry and Reconnect for the controller."
       >
         <Icon name="warning" size={14} />
-        <span>
-          {recovery.reconnectRecommended
-            ? 'Controller needs recovery'
-            : 'Controller is not responding'}
-        </span>
+        {/* The card opens only for a controller that stopped answering (ADR-642). */}
+        <span>Machine stopped answering</span>
         <span className="lf-controller-recovery-pill__action">Show</span>
       </button>
     );
