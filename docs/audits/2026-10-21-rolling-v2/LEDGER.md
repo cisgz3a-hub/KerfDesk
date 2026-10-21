@@ -11,6 +11,7 @@ Method: [METHOD.md](METHOD.md). Plan: [AREAS.md](AREAS.md).
 | 1 | 04 | Electron main process | 70c01e11f | [04-electron-main.md](04-electron-main.md) | 33 (32 unique) | 2 | 0 | 1 | 27 | 2 |
 | 2 | 05 | Job lifecycle (store) | faf5a54f1 | [05-job-lifecycle.md](05-job-lifecycle.md) | 3 | 0 | 0 | 2 | 1 | 4 |
 | 2 | 06 | Laser and layer settings UI | faf5a54f1 | [06-laser-ui-settings.md](06-laser-ui-settings.md) | 14 | 0 | 0 | 4 | 10 | 1 |
+| 2 | 07 | Image trace | faf5a54f1 | [07-trace.md](07-trace.md) | 8 | 0 | 0 | 3 | 5 | 3 |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
@@ -45,4 +46,7 @@ Coordinator checks were made on `origin/main` @ `faf5a54f1`; no audited line cha
 | 06-P2-3 | laser-ui-settings | Switching Process to Fill inside Cut Settings skips the ADR-496 §6 recipe reseed (keeps cut 90%/400 and the cut preset link) | refuter REPRO through the real wiring (`fill 90 400 birch-cut` vs inspector `fill 35 3000 birch-fill`) | open |
 | 06-P2-4 | laser-ui-settings | Cut Settings refuses to Apply values the app itself stores (37.5%, inch speeds like 304.8 mm/min, 22.5°) because of native `step` validation | **READ**: `CutSettingsInputs.tsx` renders `type="number"` with `step={props.step ?? 1}`; refuter REPRO (Apply never called) | open |
 | 06-P2-5 | laser-ui-settings | One Job Review Save on an operation with an artwork override is two Undo steps; one Undo leaves card 40% while the artwork burns S800 | refuter REPRO | open |
+| 07-P2-1 | trace | Sketch detection traces nothing (one corner triangle) on ~0.75–1.0 MP drawings with Line + fill; default Free Line Art adds a stray triangle and runs 4–6× slower at 1100–1200 px | **READ**: `trace-image.ts` `localMean` builds `x0/x1/y0/y1` from a fractional `radiusPx`, so typed-array reads at fractional indices return `undefined` and `?? 0` silently zeroes the box sums. Refuter REPRO at 900/950/1000 px | open |
+| 07-P2-2 | trace | Images larger than the 2048 px preview: the committed trace (finer grid, ADR-409) keeps Sketch windows in pixels, losing 22–44% of stroke ink the preview showed | refuter REPRO with the app's grid planner (3600×2700: 0.78 and 0.56 of 20/28 px strokes) | open |
+| 07-P2-3 | trace | Jig trace turns Line + fill into a Fill-only group; the pen line never burns | refuter REPRO through the jig builder and compiler (Edit jig → Trace an image, Pro) | open |
 | 04-P2-1 | electron-main | Camera bridge's fixed loopback port has no server identity check: a squatter receives RTSP logins; operator told the wrong reason | READ `camera-bridge.ts:11,96` (fixed origin, credentials in query, no token); `camera-bridge-lifecycle.ts:19-21` only logs bind failure | open |
