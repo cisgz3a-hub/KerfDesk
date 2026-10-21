@@ -1,3 +1,5 @@
+// A stock GRBL link: a Z probe is its Auto-focus form, since `$HZ1` belongs to the
+// Falcon contract and leaves stock GRBL stuck homing (ADR-400 Amendment 1).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
@@ -67,13 +69,13 @@ async function beginAutofocus(
 ): Promise<{
   readonly pending: ReturnType<ReturnType<typeof useLaserStore.getState>['autofocus']>;
 }> {
-  const pending = useLaserStore.getState().autofocus('$HZ1');
+  const pending = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
   await flush();
   expect(writes.at(-1)).toBe('?');
-  expect(writes).not.toContain('$HZ1\n');
+  expect(writes).not.toContain('G38.2 Z-10 F100\n');
   connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
   await flush();
-  expect(writes.at(-1)).toBe('$HZ1\n');
+  expect(writes.at(-1)).toBe('G38.2 Z-10 F100\n');
   return { pending };
 }
 
@@ -124,7 +126,7 @@ describe('store autofocus shared response ownership', () => {
 
     const { pending } = await beginAutofocus(connection, writes);
 
-    expect(writes).toEqual(['?', '$HZ1\n']);
+    expect(writes).toEqual(['?', 'G38.2 Z-10 F100\n']);
     expect(useLaserStore.getState().framedRun).toBeNull();
     expect(useLaserStore.getState().frameVerification).toBeNull();
     connection.emitLine('ok');
@@ -140,11 +142,11 @@ describe('store autofocus shared response ownership', () => {
 
     const { pending } = await beginAutofocus(connection, writes);
 
-    expect(writes).toEqual(['?', '$HZ1\n']);
+    expect(writes).toEqual(['?', 'G38.2 Z-10 F100\n']);
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
     expect(useLaserStore.getState().autofocusBusy).toBe(true);
     expect(
-      useLaserStore.getState().transcript.find((entry) => entry.raw === '$HZ1\n'),
+      useLaserStore.getState().transcript.find((entry) => entry.raw === 'G38.2 Z-10 F100\n'),
     ).toMatchObject({ direction: 'out', source: 'motion' });
 
     connection.emitLine('ok');
@@ -191,7 +193,7 @@ describe('store autofocus shared response ownership', () => {
     expect(useLaserStore.getState().safetyNotice).toMatchObject({
       kind: 'controller-error',
       code: 20,
-      rejectedLine: '$HZ1',
+      rejectedLine: 'G38.2 Z-10 F100',
     });
     expect(useLaserStore.getState().autofocusBusy).toBe(false);
   });
@@ -203,11 +205,11 @@ describe('store autofocus shared response ownership', () => {
     writes.length = 0;
     useLaserStore.setState({ pendingUntrackedAcks: 1 });
 
-    const result = await useLaserStore.getState().autofocus('$HZ1');
+    const result = await useLaserStore.getState().autofocus('G38.2 Z-10 F100');
 
     expect(result.kind).toBe('preflight-failed');
     if (result.kind === 'preflight-failed') expect(result.reason).toMatch(/previous controller/i);
-    expect(writes).not.toContain('$HZ1\n');
+    expect(writes).not.toContain('G38.2 Z-10 F100\n');
     expect(useLaserStore.getState().autofocusBusy).toBe(false);
   });
 
@@ -216,7 +218,7 @@ describe('store autofocus shared response ownership', () => {
     const connection = makeConnection(writes);
     await connectWith(connection);
 
-    const pending = useLaserStore.getState().autofocus('$HZ1');
+    const pending = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
     await flush();
     connection.emitClose();
 
@@ -263,14 +265,14 @@ describe('store autofocus shared response ownership', () => {
     writes.length = 0;
     useLaserStore.setState({ statusReport: null, statusObservation: null });
 
-    const pending = useLaserStore.getState().autofocus('$HZ1');
+    const pending = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
     await flush();
     expect(writes).toEqual(['?']);
     await vi.advanceTimersByTimeAsync(3_100);
 
     const result = await pending;
     expect(result.kind).toBe('preflight-failed');
-    expect(writes).not.toContain('$HZ1\n');
+    expect(writes).not.toContain('G38.2 Z-10 F100\n');
     expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 
@@ -280,7 +282,7 @@ describe('store autofocus shared response ownership', () => {
     await connectWith(connection);
     writes.length = 0;
 
-    const pending = useLaserStore.getState().autofocus('$HZ1');
+    const pending = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
     await flush();
     connection.emitLine('<Run|MPos:0.000,0.000,-1.000|FS:500,0>');
 
@@ -318,7 +320,7 @@ describe('store autofocus shared response ownership', () => {
   it('clears cached status and retains ownership when the autofocus write is uncertain', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes, async (data) => {
-      if (data === '$HZ1\n') throw new Error('USB write receipt is unknown.');
+      if (data === 'G38.2 Z-10 F100\n') throw new Error('USB write receipt is unknown.');
     });
     await connectWith(connection);
     writes.length = 0;

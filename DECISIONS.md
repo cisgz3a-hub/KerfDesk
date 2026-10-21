@@ -3575,7 +3575,9 @@ The floating jig panel is replaced by a dedicated editor with its own editable
 canvas, fitted to the jig on opening. Layout, selection transforms, text with the
 existing writing styles, imports, inline image tracing and Line/Fill operation
 settings are draft changes with local Undo/Redo. Shared artwork sizing, aspect-lock
-controls and the existing jig-instance copy/ordering semantics remain available.
+controls and the existing jig-instance copy/ordering semantics remain available. *Amended by ADR-652:
+the editor opens on a clean canvas showing only the jig, with no main-canvas selection, and has
+no Line/Fill or outline burn settings.*
 **Save to canvas** commits one undoable edit and locks the outlines on the main
 canvas. A new jig initially selects **Outline only**; editing an existing jig keeps
 its output mode. Closing without saving does not publish the draft. Captured boards
