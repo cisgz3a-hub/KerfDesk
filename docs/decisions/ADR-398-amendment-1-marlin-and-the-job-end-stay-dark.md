@@ -58,6 +58,8 @@ read in the primary sources.
 - Marlin output changes only after a lit burn: an air change, a mode change or an image layer's
   opening now follows the next operation's first travel. A pass seam's travel to where the head
   already is stays in the program. Marlin output with no transition after a burn is unchanged.
+- The header's emitter revision advances to `marlin-dark-air-changes-20261021-v22`, which also
+  covers ADR-462 Amendment 1.
 - `src/__fixtures__/controllers/grbl-lit-drain-checker.ts` now also reads the lines after the last
   burn: there, only `M9` and `M5` may drain with the beam lit.
   `src/__fixtures__/controllers/marlin-lit-drain-checker.ts` is its Marlin twin, built on the

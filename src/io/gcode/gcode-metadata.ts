@@ -132,7 +132,9 @@ export type GcodeMetadata = {
 // ADR-580 solves STL relief cutters against the mesh's own triangles and finishes
 // an STL relief with raster + waterline unless the operation chooses otherwise.
 // ADR-602 adds dark relative-Z Focus sweeps; air refresh timing follows G90/G91.
-export const EMITTER_REVISION = 'focus-relative-z-air-timing-20261016-v21';
+// ADR-398 Amd 1 and ADR-462 Amd 1 hold Marlin air and mode changes and air
+// repeats until a dark move, and drop air changes still held at the job end.
+export const EMITTER_REVISION = 'marlin-dark-air-changes-20261021-v22';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
