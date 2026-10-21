@@ -25,7 +25,6 @@ import type { ControllerQualification } from '../state/laser-controller-qualific
 import type { ConnectionState } from '../state/laser-store';
 import { CompactConnectionControls } from './CompactConnectionControls';
 import {
-  BriefQualificationNotice,
   QualificationNotice,
   useControllerNotice,
   type ControllerNotice,
@@ -42,8 +41,6 @@ export type ConnectionBarProps = {
   readonly qualification?: ControllerQualification;
   readonly qualificationReadBlockReason?: string | null;
   readonly reconnectRecommended?: boolean;
-  /** The controller stopped answering status queries; only this pops up (ADR-611). */
-  readonly controllerStoppedResponding?: boolean;
   /** A controller that answered this session has gone quiet: "Not responding" (ADR-611 A1). */
   readonly controllerWentSilent?: boolean;
   readonly onRetryQualification?: () => void;
@@ -87,14 +84,9 @@ export function ConnectionBar(props: Props): JSX.Element {
       data-silent={silent ? 'true' : undefined}
     >
       <div className="lf-connection-toolbar-layout">
-        <div
-          className="lf-controller-notice-slot"
-          role="status"
-          aria-label="Controller updates"
-          aria-atomic="true"
-        >
-          <BriefQualificationNotice {...props} notice={notice} />
-        </div>
+        {/* Keeps the controls at the trailing edge. A controller that needs
+            recovery says so over the canvas instead of here (ADR-642). */}
+        <div className="lf-connection-toolbar-spacer" />
         <div className="lf-connection-toolbar-controls">
           <CompactConnectionControls
             machineName={props.machineName ?? 'Unnamed machine'}

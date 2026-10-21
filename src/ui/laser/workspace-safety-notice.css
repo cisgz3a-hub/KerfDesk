@@ -1,0 +1,84 @@
+/* ADR-634: the safety notice floats over the top centre of the canvas. The
+   anchor spans the canvas stage and lets clicks through to the drawing. No
+   stacking context sits between it and the canvas overlays, so it is drawn
+   above the update card that shares the top centre and above the in-canvas
+   hints (the run-order prompt there, the tool hints at the bottom left, all
+   z-index 8). The menu bar, popovers, modal dialogs and the Live Motion popup
+   stay above it. */
+.lf-safety-notice-anchor {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  container: safety-notice / inline-size;
+}
+
+/* Outranks the accessories layer, which gives its children pointer input. */
+.lf-workspace-accessories > .lf-safety-notice-anchor {
+  pointer-events: none;
+}
+
+.lf-safety-notice-toast {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  width: 420px;
+  max-width: calc(100% - 24px);
+  /* --lf-safety-notice-room is set while the Live Motion popup is up, so the
+     notice ends above it instead of hiding its buttons underneath. */
+  max-height: min(calc(100% - 24px), var(--lf-safety-notice-room, 100vh));
+  overflow-y: auto;
+  border-radius: 4px;
+  box-shadow: var(--lf-shadow);
+  pointer-events: auto;
+  /* The safety notice, then the controller recovery card (ADR-642). */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lf-safety-notice-toast > * {
+  flex-shrink: 0;
+}
+
+/* The folded recovery card: one full-width row that stays while recovery is
+   needed (ADR-642). */
+.lf-btn.lf-controller-recovery-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 12px;
+  color: var(--lf-warning-fg);
+  background: var(--lf-bg-1);
+  border: 1px solid var(--lf-warning);
+  border-radius: 8px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.lf-controller-recovery-pill__action {
+  margin-left: auto;
+  font-weight: 400;
+  text-decoration: underline;
+}
+
+/* A canvas narrower than the card (a phone with a side panel open) would
+   squeeze it into an unreadable column. It spans the window instead, still
+   starting at the top of the canvas: with top left auto, a fixed box keeps
+   that position and escapes the canvas's clipping. */
+@container safety-notice (width < 444px) {
+  .lf-safety-notice-toast {
+    position: fixed;
+    top: auto;
+    left: 12px;
+    right: 12px;
+    transform: none;
+    width: auto;
+    max-width: none;
+    max-height: min(50vh, var(--lf-safety-notice-room, 50vh));
+    margin-top: 12px;
+  }
+}

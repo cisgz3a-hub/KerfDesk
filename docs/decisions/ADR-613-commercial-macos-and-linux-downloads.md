@@ -166,3 +166,58 @@ readback, latest last), identity-only preparation, the macOS and Linux update se
 renderer's download-page action, the download page per system, and the workflow's job graph and
 switches. Real Macs and Linux desktops, Gatekeeper, keychain prompts, file managers and USB
 adapters remain unqualified until the first release is installed on them.
+
+---
+
+## ADR-613 Amendment 1 - How macOS and Linux users reach the terms (2026-10-20)
+
+**Status:** Accepted on 2026-10-20, from the maintainer's request to copy what LightBurn does |
+**Amends:** decision 4 (packaging) of this ADR
+
+### Context
+
+The Windows installer shows the KerfDesk License & Safety Notice (`public/eula.txt`) on its
+licence page: `prepare-installer-terms.mjs` encodes it for the Preview config, and the
+unsigned lane copies the same file as its installer terms (`release-desktop-unsigned.yml`, and
+`build-commercial-platform.sh` for macOS and Linux). Only NSIS shows that page. The Mac DMG
+(drag to Applications), the `.deb` and the AppImage show no licence page, so a Mac or Linux
+operator never saw the terms. Inside the app, About and Help > Safety & liability named only
+the path `/eula.txt`, which the website serves but the desktop app does not open.
+
+LightBurn, which the maintainer asked us to copy, says in its EULA that downloading, installing
+or using the software accepts it, keeps the EULA in the app under the Help menu and in its
+documentation, and shows no install-time prompt for its macOS DMG or Linux AppImage
+(https://docs.lightburnsoftware.com/2.1/Licensing/LightBurnEULA/).
+
+### Decision
+
+1. **Help > License & Safety Notice** opens the notice in a scrolling dialog on Windows, macOS,
+   Linux and in the browser. The item is named after the document. Its text is
+   `public/eula.txt` itself, bundled into the renderer at build time
+   (`src/ui/help/license-notice.ts`), so it is the text the Windows installer shows, it works
+   offline, and it is the version that came with the installed app. A test fails if the two
+   differ. The dialog is a React dialog, not `window.alert`: the notice is too long for a
+   native alert, and an alert stalls a running job (`job-aware-dialogs.ts`).
+2. About and Help > Safety & liability point to **Help > License & Safety Notice** instead of
+   `/eula.txt`.
+3. **No install-time or first-run prompt is added**, as with LightBurn. electron-builder could
+   show the text before first use (a licence sheet when the DMG opens, from
+   `build/license_en.txt`, or `appImage.license`, which asks Agree or Disagree through zenity,
+   kdialog or Xdialog when one is installed and otherwise skips it), but that is a separate
+   decision for the maintainer.
+4. **No legal text changes.** `public/eula.txt`, `LICENSE` and the drafts in `docs/legal/` are
+   unchanged. Wording that makes use of the software count as acceptance belongs in the KerfDesk
+   Licence Agreement, which only the maintainer publishes.
+
+### Not decided here
+
+- Showing the KerfDesk Licence Agreement in the app. The signed release-train lane gives its
+  Windows installer owner-approved terms fetched by hash (`KERFDESK_COMMERCIAL_TERMS_SHA256`);
+  no build bundles them, and that lane builds Windows only and is switched off.
+
+### Verification
+
+`src/ui/help/LicenseNoticeDialog.test.tsx`: the bundled text equals `public/eula.txt` byte for
+byte, the menu label is the document's name, and the Help command opens and closes the dialog.
+`src/ui/commands/AppMenuBar.control-audit.test.tsx` clicks the item through the menu.
+Not checked in a packaged app on a Mac or a Linux desktop.

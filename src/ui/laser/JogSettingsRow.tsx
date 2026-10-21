@@ -1,6 +1,18 @@
 import { jogFeedOptions } from './jog-control-policy';
+import { useLengthUnit } from '../state/display-units';
+import { feedUnitLabel, formatDisplayLength, MM_PER_INCH } from '../display-length';
 
 const STEPS_MM = [0.1, 0.5, 1, 2, 5, 10, 25, 50, 100] as const;
+// Inch steps (ADR-629), stored as the millimetres the jog moves.
+const STEPS_IN = [0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 4] as const;
+
+/** The step choices in the display unit, keeping the current step listed. */
+export function jogStepOptions(unit: 'mm' | 'in', currentMm: number): ReadonlyArray<number> {
+  const options: number[] =
+    unit === 'in' ? STEPS_IN.map((inches) => inches * MM_PER_INCH) : [...STEPS_MM];
+  if (!options.includes(currentMm)) options.push(currentMm);
+  return options.sort((a, b) => a - b);
+}
 
 export function JogSettingsRow(props: {
   readonly disabled: boolean;
@@ -10,6 +22,7 @@ export function JogSettingsRow(props: {
   readonly onStep: (step: number) => void;
   readonly onFeed: (feed: number) => void;
 }): JSX.Element {
+  const unit = useLengthUnit();
   return (
     <div style={rowStyle}>
       <label style={fieldStyle}>
@@ -22,9 +35,9 @@ export function JogSettingsRow(props: {
           aria-label="Jog step size"
           title="Distance moved by each jog arrow click."
         >
-          {STEPS_MM.map((option) => (
+          {jogStepOptions(unit, props.step).map((option) => (
             <option key={option} value={option}>
-              {option} mm
+              {formatDisplayLength(option, unit)} {unit}
             </option>
           ))}
         </select>
@@ -37,11 +50,11 @@ export function JogSettingsRow(props: {
           onChange={(event) => props.onFeed(Number(event.target.value))}
           disabled={props.disabled}
           aria-label="Jog speed"
-          title="Feed used for XY jogs, in millimeters per minute."
+          title={`Feed used for XY jogs, in ${unit === 'in' ? 'inches' : 'millimeters'} per minute.`}
         >
           {jogFeedOptions(props.maxFeed).map((option) => (
             <option key={option} value={option}>
-              {option} mm/min
+              {formatDisplayLength(option, unit)} {feedUnitLabel(unit)}
             </option>
           ))}
         </select>

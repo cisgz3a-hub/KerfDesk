@@ -1,0 +1,55 @@
+.lf-system-fonts {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lf-system-fonts-count {
+  margin: 0;
+  font-size: 12px;
+}
+
+.lf-system-fonts-list {
+  max-height: min(50vh, 420px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+}
+
+.lf-system-fonts-family {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--lf-border);
+}
+
+.lf-system-fonts-family:last-child {
+  border-bottom: none;
+}
+
+.lf-system-fonts-specimen {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 20px;
+  line-height: 26px;
+}
+
+.lf-system-fonts-styles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.lf-system-fonts-notice,
+.lf-system-fonts-error {
+  margin: 0;
+}
+
+.lf-system-fonts-error {
+  color: var(--lf-danger);
+}
