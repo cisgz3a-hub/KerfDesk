@@ -346,6 +346,9 @@ export function finalizeStartPreparation(
     prepared.project,
     options.controllerSettings,
     readinessMode(options.machine),
+    // The banner names the firmware itself; the driver kind can differ from
+    // it, and the power-range warning describes the firmware's behaviour.
+    options.machine.detectedControllerKind ?? options.machine.activeControllerKind,
   );
   const controllerPolicy = startControllerPolicy(controller, gcode, options.machine);
   // Scoped scene/project, so a small selected-output slice of a huge design

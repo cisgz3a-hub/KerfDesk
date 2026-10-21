@@ -49,7 +49,8 @@ concurrency:
 # Required for actions/checkout — read access is enough; the deploy
 # itself authenticates via the Pages-only PAGES_CLOUDFLARE_API_TOKEN, not
 # GITHUB_TOKEN. The renamed credential prevents historical desktop workflows
-# from reusing the web-deploy token for R2.
+# from reusing the web-deploy token for R2, and the `production` environment
+# keeps it from every other job (ADR-651).
 permissions:
   contents: read
   # Read-only: the candidate phase lists successful main CI runs and manual
@@ -67,6 +68,10 @@ jobs:
     # matches a triggering run's head branch, which a fork PR can also name
     # main (ADR-360).
     if: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.payment_flag == '' || inputs.payment_flag == 'none')) || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
+    # The Pages credentials belong in this environment, limited to main, so a
+    # workflow pushed on any other branch cannot read them (ADR-651). A
+    # workflow_run deploy runs on main, the default branch.
+    environment: production
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

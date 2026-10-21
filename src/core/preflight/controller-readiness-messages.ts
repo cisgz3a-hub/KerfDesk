@@ -46,6 +46,45 @@ export function laserMaxPowerMismatchMessage(
     : `${mismatch} Apply the detected setting before starting.`;
 }
 
+/** Which firmware's behaviour the `power-range-empty` warning describes. */
+export type PowerRangeFirmware = 'grbl' | 'grblhal' | 'fluidnc' | 'unknown';
+
+const LASER_OFF_MOVES_AT_FULL_POWER =
+  'so laser-off moves fire the beam at full power while M3 or M4 is on';
+const GRBLHAL_ON_OFF_CONTROL =
+  'switches to on/off spindle control, so S no longer sets laser power';
+const RAISE_MAX_S = 'Set $30 above $31 before burning.';
+
+/** `$30` at or below `$31` leaves no S range, and firmwares differ on what
+ *  follows. Stock GRBL's `spindle_compute_pwm_value` returns the maximum PWM
+ *  when `rpm_min >= rpm_max`, before its S0 branch:
+ *  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/spindle_control.c#L192-L205
+ *  grblHAL's `spindle_precompute_pwm_values` instead marks the spindle not
+ *  variable when `rpm_max <= rpm_min`, and the driver reverts to on/off control:
+ *  https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/spindle_control.c#L1045-L1078
+ *  FluidNC reports only `$30`, the top of its spindle speed_map. A Job Review
+ *  warning, never a Start guard (ADR-565, ADR-567 Amendment 1). */
+export function laserPowerRangeEmptyMessage(
+  maxS: number,
+  minS: number | undefined,
+  firmware: PowerRangeFirmware,
+): string {
+  const range =
+    minS === undefined
+      ? `Controller reports $30=${maxS}, so there is no S power range.`
+      : `Controller $30=${maxS} is not above $31=${minS}, so there is no S power range.`;
+  switch (firmware) {
+    case 'grbl':
+      return `${range} The controller fires full power even at S0, ${LASER_OFF_MOVES_AT_FULL_POWER} (stock GRBL). ${RAISE_MAX_S}`;
+    case 'grblhal':
+      return `${range} grblHAL then ${GRBLHAL_ON_OFF_CONTROL}. ${RAISE_MAX_S}`;
+    case 'fluidnc':
+      return `${range} FluidNC reports $30 from the top of the spindle's speed_map in its YAML config, so check speed_map before burning.`;
+    case 'unknown':
+      return `${range} Stock GRBL then fires full power even at S0, ${LASER_OFF_MOVES_AT_FULL_POWER}; grblHAL instead ${GRBLHAL_ON_OFF_CONTROL}. ${RAISE_MAX_S}`;
+  }
+}
+
 export function spindleScaleMismatchMessage(
   controllerMaxPowerS: number,
   spindleMaxRpm: number,

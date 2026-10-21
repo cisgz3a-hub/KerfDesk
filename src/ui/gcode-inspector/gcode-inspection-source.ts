@@ -3,6 +3,7 @@ import {
   machineBoundsForDevice,
   rotaryYLimitMm,
   type DeviceProfile,
+  type ControllerKind,
 } from '../../core/devices';
 import type { MotionLimits } from '../../core/gcode-time';
 import { devicePlannerBlocks } from '../../core/gcode-time/program-timing-options';
@@ -35,6 +36,8 @@ export type GcodeInspectionContext = Pick<
   // coordinates the program starts in (ADR-630 Amendment 1).
   'machineKind' | 'laserPowerControl' | 'initialPositionMm' | 'boundsFromStart'
 > & {
+  /** The connected parser for an external run, independent of the saved profile. */
+  readonly controllerKind?: ControllerKind;
   readonly timing?: GcodeInspectionTiming;
   /** The machine bed in program coordinates, only when the program runs in
    * that frame (an Absolute laser job). Studio outlines it (ADR-426). */
@@ -99,14 +102,17 @@ export function projectInspectionContext(
 export function deviceInspectionContext(
   device: DeviceProfile,
   machineKind: 'laser' | 'cnc',
+  controllerKind?: ControllerKind,
 ): GcodeInspectionContext {
   const timing = deviceInspectionTiming(device);
-  if (machineKind === 'cnc') return { machineKind: 'cnc', timing };
+  const controller = controllerKind === undefined ? {} : { controllerKind };
+  if (machineKind === 'cnc') return { machineKind: 'cnc', timing, ...controller };
   return {
     machineKind: 'laser',
-    laserPowerControl: laserPowerControlForDevice(device),
+    laserPowerControl: laserPowerControlForDevice({ ...device, ...controller }),
     timing,
     laser: deviceInspectionLaser(device),
+    ...controller,
   };
 }
 
