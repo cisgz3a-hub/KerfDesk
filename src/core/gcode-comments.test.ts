@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeGcodeCommentValue } from './gcode-comments';
+import { gcodeCommentLabel, sanitizeGcodeCommentValue } from './gcode-comments';
 
 describe('sanitizeGcodeCommentValue', () => {
   it('flattens line breaks and control characters without collapsing field spacing', () => {
@@ -41,5 +41,23 @@ describe('sanitizeGcodeCommentValue', () => {
     );
     expect(sanitizeGcodeCommentValue('!~?！～？🙂'.repeat(20), 12)).toBe('_________...');
     expect(sanitizeGcodeCommentValue('!~?！～？🙂', 0)).toBe('');
+  });
+});
+
+describe('gcodeCommentLabel', () => {
+  it('keeps ordinary layer ids and colours byte for byte', () => {
+    for (const label of ['L1', 'cut-red', '#ff0000', 'material-test-row-3', 'color:#808080']) {
+      expect(gcodeCommentLabel(label)).toBe(label);
+    }
+  });
+
+  it('turns a line-break payload into inert text on the same line', () => {
+    expect(gcodeCommentLabel('cut\nG1 X300 Y10 F100 S1000\r;')).toBe(
+      'cut G1 X300 Y10 F100 S1000 ;',
+    );
+  });
+
+  it('names a label that sanitises to nothing', () => {
+    expect(gcodeCommentLabel('\r\n')).toBe('(blank)');
   });
 });
