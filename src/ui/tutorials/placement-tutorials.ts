@@ -75,7 +75,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Burn the outline onto the wood first',
         examplePhase: 0,
         instruction:
-          'Leave the leather keychain off the wood. Choose Outline only. The outline burns with standard Line settings; if this wood needs a lighter mark, change them with Edit on the outline card in Job Review. Inspect Preview, complete Frame for this exact outline job, then choose Start and Start job in Job Review.',
+          'Leave the leather keychain off the wood. Choose Outline only, inspect Preview and complete Frame for this exact outline job. Choose Start; in Job Review, check the outline card’s settings and use Edit if this wood needs a lighter mark, then Start job.',
         focus: 'Run 1: burn the outline on empty wood',
         result:
           'The wood now carries a physical outline at the same known coordinates as the canvas rectangle.',
@@ -93,7 +93,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Burn the artwork onto the keychain',
         examplePhase: 2,
         instruction:
-          'Choose Artwork only, check the artwork’s settings for the leather in Job Review (Edit changes them), and inspect Preview with the jig outline excluded. Focus for the leather surface. With the blank in place, complete a new Frame for the exact artwork job, then Start, review the warnings, and Start job.',
+          'Choose Artwork only and inspect Preview with the jig outline excluded. Focus for the leather surface. With the blank in place, complete a new Frame for the exact artwork job, then choose Start. In Job Review, check the artwork’s settings for the leather and use Edit if needed, review the warnings, and Start job.',
         focus: 'Run 2: burn the artwork on the leather',
         result:
           'The artwork is engraved on the leather keychain; the locating outline remains on the wood underneath.',

@@ -28,8 +28,8 @@ The maintainer asked for a simpler Registration Jig editor:
   and that is no larger than the outline (artwork imported into an outline carries no jig link
   until it is copied; a bigger design that merely covers the jig is not the jig's). The jig is
   then closed over, until nothing changes: whole groups, including overlapping ones; the image
-  masks, path-text guides and trace sources its artwork uses; and any other artwork that shares
-  one of those, so no edit in the editor can reach artwork it hides. Before a jig exists nothing
+  masks, path-text guides, trace sources and relief-authoring links its artwork uses; and any other
+  artwork that shares or links to one of those, so no edit in the editor can reach artwork it hides. Before a jig exists nothing
   belongs to it, so a new jig opens with just its first outline.
 - **Everything else stays out of reach.** Other main-canvas artwork is never drawn, selected,
   moved, deleted, nudged, centred or copied in the editor; Ctrl+A and box selection skip it. It
@@ -56,9 +56,10 @@ The maintainer asked for a simpler Registration Jig editor:
 
 ### Consequences
 
-Both editor tabs say in one line that burns use standard settings, which Job Review shows and
-edits before Start. The Registration Jig tutorial points to Job Review's **Edit** for the outline
-and artwork settings, and adds the design by reopening **Edit jig** and importing it inside the
+Both editor tabs say in one line that each burn uses its operation's current settings, starting
+at the standard ones for new artwork, which Job Review shows and edits after Frame, before the job
+starts. The Registration Jig tutorial runs Preview and Frame first, then uses Job Review's
+**Edit** for the outline and artwork settings before **Start job**, and adds the design by reopening **Edit jig** and importing it inside the
 editor. Advanced outline settings (Cut Settings) are no longer reachable for the outline. The
 draft model, rebasing on save, output modes and compilation are unchanged. Main-canvas artwork
 that is not part of the jig still follows the project's output mode, as before.
@@ -74,6 +75,7 @@ cover a main-canvas selection not carrying in, Ctrl+A leaving hidden artwork out
 leaves main-canvas artwork exactly as it was, and the absence of every burn setting on both tabs.
 The registration-jig browser test opens the editor over selected main-canvas artwork, finds
 nothing to select and no burn settings, and saves an outline without touching that artwork.
-Scope tests also cover overlapping groups in either order, a mask shared with hidden artwork, and a
+Scope tests also cover overlapping groups in either order, a mask shared with hidden artwork, a
+retained relief authored from jig artwork, and a
 circular and a rotated outline. A workspace audit test checks that the editor has no outline
 settings and that Job Review's outline card edits the outline's air assist and saves it.

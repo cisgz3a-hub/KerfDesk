@@ -7,6 +7,7 @@ import {
   type SceneObject,
   type Vec2,
 } from '../../../core/scene';
+import { reliefAuthoringLinkIds } from '../../../core/relief/relief-authoring-link-ids';
 import { registrationJigArtworkInstances } from '../../../core/scene/registration-jig-artwork';
 import { sceneObjectCopyDependencyIds } from '../../state/scene-object-copy-dependencies';
 
@@ -34,12 +35,13 @@ export function jigBackgroundIds(scene: Scene): ReadonlySet<string> {
 }
 
 // Nothing the editor can change may reach hidden artwork, so grow the jig until
-// it is closed: whole groups (overlapping ones too), the masks, path guides and
-// trace sources its artwork uses, and every other artwork that shares them.
+// it is closed: whole groups (overlapping ones too), the masks, path guides,
+// trace sources and relief links its artwork uses, and every other artwork that
+// shares them or links to it.
 function closeOver(scene: Scene, members: Set<string>): void {
   const uses = scene.objects.map((object) => ({
     id: object.id,
-    dependencies: sceneObjectCopyDependencyIds(object),
+    dependencies: [...sceneObjectCopyDependencyIds(object), ...reliefLinks(object)],
   }));
   for (let grew = true; grew; ) {
     const before = members.size;
@@ -52,6 +54,12 @@ function closeOver(scene: Scene, members: Set<string>): void {
     }
     grew = members.size !== before;
   }
+}
+
+// A retained relief keeps links to the vectors it was authored from.
+function reliefLinks(object: SceneObject): readonly string[] {
+  if (object.kind !== 'relief' || !('reliefAuthoring' in object)) return [];
+  return object.reliefAuthoring === undefined ? [] : reliefAuthoringLinkIds(object.reliefAuthoring);
 }
 
 const SIZE_TOLERANCE_MM = 1;

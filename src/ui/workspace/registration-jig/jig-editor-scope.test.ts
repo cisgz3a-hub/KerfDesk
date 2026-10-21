@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  testAuthoringRelief,
+  testLinkedReliefDocument,
+} from '../../../__fixtures__/relief-authoring';
+import {
   createLayer,
   createProject,
   createRegistrationLayer,
@@ -114,6 +118,22 @@ describe('jig editor scope', () => {
       raster('on-jig', 130),
       raster('off-jig', 300),
       square('mask', 5, 5),
+      square('unrelated', 300, 5),
+    ]);
+    expect([...jigBackgroundIds(scene)]).toEqual(['unrelated']);
+  });
+
+  it('shows a hidden retained relief linked to jig artwork it was authored from', () => {
+    const relief = testAuthoringRelief();
+    const { scene } = project([
+      outline,
+      // testLinkedReliefDocument links its boundary to the object with this id.
+      square('boundary', 130, 110),
+      {
+        ...relief,
+        transform: { ...relief.transform, x: 300, y: 300 },
+        reliefAuthoring: testLinkedReliefDocument(relief),
+      },
       square('unrelated', 300, 5),
     ]);
     expect([...jigBackgroundIds(scene)]).toEqual(['unrelated']);

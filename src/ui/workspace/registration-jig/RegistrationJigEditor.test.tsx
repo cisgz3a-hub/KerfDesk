@@ -266,7 +266,7 @@ describe('Registration Jig dedicated editor', () => {
     press('a', { ctrlKey: true });
     for (const tab of ['Artwork', 'Jig layout']) {
       click(tab);
-      expect(container.textContent).toContain('Burns use standard settings');
+      expect(container.textContent).toContain('Burns use each operation’s current settings');
     }
     const text = container.textContent ?? '';
     for (const label of ['Power', 'Speed', 'Passes', 'Line / Fill', 'laser settings', 'Air assist'])

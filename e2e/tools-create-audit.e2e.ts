@@ -275,7 +275,7 @@ test('tools.registration-jig opens on a clean canvas without burn settings', asy
   await page.keyboard.press('Control+a');
   // Nothing from the main canvas is on the jig canvas, so Select all finds no artwork.
   await expect(editor).toContainText('Select artwork or an outline on the jig canvas');
-  await expect(editor).toContainText('Burns use standard settings');
+  await expect(editor).toContainText('Burns use each operation’s current settings');
   for (const label of ['Power', 'Speed', 'Line / Fill settings', 'Jig outline laser settings'])
     await expect(editor.getByText(label, { exact: false })).toHaveCount(0);
   await editor.getByRole('button', { name: 'Save to canvas', exact: true }).click();
