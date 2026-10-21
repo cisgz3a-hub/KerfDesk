@@ -25,6 +25,7 @@ Method: [METHOD.md](METHOD.md). Plan: [AREAS.md](AREAS.md).
 | 5 | 20 | Raster image processing | 902f1d0c0 | [20-raster.md](20-raster.md) | 4 | 0 | 0 | 0 | 4 | 6 |
 | 6 | 21 | LightBurn, RD and material-library importers | 902f1d0c0 | [21-lb-material-importers.md](21-lb-material-importers.md) | 12 | 0 | 1 | 3 | 8 | 7 |
 | 6 | 23 | Image editor (Image Studio) | 902f1d0c0 | [23-image-editor.md](23-image-editor.md) | 13 | 0 | 0 | 3 | 10 | 5 |
+| 6 | 24 | Docs vs code drift | 902f1d0c0 | [24-docs-drift.md](24-docs-drift.md) | 8 | 0 | 0 | 0 | 8 | 13 |
 | 6 | 22 | Website | 902f1d0c0 | [22-website.md](22-website.md) | 10 | 0 | 0 | 1 | 9 | 5 |
 | 4 | 14 | Vector importers | 2c8d988db | [14-vector-importers.md](14-vector-importers.md) | 9 | 0 | 0 | 1 | 8 | 7 |
 | 3 | 12 | Camera | 2c8d988db | [12-camera.md](12-camera.md) | 9 | 0 | 0 | 3 | 6 | 2 |
