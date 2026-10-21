@@ -34,6 +34,13 @@ export function isSettingAssignmentLine(line: string): boolean {
   return code.startsWith('$') && isAssignment(code);
 }
 
+/** A write that can change what `$I` reports: `$I=` sets its build string, and
+ * `$RST=` (FluidNC `$Settings/Restore=`) can restore it (ADR-648). */
+export function isBuildInfoWriteLine(line: string): boolean {
+  if (!isSettingAssignmentLine(line)) return false;
+  return /^\$(I|RST|Settings\/Restore)=/i.test(stripControllerComments(line));
+}
+
 function isAssignment(code: string): boolean {
   return code.includes('=') && !/^\$J=/i.test(code);
 }

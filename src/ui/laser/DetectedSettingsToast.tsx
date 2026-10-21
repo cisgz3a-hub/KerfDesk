@@ -30,6 +30,7 @@ export function DetectedSettingsToast(): null {
   const settingsRows = useLaserStore((s) => s.grblSettingsRows);
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const portInfo = useLaserStore((s) => s.serialPortInfo);
+  const connectionAttempt = useLaserStore((s) => s.connectionAttempt);
   const current = useStore((s) => s.project.device);
   const pushToast = useToastStore((s) => s.pushToast);
   const notifiedReadAt = useRef<number | null>(null);
@@ -41,10 +42,11 @@ export function DetectedSettingsToast(): null {
     const message = announceDetectedSettings(
       { patch: detected, current, controllerSettings, settingsRows },
       itemsReadByPort,
-      detectedSettingsPortKey(portInfo),
+      detectedSettingsPortKey(portInfo, connectionAttempt),
     );
     if (message !== null) pushToast(message, 'info');
   }, [
+    connectionAttempt,
     controllerSettings,
     current,
     detected,
@@ -57,8 +59,19 @@ export function DetectedSettingsToast(): null {
   return null;
 }
 
-export function detectedSettingsPortKey(port: SerialPortIdentity | null | undefined): string {
-  return `${port?.transport ?? 'serial'}:${port?.usbVendorId ?? '-'}:${port?.usbProductId ?? '-'}`;
+/** A USB serial port is known by its vendor and product. A network target or a
+ * port without USB IDs has no identity here, so each connection is its own
+ * and one controller never silences another's first read. */
+export function detectedSettingsPortKey(
+  port: SerialPortIdentity | null | undefined,
+  connectionAttempt: number | undefined,
+): string {
+  const vendor = port?.usbVendorId;
+  const product = port?.usbProductId;
+  if (port?.transport !== 'tcp' && vendor !== undefined && product !== undefined) {
+    return `usb:${vendor}:${product}`;
+  }
+  return `${port?.transport ?? 'serial'}:connection:${connectionAttempt ?? 0}`;
 }
 
 /** The toast for a completed read, or null when it found no profile update or

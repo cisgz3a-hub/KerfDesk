@@ -51,11 +51,16 @@ Abort that reset the board ended in a toast about a routine read.
      `$$` read. This covers writes from the Console, Machine Settings and macros, and a job whose
      program carries one.
    Nothing is retained when no `$$` read completed in the current session or one is in flight.
+   `$$` does not report the `$I` string, so a `$I=` or `$RST=` write stays outstanding for the
+   `$I` evidence until `$I` itself is read again. Until then an owned reset keeps the `$$` snapshot
+   but not the `$I` evidence, and its `$G`-only qualification reads `$I` too.
    The operator's Wake and probe recovery resets keep their full re-read, unchanged.
 4. **The toast speaks only for something new.** A completed read pushes the "Machine settings
    detected" toast only when it found a profile update or review item that the last read on the
-   same port (USB vendor and product, or network) did not report in this run of the app. A read
-   with nothing to report is silent. Its plain result is a log line, "Controller settings read
+   same port did not report in this run of the app. A USB serial port is known by its vendor and
+   product IDs, so a reconnect to it stays quiet. A network target, or a port without USB IDs, has
+   no identity the app can see, so each connection counts as its own port: one controller never
+   silences another's first read. A read with nothing to report is silent. Its plain result is a log line, "Controller settings read
    (N).", and Controller info's "Last read" time. Machine Setup's detected-settings lane is
    unchanged.
 

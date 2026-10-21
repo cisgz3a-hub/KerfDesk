@@ -3,7 +3,11 @@ import { idleCollector, settingsMapToRows } from '../../core/controllers/grbl';
 import { runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import { handleLine } from './laser-line-handler';
 import { makeLineHandlerHarness } from './laser-line-handler.test-support';
-import { noteControllerSettingWrite } from './laser-owned-reset-settings';
+import {
+  noteControllerSettingsRead,
+  noteControllerSettingWrite,
+  type OwnedResetSettingsRefs,
+} from './laser-owned-reset-settings';
 import { useStore } from './store';
 
 const ROWS = settingsMapToRows(
@@ -129,18 +133,44 @@ describe('settings across a reset KerfDesk sent (ADR-648, audit D-5)', () => {
 
     expect(get()).toMatchObject({ grblSettingsRows: [], lastSettingsReadAt: null });
   });
+
+  it('keeps the `$$` snapshot but not `$I` when a `$I=` write was only reconciled by `$$`', async () => {
+    const { refs, set, get, safeWrite } = readSettingsHarness();
+    // A `$I=` went out, then a `$$` read: `$$` does not report the `$I` string.
+    noteControllerSettingWrite(refs, '$I=shop laser\n');
+    noteControllerSettingsRead(refs);
+
+    const reset = runGrblDisconnectTransaction(set, refs, safeWrite, {
+      retainConnection: true,
+      action: 'stop',
+      cleanupLines: ['M5', 'M9'],
+    });
+    await flush();
+    handleLine(set, get, refs, safeWrite, "Grbl 1.1h ['$' for help]");
+    await reset;
+
+    expect(get()).toMatchObject({
+      grblSettingsRows: ROWS,
+      lastSettingsReadAt: 13,
+      // Left unread, so the `$G`-only qualification reads `$I` again.
+      controllerBuildInfoRawLines: [],
+      controllerBuildInfoObservation: null,
+    });
+  });
 });
 
 describe('noteControllerSettingWrite', () => {
   it('counts `$` assignments, in a single write or a whole program, and nothing else', () => {
-    const refs: { settingsWriteRevision?: number } = {};
+    const refs: OwnedResetSettingsRefs = {};
     for (const line of ['$$\n', '$G\n', '$J=G91 X1 F100\n', 'G10 L20 P1 X0\n', 'G1 X1 ($30=1)\n']) {
       noteControllerSettingWrite(refs, line);
     }
     expect(refs.settingsWriteRevision).toBeUndefined();
 
     noteControllerSettingWrite(refs, '$30=1000\n');
+    expect(refs.buildInfoWriteRevision).toBeUndefined();
     noteControllerSettingWrite(refs, 'G21\nG90\n$I=shop laser\nG1 X1\n');
-    expect(refs.settingsWriteRevision).toBe(2);
+    noteControllerSettingWrite(refs, '$RST=*\n');
+    expect(refs).toMatchObject({ settingsWriteRevision: 3, buildInfoWriteRevision: 2 });
   });
 });

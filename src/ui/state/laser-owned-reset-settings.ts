@@ -7,11 +7,15 @@
 // again, so the banner that closes an owned reset re-reads `$G` alone. Any
 // other banner, and any `$` assignment sent since the last `$$` read (`$N=`,
 // `$RST=`, `$I=`, a job line), still discards the snapshot and re-reads all.
+// `$$` does not report the `$I` string, so a `$I=` or `$RST=` write stays
+// outstanding for the `$I` evidence until `$I` itself is read again.
 
 import type { ControllerSettingsSnapshot, GrblSettingRow } from '../../core/controllers/grbl';
-import { isSettingAssignmentLine } from '../../core/controllers/grbl/eeprom-write-line';
+import {
+  isBuildInfoWriteLine,
+  isSettingAssignmentLine,
+} from '../../core/controllers/grbl/eeprom-write-line';
 import type { DeviceProfile } from '../../core/devices';
-import type { ControllerBuildInfoState } from './laser-controller-build-info';
 import type { LaserState } from './laser-store';
 
 export type OwnedResetSettingsRefs = {
@@ -19,7 +23,16 @@ export type OwnedResetSettingsRefs = {
   settingsWriteRevision?: number;
   /** settingsWriteRevision when the current `$$` snapshot was read. */
   settingsReadRevision?: number;
+  /** Counts the writes that can change what `$I` reports (`$I=`, `$RST=`). */
+  buildInfoWriteRevision?: number;
+  /** buildInfoWriteRevision when `$I` was last read. */
+  buildInfoReadRevision?: number;
 };
+
+type BuildInfoEvidence = Pick<
+  LaserState,
+  'controllerBuildInfo' | 'controllerBuildInfoRawLines' | 'controllerBuildInfoObservation'
+>;
 
 export type RetainedControllerSettings = {
   readonly connection: unknown;
@@ -28,19 +41,28 @@ export type RetainedControllerSettings = {
   readonly detectedSettings: Partial<DeviceProfile> | null;
   readonly observedAt: number;
   readonly lastSettingsReadAt: number;
-  readonly buildInfo: ControllerBuildInfoState | null;
+  readonly buildInfo: BuildInfoEvidence | null;
 };
 
 /** Any write, or a whole program: the streamer sends a program's `$` lines
  * alone (ADR-644), so once it starts any of them may have reached EEPROM. */
 export function noteControllerSettingWrite(refs: OwnedResetSettingsRefs, text: string): void {
-  if (text.includes('$') && text.split('\n').some(isSettingAssignmentLine)) {
+  if (!text.includes('$')) return;
+  const lines = text.split('\n');
+  if (lines.some(isSettingAssignmentLine)) {
     refs.settingsWriteRevision = (refs.settingsWriteRevision ?? 0) + 1;
+  }
+  if (lines.some(isBuildInfoWriteLine)) {
+    refs.buildInfoWriteRevision = (refs.buildInfoWriteRevision ?? 0) + 1;
   }
 }
 
 export function noteControllerSettingsRead(refs: OwnedResetSettingsRefs): void {
   refs.settingsReadRevision = refs.settingsWriteRevision ?? 0;
+}
+
+export function noteControllerBuildInfoRead(refs: OwnedResetSettingsRefs): void {
+  refs.buildInfoReadRevision = refs.buildInfoWriteRevision ?? 0;
 }
 
 type RetainRefs = OwnedResetSettingsRefs & {
@@ -66,7 +88,7 @@ export function retainableControllerSettings(
     detectedSettings: state.detectedSettings,
     observedAt: observation.observedAt,
     lastSettingsReadAt: readAt,
-    buildInfo: currentBuildInfo(state),
+    buildInfo: currentBuildInfo(state, refs),
   };
 }
 
@@ -79,8 +101,13 @@ function snapshotStillHolds(state: LaserState, refs: RetainRefs): boolean {
   );
 }
 
-function currentBuildInfo(state: LaserState): ControllerBuildInfoState | null {
-  if (state.controllerBuildInfoObservation?.sessionEpoch !== state.controllerSessionEpoch) {
+/** This session's `$I` evidence, unless a write since may have changed it; the
+ * `$G`-only re-read then reads `$I` again. */
+function currentBuildInfo(state: LaserState, refs: RetainRefs): BuildInfoEvidence | null {
+  if (
+    state.controllerBuildInfoObservation?.sessionEpoch !== state.controllerSessionEpoch ||
+    (refs.buildInfoReadRevision ?? 0) !== (refs.buildInfoWriteRevision ?? 0)
+  ) {
     return null;
   }
   return {

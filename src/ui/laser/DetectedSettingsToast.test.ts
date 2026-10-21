@@ -3,8 +3,8 @@ import { settingsMapToRows } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { announceDetectedSettings, detectedSettingsPortKey } from './DetectedSettingsToast';
 
-const PORT = detectedSettingsPortKey({ usbVendorId: 0x1a86, usbProductId: 0x7523 });
-const OTHER_PORT = detectedSettingsPortKey({ usbVendorId: 0x2341, usbProductId: 0x0043 });
+const PORT = detectedSettingsPortKey({ usbVendorId: 0x1a86, usbProductId: 0x7523 }, 1);
+const OTHER_PORT = detectedSettingsPortKey({ usbVendorId: 0x2341, usbProductId: 0x0043 }, 1);
 
 function read(
   overrides: {
@@ -55,5 +55,21 @@ describe('announceDetectedSettings (ADR-648, audit F-5)', () => {
     expect(announceDetectedSettings(read({ homingEnabled: true }), memory, OTHER_PORT)).not.toBe(
       null,
     );
+  });
+
+  it('keeps the same USB port across reconnects but never merges unidentified connections', () => {
+    const usb = { usbVendorId: 0x1a86, usbProductId: 0x7523 };
+    expect(detectedSettingsPortKey(usb, 1)).toBe(detectedSettingsPortKey(usb, 2));
+
+    const memory = new Map<string, ReadonlySet<string>>();
+    const firstHost = detectedSettingsPortKey({ transport: 'tcp' }, 3);
+    const secondHost = detectedSettingsPortKey({ transport: 'tcp' }, 4);
+    announceDetectedSettings(read({ homingEnabled: true }), memory, firstHost);
+
+    expect(secondHost).not.toBe(firstHost);
+    expect(announceDetectedSettings(read({ homingEnabled: true }), memory, secondHost)).not.toBe(
+      null,
+    );
+    expect(detectedSettingsPortKey(null, 5)).not.toBe(detectedSettingsPortKey(null, 6));
   });
 });
