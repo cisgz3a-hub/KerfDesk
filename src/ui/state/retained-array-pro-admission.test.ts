@@ -64,15 +64,45 @@ it('asks for Pro before Regenerate adds V-carve copies in Free, then regenerates
   setActiveEdition(FREE);
   const before = useStore.getState().project;
 
-  const result = useStore.getState().regenerateArrayLayout(layoutId(), grid(6));
+  const onCommitted = vi.fn();
+
+  const result = useStore
+    .getState()
+    .regenerateArrayLayout(layoutId(), grid(6), undefined, before, () => true, onCommitted);
 
   expect(result).toBe('The array is waiting for its authoring tool approval.');
   expect(requestPro).toHaveBeenCalledExactlyOnceWith('vcarve', expect.any(Function));
   expect(useStore.getState().project).toBe(before);
+  expect(onCommitted).not.toHaveBeenCalled();
 
   setActiveEdition(UNRESTRICTED_EDITION);
   onAllowed?.();
   expect(vcarveCopies()).toBe(6);
+  // The editor closes once the held regeneration lands.
+  expect(onCommitted).toHaveBeenCalledOnce();
+});
+
+it('never applies a held regeneration after its editor has closed', () => {
+  setActiveEdition(FREE);
+  let editorOpen = true;
+  const onCommitted = vi.fn();
+
+  useStore
+    .getState()
+    .regenerateArrayLayout(
+      layoutId(),
+      grid(6),
+      undefined,
+      undefined,
+      () => editorOpen,
+      onCommitted,
+    );
+  editorOpen = false;
+  setActiveEdition(UNRESTRICTED_EDITION);
+  onAllowed?.();
+
+  expect(vcarveCopies()).toBe(2);
+  expect(onCommitted).not.toHaveBeenCalled();
 });
 
 it('keeps re-spacing the existing copies free', () => {
