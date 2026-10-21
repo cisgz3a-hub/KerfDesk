@@ -303,11 +303,50 @@ test('a commercial baseline behind its licence window qualifies only when expect
   };
   const result = await verifyAsarIntegrity('fixture', archivePath, 1000, launch, {
     expectLicenceWindow: true,
+    licenceWindow: true,
   });
   assert.equal(result.verdict.refused, true);
   assert.deepEqual(readFileSync(archivePath), bytes);
   calls = 0;
   await assert.rejects(verifyAsarIntegrity('fixture', archivePath, 1000, launch), /SVG import/);
+  assert.equal(calls, 1);
+  assert.deepEqual(readFileSync(archivePath), bytes);
+});
+
+test('while the licence window is held off, the commercial baseline must open in Free', async (context) => {
+  // ADR-623 Amendment 3: the unlicensed baseline imports and saves in KerfDesk Free.
+  const { archivePath, bytes, baseline } = fixture(context);
+  const renderer = {
+    ...baseline.smokeResult.renderer,
+    licensing: {
+      kind: 'observed',
+      channel: 'commercial',
+      state: 'activation-required',
+      edition: 'free',
+      proEnabled: false,
+      updateState: 'unavailable',
+    },
+  };
+  const free = { ...baseline, smokeResult: { ...baseline.smokeResult, renderer } };
+  let calls = 0;
+  const launch = async () => {
+    calls += 1;
+    return calls === 1 ? free : { ...LAUNCH, stderr: DIAGNOSTIC };
+  };
+  const options = { expectLicenceWindow: true, licenceWindow: false };
+  const result = await verifyAsarIntegrity('fixture', archivePath, 1000, launch, options);
+  assert.equal(result.verdict.refused, true);
+  assert.deepEqual(readFileSync(archivePath), bytes);
+  calls = 0;
+  const gated = async () => {
+    calls += 1;
+    const window = { ...renderer, licenceWindow: true, imported: false, saved: false };
+    return { ...baseline, smokeResult: { ...baseline.smokeResult, renderer: window } };
+  };
+  await assert.rejects(
+    verifyAsarIntegrity('fixture', archivePath, 1000, gated, options),
+    /Free workspace/,
+  );
   assert.equal(calls, 1);
   assert.deepEqual(readFileSync(archivePath), bytes);
 });

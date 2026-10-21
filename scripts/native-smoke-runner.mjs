@@ -5,6 +5,14 @@ import { collectNativeSmokeProcess, nativeSmokeLaunchOptions } from './native-sm
 
 export { nativeSmokeLaunchOptions };
 
+/** What the evidence says the package was expected to open into. */
+function licensingExpectation(args) {
+  if (args.expectFreshSandbox === true) return 'fresh-sandbox';
+  if (args.expectLicenceWindow !== true) return 'observe';
+  // While ADR-623 Amendment 3 holds the window off, it opens in KerfDesk Free.
+  return args.licenceWindow === false ? 'commercial-unlicensed-free' : 'commercial-licence-window';
+}
+
 /** Keep every attempt separate, including failures beside an older successful attempt. */
 export async function runIsolatedNativeSmoke(args, validateResult, dependencies = {}) {
   const io = dependencies.io ?? filesystem;
@@ -23,12 +31,7 @@ export async function runIsolatedNativeSmoke(args, validateResult, dependencies 
       outcome: 'running',
       executable: resolve(args.executable),
       timeoutMs: args.timeoutMs,
-      licensingExpectation:
-        args.expectFreshSandbox === true
-          ? 'fresh-sandbox'
-          : args.expectLicenceWindow === true
-            ? 'commercial-licence-window'
-            : 'observe',
+      licensingExpectation: licensingExpectation(args),
       failure: null,
       validationFailure: null,
       evidenceErrors: [],

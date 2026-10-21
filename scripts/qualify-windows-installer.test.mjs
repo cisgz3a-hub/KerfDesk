@@ -814,3 +814,50 @@ test('the qualification licence reaches only the historical profile child, which
   // A seat still signing out is retried, and never recorded as released.
   assert.match(profile, /Retry device deactivation[\s\S]*still signing out/);
 });
+
+test(
+  'historical qualification reads the shared licence window setting exactly as the app does',
+  { skip: process.platform !== 'win32' },
+  async () => {
+    const { readFileSync } = await import('node:fs');
+    const { DESKTOP_LICENCE_WINDOW } = await import('../public/desktop-licence-window.mjs');
+    const parent = readFileSync(script, 'utf8');
+    // Run the parent's own lines that read the setting (ADR-623 Amendment 3).
+    const start = parent.indexOf('$licenceWindowSetting = ');
+    const end = parent.indexOf('\n', parent.indexOf('$licenceWindowOn = '));
+    assert.ok(start > 0 && end > start);
+    const command = `$PSScriptRoot = '${path.dirname(script).replaceAll("'", "''")}'
+${parent.slice(start, end)}
+$licenceWindowOn`;
+    const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', command], {
+      encoding: 'utf8',
+      timeout: 15_000,
+      windowsHide: true,
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), DESKTOP_LICENCE_WINDOW ? 'True' : 'False');
+  },
+);
+
+test('while the licence window is held off, every reopen must reach the Free workspace', async () => {
+  const { readFileSync } = await import('node:fs');
+  const parent = readFileSync(script, 'utf8');
+  const profile = readFileSync(
+    fileURLToPath(new URL('./installed-upgrade-profile.ps1', import.meta.url)),
+    'utf8',
+  );
+  // ADR-623 Amendment 3: the profile child is told, and gets no licence key.
+  assert.match(
+    parent,
+    /if \(-not \$licenceWindowOn\) \{ \$info\.ArgumentList\.Add\('-LicenceWindowHeldOff'\) \}/,
+  );
+  assert.match(
+    parent,
+    /if \(\$licenceWindowOn -and -not \[string\]::IsNullOrEmpty\(\$qualificationLicence\)\)/,
+  );
+  assert.match(profile, /\[switch\]\$LicenceWindowHeldOff/);
+  // A licence window that appears anyway fails before any key could be entered.
+  const refused = profile.indexOf('if ($LicenceWindowHeldOff) { throw');
+  assert.ok(refused > 0 && refused < profile.indexOf("Set-UpgradeValue 'Licence key'"));
+});

@@ -391,7 +391,8 @@ jobs:
         shell: pwsh
         run: |
           $unpacked = (Resolve-Path "release/commercial/$env:VERSION/win-unpacked").Path
-          # The unlicensed commercial baseline opens behind its licence window (ADR-623).
+          # The unlicensed commercial baseline opens behind its licence window (ADR-623),
+          # or in KerfDesk Free while Amendment 3 holds it off: the probe reads that setting.
           node scripts/verify-asar-integrity-enforced.mjs "$unpacked\KerfDesk.exe" "$unpacked\resources\app.asar" --expect-licence-window
           if ($LASTEXITCODE -ne 0) { throw 'A modified app.asar did not stop the app.' }
 

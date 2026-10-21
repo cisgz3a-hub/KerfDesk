@@ -62,6 +62,7 @@ jobs:
           PREVIOUS_RELEASE_VERSION: ${{ inputs.previous_version }}
           TARGET_RELEASE_VERSION: ${{ inputs.target_version }}
           # Opens a build behind the licence window, then releases the seat (ADR-623).
+          # Unused while ADR-623 Amendment 3 holds the window off: every build opens in Free.
           KERFDESK_NATIVE_QUALIFICATION_LICENCE: ${{ secrets.KERFDESK_NATIVE_QUALIFICATION_LICENCE }}
         shell: pwsh
         run: |

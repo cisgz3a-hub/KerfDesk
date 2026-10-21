@@ -6,6 +6,7 @@ import {
   clockRolledBack,
 } from './licensing-clock.js';
 import type { LicensingConfig } from './licensing-config.js';
+import { licenceWindowText } from './licence-window.js';
 import type { LicenceRecord } from './licensing-store.js';
 import {
   licenceCoversRelease,
@@ -16,9 +17,11 @@ import {
 } from './licensing-verification.js';
 
 /**
- * What the renderer learns about this device's licence (ADR-540). A commercial
- * desktop app opens its workspace only once `edition` is Pro (ADR-623); after
- * that, no state here gates a machine operation or the open workspace.
+ * What the renderer learns about this device's licence (ADR-540). With the
+ * licence window on, a commercial desktop app opens its workspace only once
+ * `edition` is Pro (ADR-623); while ADR-623 Amendment 3 holds it off, the app
+ * always opens and `edition` only unlocks the Pro tools. No state here gates a
+ * machine operation or an open workspace.
  */
 export type LicenceStatus = {
   readonly channel: 'free' | 'commercial';
@@ -132,14 +135,20 @@ export function evaluateLicence(
     return summary(
       'unavailable',
       null,
-      'This KerfDesk build is not configured for licences, so it cannot be activated. Install an official KerfDesk release.',
+      licenceWindowText(
+        'This KerfDesk build is not configured for licences, so it cannot be activated. Install an official KerfDesk release.',
+        'This KerfDesk build is not configured for licences, so Pro tools are locked. Everything else works. Install an official KerfDesk release to use Pro.',
+      ),
     );
   const release = verifyLicenceRelease(config.release, config.releaseKeys);
   if (release === null || release.version !== version)
     return summary(
       'unavailable',
       null,
-      'This build has no valid signed release identity, so it cannot be activated. Install an official KerfDesk release.',
+      licenceWindowText(
+        'This build has no valid signed release identity, so it cannot be activated. Install an official KerfDesk release.',
+        'This build has no valid signed release identity, so Pro tools are locked. Install an official KerfDesk release to use Pro.',
+      ),
     );
   if (saved.pendingDeactivation !== undefined)
     return summary(
@@ -160,13 +169,16 @@ export function evaluateLicence(
     return summary(
       'clock-error',
       claims,
-      `This computer’s clock is earlier than the last licence check, so your trial cannot be used. Turn on ${automaticTimeSetting(platform)}, then choose Refresh licence.`,
+      `This computer’s clock is earlier than the last licence check, so ${licenceWindowText('your trial cannot be used', 'the Pro tools in your trial are locked')}. Turn on ${automaticTimeSetting(platform)}, then choose Refresh licence.`,
     );
   if (claims.accessExpiresAt !== null && Math.max(now, saved.lastSeenAt) >= claims.accessExpiresAt)
     return summary(
       'trial-expired',
       claims,
-      'Your 30-day trial has ended. Buy a licence or enter your licence key to keep using KerfDesk.',
+      licenceWindowText(
+        'Your 30-day trial has ended. Buy a licence or enter your licence key to keep using KerfDesk.',
+        'Your 30-day Pro trial has ended. KerfDesk Free keeps working. Buy a licence or enter your key to use the Pro tools again.',
+      ),
     );
   return withCheckInDue(
     summary(...currentRights(claims, release, saved.lastSeenAt, now, platform)),
@@ -202,10 +214,10 @@ function currentRights(
 /** Only a trial has a check-in (ADR-592, ADR-623 Amendment 2). */
 function checkInMessage(claims: LicenceClaims, platform: string): string {
   const days = Math.round((CHECK_IN_LIMIT[claims.tier] ?? 0) / 86_400);
-  return `KerfDesk has not confirmed this trial with the licence service for more than ${days} days, so it needs a check before KerfDesk opens again. An open KerfDesk keeps its projects, Frame and Start. Connect to the internet and choose Refresh licence. If this computer’s clock is wrong, turn on ${automaticTimeSetting(platform)} first.`;
+  return `KerfDesk has not confirmed this trial with the licence service for more than ${days} days, ${licenceWindowText('so it needs a check before KerfDesk opens again. An open KerfDesk keeps its projects, Frame and Start.', 'so new Pro tools are paused. Your projects, Frame and Start keep working.')} Connect to the internet and choose Refresh licence. If this computer’s clock is wrong, turn on ${automaticTimeSetting(platform)} first.`;
 }
 
 function updatesExpiredMessage(claims: LicenceClaims): string {
   const until = claims.updatesUntil === null ? 'its update date' : date(claims.updatesUntil);
-  return `Your licence includes KerfDesk versions released until ${until}. This version is newer, so your licence cannot open it. Renew updates, or install a version your licence covers.`;
+  return `Your licence includes KerfDesk versions released until ${until}. This version is newer, so ${licenceWindowText('your licence cannot open it', 'Pro tools are locked here')}. Renew updates, or install a version your licence covers.`;
 }
