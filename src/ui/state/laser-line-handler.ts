@@ -436,8 +436,7 @@ function handleWelcomeLine(
   // F2): the controller is fully booted, so the ok cannot be swallowed and
   // cannot be orphaned by this banner.
   flushResetCleanup(refs, (line, action) => safeWrite(line, action, 'system'), 'reset-boundary');
-  const modalStateOnly = retainedSettings !== null;
-  scheduleControllerQualification(set, get, refs, nextSessionEpoch, { modalStateOnly });
+  scheduleControllerQualification(set, get, refs, nextSessionEpoch);
 }
 
 function controllerResetBoundaryPolicy(state: LaserState): {

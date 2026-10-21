@@ -49,7 +49,9 @@ export function isBuildInfoWriteLine(line: string): boolean {
  * The bracket form's value is what follows `]`, so `[13]` alone is a query. */
 function settingCommand(line: string): { readonly key: string; readonly hasValue: boolean } | null {
   if (!line.includes('$') && !line.includes('[')) return null;
-  const code = stripControllerComments(line).replace(/\s+/g, '');
+  // Stock GRBL also ignores `/` (block delete) as it reads a line, so a leading
+  // one does not hide `/$30=500`. FluidNC keys keep theirs (`$Settings/Erase`).
+  const code = stripControllerComments(line).replace(/\s+/g, '').replace(/^\/+/, '');
   const bracket = code.startsWith('[');
   if (!bracket && !code.startsWith('$')) return null;
   const end = code.indexOf(bracket ? ']' : '=');

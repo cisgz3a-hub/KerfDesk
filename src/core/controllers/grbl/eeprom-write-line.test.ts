@@ -59,6 +59,7 @@ describe('isStoredSettingWriteLine and isBuildInfoWriteLine', () => {
     '$RST = $',
     '$rst=#',
     '[RST]*',
+    '/ $I=shop laser',
     '[I]shop laser',
   ])('treats %s as a build-info write', (line) => {
     expect(isStoredSettingWriteLine(line)).toBe(true);
@@ -75,6 +76,8 @@ describe('isStoredSettingWriteLine and isBuildInfoWriteLine', () => {
     '[13]1',
     '[ 13 ]1',
     '[NVX]',
+    '/$30=500',
+    '//$130=400',
   ])('treats %s as a setting write that leaves `$I` alone', (line) => {
     expect(isStoredSettingWriteLine(line)).toBe(true);
     expect(isBuildInfoWriteLine(line)).toBe(false);
