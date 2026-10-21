@@ -35,7 +35,11 @@ live), so trials and paid licences keep working.
    services with the app, as in 1.0.20, rather than waiting for a mounted workspace to be let in
    (`servicesAlwaysAdmitted`): the camera bridge runs, and the file-open queue, remote access and
    serial port work as soon as the workspace is there. The renderer still acknowledges each
-   renderer's admission generation, so nothing in the main process changes shape.
+   renderer's admission generation, so nothing in the main process changes shape. Because the
+   workspace now mounts before the first licence status, while Pro is still locked for startup
+   (ADR-592), a project file handed over by the operating system at launch waits for that status
+   (`initialLicenceStatus()`, up to 10 seconds) before it opens, as autosave recovery already does,
+   so a licensed user's Pro project is never judged against the startup lock.
 4. **The licence-window code stays.** `DesktopLicenceGate`, the admission signals, the startup
    ordering, the keyring checks and their tests are unchanged. The tests that specify the window
    pin the setting to `true`; `EditionProvider.licence-window-off.test.tsx` and the main-process
