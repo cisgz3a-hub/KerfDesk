@@ -200,8 +200,9 @@ function joinPiecesAcrossGroups(
     list.forEach((index, position) => {
       const other = list[representatives[position] ?? position];
       const side = sides[index];
-      const match = other === undefined ? undefined : sides[other];
-      if (side === undefined || match === undefined || other === index) return;
+      if (other === undefined || other === index) return;
+      const match = sides[other];
+      if (side === undefined || match === undefined) return;
       if (owners[other]?.group === owners[index]?.group) return;
       sides[index] = { ...side, copyClass: match.copyClass };
     });
