@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   findRegistrationBoxes,
   IDENTITY_TRANSFORM,
@@ -194,6 +194,52 @@ describe('Registration Jig dedicated editor', () => {
     expect(container.textContent).toContain('1 selected');
     expect(confirmDialog()).toBeUndefined();
     expect(close).not.toHaveBeenCalled();
+  });
+  it.each(['X (mm)', 'Width (mm)'])('Escape in %s discards the typed value', (label) => {
+    savedJigWithArtwork();
+    render();
+    press('a', { ctrlKey: true });
+    const field = container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`);
+    if (field === null) throw new Error(`Missing ${label}`);
+    const shown = field.value;
+    act(() => field.focus());
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, '42');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => {
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Registration Jig editor');
+    expect(container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)?.value).toBe(shown);
+    expect(container.textContent).not.toContain('Unsaved changes');
+  });
+  it('Enter in a field applies the value and keeps focus on the editor', async () => {
+    // Laid out as in a browser, so the editor's focus recovery can pick a button.
+    const laidOut = vi
+      .spyOn(HTMLElement.prototype, 'offsetParent', 'get')
+      .mockReturnValue(document.body);
+    onTestFinished(() => laidOut.mockRestore());
+    savedJigWithArtwork();
+    render();
+    press('a', { ctrlKey: true });
+    const field = container.querySelector<HTMLInputElement>('[aria-label="X (mm)"]');
+    if (field === null) throw new Error('Missing selection field');
+    act(() => field.focus());
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, '42');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      field.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+      );
+    });
+    // The re-created field must not hand focus, and the Enter, to the first
+    // button in the editor (the tutorial).
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Registration Jig editor');
+    expect(container.querySelector<HTMLInputElement>('[aria-label="X (mm)"]')?.value).toBe('42');
+    expect(container.textContent).toContain('Unsaved changes');
   });
   it('closes without a new undo step when nothing changed', () => {
     savedJigWithArtwork();

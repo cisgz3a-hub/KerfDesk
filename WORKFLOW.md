@@ -2759,7 +2759,9 @@ authorization, Frame proof, controller command, or safety boundary.
    its first outline, on **Jig layout**; an existing jig opens on **Artwork**. Draft edits and
    Undo/Redo stay in the editor until **Save to canvas**, and the footer shows
    **Unsaved changes** while the draft differs. Escape in a field only leaves the
-   field; otherwise Escape first clears the selection.
+   field, and in a number field it drops the value typed there; Enter applies it.
+   Either way focus returns to the editor. Otherwise Escape first clears the
+   selection.
    Escape with nothing selected, or **Close without saving**, closes at once when
    nothing changed; otherwise it asks **Save jig changes?** with **Save to canvas**,
    **Discard changes** and **Keep editing**. Discarding leaves the main canvas unchanged.
