@@ -27,7 +27,16 @@ function indicesOf(lines: ReadonlyArray<string>, word: string): number[] {
 
 describe('03-P3-1: the Marlin keep-alive never repeats between lit moves', () => {
   it('holds a repeat under M4 until a laser-off move has left the beam dark', () => {
-    const source = ['M4 S0', 'M8', 'G1 F3600', ...burns(8), 'G0 X0.000 Y10.000 S0', 'G1 X60.000 S500', 'M9', ''].join('\n');
+    const source = [
+      'M4 S0',
+      'M8',
+      'G1 F3600',
+      ...burns(8),
+      'G0 X0.000 Y10.000 S0',
+      'G1 X60.000 S500',
+      'M9',
+      '',
+    ].join('\n');
     const lines = withAirKeepAlive(source, MARLIN_LIMITS).split('\n');
 
     expect(indicesOf(lines, 'M8')).toEqual([1, 12]);

@@ -123,7 +123,10 @@ describe('03-P2-2: Marlin holds air changes until a dark move', () => {
   });
 
   it('inline: an image after a cut arms after its first travel', () => {
-    const out = marlinStrategy.emit({ groups: [A(true), { ...image(), airAssist: false }] }, INLINE);
+    const out = marlinStrategy.emit(
+      { groups: [A(true), { ...image(), airAssist: false }] },
+      INLINE,
+    );
     expect(findMarlinLitPlannerDrains(out)).toEqual([]);
     expect(out).toMatch(/; image layer R[^]*?\nG0 [^\n]*S0\nM9\nM5 I\nM3 I S0\nG1 /);
   });

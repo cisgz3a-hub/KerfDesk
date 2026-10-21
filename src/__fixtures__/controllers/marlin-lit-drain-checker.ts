@@ -100,47 +100,61 @@ function drainsPlanner(ws: ReadonlyArray<Word>): boolean {
 /** Applies one line; returns whether it planned a burning move. */
 function executeMarlinLine(beam: MarlinBeam, ws: ReadonlyArray<Word>): boolean {
   const m = code(ws, 'M');
-  const s = code(ws, 'S');
-  const inlineFlag = ws.some((w) => w.letter === 'I');
-  if (m === 3 || m === 4) {
-    if (inlineFlag) beam.mode = m === 3 ? 'continuous' : 'dynamic';
-    if (beam.mode !== 'standard') beam.plannerPower = s ?? 0;
-    return false;
-  }
-  if (m === 5) {
-    beam.inline = 0;
-    if (inlineFlag) {
-      beam.mode = 'standard';
-      beam.plannerPower = 0;
-    }
-    return false;
-  }
-  if (m === 106) beam.fan = s ?? 255;
-  if (m === 107) beam.fan = 0;
-  if (m !== null) return false;
-  return executeMotion(beam, ws, s);
+  if (m === null) return executeMotion(beam, ws);
+  executeMCode(beam, m, ws);
+  return false;
 }
 
-function executeMotion(beam: MarlinBeam, ws: ReadonlyArray<Word>, s: number | null): boolean {
+function executeMCode(beam: MarlinBeam, m: number, ws: ReadonlyArray<Word>): void {
+  const s = code(ws, 'S');
+  const inlineFlag = ws.some((w) => w.letter === 'I');
+  if (m === 3 || m === 4) armSpindle(beam, m, s, inlineFlag);
+  else if (m === 5) stopSpindle(beam, inlineFlag);
+  else if (m === 106) beam.fan = s ?? 255;
+  else if (m === 107) beam.fan = 0;
+}
+
+function armSpindle(beam: MarlinBeam, m: 3 | 4, s: number | null, inlineFlag: boolean): void {
+  if (inlineFlag) beam.mode = m === 3 ? 'continuous' : 'dynamic';
+  if (beam.mode !== 'standard') beam.plannerPower = s ?? 0;
+}
+
+function stopSpindle(beam: MarlinBeam, inlineFlag: boolean): void {
+  beam.inline = 0;
+  if (!inlineFlag) return;
+  beam.mode = 'standard';
+  beam.plannerPower = 0;
+}
+
+function executeMotion(beam: MarlinBeam, ws: ReadonlyArray<Word>): boolean {
   const g = code(ws, 'G');
   if (g === 0 || g === 1 || g === 2 || g === 3) beam.motion = g;
-  const x = code(ws, 'X') ?? beam.x;
-  const y = code(ws, 'Y') ?? beam.y;
-  const axis = ws.some((w) => 'XYZ'.includes(w.letter));
-  const arc = (beam.motion === 2 || beam.motion === 3) && ws.some((w) => 'IJR'.includes(w.letter));
-  if (!axis && !arc) return false;
-  if (beam.mode !== 'standard') {
-    if (beam.motion === 0) beam.plannerPower = 0;
-    else if (s !== null) beam.plannerPower = s;
-  }
-  const planned = arc || x !== beam.x || y !== beam.y;
-  beam.x = x;
-  beam.y = y;
-  if (!planned) return false;
+  if (!ws.some((w) => 'XYZ'.includes(w.letter)) && !isArc(beam, ws)) return false;
+  setPlannerPower(beam, code(ws, 'S'));
+  if (!plansBlock(beam, ws)) return false;
   if (beam.mode !== 'standard') beam.inline = beam.plannerPower;
   else if (beam.motion === 0) beam.inline = 0;
-  const burning = beam.motion !== 0 && (beam.inline > 0 || beam.fan > 0);
-  return burning;
+  return beam.motion !== 0 && (beam.inline > 0 || beam.fan > 0);
+}
+
+function isArc(beam: MarlinBeam, ws: ReadonlyArray<Word>): boolean {
+  return (beam.motion === 2 || beam.motion === 3) && ws.some((w) => 'IJR'.includes(w.letter));
+}
+
+function setPlannerPower(beam: MarlinBeam, s: number | null): void {
+  if (beam.mode === 'standard') return;
+  if (beam.motion === 0) beam.plannerPower = 0;
+  else if (s !== null) beam.plannerPower = s;
+}
+
+/** Moves the head; whether Marlin plans a block for the move. */
+function plansBlock(beam: MarlinBeam, ws: ReadonlyArray<Word>): boolean {
+  const x = code(ws, 'X') ?? beam.x;
+  const y = code(ws, 'Y') ?? beam.y;
+  const planned = isArc(beam, ws) || x !== beam.x || y !== beam.y;
+  beam.x = x;
+  beam.y = y;
+  return planned;
 }
 
 function lastBurnIndex(lines: ReadonlyArray<string>): number {

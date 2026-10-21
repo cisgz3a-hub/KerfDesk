@@ -60,9 +60,7 @@ export function findM3LitPlannerDrains(gcode: string): string[] {
 /** The job's own ending: switching air off (`M9`) or the beam off (`M5`). */
 export function isJobEndWord(line: string): boolean {
   const ws = words(line);
-  return (
-    ws.length === 1 && ws[0]?.letter === 'M' && (ws[0].value === 5 || ws[0].value === 9)
-  );
+  return ws.length === 1 && ws[0]?.letter === 'M' && (ws[0].value === 5 || ws[0].value === 9);
 }
 
 function words(line: string): Word[] {
