@@ -75,7 +75,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Burn the outline onto the wood first',
         examplePhase: 0,
         instruction:
-          'Leave the leather keychain off the wood. Choose Outline only and set Jig outline laser settings for marking this wood. Inspect Preview, complete Frame for this exact outline job, then choose Start and Start job in Job Review.',
+          'Leave the leather keychain off the wood. Choose Outline only, inspect Preview and complete Frame for this exact outline job. Choose Start; in Job Review, check the outline card’s settings and use Edit if this wood needs a lighter mark, then Start job.',
         focus: 'Run 1: burn the outline on empty wood',
         result:
           'The wood now carries a physical outline at the same known coordinates as the canvas rectangle.',
@@ -84,7 +84,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Place the real keychain on the burned outline',
         examplePhase: 1,
         instruction:
-          'Place the leather blank inside the burned rectangle, lining up its outside edges and intended hole orientation. Keep the wood, canvas outline and work origin fixed. Add and select the design, choose Centre artwork in outline, then check clearance from the rounded edges and hole.',
+          'Place the leather blank inside the burned rectangle, lining up its outside edges and intended hole orientation. Keep the wood, canvas outline and work origin fixed. Click Edit jig, import or drop the design (or add text) inside the jig editor, select it, choose Centre artwork in outline, check clearance from the rounded edges and hole, then Save to canvas.',
         focus: 'Place the leather; keep the wood and origin fixed',
         result:
           'Known coordinates locate the artwork on the placed leather. The machine does not detect the keychain.',
@@ -93,7 +93,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Burn the artwork onto the keychain',
         examplePhase: 2,
         instruction:
-          'Choose Artwork only, check the artwork’s settings for the leather, and inspect Preview with the jig outline excluded. Focus for the leather surface. With the blank in place, complete a new Frame for the exact artwork job, then Start, review the warnings, and Start job.',
+          'Choose Artwork only and inspect Preview with the jig outline excluded. Focus for the leather surface. With the blank in place, complete a new Frame for the exact artwork job, then choose Start. In Job Review, check the artwork’s settings for the leather and use Edit if needed, review the warnings, and Start job.',
         focus: 'Run 2: burn the artwork on the leather',
         result:
           'The artwork is engraved on the leather keychain; the locating outline remains on the wood underneath.',
