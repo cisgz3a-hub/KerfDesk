@@ -41,31 +41,32 @@ function edition(pro = false) {
   return request;
 }
 
+// Two overlapping outlines per object, so Weld has geometry to merge within
+// each operation even when the objects use different operations.
 function vector(id: string, operationId: string, x: number, color: string): ImportedSvg {
+  const square = (left: number) => ({
+    color,
+    polylines: [
+      {
+        closed: true,
+        points: [
+          { x: left, y: 0 },
+          { x: left + 20, y: 0 },
+          { x: left + 20, y: 20 },
+          { x: left, y: 20 },
+          { x: left, y: 0 },
+        ],
+      },
+    ],
+  });
   return {
     kind: 'imported-svg',
     id,
     source: `${id}.svg`,
-    bounds: { minX: x, minY: 0, maxX: x + 20, maxY: 20 },
+    bounds: { minX: x, minY: 0, maxX: x + 25, maxY: 20 },
     transform: IDENTITY_TRANSFORM,
     operationIds: [operationId],
-    paths: [
-      {
-        color,
-        polylines: [
-          {
-            closed: true,
-            points: [
-              { x, y: 0 },
-              { x: x + 20, y: 0 },
-              { x: x + 20, y: 20 },
-              { x, y: 20 },
-              { x, y: 0 },
-            ],
-          },
-        ],
-      },
-    ],
+    paths: [square(x), square(x + 5)],
   };
 }
 

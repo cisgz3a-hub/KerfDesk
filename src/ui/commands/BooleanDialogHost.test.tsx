@@ -191,6 +191,44 @@ describe('Boolean review dialog', () => {
     expect(button('Apply').disabled).toBe(true);
     expect(useStore.getState().project).toBe(before);
   });
+  it('explains a weld that would merge nothing and prevents Apply', async () => {
+    const before = await open('weld', true);
+    expect(document.querySelector('[role="status"]')?.textContent).toContain('Nothing to weld');
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+    expect(button('Apply').disabled).toBe(true);
+    expect(useStore.getState().project).toBe(before);
+  });
+  it('warns before Weld removes a shape that lies inside another', async () => {
+    const frame = {
+      ...square('frame', 0),
+      transform: { ...IDENTITY_TRANSFORM, scaleX: 4, scaleY: 4 },
+    };
+    const inner = {
+      ...square('inner', 0),
+      name: 'JOHANN',
+      transform: { ...IDENTITY_TRANSFORM, x: 15, y: 15 },
+    };
+    useStore.setState({
+      project: {
+        ...createProject(),
+        scene: {
+          objects: [frame, inner],
+          layers: [createLayer({ id: 'cut', color: '#000000' })],
+          groups: [],
+        },
+      },
+      selectedObjectId: 'frame',
+      additionalSelectedIds: new Set(['inner']),
+    });
+    await act(async () => {
+      root.render(<BooleanDialogHost />);
+      openBooleanDialog('weld');
+    });
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe(
+      '“JOHANN” lies entirely inside another shape in the same operation, so Weld removes it.',
+    );
+    expect(button('Apply').disabled).toBe(false);
+  });
   it('invalidates a changed selection without applying to new operands', async () => {
     const before = await open();
     await act(async () => useStore.setState({ additionalSelectedIds: new Set() }));
