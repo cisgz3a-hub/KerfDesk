@@ -23,7 +23,12 @@ import {
   KERFDESK_WORKSPACE_APP_HTML as KERFDESK_WORKSPACE_UI_HTML,
   KERFDESK_WORKSPACE_APP_URI as KERFDESK_WORKSPACE_UI_URI,
 } from './workspace-app-ui.js';
-import { boundedRecipeToolResult, structuredToolResult, toolResultBytes } from './tool-result.js';
+import {
+  boundedRecipeToolResult,
+  boundedWorkspaceToolResult,
+  structuredToolResult,
+  toolResultBytes,
+} from './tool-result.js';
 
 export type KerfDeskMcpToolMetadata = Partial<Record<KerfDeskMcpCommand, Record<string, unknown>>>;
 
@@ -52,7 +57,9 @@ function toolSuccess(command: KerfDeskMcpCommand, raw: Record<string, unknown>):
   const result =
     command === 'list_material_recipes' && 'recipes' in output.data
       ? boundedRecipeToolResult(output.data)
-      : structuredToolResult(output.data);
+      : command === 'get_workspace' && 'artwork' in output.data
+        ? boundedWorkspaceToolResult(output.data)
+        : structuredToolResult(output.data);
   return boundedResult(result);
 }
 

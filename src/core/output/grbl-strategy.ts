@@ -27,6 +27,7 @@ import { emitRasterGroupWithEnd } from '../raster/emit-raster';
 import { assertNever } from '../scene';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { formatGcodePowerS } from '../gcode/decimal-word';
+import { gcodeCommentLabel } from '../gcode-comments';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 import { bridgedAirGapIndices } from './air-assist-hold';
 import { withAirKeepAlive } from './air-keep-alive';
@@ -48,12 +49,12 @@ import {
 import {
   createLaserOutputCursor,
   emittedHead,
+  heldLinesAtJobEnd,
   heldLinesBeforeBurn,
   laserOffMoveLines,
   noteBurn,
   noteLaserOffMove,
   noteRasterGroupEnd,
-  releaseHeldLines,
   takeHeldLines,
   transitionLinesNow,
   type EmittedHead,
@@ -281,7 +282,7 @@ function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
-    `; layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}${overcutComment(group.finalPassOvercutMm)}${leadComment(group.laserLeads)}${tabSpanComment(group.tabSpanPowerPercent)}`,
+    `; layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}${overcutComment(group.finalPassOvercutMm)}${leadComment(group.laserLeads)}${tabSpanComment(group.tabSpanPowerPercent)}`,
   );
   pushOperationProvenanceComment(chunks, group);
   const segmentContext = { ...context, s, feed, entryRunwayMm: group.entryRunwayMm };
@@ -308,7 +309,7 @@ function emitOffsetFillGroup(group: FillGroup, context: GroupEmissionContext): s
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
-    `; offset fill layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}`,
+    `; offset fill layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}`,
   );
   pushOperationProvenanceComment(chunks, group);
   const segmentContext = { ...context, s, feed, entryRunwayMm: group.entryRunwayMm };
@@ -330,12 +331,14 @@ function emitOffsetFillGroup(group: FillGroup, context: GroupEmissionContext): s
 // A raster group writes its own opening (`M5`, arm) and closing `M5`. While a
 // preceding M3 burn may still be lit, the opening and the held air change
 // follow the group's first laser-off travel, and an M3 group that ends on a
-// burn leaves its closing `M5` for the next laser-off move (OR-1).
+// burn leaves its closing `M5` for the next laser-off move (OR-1). On Marlin
+// an M4 group does too (ADR-398 Amendment 2).
 function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext): string {
   const { device, dialect, cursor } = context;
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const operationComment = operationProvenanceComment(group);
-  const deferEntry = cursor.litAtStop;
+  const handedOver = cursor.litAtStop ? takeHeldLines(cursor) : null;
+  const laserModeCommand = laserModeWord(dialect.rasterPowerMode);
   const emission = emitRasterGroupWithEnd({
     laserPowerScaleVersion: context.laserPowerScaleVersion,
     sValues: group.sValues,
@@ -356,7 +359,7 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
           controlledLaserOffTravelFeedMmPerMin: device.controlledLaserOffTravelFeedMmPerMin,
         }),
     ...(group.bidirectional !== undefined ? { bidirectional: group.bidirectional } : {}),
-    laserModeCommand: laserModeWord(dialect.rasterPowerMode),
+    laserModeCommand,
     modalFeedrate: dialect.modalFeedrate,
     emitSOnEveryBurnMove: dialect.emitSOnEveryBurnMove,
     compactMotionWords: dialect.compactMotionWords,
@@ -367,10 +370,11 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
     color: group.color,
     powerPercent: group.power,
     ...(operationComment === undefined ? {} : { effectiveOperationComment: operationComment }),
-    ...(deferEntry ? { deferredEntry: { entryLines: takeHeldLines(cursor) } } : {}),
+    ...(handedOver === null ? {} : { deferredEntry: { entryLines: handedOver } }),
     deferClosingM5WhenLit: true,
+    stopKeepsPower: cursor.stopKeepsPower,
   });
-  noteRasterGroupEnd(cursor, emission);
+  noteRasterGroupEnd(cursor, emission, handedOver ?? [], laserModeCommand);
   return emission.gcode;
 }
 
@@ -389,7 +393,7 @@ function emitAnyGroup(group: Group, context: GroupEmissionContext): string {
       // CNC jobs are emitted by cncGrblStrategy; emit-gcode routes by the
       // project's machine kind. A cnc group reaching the laser strategy is a
       // pipeline bug — emit a visible marker instead of laser motion.
-      return `; cnc group ${group.layerId} skipped by laser strategy${LINE_END}`;
+      return `; cnc group ${gcodeCommentLabel(group.layerId)} skipped by laser strategy${LINE_END}`;
     default:
       return assertNever(group, 'Group');
   }
@@ -454,7 +458,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
   parts.push(preamble(dialect, arcMovesEnabled && jobWritesArcMoves(job)));
   let mode: 'M3' | 'M4' | 'off' = laserModeWord(dialect.cutPowerMode);
   let coolant: CoolantMode = 'off';
-  const cursor = createLaserOutputCursor(mode);
+  const cursor = createLaserOutputCursor(mode, options.stopKeepsPower === true);
   const plan = coolantPlan(job, device);
   const entryBounds =
     job.contourEntryBounds === undefined
@@ -482,13 +486,15 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
     );
     if (group.kind === 'raster') mode = 'off'; // raster ends in M5, written or held
   }
-  // Job end: held lines, air off and M5 follow the last burn, and the park
-  // runs after them. Under M3 that stops the head with the beam still lit:
-  // no laser-off move is left to take the drain before the laser is switched
-  // off. The stop is inherent to constant power and is deliberately left as is
-  // (OR-1).
-  parts.push(joinedLines(releaseHeldLines(cursor)));
-  parts.push(joinedLines(coolantTransitionLines(coolant, 'off')));
+  // Job end: air off and M5 follow the last burn, and the park runs after
+  // them. Under M3 that stops the head with the beam still lit: no laser-off
+  // move is left to take the drain before the laser is switched off. The stop
+  // is inherent to constant power and is deliberately left as is (OR-1). Held
+  // air changes are for groups that burned nothing and are dropped rather
+  // than drained lit (ADR-398 Amendment 1); the air off follows what was
+  // actually written.
+  parts.push(joinedLines(heldLinesAtJobEnd(cursor)));
+  parts.push(joinedLines(coolantTransitionLines(cursor.airInEffect, 'off')));
   // A raster group last in the job already issued its trailing M5, so the
   // postamble must not emit a redundant second one (mode === 'off').
   parts.push(postamble(mode === 'off', device, dialect, options.finishPosition));
@@ -499,6 +505,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
     ? withAirKeepAlive(program, {
         maxFeedMmPerMin: device.maxFeed,
         accelMmPerSec2: device.accelMmPerSec2,
+        stopKeepsPower: options.stopKeepsPower === true,
       })
     : program;
 }

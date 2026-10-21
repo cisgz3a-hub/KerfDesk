@@ -106,6 +106,11 @@ jobs:
       - name: Check GitHub Actions pins
         run: pnpm check:action-pins
 
+      # Every secret is read only by a job that names the environment holding
+      # it, so no branch workflow needs a repository secret (ADR-651).
+      - name: Check workflow secret scopes
+        run: pnpm check:secret-scopes
+
       - name: Check dependency licences
         run: pnpm license-check
 
