@@ -60,7 +60,7 @@ export function useSettingsEditGlow(target: SettingsEditGlowTarget): {
     };
     // A focused control that re-renders away takes focus with it and sends
     // no blur, so a press anywhere outside the editor also ends the edit...
-    const pressOutside = (event: PointerEvent): void => {
+    const pressOutside = (event: Event): void => {
       if (!(event.target instanceof Node) || !editor.contains(event.target)) end();
     };
     // ...and so does focus falling back to the page once a click or key has
