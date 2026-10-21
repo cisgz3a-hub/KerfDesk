@@ -22,6 +22,7 @@ Method: [METHOD.md](METHOD.md). Plan: [AREAS.md](AREAS.md).
 | 5 | 17 | Controller changes since 2026-10-20 | 902f1d0c0 | [17-controllers-delta.md](17-controllers-delta.md) | 3 | 0 | 0 | 0 | 3 | 4 |
 | 5 | 18 | Preflight, recovery, time estimate | 902f1d0c0 | [18-preflight-recovery.md](18-preflight-recovery.md) | 4 | 0 | 0 | 1 | 3 | 13 |
 | 5 | 19 | Platform adapters (web) | 902f1d0c0 | [19-platform-web.md](19-platform-web.md) | 4 | 0 | 0 | 1 | 3 | 2 |
+| 5 | 20 | Raster image processing | 902f1d0c0 | [20-raster.md](20-raster.md) | 4 | 0 | 0 | 0 | 4 | 6 |
 | 4 | 14 | Vector importers | 2c8d988db | [14-vector-importers.md](14-vector-importers.md) | 9 | 0 | 0 | 1 | 8 | 7 |
 | 3 | 12 | Camera | 2c8d988db | [12-camera.md](12-camera.md) | 9 | 0 | 0 | 3 | 6 | 2 |
 
