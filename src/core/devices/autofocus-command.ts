@@ -25,6 +25,10 @@ export const MAX_AUTOFOCUS_COMMAND_LENGTH = 100;
 const ACCESSORY_M_CODES: ReadonlySet<number> = new Set([
   7, 8, 9, 10, 11, 62, 63, 64, 65, 66, 67, 68, 106, 107,
 ]);
+// Override switches (M49-M53, M56) and modal-state save/restore (M70-M73),
+// which in LinuxCNC-style dialects can restore a spindle state, change how
+// later jobs run; a focus routine needs neither.
+const MODAL_M_CODES: ReadonlySet<number> = new Set([49, 50, 51, 52, 53, 56, 70, 71, 72, 73]);
 const PROBE_G_CODES: ReadonlySet<number> = new Set([38.2, 38.3, 38.4, 38.5]);
 const BEAM_M_CODES: ReadonlySet<number> = new Set([3, 4, 5]);
 // Parameter words a vendor M-code may carry. Axis, feed, tool and extruder
@@ -125,7 +129,11 @@ function vendorMCodeIssue(code: number, words: ReadonlyArray<Word>): string | nu
   if (code < 0) return ACCEPTED_FORMS;
   const whole = Math.trunc(code);
   if (BEAM_M_CODES.has(whole) || ACCESSORY_M_CODES.has(whole)) return BEAM_REASON;
-  if (RESERVED_M_CODES.has(whole) || STATE_CHANGING_M_CODES.has(whole)) {
+  if (
+    RESERVED_M_CODES.has(whole) ||
+    STATE_CHANGING_M_CODES.has(whole) ||
+    MODAL_M_CODES.has(whole)
+  ) {
     return `M${whole} is a motion, program, probe, reset or machine-settings code, not a focus command.`;
   }
   return words.slice(1).every((word) => VENDOR_PARAMETER_LETTERS.has(word.letter))

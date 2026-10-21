@@ -1,5 +1,6 @@
 import type { EmbeddedFont } from '../../core/scene';
-import { MAX_EMBEDDED_FONT_BYTES, MAX_EMBEDDED_FONTS } from '../../core/text';
+import { MAX_EMBEDDED_FONT_BYTES } from '../../core/text';
+import { MAX_EMBEDDED_FONTS } from '../../core/text/embedded-font-set';
 import { isObject } from './project-shape-primitives';
 
 export { MAX_EMBEDDED_FONTS };

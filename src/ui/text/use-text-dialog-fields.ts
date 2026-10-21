@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import {
   DEFAULT_TEXT_COLOR,
   DEFAULT_FONT_KEY,
-  embeddedFontChoice,
   encodeEmbeddedFont,
   FONT_REGISTRY,
   DEFAULT_TEXT_ALIGNMENT,
@@ -23,6 +22,7 @@ import type {
 import type { PathTextAcrossAlign, PathTextAlongAlign } from '../../core/scene/scene-object';
 import { variableTemplateToSource } from '../../core/variables';
 import type { TextDialogState } from '../state/ui-store';
+import { embeddedFontChoice } from '../../core/text/embedded-font-set';
 import {
   initialTextBend,
   initialTextLetterSpacing,

@@ -29,7 +29,7 @@ import {
   EMBEDDED_FONT_LIMIT_REASON,
   MAX_EMBEDDED_FONTS,
   withReferencedEmbeddedFonts,
-} from '../../core/text';
+} from '../../core/text/embedded-font-set';
 import { saveUndoStepName } from './undo-step-names';
 import type { DesignApplyRecord } from './design-apply-record';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';

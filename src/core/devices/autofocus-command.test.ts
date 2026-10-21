@@ -36,6 +36,7 @@ describe('autofocusCommandIssue', () => {
     ['$Sta/SSID=x', /cannot write controller settings/],
     ['M500', /not a focus command/],
     ['M84', /not a focus command/],
+    ['M72', /not a focus command/],
     ['$H', /accepts one focus command/],
     ['$X', /accepts one focus command/],
     ['$SD/Run=job.nc', /cannot write controller settings/],
