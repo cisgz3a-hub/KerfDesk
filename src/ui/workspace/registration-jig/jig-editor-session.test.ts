@@ -168,7 +168,10 @@ describe('registration jig editor session', () => {
   });
 
   it('reopens a saved jig with its own artwork and leaves the rest in the background', () => {
-    const saved = saveFirstJig();
+    saveFirstJig();
+    // The main canvas's selection (which also scopes Selected artwork only output).
+    useStore.getState().selectObject('disabled-art');
+    const saved = useStore.getState();
     const session = createJigEditorSession(saved);
 
     expect([...session.background]).toEqual(['disabled-art']);
@@ -181,6 +184,9 @@ describe('registration jig editor session', () => {
     expect(resaved.project.scene.objects.find((object) => object.id === 'disabled-art')).toBe(
       saved.project.scene.objects.find((object) => object.id === 'disabled-art'),
     );
+    // The editor's own selection stays in the editor; the main selection comes back.
+    expect(resaved.selectedObjectId).toBe('disabled-art');
+    expect(resaved.additionalSelectedIds.size).toBe(0);
   });
 
   it('saves the first layout as Outline only with one undo entry and restores artwork intent', () => {

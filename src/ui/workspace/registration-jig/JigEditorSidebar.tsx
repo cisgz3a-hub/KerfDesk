@@ -89,7 +89,8 @@ function JigLayoutSection(props: {
       {locked && <JigOutlineLock onUnlock={() => setSession(unlockJigOutlines)} />}
       <RegistrationJigOutlineControls
         key={layoutKey}
-        scene={project.scene}
+        // The whole draft, so the layout's capacity check counts hidden artwork too.
+        scene={editor.session.draft.project.scene}
         onPendingChange={editor.setPendingLayout}
         onReplace={editor.onReplaceLayout}
         onRemove={editor.onRemoveLayout}

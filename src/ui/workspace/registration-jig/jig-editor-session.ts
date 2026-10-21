@@ -220,10 +220,14 @@ export function commitJigEditorSession(
   }
   const project = lockOutlines(draft.project);
   // Publish one edit, never the editor's intermediate history or machine state.
+  // The editor never sees the main canvas's selection (ADR-652), so that selection,
+  // which also scopes Selected artwork only output, comes back as it was.
+  const live = new Set(project.scene.objects.map((object) => object.id));
+  const selected = [...selectedJigIds(state)].filter((id) => live.has(id));
   const change: Partial<AppState> = {
     project,
-    selectedObjectId: draft.selectedObjectId,
-    additionalSelectedIds: draft.additionalSelectedIds,
+    selectedObjectId: selected[0] ?? null,
+    additionalSelectedIds: new Set(selected.slice(1)),
     registrationArtworkOutputSnapshot: project.scene.layers.some(
       (layer) => layer.id === REGISTRATION_LAYER_ID,
     )

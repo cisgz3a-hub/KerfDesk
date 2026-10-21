@@ -1,6 +1,6 @@
 import {
+  applyTransform,
   findRegistrationBoxes,
-  transformedBBox,
   type AABB,
   type Project,
   type Scene,
@@ -66,20 +66,31 @@ const SIZE_TOLERANCE_MM = 1;
 
 // Centred inside the outline's own rectangle or ellipse, and no larger than the
 // outline: a bigger design that merely covers the jig is main-canvas artwork.
+// Both are measured in the outline's own frame, so a rotated outline is not
+// mistaken for its larger bounding box.
 function sitsOnOutline(object: SceneObject, outline: SceneObject): boolean {
-  const bounds = transformedBBox(object);
-  const limit = transformedBBox(outline);
+  const b = object.bounds;
+  const corners = [
+    { x: b.minX, y: b.minY },
+    { x: b.maxX, y: b.minY },
+    { x: b.maxX, y: b.maxY },
+    { x: b.minX, y: b.maxY },
+  ].flatMap((corner) => toLocal(applyTransform(corner, object.transform), outline) ?? []);
+  if (corners.length < 4) return false;
+  const xs = corners.map((corner) => corner.x);
+  const ys = corners.map((corner) => corner.y);
+  const local = outline.bounds;
+  const sx = Math.abs(outline.transform.scaleX);
+  const sy = Math.abs(outline.transform.scaleY);
   if (
-    bounds.maxX - bounds.minX > limit.maxX - limit.minX + SIZE_TOLERANCE_MM ||
-    bounds.maxY - bounds.minY > limit.maxY - limit.minY + SIZE_TOLERANCE_MM
+    (Math.max(...xs) - Math.min(...xs)) * sx > (local.maxX - local.minX) * sx + SIZE_TOLERANCE_MM ||
+    (Math.max(...ys) - Math.min(...ys)) * sy > (local.maxY - local.minY) * sy + SIZE_TOLERANCE_MM
   )
     return false;
-  const centre = toLocal(
-    { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 },
-    outline,
-  );
-  if (centre === null) return false;
-  const local = outline.bounds;
+  const centre = {
+    x: (Math.max(...xs) + Math.min(...xs)) / 2,
+    y: (Math.max(...ys) + Math.min(...ys)) / 2,
+  };
   if (outline.kind === 'shape' && outline.spec.kind === 'ellipse') {
     const rx = (local.maxX - local.minX) / 2;
     const ry = (local.maxY - local.minY) / 2;

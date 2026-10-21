@@ -157,6 +157,26 @@ describe('jig editor scope', () => {
     expect([...jigBackgroundIds(rotated.scene)]).toEqual(['beside']);
   });
 
+  it('measures artwork size in a rotated outline’s own frame', () => {
+    // An 80 x 40 outline turned 45 degrees: its bounding box is about 85 x 85 mm.
+    const tilted = {
+      ...outline,
+      transform: { ...outline.transform, x: 200, y: 200, rotationDeg: 45 },
+    };
+    const centre = { x: 200 + 20 * Math.SQRT1_2, y: 200 + 60 * Math.SQRT1_2 };
+    const sized = (id: string, size: number): SceneObject => ({
+      ...createRectangle({
+        id,
+        color: '#0000ff',
+        spec: { widthMm: size, heightMm: size, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: centre.x - size / 2, y: centre.y - size / 2 },
+      }),
+      operationIds: ['art'],
+    });
+    const { scene } = project([tilted, sized('small', 10), sized('big', 80)]);
+    expect([...jigBackgroundIds(scene)]).toEqual(['big']);
+  });
+
   it('keeps a group whole when one member belongs to the jig', () => {
     const { scene } = project(
       [outline, square('inside', 130, 110), square('mate', 5, 5), square('alone', 300, 5)],
