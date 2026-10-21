@@ -45,16 +45,17 @@ export function isBuildInfoWriteLine(line: string): boolean {
 
 /** A `$key=value` command, or FluidNC's `[key]value` form of the same
  * (fluidnc-line-limit.ts). The firmware drops whitespace before it parses a
- * line, so `$I =x`, `$ J = …` and `[ 13 ]1` are read like their compact forms. */
+ * line, so `$I =x`, `$ J = …` and `[ 13 ]1` are read like their compact forms.
+ * The bracket form's value is what follows `]`, so `[13]` alone is a query. */
 function settingCommand(line: string): { readonly key: string; readonly hasValue: boolean } | null {
   if (!line.includes('$') && !line.includes('[')) return null;
   const code = stripControllerComments(line).replace(/\s+/g, '');
-  const separator = code.startsWith('$') ? '=' : code.startsWith('[') ? ']' : null;
-  if (separator === null) return null;
-  const end = code.indexOf(separator);
+  const bracket = code.startsWith('[');
+  if (!bracket && !code.startsWith('$')) return null;
+  const end = code.indexOf(bracket ? ']' : '=');
   return {
     key: code.slice(1, end < 0 ? undefined : end),
-    hasValue: end >= 0,
+    hasValue: end >= 0 && (!bracket || end < code.length - 1),
   };
 }
 

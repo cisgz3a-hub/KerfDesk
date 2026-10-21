@@ -91,6 +91,8 @@ describe('isStoredSettingWriteLine and isBuildInfoWriteLine', () => {
     'G10 L20 P1 X0',
     '($I=x) G0 X1',
     '$NVXY',
+    '[13]',
+    '[ 13 ] ',
   ])('does not treat %s as a setting write', (line) => {
     expect(isStoredSettingWriteLine(line)).toBe(false);
     expect(isBuildInfoWriteLine(line)).toBe(false);
