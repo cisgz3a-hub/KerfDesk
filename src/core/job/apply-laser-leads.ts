@@ -242,19 +242,22 @@ function leadAttempt(
   const plan = leadPlan(segment, group, key, world);
   if (plan === null) return null;
   const { spec, shape } = plan;
-  const finalPass = finalPassLeadOut(segment, group, spec.leadOut, plan);
+  const planned = finalPassLeadOut(segment, group, spec.leadOut, plan);
   // With one pass and an overcut the final pass is the only one: it goes out
   // as chords, so its lead-in is fitted as chords, and the ordinary lead-out
   // never burns, so it is not fitted and cannot block.
-  const ordinaryOutBurns = group.passes > 1 || finalPass === null;
+  const ordinaryOutBurns = group.passes > 1 || planned === null;
   const context = ordinaryOutBurns ? plan.context : asChords(plan.context);
   const leadIn = spec.leadIn ? fitLead('in', plan.startJoin, shape, context) : null;
   const fitted =
     spec.leadOut && ordinaryOutBurns ? fitLead('out', plan.endJoin, shape, context) : null;
   // A lead-out back along the lead-in would burn it twice: the contour is
-  // started elsewhere instead (leadSegment), where the two part.
-  const leadOut =
-    fitted !== null && leadIn !== null && retracesLeadIn(fitted, leadIn) ? null : fitted;
+  // started elsewhere instead (leadSegment), where the two part. So would the
+  // final pass's, when its overcut runs a whole lap back to the seam.
+  const retraces = (out: LeadFit | null): boolean =>
+    out !== null && leadIn !== null && retracesLeadIn(out, leadIn, context.clearanceMm);
+  const leadOut = retraces(fitted) ? null : fitted;
+  const finalPass = planned !== null && retraces(planned.fit) ? { ...planned, fit: null } : planned;
   return {
     segment,
     ringId: plan.ringId,
@@ -405,8 +408,12 @@ function finalPassLeadOut(
   };
 }
 
+// A pass that goes out as chords: its leads are fitted as chords, and the
+// contour they must not cross is the chords it runs, not the arcs.
 function asChords(context: LeadFitContext): LeadFitContext {
-  return context.arcsEmitted ? { ...context, arcsEmitted: false } : context;
+  return context.arcsEmitted || context.ownBurn !== context.ownRing
+    ? { ...context, arcsEmitted: false, ownBurn: context.ownRing }
+    : context;
 }
 
 function leadedSegment(
@@ -469,20 +476,22 @@ function fitContext(
   // need not. A copy offset by another kerf runs beside it: the sliver between
   // two cuts of one outline is cut free of the part either way, so a lead
   // crossing it burns nothing that stays, and the copy's leads lie beside these.
-  const copies = world.copies[ringId] ?? [];
-  const ignoredRings = new Set([ringId, ...copies]);
+  // So is the outline a kerf piece was split from (LeadJobLines.exempt), but
+  // only a true copy's leads run beside these: the leads of a whole outline a
+  // piece lies in are burns of their own, which the piece's leads keep clear of.
+  const exempt = world.exempt[ringId] ?? [];
+  const ignoredRings = new Set([ringId, ...exempt]);
   const ignoredLines = new Set([
     lineId,
-    ...copies.flatMap((index) => [
-      ...(world.rings[index]?.lineIds ?? []),
-      ...(world.leadLines.get(index) ?? []),
-    ]),
+    ...exempt.flatMap((index) => world.rings[index]?.lineIds ?? []),
+    ...(world.copies[ringId] ?? []).flatMap((index) => world.leadLines.get(index) ?? []),
   ]);
   const holders = world.holders[ringId];
   return {
     obstacles: world.obstacles,
     ownLine: lineId,
     ownRing: ring,
+    ownBurn: world.lines[lineId] ?? ring,
     ignoredLines,
     ignoredRings,
     inside,

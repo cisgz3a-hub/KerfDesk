@@ -31,6 +31,7 @@ function fitsBesideShortCut(clearanceMm: number): boolean {
     obstacles: LeadObstacles.create([RING, obstacle], []),
     ownLine: 0,
     ownRing: RING,
+    ownBurn: RING,
     ignoredLines: new Set([0]),
     ignoredRings: new Set(),
     inside: false,

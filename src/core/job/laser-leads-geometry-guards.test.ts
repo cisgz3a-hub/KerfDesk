@@ -258,6 +258,76 @@ describe('laser lead geometry guards (ADR-626)', () => {
     ]);
   });
 
+  it('checks an arc lead against its own contour along the arc the machine runs', () => {
+    // The square starts at its corner (0, 0). Its 2 mm arc lead-in is drawn as
+    // chords, and the G2/G3 arc the machine follows bulges past them. A spike
+    // of the part reaches in between the lead-in's last chord and that arc.
+    const r = 4 / Math.PI;
+    const drawn = leadPath(
+      'in',
+      { at: { x: 0, y: 0 }, tangent: { x: 1, y: 0 }, scrap: { x: 0, y: -1 } },
+      { style: 'arc', lengthMm: 2, angleDeg: 90 },
+    ).points;
+    const before = drawn[drawn.length - 2] as Vec2;
+    const chordMiddle = { x: before.x / 2, y: before.y / 2 };
+    const out = Math.hypot(chordMiddle.x, chordMiddle.y + r);
+    const onArc = { x: (chordMiddle.x / out) * r, y: ((chordMiddle.y + r) / out) * r - r };
+    const tip = {
+      x: chordMiddle.x + 0.6 * (onArc.x - chordMiddle.x),
+      y: chordMiddle.y + 0.6 * (onArc.y - chordMiddle.y),
+    };
+    const spiked = asMoves(
+      closed([
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+        { x: 0, y: 10 },
+        { x: 0, y: 0.31 },
+        tip,
+        { x: 0, y: 0.3 },
+      ]),
+    );
+    const led = first(
+      applyLaserLeads(
+        { groups: [group([spiked], { laserLeads: { ...LEADS, leadOut: false } })] },
+        NO_BED,
+      ),
+    );
+    // The full lead-in at the corner would cut the spike along its arc, so it
+    // is shortened or the square starts elsewhere; the chords alone miss it.
+    const start = led.polyline[0] as Vec2;
+    expect(Math.hypot(start.x + r, start.y + r)).toBeGreaterThan(0.01);
+  });
+
+  it('never crosses a narrow tongue of its own part beside the join', () => {
+    // A 10 mm square started at (1, 0), with a 0.01 mm tongue 2 mm long hanging
+    // from its bottom edge just behind the start, where the lead-in arrives.
+    const tongued = closed([
+      { x: 1, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+      { x: 0, y: 0 },
+      { x: 0.98, y: 0 },
+      { x: 0.98, y: -2 },
+      { x: 0.99, y: -2 },
+      { x: 0.99, y: 0 },
+    ]);
+    const led = first(
+      applyLaserLeads(
+        { groups: [group([tongued], { laserLeads: { ...LEADS, leadOut: false } })] },
+        NO_BED,
+      ),
+    );
+    // The 2 mm arc lead-in into (1, 0) would start at (1 - r, -r), r = 4/π, and
+    // cut through the tongue between two of its samples, so the square starts
+    // elsewhere.
+    const r = 4 / Math.PI;
+    const start = led.polyline[0] as Vec2;
+    expect(led.closed).toBe(false);
+    expect(Math.hypot(start.x - (1 - r), start.y + r)).toBeGreaterThan(1);
+  });
+
   it('fits a lead shorter than the clearance, at every length the setting allows', () => {
     for (const leads of [
       { ...LEADS, lengthMm: 0.1 },

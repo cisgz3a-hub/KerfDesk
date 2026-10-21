@@ -137,6 +137,43 @@ describe('applyLaserLeads (ADR-626)', () => {
     expect(points.at(-1)?.y).toBeCloseTo(-Math.SQRT2, 9);
   });
 
+  it('never leaves a lap-long overcut along the lead-in either', () => {
+    const leads: CutGroupLaserLeads = { ...LEADS, style: 'line', angleDeg: 45 };
+    const done = applyLaserLeads(
+      {
+        groups: [group([square(0, 0, 10)], { laserLeads: leads, finalPassOvercutMm: 40 })],
+      },
+      NO_BED,
+    );
+    // The overcut ends back at the corner, where its lead-out would run out
+    // along the lead-in, so the square starts mid-edge instead.
+    const out = lead(done);
+    expect(out.polyline[1]).toEqual({ x: 5, y: 0 });
+    expect(out.polyline[0]).not.toEqual(out.polyline.at(-1));
+    expect(done.diagnostics).toBeUndefined();
+  });
+
+  it('keeps an overcut lead-out that leaves short of the seam off the whole lead-in', () => {
+    const job = (overcutMm: number) =>
+      applyLaserLeads(
+        {
+          groups: [group([square(0, 0, 10)], { laserLeads: LEADS, finalPassOvercutMm: overcutMm })],
+        },
+        NO_BED,
+      );
+    // 0.5 mm short of the seam, the lead-out arc crosses the lead-in arc in
+    // the scrap beside it, wherever the square starts: no lead-out fits.
+    expect(job(39.5).diagnostics).toEqual([
+      expect.objectContaining({ kind: 'laser-leads-adjusted', omitted: 1 }),
+    ]);
+    // 0.1 mm short, the two arcs leave at right angles but cross further out.
+    expect(job(39.9).diagnostics).toEqual([
+      expect.objectContaining({ kind: 'laser-leads-adjusted', omitted: 1 }),
+    ]);
+    // An ordinary overcut leaves well clear of the lead-in.
+    expect(job(3).diagnostics).toBeUndefined();
+  });
+
   it('leads a hole from inside, also when the hole is cut by another operation', () => {
     const outer = square(0, 0, 40);
     const hole = square(10, 10, 20);
