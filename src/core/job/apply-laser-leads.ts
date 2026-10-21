@@ -472,11 +472,12 @@ function fitContext(
   // need not. A copy offset by another kerf runs beside it: the sliver between
   // two cuts of one outline is cut free of the part either way, so a lead
   // crossing it burns nothing that stays, and the copy's leads lie beside these.
-  const copies = world.copies[ringId] ?? [];
-  const ignoredRings = new Set([ringId, ...copies]);
+  // So is the outline a kerf piece was split from (LeadJobLines.exempt).
+  const exempt = world.exempt[ringId] ?? [];
+  const ignoredRings = new Set([ringId, ...exempt]);
   const ignoredLines = new Set([
     lineId,
-    ...copies.flatMap((index) => [
+    ...exempt.flatMap((index) => [
       ...(world.rings[index]?.lineIds ?? []),
       ...(world.leadLines.get(index) ?? []),
     ]),

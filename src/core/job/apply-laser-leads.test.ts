@@ -166,6 +166,10 @@ describe('applyLaserLeads (ADR-626)', () => {
     expect(job(39.5).diagnostics).toEqual([
       expect.objectContaining({ kind: 'laser-leads-adjusted', omitted: 1 }),
     ]);
+    // 0.1 mm short, the two arcs leave at right angles but cross further out.
+    expect(job(39.9).diagnostics).toEqual([
+      expect.objectContaining({ kind: 'laser-leads-adjusted', omitted: 1 }),
+    ]);
     // An ordinary overcut leaves well clear of the lead-in.
     expect(job(3).diagnostics).toBeUndefined();
   });

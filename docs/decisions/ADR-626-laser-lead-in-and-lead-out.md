@@ -375,3 +375,26 @@ Verification: `core/job/apply-laser-leads.test.ts` gives a near-lap overcut no l
 would cross the lead-in, and leaves an ordinary overcut alone; `core/job/laser-leads-geometry-guards.test.ts`
 keeps an arc lead-in off a spike between its chord and its arc; `io/gcode/laser-leads-scrap-side.test.ts`
 leads all four dumbbell pieces with kerfs of -0.25 and -0.3 mm. Each failed before this amendment.
+
+### Amendment 5 — pieces, near-seam overcuts and long edges (2026-10-21)
+
+1. **Every piece is exempt from the outline it was split from.** When one operation cuts a contour
+   whole and another's kerf splits it, Amendment 4 paired only the first piece with the whole
+   outline, so the other pieces met it at their joins and lost their leads. Copy classes stay as they
+   are, but each ring now has an exemption list (`LeadJobLines.exempt`): its copies, and every ring
+   another operation cuts from the same scene contour that overlaps it by at least half of the
+   smaller. A lead may cross those and end inside them. Pieces of one operation are still never
+   exempt from each other.
+2. **The direction rule only where the joins coincide.** A lead-out that leaves anywhere but the
+   lead-in's own join, however near (an overcut stopping 0.1 mm short of the seam), is checked along
+   its whole path: past the clearance from its own start, it must keep the clearance from the
+   lead-in. The 30-degree rule of Amendment 2 is for a shared join only.
+3. **Long edges are gridded by the cells they pass through.** The crossing check's grid walks each
+   edge through its cells, so a long or diagonal edge is found only where a lead is near it; only an
+   edge passing more than 100,000 cells (100 m) is checked by every query.
+
+Verification: `io/gcode/laser-leads-scrap-side.test.ts` leads the whole dumbbell and both pieces
+when one operation cuts it whole and the other splits it; `core/job/apply-laser-leads.test.ts`
+gives an overcut stopping 0.1 mm short of the seam no crossing lead-out;
+`core/job/laser-lead-own-crossing.test.ts` finds crossings of 100 mm diagonal edges walked either
+way. The first two failed before this amendment.

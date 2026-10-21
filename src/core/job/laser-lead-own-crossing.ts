@@ -14,8 +14,9 @@ import type { Vec2 } from '../scene';
 
 const JOIN_NEIGHBOURHOOD_MM = 0.2;
 const CELL_MM = 1;
-// An edge across more cells than this is checked by every query instead.
-const MAX_CELLS_PER_EDGE = 64;
+// An edge is gridded in the cells it passes through; one passing more than this
+// (100 m at 1 mm) is checked by every query instead.
+const MAX_CELLS_PER_EDGE = 100_000;
 
 type RingWalk = {
   readonly cumulative: ReadonlyArray<number>;
@@ -70,23 +71,77 @@ function ringWalk(ring: ReadonlyArray<Vec2>): RingWalk {
 }
 
 function gridEdge(cells: Map<string, number[]>, wide: number[], edge: number, a: Vec2, b: Vec2) {
-  const loX = cellOf(Math.min(a.x, b.x));
-  const hiX = cellOf(Math.max(a.x, b.x));
-  const loY = cellOf(Math.min(a.y, b.y));
-  const hiY = cellOf(Math.max(a.y, b.y));
-  const count = (hiX - loX + 1) * (hiY - loY + 1);
-  if (!Number.isFinite(count) || count > MAX_CELLS_PER_EDGE) {
+  const span = Math.abs(cellOf(b.x) - cellOf(a.x)) + Math.abs(cellOf(b.y) - cellOf(a.y)) + 1;
+  if (!Number.isFinite(span) || span > MAX_CELLS_PER_EDGE) {
     wide.push(edge);
     return;
   }
-  for (let cx = loX; cx <= hiX; cx += 1) {
-    for (let cy = loY; cy <= hiY; cy += 1) {
-      const key = `${cx},${cy}`;
-      const list = cells.get(key);
-      if (list === undefined) cells.set(key, [edge]);
-      else list.push(edge);
+  const add = (cx: number, cy: number): void => {
+    const key = `${cx},${cy}`;
+    const list = cells.get(key);
+    if (list === undefined) cells.set(key, [edge]);
+    else if (list[list.length - 1] !== edge) list.push(edge);
+  };
+  walkCells(a, b, add, span + 2);
+}
+
+/** Every grid cell the segment a-b passes through, in order (a grid walk): at
+ * a cell corner both neighbours are visited, so no cell it touches is missed. */
+function walkCells(
+  a: Vec2,
+  b: Vec2,
+  visit: (cx: number, cy: number) => void,
+  maxSteps: number,
+): void {
+  const x = axisWalk(a.x, b.x);
+  const y = axisWalk(a.y, b.y);
+  visit(x.cell, y.cell);
+  for (let step = 0; step < maxSteps && !(x.cell === x.end && y.cell === y.end); step += 1) {
+    if (x.next < y.next) advance(x);
+    else if (y.next < x.next) advance(y);
+    else {
+      visit(x.cell + x.step, y.cell);
+      visit(x.cell, y.cell + y.step);
+      advance(x);
+      advance(y);
     }
+    visit(x.cell, y.cell);
+    // Rounding can step past the end cell on its last edge: stop there.
+    if (overshot(x) || overshot(y)) break;
   }
+}
+
+/** One axis of a grid walk: the cell it is in, which way it steps, and the
+ * share of the segment at which it next crosses a cell edge. */
+type AxisWalk = {
+  cell: number;
+  next: number;
+  readonly step: number;
+  readonly delta: number;
+  readonly end: number;
+};
+
+function axisWalk(from: number, to: number): AxisWalk {
+  const cell = cellOf(from);
+  const step = Math.sign(to - from);
+  if (step === 0) return { cell, next: Number.POSITIVE_INFINITY, step, delta: 0, end: cell };
+  const boundary = (step > 0 ? cell + 1 : cell) * CELL_MM;
+  return {
+    cell,
+    next: (boundary - from) / (to - from),
+    step,
+    delta: CELL_MM / Math.abs(to - from),
+    end: cellOf(to),
+  };
+}
+
+function advance(axis: AxisWalk): void {
+  axis.cell += axis.step;
+  axis.next += axis.delta;
+}
+
+function overshot(axis: AxisWalk): boolean {
+  return axis.step > 0 ? axis.cell > axis.end : axis.step < 0 && axis.cell < axis.end;
 }
 
 function cellOf(value: number): number {

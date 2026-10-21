@@ -184,18 +184,23 @@ describe('the scrap side of laser leads (ADR-626 Amendment 1)', () => {
         { x: 20, y: 30 },
       ],
     };
-    for (const second of [-0.25, -0.3]) {
+    // 0: the first operation cuts the outline whole, the second splits it.
+    for (const [first, second] of [
+      [-0.25, -0.25],
+      [-0.25, -0.3],
+      [0, -0.25],
+    ] as const) {
       const job = prepared(
         project(
           [
-            layer('a', { ...LEADS, kerfOffsetMm: -0.25 }),
+            layer('a', { ...LEADS, kerfOffsetMm: first }),
             layer('b', { ...LEADS, kerfOffsetMm: second }),
           ],
           [shape('bell', bell, ['a', 'b'])],
         ),
       );
       const cuts = job.groups.flatMap((group) => (group.kind === 'cut' ? group.segments : []));
-      expect(cuts).toHaveLength(4);
+      expect(cuts).toHaveLength(first === 0 ? 3 : 4);
       for (const cut of cuts) expect(cut.closed).toBe(false);
       expect(job.diagnostics ?? []).toEqual([]);
     }

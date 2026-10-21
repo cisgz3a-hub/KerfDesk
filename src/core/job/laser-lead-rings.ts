@@ -42,6 +42,9 @@ export type LeadJobLines = {
   readonly holders: ReadonlyArray<ReadonlySet<number>>;
   /** The other rings that are copies of each ring. */
   readonly copies: ReadonlyArray<ReadonlyArray<number>>;
+  /** The rings each ring's leads may cross and end inside: its copies, and
+   * every ring another operation cuts from the same scene contour over it. */
+  readonly exempt: ReadonlyArray<ReadonlyArray<number>>;
 };
 
 /** `burns` says which cut groups really burn; others hold no part. `scene`:
@@ -113,7 +116,43 @@ export function leadJobLines(
     sides,
     holders: ringHolders(rings, representatives, copies),
     copies,
+    exempt: exemptions(rings, owners, copies),
   };
+}
+
+// A piece and the outline it was split from are one part, whatever kerf split
+// it: when one operation cuts a contour whole and another's kerf splits it,
+// every piece lies over the whole outline, and each piece's leads may cross it,
+// as the whole outline's leads may cross every piece. Pieces of one operation
+// are different parts and stay clear of each other, so this is not a copy
+// relation (copies would make the pieces copies of each other too).
+function exemptions(
+  rings: ReadonlyArray<LeadRing>,
+  owners: ReadonlyArray<RingOwner>,
+  copies: ReadonlyArray<ReadonlyArray<number>>,
+): number[][] {
+  const bySource = new Map<string, number[]>();
+  rings.forEach((ring, index) => {
+    if (ring.source === undefined) return;
+    const list = bySource.get(ring.source);
+    if (list === undefined) bySource.set(ring.source, [index]);
+    else list.push(index);
+  });
+  return rings.map((ring, index) => {
+    const group = owners[index]?.group ?? -1;
+    const over = (ring.source === undefined ? [] : (bySource.get(ring.source) ?? [])).filter(
+      (other) => {
+        const candidate = rings[other];
+        return (
+          other !== index &&
+          candidate !== undefined &&
+          (owners[other]?.group ?? -1) !== group &&
+          boundsOverlapShare(ring.bounds, candidate.bounds) >= MIN_PIECE_OVERLAP
+        );
+      },
+    );
+    return [...new Set([...(copies[index] ?? []), ...over])];
+  });
 }
 
 // Each ring's verdict: its scene contour's, or with no scene, its own among the

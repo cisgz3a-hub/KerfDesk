@@ -67,6 +67,9 @@ const FREE_END_REACH_SHARE = 0.9;
 // A lead-out leaving within this of the way its lead-in came retraces it
 // (retracesLeadIn).
 const RETRACE_DEG = 30;
+// Two leads join at one point only within this: a lead-out from anywhere else
+// is checked against the whole lead-in.
+const SHARED_JOIN_MM = 1e-6;
 // A lead written as G2/G3 is checked against its own contour along the arcs
 // the machine follows, sampled this finely, not along the chords it is drawn
 // with, which the arcs bulge past.
@@ -203,16 +206,19 @@ function withinBounds(point: Vec2, bounds: JobBounds): boolean {
  * leaving within RETRACE_DEG of the way the lead-in came overlaps it for more
  * than a kerf width. Arc leads at a corner part at a right angle and meet again
  * only at their free ends, both in the scrap. A lead-out leaving from
- * elsewhere (an overcut's, from where the overcut ends) must keep the
- * clearance from the whole lead-in, or the two cross or run side by side. */
+ * anywhere else, however near (an overcut's, from where the overcut ends),
+ * must keep the clearance from the whole lead-in once it is the clearance from
+ * its own start, or the two cross or run side by side. */
 export function retracesLeadIn(leadOut: LeadFit, leadIn: LeadFit, clearanceMm: number): boolean {
   const start = leadOut.path.points[0];
   const inPoints = leadIn.path.points;
   const join = inPoints[inPoints.length - 1];
   if (start === undefined || join === undefined) return false;
-  if (Math.hypot(start.x - join.x, start.y - join.y) > clearanceMm) {
+  if (Math.hypot(start.x - join.x, start.y - join.y) > SHARED_JOIN_MM) {
     return walkSamples([start, ...leadOut.path.points.slice(1)]).some(
-      (sample) => distanceToPolylineMm(sample, inPoints) < clearanceMm,
+      (sample) =>
+        Math.hypot(sample.x - start.x, sample.y - start.y) > clearanceMm &&
+        distanceToPolylineMm(sample, inPoints) < clearanceMm,
     );
   }
   const outward = direction(start, leadOut.path.points[1]);
