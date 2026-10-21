@@ -73,6 +73,11 @@ jobs:
       - name: Check the published privacy notice
         run: pnpm check:privacy
 
+      # Pricing, terms, refunds and safety ship on kerfdesk.com from public/
+      # (ADR-524 Amendment 3 decision 2): fail when one differs from its source.
+      - name: Check the published pricing and policy pages
+        run: pnpm check:public-info
+
       - name: Check formatting
         run: pnpm format:check
 
