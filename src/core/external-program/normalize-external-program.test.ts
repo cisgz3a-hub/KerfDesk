@@ -81,12 +81,36 @@ describe('external G-code program normalization (ADR-630)', () => {
       expect(externalProgramBaseline(kind)).toBe(EXTERNAL_PROGRAM_BASELINE);
     }
     // Marlin stops a job at G94 (and G17 without CNC_WORKSPACE_PLANES).
-    expect(externalProgramBaseline('marlin')).toBe('G21G90');
+    expect(externalProgramBaseline('marlin')).toBe('G21\nG90');
     expect(externalProgramBaseline('smoothieware')).toBe('G17G21G90G0');
     expect(normalizeExternalProgram('X1\n', 'G21G90')).toMatchObject({
       kind: 'ok',
       program: { gcode: 'G21G90\nX1\n', baseline: 'G21G90' },
     });
+  });
+
+  it('refuses Marlin numbered lines because the ordinary sender has no checksum/resend protocol', () => {
+    for (const line of ['N1 G1 X10', 'N1 G1 X10*42']) {
+      const result = normalizeExternalProgram(line, externalProgramBaseline('marlin'));
+      expect(result).toMatchObject({
+        kind: 'refused',
+        reasons: [expect.stringContaining('numbered checksum protocol')],
+      });
+    }
+    const result = normalizeExternalProgram(' G1 X1 0 0 F600 ', undefined, 'marlin');
+    expect(result).toMatchObject({
+      kind: 'ok',
+      program: { gcode: 'G21\nG90\nG1 X1 0 0 F600\n', controllerKind: 'marlin', lineCount: 3 },
+    });
+  });
+
+  it('derives the baseline when a connected controller kind is supplied without one', () => {
+    for (const kind of ['grbl-v1.1', 'grblhal', 'fluidnc', 'smoothieware', 'marlin'] as const) {
+      expect(normalizeExternalProgram('M5', undefined, kind)).toMatchObject({
+        kind: 'ok',
+        program: { gcode: `${externalProgramBaseline(kind)}\nM5\n`, controllerKind: kind },
+      });
+    }
   });
 
   it('removes realtime bytes inside a comment with the comment, so they never reach the controller', () => {

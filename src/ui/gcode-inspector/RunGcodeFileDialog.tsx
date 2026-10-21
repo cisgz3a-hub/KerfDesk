@@ -70,7 +70,11 @@ function InspectExternalRun(
   const start = pinned ?? live;
   const source = useMemo(
     () => ({
-      ...deviceInspectionContext(project.device, machineKindOf(project.machine)),
+      ...deviceInspectionContext(
+        project.device,
+        machineKindOf(project.machine),
+        props.program.controllerKind,
+      ),
       kind: 'text' as const,
       text: props.program.gcode,
       boundsFromStart: true,
@@ -93,6 +97,9 @@ function InspectExternalRun(
       {
         machineKind: machineKindOf(project.machine),
         laserMaxPowerS: project.device.maxPowerS,
+        ...(props.program.controllerKind === undefined
+          ? {}
+          : { controllerKind: props.program.controllerKind }),
         start: start ?? DRAWN_ORIGIN,
       },
       result.analysis.findings,

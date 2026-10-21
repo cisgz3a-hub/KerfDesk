@@ -29,8 +29,10 @@ import { useUiStore } from './ui-store';
 import { applyStartPointDefaults } from './start-point-defaults';
 import {
   canonicalizeOpenedProjectBed,
+  withCurrentMachineAutofocus,
   type ProjectBedReconciliationNotice,
 } from './project-bed-reconciliation';
+import { useToastStore } from './toast-store';
 import { projectSheetActions, type ProjectSheetActions } from './project-sheet-actions';
 
 type ProjectActionSet = (
@@ -67,16 +69,25 @@ export function projectActions(
       const current = get();
       const resolution = resolveProjectMachineCapability(project, current.cncLibrary.customTools);
       const bedResolution = canonicalizeOpenedProjectBed(resolution.project, current.project);
+      const autofocus = withCurrentMachineAutofocus(bedResolution.project, current.project);
       useUiStore.getState().resetArtworkRunOrder();
       set((state) => ({
-        ...initialState(bedResolution.project),
+        ...initialState(autofocus.project),
         ...retainedApplicationState(state),
         projectDocumentEpoch: state.projectDocumentEpoch + 1,
         cachedCncMachine: resolution.cachedCncMachine,
         projectBedReconciliation: bedResolution.notice,
         dirty: bedResolution.notice?.workspaceMismatch === true,
       }));
-      const loneArtworkId = loneSelectableArtworkId(bedResolution.project.scene);
+      if (autofocus.keptCurrentCommand) {
+        useToastStore
+          .getState()
+          .pushToast(
+            "This file's Auto-focus command was not used: Auto-focus keeps your machine's own command from Machine Setup.",
+            'info',
+          );
+      }
+      const loneArtworkId = loneSelectableArtworkId(autofocus.project.scene);
       if (loneArtworkId !== null && get().selectedObjectId === null)
         get().selectObject(loneArtworkId);
       return bedResolution.notice?.workspaceMismatch === true

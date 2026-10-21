@@ -16,16 +16,22 @@ export function jigNumberFieldKeys(shown: string): {
 } {
   return {
     onKeyDown: (event) => {
-      if (event.key !== 'Enter') return;
+      if (event.key !== 'Enter' || composing(event)) return;
       event.preventDefault();
       leaveField(event.currentTarget);
     },
     // On the way down: the editor moves focus off the field on Escape before
     // the field's own key handler would run.
     onKeyDownCapture: (event) => {
-      if (event.key === 'Escape') event.currentTarget.value = shown;
+      if (event.key === 'Escape' && !composing(event)) event.currentTarget.value = shown;
     },
   };
+}
+
+// While an IME is composing, Enter and Escape belong to its candidate window
+// (as in use-dialog-a11y), so the typed value stays.
+function composing(event: FieldKeyEvent): boolean {
+  return event.nativeEvent.isComposing || event.keyCode === 229;
 }
 
 function leaveField(field: HTMLInputElement): void {

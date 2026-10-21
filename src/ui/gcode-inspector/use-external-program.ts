@@ -4,6 +4,7 @@
 // from.
 
 import { useEffect, useMemo, useState } from 'react';
+import type { ControllerKind } from '../../core/devices';
 import {
   createExternalProgramNormalizer,
   externalProgramBaseline,
@@ -24,8 +25,9 @@ export async function normalizeInSlices(
   text: string,
   live: () => boolean,
   baseline?: string,
+  controllerKind?: ControllerKind,
 ): Promise<ExternalProgramResult | null> {
-  const normalizer = createExternalProgramNormalizer(baseline);
+  const normalizer = createExternalProgramNormalizer(baseline, controllerKind);
   let count = 0;
   for (const line of sourceLines(text)) {
     normalizer.push(line);
@@ -41,22 +43,28 @@ export async function normalizeInSlices(
 /** The normalized program, or null while it is being made. Its baseline
  * line is the one the active controller accepts (externalProgramBaseline). */
 export function useNormalizedProgram(text: string): ExternalProgramResult | null {
-  const baseline = externalProgramBaseline(useLaserStore((state) => state.activeControllerKind));
+  const controllerKind = useLaserStore((state) => state.activeControllerKind);
+  const baseline = externalProgramBaseline(controllerKind);
   const [result, setResult] = useState<{
     readonly text: string;
     readonly baseline: string;
+    readonly controllerKind: ControllerKind;
     readonly value: ExternalProgramResult;
   } | null>(null);
   useEffect(() => {
     let live = true;
-    void normalizeInSlices(text, () => live, baseline).then((value) => {
-      if (live && value !== null) setResult({ text, baseline, value });
+    void normalizeInSlices(text, () => live, baseline, controllerKind).then((value) => {
+      if (live && value !== null) setResult({ text, baseline, controllerKind, value });
     });
     return () => {
       live = false;
     };
-  }, [text, baseline]);
-  return result?.text === text && result.baseline === baseline ? result.value : null;
+  }, [text, baseline, controllerKind]);
+  return result?.text === text &&
+    result.baseline === baseline &&
+    result.controllerKind === controllerKind
+    ? result.value
+    : null;
 }
 
 // A thousandth of a millimetre, the reports' own resolution, so report noise

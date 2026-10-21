@@ -9,7 +9,7 @@ import { historyProjection } from './authoring-projections';
 import { inOneUndoStep } from './design-operations';
 import { RemoteFault } from './fault';
 import { publicIdentifier } from './projections';
-import { prepareTransforms } from './transforms';
+import { prepareTransforms, validateTransforms } from './transforms';
 import type { RemoteAppStore } from './types';
 
 export type Placement = {
@@ -20,6 +20,7 @@ export type Placement = {
 /** Parsed and hydrated off the commit path; `commit` is synchronous so it can join one Undo step. */
 export type PreparedImport = {
   readonly commit: (store: RemoteAppStore, placement: Placement) => string[];
+  readonly accept: () => void;
   readonly dispose: () => Promise<void>;
 };
 type Commit = (action: () => Record<string, unknown>) => Record<string, unknown>;
@@ -44,9 +45,12 @@ export async function prepareSvgImport(
       commit: (store, placement) =>
         insertAndPlace(store, placement, () => {
           store.getState().importSvgFragment(fragment, 0);
-          prepared.commit();
-          committed = true;
         }),
+      // Retain rollback ownership until placement and the enclosing batch both succeed.
+      accept: () => {
+        prepared.commit();
+        committed = true;
+      },
       dispose: async () => {
         if (!committed) await prepared.rollback();
       },
@@ -63,6 +67,7 @@ function objectImport(object: SceneObject): PreparedImport {
       insertAndPlace(store, placement, () => {
         store.getState().importSvgObject(object, 0);
       }),
+    accept: () => undefined,
     dispose: () => Promise.resolve(),
   };
 }
@@ -88,14 +93,22 @@ export function placeArtwork(store: RemoteAppStore, ids: readonly string[], plac
   if (placement.widthMm !== undefined) {
     const objects = currentObjects(store, ids);
     const box = bounds(objects);
-    if (box.width > 0 && box.height > 0) {
-      const heightMm = (box.height * placement.widthMm) / box.width;
-      store
-        .getState()
-        .applySelectionTransforms(
-          prepareTransforms(objects, { type: 'resize', widthMm: placement.widthMm, heightMm }),
-        );
-    }
+    const scale = placement.widthMm / box.width;
+    if (!(box.width > 0) || !Number.isFinite(scale) || scale <= 0)
+      throw new RemoteFault('unsupported_operation');
+    // Uniform import sizing also represents horizontal lines: zero height stays zero.
+    const transforms = objects.map(({ id, transform }) => ({
+      id,
+      transform: {
+        ...transform,
+        x: box.minX + (transform.x - box.minX) * scale,
+        y: box.minY + (transform.y - box.minY) * scale,
+        scaleX: transform.scaleX * scale,
+        scaleY: transform.scaleY * scale,
+      },
+    }));
+    validateTransforms(objects, transforms);
+    store.getState().applySelectionTransforms(transforms);
   }
   if (placement.xMm === undefined && placement.yMm === undefined) return;
   const objects = currentObjects(store, ids);
@@ -135,7 +148,9 @@ export async function addSvg(
 ): Promise<Record<string, unknown>> {
   const prepared = await prepareSvgImport(args.svg, `Remote artwork ${shortId()}.svg`, signal);
   try {
-    return commit(() => importedReceipt(store, prepared.commit(store, args)));
+    const receipt = commit(() => importedReceipt(store, prepared.commit(store, args)));
+    prepared.accept();
+    return receipt;
   } finally {
     await prepared.dispose();
   }
@@ -178,7 +193,9 @@ export async function importFile(
   if (args.mimeType === 'image/svg+xml') {
     const prepared = await prepareSvgImport(text(bytes), args.fileName, signal);
     try {
-      return commit(() => importedReceipt(store, prepared.commit(store, args)));
+      const receipt = commit(() => importedReceipt(store, prepared.commit(store, args)));
+      prepared.accept();
+      return receipt;
     } finally {
       await prepared.dispose();
     }
@@ -222,6 +239,8 @@ async function importRaster(
         );
       } catch (error) {
         failure = error;
+        // The image loader owns temporary paged assets until its callback succeeds.
+        throw error;
       }
       return undefined;
     },

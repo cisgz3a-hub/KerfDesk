@@ -200,18 +200,23 @@ export function takeHeldLines(cursor: LaserOutputCursor): string[] {
 }
 
 /** Carry the raster's actual last position and held transitions into the next
- * group. Blank raster groups may still be holding the preceding M3 state and
- * hand back unwritten the held lines they were given (`handedOver`). */
+ * group. Blank raster groups may still be holding the preceding lit state and
+ * hand back unwritten the held lines they were given (`handedOver`). A lit
+ * ending leaves the raster's own word (`rasterMode`) in effect: M3, or M4 on
+ * Marlin (ADR-398 Amendment 2). */
 export function noteRasterGroupEnd(
   cursor: LaserOutputCursor,
   ending: RasterGroupEnd,
   handedOver: ReadonlyArray<string>,
+  rasterMode: 'M3' | 'M4',
 ): void {
   const { closingM5Deferred, head, deferredEntryLines } = ending;
-  if (deferredEntryLines.length === 0) noteWrittenWords(cursor, handedOver);
+  const openingWritten = deferredEntryLines.length === 0;
+  if (openingWritten) noteWrittenWords(cursor, handedOver);
   cursor.head = head === null ? null : emittedHead(head.x, head.y);
   cursor.held = closingM5Deferred ? [...deferredEntryLines, 'M5'] : [];
-  cursor.modeInEffect = closingM5Deferred ? 'M3' : 'off';
+  if (!closingM5Deferred) cursor.modeInEffect = 'off';
+  else if (openingWritten) cursor.modeInEffect = rasterMode;
   cursor.litAtStop = closingM5Deferred;
 }
 
