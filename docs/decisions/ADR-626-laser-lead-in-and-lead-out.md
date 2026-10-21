@@ -324,3 +324,125 @@ names a score ring and a border separately; `core/job/laser-leads-scope-and-wrap
 artwork override that turns leads off; `ui/state/laser-recipe-seeding.test.ts` reseeds after leads
 were turned on and off; `ui/state/canvas-start-editing-leads.test.ts` picks a start halfway along an
 edge of a led contour. Each failed before this amendment.
+
+### Amendment 3 — further review (2026-10-20)
+
+1. **The overcut's lead-out is held to the same rule.** With one pass and an overcut a whole lap
+   long, the final pass ends back at the seam, and its lead-out could run back along the lead-in. The
+   retrace rule of Amendment 2 now applies to it too, when it leaves within the clearance of where
+   the lead-in joins, so the contour restarts mid-edge.
+2. **Split kerf pieces stay copies across operations.** When a kerf offset splits one scene contour
+   into pieces and two operations cut it with the same offset, each operation's later pieces were
+   given classes of their own, so the other operation's identical piece sat right at the join and
+   blocked every lead. A later piece now takes the class of the piece it matches by shape
+   (`laser-lead-copies.ts` rule) in another operation; pieces of one operation stay apart.
+3. **A lead never crosses its own contour.** The walking checks read the distance to the contour
+   at samples 0.05 mm apart, and right by the join that distance is small anyway, so a lead could cut
+   through a narrow tongue of the part beside the join between two samples. The lead's path is now
+   also tested against the contour (`laser-lead-own-crossing.ts`); only a crossing within 0.2 mm of
+   the join, measured along the contour, where a lead joins and may ride its chords, is allowed.
+4. **Curve-backed artwork counts for routing.** The lead work estimate counts the contours compile
+   cuts: the canonical curve subpaths when a path has them, else its polylines.
+
+Verification: `core/job/apply-laser-leads.test.ts` restarts a lap-long overcut started at a corner;
+`io/gcode/laser-leads-scrap-side.test.ts` leads all four pieces of a dumbbell two operations split
+with the same kerf; `core/job/laser-leads-geometry-guards.test.ts` keeps a lead-in off a 0.01 mm
+tongue beside the join; `core/job/laser-leads-routing.test.ts` routes curve-backed triangles. Each
+failed before this amendment.
+
+### Amendment 4 — the crossing and pairing checks, reviewed (2026-10-21)
+
+1. **An overcut's lead-out keeps clear of the whole lead-in.** When it leaves the contour more than
+   the clearance from where the lead-in joins (an overcut that stops short of the seam), it must keep
+   the clearance from the lead-in along its whole length, or the two cross in the scrap and that
+   spot burns twice. Where both join at one point, the 30-degree retrace rule of Amendment 2 decides,
+   as before.
+2. **Arc leads are checked along the arc the machine runs.** On an arc machine the own-contour
+   crossing check of Amendment 3 follows the G2/G3 arcs, sampled to 0.001 mm, not the chords a lead
+   is drawn with, which the arcs bulge past by up to 0.005 mm.
+3. **The crossing check reads only nearby edges.** Each contour's edges go on a 1 mm grid once
+   (cached per contour), so every fit, length and restart reads only the edges round the lead; a
+   contour of tens of thousands of edges no longer costs a full scan per attempt.
+4. **Split pieces pair across operations whatever their kerf.** Amendment 3 matched a split piece to
+   another operation's only by shape within 0.01 mm, so two operations with different kerf offsets
+   lost the pairing. A piece now takes the class of the earlier piece of another operation whose
+   bounds overlap its own most (at least half of the smaller), which is its counterpart however that
+   operation offsets it, or which holds it when that operation cuts the contour whole. An exact copy
+   in the same operation (drawn twice) still shares its class, and two different pieces of one
+   operation never do.
+
+Verification: `core/job/apply-laser-leads.test.ts` gives a near-lap overcut no lead-out where it
+would cross the lead-in, and leaves an ordinary overcut alone; `core/job/laser-leads-geometry-guards.test.ts`
+keeps an arc lead-in off a spike between its chord and its arc; `io/gcode/laser-leads-scrap-side.test.ts`
+leads all four dumbbell pieces with kerfs of -0.25 and -0.3 mm. Each failed before this amendment.
+
+### Amendment 5 — pieces, near-seam overcuts and long edges (2026-10-21)
+
+1. **Every piece is exempt from the outline it was split from.** When one operation cuts a contour
+   whole and another's kerf splits it, Amendment 4 paired only the first piece with the whole
+   outline, so the other pieces met it at their joins and lost their leads. Copy classes stay as they
+   are, but each ring now has an exemption list (`LeadJobLines.exempt`): its copies, and every ring
+   another operation cuts from the same scene contour that overlaps it by at least half of the
+   smaller. A lead may cross those and end inside them. Pieces of one operation are still never
+   exempt from each other.
+2. **The direction rule only where the joins coincide.** A lead-out that leaves anywhere but the
+   lead-in's own join, however near (an overcut stopping 0.1 mm short of the seam), is checked along
+   its whole path: past the clearance from its own start, it must keep the clearance from the
+   lead-in. The 30-degree rule of Amendment 2 is for a shared join only.
+3. **Long edges are gridded by the cells they pass through.** The crossing check's grid walks each
+   edge through its cells, so a long or diagonal edge is found only where a lead is near it; only an
+   edge passing more than 100,000 cells (100 m) is checked by every query.
+
+Verification: `io/gcode/laser-leads-scrap-side.test.ts` leads the whole dumbbell and both pieces
+when one operation cuts it whole and the other splits it; `core/job/apply-laser-leads.test.ts`
+gives an overcut stopping 0.1 mm short of the seam no crossing lead-out;
+`core/job/laser-lead-own-crossing.test.ts` finds crossings of 100 mm diagonal edges walked either
+way. The first two failed before this amendment.
+
+### Amendment 6 — pieces by containment, leads between samples (2026-10-21)
+
+1. **Pieces correspond by containment, found through a box index** (`core/job/laser-lead-pieces.ts`).
+   Two rings that different operations cut from one scene contour are one part when a point just
+   inside one lies inside the other: a piece lies inside the whole outline it was split from, and
+   counterpart pieces at different kerf offsets nest. Bounds overlap alone, which Amendments 4 and 5
+   used, also paired unrelated pieces whose bounds interlock. Candidates come from a box index of the
+   rings, so a contour split into thousands of pieces costs each ring only its neighbours, not a scan
+   of every ring of the contour.
+2. **Only pieces are copies of pieces.** Copy classes pair a piece with its counterpart piece in
+   another operation that split the contour too, and a ring with its exact duplicate. A whole outline
+   is no longer a copy of the first piece split from it: they are different burns, so their leads
+   keep clear of each other. The piece is still exempt from the outline itself (Amendment 5), and
+   only a true copy's placed leads are ignored.
+3. **A lead-out from a distinct start is checked continuously.** Past the clearance from its own
+   start, each walking step of the lead-out is measured against the lead-in as a segment, so a graze
+   between two samples is caught.
+4. **The crossing check reads the contour as it burns.** For a contour that goes out as G2/G3 the
+   own-contour crossing check (Amendment 3) uses its arcs sampled to 0.002 mm (the obstacle line),
+   not its chords.
+
+Verification: `core/job/laser-lead-pieces.test.ts` pairs a piece with the L it lies in but not with
+a square in the L's corner; `io/gcode/laser-leads-scrap-side.test.ts` keeps each piece's leads a
+kerf width from the leads of the outline it was split from; `core/job/laser-lead-fit-continuous.test.ts`
+catches a lead-out grazing the lead-in between samples and a tongue present only in the burned
+contour. `core/job/laser-lead-sides.test.ts` now expects the whole outline to be exempt from, not a
+copy of, its pieces.
+
+### Amendment 7 — edges of the edge cases (2026-10-21)
+
+1. **A large lead box reads only the filled cells in it.** When a lead's box spans more grid cells
+   than the contour fills, the crossing check reads the filled cells inside the box, not every edge.
+2. **The step across the clearance is clipped, not skipped.** For a lead-out from a distinct start,
+   the walking step that crosses the clearance from that start is measured from where it crosses.
+3. **A chord-only pass checks against its chords.** The context a chord-only final pass fits with
+   (Amendment 2) also swaps the burned contour of Amendment 6 for the chord ring that pass runs.
+4. **A probe point inside any piece.** A ring's probe point lies halfway along the inward normal
+   from the middle of an edge to the ring's next wall, edges tried longest first, so it stays inside
+   a piece only one output step wide.
+5. **Coincident artworks are one outline for exemptions too.** Pieces are exempt from rings of the
+   same scene copy class, not only of the same scene contour, so a whole outline cut from one artwork
+   and the pieces another, coincident artwork's operation splits are exempt from each other.
+
+Verification: `core/job/laser-lead-own-crossing.test.ts` finds a long lead crossing a small dense
+circle; `core/job/laser-lead-fit-continuous.test.ts` catches a graze on the step across the
+clearance; `core/job/laser-lead-pieces.test.ts` pairs a 0.001 mm sliver with its counterpart and
+two coincident artworks' rings.
