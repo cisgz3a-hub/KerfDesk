@@ -110,10 +110,18 @@ export type EmitRasterInput = {
    */
   readonly deferredEntry?: { readonly entryLines: ReadonlyArray<string> };
   /**
-   * When an M3 group ends on a burn, leave its closing `M5` to the caller, which
-   * writes it after the next laser-off move (OR-1). The result reports it.
+   * When an M3 group (or, with `stopKeepsPower`, an M4 group) ends on a burn,
+   * leave its closing `M5` to the caller, which writes it after the next
+   * laser-off move (OR-1). The result reports it.
    */
   readonly deferClosingM5WhenLit?: boolean;
+  /**
+   * The controller keeps the beam at its last power when the head stops, under
+   * M4 too, and drops a move that does not move the head without darkening
+   * (Marlin, ADR-398 Amendment 2). An M4 group then reports a lit ending as an
+   * M3 group does; its lines stay those of M4.
+   */
+  readonly stopKeepsPower?: boolean;
 };
 
 export type RasterGroupEnd = {
@@ -145,7 +153,8 @@ export function emitRasterGroupWithEnd(
 type RasterEmissionState = {
   /** Opening lines still waiting for the first laser-off travel (OR-1). */
   heldOpening: ReadonlyArray<string> | null;
-  /** Under M3, the last written line is a burn: a stop now would be lit. */
+  /** Under M3 (or `stopKeepsPower`), the last line that moved the head is a
+   *  burn: a stop now would be lit. */
   endsLit: boolean;
   /** Where the group's previous sweep left the head. */
   head: RasterControllerHead | null;
@@ -232,8 +241,7 @@ function* emitRasterPasses(input: EmitRasterInput, state: RasterEmissionState): 
           reverse,
           sweepPlan,
           dotWidthCorrectionMm,
-          state.head,
-          state.heldOpening !== null,
+          { head: state.head, deferredOpening: state.heldOpening !== null, lit: state.endsLit },
         );
         // A sweep that disappears on the controller grid changes no modal
         // state. In particular, the preceding M3 burn can still be lit.

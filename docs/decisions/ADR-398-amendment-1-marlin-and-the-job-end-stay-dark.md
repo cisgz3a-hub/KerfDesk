@@ -76,5 +76,5 @@ read in the primary sources.
 - An image layer on Marlin with zero overscan can end its last row on a burn. The raster
   emitter then writes its closing `M5` (`M5 I`) straight after it, because the image emitter
   treats its M4 body as dark at a stop. That stop has no air change in it and is left for a
-  separate decision.
+  separate decision. ADR-398 Amendment 2 resolves it.
 - No hardware was operated. These are code and test results only.

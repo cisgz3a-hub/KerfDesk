@@ -330,12 +330,14 @@ function emitOffsetFillGroup(group: FillGroup, context: GroupEmissionContext): s
 // A raster group writes its own opening (`M5`, arm) and closing `M5`. While a
 // preceding M3 burn may still be lit, the opening and the held air change
 // follow the group's first laser-off travel, and an M3 group that ends on a
-// burn leaves its closing `M5` for the next laser-off move (OR-1).
+// burn leaves its closing `M5` for the next laser-off move (OR-1). On Marlin
+// an M4 group does too (ADR-398 Amendment 2).
 function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext): string {
   const { device, dialect, cursor } = context;
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const operationComment = operationProvenanceComment(group);
   const handedOver = cursor.litAtStop ? takeHeldLines(cursor) : null;
+  const laserModeCommand = laserModeWord(dialect.rasterPowerMode);
   const emission = emitRasterGroupWithEnd({
     laserPowerScaleVersion: context.laserPowerScaleVersion,
     sValues: group.sValues,
@@ -356,7 +358,7 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
           controlledLaserOffTravelFeedMmPerMin: device.controlledLaserOffTravelFeedMmPerMin,
         }),
     ...(group.bidirectional !== undefined ? { bidirectional: group.bidirectional } : {}),
-    laserModeCommand: laserModeWord(dialect.rasterPowerMode),
+    laserModeCommand,
     modalFeedrate: dialect.modalFeedrate,
     emitSOnEveryBurnMove: dialect.emitSOnEveryBurnMove,
     compactMotionWords: dialect.compactMotionWords,
@@ -369,8 +371,9 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
     ...(operationComment === undefined ? {} : { effectiveOperationComment: operationComment }),
     ...(handedOver === null ? {} : { deferredEntry: { entryLines: handedOver } }),
     deferClosingM5WhenLit: true,
+    stopKeepsPower: cursor.stopKeepsPower,
   });
-  noteRasterGroupEnd(cursor, emission, handedOver ?? []);
+  noteRasterGroupEnd(cursor, emission, handedOver ?? [], laserModeCommand);
   return emission.gcode;
 }
 
