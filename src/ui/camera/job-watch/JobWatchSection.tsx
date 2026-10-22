@@ -1,9 +1,9 @@
-// JobWatchSection — the Camera panel's Watch the job section (ADR-490):
+// JobWatchSection — the Camera panel's Watch the job fold (ADR-490, ADR-663):
 // record a timelapse of each job, and check a finished laser job's burn
 // against its path. Both are remembered per computer; while either is on the
 // camera keeps running with the panel closed, so it is there when a job starts.
 
-import { noteStyle, rowStyle, sectionStyle } from '../panel/panel-styles';
+import { noteStyle, rowStyle } from '../panel/panel-styles';
 import { BurnCheckResult } from './BurnCheckResult';
 import { TIMELAPSE_INTERVALS_SECONDS } from './job-watch-settings';
 import { useJobWatchStore } from './job-watch-store';
@@ -16,8 +16,7 @@ export function JobWatchSection(): JSX.Element {
   const burnCheck = useJobWatchStore((s) => s.burnCheck);
 
   return (
-    <section style={sectionStyle} aria-label="Watch the job">
-      <strong style={titleStyle}>Watch the job</strong>
+    <section style={columnStyle} aria-label="Watch the job">
       <div style={rowStyle}>
         <label style={checkStyle}>
           <input
@@ -69,5 +68,5 @@ export function JobWatchSection(): JSX.Element {
   );
 }
 
-const titleStyle: React.CSSProperties = { fontSize: 12 };
+const columnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };
 const checkStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };

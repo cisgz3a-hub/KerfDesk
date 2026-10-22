@@ -5,7 +5,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     id: 'camera',
     title: 'Use a camera to place artwork',
     summary:
-      'Connect a camera, calibrate it from one photo of an engraved target, and place artwork on the corrected bed image.',
+      'Start a camera, set it up from one photo of an engraved target, and place artwork on the corrected bed image.',
     category: 'Machine & setup',
     machine: 'all',
     minutes: 5,
@@ -15,17 +15,17 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     visual: 'camera',
     steps: [
       {
-        title: 'Choose a camera source',
+        title: 'Start the camera',
         instruction:
-          'Select a USB camera and choose Start, or choose Use this camera on a detected machine camera. Machine and RTSP cameras need KerfDesk Desktop; the panel says which sources this browser can read.',
-        focus: 'Source → Start',
+          "Open Tools → Camera. Choose Use this camera on the laser's built-in camera, or Start camera for a USB camera. Choose camera… or the gear opens Camera settings for network and phone cameras. They need KerfDesk Desktop; the panel says which cameras this browser can read.",
+        focus: 'Preview card → Use this camera / Start camera',
         result: 'A live camera image is available for calibration and placement.',
       },
       {
-        title: 'Engrave the calibration target',
+        title: 'Set up and engrave the target',
         instruction:
-          'Choose Calibrate camera. Cover the bed with one flat sheet, enter its thickness and, for a camera that looks straight down, the camera height by tape measure. Engrave target runs a temporary job through the usual Frame and review; Target already engraved reuses one.',
-        focus: 'Sheet thickness · camera height',
+          'Choose Set up camera. Confirm the camera, say whether it sits above the bed or on the laser head, and check the picture. Then cover the bed with one flat sheet and enter its thickness; Engrave settings holds power, speed, margin and the camera height for a camera that looks straight down. Engrave target runs a temporary job through the usual Frame and review; Target already engraved reuses one.',
+        focus: 'Camera · Mounting · Picture · Sheet thickness',
         result: 'Rings are engraved across the bed at exactly known positions.',
       },
       {
@@ -38,7 +38,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Refresh before placing artwork',
         instruction:
-          'Use Update still after moving material, or Live. Set Material surface height to the top of the material so its edges line up, then place artwork over the image or trace a visible shape. Physically Frame the exact intended job before Start.',
+          'Use Refresh picture after moving material, or Live. Set Material height to the top of the material so its edges line up, then place artwork over the image or trace a visible shape. Physically Frame the exact intended job before Start.',
         focus: 'Fresh image · correct surface height',
         result:
           'The overlay helps place artwork, and the physical Frame checks the intended job location.',

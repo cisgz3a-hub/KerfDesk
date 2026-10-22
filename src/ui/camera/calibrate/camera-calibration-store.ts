@@ -32,6 +32,11 @@ export type CalibrationResult = {
 };
 
 export type CalibrationStep =
+  // The guided setup's first screens (ADR-663): which camera, where it is
+  // mounted, and a look at its picture, before the target is engraved.
+  | { readonly kind: 'camera' }
+  | { readonly kind: 'mount' }
+  | { readonly kind: 'picture' }
   | { readonly kind: 'setup'; readonly note: string | null }
   // `started` turns true once the target job is streaming; before that the
   // machine is framing. `earlierJob` is whatever job the streamer held when
@@ -78,6 +83,9 @@ export type CameraCalibrationStore = {
   // The engraved target's area when it is known (a check of the saved
   // calibration); null derives it from the bed and the margin.
   readonly targetArea: BedArea | null;
+  /** The guided setup from its first screen, choosing the camera (ADR-663). */
+  readonly openSetup: () => void;
+  /** Straight to the target, for a camera already chosen and placed. */
   readonly openWizard: () => void;
   readonly openCheck: (saved: CameraModelRecord) => void;
   readonly closeWizard: () => void;
@@ -109,6 +117,15 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
   step: INITIAL_STEP,
   settings: DEFAULT_CALIBRATION_SETTINGS,
   targetArea: null,
+  openSetup: () =>
+    set((s) => ({
+      open: true,
+      mode: 'calibrate',
+      minimized: false,
+      step: { kind: 'camera' },
+      targetArea: null,
+      settings: withRemembered(s.settings),
+    })),
   openWizard: () =>
     set((s) => ({
       open: true,
