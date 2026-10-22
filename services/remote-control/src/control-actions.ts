@@ -17,14 +17,26 @@ const countSchema = z.object({
   ordinary: z.number().int().min(0).max(MAX_ORDINARY_CONTROL_ACTIONS),
   abort: z.number().int().min(0).max(RESERVED_ABORT_ACTIONS),
 });
+/**
+ * Desktop answers that only come before anything reaches the machine: the desktop
+ * refuses these before it owns an operation. ADR-569 keeps "unconfirmed" for a lost
+ * result, so these stay definite refusals (rolling audit 2026-10-21 01-P2-3).
+ */
+const DEFINITE_REFUSALS = ['stale_revision', 'invalid_input', 'busy'] as const;
+export type DefiniteRefusal = (typeof DEFINITE_REFUSALS)[number];
+export function isDefiniteRefusal(code: string): code is DefiniteRefusal {
+  return (DEFINITE_REFUSALS as readonly string[]).includes(code);
+}
 const recordSchema = z.object({
   leaseId: z.uuid(),
   fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
   operation: mcpControlOperationSchema.omit({ review: true }),
+  refusal: z.enum(DEFINITE_REFUSALS).optional(),
 });
 type Admission =
   | { state: 'fresh'; operationId: string }
   | { state: 'replay'; result: Record<string, unknown> }
+  | { state: 'refused'; code: DefiniteRefusal }
   | { state: 'conflict' | 'limit' | 'unavailable' };
 
 const KINDS: Record<string, z.output<typeof mcpControlOperationSchema>['kind']> = {
@@ -53,6 +65,36 @@ function usesAbortReserve(
     (MCP_PRIORITY_COMMANDS.has(command) && counts?.ordinary === MAX_ORDINARY_CONTROL_ACTIONS)
   );
 }
+type SavedOperation = z.output<typeof recordSchema>['operation'];
+function unconfirmedReceipt(
+  requestId: string,
+  operation: SavedOperation | null,
+): Record<string, unknown> {
+  return {
+    revision: operation?.revision ?? 'unconfirmed',
+    operation: {
+      operationId: requestId,
+      kind: operation?.kind ?? 'job',
+      state: 'unknown',
+      revision: operation?.revision ?? 'unconfirmed',
+      committed: operation?.committed === true ? true : null,
+      message:
+        'This action outcome is unconfirmed. Check the operation and machine status before sending another action. Do not automatically repeat it with a new ID.',
+    },
+  };
+}
+function refusedReceipt(operation: SavedOperation): Record<string, unknown> {
+  return {
+    revision: operation.revision,
+    operation: {
+      ...operation,
+      state: 'failed',
+      committed: false,
+      message:
+        'The PC refused this action before sending anything to the machine. Read the status again before a new request.',
+    },
+  };
+}
 const clientPrefix = (clientId: string) => `${PREFIX}${clientId}:`;
 const keyFor = (clientId: string, requestId: string) => `${clientPrefix(clientId)}${requestId}`;
 
@@ -72,11 +114,7 @@ export class ControlActions {
       if (!authorized()) return { state: 'unavailable' };
       const key = keyFor(props.clientId, requestId);
       const existing = recordSchema.safeParse(this.storage.kv.get(key));
-      if (existing.success) {
-        if (existing.data.leaseId !== props.leaseId || existing.data.fingerprint !== fingerprint)
-          return { state: 'conflict' };
-        return { state: 'replay', result: this.unknown(props, requestId) };
-      }
+      if (existing.success) return this.readmit(existing.data, props, requestId, fingerprint);
       // Corrupt existing metadata must not re-open a previously admitted ID.
       if (this.storage.kv.get(key) !== undefined) return { state: 'conflict' };
       const counts = this.counts(props);
@@ -112,6 +150,19 @@ export class ControlActions {
     return result;
   }
 
+  /** A used ID is never dispatched again: a refusal stays a refusal, anything else unconfirmed. */
+  private readmit(
+    existing: z.output<typeof recordSchema>,
+    props: GrantProps,
+    requestId: string,
+    fingerprint: string,
+  ): Admission {
+    if (existing.leaseId !== props.leaseId || existing.fingerprint !== fingerprint)
+      return { state: 'conflict' };
+    if (existing.refusal !== undefined) return { state: 'refused', code: existing.refusal };
+    return { state: 'replay', result: this.unknown(props, requestId) };
+  }
+
   private counts(props: GrantProps): z.output<typeof countSchema> | null {
     const raw = this.storage.kv.get(`${COUNT_PREFIX}${props.clientId}`);
     const parsed = countSchema.safeParse(raw);
@@ -125,22 +176,31 @@ export class ControlActions {
     return { leaseId: props.leaseId, ordinary: 0, abort: 0 };
   }
 
+  /** The ledger's own receipt, used whenever no desktop answer can be trusted. */
   unknown(props: GrantProps, requestId: string): Record<string, unknown> {
     const saved = recordSchema.safeParse(this.storage.kv.get(keyFor(props.clientId, requestId)));
-    const operation =
-      saved.success && saved.data.leaseId === props.leaseId ? saved.data.operation : null;
-    return {
-      revision: operation?.revision ?? 'unconfirmed',
-      operation: {
-        operationId: requestId,
-        kind: operation?.kind ?? 'job',
-        state: 'unknown',
-        revision: operation?.revision ?? 'unconfirmed',
-        committed: operation?.committed === true ? true : null,
-        message:
-          'This action outcome is unconfirmed. Check the operation and machine status before sending another action. Do not automatically repeat it with a new ID.',
-      },
-    };
+    if (!saved.success || saved.data.leaseId !== props.leaseId)
+      return unconfirmedReceipt(requestId, null);
+    return saved.data.refusal === undefined
+      ? unconfirmedReceipt(requestId, saved.data.operation)
+      : refusedReceipt(saved.data.operation);
+  }
+
+  /** Tombstone: the ID stays used, and a replay gets the same refusal, never "unconfirmed". */
+  refuse(props: GrantProps, requestId: string, code: DefiniteRefusal): void {
+    const key = keyFor(props.clientId, requestId);
+    const saved = recordSchema.safeParse(this.storage.kv.get(key));
+    if (
+      !saved.success ||
+      saved.data.leaseId !== props.leaseId ||
+      saved.data.operation.committed !== false
+    )
+      return;
+    this.storage.kv.put(key, {
+      ...saved.data,
+      operation: { ...saved.data.operation, state: 'failed' },
+      refusal: code,
+    });
   }
 
   acknowledge(props: GrantProps, requestId: string, value: unknown): void {
@@ -148,7 +208,7 @@ export class ControlActions {
     if (!parsed.success || parsed.data.operationId !== requestId) return;
     const key = keyFor(props.clientId, requestId);
     const saved = recordSchema.safeParse(this.storage.kv.get(key));
-    if (!saved.success || saved.data.leaseId !== props.leaseId) return;
+    if (!saved.success || saved.data.leaseId !== props.leaseId || saved.data.refusal) return;
     // Never persist review strings, artwork, G-code or arbitrary desktop error messages.
     const { operationId, kind, state, revision, committed } = parsed.data;
     this.storage.kv.put(key, {
