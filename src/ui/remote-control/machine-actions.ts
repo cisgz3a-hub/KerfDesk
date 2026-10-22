@@ -11,6 +11,11 @@ import type { MachineExecutionContext } from './machine-execution';
 import type { OwnedMachineOperation } from './machine-operation-state';
 import type { MachineCommand } from './machine-types';
 import { RemoteFault } from './fault';
+import {
+  currentBoardRemote,
+  type BoardRemoteStatus,
+} from '../laser/board-capture/board-capture-remote';
+import { proFeaturesUnlocked } from '../licensing/edition';
 
 /** A refusal whose fixed, controller-state message is safe to show remotely. */
 export class MachineRefusal extends RemoteFault {
@@ -31,7 +36,7 @@ async function settle(
   operation: OwnedMachineOperation,
   run: () => Promise<unknown>,
   fallback: string,
-  done: string,
+  done: string | (() => string),
 ): Promise<void> {
   operation.state = 'running';
   operation.committed = null;
@@ -42,7 +47,7 @@ async function settle(
   }
   operation.committed = true;
   operation.state = 'completed';
-  operation.message = done;
+  operation.message = typeof done === 'function' ? done() : done;
 }
 
 export async function executeConnect(
@@ -152,6 +157,39 @@ export async function executeOrigin(
     'The origin could not be set. Check the machine on the PC.',
     z ? 'Z zeroed here.' : 'Work origin set here.',
   );
+}
+
+export async function executeBoardAction(
+  finish: boolean,
+  operation: OwnedMachineOperation,
+): Promise<void> {
+  if (!proFeaturesUnlocked()) throw new RemoteFault('needs_pro');
+  const controller = currentBoardRemote();
+  if (controller === null) throw new MachineRefusal('Open Place Board on the computer first.');
+  // Refusals before the panel runs leave the controller untouched (state failed); once it runs,
+  // a capture or finish may already have written a work origin, so a failure stays unknown.
+  const blocked = boardActionBlockMessage(controller.status(), finish);
+  if (blocked !== null) throw new MachineRefusal(blocked);
+  await settle(
+    operation,
+    () => (finish ? controller.finish() : controller.capture()),
+    finish ? 'The board could not be created.' : 'The board point could not be captured.',
+    finish
+      ? 'Board created. Check every anchor on the computer, then Frame before Start.'
+      : () => {
+          const status = controller.status();
+          return `Captured point ${status.captures} of ${status.capturesNeeded ?? status.captures}.`;
+        },
+  );
+}
+
+function boardActionBlockMessage(status: BoardRemoteStatus, finish: boolean): string | null {
+  if (status.busy) return 'Place Board is busy on the computer. Wait, then try again.';
+  if (status.committed) return 'The board is already created. Start a new capture on the computer.';
+  if (finish) return null;
+  return status.capturesNeeded !== null && status.captures >= status.capturesNeeded
+    ? 'Every capture point is recorded. Use finish_board.'
+    : null;
 }
 
 export async function executePauseResume(

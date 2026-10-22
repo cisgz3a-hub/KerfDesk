@@ -12,6 +12,7 @@ import {
   mpgCommandBlockMessage,
   motionOperationCommandBlockMessage,
   setupBlockingJobCommandBlockMessage,
+  toolChangeXyOriginBlockMessage,
 } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { ProbeResult } from './probe-actions';
@@ -40,8 +41,17 @@ export function probePreflight(
   request: ProbeRequest,
 ): ProbeResult | null {
   const reason =
-    probeStateBlockReason(state, refs) ?? probeProtocolBlockReason(state, refs, lines, request);
+    probeStateBlockReason(state, refs) ??
+    toolChangeProbeBlockReason(state, request) ??
+    probeProtocolBlockReason(state, refs, lines, request);
   return reason === null ? null : { kind: 'preflight-failed', reason };
+}
+
+// A tool-change hold opens the setup gate for the new bit's Z touch-off only.
+// The corner cycle ends in G92.1 and G10 L20 P0 X Y Z, which would move the
+// X/Y origin the rest of the held job runs on (ADR-375 Amendment 3).
+function toolChangeProbeBlockReason(state: LaserState, request: ProbeRequest): string | null {
+  return request?.kind === 'z' ? null : toolChangeXyOriginBlockMessage(state);
 }
 
 export function invalidProbeEvidence(affectsXy: boolean): Partial<LaserState> {

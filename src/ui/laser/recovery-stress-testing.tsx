@@ -342,9 +342,14 @@ export async function recoverAndComplete(h: StressHarness, runId: string): Promi
     ).toHaveLength(capsule.ackedLines);
   }
 
-  h.simulator = await connectSimulator();
+  // The yanked simulator ran out its planner, as a board that keeps running
+  // does, and such a board does not reset or greet when the port reopens: the
+  // restart stays at the acknowledged line (ADR-398 Amendment 3).
+  h.simulator = await connectSimulator({ emitBannerOnOpen: false });
   const outboundBefore = h.simulator.outbound().length;
-  const started = await drive(runLaserRecoveryCapsuleFlow(capsule, h.repository));
+  const started = await drive(
+    runLaserRecoveryCapsuleFlow(await expectCapsuleFor(h.repository, runId), h.repository),
+  );
   expect(jobAwareAlert).not.toHaveBeenCalled();
   expect(started).toBe(true);
   const recoveryRunId = useLaserStore.getState().activeRunId;

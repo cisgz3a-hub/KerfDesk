@@ -21,15 +21,35 @@
 import { assertNever, type Vec2 } from '../scene';
 import type { DeviceProfile, Origin } from './device-profile';
 
-export function toMachineCoords(p: Vec2, device: DeviceProfile): Vec2 {
+// Only the origin and the bed size matter, so a saved bed frame (a camera
+// calibration's) maps exactly as the live profile does.
+type BedGeometry = Pick<DeviceProfile, 'origin' | 'bedWidth' | 'bedHeight'>;
+
+export function toMachineCoords(p: Vec2, device: BedGeometry): Vec2 {
   return originTransform(p, device.origin, device.bedWidth, device.bedHeight);
 }
 
 // Exact inverse of toMachineCoords. Most origin transforms are their own
 // inverse (axis mirrors), but 'center' is not: its X axis is translated,
 // so the preview frame mapping (H3) needs a real inverse, not a re-apply.
-export function toSceneCoords(p: Vec2, device: DeviceProfile): Vec2 {
+export function toSceneCoords(p: Vec2, device: BedGeometry): Vec2 {
   return inverseOriginTransform(p, device.origin, device.bedWidth, device.bedHeight);
+}
+
+export function sceneAxisSigns(origin: Origin): { readonly x: 1 | -1; readonly y: 1 | -1 } {
+  switch (origin) {
+    case 'front-left':
+    case 'center':
+      return { x: 1, y: -1 };
+    case 'front-right':
+      return { x: -1, y: -1 };
+    case 'rear-left':
+      return { x: 1, y: 1 };
+    case 'rear-right':
+      return { x: -1, y: 1 };
+    default:
+      return assertNever(origin, 'Origin');
+  }
 }
 
 function inverseOriginTransform(p: Vec2, origin: Origin, bedW: number, bedH: number): Vec2 {

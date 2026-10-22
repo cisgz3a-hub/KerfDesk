@@ -140,4 +140,40 @@ describe('Marlin simulator fidelity', () => {
     expect(lines).toEqual(['echo:M112 Shutdown', 'Error:Printer halted. kill() called!']);
     expect(sim.state().isHalted).toBe(true);
   });
+
+  it('skips moves until every axis is homed with NO_MOTION_BEFORE_HOMING (motion.cpp L1479)', async () => {
+    const { sim, lines, write } = await openSim({ build: { noMotionBeforeHoming: true } });
+    await write('G1 X10 F600 S100\n');
+    await vi.advanceTimersByTimeAsync(50);
+    expect(lines).toEqual(['echo:Home XYZ First', 'ok']);
+    expect(sim.state().pos).toEqual({ x: 0, y: 0, z: 0 });
+    expect(sim.state().burns).toEqual([]);
+
+    await write('G28 X Y\nG0 X10\n');
+    await vi.advanceTimersByTimeAsync(50);
+    expect(sim.state().homedAxes).toBe('XY');
+    expect(lines.slice(2)).toEqual(['ok', 'echo:Home Z First', 'ok']);
+
+    await write('G28\nG0 X10\n');
+    await vi.advanceTimersByTimeAsync(100);
+    expect(lines.slice(5)).toEqual(['ok', 'ok']);
+    expect(sim.state().pos).toEqual({ x: 10, y: 0, z: 0 });
+  });
+
+  it('after stop() announces itself once, then skips each move it reads (queue.cpp L523)', async () => {
+    const { sim, lines, write } = await openSim();
+    const stopped = 'Printer stopped due to errors. Fix the error and use M999 to restart. ';
+    sim.stop();
+    await write('M114\nG0 X10\n');
+    await vi.advanceTimersByTimeAsync(50);
+    // The notice is printed when the G0 is read, ahead of the M114's answer.
+    expect(lines).toEqual([
+      expect.stringMatching(new RegExp(`^Error:${stopped.replace(/[.()]/g, '\\$&')}`)),
+      expect.stringMatching(new RegExp(`^${stopped.replace(/[.()]/g, '\\$&')}`)),
+      'X:0.00 Y:0.00 Z:0.00 E:0.00 Count X:0 Y:0 Z:0',
+      'ok',
+      'ok',
+    ]);
+    expect(sim.state().pos).toEqual({ x: 0, y: 0, z: 0 });
+  });
 });

@@ -9,6 +9,7 @@ import {
   type CameraCaptureBinding,
 } from '../camera-capture-binding';
 import type { FisheyeDistortion } from '../fisheye';
+import { normalizeCameraBedFrame, type CameraBedFrame } from './camera-bed-frame';
 import { normalizeCameraModelAccuracy, type CameraModelAccuracy } from './camera-model-accuracy';
 import {
   cameraCentre,
@@ -31,6 +32,11 @@ export type CameraModelRecord = {
   readonly calibratedAt: string;
   /** A camera that rides on the laser head (ADR-449); absent for a fixed camera. */
   readonly mount?: CameraMount;
+  /**
+   * The bed frame the engraved target's rings were placed in (rolling audit
+   * 12-P2-2); absent on records saved before it was kept.
+   */
+  readonly bedFrame?: CameraBedFrame;
 };
 
 /** Where a camera sits when it is not fixed above the bed (ADR-449). */
@@ -76,8 +82,8 @@ export function normalizeCameraModelRecord(value: unknown): CameraModelRecord | 
   if (lens === undefined || pose === undefined || accuracy === undefined) return undefined;
   if (typeof calibratedAt !== 'string' || calibratedAt.length === 0) return undefined;
   const capture = optionalField(value['capture'], normalizeCameraCaptureBinding);
-  const mount = optionalField(value['mount'], normalizeMount);
-  if (capture === null || mount === null) return undefined;
+  const placement = placementFields(value);
+  if (capture === null || placement === null) return undefined;
   return {
     version: 1,
     lens,
@@ -85,7 +91,20 @@ export function normalizeCameraModelRecord(value: unknown): CameraModelRecord | 
     ...(capture === undefined ? {} : { capture }),
     accuracy,
     calibratedAt,
+    ...placement,
+  };
+}
+
+// Where the camera sits and the bed frame it was fitted in; null when either is malformed.
+function placementFields(
+  value: Record<string, unknown>,
+): Pick<CameraModelRecord, 'mount' | 'bedFrame'> | null {
+  const mount = optionalField(value['mount'], normalizeMount);
+  const bedFrame = optionalField(value['bedFrame'], normalizeCameraBedFrame);
+  if (mount === null || bedFrame === null) return null;
+  return {
     ...(mount === undefined ? {} : { mount }),
+    ...(bedFrame === undefined ? {} : { bedFrame }),
   };
 }
 

@@ -93,7 +93,6 @@ function LeadSizeFields(props: {
           value={leadLengthMmFor(layer)}
           min={MIN_LEAD_LENGTH_MM}
           max={MAX_LEAD_LENGTH_MM}
-          step={0.1}
           label="lead length"
           title="Length of each lead in millimeters."
         />
@@ -106,7 +105,6 @@ function LeadSizeFields(props: {
           value={leadAngleDegFor(layer, style)}
           min={MIN_LEAD_ANGLE_DEG}
           max={maxLeadAngleDeg(style)}
-          step={1}
           label="lead angle"
           title={
             style === 'arc'

@@ -3,6 +3,8 @@ import type { RasterGroup } from '../../core/job';
 import { compileJob } from '../../core/job/compile-job';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
 import type { FileSaveRequest, PlatformAdapter, SaveTarget } from '../../platform/types';
+import { installChromiumSavePicker } from '../../platform/web/chromium-save-picker.test-support';
+import { webAdapter } from '../../platform/web/web-adapter';
 import { handleSaveProcessedBitmap } from './save-processed-bitmap';
 
 describe('handleSaveProcessedBitmap', () => {
@@ -170,6 +172,8 @@ describe('handleSaveProcessedBitmap', () => {
       project: rasterProject(),
       selectedObjectId: 'R1',
       pushToast: toast.pushToast,
+      // The PNG is made before the picker opens (ADR-656).
+      encodePng: async () => new Blob(['png'], { type: 'image/png' }),
     });
 
     expect(toast.messages).toEqual([]);
@@ -214,6 +218,50 @@ describe('handleSaveProcessedBitmap', () => {
         variant: 'error',
       },
     ]);
+  });
+});
+
+describe('processed bitmap over an existing file (ADR-656, audit 19-P2-1)', () => {
+  it('leaves the existing PNG intact when encoding fails, without opening the picker', async () => {
+    const disk = new Map([['logo-processed.png', 'previous png']]);
+    const picker = installChromiumSavePicker(disk);
+    const { pushToast, messages } = toasts();
+    try {
+      await handleSaveProcessedBitmap({
+        platform: webAdapter,
+        project: rasterProject(),
+        selectedObjectId: 'R1',
+        pushToast,
+        encodePng: async () => {
+          throw new Error('encoder out of memory');
+        },
+      });
+    } finally {
+      picker.restore();
+    }
+    expect(picker.picks()).toBe(0);
+    expect(disk.get('logo-processed.png')).toBe('previous png');
+    expect(messages).toContainEqual({
+      message: 'Could not save processed bitmap: encoder out of memory',
+      variant: 'error',
+    });
+  });
+
+  it('replaces the chosen file with the prepared PNG', async () => {
+    const disk = new Map([['logo-processed.png', 'previous png']]);
+    const picker = installChromiumSavePicker(disk);
+    try {
+      await handleSaveProcessedBitmap({
+        platform: webAdapter,
+        project: rasterProject(),
+        selectedObjectId: 'R1',
+        pushToast: () => undefined,
+        encodePng: async () => new Blob(['new png'], { type: 'image/png' }),
+      });
+    } finally {
+      picker.restore();
+    }
+    expect(disk.get('logo-processed.png')).toBe('new png');
   });
 });
 

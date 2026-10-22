@@ -1,7 +1,6 @@
 import { compileCncProjectedOperation } from './compile-cnc-projected-operation';
 import { tagArtworkGroup, type CompiledCncOperation } from './compile-cnc-operation-result';
 import type { CncOperationGroups } from './compile-cnc-operation-result';
-import { cncGroupForPasses } from './compile-cnc-pass-group';
 // compileCncJob — Scene + DeviceProfile + CncMachineConfig → Job of CncGroups.
 //
 // Materialize layer geometry in machine coordinates and order passes safely:
@@ -12,11 +11,10 @@ import { cncGroupForPasses } from './compile-cnc-pass-group';
 //
 // Pure and deterministic: no clock, random input, or I/O.
 
-import { machineBoundsForDevice, type DeviceProfile } from '../devices';
+import type { DeviceProfile } from '../devices';
 import { artworkOperationRuns } from '../artwork-order';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
-  layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,
   type Layer,
@@ -53,10 +51,9 @@ import {
   type CncCompilationTaskResult,
   type PreparedCncCompilationArtifact,
 } from './cnc-compilation-artifact';
-import type { VCarveLadder } from './vcarve-plan';
-import { passesForCncLayerWithEvidence } from './compile-cnc-layer-passes';
-import { machineFrameHandedness } from './machine-frame-handedness';
-import { applyProfileLeadPasses } from './profile-lead-passes';
+import { profileLeadJobWalls } from './profile-lead-job-walls';
+import type { ProfileLeadKeptWall } from './profile-lead-kept-walls';
+import { cncGroupForLayerResolvedWithEvidence } from './compile-cnc-layer-group';
 import {
   boundVCarveLadder,
   buildCncCompilationSidecar,
@@ -66,8 +63,6 @@ import {
 } from './cnc-compilation-sidecar';
 import { compiledInlayGroups, secondaryClearingGroups } from './compile-cnc-operation-groups';
 import { restAwareVCarveGroup } from './vcarve-rest-finishing';
-import { cncSettingsForStage } from './cnc-stage-settings';
-import { preserveProfileFinishStages, profileStageRuns } from './profile-finishing-stage';
 
 export { xyToolpathsForCutType } from './compile-cnc-layer-passes';
 export { vcarveClearanceGroupForLayer } from './compile-cnc-operation-groups';
@@ -155,7 +150,11 @@ function compileCncSnapshot(
   const omittedOpenContourSources: CncOpenContourOmissionSource[] = [];
   const sourceObjects = scene.objects;
   const allSourceObjects = [...sourceObjects, ...(scene.outputDependencies ?? [])];
-  for (const [operationIndex, run] of artworkOperationRuns(scene).entries()) {
+  const runs = artworkOperationRuns(scene);
+  // ADR-250 Amendment 3: every profile lead keeps clear of the parts that
+  // every profile operation keeps, so collect those walls before any compiles.
+  const leadWalls = profileLeadJobWalls(runs, sourceObjects, device, config, sourceGeometry);
+  for (const [operationIndex, run] of runs.entries()) {
     const operation = compileCncOperation(
       sourceObjects,
       run,
@@ -163,8 +162,9 @@ function compileCncSnapshot(
       device,
       config,
       vcarveLayers,
-      sourceGeometry?.get(operationIndex),
+      sourceGeometry?.get(operationIndex) ?? leadWalls.geometry.get(operationIndex),
       allSourceObjects,
+      leadWalls.walls,
     );
     if (operation.kind === 'relief-materialization-failed') return operation;
     clearingGroups.push(...operation.clearingGroups);
@@ -203,6 +203,7 @@ function compileCncOperation(
   vcarveLayers: CncCompilationEvidence['vcarveLayers'],
   sourceGeometry?: CncOperationSourceGeometry,
   allSourceObjects: Scene['objects'] = sourceObjects,
+  leadWalls: ReadonlyArray<ProfileLeadKeptWall> = [],
 ): CompiledCncOperation | ReliefMaterializationFailure {
   const { layer, priorityObjectId } = run;
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
@@ -233,6 +234,7 @@ function compileCncOperation(
     device,
     config,
     vcarveLayers,
+    leadWalls,
   );
   const usesStepover = relief.evidence.stepoverUsed || vectorGroups.stepoverUsed;
   return {
@@ -268,6 +270,7 @@ function compileVectorOperationGroups(
   device: DeviceProfile,
   config: CncMachineConfig,
   vcarveLayers: CncCompilationEvidence['vcarveLayers'],
+  leadWalls: ReadonlyArray<ProfileLeadKeptWall>,
 ): CncOperationGroups {
   if (polylines.length === 0) {
     return {
@@ -277,7 +280,7 @@ function compileVectorOperationGroups(
       stepoverUsed: false,
     };
   }
-  const inlay = compiledInlayGroups(layer, settings, polylines, device, config);
+  const inlay = compiledInlayGroups(layer, settings, polylines, device, config, leadWalls);
   if (inlay !== null) {
     const groups = inlay.groups;
     return {
@@ -306,6 +309,7 @@ function compileVectorOperationGroups(
       priorityObjectId,
       settings.cutType === 'v-carve',
     ),
+    leadWalls,
   );
   const offsetLadderDiagnostics = offsetDiagnosticsForStatus(layer.id, {
     offsetFailed: secondary.offsetFailed || compiledGroup.offsetFailed,
@@ -364,82 +368,4 @@ export function cncGroupForLayer(
     config,
     sourceContours,
   ).group;
-}
-
-type CompiledLayerGroup = {
-  readonly group: CncGroup | null;
-  readonly groups: ReadonlyArray<CncGroup>;
-  readonly offsetFailed: boolean;
-  readonly passLimited: boolean;
-  readonly stepoverUsed: boolean;
-};
-
-function cncGroupForLayerResolvedWithEvidence(
-  layer: Layer,
-  settings: CncLayerSettings,
-  polylines: ReadonlyArray<Polyline>,
-  device: DeviceProfile,
-  config: CncMachineConfig,
-  sourceContours?: ReadonlyArray<CollectedCncContour>,
-  vcarveLadder?: VCarveLadder,
-): CompiledLayerGroup {
-  const tool = layerCncTool(config, settings);
-  // Cut direction is a physical rule applied to machine numbers, and
-  // front-right / rear-left mirror the frame — see machine-frame-handedness.
-  const handedness = machineFrameHandedness(device.origin);
-  const result = passesForCncLayerWithEvidence(
-    polylines,
-    settings,
-    tool,
-    config,
-    handedness,
-    sourceContours,
-    vcarveLadder,
-  );
-  // ADR-250: bake profile lead-in/out into closed profile passes (default-on
-  // for profile-outside/inside; a no-op for other cut types and shape 'none').
-  const led = preserveProfileFinishStages(
-    result.passes,
-    applyProfileLeadPasses(
-      result.passes,
-      settings,
-      tool.diameterMm,
-      machineBoundsForDevice(device),
-    ),
-  );
-  const includeRampEntry = recordsRampEntry(settings, result.rampedEntry);
-  const options = {
-    includeRampEntry,
-    ...(result.restStock === undefined ? {} : { restStock: result.restStock }),
-  };
-  const groups = profileStageRuns(led).flatMap((run) => {
-    const stageSettings = run.finishing
-      ? cncSettingsForStage(settings, 'profile-finish', tool)
-      : settings;
-    const group = cncGroupForPasses(
-      layer,
-      stageSettings,
-      tool,
-      run.passes,
-      device,
-      config,
-      run.finishing ? { ...options, cuttingStage: 'profile-finish' } : options,
-    );
-    return group === null ? [] : [group];
-  });
-  return {
-    group: cncGroupForPasses(layer, settings, tool, led, device, config, options),
-    groups,
-    offsetFailed: result.offsetFailed,
-    passLimited: result.passLimited,
-    stepoverUsed: result.stepoverUsed,
-  };
-}
-
-// A group records the layer's ramp angle only when its passes ramp (ADR-273
-// Amendment 2), so adaptive, drill and helical pocket groups record none. A
-// V-carve keeps its own requested entry: its header says whether the planner
-// ramped or the medial depth profile governs (ADR-285 item 6).
-function recordsRampEntry(settings: CncLayerSettings, rampedEntry: boolean): boolean {
-  return settings.cutType === 'v-carve' || rampedEntry;
 }

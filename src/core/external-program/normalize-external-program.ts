@@ -60,16 +60,28 @@ export type ExternalProgramResult =
 export const EXTERNAL_PROGRAM_BASELINE = 'G17G21G90G94G0';
 
 /**
+ * Smoothieware's laser power scale. Laser.cpp burns every G1-G3 at
+ * S x scale, `M221 S` sets the scale in percent and only a reboot resets it
+ * to 100; M120/M121 do not save it. The Frame, a jog and Home send `M221 S0`
+ * (SMOOTHIE_FRAME_TOOL_OFF_LINES), as does the end of KerfDesk's own job, so a
+ * program that sets its power only with S would burn nothing, while the review
+ * reads it at the power-up scale (ADR-630 Amendment 3).
+ * https://github.com/Smoothieware/Smoothieware/blob/edge/src/modules/tools/laser/Laser.cpp
+ */
+const SMOOTHIE_BASELINE_POWER_SCALE = 'M221 S100';
+
+/**
  * The baseline a controller accepts. Marlin stops a job at a command its
  * build lacks (G94 always, G17 without CNC_WORKSPACE_PLANES). Its units and
  * distance commands must be separate lines; optional motion/plane behavior
- * is disclosed by the Marlin reader. Smoothieware has no G94.
+ * is disclosed by the Marlin reader. Smoothieware has no G94, and keeps its
+ * laser power scale between programs.
  */
 export function externalProgramBaseline(kind: ControllerKind): string {
   if (kind === 'grbl-v1.1' || kind === 'grblhal' || kind === 'fluidnc') {
     return EXTERNAL_PROGRAM_BASELINE;
   }
-  return kind === 'smoothieware' ? 'G17G21G90G0' : 'G21\nG90';
+  return kind === 'smoothieware' ? `G17G21G90G0\n${SMOOTHIE_BASELINE_POWER_SCALE}` : 'G21\nG90';
 }
 
 /** The baseline's words with what each sets, for the Run review. */
@@ -79,6 +91,7 @@ export const BASELINE_WORD_MEANINGS: Readonly<Record<string, string>> = {
   G90: 'absolute moves',
   G94: 'feed per minute',
   G0: 'rapid motion',
+  M221: 'full laser power scale',
 };
 
 /** The refusals listed before "and more", so a bad file stays readable. */

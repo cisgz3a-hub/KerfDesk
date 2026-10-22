@@ -5,6 +5,10 @@ import {
   type Project,
   type Scene,
 } from '../../../core/scene';
+import {
+  validateSceneBudgets,
+  validateSceneIntegrity,
+} from '../../../io/project/project-scene-integrity-validator';
 
 // Rebase a jig draft onto a main project that changed while the editor was
 // open. The editor is a full-screen modal, so those changes come from
@@ -26,7 +30,11 @@ export type JigRebaseConflict =
    *  in the merge uses an operation the other side removed. */
   | 'operations'
   /** A project field outside the scene was changed differently on both sides. */
-  | 'project';
+  | 'project'
+  /** Separately valid edits exceed a persistence budget when combined. */
+  | 'scene-limits'
+  /** The combined scene has conflicting identities, colours or references. */
+  | 'scene-integrity';
 
 export type JigRebase =
   | { readonly kind: 'rebased'; readonly project: Project }
@@ -56,6 +64,8 @@ export function rebaseJigDraft(base: Project, current: Project, draft: Project):
   try {
     const project = mergeFields(base, current, draft, 'project', DRAFT_PROJECT_FIELDS);
     project.scene = rebaseScene(base.scene, current.scene, draft.scene);
+    const conflict = jigSceneConflict(project.scene as Scene);
+    if (conflict !== null) refuse(conflict);
     if (draft.registrationArtworkOutputSnapshot !== undefined)
       project.registrationArtworkOutputSnapshot = draft.registrationArtworkOutputSnapshot;
     return { kind: 'rebased', project: project as Project };
@@ -63,6 +73,12 @@ export function rebaseJigDraft(base: Project, current: Project, draft: Project):
     if (reason instanceof Conflict) return { kind: 'conflict', conflict: reason.conflict };
     throw reason;
   }
+}
+
+/** A saved jig must satisfy the same scene contract as a reopened project. */
+export function jigSceneConflict(scene: Scene): JigRebaseConflict | null {
+  if (validateSceneBudgets({ ...scene }) !== null) return 'scene-limits';
+  return validateSceneIntegrity({ ...scene }) === null ? null : 'scene-integrity';
 }
 
 function rebaseScene(base: Scene, current: Scene, draft: Scene): Scene {

@@ -157,6 +157,8 @@ export type GcodeRenderModel = {
 };
 
 export type BuildRenderModelOptions = {
+  /** Enable only the connected stock GRBL parser's known block semantics. */
+  readonly stockGrbl?: boolean;
   /** Explicit program context. Unspecified/CNC retains geometric G1 cutting
    * semantics because spindle S0/M5 does not establish that a tool is clear. */
   readonly machineKind?: 'laser' | 'cnc' | undefined;

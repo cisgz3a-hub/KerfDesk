@@ -2,7 +2,8 @@
 // every row and column it holds, labelled with the burned values, each cell
 // shaded by its energy from faint to deep. Engraved cells fill; cut cells
 // show only their outline. The last valid card stays, dimmed, while a field
-// is invalid. Display only: nothing here reaches output.
+// is invalid. Cell proportions are physical; matrix spacing is schematic so
+// every axis label stays readable. Display only: nothing here reaches output.
 
 import { useRef, type CSSProperties, type SVGProps } from 'react';
 import type { MaterialTestGridOptions } from '../../core/job/material-test-grid';
@@ -54,10 +55,16 @@ export function MaterialTestPreview(props: {
   const label = stale
     ? `Test card preview, paused until every field is valid. Last valid card: ${model.summary}`
     : `Test card preview. ${model.summary}`;
+  const proportions = `Cells: ${model.cellWidth} × ${model.cellHeight} mm. Cell proportions shown; spacing is schematic.`;
   return (
-    <div role="img" aria-label={label} style={{ ...frameStyle, opacity: stale ? 0.35 : 1 }}>
+    <div
+      role="img"
+      aria-label={`${label} ${proportions}`}
+      style={{ ...frameStyle, opacity: stale ? 0.35 : 1 }}
+    >
       <PreviewHeader model={model} />
       <PreviewGrid model={model} />
+      <div style={noteStyle}>{proportions}</div>
     </div>
   );
 }
@@ -139,18 +146,22 @@ function PreviewCell(props: {
   const { cell, model, size } = props;
   const shade = cell.energy > 0 ? burnShade(cell.energy) : 'var(--lf-bg-input)';
   const cut = model.mode === 'line';
-  // A cut burns the outline, drawn inside the cell so neighbours never touch.
-  const outline = cut ? Math.max(1, size * 0.14) : 0;
+  // Fit the physical shape uniformly inside its labelled matrix slot. The
+  // stroke stays inside that footprint, without thickening subpixel strips.
+  const scale = size / Math.max(model.cellWidth, model.cellHeight);
+  const width = model.cellWidth * scale;
+  const height = model.cellHeight * scale;
+  const outline = Math.min(cut ? 1 : 0.75, width / 3, height / 3);
   return (
     <rect
-      x={props.x + outline / 2}
-      y={props.y + outline / 2}
-      width={size - outline}
-      height={size - outline}
-      rx={1.5}
+      x={props.x + (size - width + outline) / 2}
+      y={props.y + (size - height + outline) / 2}
+      width={width - outline}
+      height={height - outline}
+      rx={Math.min(1.5, width / 4, height / 4)}
       fill={cut ? 'var(--lf-bg-input)' : shade}
       stroke={cut && cell.energy > 0 ? shade : 'var(--lf-border)'}
-      strokeWidth={cut ? outline : 0.75}
+      strokeWidth={outline}
     >
       <title>{cellTitle(cell, model)}</title>
     </rect>
@@ -233,6 +244,7 @@ const headerStyle: CSSProperties = {
   fontSize: 12,
 };
 const axisKeyStyle: CSSProperties = { marginRight: 12, whiteSpace: 'nowrap' };
+const noteStyle: CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 12 };
 const legendStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',

@@ -13,6 +13,12 @@ import type { GcodeRenderModel, ProgramFinding } from '../gcode-view';
 import type { ControllerKind } from '../devices';
 import { scanGcodeWords } from '../gcode/word-scan';
 import { createMarlinProgramReader } from './marlin-program-reader';
+import {
+  grblBlockRejection,
+  grblBlockUncertainty,
+  grblRejectedBlockWarning,
+} from '../gcode-view/grbl-block-rejection';
+import { externalProgramBaseline } from './normalize-external-program';
 
 export type ExternalProgramEnvelope = {
   readonly minX: number;
@@ -55,8 +61,6 @@ const PROBE_CODES: ReadonlyArray<number> = [38.2, 38.3, 38.4, 38.5];
 
 /** Unsupported words another warning already explains. */
 const EXPLAINED_WORDS: ReadonlySet<string> = new Set([
-  'G10',
-  'L',
   'G28.1',
   'G30',
   'G30.1',
@@ -127,13 +131,14 @@ export function reviewExternalProgram(
   context: ExternalProgramContext,
   findings: ReadonlyArray<ProgramFinding> = [],
 ): ExternalProgramReview {
-  const interpreted =
-    context.controllerKind === 'marlin' ? marlinReviewText(gcode, context.machineKind) : null;
+  const interpreted = controllerReviewText(gcode, context);
   const reviewedText = interpreted?.gcode ?? gcode;
-  const scanned = commandsIn(reviewedText);
+  const baselineLines = baselineLineCount(gcode, context.controllerKind);
+  const scanned = commandsIn(reviewedText, baselineLines);
   // Marlin's M3/M4 without S uses configured startup power; its reader names
   // that separately. GRBL's retained-S warning would contradict it.
-  const commands = interpreted === null ? scanned : { ...scanned, onBeforeSpeed: false };
+  const commands =
+    context.controllerKind === 'marlin' ? { ...scanned, onBeforeSpeed: false } : scanned;
   // Motion the Inspector could not draw is not "never moves": it has no envelope.
   const still =
     model.stats.programBounds === null && model.skippedMotions.length === 0
@@ -146,7 +151,7 @@ export function reviewExternalProgram(
     ...coordinateSystemWarnings(model),
     ...(still === undefined ? pointEnvelopeWarnings(reviewedText, model) : [NEVER_MOVES]),
     ...unitWarnings(model),
-    ...toolLeftOnWarnings(model),
+    ...toolLeftOnWarnings(model, baselineLines),
     ...machineModeWarnings(model, context),
     ...skippedMotionWarnings(model),
     ...findings
@@ -161,6 +166,11 @@ export function reviewExternalProgram(
   return { envelope, units: declaredUnits(model), warnings };
 }
 
+function controllerReviewText(gcode: string, context: ExternalProgramContext) {
+  if (context.controllerKind === 'marlin') return marlinReviewText(gcode, context.machineKind);
+  return context.controllerKind === 'grbl-v1.1' ? grblReviewText(gcode) : null;
+}
+
 function marlinReviewText(
   gcode: string,
   machineKind: 'laser' | 'cnc',
@@ -171,6 +181,19 @@ function marlinReviewText(
     const result = read(line);
     warnings.push(...result.warnings.map((warning) => `Line ${index + 1}: ${warning}`));
     return result.line;
+  });
+  return { gcode: lines.join('\n'), warnings };
+}
+
+function grblReviewText(gcode: string): { readonly gcode: string; readonly warnings: string[] } {
+  const warnings: string[] = [];
+  const lines = gcode.split('\n').map((line, index) => {
+    const rejected = grblBlockRejection(line);
+    const uncertain = grblBlockUncertainty(line);
+    if (rejected === null && uncertain !== null) warnings.push(`Line ${index + 1}: ${uncertain}`);
+    if (rejected === null) return line;
+    warnings.push(`Line ${index + 1}: ${grblRejectedBlockWarning(rejected)}`);
+    return '';
   });
   return { gcode: lines.join('\n'), warnings };
 }
@@ -211,12 +234,21 @@ function unsupportedWordWarnings(findings: ReadonlyArray<ProgramFinding>): Reado
   ];
 }
 
-function commandsIn(gcode: string): Commands {
+// The sent program opens with KerfDesk's baseline (externalProgramBaseline).
+// Its lines set the modes the review assumes; they are not the program's own
+// commands. Smoothieware's `M221 S100` restores the power-up scale: it is not
+// an S the program set, nor the program leaving its laser on.
+function baselineLineCount(gcode: string, kind: ControllerKind | undefined): number {
+  const baseline = externalProgramBaseline(kind ?? 'grbl-v1.1');
+  return gcode.startsWith(`${baseline}\n`) ? baseline.split('\n').length : 0;
+}
+
+function commandsIn(gcode: string, baselineLines: number): Commands {
   const g = new Set<number>();
   const m = new Set<number>();
   const offsetWrites = new Set<number>();
   const speed = createSpeedTracker();
-  for (const line of gcode.split('\n')) {
+  for (const line of gcode.split('\n').slice(baselineLines)) {
     const words = scanGcodeWords(line);
     for (const word of words) {
       const code = Math.round(word.value * 10) / 10;
@@ -325,9 +357,10 @@ function coordinateSystemWarnings(model: ReviewModel): ReadonlyArray<string> {
 
 // GRBL switches the spindle or laser off at a program end (M2/M30), as the
 // Inspector's parser does, so a CAM program ending in M30 without M5 is fine.
-function toolLeftOnWarnings(model: ReviewModel): ReadonlyArray<string> {
+function toolLeftOnWarnings(model: ReviewModel, baselineLines: number): ReadonlyArray<string> {
   let on = false;
   for (const event of model.events) {
+    if (event.line < baselineLines) continue;
     if (event.kind === 'spindle-on') on = true;
     else if (event.kind === 'spindle-off' || event.kind === 'program-end') on = false;
   }

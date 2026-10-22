@@ -30,14 +30,13 @@ type OutlineStats = { count: number; area: number; perimeter: number };
 type SourceOutline = {
   readonly source: VectorSceneObject;
   readonly bounds: Bounds | null;
-  readonly perimeter: number;
   /** No vertex of the source survives on the welded outline. */
   readonly candidate: boolean;
 };
 
 /**
- * Compare Weld's output with its source outlines in linear time, without a
- * second union. Weld only merges overlapping or touching contours, so when no
+ * Compare Weld's output count and area with its sources before checking coverage.
+ * Weld only merges overlapping or touching contours, so when no
  * contour is merged, removed or split, the contour count and the summed contour
  * areas match the sources up to Clipper's grid rounding.
  *
@@ -91,7 +90,6 @@ function compareOutlines(
     outlines.push({
       source,
       bounds: boundsForPaths([{ color: '', polylines }]),
-      perimeter: own.perimeter,
       candidate: own.count > 0 && !survives,
     });
   }
@@ -123,11 +121,7 @@ function absorbedSourceIds(outlines: ReadonlyArray<SourceOutline>): string[] {
     const own = pieces.get(candidate) ?? [];
     const covers = (other: SourceOutline): boolean =>
       other !== candidate && !absorbed.has(other) && near(candidate, other);
-    const covered =
-      own.length > 0 &&
-      own.every((piece) =>
-        pieceCovered(piece, coveringPaths(piece.key, pieces, covers), candidate),
-      );
+    const covered = own.length > 0 && own.every((piece) => pieceCovered(piece, pieces, covers));
     if (covered) absorbed.add(candidate);
   }
   return candidates
@@ -135,29 +129,30 @@ function absorbedSourceIds(outlines: ReadonlyArray<SourceOutline>): string[] {
     .map((candidate) => candidate.source.id);
 }
 
-function coveringPaths(
-  key: string,
+function pieceCovered(
+  piece: WeldBatchPiece,
   pieces: ReadonlyMap<SourceOutline, ReadonlyArray<WeldBatchPiece>>,
   covers: (other: SourceOutline) => boolean,
-): PathsD {
-  const paths: PathsD = [];
+): boolean {
+  let remaining: PathsD = piece.batch.paths;
   for (const [outline, otherPieces] of pieces) {
     if (!covers(outline)) continue;
-    for (const piece of otherPieces) if (piece.key === key) paths.push(...piece.batch.paths);
+    for (const other of otherPieces) {
+      if (other.key !== piece.key) continue;
+      const uncovered = tryVectorOp(() =>
+        differenceD(remaining, other.batch.paths, FillRule.NonZero, VECTOR_PATH_PRECISION_DECIMALS),
+      );
+      if (uncovered.kind === 'error') return false;
+      remaining = uncovered.value;
+      // Stop as soon as the whole contribution is covered. An enclosing source
+      // should not require rebuilding all other regions for every inner object.
+      if (remaining.length === 0) return true;
+    }
   }
-  return paths;
-}
-
-function pieceCovered(piece: WeldBatchPiece, others: PathsD, candidate: SourceOutline): boolean {
-  if (others.length === 0) return false;
-  // Normalized regions keep holes opposite to outers, so non-zero over the
-  // concatenated batch members is their union, as in Weld itself.
-  const uncovered = tryVectorOp(() =>
-    differenceD(piece.batch.paths, others, FillRule.NonZero, VECTOR_PATH_PRECISION_DECIMALS),
-  );
-  if (uncovered.kind === 'error') return false;
-  const area = Math.abs(uncovered.value.reduce((sum, path) => sum + areaD(path), 0));
-  return area <= candidate.perimeter / GRID + 1e-9;
+  // Both operands are already normalized onto the same grid. Any remaining
+  // region is a real contribution; a large source perimeter must not hide a
+  // small but still surviving bridge under an area tolerance.
+  return false;
 }
 
 function near(a: SourceOutline, b: SourceOutline): boolean {

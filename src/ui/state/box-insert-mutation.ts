@@ -13,6 +13,7 @@
 // free a part, so the slots are cut while the panel is still held.
 
 import {
+  activeCncTool,
   addObject,
   addLayer,
   bindSceneObjectToOperations,
@@ -24,9 +25,11 @@ import {
   type ImportedSvg,
   type Layer,
   type Polyline,
+  type Project,
   type Scene,
   type SceneObject,
 } from '../../core/scene';
+import { withoutCncFeedSource } from './cnc-feed-provenance';
 import { pushUndo, type MutationResult, type StateSlice } from './scene-mutations';
 
 // The default drawn-vector cut color (draw-tool parity): panels join the
@@ -82,6 +85,38 @@ export function applyInsertBoxPanels(
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
     dirty: true,
+  };
+}
+
+/**
+ * The reliefs are sized for the active bit (F-K3, ADR-106 Amendment 1), so the
+ * fresh operations must cut with it. The machine starter pins its own cutter
+ * (ADR-256); when that is not the active bit, the operation follows the active
+ * bit instead, as Design Studio Apply drops a seeded bit. The starter's numbers
+ * stay as retained values: its provenance names its own cutter, and the next
+ * machine refresh would pin that cutter again.
+ */
+export function cutFreshCncOperationsWithActiveBit<T extends { readonly project: Project }>(
+  previousLayers: ReadonlyArray<Layer>,
+  result: T,
+): T {
+  const machine = result.project.machine;
+  if (machine?.kind !== 'cnc') return result;
+  const activeToolId = activeCncTool(machine).id;
+  const existing = new Set(previousLayers.map((layer) => layer.id));
+  let changed = false;
+  const layers = result.project.scene.layers.map((layer) => {
+    const settings = layer.cnc;
+    if (existing.has(layer.id) || settings?.toolId === undefined) return layer;
+    if (settings.toolId === activeToolId) return layer;
+    const { toolId: _seededTool, ...followsActiveBit } = settings;
+    changed = true;
+    return { ...layer, cnc: withoutCncFeedSource(followsActiveBit) };
+  });
+  if (!changed) return result;
+  return {
+    ...result,
+    project: { ...result.project, scene: { ...result.project.scene, layers } },
   };
 }
 

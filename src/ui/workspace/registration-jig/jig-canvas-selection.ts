@@ -9,7 +9,7 @@ import {
   type SelectionTransform,
   type Vec2,
 } from '../../../core/scene';
-import type { HandleKind } from '../handles';
+import { HANDLE_SCREEN_PX, type HandleKind } from '../handles';
 import {
   hitSelectionRotateHandle,
   pointerAngleDeg,
@@ -112,6 +112,18 @@ export function jigHandleAt(
 ): JigHandle | null {
   const metrics = selectionMetrics(objects);
   if (metrics === null) return null;
+  const { minX, minY, maxX, maxY } = metrics.bbox;
+  // Overlapping fixed-pixel handles must leave small artwork an interior move
+  // target. The handle portions on and outside the bounds remain available.
+  const handleSize = HANDLE_SCREEN_PX * pxToMm;
+  if (
+    (maxX - minX <= handleSize || maxY - minY <= handleSize) &&
+    point.x > minX &&
+    point.x < maxX &&
+    point.y > minY &&
+    point.y < maxY
+  )
+    return null;
   const handle = hitAabbHandle(metrics.bbox, point, pxToMm);
   if (handle !== null) return { kind: 'resize', handle };
   return hitSelectionRotateHandle(objects, point, pxToMm) ? { kind: 'rotate' } : null;

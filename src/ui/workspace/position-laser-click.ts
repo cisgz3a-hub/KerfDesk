@@ -5,17 +5,23 @@
 // limits (ADR-375) → the laser store's machine-position jog path, including
 // work-offset conversion and CNC safe Z.
 // With the camera overlay visible this is
-// "click the object in the camera image, the head moves to it".
+// "click the object in the camera image, the head moves to it". The head
+// camera's capture stops (ADR-449) use the same target and limits.
 
-import { toMachineCoords } from '../../core/devices';
+import { toMachineCoords, toSceneCoords } from '../../core/devices';
 import type { DeviceProfile } from '../../core/devices';
 import type { Vec2 } from '../../core/scene';
 import { useLaserStore } from '../state/laser-store';
 import { jogFrameCommandBlockMessage } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
 import { resolveManualMotionLimits } from '../state/manual-motion-limits';
-import { resolveNativeBedFrame } from '../state/native-bed-frame';
-import { bedPointToNative, type NativeXyBounds } from '../../core/devices/native-bed-frame';
+import { resolveNativeBedFrame, type NativeBedEvidence } from '../state/native-bed-frame';
+import {
+  bedPointToNative,
+  nativePointToBed,
+  type NativeBedFrame,
+  type NativeXyBounds,
+} from '../../core/devices/native-bed-frame';
 
 // Same positioning feed policy as the JogPad: fast, capped by the device.
 const POSITION_FEED_CAP_MM_PER_MIN = 3000;
@@ -64,18 +70,61 @@ export function dispatchPositionLaser(scenePoint: Vec2, device: DeviceProfile): 
       );
     return;
   }
-  // On stock GRBL the bed edge on the homing side is where the homing switch
-  // trips; the limits keep the head the pull-off clear of it (ADR-375).
-  const target = clampToNative(
-    bedPointToNative(positionLaserTarget(scenePoint, device), frame),
-    resolveManualMotionLimits(frame, laser) ?? frame.nativeBounds,
-  );
+  const target = positionLaserNativeTarget(scenePoint, device, frame, laser);
   void laser
     .jogToMachinePosition(target.x, target.y, positionLaserFeed(device.maxFeed))
     .catch(() => {
       // The jog path surfaces write failures through the transcript/safety
       // notice; the click itself must never throw into React.
     });
+}
+
+/**
+ * The native jog target for a scene point: inside the bed, through the origin
+ * transform, and inside the manual-motion limits. On stock GRBL the bed edge on
+ * the homing side is where the homing switch trips; the limits keep the head
+ * the pull-off clear of it (ADR-375).
+ */
+export function positionLaserNativeTarget(
+  scenePoint: Vec2,
+  device: DeviceProfile,
+  frame: NativeBedFrame,
+  evidence: NativeBedEvidence,
+): Vec2 {
+  return clampToNative(
+    bedPointToNative(positionLaserTarget(scenePoint, device), frame),
+    manualMotionBox(frame, evidence),
+  );
+}
+
+/** A box on the bed, scene mm. */
+export type BedBox = {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+};
+
+/** Where on the bed {@link positionLaserNativeTarget} can take the head. */
+export function positionLaserReach(
+  device: DeviceProfile,
+  frame: NativeBedFrame,
+  evidence: NativeBedEvidence,
+): BedBox {
+  const box = manualMotionBox(frame, evidence);
+  const a = toSceneCoords(nativePointToBed({ x: box.minX, y: box.minY }, frame), device);
+  const b = toSceneCoords(nativePointToBed({ x: box.maxX, y: box.maxY }, frame), device);
+  const bed = { minX: 0, minY: 0, maxX: device.bedWidth, maxY: device.bedHeight };
+  return {
+    minX: Math.max(bed.minX, Math.min(a.x, b.x)),
+    minY: Math.max(bed.minY, Math.min(a.y, b.y)),
+    maxX: Math.min(bed.maxX, Math.max(a.x, b.x)),
+    maxY: Math.min(bed.maxY, Math.max(a.y, b.y)),
+  };
+}
+
+function manualMotionBox(frame: NativeBedFrame, evidence: NativeBedEvidence): NativeXyBounds {
+  return resolveManualMotionLimits(frame, evidence) ?? frame.nativeBounds;
 }
 
 function clampToNative(point: Vec2, bounds: NativeXyBounds): Vec2 {

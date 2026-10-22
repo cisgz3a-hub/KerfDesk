@@ -38,6 +38,16 @@ describe('project Auto-focus command on load', () => {
     expect(loadedAutofocus('G38.2 Z-10 F100')).toBe('G38.2 Z-10 F100');
     expect(loadedAutofocus('')).toBe('');
   });
+
+  // Controller audit v3 D2-P3-3/P3-4 (ADR-400 Amendment 2): an F-less probe
+  // runs at the last job's feed, a silent probe can end as a plain Z move, and
+  // G30 does not focus. The load rule is controller-independent.
+  it.each(['G38.2 Z-10', 'G38.2 Z-10 F6000', 'G38.3 Z-500 F100', 'G30', 'G30 Z1.5'])(
+    'clears the probe %j',
+    (payload) => {
+      expect(loadedAutofocus(payload)).toBe('');
+    },
+  );
 });
 
 describe('machine profile Auto-focus command', () => {
@@ -56,5 +66,22 @@ describe('machine profile Auto-focus command', () => {
     if (result.kind !== 'ok') return;
     expect(result.document.profile.autofocusCommand).toBe('');
     expect(result.document.reviewNotes.join(' ')).toMatch(/Auto-focus command removed/);
+  });
+
+  it('clears an imported F-less probe and says it needs its own feed', () => {
+    const text = serializeMachineProfileDocument({
+      format: MACHINE_PROFILE_FORMAT,
+      schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
+      profile: { ...DEFAULT_DEVICE_PROFILE, autofocusCommand: 'G38.2 Z-10' },
+      source: { kind: 'custom', label: 'Shared' },
+      reviewNotes: [],
+    });
+
+    const result = deserializeMachineProfileDocument(text, 'import');
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.document.profile.autofocusCommand).toBe('');
+    expect(result.document.reviewNotes.join(' ')).toMatch(/needs its own feed/);
   });
 });

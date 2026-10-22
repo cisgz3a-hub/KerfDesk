@@ -148,13 +148,16 @@ export function describeAutofocusResult(result: AutofocusResult): {
     case 'rejected':
       if (result.errorCode === 20) {
         return {
-          message: `Auto-focus rejected (error:20 — unsupported on this firmware). Check the vendor autofocus command and firmware instructions for your machine.`,
+          message: `Auto-focus rejected (error:20 — no probe input, or unsupported on this firmware). Check the vendor autofocus command and firmware instructions for your machine.`,
           variant: 'error',
         };
       }
+      // GRBL, grblHAL and FluidNC error:9 is "G-code locked out during alarm
+      // or jog"; a missing probe input answers error:20 (controller audit v3
+      // D2-P3-1).
       if (result.errorCode === 9) {
         return {
-          message: `Auto-focus rejected (error:9 — G-code locked / no probe pin).`,
+          message: `Auto-focus rejected (error:9 — G-code is locked while the controller is in Alarm or Jog). Clear the alarm or let the jog finish, then retry.`,
           variant: 'error',
         };
       }

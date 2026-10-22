@@ -58,6 +58,8 @@ artwork, with **Created by Ons Houtkombuis** visible below. The artwork is embed
 startup page and decoded with the text, so the wood is present on the first splash paint.
 The splash becomes visible only after its complete markup is parsed, even when the HTML
 arrives in chunks. The workspace does not accept pointer or keyboard input behind it.
+Workspace overlays, including the controller pause panel, stay beneath the startup screen
+through its hold and fade. Live machine controls regain their normal priority after dismissal.
 Reduced motion uses a static indicator. Both web and desktop hold the screen for at least four
 visible seconds from its first frame after the workspace module starts, then fade it over
 750 ms once the workspace canvas has had a paint opportunity. Time before that frame or while
@@ -993,6 +995,9 @@ that owns those fields, without changing the existing Frame/Start policy.
    geometry that will be cut, carved, or burned.
 3. **Undo last** removes only the most recent assignment. **Done** commits the whole numbering
    session as one undoable project action. **Cancel** restores the order from before the session.
+   Placement and output-scope changes made during numbering remain after Cancel and leave the
+   project unsaved. **Save** finishes the visible numbering order before opening a file picker or
+   writing, so a later Cancel cannot make the saved file and the clean project disagree.
 4. Numbering ends automatically after every run unit has been assigned.
 5. While numbering is open, other design edits (Delete, nudge, paste, Undo/Redo, menu, toolbar
    and command-search commands) are refused with a notice to click **Done** or **Cancel** first,
@@ -1199,6 +1204,11 @@ that owns those fields, without changing the existing Frame/Start policy.
    score line, a sheet border, or a part whose operation has no leads) could be either, so the
    shapes inside it get no leads, and Job Review names that operation: turn on its leads if it cuts
    parts out, or choose a fixed side. One that burns nothing (0% power) does not count.
+   Open lines of a Line operation that close a region (their ends meet, cross, or stop up to
+   0.5 mm short, such as a plate drawn as separate lines) may be a part's outline too, so the
+   shapes inside that region get no leads either, and Job Review says to close the outline with
+   **Tools → Join paths** or choose a fixed side (ADR-626 Amendment 8). DXF import already joins
+   LINE and ARC pieces whose ends meet.
    **Always outside** and **Always inside** put every lead of the operation on that side.
 4. Leads join each closed shape where it really starts, so they follow **Start closed shapes**
    (F-A9e) and the job start point. Where no lead fits there (a hole that starts at a corner), the
@@ -1209,7 +1219,10 @@ that owns those fields, without changing the existing Frame/Start policy.
    how many shapes that affects. That shape is cut as it would be without leads.
 6. Every pass cuts lead-in, shape, lead-out. With **Overcut** the final pass runs past the start
    first and leaves by a lead-out from where the overcut ends. Leads follow the kerf-offset path.
-   Shapes with tabs and perforated lines get no leads, and Job Review says so. Open paths get none.
+   Shapes with tabs and perforated lines get no leads, and Job Review says so. Open paths get none,
+   including a shape that **Remove overlapping lines** opened up, but leads still keep out of it.
+   When open paths whose ends meet sit on an operation with a kerf offset or leads, or hold shapes
+   that inside-first would cut first, Job Review warns that they are cut as open lines.
 7. Preview, Frame, both time estimates, Job Review and every output format (GRBL, Marlin,
    Smoothieware, Ruida) show the leads. On machines that take arcs, a shape that goes out as arcs
    keeps them and its arc leads go out as arcs too. CNC output never changes.
@@ -1305,6 +1318,8 @@ that owns those fields, without changing the existing Frame/Start policy.
    (ADR-431).
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
+   The file is made before the destination is asked for, so a failure leaves an existing file as
+   it was (ADR-656); a slow export asks for one more click on **Choose file…**.
 4. Re-import preserves the supported vector/image composition, physical size and image clips
    (ADR-358). New exports also restore their authored scene coordinate frame through explicit
    artwork-origin metadata (ADR-574), before ordinary import placement. Older exports, or files
@@ -1586,10 +1601,11 @@ the completed physical Frame is the spatial source of truth.
 #### Error — file is not a valid .lf2
 - Modal: `Could not open <filename>: not a valid KerfDesk project.` No load.
 
-#### Edge — the file carries an Auto-focus command (ADR-400 Amendment 1)
-1. On load, an Auto-focus command that is not a focus routine (a G0–G3 move, an X/Y word, an
-   M-code, `S` above 0, or a `$` settings write) is cleared, as a refused
-   positioning-light command is. Auto-focus then shows **Set up auto-focus**.
+#### Edge — the file carries an Auto-focus command (ADR-400 Amendments 1 and 2)
+1. On load, an Auto-focus command that is not a focus routine is cleared, as a refused
+   positioning-light command is. That covers a G0–G3 move, an X/Y word, an M-code, `S` above 0,
+   a `$` settings write, a probe without its own feed of at most 150 mm/min, a `G38.3`/`G38.5`
+   probe and `G30`. Auto-focus then shows **Set up auto-focus**.
 2. A file for the machine already in use (same profile, name and bed) keeps that machine's own
    Auto-focus command from Machine Setup. When the file's command differs, an info toast says
    `This file's Auto-focus command was not used: Auto-focus keeps your machine's own command from
@@ -1597,9 +1613,15 @@ the completed physical Frame is the spatial source of truth.
 3. A file for another machine brings its vetted command with the rest of that machine, behind the
    machine notice; **Keep current machine** restores the current command too.
 4. Whatever its source, the Auto-focus button sends only a focus routine: `$HZ1` on the Falcon
-   A1 Pro, `$HZ` on grblHAL or FluidNC, a Z-only `G38.2`–`G38.5` probe, or `G30` on Marlin or
-   Smoothieware. Stock GRBL gets no `$H…` command, which would leave it stuck homing. Any M-code and
-   anything else is refused with its reason and nothing is sent.
+   A1 Pro, `$HZ` on grblHAL or FluidNC, or a Z-only `G38.2`/`G38.4` probe with its own feed of at
+   most 150 mm/min, for example `G38.2 Z-10 F100`. Its Z target is a work-coordinate position
+   (G90), not a distance. Without F the controller would probe at the last job's feed. `G38.3` and
+   `G38.5` end silently when they miss, and `G30` does not focus on any supported firmware, so
+   all three are refused. Stock GRBL gets no `$H…` command, which would leave it stuck homing. Any
+   M-code and anything else is refused with its reason and nothing is sent.
+5. When the controller answers `error:9`, it was in Alarm or Jog: clear the alarm or let the jog
+   finish, then retry. `error:20` means the firmware has no probe input or does not support the
+   command.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).
@@ -2084,8 +2106,12 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
    controller's own (ADR-375).
 3. After Unlock without Home, stock GRBL's own reported MPos aims the hold, while the rest of the
    app still treats the position as unknown (ADR-375).
-4. Otherwise the jog asks for full travel and relies on the release.
-5. A release just after the jog went out waits for its reply before `0x85`, as Cancel does
+4. After a Home in this session, the hold also stops the pull-off clear of the switch with soft
+   limits off, so a held arrow toward the homing corner does not trip the switch (`ALARM:1`). On
+   grblHAL this works for every homing direction (`$23`): force set origin is read from `$22`
+   bit 3 when the `$$` dump prints the whole `$22` bitfield (ADR-375 Amendment 3).
+5. Otherwise the jog asks for full travel and relies on the release.
+6. A release just after the jog went out waits for its reply before `0x85`, as Cancel does
    (F-B4). If a motion line's reply never comes, Cancel says so after 8 s and the jog stays owned,
    since the reply may still arrive; once the controller reports Idle, Disconnect and Connect stay
    available to clear it (ADR-640).
@@ -2576,8 +2602,13 @@ authorization, Frame proof, controller command, or safety boundary.
 2. `$number=value` settings writes require connected, idle controller state and explicit
    confirmation. On stock GRBL a value the firmware would store differently (anything but 0 or 1
    for an on/off setting, a fraction or a value outside 0-255 for its other 8-bit settings) is
-   refused before the prompt. Every acknowledged write is read back with `$$`, so the settings
-   table shows what the controller stored (ADR-375).
+   refused before the prompt. On grblHAL, a value for one of the GRBL settings KerfDesk knows is
+   refused before the prompt unless it is one plain number the setting takes as typed: grblHAL
+   keeps only the number at the start (`$100=26,67` would store 26), and older builds read
+   `$22=1.0` as 10, so the message names the line to send instead. Every acknowledged write is
+   read back with `$$`, so the settings table shows what the controller stored (ADR-375). When
+   the re-read shows a different value than the one typed, the Console says so (ADR-375
+   Amendment 3).
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
@@ -2936,7 +2967,11 @@ authorization, Frame proof, controller command, or safety boundary.
   An `ALARM:N` is not counted as acknowledging a line. After a stop that discards the
   controller's planner (Abort, the auto-abort after a rejected line, a reboot), the automatic
   line also steps back over the moves the last status report showed still waiting in the
-  planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362).
+  planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362). A lost
+  link steps back the same way once the first reconnect shows the controller restarted: its
+  startup banner (an Arduino-based board resets when its port reopens, and one powered from
+  USB stops when the cable is pulled) or an Alarm. A controller that answers without either
+  kept running, and the line stays at the first unacknowledged one (ADR-398 Amendment 3).
 - Resume, saved or manual, re-arms the beam with the power commands of the controller the job
   was written for (ADR-364).
   - A Smoothieware job resumes with `fire off` and restores its own `M221` scale and
@@ -2967,8 +3002,8 @@ authorization, Frame proof, controller command, or safety boundary.
   and points here instead of to Set origin here, which would place the rest of the job where
   the head stopped (ADR-341 Amendment 5).
 - After a lost connection the recovery record also keeps how many lines had been sent: a
-  controller keeps running what it had received, so the head stops at the end of the last of
-  them. When the origin is gone, not reported or moved, **Continue from where the head stopped**
+  controller that keeps running runs what it had received, so the head stops at the end of the
+  last of them. When the origin is gone, not reported or moved, **Continue from where the head stopped**
   writes one `G92` that makes the head's current spot that program point, without moving the
   head, and sets the restart to the next line. It is meant for a machine that was not homed
   before the job, and only while nobody has moved the head since the stop; if the controller
@@ -4769,6 +4804,67 @@ preview and applied copies use the same plan; this is not optimal nesting (ADR-5
 
 ---
 
+### F-BC4. Place an irregular board from a photo (ADR-654)
+
+**ADR:** [ADR-654](docs/decisions/ADR-654-outline-board-from-photo.md).
+
+**Operator intent.** Draw the irregular edge of an offcut, live-edge slab or shaped blank from a
+phone photo at its exact ruler-measured size, lay artwork out on it straight away, and register it
+to the machine with two head captures before burning.
+
+**Where in the UI.** Open **Tools → Place Board**, choose **Outline**, then **Draw board from
+photo…**. The photo window takes a file, a pasted photo (Ctrl+V), or a photo an MCP assistant sends
+to the desktop app (`set_board_photo`), which opens the window by itself.
+
+**The happy path.**
+
+1. Photograph the board from straight above with the whole board in view, and open the photo.
+2. Click each corner of the board in order around its edge, adding points along curved edges.
+   Drag a point to move it. **Straighten edge** lines up points that are a little off: pick the
+   points at the two ends of an edge and the points between move onto the straight line joining
+   them. **Undo** reverses the last click, drag, straighten or clear; **Clear** starts over. The
+   dashed line shows the closing edge.
+3. Enter the board's ruler-measured width (left to right in the photo) and height (top to bottom).
+   The clicked outline is scaled to exactly that size. Every clicked corner is a check point, up
+   to six (more points pick the sharpest six); A is the point nearest the photo's bottom-left by
+   default and can be changed, and B is the point farthest from A.
+4. **Draw on canvas** puts the locked outline on the canvas at once, centred and out of the burn.
+   Placement is unchanged until the board is registered.
+5. Select artwork and use **Fit to board** or **Array on board** inside the outline (a conservative
+   inscribed rectangle).
+6. Jog beam-off onto point A and **Capture**, then point B and **Capture**. **Register board**
+   checks the measured scale, sets the work origin at the outline's physical front-left corner,
+   gives the drawn outline the shape and turn the head measured about its own centre, turns
+   unlocked artwork lying on it by the same angle, and switches placement to User Origin
+   front-left. This is one Undo step.
+7. Check every remaining point. Each accepted or adjusted point is measured and refits the outline.
+   These checks are accuracy advice, not a Start gate.
+8. Preview, complete **Frame** for the exact placement, then Start. The completed Frame remains the
+   ordinary Start gate.
+
+**Edge / error cases.** **Draw on canvas** stays disabled, with the reason shown, until there are
+at least three points that do not cross and a width and height of at least 3 mm. A typed size whose
+proportions differ from the clicked outline by more than 10% shows a notice (width and height
+swapped, or a photo taken at an angle) without blocking. **Straighten edge** refuses neighbouring
+ends (there is nothing between them) and any edge whose points sit more than 15% of its length off
+the line, so it cannot collapse a corner. A head-measured spacing of A and B over 5%
+different from the drawn outline is refused as a likely wrong point or size; over 1% shows a
+notice. Locked artwork does not turn at registration. Without a connected machine the board can be
+drawn and laid out but not registered. Reconnect, reset/alarm, homing/manual-position or
+work-origin changes stale the capture epochs and require recapture. A checked point over 5 mm from
+prediction warns about the selected point; a least-squares miss over 1.5 mm warns about photo
+distortion and recommends an edge margin.
+
+**Hardware verification checklist (user-driven — hardware CLAIMED).**
+
+1. Secure scrap material and use S=0 / an air trace first.
+2. Draw the board from a straight-down photo, lay out test artwork, capture A and B and register.
+3. Move beam-off to every check point and confirm the head lands on the physical edge.
+4. Keep test artwork several millimetres inside the outline, then complete Frame and inspect the
+   air trace before enabling normal power.
+
+---
+
 ### F-F4. Convert a selected vector to a bitmap (Phase F.4)
 
 **ADR:** [ADR-029](DECISIONS.md#adr-029--convert-to-bitmap-vector--raster-engrave-source).
@@ -6005,6 +6101,14 @@ and lifts the command's CNC-only gate.)*
    removal confirmation, clamping, and actual spindle-at-speed remain
    operator/machine responsibilities.
 
+#### Error — X/Y origin change during the hold
+1. The hold re-zeroes Z only. The rest of the job runs on the X/Y origin it
+   started with, so the XYZ corner probe, Set origin, Reset origin, the saved-origin
+   writes and the phone remote's X/Y `set_work_origin` are refused for the whole
+   hold, before anything is written. The Probe panel offers only "Z only" there
+   and keeps the remembered XYZ mode for after the job. Zero Z and the Z probe stay
+   available (ADR-375 Amendment 3). To change X/Y, stop the job first.
+
 #### Empty
 1. Single-bit jobs never pause.
 
@@ -6152,6 +6256,12 @@ and lifts the command's CNC-only gate.)*
    An inlay pair never ramps, so its insert keeps its lead even when the
    layer carries a Ramp entry angle left from an earlier cut type, which an
    inlay layer does not show (ADR-250 Amendment 2).
+   A lead never cuts into a part the job keeps: the whole cutter, not just its
+   centre, stays clear of every part on every profile operation and inside the
+   hole a nested part sits in. Where no lead fits, that pass plunges straight
+   down on the cut line as it would with None, and Job Review warns that the
+   plunge can mark that edge. The warning never blocks Frame or Start
+   (ADR-250 Amendment 3).
 
 #### Advisory — invalid or unrepresentable V-carve entry
 1. Ordinary profile/pocket/engrave and relief roughing retain positive requested
@@ -6499,22 +6609,27 @@ and lifts the command's CNC-only gate.)*
    after M5. Fixed feeds are capped to the device-profile maximum.
 2. The toast repeats the operator contract: zero X/Y at the area's
    front-left corner and Z on the surface to be faced before running.
-3. Choose the destination when Save is clicked. Background emitted-text
+3. Save checks and generates the whole program first (**Checking surfacing
+   program…**), then asks for the destination (ADR-656): the browser's save
+   picker empties an existing file as soon as it returns. Background emitted-text
    preflight checks the work-origin bed envelope, enabled no-go-zone
    uncertainty, feed/RPM ceilings, finite coordinates, safe travel/depth,
-   and spindle-start clearance before a writable transaction opens. Setup
-   and controller findings remain advisory toasts, including on picker cancel.
-4. Generation, preflight, and file writes use bounded buffers. **Cancel surfacing
-   save** stops preparation or discards uncommitted file bytes. **Finishing
-   surfacing save…** means the complete file is already being committed and
-   can no longer be cancelled. A replacement save waits for that commit to
-   settle before opening another writable; changing projects retires old UI
-   notifications. Existing file contents survive preflight, generation, or
-   write failures before the final commit.
+   and spindle-start clearance before the picker opens. When preparation
+   outlasts the Save click, **Save surfacing program** asks for one more
+   click on **Choose file…**. Setup and controller findings remain advisory
+   toasts, including on picker cancel.
+4. Generation and preflight use bounded buffers; the finished program is held
+   in browser blob storage until it is written. **Cancel surfacing save** stops
+   preparation or the destination choice, and no file is touched. Once a file
+   is chosen, **Finishing surfacing save…** writes the complete program and can
+   no longer be cancelled. A replacement save waits for that commit to settle
+   before opening another writable; changing projects retires old UI
+   notifications. Existing file contents survive preflight, generation and
+   cancellation; only a write failure after the file is chosen can leave it empty.
 
 #### Error — save fails
-1. A preflight failure or failed dialog/write toasts the reason; nothing
-   is written.
+1. A preflight or generation failure toasts the reason before any file dialog
+   opens; nothing is written. A failed dialog or write toasts the reason.
 
 #### Empty
 1. Cancelling the save dialog writes nothing.
@@ -7756,6 +7871,16 @@ as the pane's design record.
    An errored stream is released only after its remaining reply ownership and Idle settlement
    allow it; error reporting is not successful completion.
 
+#### Error — firmware skips a move (ADR-395 Amendment 1)
+1. A build with `NO_MOTION_BEFORE_HOMING` answers each move with `echo:Home XYZ First` (naming
+   the unhomed axes) and then `ok`; a stopped Marlin prints "Printer stopped due to errors" for
+   each move it reads. Both are handled like a non-halting `Error:` for the line: the job stops
+   before its next line (so a fan-wired laser's `M106` is never sent), the Frame stops and does
+   not count as completed, a jog or owned command is refused.
+2. The notice names the axes. Home is `G28 X Y`, so a build that also needs Z homed is told to
+   home Z from the Console (`G28 Z`) if it has a Z endstop, or to turn `NO_MOTION_BEFORE_HOMING`
+   off. A stopped controller is told to send `M999 S1` (plain `M999` asks for a line resend).
+
 ### F-H3. Smoothieware halt and recovery
 
 #### Success
@@ -7897,6 +8022,9 @@ as the pane's design record.
    **Box slots** operation pockets the divider slots at the same depth.
    The pocket clears every slot, so no loose piece is left and no tab
    bridges a slot; clearing runs before any outline frees a panel.
+   Both operations cut with the active bit the reliefs were sized for.
+   Where a machine starter would pin its own cutter instead, they follow
+   the active bit and keep the starter's feeds as retained values.
 
 #### Error — relief tool larger than a finger cell
 1. Validation error per F-K2; generation disabled until resolved.
@@ -8295,6 +8423,11 @@ as the pane's design record.
   the photo step says the sheet must lie where it was engraved, and **Back** engraves a new one.
 - **Edge / another camera.** A photo from another camera or with another crop is not compared;
   the result says why and the new calibration can still be saved.
+- **Edge / Machine Setup changed since calibrating.** A calibration keeps the origin, bed size and
+  native bed frame its target was engraved in (ADR-440 Amendment 1). After a bed-size or
+  native-frame change the camera picture is moved to match, and the calibration row says on what
+  bed it was made and how far it moved. After an origin change the camera is not used: the Camera
+  panel says "Calibrate the camera again, or set the origin back".
 
 ### F-CAM3. Corrected camera overlay (ADR-440, ADR-441 Amendment 2)
 
@@ -8536,7 +8669,9 @@ as the pane's design record.
 - **Edge / stop.** **Stop** cancels the move in progress. The panel says how many pictures were
   taken and shows them.
 - **Edge / out of reach.** When the head cannot travel far enough for the camera to see an edge
-  of the area, the picture stops short of that edge and the panel says why.
+  of the area, the picture stops short of that edge and the panel says why. Like **Move laser
+  here**, the stops keep the pull-off clear of the homing switches when hard limits are on
+  (ADR-449 Amendment 1).
 - **Edge / back to live.** **Live** clears the joined picture and shows the live camera again.
 - **Edge / work-position reports.** A controller set to report its work position (`$10`) places
   the head at WPos plus the reported work offset (WCO), the position the status panel shows. Until
@@ -8568,7 +8703,9 @@ as the pane's design record.
 - **Error / no camera.** A job that starts without a running camera gets a note instead: no
   timelapse, and "The camera was not running when the job started."
 - **Error / cannot check.** A CNC job, a camera that is not fixed and calibrated, or a job that
-  was stopped says why it was not checked. The camera stopping mid-job ends the timelapse with the
+  was stopped says why it was not checked. So does a job whose bed position is unverified (no
+  homing, not homed, Verified Origin): KerfDesk does not know where it burns (ADR-490
+  Amendment 1). The camera stopping mid-job ends the timelapse with the
   frames it has.
 
 ---
@@ -9124,6 +9261,13 @@ desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance
 2. A corner request may mutate XY and therefore invalidates XY-origin, WCO, and
    both compatibility Frame evidence and any exact candidate/permit at
    reservation time.
+3. Both cycles start with `G54`, the system the prepared program runs in. Once the
+   controller acknowledges it, KerfDesk records G54 as the active WCS, so the next
+   Frame keeps the probe's Work-Z instead of selecting G54 again. When the
+   controller was known to be in another system (G55-G59), its WCO and Frame
+   evidence are void, as after Frame's own G54 selection. Zero Z, Set origin and
+   the other GRBL-family origin writes, which put `G54` in their block, do the
+   same (ADR-375 Amendment 3).
 
 This software qualification does not prove physical plate geometry, probe
 wiring, spindle coast-down, or real-machine reset behavior. First hardware

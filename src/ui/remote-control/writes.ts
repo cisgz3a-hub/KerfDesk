@@ -1,6 +1,7 @@
 import { IDENTITY_TRANSFORM, type ShapeObject } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives/create-rectangle';
 import { DEFAULT_TEXT_COLOR } from '../../core/text';
+import type { AppState } from '../state/store';
 import type { RemoteAppStore, RemoteWrite } from './types';
 import { updateOperationFull } from './design-operations';
 import { editableArtwork, expandedArtworkGroupIds, prepareTransforms } from './transforms';
@@ -10,6 +11,7 @@ import { applyHistory, prepareArrange } from './arrange';
 import { publicIdentifier, selectedIds } from './projections';
 import { prepareRemoteShape } from './touch-shapes';
 import { prepareRemoteSelection } from './selection';
+import { deliverBoardPhoto, placeOnBoard, prepareBoardPhoto, preparePlaceOnBoard } from './board';
 import { RemoteFault } from './fault';
 
 export async function applyRemoteWrite(
@@ -21,6 +23,38 @@ export async function applyRemoteWrite(
 ): Promise<Record<string, unknown>> {
   assertCurrent();
   const state = store.getState();
+  if (isBoardWrite(write)) return applyBoardWrite(write, state, store, commit);
+  return applyOrdinaryRemoteWrite(write, state, store, signal, commit);
+}
+
+type BoardWrite = Extract<RemoteWrite, { readonly command: 'set_board_photo' | 'place_on_board' }>;
+type OrdinaryWrite = Exclude<RemoteWrite, BoardWrite>;
+
+function isBoardWrite(write: RemoteWrite): write is BoardWrite {
+  return write.command === 'set_board_photo' || write.command === 'place_on_board';
+}
+
+function applyBoardWrite(
+  write: BoardWrite,
+  state: AppState,
+  store: RemoteAppStore,
+  commit: (action: () => Record<string, unknown>) => Record<string, unknown>,
+): Record<string, unknown> {
+  if (write.command === 'set_board_photo') {
+    const file = prepareBoardPhoto(write.args);
+    return commit(() => deliverBoardPhoto(file));
+  }
+  const prepared = preparePlaceOnBoard(state, write.args);
+  return commit(() => placeOnBoard(store, prepared));
+}
+
+async function applyOrdinaryRemoteWrite(
+  write: OrdinaryWrite,
+  state: AppState,
+  store: RemoteAppStore,
+  signal: AbortSignal,
+  commit: (action: () => Record<string, unknown>) => Record<string, unknown>,
+): Promise<Record<string, unknown>> {
   switch (write.command) {
     case 'set_selection': {
       const ids = prepareRemoteSelection(state, write.args);

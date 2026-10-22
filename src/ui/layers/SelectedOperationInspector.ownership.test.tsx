@@ -100,7 +100,11 @@ describe('operation inspector artwork ownership', () => {
         if (field === null || field.form === null) throw new Error('Power mode form missing');
         expect(field.value).toBe(previousChoice);
         const form = field.form;
-        field.value = choice;
+        // A pick fires change; only changed fields reach the artwork (06-P2-2).
+        await act(async () => {
+          field.value = choice;
+          field.dispatchEvent(new Event('change', { bubbles: true }));
+        });
         expect(form.checkValidity()).toBe(true);
         await act(async () => form.requestSubmit());
 

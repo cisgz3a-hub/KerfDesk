@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../../kit/icons';
 import {
   findRegistrationBoxBounds,
+  boardVerificationTargetsEqual,
   type BoardVerificationTarget,
   type CapturedBoardGeometry,
 } from '../../../core/scene';
@@ -32,8 +33,8 @@ export function BoardAnchorOverlay(props: BoardAnchorOverlayProps): JSX.Element 
   const [overlayRef, parentSize] = useParentElementSize();
   const bounds = useMemo(() => findRegistrationBoxBounds(scene), [scene]);
   const handles = useMemo(
-    () => (bounds === null ? [] : boardAnchorOverlayHandles(props.geometry.kind, bounds)),
-    [bounds, props.geometry.kind],
+    () => (bounds === null ? [] : boardAnchorOverlayHandles(props.geometry, bounds)),
+    [bounds, props.geometry],
   );
   const view = useMemo(
     () =>
@@ -57,7 +58,7 @@ export function BoardAnchorOverlay(props: BoardAnchorOverlayProps): JSX.Element 
         ? null
         : visibleHandles.map((handle) => (
             <BoardAnchorButton
-              key={`${handle.target.kind}:${handle.target.anchor}`}
+              key={targetKey(handle.target)}
               handle={handle}
               view={view}
               active={sameTarget(handle.target, props.activeTarget)}
@@ -84,7 +85,11 @@ function BoardAnchorButton(props: {
       aria-pressed={props.active}
       title={props.handle.label}
       disabled={props.disabled}
-      data-board-anchor={props.handle.target.anchor}
+      data-board-anchor={
+        props.handle.target.kind === 'outline'
+          ? String(props.handle.target.index)
+          : props.handle.target.anchor
+      }
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation();
@@ -104,7 +109,13 @@ function BoardAnchorButton(props: {
 }
 
 function sameTarget(left: BoardVerificationTarget, right: BoardVerificationTarget | null): boolean {
-  return right !== null && left.kind === right.kind && left.anchor === right.anchor;
+  return right !== null && boardVerificationTargetsEqual(left, right);
+}
+
+function targetKey(target: BoardVerificationTarget): string {
+  return target.kind === 'outline'
+    ? `${target.kind}:${target.index}`
+    : `${target.kind}:${target.anchor}`;
 }
 
 type ElementSize = { readonly width: number; readonly height: number };

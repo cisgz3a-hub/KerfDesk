@@ -91,6 +91,7 @@ import { materialLibraryActions, type MaterialLibraryActions } from './material-
 import { savedLibrariesActions, type SavedLibrariesActions } from './saved-libraries-actions';
 import { libraryActions, type LibraryActions } from './material-library-store-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
+import type { LayerParamOwnerActions } from './layer-param-actions';
 import { operationActions, type OperationActions } from './operation-actions';
 import { artworkOrderActions, type ArtworkOrderActions } from './artwork-order-actions';
 import { imageEditActions, type ImageEditActions } from './image-edit-actions';
@@ -111,6 +112,7 @@ import {
 } from './selection-transform-actions';
 import { registrationActions, type RegistrationActions } from './registration-actions';
 import { boardCaptureActions } from './board-capture-actions';
+import type { OutlineBoardShape } from './board-outline-register';
 import { boardTileActions, type BoardTileActions } from './board-tile-actions';
 import {
   pathNodeEditActions,
@@ -159,6 +161,7 @@ export const DEFAULT_OUTPUT_SCOPE_SETTINGS: OutputScopeSettings = {
 };
 
 export type AppState = PartGeneratorActions &
+  LayerParamOwnerActions &
   ConstrainedSketchActions &
   ReliefAuthoringActions &
   ObjectPropertiesActions &
@@ -320,14 +323,21 @@ export type AppState = PartGeneratorActions &
     // blanks. Diameter in mm; replacement keeps position and lock state.
     readonly addRegistrationCircle: (diameterMm: number) => void;
     // ADR-124 / ADR-126: commit a captured board — build the registration outline
-    // (rect or circle) from the measured size, center + lock it, keep it out of
+    // (rect, circle, or outline) from the measured size, place + lock it, keep it out of
     // the burn, and switch placement to user-origin so the next Start lands on the
     // real board. addCapturedBoardBox is the rectangle back-compat wrapper.
     readonly addCapturedBoard: (shape: BoardShape) => void;
     readonly addCapturedBoardBox: (widthMm: number, heightMm: number) => void;
+    // ADR-654 canvas first: put a photo-drawn outline board on the canvas, centred,
+    // locked and out of the burn, without changing placement; it is not registered.
+    readonly drawCapturedBoardOutline: (shape: OutlineBoardShape) => void;
+    // ADR-654: register the drawn outline with the head-measured shape, keeping its
+    // place, turning the artwork on it by `rotationDeg`, and switching placement to
+    // user-origin front-left. Adds a centred outline when none is drawn.
+    readonly registerCapturedBoardOutline: (shape: OutlineBoardShape, rotationDeg: number) => void;
     // Resize a captured board after a physical anchor check while preserving the
-    // canvas anchor that corresponds to its work origin (rect bottom-left or
-    // circle center).
+    // canvas anchor that corresponds to its work origin (rect/outline front-left
+    // or circle center).
     readonly updateCapturedBoard: (shape: BoardShape) => void;
     // ADR-057: delete the jig box(es) and the reserved registration layer. No-op
     // when no jig is present.

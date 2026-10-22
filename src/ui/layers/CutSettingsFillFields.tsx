@@ -8,6 +8,7 @@ import { CutSettingsFillDensityFields } from './CutSettingsFillDensityFields';
 import { scanLineOverscanNote } from './fill-overscan-fallback';
 import { PassAngleStepField } from './CutSettingsScanPatternFields';
 import { AutoOverscanSwitch, automaticOverscanNote } from './CutSettingsAutoOverscan';
+import { boundsAdmitting } from './CutSettingsInputs';
 
 export function CutSettingsFillFields(props: {
   readonly layer: Layer;
@@ -33,15 +34,16 @@ export function CutSettingsFillFields(props: {
         <NumberInput
           name="hatchAngleDeg"
           value={hatchAngleDeg}
+          stored={props.layer.hatchAngleDeg}
           min={0}
           max={180}
-          step={5}
           onChange={setHatchAngleDeg}
         />
         <span className="lf-field-unit">deg</span>
       </Field>
       <CutSettingsFillDensityFields
         lineIntervalMm={props.lineIntervalMm}
+        storedLineIntervalMm={props.layer.hatchSpacingMm}
         onChange={props.onLineIntervalMmChange}
       />
       <p className="lf-laser-help">
@@ -51,6 +53,7 @@ export function CutSettingsFillFields(props: {
       <FillOverscanField
         fillStyle={fillStyle}
         value={fillOverscanMm}
+        stored={props.layer.fillOverscanMm}
         onChange={setFillOverscanMm}
         automatic={
           props.showCutSettingsExtras === true && fillStyle !== 'offset'
@@ -148,6 +151,7 @@ function FillScanDirectionFields(props: {
 function FillOverscanField(props: {
   readonly fillStyle: Layer['fillStyle'];
   readonly value: number;
+  readonly stored: number;
   readonly onChange: (value: number) => void;
   /** ADR-495's switch; null where it is not offered. */
   readonly automatic: {
@@ -170,9 +174,9 @@ function FillOverscanField(props: {
         <NumberInput
           name="fillOverscanMm"
           value={props.value}
+          stored={props.stored}
           min={0}
           max={MAX_FILL_OVERSCAN_MM}
-          step={0.5}
           disabled={isAutomatic}
           onChange={props.onChange}
         />
@@ -210,22 +214,25 @@ function ExpertOverrideField(props: { readonly enabled: boolean }): JSX.Element 
   );
 }
 
+// Any step, and a range that takes the stored value (06-P2-4): a 22.5° angle
+// or a LightBurn overscan must not block Apply for an edit elsewhere.
 function NumberInput(props: {
   readonly name: string;
   readonly value: number;
+  readonly stored: number;
   readonly min: number;
   readonly max?: number;
-  readonly step?: number;
   readonly label?: string;
   readonly disabled?: boolean;
   readonly onChange?: (value: number) => void;
 }): JSX.Element {
+  const bounds = boundsAdmitting(props.stored, props.min, props.max);
   const input = {
     name: props.name,
     className: 'lf-input',
-    min: props.min,
-    ...(props.max !== undefined ? { max: props.max } : {}),
-    step: props.step ?? 1,
+    min: bounds.min,
+    ...(bounds.max !== undefined ? { max: bounds.max } : {}),
+    step: 'any',
     disabled: props.disabled === true,
     style: numberStyle,
     'aria-label': `Cut settings ${props.label ?? props.name}`,

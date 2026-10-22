@@ -160,13 +160,25 @@ function cutterLine(line: Line, cutter: Cutter): MarlinReadLine {
 }
 
 function fanLine(line: Line): MarlinReadLine {
+  // P participates in the parser even though it is not passed to the generic
+  // fan renderer. Validate it before selecting a fan, including M107's P.
+  const checked = projectParameters(line, line.code === 'M106' ? 'PS' : 'P');
+  if (checked.unplaced !== undefined) {
+    return {
+      line: '',
+      warnings: [
+        ...checked.warnings,
+        'Fan output is uncertain after this line. The preview retains the previous fan power; it does not establish that the laser is off.',
+      ],
+    };
+  }
   if ((value(line, 'P') ?? 0) !== 0)
     return unknown(
       `${line.code} selects another fan; the configured laser fan cannot be inferred.`,
       undefined,
       line.warnings,
     );
-  return projectParameters(line, line.code === 'M106' ? 'S' : '');
+  return { line: checked.line.replace(/ P[^ ]+/g, ''), warnings: checked.warnings };
 }
 
 function unsupportedLine({ code, warnings }: Line): MarlinReadLine {

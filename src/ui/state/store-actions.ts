@@ -5,7 +5,6 @@ import {
   sceneObjectHasVisibleLayer,
   type Project,
   type Transform,
-  updateLayer,
 } from '../../core/scene';
 import { jobPlacementAfterDeviceChange, jobPlacementAfterProfileSelection } from '../job-placement';
 import { fitToSelection } from './viewport-actions';
@@ -29,8 +28,7 @@ import { projectWithParkedCnc } from './parked-cnc-machine';
 import { captureSetupHistoryContext, setupHistoryContextFor } from './setup-history-context';
 import { tracePartHistorySelection } from './trace-part-history';
 import { machineSetupActions } from './machine-setup-actions';
-import { synchronizeCncTabCount } from './cnc-tab-count-sync';
-import { sceneWithModeSwitchRecipe } from './laser-recipe-seeding';
+import { layerParamOwnerActions, projectWithLayerParam } from './layer-param-actions';
 import {
   nextProbeSetupState,
   projectsShareProbeSetupIdentity,
@@ -51,6 +49,7 @@ export function sceneActions(
 ): Pick<
   AppState,
   | 'setLayerParam'
+  | 'setLayerParamWithArtworkOverrides'
   | 'moveLayer'
   | 'updateDeviceProfile'
   | 'replaceDeviceProfile'
@@ -60,17 +59,7 @@ export function sceneActions(
   return {
     setLayerParam: (layerId, patch) =>
       authoringSet((s) => {
-        const updated = sceneWithModeSwitchRecipe(
-          s.project,
-          updateLayer(s.project.scene, layerId, patch),
-          layerId,
-          patch,
-          s.materialLibrary,
-        );
-        const project = {
-          ...s.project,
-          scene: synchronizeCncTabCount(s.project.scene, updated, layerId),
-        };
+        const project = projectWithLayerParam(s, layerId, patch);
         return {
           project,
           undoStack: pushUndo(s.project, s.undoStack),
@@ -79,6 +68,7 @@ export function sceneActions(
           ...(patch.visible === false ? visibleSelectionState(s, project) : {}),
         };
       }),
+    ...layerParamOwnerActions(authoringSet),
     moveLayer: (layerId, direction) =>
       set((s) => {
         const scene = moveSceneLayer(s.project.scene, layerId, direction);

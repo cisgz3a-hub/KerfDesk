@@ -158,6 +158,11 @@ export type LaserStoreActions = {
     readonly x: number;
     readonly y: number;
   }) => Promise<void>;
+  /** Set work zero to a known machine point without moving the head. */
+  readonly setOriginAtMachinePoint: (pointMm: {
+    readonly x: number;
+    readonly y: number;
+  }) => Promise<void>;
   /** Make the head's current point the program point it stopped at, in mm, with
    *  one G92, and resolve to the XY work offset written (ADR-341 Amd 6). */
   readonly setOriginAtProgramPoint: (pointMm: {
