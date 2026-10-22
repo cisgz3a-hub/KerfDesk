@@ -331,7 +331,7 @@ describe('camera calibration photo ownership', () => {
     'drops a delayed result after %s and keeps the newer review',
     async (action) => {
       const old = await takePendingPhoto();
-      await clickControl(document.body, action === 'cancel' ? 'Cancel' : 'Close Calibrate camera');
+      await clickControl(document.body, action === 'cancel' ? 'Cancel' : 'Close Camera setup');
       if (action === 'close') {
         await act(async () => useCameraCalibrationStore.getState().openWizard());
         await clickControl(document.body, 'Target already engraved');

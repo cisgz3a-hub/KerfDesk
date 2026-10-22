@@ -5,7 +5,11 @@
 import { act } from 'react';
 import type * as CalibrationActions from './calibration-actions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clickElement, mountControl } from '../../image-editor/control-audit-test-support';
+import {
+  clickControl,
+  clickElement,
+  mountControl,
+} from '../../image-editor/control-audit-test-support';
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
 import { useLaserStore } from '../../state/laser-store';
@@ -59,9 +63,17 @@ describe('calibrating a camera on the laser head', () => {
   it('engraves a small square in the middle of the bed instead of covering it', async () => {
     await mountControl(<CameraCalibrationWizard />);
     expect(document.body.textContent).toContain('Margin (mm)');
-    const onHead = headCheckbox();
-    await clickElement(onHead);
+    expect(document.body.textContent).toContain('Camera: above the bed');
+    // Where the camera is mounted is its own screen of the setup (ADR-663).
+    await clickControl(document.body, 'Change');
+    expect(useCameraCalibrationStore.getState().step).toEqual({ kind: 'mount' });
+    await clickElement(mountCard('On the laser head'));
     expect(useCameraCalibrationStore.getState().settings.headCamera).toBe(true);
+    expect(mountCard('On the laser head')?.getAttribute('aria-pressed')).toBe('true');
+    expect(mountCard('Above the bed')?.getAttribute('aria-pressed')).toBe('false');
+    await clickControl(document.body, 'Next');
+    await clickControl(document.body, 'Next');
+    expect(document.body.textContent).toContain('Camera: on the laser head');
     expect(document.body.textContent).toContain('Target size (mm)');
     expect(document.body.textContent).not.toContain('Margin (mm)');
     expect(document.body.textContent).toContain('across 40 × 40 mm');
@@ -88,9 +100,12 @@ describe('calibrating a camera on the laser head', () => {
   });
 });
 
-function headCheckbox(): HTMLInputElement | null {
-  const label = [...document.body.querySelectorAll('label')].find((element) =>
-    element.textContent?.includes('Camera rides on the laser head'),
+function mountCard(title: string): HTMLButtonElement | null {
+  return (
+    [
+      ...document.body.querySelectorAll<HTMLButtonElement>(
+        '[aria-label="Where the camera is mounted"] button',
+      ),
+    ].find((button) => button.querySelector('strong')?.textContent === title) ?? null
   );
-  return label?.querySelector<HTMLInputElement>('input[type="checkbox"]') ?? null;
 }
