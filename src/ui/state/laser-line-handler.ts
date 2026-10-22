@@ -29,7 +29,7 @@ import {
   qualifyingController,
   scheduleControllerQualification,
 } from './laser-controller-qualification';
-import { controllerRebootNotice } from './laser-safety-notice';
+import { controllerLink, controllerRebootNotice } from './laser-safety-notice';
 import { isOwnedCncPauseLiftReset, ownedLiftResetPatch } from './cnc-pause-lift-state';
 import {
   clearCncLiveCaps,
@@ -483,7 +483,7 @@ function rebootDuringJobPatch(
     streamer: wipeInFlight(markErrored(streamer)),
     ...liveCanvasLifecyclePatch(state, 'errored'),
     // First notice wins — an earlier root cause is what the operator needs.
-    safetyNotice: state.safetyNotice ?? controllerRebootNotice(),
+    safetyNotice: state.safetyNotice ?? controllerRebootNotice(controllerLink(state)),
   };
 }
 

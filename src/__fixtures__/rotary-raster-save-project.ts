@@ -29,7 +29,12 @@ const ROTARY_SETUP: RotarySetup = {
   objectDiameterMm: ROTARY_OBJECT_DIAMETER_MM,
 };
 
-/** Builds the shared Save-path fixture whose raster requires Labs permission. */
+/**
+ * Builds the shared Save-path fixture: an active chuck rotary with a raster.
+ * Rotary output needs no Labs permission (ADR-315 decision 1). The raster is
+ * uniform, so tests using it cannot see row order; rotary-transform-raster
+ * tests cover that.
+ */
 export function rotaryRasterSaveProject(): Project {
   const raster: SceneObject = {
     kind: 'raster-image',

@@ -55,6 +55,13 @@ export function releaseUnarchivedRun(runId: string): void {
   useUnarchivedRunStore.setState({ openArtifact: null, completedRun: null });
 }
 
+/** A run without a run id was accepted (untracked-start-retirement.ts): the
+ * kept run is no longer the job that just finished, so nothing is offered for
+ * it. The run id stays, as when it is released. */
+export function withdrawUnarchivedOffer(): void {
+  useUnarchivedRunStore.setState({ openArtifact: null, completedRun: null });
+}
+
 export function isUnarchivedRun(runId: string): boolean {
   return useUnarchivedRunStore.getState().runId === runId;
 }

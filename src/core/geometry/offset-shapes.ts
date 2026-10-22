@@ -5,7 +5,6 @@
 // https://docs.lightburnsoftware.com/latest/Reference/OffsetShapes/
 
 import {
-  areaD,
   EndType,
   FillRule,
   inflatePathsD,
@@ -210,10 +209,10 @@ function splitPath(path: ColoredPath): { readonly closed: PathsD; readonly open:
   for (const polyline of path.polylines) {
     if (isClosedPolygon(polyline) || isClosedEnough(polyline)) {
       const ring = polylineToPathD(polyline);
-      // A closed path with no area, such as SVG `M0 0 L10 0 Z`, draws only a
-      // line, so it is outlined as that line, as an open path or a closed
-      // two-point DXF polyline is (audit 2026-10-21 geometry P3-3).
-      if (ring.length >= 3 && !enclosesNothing(ring)) closed.push(ring);
+      // Signed area can cancel between filled lobes of a self-intersection.
+      // Only genuinely collinear rings are strokes; normalize all other rings
+      // under the path's fill rule before offsetting their filled region.
+      if (ring.length >= 3 && !collinearRing(ring)) closed.push(ring);
       else if (ring.length >= 2) open.push(ring.concat(ring.slice(0, 1)));
     } else if (polyline.points.length >= 2) {
       open.push(polyline.points.map((point) => ({ x: point.x, y: point.y })));
@@ -222,18 +221,32 @@ function splitPath(path: ColoredPath): { readonly closed: PathsD; readonly open:
   return { closed, open };
 }
 
-// Thinner on average than the 1 µm grid the region is normalized on, where it
-// would vanish: twice the area over the perimeter is a sliver's width.
-function enclosesNothing(ring: PathD): boolean {
-  let perimeter = 0;
-  for (let index = 0; index < ring.length; index += 1) {
-    const from = ring[index];
-    const to = ring[(index + 1) % ring.length];
-    if (from !== undefined && to !== undefined) {
-      perimeter += Math.hypot(to.x - from.x, to.y - from.y);
+// A rotated or scaled straight line comes out of materialization a few ulps off
+// exact collinearity, so "on the line" means within half the 1 µm grid that the
+// filled region is normalized on.
+const COLLINEAR_TOLERANCE_MM = 0.5 / 10 ** VECTOR_PATH_PRECISION_DECIMALS;
+
+function collinearRing(ring: PathD): boolean {
+  const first = ring[0];
+  if (first === undefined) return true;
+  // The vertex farthest from the first fixes the line's direction; two close
+  // vertices would give a direction that the tolerance cannot bound.
+  let far = first;
+  let farSq = 0;
+  for (const point of ring) {
+    const distanceSq = (point.x - first.x) ** 2 + (point.y - first.y) ** 2;
+    if (distanceSq > farSq) {
+      far = point;
+      farSq = distanceSq;
     }
   }
-  return 2 * Math.abs(areaD(ring)) <= perimeter / 10 ** VECTOR_PATH_PRECISION_DECIMALS;
+  if (farSq === 0) return true;
+  const dx = far.x - first.x;
+  const dy = far.y - first.y;
+  const limit = COLLINEAR_TOLERANCE_MM * Math.sqrt(farSq);
+  return ring.every(
+    (point) => Math.abs(dx * (point.y - first.y) - dy * (point.x - first.x)) <= limit,
+  );
 }
 
 // Each ColoredPath is its own fill batch, under the rule the canvas and CAM use.

@@ -28,7 +28,12 @@ import { computeProgramStats } from './program-stats';
 import { createProgramBoundsTracker, type ProgramBoundsTracker } from './program-bounds';
 import { createPlacementReader, placeBeforeMotion } from './render-model-placement';
 import { nonMotionCategory, recordUnplacedLine } from './render-model-line-accounting';
-import { emitArc } from './render-model-arc';
+import { emitArc, grblArcBlockRejection } from './render-model-arc';
+import {
+  grblBlockRejection,
+  grblBlockUncertainty,
+  grblRejectedBlockWarning,
+} from './grbl-block-rejection';
 import { createSegmentBuilder, type SegmentBuilder } from './segment-builder';
 import {
   countUnsupported,
@@ -48,6 +53,7 @@ import {
 const AXIS_EPSILON = 1e-9;
 
 type BuildContext = {
+  readonly stockGrbl: boolean;
   readonly coordinateRepresentation: BuildRenderModelOptions['coordinateRepresentation'];
   readonly controllerArcToleranceMm: number | undefined;
   readonly laser: LaserRenderState;
@@ -77,6 +83,7 @@ export function createGcodeRenderModelBuilder(
   // it is opt-in: only the live countdown passes it as a responsiveness budget
   // it degrades from, never as a refusal of the job itself.
   const context: BuildContext = {
+    stockGrbl: options.stockGrbl === true,
     coordinateRepresentation: options.coordinateRepresentation,
     controllerArcToleranceMm: options.controllerArcToleranceMm,
     laser: createLaserRenderState(options),
@@ -167,6 +174,7 @@ function processLine(context: BuildContext, raw: string, line: number): number {
   );
   if (words === null || words.length === 0) return LINE_CATEGORY.junk;
   context.recognizedWords += words.length;
+  if (recordGrblBlock(context, stripped, words, line)) return LINE_CATEGORY.unsupported;
   updateLaserRenderState(context.laser, words, raw);
   const accounting = {
     countUnsupported: (word: string, atLine: number) =>
@@ -181,6 +189,24 @@ function processLine(context: BuildContext, raw: string, line: number): number {
   const outcome = applyLineWords(context.modal, motionWords, line, accounting);
   if (emitPlacedLineMotion(context, outcome, motionWords, line)) return LINE_CATEGORY.motion;
   return nonMotionCategory(outcome, motionWords !== words);
+}
+
+function recordGrblBlock(
+  context: BuildContext,
+  raw: string,
+  words: ReadonlyArray<GcodeWordMatch>,
+  line: number,
+): boolean {
+  if (!context.stockGrbl) return false;
+  const rejected =
+    grblBlockRejection(raw) ??
+    grblArcBlockRejection(context.modal, words, context.program.canPlace);
+  if (rejected !== null) {
+    context.skipped.push({ line, reason: grblRejectedBlockWarning(rejected) });
+    return true;
+  }
+  if (grblBlockUncertainty(raw) !== null) recordUnplacedLine(context, line, 'origin');
+  return false;
 }
 
 // Without `boundsFromStart` every line's axis words are ordinary motion.

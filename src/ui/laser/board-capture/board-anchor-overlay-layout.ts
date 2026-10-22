@@ -1,4 +1,9 @@
-import type { AABB, BoardVerificationTarget, CapturedBoardGeometry } from '../../../core/scene';
+import {
+  outlineBoardShape,
+  type AABB,
+  type BoardVerificationTarget,
+  type CapturedBoardGeometry,
+} from '../../../core/scene';
 import type { ViewTransform } from '../../workspace/view-transform';
 
 export type BoardAnchorOverlayHandle = {
@@ -13,10 +18,37 @@ export type BoardAnchorOverlayHandle = {
  * code, which derives the physical machine point from CapturedBoardGeometry.
  */
 export function boardAnchorOverlayHandles(
-  kind: CapturedBoardGeometry['kind'],
+  geometry: CapturedBoardGeometry,
   bounds: AABB,
 ): ReadonlyArray<BoardAnchorOverlayHandle> {
-  return kind === 'rect' ? rectangleHandles(bounds) : circleHandles(bounds);
+  switch (geometry.kind) {
+    case 'rect':
+      return rectangleHandles(bounds);
+    case 'circle':
+      return circleHandles(bounds);
+    case 'outline':
+      return outlineHandles(geometry, bounds);
+  }
+}
+
+function outlineHandles(
+  geometry: Extract<CapturedBoardGeometry, { readonly kind: 'outline' }>,
+  bounds: AABB,
+): ReadonlyArray<BoardAnchorOverlayHandle> {
+  const shape = outlineBoardShape(geometry);
+  if (shape === null) return [];
+  return shape.anchorIndices.flatMap((index, position) => {
+    const point = shape.pointsMm[index];
+    if (point === undefined) return [];
+    const ordinal = position + 1;
+    return [
+      {
+        target: { kind: 'outline', index, ordinal },
+        label: `Verify board anchor ${ordinal}`,
+        scenePoint: { x: bounds.minX + point.x, y: bounds.minY + point.y },
+      },
+    ];
+  });
 }
 
 export function scenePointToOverlayPosition(

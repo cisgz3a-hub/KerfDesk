@@ -38,6 +38,7 @@ import { cncPauseLiftSkipReason, currentCncPauseLift } from './cnc-pause-lift-st
 import { CNC_REENTRY_BUSY_MESSAGE, resumeLiftedCncJob } from './cnc-pause-reentry-run';
 import {
   cncPauseResumeStalledNotice,
+  controllerLink,
   streamStalledNotice,
   type LaserSafetyAction,
 } from './laser-safety-notice';
@@ -353,7 +354,8 @@ function recordPauseResumeStall(context: PauseResumeContext): void {
   const cncJob = context.get().activeJobMachineKind === 'cnc';
   context.set((state) => ({
     safetyNotice:
-      state.safetyNotice ?? (cncJob ? cncPauseResumeStalledNotice() : streamStalledNotice()),
+      state.safetyNotice ??
+      (cncJob ? cncPauseResumeStalledNotice() : streamStalledNotice(controllerLink(state))),
   }));
   if (cncJob) return;
   void context.failDarkStop().catch(() => undefined);

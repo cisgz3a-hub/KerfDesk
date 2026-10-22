@@ -1,6 +1,6 @@
 ## ADR-635 - The Falcon A1 Pro's red pointer is switched over its network link
 
-**Status:** Accepted by the maintainer on 2026-10-19 ("The LED doesn't work … In the Creality Falcon's own software they just have a button to switch LED on, not different things to go fill in"; asked which light, they chose the red pointer on the head). Amends ADR-603 and ADR-605. Software verification only; the pointer has not yet been switched on a machine by KerfDesk.
+**Status:** Superseded by ADR-664 on 2026-10-22: on the maintainer's machine assist light 0 lit the wrong light, and the A1 Pro's LED is now its laser at low power. Accepted by the maintainer on 2026-10-19 ("The LED doesn't work … In the Creality Falcon's own software they just have a button to switch LED on, not different things to go fill in"; asked which light, they chose the red pointer on the head). Amends ADR-603 and ADR-605. Software verification only; the pointer has not yet been switched on a machine by KerfDesk.
 
 **Context.** Machine Setup → Positioning LED / crosshair accepts only one documented accessory M-code for on and one for off (ADR-603, ADR-612). The Falcon A1 Pro has no such command: Creality's LightBurn bundle has no light macro (`docs/audits/2026-09-19-machine-compatibility-fixes/falcon-vendor-configuration.json`), and no public G-code for it was found. On an A1 Pro the section could only be filled with guesses, so the operator got "Positioning light on command must be one documented accessory M-code …" and no light.
 

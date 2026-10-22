@@ -14,6 +14,7 @@ import {
   MaterialRecipePreview,
 } from '../material-library/MaterialRecipePreview';
 import { buildStarterLibrary } from './material-library-builders';
+import { openStarterLibrary } from './open-starter-library';
 import {
   materialBindingStatus,
   materialBindingStatusText,
@@ -56,7 +57,6 @@ export function MaterialLibraryPanel(): JSX.Element {
 function EmptyMaterialLibraryPanel(): JSX.Element {
   const device = useStore((state) => state.project.device);
   const createLibrary = useStore((state) => state.createLibrary);
-  const setMaterialLibrary = useStore((state) => state.setMaterialLibrary);
   const kind = useStore((state) => machineKindOf(state.project.machine));
   const starterEntry = kind === 'laser' ? starterLibraryEntryForProfileId(device.profileId) : null;
   return (
@@ -82,7 +82,7 @@ function EmptyMaterialLibraryPanel(): JSX.Element {
             aria-label="Create starter material library for the selected device"
             title={`Create a starter library for ${starterEntry.profile.name}. Researched starting points, not guaranteed burn settings.`}
             onClick={() =>
-              setMaterialLibrary(buildStarterLibrary(starterEntry.profile, starterEntry.presets))
+              openStarterLibrary(buildStarterLibrary(starterEntry.profile, starterEntry.presets))
             }
           >
             Starter Presets

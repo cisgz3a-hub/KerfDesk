@@ -104,7 +104,7 @@ class PlatformUpdateService implements DesktopUpdates {
     const { platform, keys, fetch, currentVersion } = this.options;
     const next = await fetchPlatformCandidate(fetch, keys, platform, this.now());
     if (next === null) {
-      this.set('up-to-date', null);
+      this.handleMissingFeed();
       return;
     }
     if (
@@ -138,6 +138,10 @@ class PlatformUpdateService implements DesktopUpdates {
         /* OS notifications are optional. */
       }
     }
+  }
+  private handleMissingFeed(): void {
+    if (this.candidate !== null) throw new Error('Previously available platform feed is missing');
+    this.set('up-to-date', null);
   }
   /** Opens the download page of the verified, still covered candidate. */
   readonly download = (): UpdateStatus => {

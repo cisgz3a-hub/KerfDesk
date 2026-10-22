@@ -62,6 +62,12 @@ export function encodeGrblSettingValue(
   return blocked('The decimal value cannot be represented for this controller.');
 }
 
+/** True when grblHAL reads this known GRBL setting with read_uint (a whole
+ *  number) rather than read_float. */
+export function grblHalReadsWholeNumber(id: number): boolean {
+  return !HAL_DECIMAL_IDS.has(id);
+}
+
 function encodeHalInteger(parts: DecimalParts, valueLimit: number): EncodedGrblSettingValue {
   // HAL's read_uint accepts a decimal point but multiplies its accumulator
   // for fractional zeroes: 25.0 becomes 250. Expand the exact input first,

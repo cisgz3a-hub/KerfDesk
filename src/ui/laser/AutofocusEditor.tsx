@@ -15,7 +15,10 @@
 // error:3 but is left in its homing state until a reset (controller audit
 // 2026-09-25 CG-9).
 
-import { profileAutofocusIssue } from '../../core/devices/autofocus-command';
+import {
+  MAX_AUTOFOCUS_PROBE_FEED_MM_PER_MIN,
+  profileAutofocusIssue,
+} from '../../core/devices/autofocus-command';
 import type { ControllerCommandSet, ControllerKind } from '../../core/devices/device-profile';
 import { inlineCodeStyle } from './device-settings-shared';
 
@@ -88,9 +91,12 @@ export function AutofocusEditor(props: {
       )}
       <p style={focusHintStyle}>
         Only one controller line is supported; multi-step G-code probe sequences are not sent from
-        this control. Leave this empty when the machine has no supported auto-focus routine. Common
-        error replies: <code style={inlineCodeStyle}>error:9</code> (no probe pin) and{' '}
-        <code style={inlineCodeStyle}>error:20</code> (unsupported G-code on this firmware).
+        this control. A <code style={inlineCodeStyle}>G38.2</code> probe needs its own feed, at most{' '}
+        {MAX_AUTOFOCUS_PROBE_FEED_MM_PER_MIN} mm/min, and its Z target is a work-coordinate position
+        (G90), not a distance. Leave this empty when the machine has no supported auto-focus
+        routine. Common error replies: <code style={inlineCodeStyle}>error:9</code> (the controller
+        was in Alarm or Jog) and <code style={inlineCodeStyle}>error:20</code> (no probe input, or
+        unsupported G-code on this firmware).
       </p>
     </div>
   );

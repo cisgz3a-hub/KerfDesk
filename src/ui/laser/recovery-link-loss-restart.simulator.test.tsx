@@ -6,14 +6,22 @@
 // throwing away the acknowledged moves it had queued: the automatic restart
 // must step back over them. A board that kept running answers without a
 // banner, and the restart and Continue from where the head stopped stay as
-// they were (ADR-341 Amendment 6).
+// they were (ADR-341 Amendment 6). grblHAL greets every new Telnet client with
+// the same banner while it keeps running, so a network reconnect cannot show
+// a restart: nothing steps back, and the hint names the line that would
+// (ADR-398 Amendment 4, controller audit D7-P2-1).
 
+import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { createGrblSimulator, type GrblSimulator } from '../../__fixtures__/controllers';
+import { GRBL_PLANNER_BLOCKS } from '../../__fixtures__/controllers/grbl-sim-planner';
 import { isSendableGcodeLine } from '../../core/controllers/grbl';
 import { rawResumeLine } from '../../core/recovery';
 import { isPlannerMotionLine } from '../../core/recovery/planner-backlog-restart';
+import type { PlatformAdapter } from '../../platform/types';
+import { useLaserStore } from '../state/laser-store';
 import type { RecoveryCapsule, RecoveryRepository } from '../state/recovery';
-import { automaticRecoveryRestart } from './laser-recovery-automatic-restart';
+import { automaticRecoveryRestart, automaticRestartHint } from './laser-recovery-automatic-restart';
 import { recoveryHeadStop } from './laser-recovery-head-stop';
 import {
   connectSimulator,
@@ -77,6 +85,44 @@ function rawLineOfMove(gcode: string, move: number): number {
   throw new Error(`The program has no movement ${move}.`);
 }
 
+const GRBLHAL_BANNER = "GrblHAL 1.1f ['$' or '$HELP' for help]";
+
+/** The simulator reached over a Wi-Fi Telnet session, as the desktop network
+ * adapter reports one. */
+function overTelnet(simulator: GrblSimulator): PlatformAdapter {
+  const serial = simulator.adapter.serial;
+  return {
+    ...simulator.adapter,
+    serial: {
+      ...serial,
+      transport: 'tcp',
+      requestPort: async () => {
+        const port = await serial.requestPort();
+        return port === null ? null : { ...port, info: { transport: 'tcp' } };
+      },
+    },
+  };
+}
+
+/** A grblHAL board that never reset, reached again over Telnet: it greets
+ * the new client with its startup banner, then answers the status query. */
+async function reconnectOverTelnet(): Promise<GrblSimulator> {
+  const simulator = createGrblSimulator({
+    plannerBlocks: GRBL_PLANNER_BLOCKS,
+    motionMs: 25,
+    firmwareBanner: GRBLHAL_BANNER,
+  });
+  await act(async () => {
+    await useLaserStore.getState().connect(overTelnet(simulator));
+  });
+  await tick(1_200);
+  const laser = useLaserStore.getState();
+  expect(laser.serialPortInfo?.transport).toBe('tcp');
+  expect(laser.detectedControllerKind).toBe('grblhal');
+  expect(laser.statusReport?.state).toBe('Idle');
+  return simulator;
+}
+
 /** Planner movement lines among the first `sendable` sendable lines. */
 function movesWithin(gcode: string, sendable: number): number {
   let seen = 0;
@@ -115,6 +161,7 @@ describe('the first reconnect after a lost link', () => {
       });
       expect(revised.interruption).not.toHaveProperty('plannerBacklogIfRestarted');
       expect(revised.interruption.message).toContain('startup banner');
+      expect(revised.interruption.message).toMatch(/^The USB connection was lost/);
 
       const restart = automaticRecoveryRestart(revised);
       expect(restart?.plannerBacklogBasis).toBe('planner-size');
@@ -144,6 +191,43 @@ describe('the first reconnect after a lost link', () => {
       });
       expect(automaticRecoveryRestart(revised)?.line).toBe(rawResumeLine(gcode, saved.ackedLines));
       expect(recoveryHeadStop(revised)).not.toBeNull();
+    },
+    STRESS_TIMEOUT_MS,
+  );
+
+  it(
+    'does not step back on a Telnet greeting from a board that kept running, and names the line a restart would need',
+    async () => {
+      const { h, saved, gcode, queuedAtDrop } = await loseLinkWithPlannerFull();
+      const firstUnacked = rawResumeLine(gcode, saved.ackedLines);
+      h.simulator = await reconnectOverTelnet();
+      const revised = await settledCapsule(h.repository, saved);
+      expect(revised.interruption).toMatchObject({
+        kind: 'disconnect',
+        sentLines: saved.interruption.sentLines,
+        unconfirmedPlannerBacklog: saved.interruption.plannerBacklogIfRestarted,
+      });
+      expect(revised.interruption).not.toHaveProperty('plannerBacklog');
+      expect(revised.interruption).not.toHaveProperty('plannerBacklogIfRestarted');
+      const message = revised.interruption.message;
+      expect(message).toMatch(/^The network connection was lost/);
+      expect(message).toContain('does not show whether the controller restarted');
+      expect(message).not.toMatch(/USB|Arduino|had restarted/);
+
+      // The automatic line stays where a board that kept running needs it.
+      const restart = automaticRecoveryRestart(revised);
+      expect(restart?.line).toBe(firstUnacked);
+      expect(restart?.plannerBacklogBlocks).toBeUndefined();
+      // The line a restart would need covers every move still queued at the drop.
+      const ackedMoves = movesWithin(gcode, saved.ackedLines);
+      const firstDiscarded = rawLineOfMove(gcode, ackedMoves - queuedAtDrop + 1);
+      const ifRestarted = restart?.ifRestarted;
+      expect(ifRestarted?.basis).toBe('planner-size');
+      expect(ifRestarted?.line).toBeLessThanOrEqual(firstDiscarded);
+      expect(automaticRestartHint(restart ?? null)).toContain(
+        `restart from line ${ifRestarted?.line} to replay them`,
+      );
+      expect(recoveryHeadStop(revised)?.sentLines).toBe(saved.interruption.sentLines);
     },
     STRESS_TIMEOUT_MS,
   );

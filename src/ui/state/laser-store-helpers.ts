@@ -11,6 +11,7 @@ import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import { disconnectedControllerQualification } from './laser-controller-qualification';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import {
+  controllerLink,
   disconnectDuringFireNotice,
   disconnectDuringJobNotice,
   disconnectDuringMotionNotice,
@@ -37,7 +38,7 @@ export const UNKNOWN_IDLE_STATUS_MESSAGE =
 export const MOTION_OPERATION_ACTIVE_MESSAGE =
   'A jog or frame operation is active. Wait for GRBL to report Idle, or cancel the operation, before sending another motion command.';
 export const FIRE_ACTIVE_COMMAND_MESSAGE =
-  'Release the momentary Fire control before sending another machine command.';
+  'Release the momentary Fire control, or switch the laser dot off, before sending another machine command.';
 export const MPG_ACTIVE_MOTION_MESSAGE =
   'Jog and Frame are unavailable while grblHAL reports MPG mode active. Return motion control from the pendant/MPG to KerfDesk and wait for an MPG:0 report.';
 /** Operator guidance for a command rejected while grblHAL MPG owns transport control. */
@@ -485,16 +486,18 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
 // Only a link lost while the machine may still move raises the E-stop banner
 // (ADR-639, amending P0-B). A settings or build-info read, a reset the
 // controller already answered at rest, or the handshake moves nothing: its
-// incident is logged and the rail shows the ordinary disconnected state.
+// incident is logged and the rail shows the ordinary disconnected state. The
+// notice names the link the session ran over (controller audit D7-P3-3).
 function portCloseSafetyNotice(state: LaserState, wasActiveJob: boolean): LaserSafetyNotice | null {
-  if (state.fireActive) return disconnectDuringFireNotice();
+  const link = controllerLink(state);
+  if (state.fireActive) return disconnectDuringFireNotice(link);
   const operationMotion = controllerOperation.controllerOperationMotion(
     state.controllerOperation,
     state.statusReport,
   );
-  if (wasActiveJob || operationMotion === 'job') return disconnectDuringJobNotice();
+  if (wasActiveJob || operationMotion === 'job') return disconnectDuringJobNotice(link);
   if (state.motionOperation !== null || operationMotion === 'motion') {
-    return disconnectDuringMotionNotice();
+    return disconnectDuringMotionNotice(link);
   }
   return null;
 }

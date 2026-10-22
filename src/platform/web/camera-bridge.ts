@@ -4,13 +4,11 @@ import type {
   CameraBridgeProbeRequest,
   CameraBridgeProbeResult,
   CameraBridgeStreamStatus,
-  FalconPointerSwitchResult,
   MachineCameraDiscovery,
 } from '../types';
 
 const DEFAULT_BRIDGE_ORIGIN = 'http://127.0.0.1:51731';
 const STREAM_STATUS_TIMEOUT_MS = 3_000;
-const FALCON_POINTER_TIMEOUT_MS = 15_000;
 
 const BRIDGE_NOT_RUNNING_REASON =
   'The network-camera bridge is available only in KerfDesk Desktop or local development. For local development, run pnpm camera:bridge in a separate terminal; hosted web builds support USB cameras only.';
@@ -24,44 +22,7 @@ export function createHttpCameraBridge(bridgeOrigin = DEFAULT_BRIDGE_ORIGIN): Ca
     discoverMachineCamera: () => discoverMachineCamera(origin),
     proxiedFrameUrl: (cameraUrl) => `${origin}/frame.jpg?url=${encodeURIComponent(cameraUrl)}`,
     health: () => fetchHealth(origin),
-    switchFalconPointer: (host, on) => switchFalconPointer(origin, host, on),
   };
-}
-
-async function switchFalconPointer(
-  origin: string,
-  host: string,
-  on: boolean,
-): Promise<FalconPointerSwitchResult> {
-  const query = `host=${encodeURIComponent(host)}&state=${on ? 'on' : 'off'}`;
-  const controller = new AbortController();
-  // The bridge itself gives the Falcon 5 s and may wait for a camera frame first.
-  const timeout = setTimeout(() => controller.abort(), FALCON_POINTER_TIMEOUT_MS);
-  try {
-    const response = await fetch(`${origin}/falcon/pointer?${query}`, {
-      method: 'POST',
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
-      signal: controller.signal,
-    });
-    const body: unknown = await response.json();
-    if (isRecord(body) && body['kind'] === 'ok') return { kind: 'ok' };
-    return {
-      kind: 'failed',
-      reason:
-        isRecord(body) && typeof body['reason'] === 'string'
-          ? body['reason']
-          : 'The local camera bridge returned an invalid response.',
-    };
-  } catch {
-    return {
-      kind: 'failed',
-      reason:
-        'The Falcon pointer is switched through KerfDesk Desktop’s local bridge, which did not answer.',
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 async function fetchStreamStatus(

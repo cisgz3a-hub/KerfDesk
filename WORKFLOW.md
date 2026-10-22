@@ -146,7 +146,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **CNC Canvas Focus**: has no effect. It collapsed the CNC 3D result pane by default when the viewport was 1439 px wide or less (ADR-223), and that pane has not been shown since 2026-08-03 (F-CNC28).
 - **Left tool strip (ADR-051)**: the default strip is 40 px wide with 30 px tools (52 px while curve actions show; ADR-608) and scrolls on short windows. Edit and Draw groups retain Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and a named icon button for the design library. Design Studio (Pro) has a labelled button in the main toolbar (ADR-272, flows F-DS1..F-DS4). Curve-node actions remain beside the editing tools with readable labels. Preview is in the primary toolbar, with a More fallback at narrow widths, and the Window menu.
 - **Machine-panel hierarchy (ADR-340, ADR-420 Amendment 2, ADR-593)**: a coloured Home button occupies the centre of the jog arrows; if homing is not configured it opens the same setup entry. Beside the arrows, three compact rows hold Manual Air, laser Auto-focus or its setup entry, and Set origin here. CNC keeps Home and Set origin when Manual Air is hidden, and still offers OFF for air left on in Laser mode. The Origin dropdown contains Reset/persistent-origin, Release motors, typed/saved positioning, the timed start mark, hand-positioning guidance and CNC probing. Placement contains placement/output and CNC maintenance. Console contains communication controls, Super console, machine hours and history/recovery. Active interruption notices, repeat offers, probe-removal/work-Z notices and the canonical Live Motion controls remain outside those dropdowns. Manual Air's setup guidance and switching behaviour are unchanged. Tutorial buttons no longer sit beside positioning, origin or Frame/Start: lessons live in Learn and on the tool panels that teach a procedure (ADR-348).
-- **Artwork centre & LED (ADR-603 Amendment 1)**: Marlin Fan-mosfet profiles have no positioning-light controls or commands (ADR-612). For supported profiles, select one artwork or group on the canvas, then use the button beneath the jog arrows. With several artworks selected, first choose one in **Artwork to centre**, then click the button; choosing alone sends no motion and keeps the canvas selection. The head moves with the cutting beam off to that artwork's centre on the board, using the configured pointer offset, then leaves the separate LED on. Absolute Coords can use the canvas directly; User Origin, Verified Origin and Current Position use a completed Frame's captured placement, so Frame once before centring an individual artwork. Start keeps the same framed placement. **LED on** and **LED off** switch the separate light without moving the head or requiring a selection. There is no expiry timer. Off remains available after reset for a configured light because auxiliary outputs may stay on; the control tracks commands, not an optical sensor. Machine Setup → Options → Positioning LED / crosshair stores the documented on/off commands and pointer offset in canvas bed axes. On the Creality Falcon A1 Pro profile there is nothing to type: tick **Use the Falcon's red pointer** and KerfDesk Desktop switches the head's red pointer over the Falcon's own network link, as Creality's software does and through the same link as its camera (ADR-635). The PC must reach the Falcon there; the web app cannot. No output is enabled by default; stock GRBL needs a documented vendor/custom-firmware mapping, and Ruida's file-only path or a manually switched light must be controlled at the machine. **Centre & LED after Frame (ADR-605)** remains an independent, opt-in setting in the same section: a clean Frame from the Frame button centres the LED on the whole framed job and leaves it on. It works in all four Cartesian placement modes and retains the original placement for Start (ADR-605 Amendment 1). Changed artwork or placement, interrupted/failed travel, or a later ordinary jog still invalidates Frame.
+- **Artwork centre & LED (ADR-603 Amendment 1)**: Marlin Fan-mosfet profiles have no positioning-light controls or commands (ADR-612). For supported profiles, select one artwork or group on the canvas, then use the button beneath the jog arrows. With several artworks selected, first choose one in **Artwork to centre**, then click the button; choosing alone sends no motion and keeps the canvas selection. The head moves with the cutting beam off to that artwork's centre on the board, using the configured pointer offset, then leaves the separate LED on. Absolute Coords can use the canvas directly; User Origin, Verified Origin and Current Position use a completed Frame's captured placement, so Frame once before centring an individual artwork. Start keeps the same framed placement. **LED on** and **LED off** switch the separate light without moving the head or requiring a selection. There is no expiry timer. Off remains available after reset for a configured light because auxiliary outputs may stay on; the control tracks commands, not an optical sensor. Machine Setup → Options → Positioning LED / crosshair stores the documented on/off commands and pointer offset in canvas bed axes. The Creality Falcon A1 Pro's 20 W head has no separate LED, so on its profile there is nothing to type: tick **Show where it will burn with the laser at low power** and LED on, Artwork centre & LED and Centre & LED after Frame turn the laser itself on at a capped low power (1% by default, never above 5%) after the usual beam-off M5 and move, as Creality's "Laser on" button does (ADR-664). The dot holds the Fire latch, so jog, Frame, Start and the Console refuse until LED off or the Live Motion bar's LASER OFF puts it out, and it goes off by itself after 30 s. The infrared module's invisible beam is refused. No output is enabled by default; stock GRBL needs a documented vendor/custom-firmware mapping, and Ruida's file-only path or a manually switched light must be controlled at the machine. **Centre & LED after Frame (ADR-605)** remains an independent, opt-in setting in the same section: a clean Frame from the Frame button centres the LED on the whole framed job and leaves it on. It works in all four Cartesian placement modes and retains the original placement for Start (ADR-605 Amendment 1). Changed artwork or placement, interrupted/failed travel, or a later ordinary jog still invalidates Frame.
 - **After a job completes (ADR-340, ADR-603)**: the job dock shows **Job complete** and **Done** after controller settlement. Pausing during final settlement retains that run's completion owner and Resume requires fresh Idle evidence. Missing acknowledgements say **Waiting for controller replies**, without asserting a controller hold; a new acknowledgement clears the stale wait immediately. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains offered while its receipt still matches the job, and like Start it needs a fresh Frame (ADR-372 Amendment 1). Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
 - **Workspace colours**: panels, drawing bed, grid, rulers and controls use the application appearance preference, defaulting to Light. Window > Appearance offers Light, Dark and Match System (ADR-339). Dark mode uses the approved charcoal drawing surface and light, readable vector ink. Contrast adjustments happen only while drawing the workspace; saved artwork, raster pixels, exported files and machine output retain their original colours and settings. The layout menu uses the same themed surface as the rest of the workspace.
 - **Notifications**: transient messages stay within the available canvas area, clear of the job dock, Live Motion bar, and zoom controls. An open modal gives notifications a reserved scrolling row so they do not cover its actions. Message lifetimes and dismissal controls are unchanged.
@@ -995,6 +995,9 @@ that owns those fields, without changing the existing Frame/Start policy.
    geometry that will be cut, carved, or burned.
 3. **Undo last** removes only the most recent assignment. **Done** commits the whole numbering
    session as one undoable project action. **Cancel** restores the order from before the session.
+   Placement and output-scope changes made during numbering remain after Cancel and leave the
+   project unsaved. **Save** finishes the visible numbering order before opening a file picker or
+   writing, so a later Cancel cannot make the saved file and the clean project disagree.
 4. Numbering ends automatically after every run unit has been assigned.
 5. While numbering is open, other design edits (Delete, nudge, paste, Undo/Redo, menu, toolbar
    and command-search commands) are refused with a notice to click **Done** or **Cancel** first,
@@ -1598,10 +1601,11 @@ the completed physical Frame is the spatial source of truth.
 #### Error — file is not a valid .lf2
 - Modal: `Could not open <filename>: not a valid KerfDesk project.` No load.
 
-#### Edge — the file carries an Auto-focus command (ADR-400 Amendment 1)
-1. On load, an Auto-focus command that is not a focus routine (a G0–G3 move, an X/Y word, an
-   M-code, `S` above 0, or a `$` settings write) is cleared, as a refused
-   positioning-light command is. Auto-focus then shows **Set up auto-focus**.
+#### Edge — the file carries an Auto-focus command (ADR-400 Amendments 1 and 2)
+1. On load, an Auto-focus command that is not a focus routine is cleared, as a refused
+   positioning-light command is. That covers a G0–G3 move, an X/Y word, an M-code, `S` above 0,
+   a `$` settings write, a probe without its own feed of at most 150 mm/min, a `G38.3`/`G38.5`
+   probe and `G30`. Auto-focus then shows **Set up auto-focus**.
 2. A file for the machine already in use (same profile, name and bed) keeps that machine's own
    Auto-focus command from Machine Setup. When the file's command differs, an info toast says
    `This file's Auto-focus command was not used: Auto-focus keeps your machine's own command from
@@ -1609,9 +1613,15 @@ the completed physical Frame is the spatial source of truth.
 3. A file for another machine brings its vetted command with the rest of that machine, behind the
    machine notice; **Keep current machine** restores the current command too.
 4. Whatever its source, the Auto-focus button sends only a focus routine: `$HZ1` on the Falcon
-   A1 Pro, `$HZ` on grblHAL or FluidNC, a Z-only `G38.2`–`G38.5` probe, or `G30` on Marlin or
-   Smoothieware. Stock GRBL gets no `$H…` command, which would leave it stuck homing. Any M-code and
-   anything else is refused with its reason and nothing is sent.
+   A1 Pro, `$HZ` on grblHAL or FluidNC, or a Z-only `G38.2`/`G38.4` probe with its own feed of at
+   most 150 mm/min, for example `G38.2 Z-10 F100`. Its Z target is a work-coordinate position
+   (G90), not a distance. Without F the controller would probe at the last job's feed. `G38.3` and
+   `G38.5` end silently when they miss, and `G30` does not focus on any supported firmware, so
+   all three are refused. Stock GRBL gets no `$H…` command, which would leave it stuck homing. Any
+   M-code and anything else is refused with its reason and nothing is sent.
+5. When the controller answers `error:9`, it was in Alarm or Jog: clear the alarm or let the jog
+   finish, then retry. `error:20` means the firmware has no probe input or does not support the
+   command.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).
@@ -2096,8 +2106,12 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
    controller's own (ADR-375).
 3. After Unlock without Home, stock GRBL's own reported MPos aims the hold, while the rest of the
    app still treats the position as unknown (ADR-375).
-4. Otherwise the jog asks for full travel and relies on the release.
-5. A release just after the jog went out waits for its reply before `0x85`, as Cancel does
+4. After a Home in this session, the hold also stops the pull-off clear of the switch with soft
+   limits off, so a held arrow toward the homing corner does not trip the switch (`ALARM:1`). On
+   grblHAL this works for every homing direction (`$23`): force set origin is read from `$22`
+   bit 3 when the `$$` dump prints the whole `$22` bitfield (ADR-375 Amendment 3).
+5. Otherwise the jog asks for full travel and relies on the release.
+6. A release just after the jog went out waits for its reply before `0x85`, as Cancel does
    (F-B4). If a motion line's reply never comes, Cancel says so after 8 s and the jog stays owned,
    since the reply may still arrive; once the controller reports Idle, Disconnect and Connect stay
    available to clear it (ADR-640).
@@ -2307,8 +2321,8 @@ minimum target size.
    bound still applies; the CNC-only Door progress extension does not.
 
 #### Success — generic CNC resume (ADR-180 amendment 2)
-1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens that warning's full text for a router job whose `$32` is on or unreported. When a GRBL or grblHAL controller reports `$32=1`, that warning carries **Send $32=0**: after a confirm, it writes the setting through Machine Settings' guarded write, reads `$$` back to verify, and the warning clears (ADR-180 Amendment 6). FluidNC, whose `$32` follows its YAML spindle type, gets no button.
-2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues. In laser mode (`$32=1`) GRBL and grblHAL skip that delay, and the stopped cutter moves the instant power returns (CNC audit MC-1).
+1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens that warning's full text for a router job whose `$32` is on or unreported. When a GRBL or grblHAL controller reports `$32=1`, that warning carries **Send $32=0**: after a confirm, it writes the setting through Machine Settings' guarded write, reads `$$` back to verify, and the warning clears (ADR-180 Amendment 6). FluidNC, whose `$32` follows its YAML spindle type, gets no button. On FluidNC the advisory is its own (ADR-180 Amendment 7). KerfDesk never lifts the bit there (it stays in the cut unless parking is on in FluidNC's own configuration), and FluidNC's door resume waits only the spindle's `spinup_ms` from its YAML configuration. That is 0 unless set; an RS485 VFD that reports its speed is waited for. So the bit can be fed through the cut while it is still speeding up. The advisory recommends **ABORT JOB** and recovery from the interrupted-job card, or setting `spinup_ms` in the spindle's section of the FluidNC configuration to the spindle's time to full speed. With `$32=1` (a Laser spindle type), it says Resume has no spin-up, and to configure a router spindle in the YAML.
+2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues. In laser mode (`$32=1`) GRBL and grblHAL skip that delay, and the stopped cutter moves the instant power returns (CNC audit MC-1). FluidNC restores the spindle with no delay of its own and waits only the spindle's `spinup_ms` (controller audit v3 D4-P2-2).
 3. Fresh post-command same-session `Door:3` reports keep **JOB RESUMING** live without refilling.
    Two seconds of silence fails; a non-resettable 30-second maximum bounds custom firmware. Only
    fresh `Run`/`Idle` proof releases host refill. Every immediately stageable owned stream write
@@ -2324,7 +2338,9 @@ minimum target size.
 
 #### Success — lift
 1. After a confirmed CNC Pause (F-B7), the app checks the conditions for a lift:
-   - GRBL 1.1 or grblHAL;
+   - GRBL 1.1 or grblHAL, as named by the welcome banner (or the connected driver before one).
+     FluidNC never lifts. This is checked before the settings, because FluidNC's `$I` lists
+     parking (`P`) whatever its YAML says (ADR-180 Amendment 7);
    - `$32=0` is confirmed;
    - the build has no parking (`P` in `$I`);
    - (A later Pause of the same job relies on the `$32` and parking check an earlier lift made
@@ -2588,8 +2604,13 @@ authorization, Frame proof, controller command, or safety boundary.
 2. `$number=value` settings writes require connected, idle controller state and explicit
    confirmation. On stock GRBL a value the firmware would store differently (anything but 0 or 1
    for an on/off setting, a fraction or a value outside 0-255 for its other 8-bit settings) is
-   refused before the prompt. Every acknowledged write is read back with `$$`, so the settings
-   table shows what the controller stored (ADR-375).
+   refused before the prompt. On grblHAL, a value for one of the GRBL settings KerfDesk knows is
+   refused before the prompt unless it is one plain number the setting takes as typed: grblHAL
+   keeps only the number at the start (`$100=26,67` would store 26), and older builds read
+   `$22=1.0` as 10, so the message names the line to send instead. Every acknowledged write is
+   read back with `$$`, so the settings table shows what the controller stored (ADR-375). When
+   the re-read shows a different value than the one typed, the Console says so (ADR-375
+   Amendment 3).
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
@@ -2946,13 +2967,24 @@ authorization, Frame proof, controller command, or safety boundary.
   automatic line is the rejected line itself, so that burn is not skipped; the picker says
   that lines the controller ran after it before stopping may burn again (ADR-341 Amendment 3).
   An `ALARM:N` is not counted as acknowledging a line. After a stop that discards the
-  controller's planner (Abort, the auto-abort after a rejected line, a reboot), the automatic
-  line also steps back over the moves the last status report showed still waiting in the
-  planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362). A lost
-  link steps back the same way once the first reconnect shows the controller restarted: its
-  startup banner (an Arduino-based board resets when its port reopens, and one powered from
-  USB stops when the cable is pulled) or an Alarm. A controller that answers without either
-  kept running, and the line stays at the first unacknowledged one (ADR-398 Amendment 3).
+  controller's planner (Abort, the auto-abort after a rejected line, a reboot, an alarm), the
+  automatic line also steps back over the moves the last status report showed still waiting in
+  the planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362). An
+  alarm that arrives after the last line was acknowledged, while the controller is still
+  running its planner (a Smoothieware kill button or hard limit), ends the job the same way
+  and steps back the same way (ADR-341 Amendment 10). A lost link steps back the same way once
+  the first reconnect shows the controller restarted: its startup banner (an Arduino-based board
+  resets when its port reopens, and one powered from USB stops when the cable is pulled) or an
+  Alarm. A controller that answers without either kept running, and the line stays at the first
+  unacknowledged one (ADR-398 Amendment 3).
+  grblHAL sends the same banner to every new network connection and every native-USB port
+  open without resetting, and a board on Wi-Fi or Ethernet cannot show a restart at all. On
+  those links the banner does not count: a `Run` or `Hold` status means the controller kept
+  running, an Alarm that it stopped, and anything else leaves the restart unknown. An unknown
+  restart keeps the automatic line, and the picker names the earlier line that replays the
+  moves a restart would have thrown away, for the operator to choose after inspecting the
+  work (ADR-398 Amendment 4). The Review and the lost-link notices name the link, USB or
+  network.
 - Resume, saved or manual, re-arms the beam with the power commands of the controller the job
   was written for (ADR-364).
   - A Smoothieware job resumes with `fire off` and restores its own `M221` scale and
@@ -3016,7 +3048,11 @@ authorization, Frame proof, controller command, or safety boundary.
   re-anchored where the head stopped; the dialog and confirmation name that placement. With no
   such run, the confirmation says the restart is anchored at the head as it is now (ADR-362).
   While an interrupted laser job is saved, the line field starts at its automatic restart line
-  (a file line, like the field) and says where the job stopped in sent lines.
+  (a file line, like the field) and says where the job stopped in sent lines. When that job
+  was itself a resumed recovery or a painted second pass, its lines count its own program, not
+  the project's full program this control replays, so the field is not filled in and the hint
+  points to the card's Review. The dialog and confirmation say which program the line counts
+  (ADR-341 Amendment 10).
   Costly image/fill preparation runs in the background for both manual and fingerprint-based
   recovery; worker failure is retryable and never falls back to blocking the canvas.
 - Recovery preserves the saved scope and resolved placement. It uses its separate source,
@@ -3414,11 +3450,14 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    takes the flat length of a strip wrapped once round the part where the artwork goes and the
    strip's thickness (default 0.1 mm), shows Ø = wrap / π − thickness, and **Use this diameter**
    fills the field.
-3. A **chuck** scales Y by Motion per turn / (π × object diameter). A **roller** either leaves Y
-   unscaled (**Scale Y from the roller diameter** off: the controller already moves the surface
-   in millimetres; every pre-ADR-373 roller setup, byte-identical output) or scales it by Motion
-   per turn / (π × **Roller diameter**), independent of the part's size. Motion per turn is
-   disabled while it has no effect. A chuck never stores a roller diameter.
+3. A **chuck** scales Y by Motion per turn / (π × object diameter). A **roller** either scales it
+   by Motion per turn / (π × **Roller diameter**), independent of the part's size, or leaves Y
+   unscaled (**Scale Y from the roller diameter** off: the controller's Y steps/mm already move
+   the surface in millimetres; every pre-ADR-373 roller setup, byte-identical output). A new
+   roller starts scaled (Roller diameter 25 mm until measured), as LightBurn's roller always is,
+   and so does a saved chuck switched to Roller; a saved roller opens in the mode it was saved
+   with (ADR-373 Amendment 1). Motion per turn is disabled while it has no effect. A chuck never
+   stores a roller diameter.
 4. The preview shows the surface circumference, the machine travel for one revolution (the wrap
    limit the bounds preflight enforces), the Y scale, and the tallest artwork one revolution holds.
 5. **Rotary preset** (ADR-503) shows when the machine's family has a rotary whose maker publishes
@@ -3438,8 +3477,17 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    `G90` on Marlin (Smoothieware wraps the same move in its tool-off lines and `M120`/`M121`),
    `M5` / `G21 G91` / `G1 Y… F… S0` / `G90` on the Falcon contract. No turn carries M3/M4 or a
    power word. Ruida has no jog command, so the test is unavailable there.
-3. The operator checks that a mark on the part returns to the same place, adjusts the
-   measurements, tests again, then applies.
+3. The operator checks that a mark returns to the same place, corrects the value the note under
+   the buttons names, tests again, then applies (ADR-373 Amendment 1):
+   - after **Turn chuck once** or **Turn roller once**: Motion per turn, lower if it turned too
+     far, higher if it stopped short;
+   - after **Turn object once** on a scaled roller: check Motion per turn with Turn roller once
+     first, then measure the roller diameter and the object again rather than tuning either;
+   - after **Turn object once** on an unscaled roller: the controller is not moving the surface in
+     millimetres, so turn on **Scale Y from the roller diameter** (roller diameter and Motion per
+     turn) or set the controller's Y steps/mm to the surface. The note says that changing the
+     object diameter can make the mark land without fixing the size: a roller's Y scale never
+     reads it.
 
 #### Edge — stop, close, refusal
 1. **Stop rotation**, closing the dialog, or Esc sends jog cancel (`0x85`) where the firmware
@@ -3454,8 +3502,8 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 #### Success — the Rotary switch
 1. Once the profile has a rotary setup, a laser project's Job actions dock shows a **Rotary**
    toggle above Frame and Start with the attachment and size, for example
-   "Roller, Ø60 mm (rollers Ø25 mm)" or "Off · Chuck, Ø80 mm". Its tooltip gives the Y scale and
-   the machine travel for one revolution.
+   "Roller, Ø60 mm (rollers Ø25 mm)", "Roller, Ø60 mm (Y not scaled)" or "Off · Chuck, Ø80 mm".
+   Its tooltip gives the Y scale and the machine travel for one revolution.
 2. It toggles `device.rotary.enabled`, the setup Rotary Setup edits, as one undoable profile
    edit. It is disabled while a job, motion or controller operation owns the machine. A setup
    whose measurements cannot map Y opens Rotary Setup instead of switching on.
@@ -3532,7 +3580,10 @@ again) or **Discard changes**.
      banner names (when the driver can connect to it), the baud rate that answered, the machine
      type from `$32` (laser mode on or off; a Laser + CNC draft keeps both, and a machine chosen
      from the list keeps the type the list gives it, ADR-637 Amendment 1), and the mapped `$$`
-     values. The strip lists each change
+     values. A machine chosen from the list also keeps its listed work area: `$130`/`$131` are
+     the controller's travel, not the bed, so the strip shows them beside the kept area instead
+     of filling them in (ADR-637 Amendment 2). The strip lists each change the fill made that the
+     draft still holds
      as old → new with one **Undo** that restores the draft as it was. A machine already set up
      that the operator only opens setup for keeps its values and offers **Use detected values**
      for the ones that differ (ADR-347). When the adopted firmware differs from the one it
@@ -3655,7 +3706,9 @@ settings and Job Review keep their existing read-only setup references.
    material/bit/stock/tiling, the operation material/tool plan, job placement, CNC cache, and
    existing spindle-ceiling effects through one store action and one undo entry. **Cancel** leaves
    the live project, dirty state, undo/redo history, and controller unchanged. Only after Save does
-   the flow execute and exactly re-read any explicitly queued common firmware writes.
+   the flow execute and exactly re-read any explicitly queued common firmware writes. While a job
+   runs or is held (a CNC bit change included), Save is disabled and says why, as the toolbar's
+   Laser / CNC switch is; the draft stays open and saves once the job ends (ADR-416 Amendment 1).
 
 #### Success — configure CNC defaults before artwork exists
 
@@ -4782,6 +4835,67 @@ artwork bounds; a verified parametric ellipse can use its major radius. Array
 offers **Use the round boundary**, which centres rows and checks every footprint
 corner against the usable circle, or the conservative inscribed square. The
 preview and applied copies use the same plan; this is not optimal nesting (ADR-599).
+
+---
+
+### F-BC4. Place an irregular board from a photo (ADR-654)
+
+**ADR:** [ADR-654](docs/decisions/ADR-654-outline-board-from-photo.md).
+
+**Operator intent.** Draw the irregular edge of an offcut, live-edge slab or shaped blank from a
+phone photo at its exact ruler-measured size, lay artwork out on it straight away, and register it
+to the machine with two head captures before burning.
+
+**Where in the UI.** Open **Tools → Place Board**, choose **Outline**, then **Draw board from
+photo…**. The photo window takes a file, a pasted photo (Ctrl+V), or a photo an MCP assistant sends
+to the desktop app (`set_board_photo`), which opens the window by itself.
+
+**The happy path.**
+
+1. Photograph the board from straight above with the whole board in view, and open the photo.
+2. Click each corner of the board in order around its edge, adding points along curved edges.
+   Drag a point to move it. **Straighten edge** lines up points that are a little off: pick the
+   points at the two ends of an edge and the points between move onto the straight line joining
+   them. **Undo** reverses the last click, drag, straighten or clear; **Clear** starts over. The
+   dashed line shows the closing edge.
+3. Enter the board's ruler-measured width (left to right in the photo) and height (top to bottom).
+   The clicked outline is scaled to exactly that size. Every clicked corner is a check point, up
+   to six (more points pick the sharpest six); A is the point nearest the photo's bottom-left by
+   default and can be changed, and B is the point farthest from A.
+4. **Draw on canvas** puts the locked outline on the canvas at once, centred and out of the burn.
+   Placement is unchanged until the board is registered.
+5. Select artwork and use **Fit to board** or **Array on board** inside the outline (a conservative
+   inscribed rectangle).
+6. Jog beam-off onto point A and **Capture**, then point B and **Capture**. **Register board**
+   checks the measured scale, sets the work origin at the outline's physical front-left corner,
+   gives the drawn outline the shape and turn the head measured about its own centre, turns
+   unlocked artwork lying on it by the same angle, and switches placement to User Origin
+   front-left. This is one Undo step.
+7. Check every remaining point. Each accepted or adjusted point is measured and refits the outline.
+   These checks are accuracy advice, not a Start gate.
+8. Preview, complete **Frame** for the exact placement, then Start. The completed Frame remains the
+   ordinary Start gate.
+
+**Edge / error cases.** **Draw on canvas** stays disabled, with the reason shown, until there are
+at least three points that do not cross and a width and height of at least 3 mm. A typed size whose
+proportions differ from the clicked outline by more than 10% shows a notice (width and height
+swapped, or a photo taken at an angle) without blocking. **Straighten edge** refuses neighbouring
+ends (there is nothing between them) and any edge whose points sit more than 15% of its length off
+the line, so it cannot collapse a corner. A head-measured spacing of A and B over 5%
+different from the drawn outline is refused as a likely wrong point or size; over 1% shows a
+notice. Locked artwork does not turn at registration. Without a connected machine the board can be
+drawn and laid out but not registered. Reconnect, reset/alarm, homing/manual-position or
+work-origin changes stale the capture epochs and require recapture. A checked point over 5 mm from
+prediction warns about the selected point; a least-squares miss over 1.5 mm warns about photo
+distortion and recommends an edge margin.
+
+**Hardware verification checklist (user-driven — hardware CLAIMED).**
+
+1. Secure scrap material and use S=0 / an air trace first.
+2. Draw the board from a straight-down photo, lay out test artwork, capture A and B and register.
+3. Move beam-off to every check point and confirm the head lands on the physical edge.
+4. Keep test artwork several millimetres inside the outline, then complete Frame and inspect the
+   air trace before enabling normal power.
 
 ---
 
@@ -7828,6 +7942,8 @@ as the pane's design record.
 4. Abort uses the controller's Ctrl-X halt path; a halted controller answers `!!` to normal
    lines (`error:Alarm lock` in grbl mode). Its `ALARM:` lines (hard limit, kill button, Abort
    in grbl mode) stop a running job and are logged; they never name a job line as rejected.
+   One that arrives after the last line was answered, while queued moves still run, stops the
+   job too and is saved as a stop that discarded the planner (ADR-341 Amendment 10).
    Unlock sends `M999`. A Frame that ended before its own `M121` gets one `M121` once the board
    is unhalted and Idle, so job travel keeps the configured seek rate. The board halts rather
    than reboots, so the controller checks run again on the first Idle after Unlock. This is not
@@ -8259,12 +8375,17 @@ as the pane's design record.
 
 ## Camera Mode flows
 
-### F-CAM1. Choose a camera (ADR-116, ADR-440, ADR-446)
+### F-CAM1. Choose a camera (ADR-116, ADR-440, ADR-446, ADR-663)
 
-- **Success / camera running.** The operator opens the Camera panel and starts a USB camera, or
-  presses **Use this camera** on a detected machine camera. The live picture is the one source every
-  camera feature captures through. Closing the panel keeps the camera running while the calibrated
-  overlay shows it on the canvas.
+- **Success / camera running.** The operator opens the Camera panel. Its preview card names the
+  camera and offers one button: **Use this camera** when the bridge found the laser's built-in
+  camera, otherwise **Start camera** for the chosen USB camera. The live picture is the one source
+  every camera feature captures through. Closing the panel keeps the camera running while the
+  calibrated overlay shows it on the canvas.
+- **Success / another camera.** **Choose camera…** on the card, or the gear, opens **Camera
+  settings** inside the panel: machine-camera detection, **RTSP camera…**, **Phone camera…** and
+  the USB picker with **Start USB camera**. The back arrow returns to the camera. The guided setup's
+  first screen lists the same cameras (F-CAM2).
 - **Hosted browser / machine camera.** A laser's built-in camera, RTSP/IP cameras and phone camera
   apps answer on the local network without the permission browsers need to read pixels, so the
   hosted web app cannot use them. The panel says so and links KerfDesk Desktop, which reads them
@@ -8288,11 +8409,20 @@ as the pane's design record.
 - **Edge / camera without its own calibration.** The setup steps say to calibrate it, the canvas
   says the saved calibration belongs to another camera, and calibrating it keeps the others.
 
-### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1, 3 and 4)
+### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1, 3 and 4, ADR-663)
 
-- **Success / calibrated.** **Calibrate camera…** opens the wizard. The operator covers the bed
-  with one flat sheet, enters its thickness and, optionally, the camera lens height by tape
-  measure, and presses **Engrave target**: the ring target streams as a temporary job through the
+- **Success / guided setup.** Before the running camera is calibrated, the panel shows **Set up
+  your camera**; **Set up camera** opens the **Camera setup** wizard at its first of six steps.
+  **Camera** lists the laser's camera and each USB camera with **Use this camera** (network and
+  phone cameras in a fold); Next needs a running camera. **Mounting** asks **Above the bed** or
+  **On the laser head** with two picture cards. **Picture** shows the live picture and measures it
+  every three seconds: dark (average luma below 60), washed out (more than 5 % near white) and the
+  finest bed millimetres per pixel, flagged above 0.5 mm. It is advice; Next is always offered.
+  The next three steps are the target, the photo and the result below. In Camera settings,
+  **Recalibrate…** opens at the target and **Check camera…** at the photo.
+- **Success / calibrated.** On the target step the operator covers the bed with one flat sheet,
+  enters its thickness and, optionally (under **Engrave settings**, with power, speed and margin),
+  the camera lens height by tape measure, and presses **Engrave target**: the ring target streams as a temporary job through the
   normal Frame, review and Start path, leaving the project and undo history untouched. When the
   job finishes the wizard moves to the photo. The operator moves the head clear of the three solid
   discs and presses **Take photo**; the rings are found and the camera fitted in a worker. The
@@ -8353,9 +8483,11 @@ as the pane's design record.
 
 - **Success / overlay on canvas.** With a saved calibration, the canvas shows the camera picture
   through the camera model: lens distortion and parallax are undone per pixel on the GPU, and the
-  picture tracks zoom and pan. The overlay row offers show/hide, a Fade slider, **Update still**
-  (freeze the current frame, LightBurn's Update Overlay model) and **Live** for any camera kind.
-- **Material surface height.** Enter the material's top height above the bed; the overlay and
+  picture tracks zoom and pan. The everyday panel offers **Refresh picture** (freeze the current
+  frame, LightBurn's Update Overlay model), **Live**, **Trace from camera**, **Show on canvas** and
+  an **Opacity** slider for any camera kind (ADR-663). **Fill blanks** (F-CAM9) and **Raised
+  objects** (height areas, below) open as folds; the **Accuracy map** is in Camera settings.
+- **Material height.** Enter the material's top height above the bed; the overlay and
   camera trace show the bed as seen at that height, so the material's edges line up.
 - **Object heights.** **Add height area** gives part of the bed its own height, for an object that
   stands above the material such as a box. With objects selected, the area starts around them
@@ -8485,14 +8617,14 @@ as the pane's design record.
   user-cancelled save dialogs stay quiet.
 - **Empty / no active source.** Snapshot actions are disabled until a camera
   source is active.
-- **Edge / watching a job.** The camera panel can toggle between compact and
-  wide monitoring widths, with the preference kept locally.
+- **Edge / watching a job.** **Larger view** in Camera settings toggles the panel between compact
+  and wide monitoring widths, with the preference kept locally.
 
 ### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendment 1)
 
 - **Success / fill a batch of blanks.** With a saved calibration and a live camera, the operator
   lays out blanks, puts the design on one of them, selects it and presses **Find pieces** in the
-  Camera panel's **Pieces on the bed** section. The overlay turns on and each piece is outlined on
+  Camera panel's **Fill blanks** fold (**Pieces on the bed**). The overlay turns on and each piece is outlined on
   the canvas with its number, centre and long-side line. The panel lists each piece with its size
   and angle and how the design will move and turn onto it. **Place selection on each piece** adds
   a copy on every ticked piece, the way the design sits on its own piece, as one undo step.
@@ -9343,16 +9475,30 @@ The G-code Inspector is free in every edition (ADR-627).
 4. A clean Frame unlocks **Start**. The status reads **Ready to start**. A Jog, Home, origin
    or probe change, reset, alarm, reconnect, another Frame or a machine-mode switch locks it
    again with the reason; the program is then read again from wherever the head stands.
-5. **Start** asks the usual laser-mode (`$32`) or CNC workholding question, checks the Frame is
+5. **Start** asks the usual CNC workholding question, or on a laser the `$30`/`$32` settings
+   question whenever Job Review would ask it; on this path it cites the Run review warnings, and
+   it opens with the rapids that would burn (ADR-630 Amendment 4). It checks the Frame is
    still current and the head is still at the program's start, then streams the program with
    the ordinary streamer and closes the Inspector. The last check, after the controller is
    prepared, repeats the session, origin, position and machine-mode checks. The Live Motion
-   bar's Pause, Resume and **ABORT JOB** work as for any job.
+   bar's Pause, Resume and **ABORT JOB** work as for any job. Once the program may have reached
+   the controller, the project's interrupted-job card, **Run again** and second-pass offer are
+   retired: the file is now the last thing the machine ran (ADR-341 Amendment 10).
 6. One Frame allows one run. Running the file again needs another Frame.
 
 #### Warnings (never refuse)
 
-Work-offset writes (`G10 L2`/`G10 L20`, listed first: later moves, and later jobs, may be
+The connected controller's `$30` and `$32` come first, checked and worded as Job Review does for
+a project Start (ADR-630 Amendment 4): a router reporting `$32=1` (laser mode on: the spin-up
+dwell runs with the spindle off and plunges start with the bit not at speed), a laser reporting
+`$32=0`, a `$30` that does not match the profile's max S or the spindle's max RPM, and settings
+not read or not reported. On a laser whose `$32=0` is reported or not confirmed, a program with
+G0 moves made while `M3`/`M4` is on and `S` is not set to 0 also gets a warning that counts them
+and names the first by its line in the sent program: with laser mode off, GRBL, grblHAL and
+FluidNC keep the beam on during those rapids, so each burns a line. A program that writes `S0`
+on every G0 gets no such warning.
+
+Then the program's own: work-offset writes (`G10 L2`/`G10 L20`, listed first: later moves, and later jobs, may be
 displaced from the traced outline), moves in machine coordinates (`G53`), a work coordinate
 switch away from `G54`, `G92`, `G28`/`G30` moves and `G28.1`/`G30.1` stored positions,
 relative moves (`G91`, read from where the head stands), a program that ends in inches (`G20`,

@@ -3,7 +3,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
-import { captureMaterialRecipe, type MaterialRecipe } from '../../core/material-library';
+import {
+  captureMaterialRecipe,
+  starterLibraryEntryForProfileId,
+  type MaterialRecipe,
+} from '../../core/material-library';
 import type { FileHandle, PlatformAdapter, SaveTarget } from '../../platform/types';
 import {
   MATERIAL_LIBRARY_FORMAT,
@@ -13,8 +17,15 @@ import {
 } from '../../io/material-library';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
+import {
+  EMPTY_MATERIAL_LIBRARY_COLLECTION,
+  libraryDocument,
+  reconcileActiveDocument,
+  setLibraryPayload,
+} from '../state/material-library-collection';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
+import { buildStarterLibrary } from './material-library-builders';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 
 (
@@ -209,6 +220,71 @@ describe('MaterialLibraryPanel', () => {
           ?.description,
       ).toMatch(/cannot cut or engrave clear acrylic/i);
       expect(state.materialLibraryDirty).toBe(false);
+    } finally {
+      await unmount(root, host);
+    }
+  });
+
+  it('keeps a changed starter library and opens a fresh copy beside it (audit 21-P1-1)', async () => {
+    useStore.getState().replaceDeviceProfile(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
+    const catalog = starterLibraryEntryForProfileId(NEOTRONICS_PROFILE_ID);
+    if (catalog === null) throw new Error('Neotronics starter catalog missing');
+    const stock = buildStarterLibrary(catalog.profile, catalog.presets);
+    // The operator added "My walnut" to their starter library, which auto-saved;
+    // after a restart (or deleting the open library) no library is open.
+    const changed = { ...stock, entries: [...stock.entries, preset({ id: 'my-walnut' })] };
+    useStore.setState({
+      materialLibrary: null,
+      savedLibraries: setLibraryPayload(EMPTY_MATERIAL_LIBRARY_COLLECTION, changed, 1),
+    });
+    const { host, root } = await renderPanel();
+    try {
+      await act(async () => {
+        button(host, 'Create starter material library for the selected device').click();
+      });
+
+      const state = useStore.getState();
+      expect(state.materialLibrary?.libraryId).toBe(`${stock.libraryId}-2`);
+      expect(state.materialLibrary?.entries).toEqual(stock.entries);
+      // The persistence hook folds the open library into the saved ones; the
+      // changed starter library survives it, presets and all.
+      const saved = reconcileActiveDocument(state.savedLibraries, state.materialLibrary, 2);
+      expect(libraryDocument(saved, stock.libraryId)?.entries.map((entry) => entry.id)).toContain(
+        'my-walnut',
+      );
+      expect(Object.keys(saved.libraries).sort()).toEqual(
+        [stock.libraryId, `${stock.libraryId}-2`].sort(),
+      );
+      expect(useToastStore.getState().toasts).toEqual([
+        expect.objectContaining({
+          variant: 'info',
+          message: expect.stringContaining('is kept in Saved Libraries'),
+        }),
+      ]);
+    } finally {
+      await unmount(root, host);
+    }
+  });
+
+  it('reopens a saved starter library that still holds the stock presets', async () => {
+    useStore.getState().replaceDeviceProfile(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
+    const catalog = starterLibraryEntryForProfileId(NEOTRONICS_PROFILE_ID);
+    if (catalog === null) throw new Error('Neotronics starter catalog missing');
+    const stock = buildStarterLibrary(catalog.profile, catalog.presets);
+    useStore.setState({
+      materialLibrary: null,
+      savedLibraries: setLibraryPayload(EMPTY_MATERIAL_LIBRARY_COLLECTION, stock, 1),
+    });
+    const { host, root } = await renderPanel();
+    try {
+      await act(async () => {
+        button(host, 'Create starter material library for the selected device').click();
+      });
+
+      const state = useStore.getState();
+      expect(state.materialLibrary?.libraryId).toBe(stock.libraryId);
+      expect(Object.keys(state.savedLibraries.libraries)).toEqual([stock.libraryId]);
+      expect(useToastStore.getState().toasts).toEqual([]);
     } finally {
       await unmount(root, host);
     }

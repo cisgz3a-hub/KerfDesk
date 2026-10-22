@@ -8,15 +8,16 @@
 // clockwise test reads only axis_0 and axis_1, so the XY solve, sweep and box
 // apply unchanged once each point is read in its plane's axes.
 
-import { ARC_EPSILON, arcSweepAngle } from '../gcode';
+import { ARC_EPSILON, arcSweepAngle, type GcodeWordMatch } from '../gcode';
 // Deep import: the exact arc box, also used by the output invariants.
 import { arcAabb } from '../invariants/arc-bounds';
 import { timingArcPoints } from './controller-arc-points';
 import { isLaserOffFeed, renderedPower, type LaserRenderState } from './laser-render-state';
 import type { ProgramBoundsTracker } from './program-bounds';
-import { ARC_RADIUS_TOLERANCE_MM, renderArcCenter } from './render-model-arc-center';
+import { arcRadiusMismatch, renderArcCenter } from './render-model-arc-center';
+import { resolveTarget } from './render-model-coordinates';
 import { SEG_KIND, SEG_MOTION, type SkippedMotion } from './render-model-types';
-import type { RenderModal } from './render-model-words';
+import { applyLineWords, type RenderModal } from './render-model-words';
 import type { SegmentBuilder } from './segment-builder';
 
 const AXIS_EPSILON = 1e-9;
@@ -45,6 +46,7 @@ const ARC_PLANES: Readonly<Record<RenderModal['plane'], ArcPlane>> = {
 
 /** What drawing an arc reads and writes of the builder's context. */
 export type ArcContext = {
+  readonly stockGrbl: boolean;
   readonly controllerArcToleranceMm: number | undefined;
   readonly laser: LaserRenderState;
   readonly modal: RenderModal;
@@ -53,6 +55,64 @@ export type ArcContext = {
   readonly skipped: SkippedMotion[];
   controllerArcBudgetRelief: number;
 };
+
+/** Validate known arc geometry before committing this block's modes or tool
+ * events. The selected plane's axes must be placed, including its Z axis. */
+export function grblArcBlockRejection(
+  before: RenderModal,
+  words: ReadonlyArray<GcodeWordMatch>,
+  canPlace: ProgramBoundsTracker['canPlace'] = () => true,
+): string | null {
+  if (!commandsArc(before, words)) return null;
+  const modal = { ...before };
+  const { axisWords } = applyLineWords(modal, words, 0, {
+    countUnsupported: () => undefined,
+    pushEvent: () => undefined,
+  });
+  if (modal.motion < 2 || hasNonArcCommand(words)) return null;
+  const plane = ARC_PLANES[modal.plane];
+  // GRBL requires an axis word in the selected plane even for a full circle.
+  // This structural requirement is independent of the starting position.
+  if (!axisWords.has(plane.axis0.toUpperCase()) && !axisWords.has(plane.axis1.toUpperCase())) {
+    return `arc requires axis words in the active G${modal.plane} plane`;
+  }
+  if (axisWords.has('R') && words.some((word) => 'IJK'.includes(word.letter))) {
+    return 'R-form arc also supplies unused I/J/K offsets';
+  }
+  if (!canPlace([plane.axis0, plane.axis1])) return null;
+  const from = inPlane(plane, modal);
+  const to = inPlane(plane, resolveTarget(modal, axisWords));
+  const solved = renderArcCenter(
+    planeWords(plane, axisWords),
+    from,
+    to,
+    modal.motion === 2,
+    modal.unitScale,
+    true,
+    plane.offsetNames,
+  );
+  if ('skipped' in solved) return solved.skipped;
+  const radius = Math.hypot(from.x - solved.center.x, from.y - solved.center.y);
+  const endRadius = Math.hypot(to.x - solved.center.x, to.y - solved.center.y);
+  return arcRadiusMismatch(radius, endRadius, true)
+    ? 'arc radius mismatch between start and end points'
+    : null;
+}
+
+function commandsArc(before: RenderModal, words: ReadonlyArray<GcodeWordMatch>): boolean {
+  const explicit = words.some(
+    (word) => word.letter === 'G' && [2, 3].includes(Math.round(word.value * 100) / 100),
+  );
+  return explicit || (before.motion >= 2 && words.some((word) => 'XYZ'.includes(word.letter)));
+}
+
+function hasNonArcCommand(words: ReadonlyArray<GcodeWordMatch>): boolean {
+  return words.some(
+    (word) =>
+      word.letter === 'G' &&
+      [10, 28, 30, 38.2, 38.3, 38.4, 38.5, 43.1, 49, 53, 80, 92].includes(word.value),
+  );
+}
 
 /** Draws the G2/G3 from the modal position to `target`; false when it is skipped. */
 export function emitArc(
@@ -68,7 +128,15 @@ export function emitArc(
   const from = inPlane(plane, start);
   const to = inPlane(plane, target);
   const words = modal.plane === 17 ? axisWords : planeWords(plane, axisWords);
-  const solved = renderArcCenter(words, from, to, clockwise, modal.unitScale, plane.offsetNames);
+  const solved = renderArcCenter(
+    words,
+    from,
+    to,
+    clockwise,
+    modal.unitScale,
+    context.stockGrbl,
+    plane.offsetNames,
+  );
   if ('skipped' in solved) {
     context.skipped.push({ line, reason: solved.skipped });
     return false;
@@ -76,7 +144,7 @@ export function emitArc(
   const { center } = solved;
   const radius = Math.hypot(from.x - center.x, from.y - center.y);
   const endRadius = Math.hypot(to.x - center.x, to.y - center.y);
-  if (Math.abs(radius - endRadius) > ARC_RADIUS_TOLERANCE_MM) {
+  if (arcRadiusMismatch(radius, endRadius, context.stockGrbl)) {
     context.skipped.push({ line, reason: 'arc radius mismatch between start and end points' });
     return false;
   }

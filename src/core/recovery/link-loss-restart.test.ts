@@ -6,7 +6,12 @@
 import { describe, expect, it } from 'vitest';
 import { automaticRestart } from './automatic-restart-line';
 import { parseOptionalJobInterruption, type JobInterruption } from './job-interruption';
-import { awaitsLinkLossVerdict, settleLinkLossRestart } from './link-loss-restart';
+import {
+  awaitsLinkLossVerdict,
+  settleLinkLossRestart,
+  type LinkLossRestartEvidence,
+  type LinkLossRestartSign,
+} from './link-loss-restart';
 
 const GCODE = Array.from({ length: 60 }, (_, i) => `G1 X${i % 2 === 0 ? 0 : 20} Y${i} S800`).join(
   '\n',
@@ -30,11 +35,17 @@ describe('a lost link before the reconnect', () => {
   });
 });
 
+const usb = (sign: LinkLossRestartSign): LinkLossRestartEvidence => ({ sign, link: 'usb' });
+const network = (sign: LinkLossRestartSign): LinkLossRestartEvidence => ({
+  sign,
+  link: 'network',
+});
+
 describe('settleLinkLossRestart', () => {
   it.each(['boot-banner', 'alarm'] as const)(
     'steps back a whole planner when the reconnect shows a %s',
-    (evidence) => {
-      const settled = settleLinkLossRestart(LOST_LINK, evidence);
+    (sign) => {
+      const settled = settleLinkLossRestart(LOST_LINK, usb(sign));
       expect(settled).toMatchObject({
         kind: 'disconnect',
         sentLines: 45,
@@ -55,7 +66,7 @@ describe('settleLinkLossRestart', () => {
   );
 
   it('keeps the restart and the message when the controller kept running', () => {
-    const settled = settleLinkLossRestart(LOST_LINK, 'kept-running');
+    const settled = settleLinkLossRestart(LOST_LINK, usb('kept-running'));
     expect(settled).toEqual({
       kind: 'disconnect',
       message: LOST_LINK.message,
@@ -69,7 +80,7 @@ describe('settleLinkLossRestart', () => {
     const reported = { ackedAtStatus: 38, queuedBlocks: 6 };
     const settled = settleLinkLossRestart(
       { ...LOST_LINK, plannerBacklogIfRestarted: reported },
-      'boot-banner',
+      usb('boot-banner'),
     );
     expect(settled?.plannerBacklog).toEqual(reported);
     if (settled === null) throw new Error('Expected a settled interruption.');
@@ -81,13 +92,55 @@ describe('settleLinkLossRestart', () => {
 
   it('leaves records that wait for no verdict alone', () => {
     const { plannerBacklogIfRestarted: _backlog, ...settled } = LOST_LINK;
-    expect(settleLinkLossRestart(settled, 'boot-banner')).toBeNull();
+    expect(settleLinkLossRestart(settled, usb('boot-banner'))).toBeNull();
     const reboot: JobInterruption = {
       kind: 'controller-reboot',
       message: 'Rebooted.',
       plannerBacklog: PLANNER_SIZE,
     };
-    expect(settleLinkLossRestart(reboot, 'kept-running')).toBeNull();
+    expect(settleLinkLossRestart(reboot, usb('kept-running'))).toBeNull();
+  });
+
+  it('names the link the reconnect came over', () => {
+    expect(settleLinkLossRestart(LOST_LINK, usb('boot-banner'))?.message).toMatch(
+      /^The USB connection was lost/,
+    );
+    const alarmed = settleLinkLossRestart(LOST_LINK, network('alarm'))?.message;
+    expect(alarmed).toMatch(/^The network connection was lost/);
+    expect(alarmed).not.toMatch(/USB|Arduino/);
+  });
+});
+
+// ADR-398 Amendment 4, controller audit D7-P2-1: grblHAL greets every new
+// Telnet client with its startup banner, so a Wi-Fi reconnect to a board that
+// kept burning cannot show a restart. Nothing steps back on its own; the
+// restart hint names the line that would.
+describe('a reconnect that cannot show whether the controller restarted', () => {
+  it('keeps the automatic line and names the step back a restart would need', () => {
+    const settled = settleLinkLossRestart(LOST_LINK, network('unknown'));
+    expect(settled).toMatchObject({
+      kind: 'disconnect',
+      sentLines: 45,
+      unconfirmedPlannerBacklog: PLANNER_SIZE,
+    });
+    expect(settled).not.toHaveProperty('plannerBacklog');
+    expect(settled).not.toHaveProperty('plannerBacklogIfRestarted');
+    if (settled === null) throw new Error('Expected a settled interruption.');
+    expect(awaitsLinkLossVerdict(settled)).toBe(false);
+    expect(settled.message).toMatch(/^The network connection was lost/);
+    expect(settled.message).toContain('does not show whether the controller restarted');
+    expect(settled.message).not.toMatch(/USB|Arduino|had restarted/);
+    expect(automaticRestart(GCODE, ACKED, settled)).toEqual({
+      line: 41,
+      replaysRejectedLine: false,
+      ifRestarted: { line: 26, blocks: 15, basis: 'planner-size' },
+    });
+  });
+
+  it('explains a grblHAL USB greeting in USB terms', () => {
+    const message = settleLinkLossRestart(LOST_LINK, usb('unknown'))?.message;
+    expect(message).toMatch(/^The USB connection was lost/);
+    expect(message).toContain('each time its USB port opens');
   });
 });
 
@@ -98,6 +151,17 @@ describe('the stored record', () => {
       parseOptionalJobInterruption({
         ...LOST_LINK,
         plannerBacklogIfRestarted: { ackedAtStatus: -1 },
+      }),
+    ).toBeNull();
+  });
+
+  it('reads an unconfirmed backlog and rejects a corrupt one', () => {
+    const unconfirmed = settleLinkLossRestart(LOST_LINK, network('unknown'));
+    expect(parseOptionalJobInterruption(unconfirmed)).toEqual({ interruption: unconfirmed });
+    expect(
+      parseOptionalJobInterruption({
+        ...unconfirmed,
+        unconfirmedPlannerBacklog: { ackedAtStatus: 1, queuedBlocks: 2, bound: 'other' },
       }),
     ).toBeNull();
   });
