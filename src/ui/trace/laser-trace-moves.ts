@@ -8,6 +8,11 @@
 // corners, open-chain ends and ring seams keep their exact positions. As on
 // CNC, the scene then stores what the machine runs at that placement: a curved
 // subpath's compatibility polyline becomes compile's own flattening.
+//
+// A dense trace has tens of thousands of subpaths, so this runs as resumable
+// trace steps: the commit drives them cooperatively and the browser keeps
+// painting and taking input between subpaths. Both runners do the same work in
+// the same order, so the result does not depend on which one ran it.
 
 import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
@@ -20,7 +25,8 @@ import {
 } from '../../core/scene';
 import { carrySubpathNesting } from '../../core/scene/subpath-nesting';
 import { simplifyToolpathPolyline, type ToolpathSimplifyOptions } from '../../core/toolpath';
-import { preserveLaserTraceTopology } from './laser-trace-topology';
+import { runTraceSteps, type TraceSteps } from '../../core/trace/trace-steps';
+import { preserveLaserTraceTopologySteps } from './laser-trace-topology';
 
 // The tree-wide hard-corner convention, as in the CNC fairing: the sharpener,
 // curve refinement and dense corner detection all pin at 60 degrees.
@@ -43,6 +49,15 @@ export function simplifyTracedPathsForLaser(
   paths: ReadonlyArray<ColoredPath>,
   placement: Transform,
 ): ColoredPath[] {
+  return runTraceSteps(simplifyTracedPathsForLaserSteps(paths, placement));
+}
+
+/** simplifyTracedPathsForLaser as resumable steps, a checkpoint per subpath. */
+export function* simplifyTracedPathsForLaserSteps(
+  paths: ReadonlyArray<ColoredPath>,
+  placement: Transform,
+): TraceSteps<ColoredPath[]> {
+  const cooperate = yield;
   const scaleX = Math.abs(placement.scaleX);
   const scaleY = Math.abs(placement.scaleY);
   // Compile bounds curve deviation with the largest axis scale.
@@ -59,21 +74,33 @@ export function simplifyTracedPathsForLaser(
         ? DEFAULT_MACHINE_CURVE_TOLERANCE_MM / largestScale
         : null,
   };
-  const candidates = paths.map((path) => conditionPath(path, moves));
+  const candidates: ColoredPath[] = [];
+  for (const path of paths) candidates.push(yield* conditionPathSteps(path, moves, cooperate));
   // The topology check keeps every crossing and nesting relation of the
   // source, subpath for subpath, so a traced forest (ADR-531) carries.
-  return preserveLaserTraceTopology(paths, candidates, placement).map((path, index) =>
-    path === paths[index] ? path : carrySubpathNesting(paths[index] as ColoredPath, path),
-  );
+  const preserved = yield* preserveLaserTraceTopologySteps(paths, candidates, placement);
+  const carried: ColoredPath[] = [];
+  for (const [index, path] of preserved.entries()) {
+    if (cooperate) yield;
+    const source = paths[index] as ColoredPath;
+    carried.push(path === source ? path : carrySubpathNesting(source, path));
+  }
+  return carried;
 }
 
-function conditionPath(path: ColoredPath, moves: LaserMoves): ColoredPath {
+function* conditionPathSteps(
+  path: ColoredPath,
+  moves: LaserMoves,
+  cooperate: boolean,
+): TraceSteps<ColoredPath> {
   const curves = path.curves;
   if (curves === undefined) {
     // Compile reads the polylines of a path without curves.
-    const polylines = path.polylines.map((polyline) =>
-      simplifyToolpathPolyline(polyline, moves.simplify),
-    );
+    const polylines: Polyline[] = [];
+    for (const polyline of path.polylines) {
+      if (cooperate) yield;
+      polylines.push(simplifyToolpathPolyline(polyline, moves.simplify));
+    }
     return polylines.every((polyline, index) => polyline === path.polylines[index])
       ? path
       : { ...path, polylines };
@@ -82,17 +109,18 @@ function conditionPath(path: ColoredPath, moves: LaserMoves): ColoredPath {
   let changed = false;
   const polylines: Polyline[] = [];
   const nextCurves: CurveSubpath[] = [];
-  curves.forEach((curve, index) => {
+  for (const [index, curve] of curves.entries()) {
+    if (cooperate) yield;
     const conditioned = conditionSubpath(curve, moves);
     if (conditioned === null) {
       polylines.push(path.polylines[index] as Polyline);
       nextCurves.push(curve);
-      return;
+      continue;
     }
     changed = true;
     polylines.push(conditioned.polyline);
     nextCurves.push(conditioned.curve);
-  });
+  }
   return changed ? { ...path, polylines, curves: nextCurves } : path;
 }
 
