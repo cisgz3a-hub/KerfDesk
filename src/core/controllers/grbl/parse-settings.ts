@@ -78,6 +78,10 @@ export type ControllerSettingsSnapshot = Partial<
   // G92 origin (Set origin here) and restores it at power-up. Read, never
   // written, so Job Review can say which (ADR-375).
   readonly g92PersistenceDisabled?: boolean;
+  // grblHAL `$22` bit 3 "Set machine origin to 0" (force set origin), read
+  // only from a dump that prints the whole `$22` bitfield (ADR-375
+  // Amendment 2); undefined for stock GRBL and FluidNC, which print 0 or 1.
+  readonly homingForceSetOrigin?: boolean;
   // `$100` / `$101` / `$102`: one step's length bounds how far the machine position a
   // status report shows can sit from the firmware's own (ADR-375).
   readonly stepsPerMmX?: number;
@@ -201,6 +205,7 @@ export function settingsMapToControllerSettings(
     ...(maxFeedY === undefined ? {} : { maxFeedY }),
     ...machineModeField(map),
     ...g92PersistenceField(map),
+    ...forceSetOriginField(map),
     ...stepsPerMmFields(map),
     ...zeroMaxPowerField(map),
   };
@@ -252,6 +257,23 @@ function g92PersistenceField(
 ): Pick<ControllerSettingsSnapshot, 'g92PersistenceDisabled'> {
   const g92PersistenceDisabled = parseBooleanSetting(map, 384);
   return g92PersistenceDisabled === undefined ? {} : { g92PersistenceDisabled };
+}
+
+// grblHAL's `$22` bit 3 is force set origin, which puts a homed axis at 0 and
+// decides its envelope. `$$` prints the whole bitfield, and lists extended
+// settings such as `$384`, only at COMPATIBILITY_LEVEL <= 1; above that `$22`
+// is 0 or 1 and force origin is a build default no setting reports. So the
+// bit is read when `$22` carries more than bit 0 or the dump lists `$384`:
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.h#L714-L718
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.c#L1775-L1782
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/system.c#L300-L317
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/machine_limits.c#L116-L140
+function forceSetOriginField(
+  map: ReadonlyMap<number, string>,
+): Pick<ControllerSettingsSnapshot, 'homingForceSetOrigin'> {
+  const flags = parseNonNegativeInteger(map.get(22));
+  if (flags === undefined || (flags <= 1 && !map.has(384))) return {};
+  return { homingForceSetOrigin: (flags & 8) !== 0 };
 }
 
 function stepsPerMmFields(
