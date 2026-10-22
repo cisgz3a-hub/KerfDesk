@@ -4,6 +4,7 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 
 | # | Area | Tree | Report | Raised | Refuted | P1 | P2 | P3 | Known |
 |---|---|---|---|---|---|---|---|---|---|
+| D1 | Air assist and accessories | 7cd526213 | [D1-ctl-air-accessories.md](D1-ctl-air-accessories.md) | 4 | 0 | 0 | 0 | 4 | 7 |
 | D2 | Focus and Z | 7cd526213 | [D2-ctl-focus-z.md](D2-ctl-focus-z.md) | 5 | 0 | 0 | 1 (P3-3 raised) | 4 | 3 |
 
 ## Confirmed P1/P2 (coordinator-verified)
