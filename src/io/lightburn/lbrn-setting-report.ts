@@ -114,6 +114,11 @@ const NOT_REPORTED = new Set([
   'runblower',
   'dooutput',
   'hide',
+  // Sub-layers, each opened as an operation of its own, and each tab's name and
+  // Output switch.
+  'sublayer',
+  'subname',
+  'suboutput',
   // Fill settings: read on a Fill, ignored by LightBurn on a Line.
   'interval',
   'lineinterval',
