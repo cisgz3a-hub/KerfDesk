@@ -80,6 +80,12 @@ The release workflow uses these values only in its final publication step:
 | `PREVIEW_CLOUDFLARE_ACCOUNT_ID` | Variable | Verified account owning the download bucket |
 | `PREVIEW_R2_API_TOKEN` | Secret | Token value (not the S3 key pair) of an R2 API token with Admin Read & Write; the REST API reads the bucket and does not accept Object Read & Write tokens |
 
+Add both secrets to the `desktop-preview` environment, never as repository
+secrets, and limit that environment's deployment tags to `v*-preview.*`. The
+publication job names that environment, so no branch workflow can read them
+(ADR-651); `pnpm check:secret-scopes` fails if another job reads them. The two
+variables can live in the environment or the repository.
+
 Before the first release, configure the bucket's production custom domain and
 GET/HEAD CORS for `https://kerfdesk.com` (and any explicitly supported alternate
 website origin). Ensure caching rules respect `no-store` for latest metadata;
