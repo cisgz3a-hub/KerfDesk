@@ -14,10 +14,17 @@ export function rotaryTypeLabel(setup: RotarySetup): string {
   return setup.type === 'roller' ? 'Roller' : 'Chuck';
 }
 
-/** "Chuck, Ø60 mm", plus the roller size when Y is scaled from it. */
+/**
+ * "Chuck, Ø60 mm", plus what a roller's Y follows: the roller size when Y is
+ * scaled from it, or "Y not scaled" for a controller set to the surface
+ * (ADR-373 Amendment 1), so the switch and Job Review name the mode.
+ */
 export function rotaryAttachmentSummary(setup: RotarySetup): string {
   const summary = `${rotaryTypeLabel(setup)}, Ø${formatRotaryMm(setup.objectDiameterMm)} mm`;
-  if (!rotaryUsesRollerDiameter(setup) || setup.rollerDiameterMm === undefined) return summary;
+  if (setup.type === 'chuck') return summary;
+  if (!rotaryUsesRollerDiameter(setup) || setup.rollerDiameterMm === undefined) {
+    return `${summary} (Y not scaled)`;
+  }
   return `${summary} (rollers Ø${formatRotaryMm(setup.rollerDiameterMm)} mm)`;
 }
 

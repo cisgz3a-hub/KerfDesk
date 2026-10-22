@@ -187,7 +187,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Check rotary travel and direction',
         instruction:
-          'For a chuck, set Motion per turn from the verified machine setup. For a roller whose controller moves in motor millimetres, turn on Scale Y from the roller diameter and enter the driven roller diameter and Motion per turn. Inspect Y scale and Machine travel per revolution; use Reverse rotary direction only when needed.',
+          'For a chuck, set Motion per turn from the verified machine setup. For a roller, keep Scale Y from the roller diameter on and enter the driven roller diameter and Motion per turn; turn it off only when the controller’s Y steps/mm already move the part’s surface in millimetres. Inspect Y scale and Machine travel per revolution; use Reverse rotary direction only when needed.',
         focus: 'Scale · travel per revolution',
         result:
           'The conversion between the flat design and rotary movement is explicit in the profile.',
@@ -195,7 +195,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Test the rotation',
         instruction:
-          'With the controller connected and Idle, mark the part and choose a Test rotation button. The part turns one revolution slowly with the laser off, pauses, then turns back. If the mark does not return to the same place, adjust the measurements and test again before Apply.',
+          'With the controller connected and Idle, mark the part and choose a Test rotation button. The part turns one revolution slowly with the laser off, pauses, then turns back. If it misses, follow the note under the buttons: a chuck or roller turn corrects Motion per turn, and an unscaled roller needs Scale Y from the roller diameter or a controller set to the surface. Changing the object diameter never fixes a roller’s burn size.',
         focus: 'Test rotation',
         result: 'One revolution on the machine matches one revolution of the part.',
       },

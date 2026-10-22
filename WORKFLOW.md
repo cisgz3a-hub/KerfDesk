@@ -3398,11 +3398,14 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    takes the flat length of a strip wrapped once round the part where the artwork goes and the
    strip's thickness (default 0.1 mm), shows Ø = wrap / π − thickness, and **Use this diameter**
    fills the field.
-3. A **chuck** scales Y by Motion per turn / (π × object diameter). A **roller** either leaves Y
-   unscaled (**Scale Y from the roller diameter** off: the controller already moves the surface
-   in millimetres; every pre-ADR-373 roller setup, byte-identical output) or scales it by Motion
-   per turn / (π × **Roller diameter**), independent of the part's size. Motion per turn is
-   disabled while it has no effect. A chuck never stores a roller diameter.
+3. A **chuck** scales Y by Motion per turn / (π × object diameter). A **roller** either scales it
+   by Motion per turn / (π × **Roller diameter**), independent of the part's size, or leaves Y
+   unscaled (**Scale Y from the roller diameter** off: the controller's Y steps/mm already move
+   the surface in millimetres; every pre-ADR-373 roller setup, byte-identical output). A new
+   roller starts scaled (Roller diameter 25 mm until measured), as LightBurn's roller always is,
+   and so does a saved chuck switched to Roller; a saved roller opens in the mode it was saved
+   with (ADR-373 Amendment 1). Motion per turn is disabled while it has no effect. A chuck never
+   stores a roller diameter.
 4. The preview shows the surface circumference, the machine travel for one revolution (the wrap
    limit the bounds preflight enforces), the Y scale, and the tallest artwork one revolution holds.
 5. **Rotary preset** (ADR-503) shows when the machine's family has a rotary whose maker publishes
@@ -3422,8 +3425,17 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    `G90` on Marlin (Smoothieware wraps the same move in its tool-off lines and `M120`/`M121`),
    `M5` / `G21 G91` / `G1 Y… F… S0` / `G90` on the Falcon contract. No turn carries M3/M4 or a
    power word. Ruida has no jog command, so the test is unavailable there.
-3. The operator checks that a mark on the part returns to the same place, adjusts the
-   measurements, tests again, then applies.
+3. The operator checks that a mark returns to the same place, corrects the value the note under
+   the buttons names, tests again, then applies (ADR-373 Amendment 1):
+   - after **Turn chuck once** or **Turn roller once**: Motion per turn, lower if it turned too
+     far, higher if it stopped short;
+   - after **Turn object once** on a scaled roller: check Motion per turn with Turn roller once
+     first, then measure the roller diameter and the object again rather than tuning either;
+   - after **Turn object once** on an unscaled roller: the controller is not moving the surface in
+     millimetres, so turn on **Scale Y from the roller diameter** (roller diameter and Motion per
+     turn) or set the controller's Y steps/mm to the surface. The note says that changing the
+     object diameter can make the mark land without fixing the size: a roller's Y scale never
+     reads it.
 
 #### Edge — stop, close, refusal
 1. **Stop rotation**, closing the dialog, or Esc sends jog cancel (`0x85`) where the firmware
@@ -3438,8 +3450,8 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 #### Success — the Rotary switch
 1. Once the profile has a rotary setup, a laser project's Job actions dock shows a **Rotary**
    toggle above Frame and Start with the attachment and size, for example
-   "Roller, Ø60 mm (rollers Ø25 mm)" or "Off · Chuck, Ø80 mm". Its tooltip gives the Y scale and
-   the machine travel for one revolution.
+   "Roller, Ø60 mm (rollers Ø25 mm)", "Roller, Ø60 mm (Y not scaled)" or "Off · Chuck, Ø80 mm".
+   Its tooltip gives the Y scale and the machine travel for one revolution.
 2. It toggles `device.rotary.enabled`, the setup Rotary Setup edits, as one undoable profile
    edit. It is disabled while a job, motion or controller operation owns the machine. A setup
    whose measurements cannot map Y opens Rotary Setup instead of switching on.

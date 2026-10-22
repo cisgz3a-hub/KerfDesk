@@ -11,8 +11,8 @@
 
 1. Open **Tools > Rotary Setup**, or **Setup…** beside the **Rotary** switch above Frame and Start.
 2. Choose Roller or Chuck and enter the object diameter or its circumference (they are linked). For a tapered or soft part, use **Measure with a strip** where the artwork goes. Set direction.
-3. Chuck mode requires machine motion per revolution. A roller leaves Y unscaled when the controller already moves the surface in millimetres; otherwise turn on **Scale Y from the roller diameter** and enter the driven roller diameter and motion per roller revolution (ADR-373).
-4. With the controller connected and Idle, mark the part and use **Test rotation**: it turns one revolution slowly with the laser off, pauses, and turns back. Adjust the measurements until the mark returns to the same place, then Apply.
+3. Chuck mode requires machine motion per revolution. A new roller starts with **Scale Y from the roller diameter** on: enter the driven roller diameter and motion per roller revolution, as in LightBurn. Turn it off only when the controller's Y steps/mm already move the part's surface in millimetres; Y is then not scaled (ADR-373, Amendment 1).
+4. With the controller connected and Idle, mark the part and use **Test rotation**: it turns one revolution slowly with the laser off, pauses, and turns back. If it misses, follow the note under the buttons. **Turn chuck once** and **Turn roller once** correct Motion per turn. An unscaled roller that misses needs **Scale Y from the roller diameter** or a controller set to the surface. Changing the object diameter can make a roller's mark land without fixing its burn size. Then Apply.
 5. Generate the calibration pattern and measure it on the actual attachment before running artwork.
 6. Check the **Rotary** switch before every Frame: it shows whether the rotary mapping is on and for which attachment and diameter. Switching it expires a completed Frame.
 7. For raster output, review the rotary qualification warning and use a supervised low-risk test to establish scale, direction, seam placement, focus, workholding, and material response. The warning informs and never refuses output.
