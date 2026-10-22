@@ -3163,7 +3163,7 @@ reload / address-bar defaults in the web build (acceptable on a CAD surface).
 
 ## ADR-052 — Scanning offset compensation: a per-speed table cancels the bidirectional zipper
 
-**Status:** Accepted; model, emitters, bounds, IO, calibration UI, and provenance status shipped; physical calibration pending. | **Date:** 2026-06-17
+**Status:** Accepted; model, emitters, bounds, IO, calibration UI, and provenance status shipped; physical calibration pending; Job Origin anchors the design rows, not the compensated ones, by ADR-052 Amendment 1 | **Date:** 2026-06-17
 
 ### Context
 

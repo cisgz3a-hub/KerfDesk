@@ -17,7 +17,7 @@ export { cncPassEntryDepthMm, cncPassXyPoints, EMPTY_JOB } from './job';
 export { compileJob } from './compile-job';
 export { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
 export type { JobBounds } from './job-bounds';
-export { computeJobBounds, computeJobMotionBounds } from './job-bounds';
+export { computeJobBounds, computeJobMotionBounds, computeJobPlacementBounds } from './job-bounds';
 export type { ComputeFrameBoundsOptions } from './frame-bounds';
 export { computeFrameBounds } from './frame-bounds';
 export { frameBoundsSignature } from './frame-verification';

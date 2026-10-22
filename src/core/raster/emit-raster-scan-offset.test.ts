@@ -42,6 +42,32 @@ describe('emitRasterGroup scan-offset compensation', () => {
     ]);
   });
 
+  // A negative table moves reverse rows against their travel: +X here.
+  it('shifts reverse rows the other way for a negative scan offset', () => {
+    const out = emitRasterGroup(
+      makeInput({
+        width: 4,
+        height: 2,
+        bounds: { minX: 0, minY: 0, maxX: 4, maxY: 2 },
+        overscanMm: 1,
+        scanOffsetMm: -0.25,
+        sValues: new Uint16Array([500, 500, 0, 0, 0, 0, 700, 700]),
+      }),
+    );
+
+    const motion = out.split('\n').filter((line) => line.startsWith('G'));
+    expect(motion).toEqual([
+      'G0 X-1.000 Y0.500 S0',
+      'G1 X0.000 F6000 S0',
+      'G1 X2.000 S500',
+      'G1 X3.000 S0',
+      'G0 X5.250 Y1.500 S0',
+      'G1 X4.250 S0',
+      'G1 X2.250 S700',
+      'G1 X1.250 S0',
+    ]);
+  });
+
   it('applies scan offset to every corrected reverse-row X coordinate', () => {
     const out = emitRasterGroup(
       makeInput({

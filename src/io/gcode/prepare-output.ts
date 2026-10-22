@@ -11,7 +11,7 @@ import { cncSideInputScene, cncSideOutputProject } from '../../core/cnc/cnc-two-
 import {
   applyJobOriginOffset,
   compileJob,
-  computeJobBounds,
+  computeJobPlacementBounds,
   computeRegistrationBoxBounds,
   computeSceneOutputBounds,
   jobOriginOffset,
@@ -399,7 +399,9 @@ export function registrationBoxBounds(project: Project): JobBounds | null {
   const boxScene = registrationBoxScene(project.scene);
   if (boxScene === null) return null;
   const compiled = compileCncJobResult(boxScene, project.device, machine);
-  return compiled.kind === 'compiled' ? computeJobBounds(compiled.job, project.device) : null;
+  return compiled.kind === 'compiled'
+    ? computeJobPlacementBounds(compiled.job, project.device)
+    : null;
 }
 
 /** Actual anchor source for selected output using the whole-scene origin. */
@@ -412,5 +414,7 @@ function fullSceneOutputBounds(project: Project): JobBounds | null {
     return computeSceneOutputBounds(project.scene, project.device);
   }
   const compiled = compileCncJobResult(project.scene, project.device, machine);
-  return compiled.kind === 'compiled' ? computeJobBounds(compiled.job, project.device) : null;
+  return compiled.kind === 'compiled'
+    ? computeJobPlacementBounds(compiled.job, project.device)
+    : null;
 }
