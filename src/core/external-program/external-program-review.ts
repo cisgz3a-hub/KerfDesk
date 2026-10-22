@@ -13,6 +13,7 @@ import type { GcodeRenderModel, ProgramFinding } from '../gcode-view';
 import type { ControllerKind } from '../devices';
 import { scanGcodeWords } from '../gcode/word-scan';
 import { createMarlinProgramReader } from './marlin-program-reader';
+import { externalProgramBaseline } from './normalize-external-program';
 
 export type ExternalProgramEnvelope = {
   readonly minX: number;
@@ -130,7 +131,8 @@ export function reviewExternalProgram(
   const interpreted =
     context.controllerKind === 'marlin' ? marlinReviewText(gcode, context.machineKind) : null;
   const reviewedText = interpreted?.gcode ?? gcode;
-  const scanned = commandsIn(reviewedText);
+  const baselineLines = baselineLineCount(gcode, context.controllerKind);
+  const scanned = commandsIn(reviewedText, baselineLines);
   // Marlin's M3/M4 without S uses configured startup power; its reader names
   // that separately. GRBL's retained-S warning would contradict it.
   const commands = interpreted === null ? scanned : { ...scanned, onBeforeSpeed: false };
@@ -146,10 +148,11 @@ export function reviewExternalProgram(
     ...coordinateSystemWarnings(model),
     ...(still === undefined ? pointEnvelopeWarnings(reviewedText, model) : [NEVER_MOVES]),
     ...unitWarnings(model),
-    ...toolLeftOnWarnings(model),
+    ...toolLeftOnWarnings(model, baselineLines),
     ...machineModeWarnings(model, context),
+    ...skippedMotionWarnings(model),
     ...findings
-      .filter((finding) => finding.severity !== 'info')
+      .filter((finding) => finding.severity !== 'info' && finding.id !== SKIPPED_MOTION_FINDING)
       .map((finding) => `${finding.title}: ${finding.detail}`),
     ...unsupportedWordWarnings(findings),
   ];
@@ -177,6 +180,24 @@ function marlinReviewText(
 const NEVER_MOVES =
   'The program never moves: its Frame visits the point where the head stands, where the program runs. The Frame does not prove Z clearance.';
 
+/** Program Health's notice for the same moves, which the warning below replaces. */
+const SKIPPED_MOTION_FINDING = 'skipped-motion';
+
+// A move the Inspector cannot read (an arc whose radius does not match, say)
+// adds nothing to the outline. A controller with looser limits may still run
+// it, so the review says the Frame leaves it out, as it does for every other
+// move it cannot place (ADR-630 Amendment 2). Lines count in the sent
+// program, baseline first.
+function skippedMotionWarnings(model: ReviewModel): ReadonlyArray<string> {
+  const first = model.skippedMotions[0];
+  if (first === undefined) return [];
+  const count = model.skippedMotions.length;
+  const one = count === 1;
+  return [
+    `The Inspector could not read ${one ? 'one move' : `${count} moves`} (first: line ${first.line + 1} of the sent program, ${first.reason}), so ${one ? 'it is' : 'they are'} not in the Frame outline. If the controller runs ${one ? 'it' : 'them'}, the head still makes ${one ? 'that move' : 'those moves'}.`,
+  ];
+}
+
 // Program Health lists what the Inspector does not interpret as notes; a run
 // sends those words anyway, so the review names them.
 function unsupportedWordWarnings(findings: ReadonlyArray<ProgramFinding>): ReadonlyArray<string> {
@@ -192,12 +213,21 @@ function unsupportedWordWarnings(findings: ReadonlyArray<ProgramFinding>): Reado
   ];
 }
 
-function commandsIn(gcode: string): Commands {
+// The sent program opens with KerfDesk's baseline (externalProgramBaseline).
+// Its lines set the modes the review assumes; they are not the program's own
+// commands. Smoothieware's `M221 S100` restores the power-up scale: it is not
+// an S the program set, nor the program leaving its laser on.
+function baselineLineCount(gcode: string, kind: ControllerKind | undefined): number {
+  const baseline = externalProgramBaseline(kind ?? 'grbl-v1.1');
+  return gcode.startsWith(`${baseline}\n`) ? baseline.split('\n').length : 0;
+}
+
+function commandsIn(gcode: string, baselineLines: number): Commands {
   const g = new Set<number>();
   const m = new Set<number>();
   const offsetWrites = new Set<number>();
   const speed = createSpeedTracker();
-  for (const line of gcode.split('\n')) {
+  for (const line of gcode.split('\n').slice(baselineLines)) {
     const words = scanGcodeWords(line);
     for (const word of words) {
       const code = Math.round(word.value * 10) / 10;
@@ -306,9 +336,10 @@ function coordinateSystemWarnings(model: ReviewModel): ReadonlyArray<string> {
 
 // GRBL switches the spindle or laser off at a program end (M2/M30), as the
 // Inspector's parser does, so a CAM program ending in M30 without M5 is fine.
-function toolLeftOnWarnings(model: ReviewModel): ReadonlyArray<string> {
+function toolLeftOnWarnings(model: ReviewModel, baselineLines: number): ReadonlyArray<string> {
   let on = false;
   for (const event of model.events) {
+    if (event.line < baselineLines) continue;
     if (event.kind === 'spindle-on') on = true;
     else if (event.kind === 'spindle-off' || event.kind === 'program-end') on = false;
   }

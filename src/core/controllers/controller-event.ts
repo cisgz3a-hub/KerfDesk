@@ -6,6 +6,13 @@
 
 import type { StatusReport } from './grbl/status-parser';
 
+/** Why the firmware skipped a move it still answers `ok` (ADR-395 Amendment 1). */
+export type MotionRefusal =
+  // Marlin NO_MOTION_BEFORE_HOMING: `echo:Home XYZ First` names the unhomed axes.
+  | { readonly reason: 'home-first'; readonly axes: string }
+  // A stopped Marlin (stop() after a firmware error) skips every G0-G3 until M999.
+  | { readonly reason: 'stopped' };
+
 export type ControllerEvent =
   | { readonly kind: 'ok' }
   | {
@@ -18,6 +25,8 @@ export type ControllerEvent =
       // The firmware stopped itself and answers nothing until it is reset or
       // power-cycled (Marlin `Error:Printer halted. kill() called!`).
       readonly halted?: true;
+      // The firmware skipped a move without moving; the line still gets `ok`.
+      readonly motionRefusal?: MotionRefusal;
     }
   | { readonly kind: 'alarm'; readonly code: number }
   // A firmware alarm announced as text instead of a number (Smoothieware

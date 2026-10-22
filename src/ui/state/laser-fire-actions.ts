@@ -105,7 +105,7 @@ async function deactivateFire(
     get().controllerSessionEpoch === sessionEpoch &&
     get().connectionAttempt === connectionAttempt
   ) {
-    // The Falcon's LED is this same beam (ADR-660): M5 put the dot out too.
+    // The Falcon's LED is this same beam (ADR-664): M5 put the dot out too.
     const dot = isLaserDotLight(useStore.getState().project.device.positioningLight);
     set({ fireActive: false, ...(dot ? { positioningLightEnabled: false } : {}) });
   }

@@ -246,7 +246,7 @@ function describeLiveMotion(
 
 type FireLatch = 'momentary' | 'laser-dot';
 
-// The Falcon's LED holds the Fire latch too (ADR-660); say which beam is on.
+// The Falcon's LED holds the Fire latch too (ADR-664); say which beam is on.
 function fireLatch(state: LaserState): FireLatch | null {
   if (!state.fireActive) return null;
   return laserDotLit(state) ? 'laser-dot' : 'momentary';

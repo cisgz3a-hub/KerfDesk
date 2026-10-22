@@ -1,5 +1,5 @@
 // Switching a positioning light on inside its owned transaction, and the
-// Falcon laser dot's 30 s auto-off (ADR-603, ADR-660).
+// Falcon laser dot's 30 s auto-off (ADR-603, ADR-664).
 
 import type { DeviceProfile } from '../../core/devices/device-profile';
 import {

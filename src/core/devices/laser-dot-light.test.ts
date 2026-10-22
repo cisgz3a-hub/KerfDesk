@@ -11,7 +11,7 @@ import {
   positioningLightIssue,
 } from './positioning-light';
 
-describe('Falcon A1 Pro laser dot (ADR-660)', () => {
+describe('Falcon A1 Pro laser dot (ADR-664)', () => {
   it('needs no commands, only a capped power', () => {
     expect(LASER_DOT_LIGHT.powerPercent).toBe(1);
     expect(positioningLightIssue(LASER_DOT_LIGHT, 'grblhal')).toBeNull();

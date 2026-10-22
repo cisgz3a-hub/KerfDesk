@@ -4,6 +4,7 @@
 
 import type { SerialConnection } from '../../platform/types';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
+import { acknowledgedWcsPatch } from './acknowledged-wcs';
 import {
   startControllerCommand,
   waitForFreshIdle,
@@ -75,6 +76,7 @@ async function runProbe(
       assertProbeWireOwnership(get(), refs, connection, transactionId, pendingLine);
       await sendProbeLine(refs, safeWrite, pendingLine, `probe line ${index + 1}`, 'motion');
       assertProbeWireOwnership(get(), refs, connection, transactionId, pendingLine);
+      recordAcknowledgedWcs(set, transactionId, pendingLine);
     }
     setProbePhase(set, transactionId, 'settling');
     pendingLine = refs.driver.commands.settleDwell;
@@ -125,6 +127,15 @@ function reserveProbe(set: SetFn, affectsXy: boolean): number {
     log: pushLog(state, `[lf2] Probe transaction ${transactionId} started.`),
   }));
   return transactionId;
+}
+
+// Both cycles start with `G54` (probe.ts), so the program's system is the one
+// they probe. The store follows the controller there once it acknowledges the
+// line, and the next Frame keeps this probe's Work-Z (ADR-375 Amendment 3).
+function recordAcknowledgedWcs(set: SetFn, transactionId: number, line: string): void {
+  set((state) =>
+    isCurrentProbe(state, transactionId) ? acknowledgedWcsPatch(state, line, 'Probe') : {},
+  );
 }
 
 function sendProbeLine(

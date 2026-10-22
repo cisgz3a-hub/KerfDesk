@@ -187,14 +187,6 @@ export type SaveTarget = {
    * unsupported carrier, unresolved alias or failed lookup remains unknown. */
   readonly compareDestination?: (other: SaveTarget) => Promise<SaveDestinationComparison>;
   readonly write: (data: string | Blob) => Promise<void>;
-  /** Backpressured output; cancellation discards staged bytes until finalization
-   * begins. onFinalizing marks the irrevocable close, before which callers must
-   * stop offering cancellation. The promise settles when that close completes. */
-  readonly writeChunks?: (
-    chunks: AsyncIterable<string>,
-    signal?: AbortSignal,
-    onFinalizing?: () => void,
-  ) => Promise<void>;
 };
 
 /** A picked directory that can mint named targets later. Merely reserving the
@@ -510,7 +502,9 @@ export type PlatformAdapter = {
   readonly pickFilesForOpen: (req: FileOpenRequest) => Promise<ReadonlyArray<FileHandle>>;
 
   // Show a file-save picker. Resolves to a SaveTarget the caller writes
-  // through, or `null` if the user cancels.
+  // through, or `null` if the user cancels. In Chromium (the browser and the
+  // desktop app) an existing chosen file is already EMPTY when this resolves,
+  // so callers prepare every byte first and write straight after (ADR-656).
   readonly pickFileForSave: (req: FileSaveRequest) => Promise<SaveTarget | null>;
   /** Reserve a destination during user activation without creating or
    * truncating the file. Web uses a directory handle plus an editable filename;

@@ -39,7 +39,7 @@ export function PositioningLightEditor({
   const value = device.positioningLight;
   const issue = devicePositioningLightIssue(device);
   // The Falcon A1 Pro's head has no separate LED: its LED is the laser itself
-  // at low power, as Creality's "Laser on" button does (ADR-660).
+  // at low power, as Creality's "Laser on" button does (ADR-664).
   if (device.controllerCommandSet === LASER_DOT_COMMAND_SET && !isGcodeLight(value))
     return (
       <LaserDotEditor

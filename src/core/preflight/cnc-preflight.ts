@@ -40,6 +40,7 @@ import {
 } from '../scene';
 import { findCncMotionBoundsPreflightIssues } from './cnc-motion-bounds-preflight';
 import { cncOpenContourIssues } from './cnc-open-contour-issues';
+import { cncProfileLeadPlungeIssues } from './cnc-profile-lead-plunge-issues';
 import { findInvalidCncToolGeometry } from './cnc-tool-geometry';
 import { findNoGoZoneCollisions } from './no-go-zones';
 import type { PreflightIssue, PreflightResult } from './preflight';
@@ -77,6 +78,7 @@ export function runCncPreflight(
   }
   appendSourceGeometryIssues(project, config, options, issues);
   appendRampEntryPlungeIssues(project, options.compiledJob, issues);
+  issues.push(...cncProfileLeadPlungeIssues(options.compiledJob));
   issues.push(...findCncMotionBoundsPreflightIssues(project.device, gcode, options));
   appendNonFiniteCoordIssues(gcode, issues);
   appendNoGoZoneIssues(project, config, gcode, options, issues);

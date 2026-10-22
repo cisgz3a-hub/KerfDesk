@@ -15,7 +15,7 @@ export type GcodePositioningLight = {
 
 /** The Falcon A1 Pro's 20 W head has no separate pointer. Like the "Laser on"
  * button in Creality's own software, its LED is the cutting laser itself at a
- * capped low power, so the dot is exactly where it will burn (ADR-660). */
+ * capped low power, so the dot is exactly where it will burn (ADR-664). */
 export type LaserDotLight = {
   readonly kind: 'laser-dot';
   /** Share of the controller's S range, never above HARD_MAX_FIRE_POWER_PERCENT. */

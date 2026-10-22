@@ -63,7 +63,7 @@ export async function positioningLightCommand(
 }
 
 /** One light state inside the owned transaction: the mapping's G-code line, or
- * for the laser dot the capped beam-on line or M5 (ADR-660). The caller holds
+ * for the laser dot the capped beam-on line or M5 (ADR-664). The caller holds
  * the Fire latch before the dot's on, and has flushed override flags. */
 export async function switchLight(
   context: PositioningLightTransaction,

@@ -45,6 +45,12 @@
          workspace loads.
          Inline CSS is allowed by the CSP; startup code stays in the bundle. -->
     <style>
+      /* Keep even the topmost live machine controls below the startup screen.
+         Release this stacking boundary with startup input so body portals cannot
+         cover those controls once the workspace is ready. */
+      #app-root[inert] {
+        isolation: isolate;
+      }
       #app-splash {
         position: fixed;
         inset: 0;

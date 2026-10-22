@@ -8,4 +8,5 @@ export { fillGradientInPlace } from './gradient-fill';
 export type { CloneStroke } from './clone-stroke';
 export { cloneStrokeDirtyRect, cloneStrokeInPlace } from './clone-stroke';
 
-export { healDirtyRect, healSpotInPlace } from './spot-heal';
+export type { HealRepair } from './spot-heal';
+export { healDirtyRect, healRepairFrom, healSpotInPlace } from './spot-heal';

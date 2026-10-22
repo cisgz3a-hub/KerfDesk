@@ -45,7 +45,6 @@ export function LineTabFields(props: { readonly layer: Layer }): JSX.Element {
           value={layer.tabSizeMm}
           min={0.01}
           max={100}
-          step={0.01}
           label="tab size"
           title="Set the length of each uncut bridge gap in millimeters."
         />
@@ -71,7 +70,6 @@ export function LineTabFields(props: { readonly layer: Layer }): JSX.Element {
           value={layer.tabCutPowerPercent ?? 0}
           min={0}
           max={100}
-          step={1}
           label="tab power"
           title="Burn the tabs at this share of the cut power so parts snap out cleanly. 0 leaves them uncut."
         />
@@ -115,14 +113,9 @@ function TabSpacingFields(props: { readonly layer: Layer }): JSX.Element {
       <Field label="Spacing">
         <NumberInput
           name="tabSpacingMm"
-          value={within(
-            props.layer.tabSpacingMm ?? DEFAULT_TAB_SPACING_MM,
-            MIN_TAB_SPACING_MM,
-            MAX_TAB_SPACING_MM,
-          )}
+          value={props.layer.tabSpacingMm ?? DEFAULT_TAB_SPACING_MM}
           min={MIN_TAB_SPACING_MM}
           max={MAX_TAB_SPACING_MM}
-          step={0.01}
           label="tab spacing"
           title="Add one tab per this length of outline, spread evenly. Every closed shape gets at least one."
         />
@@ -131,7 +124,7 @@ function TabSpacingFields(props: { readonly layer: Layer }): JSX.Element {
       <Field label="At most">
         <NumberInput
           name="tabMaxPerShape"
-          value={within(props.layer.tabMaxPerShape ?? 0, 0, MAX_TABS_PER_SHAPE)}
+          value={props.layer.tabMaxPerShape ?? 0}
           min={0}
           max={MAX_TABS_PER_SHAPE}
           step={1}
@@ -225,10 +218,4 @@ function selectedTabObject(
 function tabPathColor(object: SceneObject | null, layer: Layer): string {
   if (object === null || !('paths' in object)) return layer.color;
   return object.paths.find((path) => pathUsesOperation(object, path, layer))?.color ?? layer.color;
-}
-
-// A value stored outside the field's range (a hand-edited file, an artwork
-// override) opens clamped, so it never blocks Apply.
-function within(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

@@ -37,7 +37,7 @@ function dotHarness(light: LaserDotLight = LASER_DOT_LIGHT) {
   return { ...h, lines };
 }
 
-describe('Falcon A1 Pro laser dot through the LED controls (ADR-660)', () => {
+describe('Falcon A1 Pro laser dot through the LED controls (ADR-664)', () => {
   it('LED on lights the laser at the capped power after M5, with power at 100%', async () => {
     const h = dotHarness();
     await h.actions.switchPositioningLightOn();

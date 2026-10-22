@@ -41,8 +41,9 @@ describe('DeviceSetupWizard machine list', () => {
       expect(
         view.host.querySelectorAll('nav[aria-label="Machine Setup steps"] button'),
       ).toHaveLength(3);
+      // Withdrawn presets stay in the catalog for saved copies only (ADR-660).
       const brandLasers = GRBL_MACHINE_PROFILE_CATALOG.filter(
-        (entry) => entry.profile.vendor !== 'Generic',
+        (entry) => entry.profile.vendor !== 'Generic' && entry.withdrawn === undefined,
       );
       expect(machineRows(view.host)).toHaveLength(brandLasers.length + CNC_MACHINE_CATALOG.length);
       expect(input(view.host, 'Search machines')).toBeInstanceOf(HTMLInputElement);
@@ -130,9 +131,11 @@ describe('DeviceSetupWizard machine list', () => {
       expect(view.host.querySelectorAll('input[name="machine-capability"]')).toHaveLength(3);
 
       await act(async () => radio(view.host, 'CNC only').click());
-      await changeSelect(view.host, 'Firmware', 'grblhal');
-      // One draft value: Connection options shows the same controller.
+      // The Ortur preset is grblHAL (ADR-660), so choose another firmware.
       expect(select(view.host, 'Controller firmware').value).toBe('grblhal');
+      await changeSelect(view.host, 'Firmware', 'grbl-v1.1');
+      // One draft value: Connection options shows the same controller.
+      expect(select(view.host, 'Controller firmware').value).toBe('grbl-v1.1');
       expect(view.host.querySelector('.lf-setup-summary')?.textContent).toContain('CNC');
 
       await act(async () => button(view.host, 'Next').click());
@@ -198,9 +201,13 @@ describe('DeviceSetupWizard machine list', () => {
       const falcon = radio(view.host, 'Use Creality Falcon A1 Pro');
       // A firmware hint, never an identification (ADR-240).
       expect(falcon.closest('label')?.textContent).toContain('Same firmware');
+      // The LM3 runs Ortur's grblHAL-based OLF 2.x (ADR-660).
       expect(
         radio(view.host, 'Use Ortur Laser Master 3 (LU2-10A, 10 W)').closest('label')?.textContent,
-      ).toContain('Other firmware');
+      ).toContain('Same firmware');
+      expect(radio(view.host, 'Use xTool D1 Pro (20 W)').closest('label')?.textContent).toContain(
+        'Other firmware',
+      );
       await act(async () => falcon.click());
       expect(select(view.host, 'Controller firmware').value).toBe('grblhal');
       await act(async () => button(view.host, 'Next').click());

@@ -197,7 +197,7 @@ function laserDotInvolved(mapping: PositioningLight, refs: LiveRefs): boolean {
 }
 
 /** The dot's own Fire latch does not refuse its LED off, or a new LED on or
- * centre that puts it out first (ADR-660). A held momentary Fire still does. */
+ * centre that puts it out first (ADR-664). A held momentary Fire still does. */
 function withoutOwnDotLatch(state: LaserState, refs: LiveRefs): LaserState {
   const lit = lightSnapshots.get(refs);
   return lit?.session() === true && isLaserDotLight(lit.mapping) && state.positioningLightEnabled

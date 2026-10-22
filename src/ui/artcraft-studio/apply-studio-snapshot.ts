@@ -4,6 +4,7 @@ import { useStore } from '../state';
 import type { AppState, ImportOutcome } from '../state/store';
 import { objectInsertActions } from '../state/object-insert-actions';
 import { imageImportActions } from '../state/import-actions';
+import { commitProjectEditNow } from '../state/project-edit-commit';
 import { projectWithRefreshedReliefLinks } from '../state/relief-link-mutation';
 import { pushUndo } from '../state/undo-stack';
 import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
@@ -81,14 +82,18 @@ function commitArtwork(
   if (result === null) throw new Error('The previously applied artwork is no longer available.');
   if (useStore.getState().project !== state.project)
     throw new Error('The project changed while applying artwork.');
-  useStore.setState({
+  // The staged import skipped the store's guard. Saved Pro operation defaults
+  // or a Pro-bound target make this Pro work, which asks first (ADR-592).
+  const committed = commitProjectEditNow(() => ({
     project: projectWithRefreshedReliefLinks(staged.project),
     selectedObjectId: staged.selectedObjectId,
     additionalSelectedIds: staged.additionalSelectedIds,
     undoStack: pushUndo(state.project, state.undoStack, 'Apply studio artwork'),
     redoStack: [],
     dirty: true,
-  });
+  }));
+  if (!committed)
+    throw new Error('This artwork is Pro work. Unlock KerfDesk Pro, then apply it again.');
   return result;
 }
 

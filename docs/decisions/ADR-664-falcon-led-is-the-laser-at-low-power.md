@@ -1,4 +1,4 @@
-## ADR-660 - The Falcon A1 Pro's LED is its own laser at low power
+## ADR-664 - The Falcon A1 Pro's LED is its own laser at low power
 
 **Status:** Accepted by the maintainer on 2026-10-22. Replaces ADR-635; amends ADR-603 and ADR-605. Software verification only; the dot has not yet been lit on a machine by KerfDesk.
 

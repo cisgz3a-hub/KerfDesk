@@ -1,4 +1,4 @@
-// The Falcon A1 Pro's LED is its own laser at capped low power (ADR-660).
+// The Falcon A1 Pro's LED is its own laser at capped low power (ADR-664).
 //
 // Its 20 W head has no separate pointer: Creality's software shows where it
 // will burn with a "Laser on" button that fires the beam at 1-10% and turns it

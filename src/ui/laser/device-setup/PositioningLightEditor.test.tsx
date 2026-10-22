@@ -83,7 +83,7 @@ describe('positioning light setup', () => {
     expect(host.querySelector('input')).toBeNull();
   });
 
-  it('sets up the Falcon A1 Pro laser dot with one tick and nothing to type (ADR-660)', () => {
+  it('sets up the Falcon A1 Pro laser dot with one tick and nothing to type (ADR-664)', () => {
     let state = initDeviceSetup(FALCON_A1_PRO_GRBLHAL_PROFILE, null, {
       machine: LASER_MACHINE_CONFIG,
     });

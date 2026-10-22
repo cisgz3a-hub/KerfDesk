@@ -59,14 +59,20 @@ export function personalArtworkActions(
     exportLibrary: () => void run((isCurrent) => exportLibrary(platform, storage, isCurrent)),
     insert: (entry: PersonalArtwork) => {
       try {
-        useStore.setState((state) => insertPersonalArtwork(state, entry));
-        useToastStore
-          .getState()
-          .pushToast(
-            `${entry.name} added with its saved operations. Review settings for this machine.`,
-            'success',
-          );
-        onClose();
+        // Saved V-carve, relief or adaptive work is new Pro work here: without
+        // Pro the insert waits for the Pro prompt, as paste does (ADR-592).
+        useStore.getState().commitProjectEdit(
+          (state) => insertPersonalArtwork(state, entry),
+          () => {
+            useToastStore
+              .getState()
+              .pushToast(
+                `${entry.name} added with its saved operations. Review settings for this machine.`,
+                'success',
+              );
+            onClose();
+          },
+        );
       } catch (cause) {
         onError(personalArtworkError(cause));
       }
