@@ -5,7 +5,6 @@
 // https://docs.lightburnsoftware.com/latest/Reference/OffsetShapes/
 
 import {
-  areaD,
   EndType,
   FillRule,
   inflatePathsD,
@@ -210,10 +209,10 @@ function splitPath(path: ColoredPath): { readonly closed: PathsD; readonly open:
   for (const polyline of path.polylines) {
     if (isClosedPolygon(polyline) || isClosedEnough(polyline)) {
       const ring = polylineToPathD(polyline);
-      // A closed path with no area, such as SVG `M0 0 L10 0 Z`, draws only a
-      // line, so it is outlined as that line, as an open path or a closed
-      // two-point DXF polyline is (audit 2026-10-21 geometry P3-3).
-      if (ring.length >= 3 && !enclosesNothing(ring)) closed.push(ring);
+      // Signed area can cancel between filled lobes of a self-intersection.
+      // Only genuinely collinear rings are strokes; normalize all other rings
+      // under the path's fill rule before offsetting their filled region.
+      if (ring.length >= 3 && !collinearRing(ring)) closed.push(ring);
       else if (ring.length >= 2) open.push(ring.concat(ring.slice(0, 1)));
     } else if (polyline.points.length >= 2) {
       open.push(polyline.points.map((point) => ({ x: point.x, y: point.y })));
@@ -222,18 +221,14 @@ function splitPath(path: ColoredPath): { readonly closed: PathsD; readonly open:
   return { closed, open };
 }
 
-// Thinner on average than the 1 µm grid the region is normalized on, where it
-// would vanish: twice the area over the perimeter is a sliver's width.
-function enclosesNothing(ring: PathD): boolean {
-  let perimeter = 0;
-  for (let index = 0; index < ring.length; index += 1) {
-    const from = ring[index];
-    const to = ring[(index + 1) % ring.length];
-    if (from !== undefined && to !== undefined) {
-      perimeter += Math.hypot(to.x - from.x, to.y - from.y);
-    }
-  }
-  return 2 * Math.abs(areaD(ring)) <= perimeter / 10 ** VECTOR_PATH_PRECISION_DECIMALS;
+function collinearRing(ring: PathD): boolean {
+  const first = ring[0];
+  if (first === undefined) return true;
+  const next = ring.find((point) => point.x !== first.x || point.y !== first.y);
+  if (next === undefined) return true;
+  const dx = next.x - first.x;
+  const dy = next.y - first.y;
+  return ring.every((point) => dx * (point.y - first.y) === dy * (point.x - first.x));
 }
 
 // Each ColoredPath is its own fill batch, under the rule the canvas and CAM use.
