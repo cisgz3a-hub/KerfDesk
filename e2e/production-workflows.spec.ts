@@ -213,10 +213,18 @@ test('exports rotary raster through the configured machine-space transform', asy
   expect(Math.max(...yValues)).toBeGreaterThan(30);
 });
 
-test('opens the one-photo camera calibration without a Labs switch', async ({ page }) => {
+test('walks the guided camera setup to the one-photo calibration without a Labs switch', async ({
+  page,
+}) => {
   await (await toolbarCommand(page, 'Camera')).click();
-  await page.getByRole('button', { name: 'Calibrate camera…' }).click();
-  await expect(page.getByText('Calibrate camera', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Start camera', exact: true }).click();
+  await page.getByRole('button', { name: 'Set up camera', exact: true }).click();
+  await expect(page.getByText('Camera setup', { exact: true })).toBeVisible();
+  await expect(page.getByText('Which camera should KerfDesk use?')).toBeVisible();
+  for (const screen of ['Where is the camera?', 'Check the picture', 'Engrave the target']) {
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(page.getByText(screen, { exact: true })).toBeVisible();
+  }
   await page.getByRole('button', { name: 'Target already engraved' }).click();
   await expect(page.getByRole('button', { name: 'Take photo' })).toBeVisible();
 });

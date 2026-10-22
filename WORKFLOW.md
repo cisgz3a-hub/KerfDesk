@@ -8362,12 +8362,17 @@ as the pane's design record.
 
 ## Camera Mode flows
 
-### F-CAM1. Choose a camera (ADR-116, ADR-440, ADR-446)
+### F-CAM1. Choose a camera (ADR-116, ADR-440, ADR-446, ADR-663)
 
-- **Success / camera running.** The operator opens the Camera panel and starts a USB camera, or
-  presses **Use this camera** on a detected machine camera. The live picture is the one source every
-  camera feature captures through. Closing the panel keeps the camera running while the calibrated
-  overlay shows it on the canvas.
+- **Success / camera running.** The operator opens the Camera panel. Its preview card names the
+  camera and offers one button: **Use this camera** when the bridge found the laser's built-in
+  camera, otherwise **Start camera** for the chosen USB camera. The live picture is the one source
+  every camera feature captures through. Closing the panel keeps the camera running while the
+  calibrated overlay shows it on the canvas.
+- **Success / another camera.** **Choose camera…** on the card, or the gear, opens **Camera
+  settings** inside the panel: machine-camera detection, **RTSP camera…**, **Phone camera…** and
+  the USB picker with **Start USB camera**. The back arrow returns to the camera. The guided setup's
+  first screen lists the same cameras (F-CAM2).
 - **Hosted browser / machine camera.** A laser's built-in camera, RTSP/IP cameras and phone camera
   apps answer on the local network without the permission browsers need to read pixels, so the
   hosted web app cannot use them. The panel says so and links KerfDesk Desktop, which reads them
@@ -8391,11 +8396,20 @@ as the pane's design record.
 - **Edge / camera without its own calibration.** The setup steps say to calibrate it, the canvas
   says the saved calibration belongs to another camera, and calibrating it keeps the others.
 
-### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1, 3 and 4)
+### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1, 3 and 4, ADR-663)
 
-- **Success / calibrated.** **Calibrate camera…** opens the wizard. The operator covers the bed
-  with one flat sheet, enters its thickness and, optionally, the camera lens height by tape
-  measure, and presses **Engrave target**: the ring target streams as a temporary job through the
+- **Success / guided setup.** Before the running camera is calibrated, the panel shows **Set up
+  your camera**; **Set up camera** opens the **Camera setup** wizard at its first of six steps.
+  **Camera** lists the laser's camera and each USB camera with **Use this camera** (network and
+  phone cameras in a fold); Next needs a running camera. **Mounting** asks **Above the bed** or
+  **On the laser head** with two picture cards. **Picture** shows the live picture and measures it
+  every three seconds: dark (average luma below 60), washed out (more than 5 % near white) and the
+  finest bed millimetres per pixel, flagged above 0.5 mm. It is advice; Next is always offered.
+  The next three steps are the target, the photo and the result below. In Camera settings,
+  **Recalibrate…** opens at the target and **Check camera…** at the photo.
+- **Success / calibrated.** On the target step the operator covers the bed with one flat sheet,
+  enters its thickness and, optionally (under **Engrave settings**, with power, speed and margin),
+  the camera lens height by tape measure, and presses **Engrave target**: the ring target streams as a temporary job through the
   normal Frame, review and Start path, leaving the project and undo history untouched. When the
   job finishes the wizard moves to the photo. The operator moves the head clear of the three solid
   discs and presses **Take photo**; the rings are found and the camera fitted in a worker. The
@@ -8456,9 +8470,11 @@ as the pane's design record.
 
 - **Success / overlay on canvas.** With a saved calibration, the canvas shows the camera picture
   through the camera model: lens distortion and parallax are undone per pixel on the GPU, and the
-  picture tracks zoom and pan. The overlay row offers show/hide, a Fade slider, **Update still**
-  (freeze the current frame, LightBurn's Update Overlay model) and **Live** for any camera kind.
-- **Material surface height.** Enter the material's top height above the bed; the overlay and
+  picture tracks zoom and pan. The everyday panel offers **Refresh picture** (freeze the current
+  frame, LightBurn's Update Overlay model), **Live**, **Trace from camera**, **Show on canvas** and
+  an **Opacity** slider for any camera kind (ADR-663). **Fill blanks** (F-CAM9) and **Raised
+  objects** (height areas, below) open as folds; the **Accuracy map** is in Camera settings.
+- **Material height.** Enter the material's top height above the bed; the overlay and
   camera trace show the bed as seen at that height, so the material's edges line up.
 - **Object heights.** **Add height area** gives part of the bed its own height, for an object that
   stands above the material such as a box. With objects selected, the area starts around them
@@ -8588,14 +8604,14 @@ as the pane's design record.
   user-cancelled save dialogs stay quiet.
 - **Empty / no active source.** Snapshot actions are disabled until a camera
   source is active.
-- **Edge / watching a job.** The camera panel can toggle between compact and
-  wide monitoring widths, with the preference kept locally.
+- **Edge / watching a job.** **Larger view** in Camera settings toggles the panel between compact
+  and wide monitoring widths, with the preference kept locally.
 
 ### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendment 1)
 
 - **Success / fill a batch of blanks.** With a saved calibration and a live camera, the operator
   lays out blanks, puts the design on one of them, selects it and presses **Find pieces** in the
-  Camera panel's **Pieces on the bed** section. The overlay turns on and each piece is outlined on
+  Camera panel's **Fill blanks** fold (**Pieces on the bed**). The overlay turns on and each piece is outlined on
   the canvas with its number, centre and long-side line. The panel lists each piece with its size
   and angle and how the design will move and turn onto it. **Place selection on each piece** adds
   a copy on every ticked piece, the way the design sits on its own piece, as one undo step.

@@ -1,8 +1,8 @@
-// CalibrationSetupStep — step 1 of the camera calibration wizard (ADR-441):
-// the engrave settings, the sheet thickness and the optional tape-measured
-// camera height, then either engrave the ring target as a temporary job or
-// go straight to the photo when a target is already on the bed. A camera on
-// the laser head (ADR-449) gets a small square target in the middle of the bed.
+// CalibrationSetupStep — the target screen of the camera setup (ADR-441,
+// ADR-663): the sheet thickness up front, the rest of the engrave settings
+// folded away, then either engrave the ring target as a temporary job or go
+// straight to the photo when a target is already on the bed. A camera on the
+// laser head (ADR-449) gets a small square target in the middle of the bed.
 
 import { useState } from 'react';
 import { bedTargetLayout } from '../../../core/camera/target/bed-target';
@@ -12,7 +12,6 @@ import { useAssumedTarget } from './assumed-target';
 import { calibrationTargetArea, engraveCalibrationTarget } from './calibration-actions';
 import { useCameraCalibrationStore, type CalibrationSettings } from './camera-calibration-store';
 import {
-  checkStyle,
   columnStyle,
   errStyle,
   fieldStyle,
@@ -24,11 +23,68 @@ import {
 export function CalibrationSetupStep(props: { readonly note: string | null }): JSX.Element {
   const settings = useCameraCalibrationStore((s) => s.settings);
   const setStep = useCameraCalibrationStore((s) => s.setStep);
-  const connected = useLaserStore((s) => s.connection.kind === 'connected');
+  const updateSettings = useCameraCalibrationStore((s) => s.updateSettings);
   const bedWidth = useStore((s) => s.project.device.bedWidth);
   const bedHeight = useStore((s) => s.project.device.bedHeight);
   const area = calibrationTargetArea(bedWidth, bedHeight, settings);
   const rings = bedTargetLayout({ area }).marks.length;
+
+  return (
+    <div style={columnStyle}>
+      <p style={leadStyle}>Engrave the target</p>
+      <p style={textStyle}>
+        {settings.headCamera
+          ? 'Put a flat sheet of scrap in the middle of the bed'
+          : 'Cover the bed with one flat sheet of scrap'}{' '}
+        (card, plywood or anodised aluminium) and enter how thick it is.
+      </p>
+      <NumberField
+        label="Sheet thickness (mm)"
+        value={settings.sheetThicknessMm}
+        step={0.1}
+        title="Thickness of the sheet the target is engraved on. The camera is fitted to its top surface."
+        onChange={(value) =>
+          updateSettings({ sheetThicknessMm: value ?? settings.sheetThicknessMm })
+        }
+      />
+      <p style={noteStyle}>
+        KerfDesk engraves {rings} small rings across {Math.round(area.width)} ×{' '}
+        {Math.round(area.height)} mm, then one photo of them calibrates the lens, finds where the
+        camera is, and maps the picture onto the bed. Your project and undo history are not touched.
+      </p>
+      <p style={mountLineStyle}>
+        Camera: {settings.headCamera ? 'on the laser head' : 'above the bed'}
+        <button
+          type="button"
+          className="lf-btn"
+          onClick={() => setStep({ kind: 'mount' })}
+          title="Change where the camera is mounted."
+        >
+          Change
+        </button>
+      </p>
+      <details style={foldStyle}>
+        <summary
+          style={summaryStyle}
+          title="Show or hide the power, speed and passes used to engrave the target."
+        >
+          Engrave settings
+        </summary>
+        <SettingsFields settings={settings} />
+      </details>
+      <TargetActions settings={settings} note={props.note} />
+    </div>
+  );
+}
+
+// Engrave the target, or go to the photo of one already engraved, and Back.
+function TargetActions(props: {
+  readonly settings: CalibrationSettings;
+  readonly note: string | null;
+}): JSX.Element {
+  const { settings } = props;
+  const setStep = useCameraCalibrationStore((s) => s.setStep);
+  const connected = useLaserStore((s) => s.connection.kind === 'connected');
   const assumed = useAssumedTarget();
 
   const engrave = async (): Promise<void> => {
@@ -49,17 +105,7 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
   };
 
   return (
-    <div style={columnStyle}>
-      <p style={noteStyle}>
-        {settings.headCamera
-          ? 'Put a flat sheet of scrap in the middle of the bed'
-          : 'Cover the bed with one flat sheet of scrap'}{' '}
-        (card, plywood or anodised aluminium). KerfDesk engraves {rings} small rings across{' '}
-        {Math.round(area.width)} × {Math.round(area.height)} mm, then one photo of them calibrates
-        the lens, finds where the camera is, and maps the picture onto the bed. Your project and
-        undo history are not touched.
-      </p>
-      <SettingsFields settings={settings} />
+    <>
       <div style={rowStyle}>
         <button
           type="button"
@@ -87,7 +133,17 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
         <p style={noteStyle}>Connect the machine to engrave, or use a target engraved earlier.</p>
       )}
       {props.note === null ? null : <p style={errStyle}>{props.note}</p>}
-    </div>
+      <div style={rowStyle}>
+        <button
+          type="button"
+          className="lf-btn"
+          onClick={() => setStep({ kind: 'picture' })}
+          title="Back to the camera picture."
+        >
+          Back
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -99,28 +155,12 @@ function correctionHint(headCamera: boolean): string {
     : ' If it was engraved with another margin, enter that margin first.';
 }
 
+// The rest of the target settings, folded away: most cameras never need them.
 function SettingsFields(props: { readonly settings: CalibrationSettings }): JSX.Element {
   const { settings } = props;
   const update = useCameraCalibrationStore((s) => s.updateSettings);
   return (
-    <>
-      <div style={rowStyle}>
-        <NumberField
-          label="Sheet thickness (mm)"
-          value={settings.sheetThicknessMm}
-          step={0.1}
-          title="Thickness of the sheet the target is engraved on. The camera is fitted to its top surface."
-          onChange={(value) => update({ sheetThicknessMm: value ?? settings.sheetThicknessMm })}
-        />
-        <NumberField
-          label="Camera height (mm)"
-          value={settings.cameraHeightMm}
-          step={1}
-          placeholder="optional"
-          title="Height of the camera lens above the bed, by tape measure. Leave empty if unsure; enter it for a camera that looks straight down."
-          onChange={(value) => update({ cameraHeightMm: value })}
-        />
-      </div>
+    <div style={foldBodyStyle}>
       <div style={rowStyle}>
         <NumberField
           label="Power %"
@@ -136,6 +176,8 @@ function SettingsFields(props: { readonly settings: CalibrationSettings }): JSX.
           title="Engrave speed for the rings."
           onChange={(value) => update({ speedMmPerMin: value ?? settings.speedMmPerMin })}
         />
+      </div>
+      <div style={rowStyle}>
         {settings.headCamera ? (
           <NumberField
             label="Target size (mm)"
@@ -153,22 +195,21 @@ function SettingsFields(props: { readonly settings: CalibrationSettings }): JSX.
             onChange={(value) => update({ marginMm: value ?? settings.marginMm })}
           />
         )}
-      </div>
-      <label style={checkStyle}>
-        <input
-          type="checkbox"
-          checked={settings.headCamera}
-          title="Tick when the camera is fixed to the laser head and moves with it. The target becomes a small square, and the photo is taken wherever you move the head."
-          onChange={(event) => update({ headCamera: event.currentTarget.checked })}
+        <NumberField
+          label="Camera height (mm)"
+          value={settings.cameraHeightMm}
+          step={1}
+          placeholder="optional"
+          title="Height of the camera lens above the bed, by tape measure. Leave empty if unsure; enter it for a camera that looks straight down."
+          onChange={(value) => update({ cameraHeightMm: value })}
         />
-        Camera rides on the laser head
-      </label>
+      </div>
       <p style={noteStyle}>
         {settings.headCamera
           ? 'A camera on the head sees a small patch of the bed, so the target is a small square in the middle. After engraving, move the head until the camera sees the whole square; KerfDesk records where the head was for the photo.'
           : 'A camera height is optional. For a camera that looks almost straight down, one photo cannot tell how high the camera is, and the measured height keeps thick material lined up.'}
       </p>
-    </>
+    </div>
   );
 }
 
@@ -210,3 +251,23 @@ function NumberField(props: {
     </label>
   );
 }
+
+const leadStyle: React.CSSProperties = { margin: 0, fontWeight: 600 };
+const textStyle: React.CSSProperties = { margin: 0 };
+const mountLineStyle: React.CSSProperties = {
+  margin: 0,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+};
+const foldStyle: React.CSSProperties = {
+  borderTop: '1px solid var(--lf-border)',
+  paddingTop: 6,
+};
+const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontWeight: 600 };
+const foldBodyStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  paddingTop: 8,
+};

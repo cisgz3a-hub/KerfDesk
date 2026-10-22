@@ -9,6 +9,7 @@ test('RTSP bridge failure requires explicit reconnect even when the image never 
   const camera = page.getByRole('dialog', { name: 'Camera preview', exact: true });
   await page.goto('/');
   await (await toolbarCommand(page, 'Camera')).click();
+  await camera.getByRole('button', { name: 'Camera settings', exact: true }).click();
   await camera.getByText(/^RTSP camera/).click();
   await camera.getByRole('textbox', { name: 'RTSP camera URL' }).fill('rtsp://192.168.10.1:8554/');
   await camera.getByRole('button', { name: 'Connect', exact: true }).click();
