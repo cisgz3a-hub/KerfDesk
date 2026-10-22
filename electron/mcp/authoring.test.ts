@@ -97,6 +97,7 @@ const nonDestructiveEdits = [
   'import_file',
   'create_operation',
   'save_project',
+  'set_board_photo',
 ];
 
 afterEach(async () => {

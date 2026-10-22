@@ -193,6 +193,8 @@ export function mcpToolAnnotations(command: KerfDeskMcpCommand): ToolAnnotations
           'import_file',
           'create_operation',
           'save_project',
+          // Opens a photo on the computer; the operator draws any board there.
+          'set_board_photo',
         ].includes(command)),
     idempotentHint: readOnly,
     openWorldHint: false,
