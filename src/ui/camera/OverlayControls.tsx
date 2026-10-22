@@ -84,7 +84,12 @@ function CalibratedOverlayControls(props: { readonly headCamera: boolean }): JSX
           style={checkStyle}
           title="Show or hide the corrected camera picture on the workspace canvas."
         >
-          <input type="checkbox" checked={visible} onChange={placement.toggleOverlay} />
+          <input
+            type="checkbox"
+            title="Show or hide the corrected camera picture on the workspace canvas."
+            checked={visible}
+            onChange={placement.toggleOverlay}
+          />
           Show on canvas
         </label>
         <OpacityControl opacity={opacity} onChange={setOpacity} />

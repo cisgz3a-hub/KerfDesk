@@ -64,7 +64,12 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
         </button>
       </p>
       <details style={foldStyle}>
-        <summary style={summaryStyle}>Engrave settings</summary>
+        <summary
+          style={summaryStyle}
+          title="Show or hide the power, speed and passes used to engrave the target."
+        >
+          Engrave settings
+        </summary>
         <SettingsFields settings={settings} />
       </details>
       <TargetActions settings={settings} note={props.note} />
