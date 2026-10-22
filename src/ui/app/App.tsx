@@ -34,6 +34,7 @@ import { ProProjectDesktopDialog } from './ProProjectDesktopDialog';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useFalconPointerLink } from './use-falcon-pointer-link';
 import { useJobWatch } from '../camera/job-watch/job-watch-runner';
+import { useCameraHelpers } from '../camera/helpers/install-camera-helpers';
 import { useAutoConnectController } from './use-auto-connect-controller';
 import { useCncLibraryPersistence } from './use-cnc-library-persistence';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
@@ -160,6 +161,7 @@ function WorkspaceLifecycle(): null {
   useOperationColorPeek();
   useFalconPointerLink();
   useJobWatch();
+  useCameraHelpers();
   useAutoConnectController();
   useWindowTitle();
   return null;

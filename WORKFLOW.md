@@ -1765,6 +1765,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Alt+M` - Measure (Option+M on macOS)
 - `Alt+T` - Trace Image (LightBurn's binding; Option+T on macOS; no-op unless an image is
   selected)
+- `Alt+C` - Refresh the camera picture (LightBurn's Update Overlay; Option+C on macOS; F-CAM3)
 - `Cmd/Ctrl+Shift+B` - Convert to Bitmap (LightBurn's binding; no-op unless a
   single convertible vector is selected)
 
@@ -8286,6 +8287,14 @@ as the pane's design record.
   settings** inside the panel: machine-camera detection, **RTSP camera…**, **Phone camera…** and
   the USB picker with **Start USB camera**. The back arrow returns to the camera. The guided setup's
   first screen lists the same cameras (F-CAM2).
+- **Success / camera starts by itself (ADR-663 Amendment 1).** KerfDesk remembers the kind of
+  camera that last ran (a USB camera by the device that opened). With **Start my camera by
+  itself** on (Camera settings → Helpers, default on) it starts when the panel opens, and a
+  calibrated one also starts when KerfDesk opens with its calibration, a calibration is saved, or
+  the laser connects (the laser's own camera answers then), so the bed shows on the canvas
+  without opening the panel. It acts only when no camera is running, starting or showing a
+  problem, tries once, and stays quiet when the camera is not there. A USB camera starts only when
+  the remembered device is plugged in, never another in its place.
 - **Hosted browser / machine camera.** A laser's built-in camera, RTSP/IP cameras and phone camera
   apps answer on the local network without the permission browsers need to read pixels, so the
   hosted web app cannot use them. The panel says so and links KerfDesk Desktop, which reads them
@@ -8387,6 +8396,12 @@ as the pane's design record.
   frame, LightBurn's Update Overlay model), **Live**, **Trace from camera**, **Show on canvas** and
   an **Opacity** slider for any camera kind (ADR-663). **Fill blanks** (F-CAM9) and **Raised
   objects** (height areas, below) open as folds; the **Accuracy map** is in Camera settings.
+- **Refresh with Alt+C or after a job (ADR-663 Amendment 1).** Alt+C (Option+C on macOS) does
+  **Refresh picture** from anywhere outside a text field; with no camera running it opens the
+  Camera panel, starts the remembered camera and refreshes once it runs (within 30 s), and it says
+  why when it cannot (no camera, not set up, a head camera). With **Refresh the picture after each
+  job** on (default on), a held picture is taken again 3 s after a job finishes; a live picture,
+  a stopped job and a head camera are left alone.
 - **Material height.** Enter the material's top height above the bed; the overlay and
   camera trace show the bed as seen at that height, so the material's edges line up.
 - **Object heights.** **Add height area** gives part of the bed its own height, for an object that

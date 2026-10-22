@@ -6,7 +6,7 @@ import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 //   * File: Cmd/Ctrl+N, O, S, I; Cmd/Ctrl+Shift+E for Save G-code
 //   * Edit: Cmd/Ctrl+Z, Shift+Z, Delete/Backspace, Escape
 //   * Tools: T, Cmd/Ctrl+R/E/L, Alt+M (measure), Alt+T (trace image),
-//     Cmd/Ctrl+Shift+B (convert to bitmap)
+//     Alt+C (refresh the camera picture), Cmd/Ctrl+Shift+B (convert to bitmap)
 //   * Transform: arrow keys (nudge; Shift large, Ctrl/Cmd fine), H/V (flip)
 //   * View: P (preview toggle)
 
@@ -365,6 +365,10 @@ export type ToolCtx = {
   // Alt/Option+T — LightBurn's Trace Image binding. The callback owns the
   // gate (a selected image), exactly like the Tools > Trace Image command.
   readonly openTraceImage: () => void;
+  // Alt/Option+C — LightBurn's Update Overlay binding: a new held camera
+  // picture on the canvas, starting the remembered camera first if needed
+  // (ADR-663 Amendment 1).
+  readonly refreshCameraPicture: () => void;
 };
 
 // Ctrl/Cmd + letter arms a drawing tool, matching LightBurn (ADR-051 B7):
@@ -407,6 +411,7 @@ const TOOL_CHORDS: ReadonlyArray<KeyBinding<ToolCtx>> = [
   },
   { match: (e) => isAltLetterChord(e, 'm'), invoke: (ctx) => ctx.setToolMode({ kind: 'measure' }) },
   { match: (e) => isAltLetterChord(e, 't'), invoke: (ctx) => ctx.openTraceImage() },
+  { match: (e) => isAltLetterChord(e, 'c'), invoke: (ctx) => ctx.refreshCameraPicture() },
   { match: isConvertToBitmapChord, invoke: (ctx) => ctx.openConvertToBitmap() },
 ];
 

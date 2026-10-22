@@ -20,6 +20,7 @@ import { activeCameraModelNow } from '../active-camera-model';
 import { OverlayControls } from '../OverlayControls';
 import { JobWatchSection } from '../job-watch/JobWatchSection';
 import { jobWatchWantsCamera, useJobWatchStore } from '../job-watch/job-watch-store';
+import { startRememberedCamera } from '../helpers/auto-start';
 import { CameraFold } from './CameraFold';
 import { CameraPreviewCard } from './CameraPreviewCard';
 import { CameraSettingsView } from './CameraSettingsView';
@@ -141,6 +142,8 @@ function useCameraPanelOpenState() {
     });
     // Probe the machine-integrated camera once on open; the button re-probes.
     if (bridgeAvailable && machineCamera.kind === 'idle') void detectMachineCamera(bridge);
+    // Then start the camera used last, so it is there without a click (ADR-663 Amendment 1).
+    void startRememberedCamera({ camera, bridge, bridgeAvailable });
     return () => {
       stopWatchingDevices?.();
       if (!cameraShownOnCanvas() && !jobWatchWantsCamera()) stopSource();

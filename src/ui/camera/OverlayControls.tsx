@@ -121,7 +121,7 @@ function PictureActionRow(props: {
           className="lf-btn lf-btn--primary"
           disabled={!props.sourceLive}
           onClick={() => void props.placement.updateStill()}
-          title="Take a new picture of the bed and show it on the canvas, held still while you place artwork."
+          title="Take a new picture of the bed and show it on the canvas, held still while you place artwork (Alt+C)."
         >
           <Icon name="refresh" size={14} /> Refresh picture
         </button>

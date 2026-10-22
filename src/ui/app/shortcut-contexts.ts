@@ -6,6 +6,7 @@
 // keydown is also the freshest state a shortcut could act on.
 
 import type { PlatformAdapter } from '../../platform/types';
+import { refreshCameraPictureFromKey } from '../camera/helpers/refresh-picture';
 import { traceImageAction } from '../commands/image-command-actions';
 import {
   selectedConvertibleVectors,
@@ -106,6 +107,7 @@ export const TOOL_SHORTCUT_CONTEXT: ToolCtx = {
   setToolMode: (mode) => useUiStore.getState().setToolMode(mode),
   openConvertToBitmap,
   openTraceImage,
+  refreshCameraPicture: () => refreshCameraPictureFromKey(),
 };
 
 export const VIEW_SHORTCUT_CONTEXT: ViewCtx = {
