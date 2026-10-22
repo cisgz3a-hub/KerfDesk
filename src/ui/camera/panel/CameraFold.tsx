@@ -14,7 +14,7 @@ export function CameraFold(props: {
 }): JSX.Element {
   return (
     <details style={foldStyle} open={props.defaultOpen}>
-      <summary style={summaryStyle}>
+      <summary style={summaryStyle} title={`Show or hide ${props.title}`}>
         <span style={titleStyle}>{props.title}</span>
         {props.hint === undefined ? null : <span style={hintStyle}>{props.hint}</span>}
       </summary>
