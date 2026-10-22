@@ -2,7 +2,7 @@ import { normalizeGcodeDialectSelection } from '../../core/devices';
 import { isKnownControllerKind } from '../../core/devices/device-profile';
 import {
   devicePositioningLightIssue,
-  FALCON_POINTER_COMMAND_SET,
+  LASER_DOT_COMMAND_SET,
 } from '../../core/devices/positioning-light';
 
 /** An invalid (or since-tightened) light mapping is dropped with a review note
@@ -17,9 +17,8 @@ export function recoverPositioningLight(value: Record<string, unknown>): {
   const issue = devicePositioningLightIssue({
     positioningLight: value['positioningLight'],
     controllerKind: isKnownControllerKind(kind) ? kind : undefined,
-    // Only the Falcon pointer reads this, and only as an exact match.
-    controllerCommandSet:
-      commandSet === FALCON_POINTER_COMMAND_SET ? FALCON_POINTER_COMMAND_SET : undefined,
+    // Only the laser dot reads this, and only as an exact match.
+    controllerCommandSet: commandSet === LASER_DOT_COMMAND_SET ? LASER_DOT_COMMAND_SET : undefined,
     gcodeDialect: normalizeGcodeDialectSelection(value['gcodeDialect']),
   });
   if (issue === null) return { value, notes: [] };

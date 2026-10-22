@@ -1,6 +1,8 @@
 import type { StatusReport } from '../../core/controllers/grbl';
-import { isFalconPointerLight, type PositioningLight } from '../../core/devices/positioning-light';
-import { prepareFalconPointer, switchFalconPointer } from './falcon-pointer-link';
+import { isLaserDotLight, type PositioningLight } from '../../core/devices/positioning-light';
+import { laserDotOnLine } from './laser-dot-light';
+import type { LaserSafetyAction } from './laser-safety-notice';
+import { firePowerOverrideReset } from './laser-start-override-reset';
 import {
   cancelFreshControllerStatusWait,
   waitForFreshControllerStatus,
@@ -12,7 +14,7 @@ import {
 } from './laser-interactive-command';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { recordStatusPollTick } from './laser-status-poll-schedule';
-import { jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
+import { jogFrameCommandBlockMessage } from './laser-store-helpers';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWrite } from './laser-safe-write';
 
@@ -41,42 +43,19 @@ export function assertPositioningLightAdmission(state: LaserState, refs: LiveRef
     throw new Error('Wait for the current controller command to settle.');
 }
 
-/**
- * Find the Falcon before a light transaction takes the controller, when it may
- * switch the Falcon pointer (ADR-635): discovery sends the controller nothing
- * and can take seconds, so it must not hold up jog, Frame or Start. The request
- * is admitted again once it is done. Throws, with nothing sent, when the
- * pointer cannot be reached.
- */
-export async function findFalconBeforeHold(
-  set: (patch: Partial<LaserState>) => void,
-  get: () => LaserState,
-  refs: LiveRefs,
-  lights: ReadonlyArray<PositioningLight | undefined>,
-): Promise<void> {
-  if (!lights.some((light) => isFalconPointerLight(light))) return;
-  try {
-    await prepareFalconPointer();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    set({ lastWriteError: message, log: pushLog(get(), `[lf2] Positioning light: ${message}`) });
-    throw error;
-  }
-  assertPositioningLightAdmission(get(), refs);
-}
-
 /** Each physical step owns its exact terminal reply. Driver shell responses
  * (Smoothie's `fire off`) are classified by the existing driver as an ACK. */
 export async function positioningLightCommand(
   context: PositioningLightTransaction,
   command: string,
+  action: LaserSafetyAction = 'jog',
 ): Promise<void> {
   context.assertCurrent();
   await startControllerCommand(context.refs, context.write, {
     kind: 'interactive-command',
     label: 'Positioning light',
     command: `${command.trim()}\n`,
-    action: 'jog',
+    action,
     source: 'motion',
     timeoutMode: 'non-idle-status-activity',
   });
@@ -84,16 +63,35 @@ export async function positioningLightCommand(
 }
 
 /** One light state inside the owned transaction: the mapping's G-code line, or
- * the Falcon pointer's network switch, which the controller never sees (ADR-635). */
+ * for the laser dot the capped beam-on line or M5 (ADR-664). The caller holds
+ * the Fire latch before the dot's on, and has flushed override flags. */
 export async function switchLight(
   context: PositioningLightTransaction,
   mapping: PositioningLight,
   on: boolean,
 ): Promise<void> {
-  if (!isFalconPointerLight(mapping))
+  if (!isLaserDotLight(mapping))
     return positioningLightCommand(context, on ? mapping.onCommand : mapping.offCommand);
+  if (!on) return positioningLightCommand(context, 'M5', 'fire');
+  return positioningLightCommand(context, laserDotOnLine(context.get(), mapping), 'fire');
+}
+
+/**
+ * Put the power override back to 100% before the dot goes on: the controller
+ * scales S by it, so one a job left at 200% would double the capped power, as
+ * for Fire. The fence's owned ACK first flushes older override flags; the
+ * caller already holds the Fire latch, which refuses new ones. The reset is a
+ * realtime byte on its own and owes no acknowledgement (ADR-361).
+ */
+export async function resetLaserDotPowerOverride(
+  context: PositioningLightTransaction,
+): Promise<void> {
+  const state = context.get();
+  const reset = firePowerOverrideReset(state.capabilities.overrides, state.ovCache);
+  if (reset === '') return;
+  await positioningLightFence(context);
   context.assertCurrent();
-  await switchFalconPointer(on);
+  await context.write(reset, 'fire', 'system');
   context.assertCurrent();
 }
 
