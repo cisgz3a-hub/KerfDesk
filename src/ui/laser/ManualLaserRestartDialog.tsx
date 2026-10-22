@@ -49,6 +49,7 @@ export function ManualLaserRestartDialog(props: {
         prepared.laserModeStartSnapshot,
         prepared.controllerSnapshot,
         manualRestartNotes(props.restart),
+        prepared,
       );
       if (started) {
         noteManualRestartStarted(props.restart);

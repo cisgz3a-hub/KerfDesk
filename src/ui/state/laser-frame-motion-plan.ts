@@ -1,5 +1,6 @@
 import { buildCncFrameMotion, type CncFrameMotionPlan } from './cnc-frame-lines';
 import { frameMotionFeeds } from './frame-feed-limits';
+import { frameNoGoZoneWarnings } from './frame-no-go-warnings';
 import { currentWorkZMm } from './infer-machine-position';
 import { useStore } from './store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
@@ -28,7 +29,7 @@ export function buildFrameDispatchPlan(
   const state = get();
   const feeds = frameMotionFeeds(feed, state.controllerSettings);
   const toolOffLines = refs.driver.commands.frameToolOffLines.map((line) => `${line}\n`);
-  const project = candidate?.project ?? jobProject ?? useStore.getState().project;
+  const project = framedProject(candidate, jobProject);
   const frameBounds = frameBoundsForProject(bounds, project);
   const perimeter = refs.driver.commands.buildFrameLines(frameBounds, feeds.xyMmPerMin);
   const returnLine = frameReturnLine(
@@ -70,6 +71,32 @@ export function buildFrameDispatchPlan(
   });
   if (motion.kind === 'blocked') return motion;
   return { ...motion, lines: [...toolOffLines, ...motion.lines] };
+}
+
+/** The configured no-go zones this Frame's route crosses (approach, perimeter
+ * and return), for the same project, start point and return leg
+ * buildFrameDispatchPlan sends. Warnings only (ADR-232 Amendment 1). */
+export function frameRouteNoGoWarnings(
+  state: LaserState,
+  bounds: Parameters<LaserState['frame']>[0],
+  candidate: Parameters<LaserState['frame']>[2] | Parameters<LaserState['traceFrame']>[2],
+  jobProject?: Parameters<LaserState['frame']>[3],
+  external?: Parameters<LaserState['frame']>[5],
+): ReadonlyArray<string> {
+  const project = framedProject(candidate, jobProject);
+  return frameNoGoZoneWarnings(
+    state,
+    project,
+    frameBoundsForProject(bounds, project),
+    frameReturnTarget(candidate, external),
+  );
+}
+
+function framedProject(
+  candidate: Parameters<typeof buildFrameDispatchPlan>[4],
+  jobProject: Parameters<typeof buildFrameDispatchPlan>[5],
+): Project {
+  return candidate?.project ?? jobProject ?? useStore.getState().project;
 }
 
 function frameBoundsForProject(bounds: FrameBounds, project: Project): FrameBounds {

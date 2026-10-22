@@ -1413,7 +1413,10 @@ Frame prepares the candidate and runs the physical tool-off Frame dialog-free;
 Start stays greyed out until that Frame completes and never runs one (ADR-372). Calculated bed bounds, configured
 no-go zones, and live output-setting findings travel with that exact candidate;
 they surface as warnings when the operator presses Start on the review-pending
-permit after a clean Frame. They do not refuse Frame or Start. The actual
+permit after a clean Frame. The Frame's own route (the approach from the head,
+the traced perimeter and the return) is compared with enabled no-go zones as it
+is sent: a crossing is a warning toast, as a jog's is, and travels with the
+candidate into Job Review (ADR-232 Amendment 1). They do not refuse Frame or Start. The actual
 controller outcome is authoritative: only a cleanly completed trace and return
 earns the exact-job permit. Confirming the Start-time Job Review creates the
 review evidence, claims that permit, and streams its bound program. A Frame still
@@ -6763,7 +6766,11 @@ and lifts the command's CNC-only gate.)*
    recovery-specific, not ordinary Start policy gates. The operator must
    supervise re-entry with the physical E-stop reachable.
 9. Laser jobs retain Start from line: modal state is reconstructed and the head
-   positions with the beam off before arming.
+   positions with the beam off before arming. The saved recovery and the manual
+   Start from line both confirm the original program's warnings plus any enabled
+   no-go zone the beam-off re-entry move crosses from where the head stands now
+   (ADR-232 Amendment 1). Without a verified controller-to-bed mapping the
+   re-entry is not compared, as Start's entry move is not.
 
 #### Error — impossible resumes
 1. Every CNC call into the core resume builder is refused before parsing or

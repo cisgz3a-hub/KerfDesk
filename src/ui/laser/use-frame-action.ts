@@ -56,6 +56,7 @@ import {
   requireFrameControllerQueue,
   requireFrameControllerRunsMachineKind,
   waitForFrameOutcome,
+  withFrameNoGoWarnings,
 } from './frame-dispatch-support';
 import {
   dispatchTracedFrame,
@@ -363,7 +364,7 @@ async function dispatchPreparedFrame(
     return false;
   }
   const candidateOptions = reviewedFrameCandidateOptions(bundle, options);
-  const candidate: FramedRunCandidate = {
+  const candidate = withFrameNoGoWarnings<FramedRunCandidate>(currentLaser, motionBounds, {
     preparedStart: bundle.prepared,
     project: bundle.project,
     ...candidateOptions,
@@ -379,7 +380,7 @@ async function dispatchPreparedFrame(
     ...(bundle.frameWcsNormalizationWarning === undefined
       ? {}
       : { frameWcsNormalizationWarning: bundle.frameWcsNormalizationWarning }),
-  };
+  });
 
   publishFramePreparationStage('tracing');
   const completion = waitForFrameOutcome(candidate);

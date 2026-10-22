@@ -16,6 +16,11 @@ import { useLaserStore } from '../state/laser-store';
 import type { LaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
 import { resumeConfirmation } from './resume-confirmation';
+import {
+  confirmResumeWarnings,
+  resumeReviewWarnings,
+  type ResumeQualification,
+} from './resume-review-warnings';
 import { buildLaserResumeProgram } from './laser-resume-program';
 import { markOwnedResumeCheckpoint, sameCheckpoint } from './start-job-checkpoint-policy';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
@@ -27,7 +32,9 @@ import {
 
 // Shared resume back half: build the re-entry program, confirm, suspend
 // checkpoint tracking (the resume run has its own numbering — ADR-118), and
-// stream it.
+// stream it. `qualification` is the prepared source's: its warnings and
+// trusted bed offset, so the confirmation lists what the saved recovery's does
+// (ADR-232 Amendment 1).
 export async function streamResumeFromRawLine(
   project: Project,
   gcode: string,
@@ -36,8 +43,13 @@ export async function streamResumeFromRawLine(
   laserModeStartSnapshot: LaserModeStartSnapshot,
   preparedController = useLaserStore.getState(),
   placementNote?: string,
+  qualification: ResumeQualification = { warnings: [] },
 ): Promise<boolean> {
-  const reviewed = reviewResume(project, gcode, fromLine, laserModeStartSnapshot, placementNote);
+  const reviewed = reviewResume(project, gcode, fromLine, laserModeStartSnapshot, placementNote, {
+    ...qualification,
+    project,
+    controllerSnapshot: preparedController,
+  });
   if (reviewed === null) return false;
   const { resumeGcode, laserModeStartEvidence } = reviewed;
   const checkpointBeforeStart = readJobCheckpoint();
@@ -143,6 +155,7 @@ function reviewResume(
   fromLine: number,
   laserModeStartSnapshot: LaserModeStartSnapshot,
   placementNote: string | undefined,
+  source: Parameters<typeof resumeReviewWarnings>[0],
 ): {
   readonly resumeGcode: string;
   readonly laserModeStartEvidence: Exclude<ReturnType<typeof confirmLaserModeStartEvidence>, null>;
@@ -155,6 +168,7 @@ function reviewResume(
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
     return null;
   }
+  if (!confirmResumeWarnings(resumeReviewWarnings(source, resume))) return null;
   const resumeGcode = resume.lines.join('\n');
   const laserModeStartEvidence = confirmLaserModeStartEvidence(
     project,

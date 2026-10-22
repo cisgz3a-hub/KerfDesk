@@ -35,8 +35,10 @@ import { StartFromLineControl } from './StartFromLineControl';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
-  // Declining stops each flow before anything streams.
-  jobAwareConfirm: vi.fn(() => false),
+  // Declining stops each flow before anything streams. The prepared source's
+  // warnings are accepted so the flow reaches the resume question
+  // (ADR-232 Amendment 1).
+  jobAwareConfirm: vi.fn((question: string) => question.startsWith('Controller warning:')),
 }));
 
 (

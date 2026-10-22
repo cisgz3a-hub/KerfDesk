@@ -7,7 +7,7 @@
 
 import { isAtOrAboveSafeZ } from './cnc-frame-lines';
 import { currentWorkZMm, inferCurrentMachinePosition } from './infer-machine-position';
-import { buildFrameDispatchPlan } from './laser-frame-motion-plan';
+import { buildFrameDispatchPlan, frameRouteNoGoWarnings } from './laser-frame-motion-plan';
 import { runHomeAction } from './laser-home-action';
 import {
   markMotionOperationDispatched,
@@ -22,7 +22,7 @@ import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './las
 import { useStore } from './store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
-import { warnJogMotionPolicy } from './laser-jog-warnings';
+import { publishMotionPolicyWarning, warnJogMotionPolicy } from './laser-jog-warnings';
 import {
   assertManualMotionNotCancelled,
   manualMotionCancelGeneration,
@@ -230,6 +230,7 @@ async function runFrame(
     set({ lastWriteError: plan.message, log: pushLog(get(), `[lf2] ${plan.message}`) });
     throw new Error(plan.message);
   }
+  warnFrameRouteNoGoZones(context, bounds, candidate, jobProject, externalFrame);
   // Every Frame ends with the active driver's planner-drain marker. Status
   // reports alone are not a causal completion proof: realtime replies can be
   // delayed, and Marlin M114 normally reports projected rather than physical
@@ -280,6 +281,20 @@ async function runFrame(
   } catch (error) {
     set((state) => failOwnedMotionOperation(state, operation.operationId));
     throw error;
+  }
+}
+
+// Like a jog, a Frame whose own route crosses a no-go zone is warned and still
+// sent (ADR-232 Amendment 1).
+function warnFrameRouteNoGoZones(
+  { set, get }: JogActionContext,
+  bounds: Parameters<typeof frameRouteNoGoWarnings>[1],
+  candidate: Parameters<typeof frameRouteNoGoWarnings>[2],
+  jobProject: Parameters<typeof frameRouteNoGoWarnings>[3],
+  external: Parameters<typeof frameRouteNoGoWarnings>[4],
+): void {
+  for (const warning of frameRouteNoGoWarnings(get(), bounds, candidate, jobProject, external)) {
+    publishMotionPolicyWarning(set, get, warning);
   }
 }
 

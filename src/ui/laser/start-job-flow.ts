@@ -321,6 +321,7 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
     prepared.laserModeStartSnapshot,
     prepared.controllerSnapshot,
     manualRestartNotes(restart),
+    prepared,
   );
   if (started) noteManualRestartStarted(restart);
 }
